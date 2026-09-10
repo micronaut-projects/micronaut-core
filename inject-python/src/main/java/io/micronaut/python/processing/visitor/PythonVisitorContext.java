@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.visitor;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -41,16 +42,32 @@ import io.micronaut.inject.writer.GeneratedFile;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
+import io.micronaut.python.processing.element.PythonAnnotationElement;
+import io.micronaut.python.processing.element.PythonClassElement;
+import io.micronaut.python.processing.element.PythonElementFactory;
+import io.micronaut.python.processing.model.ArgumentsDef;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.model.ReturnDef;
+import io.micronaut.python.processing.model.TypeRef;
+import io.micronaut.python.processing.util.PythonTypeResolver;
 
 /**
  * Visitor context implementation backed by the Python processing environment.
  */
 @Experimental
 public final class PythonVisitorContext implements VisitorContext {
+
+    private static final String INFO_PREFIX = "INFO: ";
     private final MutableConvertibleValues<Object> visitorAttributes = new MutableConvertibleValuesMap<>();
     private final Map<String, DecoratorDef> decorators;
     private final PythonProcessingEnvironment processingEnvironment;
     private final JavaVisitorContext javaVisitorContext;
+
+    private @Nullable PythonAnnotationMetadataBuilder annotationMetadataBuilder;
+    private @Nullable PythonElementAnnotationMetadataFactory elementAnnotationMetadataFactory;
+    private @Nullable PythonTypeResolver typeResolver;
 
     public PythonVisitorContext(Map<String, DecoratorDef> decorators, PythonProcessingEnvironment processingEnvironment) {
         this(decorators, processingEnvironment, null);
@@ -82,10 +99,12 @@ public final class PythonVisitorContext implements VisitorContext {
 
     @Override
     public PythonElementAnnotationMetadataFactory getElementAnnotationMetadataFactory() {
-        return new PythonElementAnnotationMetadataFactory(
-            false,
-            getAnnotationMetadataBuilder()
-        );
+        PythonElementAnnotationMetadataFactory factory = elementAnnotationMetadataFactory;
+        if (factory == null) {
+            factory = new PythonElementAnnotationMetadataFactory(false, getAnnotationMetadataBuilder());
+            elementAnnotationMetadataFactory = factory;
+        }
+        return factory;
     }
 
     @Override
@@ -96,23 +115,52 @@ public final class PythonVisitorContext implements VisitorContext {
         throw new UnsupportedOperationException("Expressions require a Java visitor context");
     }
 
-    @Override
-    public PythonAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
-        return new PythonAnnotationMetadataBuilder(decorators, this);
+    /**
+     * @return The resolver of Python types to Java class elements for this processing run
+     */
+    public PythonTypeResolver getTypeResolver() {
+        PythonTypeResolver resolver = typeResolver;
+        if (resolver == null) {
+            resolver = new PythonTypeResolver(this);
+            typeResolver = resolver;
+        }
+        return resolver;
     }
 
     @Override
+    public PythonAnnotationMetadataBuilder getAnnotationMetadataBuilder() {
+        // One builder per visitor context so the annotation mirror and member caches are shared by
+        // every element created during the same processing run.
+        PythonAnnotationMetadataBuilder builder = annotationMetadataBuilder;
+        if (builder == null) {
+            builder = new PythonAnnotationMetadataBuilder(decorators, this);
+            annotationMetadataBuilder = builder;
+        }
+        return builder;
+    }
+
+    // Diagnostics go to the compiler's messager when a Java visitor context is present, so they
+    // are attributed and surface with javac's own; the console is only for the bare parser.
+    @Override
     public void info(String message, Element element) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.info(message, element);
+            return;
+        }
         if (element != null) {
-            System.out.println("INFO: " + message + " @ " + element);
+            System.out.println(INFO_PREFIX + message + " @ " + element);
         } else {
-            System.out.println("INFO: " + message);
+            System.out.println(INFO_PREFIX + message);
         }
     }
 
     @Override
     public void info(String message) {
-        System.out.println("INFO: " + message);
+        if (javaVisitorContext != null) {
+            javaVisitorContext.info(message);
+            return;
+        }
+        System.out.println(INFO_PREFIX + message);
     }
 
     @Override
@@ -130,6 +178,10 @@ public final class PythonVisitorContext implements VisitorContext {
 
     @Override
     public void warn(String message, Element element) {
+        if (javaVisitorContext != null) {
+            javaVisitorContext.warn(message, element);
+            return;
+        }
         if (element != null) {
             System.out.println("WARN: " + message + " @ " + element);
         } else {
@@ -324,7 +376,7 @@ public final class PythonVisitorContext implements VisitorContext {
             List.of(),
             null
         );
-        return new PythonClassElement(annotationDef, processingEnvironment);
+        return new PythonAnnotationElement(annotationDef, processingEnvironment);
     }
 
     @Override

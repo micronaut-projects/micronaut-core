@@ -111,7 +111,10 @@ public interface BeanContextConfiguration {
     }
 
     /**
-     * @return Beans predicate.
+     * The predicate narrowing which compiled definitions the context considers.
+     *
+     * @return Beans predicate, or {@code null} if the context is not narrowed by one
+     * @see BeanContext#getBeansPredicate()
      * @since 5.0
      */
     @Nullable

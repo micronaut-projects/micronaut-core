@@ -59,6 +59,7 @@ public class MixinVisitorProcessor extends AbstractInjectAnnotationProcessor {
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         if (!(annotations.size() == 1 && Generated.class.getName().equals(annotations.iterator().next().getQualifiedName().toString()))) {
 
             for (Object nativeType : postponedTypes.values()) {

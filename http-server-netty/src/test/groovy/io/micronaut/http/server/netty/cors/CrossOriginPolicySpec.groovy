@@ -20,13 +20,21 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.http.HttpHeaders
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
+import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.annotation.ResponseFilter
+import io.micronaut.http.annotation.ServerFilter
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.annotation.Client
+import io.micronaut.http.server.HttpServerConfiguration
+import io.micronaut.http.server.cors.CrossOriginEmbedderPolicy
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
 import jakarta.inject.Inject
 import spock.lang.Specification
+
+import static io.micronaut.http.HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY
+import static io.micronaut.http.annotation.Filter.MATCH_ALL_PATTERN
 
 @Property(name = "spec.name", value = CrossOriginPolicySpec.SPEC_NAME)
 @Property(name = "micronaut.server.cors.enabled", value = "false")
@@ -39,6 +47,9 @@ class CrossOriginPolicySpec extends Specification {
     @Inject
     @Client("/")
     HttpClient httpClient
+
+    @Inject
+    HttpServerConfiguration.CorsConfiguration corsConfiguration
 
     void "configured cross-origin policies are included without an Origin header"() {
         given:
@@ -55,12 +66,64 @@ class CrossOriginPolicySpec extends Specification {
         response.headers.get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY) == "same-site"
     }
 
+    void "configured cross-origin policies do not overwrite existing response headers"() {
+        when:
+        HttpResponse<?> response = httpClient.toBlocking().exchange(HttpRequest.GET("/cross-origin-policy-with-headers"))
+
+        then:
+        response.headers.get(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY) == "unsafe-none"
+        response.headers.get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY) == "same-origin"
+    }
+
+    void "configured cross-origin policies do not overwrite headers set by a response filter"() {
+        when:
+        HttpResponse<?> response = httpClient.toBlocking().exchange(HttpRequest.GET("/cross-origin-policy-with-filter"))
+
+        then:
+        response.headers.getAll(CROSS_ORIGIN_EMBEDDER_POLICY) == ["unsafe-none"]
+    }
+
+    void "configured cross-origin policies reflect configuration changes"() {
+        given:
+        corsConfiguration.setCrossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.UNSAFE_NONE)
+
+        when:
+        HttpResponse<?> response = httpClient.toBlocking().exchange(HttpRequest.GET("/cross-origin-policy"))
+
+        then:
+        response.headers.get(CROSS_ORIGIN_EMBEDDER_POLICY) == "unsafe-none"
+
+        cleanup:
+        corsConfiguration.setCrossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.REQUIRE_CORP)
+    }
+
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    @ServerFilter(MATCH_ALL_PATTERN)
+    static class TestResponseFilter {
+        @ResponseFilter("/cross-origin-policy-with-filter")
+        void setCrossOriginEmbedderPolicy(MutableHttpResponse<?> response) {
+            response.header(CROSS_ORIGIN_EMBEDDER_POLICY, "unsafe-none")
+        }
+    }
+
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Controller
     static class TestController {
 
         @Get("/cross-origin-policy")
         String index() {
+            "ok"
+        }
+
+        @Get("/cross-origin-policy-with-headers")
+        HttpResponse<?> indexWithHeaders() {
+            HttpResponse.ok("ok")
+                .header(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY, "unsafe-none")
+                .header(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY, "same-origin")
+        }
+
+        @Get("/cross-origin-policy-with-filter")
+        String indexWithFilter() {
             "ok"
         }
     }

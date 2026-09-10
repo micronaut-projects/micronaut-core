@@ -25,7 +25,9 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Produces GraalPy-compatible, hash-based Python bytecode without requiring a Python launcher
@@ -169,5 +171,27 @@ public final class PythonBytecodeCompiler implements AutoCloseable {
      */
     @SuppressWarnings("ArrayRecordComponent")
     public record Result(String cachePath, byte[] bytes) {
+
+        // the generated members of a record compare an array by identity, which would make two results holding
+        // the same bytes unequal: the bytes are compared, hashed and printed by their content
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            return o instanceof Result other
+                && Objects.equals(cachePath, other.cachePath)
+                && Arrays.equals(bytes, other.bytes);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(cachePath, Arrays.hashCode(bytes));
+        }
+
+        @Override
+        public String toString() {
+            return "Result[cachePath=" + cachePath + ", bytes=" + (bytes == null ? "null" : bytes.length + " bytes") + ']';
+        }
     }
 }

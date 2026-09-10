@@ -24,10 +24,12 @@ import io.micronaut.core.reflect.ClassUtils
 import io.micronaut.core.type.Argument
 import io.micronaut.http.HttpRequest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.reactor.ReactorContext
 import reactor.util.context.ContextView
 import java.util.*
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutorService
 import java.util.function.Supplier
 import kotlin.coroutines.Continuation
 import kotlin.coroutines.CoroutineContext
@@ -51,14 +53,30 @@ class ContinuationArgumentBinder : TypedRequestArgumentBinder<Continuation<*>> {
 
         private val reactorContextPresent: Boolean = ClassUtils.isPresent("kotlinx.coroutines.reactor.ReactorContext", null);
 
+        /**
+         * Builds the dispatcher a route's coroutine should run and resume on.
+         *
+         * The returned dispatcher holds a reference to [executorService] and is meant to be resolved once per
+         * executor and reused; [kotlinx.coroutines.CoroutineDispatcher] equality is identity based, so a fresh
+         * instance per request would defeat `withContext` short circuiting and allocate on the request path.
+         *
+         * Note the returned dispatcher must never be closed: closing it shuts down the underlying executor.
+         *
+         * @param executorService The executor the route was assigned to
+         * @return The dispatcher for that executor
+         */
+        @JvmStatic
+        fun dispatcherFor(executorService: ExecutorService): CoroutineContext = executorService.asCoroutineDispatcher()
+
         @JvmStatic
         fun setupCoroutineContext(source: HttpRequest<*>,
                                   contextView: ContextView,
                                   propagatedContext: PropagatedContext,
-                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>) {
+                                  continuationArgumentBinderCoroutineContextFactories: Collection<HttpCoroutineContextFactory<*>>,
+                                  dispatcher: CoroutineContext?) {
             val customContinuation = source.getAttribute(CONTINUATION_ARGUMENT_ATTRIBUTE_KEY, CustomContinuation::class.java).orElse(null)
             if (customContinuation != null) {
-                var coroutineContext: CoroutineContext = Dispatchers.Default
+                var coroutineContext: CoroutineContext = dispatcher ?: Dispatchers.Default
                 if (reactorContextPresent) {
                     coroutineContext += propagateReactorContext(contextView)
                 }

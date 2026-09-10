@@ -1,5 +1,6 @@
 package io.micronaut.context.scope
 
+import io.micronaut.context.exceptions.BeanDestructionException
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.BeanIdentifier
 import jakarta.inject.Singleton
@@ -266,6 +267,96 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         latecomer.isEmpty()
     }
 
+    void "under a lock per bean a destruction that resolves another bean of the scope reaches the instance held"() {
+        given: "two beans, each of which resolves the other as it is destroyed"
+        def scope = new TestScope(true)
+        def firstContext = new TestCreationContext(BeanIdentifier.of("first"))
+        def secondContext = new TestCreationContext(BeanIdentifier.of("second"))
+        def first = scope.getOrCreate(firstContext)
+        def second = scope.getOrCreate(secondContext)
+        def resolvedByFirst = null
+        def resolvedBySecond = null
+        firstContext.created[0].onClose = { resolvedByFirst = scope.getOrCreate(secondContext) }
+        secondContext.created[0].onClose = { resolvedBySecond = scope.getOrCreate(firstContext) }
+
+        when:
+        scope.destroyScope(scope.scopeMap)
+
+        then: "whichever is destroyed first, the other reaches the instance the scope held, not a fresh one"
+        resolvedByFirst.is(second)
+        resolvedBySecond.is(first)
+        firstContext.created.size() == 1
+        secondContext.created.size() == 1
+        firstContext.created[0].closed
+        secondContext.created[0].closed
+        scope.scopeMap.isEmpty()
+    }
+
+    void "under a lock per bean two destructions of one map close each bean once"() {
+        given: "a bean whose destruction lets a second destruction of the map run to the end"
+        def scope = new TestScope(true)
+        def secondDestructionDone = new CountDownLatch(1)
+        def context = new TestCreationContext(BeanIdentifier.of("slow"))
+        scope.getOrCreate(context)
+        def closings = new java.util.concurrent.atomic.AtomicInteger()
+        context.created[0].onClose = {
+            closings.incrementAndGet()
+            Thread.start { scope.destroyScope(scope.scopeMap); secondDestructionDone.countDown() }
+            assert secondDestructionDone.await(5, TimeUnit.SECONDS): "the second destruction should not wait for the first"
+        }
+
+        when:
+        scope.destroyScope(scope.scopeMap)
+
+        then:
+        closings.get() == 1
+        scope.scopeMap.isEmpty()
+    }
+
+    void "under a lock per bean two maps destroyed at once each close their own bean"() {
+        given: "two maps of one scope, each holding a bean that equals the other, as two BeanRegistration of one identifier and definition do"
+        def scope = new TestScope(true)
+        def other = new ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>()
+        def id = BeanIdentifier.of("shared")
+        def first = new EqualByIdentifierCreatedBean(id: id, bean: new Object())
+        def second = new EqualByIdentifierCreatedBean(id: id, bean: new Object())
+        scope.scopeMap.put(id, first)
+        other.put(id, second)
+        def otherDestroyed = new CountDownLatch(1)
+        first.onClose = {
+            Thread.start { scope.destroyScope(other); otherDestroyed.countDown() }
+            assert otherDestroyed.await(5, TimeUnit.SECONDS): "the destruction of the other map should not wait for this one"
+        }
+
+        when: "the other map is destroyed while this one is closing its own bean"
+        scope.destroyScope(scope.scopeMap)
+
+        then: "the bean of the other map is closed and taken out, not taken for the one already being closed"
+        first.closed
+        second.closed
+        scope.scopeMap.isEmpty()
+        other.isEmpty()
+    }
+
+    void "under a lock per bean a bean held under a key of the scope's own is closed once and taken out"() {
+        given: "a map keying a bean by something other than the identifier the bean carries"
+        def scope = new TestScope(true)
+        def closings = new java.util.concurrent.atomic.AtomicInteger()
+        def held = new TestCreatedBean(id: BeanIdentifier.of("its own name"), bean: new Object(), onClose: { closings.incrementAndGet() })
+        scope.scopeMap.put(BeanIdentifier.of("the scope's key"), held)
+
+        when: "on a daemon thread, since a destruction that spins closing it again could not be interrupted"
+        def destruction = new Thread({ scope.destroyScope(scope.scopeMap) } as Runnable, "destruction")
+        destruction.daemon = true
+        destruction.start()
+        destruction.join(TimeUnit.SECONDS.toMillis(10))
+
+        then: "the destruction ends, having closed the bean once and taken it out"
+        !destruction.alive
+        closings.get() == 1
+        scope.scopeMap.isEmpty()
+    }
+
     void "under a lock per bean the scope map must be a concurrent map"() {
         given:
         def scope = new TestScope(true, new HashMap<BeanIdentifier, CreatedBean<?>>())
@@ -297,6 +388,175 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         lockPerBean << [false, true]
     }
 
+    void "under a lock per bean a creation in flight when the scope is destroyed is destroyed too"() {
+        given:
+        def scope = new TestScope(true)
+        def creating = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {
+            creating.countDown()
+            release.await(5, TimeUnit.SECONDS)
+        })
+
+        when: "the scope is stopped while a creation is inside its doCreate, holding nothing the destruction sees"
+        def creator = Thread.start { scope.getOrCreate(creationContext) }
+        creating.await(5, TimeUnit.SECONDS)
+        assert scope.scopeMap.isEmpty(): "the creation has not published its bean yet"
+        def stopper = Thread.start { scope.stop() }
+        stopper.join(300)
+
+        then: "the destruction waits for the creation rather than finishing on an empty map"
+        stopper.alive
+        !scope.closed
+
+        when:
+        release.countDown()
+        creator.join(5000)
+        stopper.join(5000)
+
+        then: "the bean the creation published is closed, not left behind in a scope that is already shut down"
+        !creator.alive
+        !stopper.alive
+        creationContext.created.size() == 1
+        creationContext.created[0].closed
+        scope.scopeMap.isEmpty()
+        scope.closed
+    }
+
+    void "under a lock per bean a creation in flight that fails does not hold the destruction up"() {
+        given:
+        def scope = new TestScope(true)
+        def creating = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {
+            creating.countDown()
+            release.await(5, TimeUnit.SECONDS)
+            throw new IllegalStateException("Bad things")
+        })
+
+        when:
+        def creator = Thread.start { try { scope.getOrCreate(creationContext) } catch (IllegalStateException ignored) { } }
+        creating.await(5, TimeUnit.SECONDS)
+        def stopper = Thread.start { scope.stop() }
+        stopper.join(300)
+
+        then:
+        stopper.alive
+
+        when:
+        release.countDown()
+        creator.join(5000)
+        stopper.join(5000)
+
+        then: "the failed creation leaves nothing behind and the destruction ends"
+        !stopper.alive
+        creationContext.created.isEmpty()
+        scope.scopeMap.isEmpty()
+        scope.closed
+    }
+
+    void "under a lock per bean a creation of another scope map does not hold a destruction up"() {
+        given: "two maps standing for two contexts of one scope, as a request scope holds one map per request"
+        def other = new ConcurrentHashMap<BeanIdentifier, CreatedBean<?>>()
+        def scope = new TestScope(true)
+        def creating = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {
+            creating.countDown()
+            release.await(5, TimeUnit.SECONDS)
+        })
+
+        when: "a creation into the other map is in flight"
+        def creator = Thread.start { scope.withScopeMap(other) { scope.getOrCreate(creationContext) } }
+        creating.await(5, TimeUnit.SECONDS)
+        def destroyer = Thread.start { scope.destroyScope(scope.scopeMap) }
+        destroyer.join(5000)
+
+        then: "the destruction of this map is not made to wait for it"
+        !destroyer.alive
+
+        cleanup:
+        release.countDown()
+        creator.join(5000)
+    }
+
+    void "under a lock per bean remove by definition waits for a creation of the definition in flight"() {
+        given:
+        def definition = Stub(BeanDefinition)
+        def scope = new TestScope(true)
+        def creating = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {
+            creating.countDown()
+            release.await(5, TimeUnit.SECONDS)
+        }, definition)
+        def removed = new AtomicReference<Optional<Object>>()
+
+        when:
+        def creator = Thread.start { scope.getOrCreate(creationContext) }
+        creating.await(5, TimeUnit.SECONDS)
+        def remover = Thread.start { removed.set(scope.remove(definition)) }
+        remover.join(300)
+
+        then: "the removal waits for the creation instead of missing the bean it is about to publish"
+        remover.alive
+        removed.get() == null
+
+        when:
+        release.countDown()
+        creator.join(5000)
+        remover.join(5000)
+
+        then:
+        !creator.alive
+        !remover.alive
+        removed.get().present
+        removed.get().get().is(creationContext.created[0].bean)
+        creationContext.created[0].closed
+        scope.scopeMap.isEmpty()
+    }
+
+    void "under a lock per bean remove by definition destroys the bean and an unknown definition is empty"() {
+        given:
+        def definition = Stub(BeanDefinition)
+        def scope = new TestScope(true)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {}, definition)
+        def bean = scope.getOrCreate(creationContext)
+
+        when:
+        def removed = scope.remove(definition)
+
+        then:
+        removed.present
+        removed.get().is(bean)
+        creationContext.created[0].closed
+        scope.scopeMap.isEmpty()
+
+        when:
+        def none = scope.remove(Stub(BeanDefinition))
+
+        then:
+        !none.present
+    }
+
+    void "under a lock per bean a destruction failure of remove by definition is propagated to the caller"() {
+        given: "the bean type is answered, the destruction exception names it"
+        def definition = Stub(BeanDefinition) {
+            getBeanType() >> Object
+        }
+        def scope = new TestScope(true)
+        def creationContext = new TestCreationContext(BeanIdentifier.of("myBean"), {}, definition)
+        creationContext.failToClose = true
+        scope.getOrCreate(creationContext)
+
+        when:
+        scope.remove(definition)
+
+        then: "unlike remove by identifier it is not routed through handleDestructionException"
+        thrown(BeanDestructionException)
+        scope.scopeMap.isEmpty()
+    }
+
     /**
      * A scope map that puts one more entry in the first time its keys are read, standing for a bean created by
      * another thread while the scope is being destroyed.
@@ -325,11 +585,22 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         @Override
         CreatedBean<?> remove(Object key) {
             def removed = delegate.remove(key)
+            arrive()
+            return removed
+        }
+
+        @Override
+        boolean remove(Object key, Object value) {
+            def removed = delegate.remove(key, value)
+            arrive()
+            return removed
+        }
+
+        private void arrive() {
             if (!arrived) {
                 arrived = true
                 delegate.put(late.id(), late)
             }
-            return removed
         }
     }
 
@@ -356,8 +627,27 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
             return true
         }
 
+        /**
+         * The map creations of the current thread go to, standing for a scope whose map belongs to a context
+         * rather than to the scope itself, as the request scope's does.
+         */
+        final ThreadLocal<Map<BeanIdentifier, CreatedBean<?>>> currentMap = new ThreadLocal<>()
+
+        def withScopeMap(Map<BeanIdentifier, CreatedBean<?>> map, Closure<?> work) {
+            currentMap.set(map)
+            try {
+                return work.call()
+            } finally {
+                currentMap.remove()
+            }
+        }
+
         @Override
         protected Map<BeanIdentifier, CreatedBean<?>> getScopeMap(boolean forCreation) {
+            def current = currentMap.get()
+            if (current != null) {
+                return current
+            }
             if (scopeMap == null) {
                 throw new IllegalStateException("No scope map")
             }
@@ -375,16 +665,19 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
 
         final BeanIdentifier id
         final List<TestCreatedBean> created = []
+        final BeanDefinition<Object> definition
         Runnable onCreate
+        boolean failToClose
 
-        TestCreationContext(BeanIdentifier id, Runnable onCreate = {}) {
+        TestCreationContext(BeanIdentifier id, Runnable onCreate = {}, BeanDefinition<Object> definition = null) {
             this.id = id
             this.onCreate = onCreate
+            this.definition = definition
         }
 
         @Override
         BeanDefinition<Object> definition() {
-            return null
+            return definition
         }
 
         @Override
@@ -395,9 +688,26 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         @Override
         CreatedBean<Object> create() {
             onCreate.run()
-            def createdBean = new TestCreatedBean(id: id, bean: new Object())
+            def createdBean = new TestCreatedBean(id: id, bean: new Object(), definition: definition, failToClose: failToClose)
             created << createdBean
             return createdBean
+        }
+    }
+
+    /**
+     * A created bean that equals another of the same identifier, as {@link io.micronaut.context.BeanRegistration}
+     * equals another of the same identifier and definition, however distinct the instances they hold are.
+     */
+    static class EqualByIdentifierCreatedBean extends TestCreatedBean {
+
+        @Override
+        boolean equals(Object o) {
+            return o instanceof EqualByIdentifierCreatedBean && ((EqualByIdentifierCreatedBean) o).id == id
+        }
+
+        @Override
+        int hashCode() {
+            return id.hashCode()
         }
     }
 
@@ -405,11 +715,14 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
 
         BeanIdentifier id
         Object bean
+        BeanDefinition<Object> definition
         boolean closed
+        boolean failToClose
+        Runnable onClose = {}
 
         @Override
         BeanDefinition<Object> definition() {
-            return null
+            return definition
         }
 
         @Override
@@ -425,6 +738,10 @@ class AbstractConcurrentCustomScopeSpec extends Specification {
         @Override
         void close() {
             closed = true
+            onClose.run()
+            if (failToClose) {
+                throw new BeanDestructionException(definition, new IllegalStateException("destroy failed on purpose"))
+            }
         }
     }
 }

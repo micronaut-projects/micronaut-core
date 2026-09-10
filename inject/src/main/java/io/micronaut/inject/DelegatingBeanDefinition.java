@@ -160,4 +160,9 @@ public interface DelegatingBeanDefinition<T> extends BeanDefinition<T> {
     default List<Argument<?>> getTypeArguments(String type) {
         return getTarget().getTypeArguments(type);
     }
+
+    @Override
+    default Collection<String> getTypeArgumentKeys() {
+        return getTarget().getTypeArgumentKeys();
+    }
 }

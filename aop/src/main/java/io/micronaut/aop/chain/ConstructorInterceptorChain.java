@@ -23,6 +23,7 @@ import io.micronaut.aop.InvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.exceptions.ConstructorAdviceException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -64,6 +65,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      */
     private final BeanConstructor<T> interceptedConstructor;
     private final @Nullable Object[] internalParameters;
+    /**
+     * The exception the intercepted constructor's own body threw, if it threw one. Kept so that
+     * {@link #instantiate} can tell it apart from an exception thrown by the advice around it: the two are
+     * propagated differently.
+     */
+    private @Nullable RuntimeException bodyFailure;
 
     /**
      * Default constructor.
@@ -107,7 +114,12 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
             } else {
                 finalParameters = getParameterValues();
             }
-            return beanConstructor.instantiate(finalParameters);
+            try {
+                return beanConstructor.instantiate(finalParameters);
+            } catch (RuntimeException e) {
+                bodyFailure = e;
+                throw e;
+            }
         } else {
             interceptor = this.interceptors[index++];
             if (LOG.isTraceEnabled()) {
@@ -197,13 +209,29 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor<T1, T1>[] resolvedInterceptors = interceptorRegistry
             .resolveConstructorInterceptors(constructor, interceptors);
-        return Objects.requireNonNull(new ConstructorInterceptorChain<>(
+        ConstructorInterceptorChain<T1> chain = new ConstructorInterceptorChain<>(
             definition,
             constructor,
             resolvedInterceptors,
             additionalProxyConstructorParametersCount,
             parameters
-        ).proceed(), "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
+        );
+        T1 bean;
+        try {
+            bean = chain.proceed();
+        } catch (ConstructorAdviceException e) {
+            // Already carried, by the advice around a bean this one's construction depends on
+            throw e;
+        } catch (RuntimeException e) {
+            if (e == chain.bodyFailure) {
+                // The constructor's own body threw. Keep the wrapping an unadvised constructor's throwable gets
+                throw e;
+            }
+            // The advice around the constructor threw. Advice around a method reaches its caller as it was
+            // thrown; carry this one so that construction advice does too
+            throw new ConstructorAdviceException(e);
+        }
+        return Objects.requireNonNull(bean, "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
     }
 
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,

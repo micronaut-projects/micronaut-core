@@ -48,6 +48,7 @@ import jakarta.inject.Singleton;
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
@@ -108,6 +109,18 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
     private final ClassLoader classLoader;
     @Nullable
     private Beans beans;
+
+    /**
+     * The producers of {@link #beans}, keyed by the definition name their reference reports. Built on the first
+     * lookup by definition class and dropped as soon as the producers are rebuilt, which the {@link Beans} the
+     * index was built from detects. Only a {@link io.micronaut.context.RuntimeBeanDefinition} is added to a live
+     * {@code Beans}, and the name it generates is never a compiled definition class name, so an index built
+     * before such an addition cannot answer a lookup wrongly.
+     */
+    @Nullable
+    @SuppressWarnings("java:S3077")
+    private volatile ProducersByDefinitionName producersByDefinitionName;
+
     private final BeanResolutionCustomizer beanResolutionCustomizer;
 
     private final List<BeanDefinitionProducer> additionalBeanDefinitions = new ArrayList<>();
@@ -178,7 +191,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Objects.requireNonNull(beans).all.add(producer);
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
-        for (Class<?> exposedType : reference.getExposedTypes()) {
+        Set<Class<?>> exposedTypes = reference.getExposedTypes();
+        for (Class<?> exposedType : exposedTypes) {
             resolveTypeIndex(exposedType).add(producer);
             if (beanType.equals(exposedType)) {
                 beanTypeIndexAdded = true;
@@ -186,6 +200,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
         if (!beanTypeIndexAdded) {
             resolveTypeIndex(beanType).add(producer);
+        }
+        for (Class<?> indexedType : reference.getIndexes()) {
+            if (indexedType != beanType && !exposedTypes.contains(indexedType)) {
+                resolveTypeIndex(indexedType).add(producer);
+            }
         }
     }
 
@@ -211,6 +230,50 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             }
         }
         return references;
+    }
+
+    @Override
+    @Nullable
+    public <T> BeanDefinition<T> findBeanDefinitionByDefinitionClass(BeanContext beanContext, Class<? extends BeanDefinition<T>> definitionClass) {
+        Beans current = beans;
+        if (current == null) {
+            return null;
+        }
+        List<BeanDefinitionProducer> candidates = producersByDefinitionName(current).get(definitionClass.getName());
+        if (candidates == null) {
+            return null;
+        }
+        for (BeanDefinitionProducer producer : candidates) {
+            // The name is only a cheap filter: two references can carry the same name across class loaders,
+            // so keep looking until one of them loads as the requested class
+            BeanDefinition<T> definition = producer.getDefinitionIfEnabled(beanContext, null, beanResolutionCustomizer, null, null, null);
+            if (definition != null && definition.getClass() == definitionClass) {
+                return definition;
+            }
+        }
+        return null;
+    }
+
+    private Map<String, List<BeanDefinitionProducer>> producersByDefinitionName(Beans current) {
+        ProducersByDefinitionName cached = producersByDefinitionName;
+        if (cached != null && cached.beans == current) {
+            return cached.index;
+        }
+        Map<String, List<BeanDefinitionProducer>> index = new HashMap<>();
+        indexByDefinitionName(index, current.all);
+        // A proxied bean is disabled in the main list and its target is kept apart, see createBeans
+        indexByDefinitionName(index, current.proxyTargetBeans);
+        producersByDefinitionName = new ProducersByDefinitionName(current, index);
+        return index;
+    }
+
+    private static void indexByDefinitionName(Map<String, List<BeanDefinitionProducer>> index, List<BeanDefinitionProducer> producers) {
+        for (BeanDefinitionProducer producer : producers) {
+            BeanDefinitionReference<?> reference = producer.reference;
+            if (reference != null) {
+                index.computeIfAbsent(reference.getBeanDefinitionName(), name -> new ArrayList<>(1)).add(producer);
+            }
+        }
     }
 
     @Override
@@ -560,11 +623,20 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         for (Class<?> indexedType : exposedTypes) {
             indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN).add(beanDefinitionProducer);
         }
+        // A bean can also be enumerated by the types it is @Indexed by, even ones it does not implement
+        for (Class<?> indexedType : reference.getIndexes()) {
+            if (!exposedTypes.contains(indexedType)) {
+                indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN).add(beanDefinitionProducer);
+            }
+        }
     }
 
     private static void indexDisabledBean(Map<Class<?>, List<BeanDefinitionProducer>> indexByType, BeanDefinitionReference<?> reference) {
         // For disabled beans we want to initialize the index collection, otherwise MISS will cause N search
         for (Class<?> indexedType : reference.getExposedTypes()) {
+            indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        }
+        for (Class<?> indexedType : reference.getIndexes()) {
             indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
         }
     }
@@ -581,6 +653,9 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
             refs = list;
         }
         return refs;
+    }
+
+    private record ProducersByDefinitionName(Beans beans, Map<String, List<BeanDefinitionProducer>> index) {
     }
 
     private record Beans(
@@ -690,7 +765,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     }
                 }
                 BeanDefinition<T> def = (BeanDefinition<T>) defObject;
-                if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, def))) {
+                if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, def) || isIndexedBy(beanType))) {
                     return null;
                 }
                 if (defPredicate != null && !defPredicate.test(def)) {
@@ -706,7 +781,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
                 return null;
             }
-            if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, ref))) {
+            if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, ref) || isIndexedBy(beanType))) {
                 return null;
             }
             if (refPredicate != null && !refPredicate.test(ref)) {
@@ -730,6 +805,27 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 this.definition = DEFINITION_DISABLED_SENTINEL;
                 return null;
             }
+        }
+
+        /**
+         * Whether the bean is explicitly indexed by the requested type. A bean annotated with
+         * {@code @Indexed(Marker.class)} is enumerable by {@code Marker} even when it does not implement it.
+         *
+         * @param beanType The requested bean type
+         * @return True if the bean declares an index for exactly the requested type
+         */
+        private boolean isIndexedBy(Argument<?> beanType) {
+            BeanDefinitionReference<?> ref = reference;
+            if (ref == null) {
+                return false;
+            }
+            Class<?> type = beanType.getType();
+            for (Class<?> indexedType : ref.getIndexes()) {
+                if (indexedType == type) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         void disableIfMatch(BeanDefinitionReference<?> toDisable) {

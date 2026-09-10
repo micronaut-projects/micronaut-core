@@ -22,6 +22,7 @@ import java.time.Duration
 @Issue('https://github.com/micronaut-projects/micronaut-core/issues/2971')
 @MicronautTest
 @Property(name = 'spec.name', value = 'ClientTimeoutSpec')
+@Property(name = 'micronaut.server.error-response-include-message', value = 'always')
 class ClientTimeoutSpec extends Specification {
 
     @Inject

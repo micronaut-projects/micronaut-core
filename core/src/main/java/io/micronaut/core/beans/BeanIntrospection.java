@@ -16,6 +16,7 @@
 package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.beans.exceptions.IntrospectionException;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
@@ -189,6 +190,48 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      */
     default Argument<?>[] getConstructorArguments() {
         return Argument.ZERO_ARGUMENTS;
+    }
+
+    /**
+     * If the bean itself declares any type arguments this method will return the arguments that represent those
+     * types.
+     *
+     * <p>Note this returns the type arguments the bean type <em>declares</em>, not the arguments it binds in a
+     * super type. Use {@link #getTypeArguments(Class)} for the latter.</p>
+     *
+     * @return The type arguments
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments() {
+        return getTypeArguments(getBeanType());
+    }
+
+    /**
+     * Return the type arguments this bean binds in the given interface or super type.
+     *
+     * <p>For example a type declared as {@code class Foo implements Function<String, Integer>} answers
+     * {@code [String T, Integer R]} for {@code Function.class}.</p>
+     *
+     * @param type The super class or interface type
+     * @return The type arguments, never {@code null}
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments(@Nullable Class<?> type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        return getTypeArguments(type.getName());
+    }
+
+    /**
+     * Return the type arguments this bean binds in the given interface or super type.
+     *
+     * @param type The super class or interface type name
+     * @return The type arguments, never {@code null}
+     * @since 5.2.0
+     */
+    default List<Argument<?>> getTypeArguments(@Nullable String type) {
+        return Collections.emptyList();
     }
 
     /**
@@ -409,6 +452,32 @@ public interface BeanIntrospection<T> extends AnnotationMetadataDelegate, BeanIn
      */
     default List<BeanConstructor<T>> getConstructors() {
         return List.of(getConstructor());
+    }
+
+    /**
+     * Whether this introspection tells the declarations of the bean type apart from the ones it inherits.
+     *
+     * <p>A property merges what its field, its accessors and every super type declaring one of them carry
+     * into one annotation metadata, and a method merges the annotations of the methods it overrides. A
+     * specification attributing an annotation to the element declaring it - Jakarta Validation puts a
+     * constraint an interface declares in the implicit group of that interface, validates a constraint of a
+     * field against the field rather than the getter, and reports the constraints of an element apart from the
+     * inherited ones - needs them apart. An introspection separating them lists in
+     * {@link BeanProperty#getMembers()} the field of a property and the accessor of every type of the
+     * hierarchy declaring one, each carrying the annotations of its own declaration only, and answers what a
+     * method declares itself through {@link BeanMethod#getDeclaredMethodAnnotationMetadata()}.</p>
+     *
+     * <p>A generated introspection separates the declarations when it is compiled with
+     * {@link io.micronaut.core.annotation.Introspected#members()}; by default it does not, and the members of
+     * its properties are empty.</p>
+     *
+     * @return True if the members of a property and the annotations of a method are reported by the type
+     * declaring them
+     * @since 5.2.0
+     */
+    @Experimental
+    default boolean separatesDeclarations() {
+        return false;
     }
 
     /**

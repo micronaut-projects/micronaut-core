@@ -296,6 +296,17 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     }
 
     /**
+     * Returns the resolver for language-specific injection point shapes.
+     *
+     * @return The injection point resolver
+     * @since 5.2.0
+     */
+    @Experimental
+    default BeanDefinitionInjectionPointResolver getBeanDefinitionInjectionPointResolver() {
+        return BeanDefinitionInjectionPointResolver.NONE;
+    }
+
+    /**
      * Find all the classes within the given package and having the given annotation.
      *
      * @param aPackage    The package
@@ -366,7 +377,8 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
         JAVA("Java"),
         GROOVY("Groovy"),
         KOTLIN("Kotlin"),
-        PYTHON("Python"),;
+        PYTHON("Python"),
+        SCALA("Scala");
 
         private final String displayName;
 

@@ -1,6 +1,8 @@
 package io.micronaut.docs.server.form;
 
 import io.micronaut.context.annotation.Requires;
+
+//tag::imports[]
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
@@ -22,6 +24,7 @@ import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.stream.Collectors;
+//end::imports[]
 
 @Requires(property = "spec.name", value = "FormControllerTest")
 //tag::class[]

@@ -123,6 +123,7 @@ public class BeanDefinitionInjectProcessor extends AbstractInjectAnnotationProce
 
     @Override
     public final boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         boolean processingOver = roundEnv.processingOver();
         if (!processingOver) {
             JavaAnnotationMetadataBuilder annotationMetadataBuilder = javaVisitorContext.getAnnotationMetadataBuilder();

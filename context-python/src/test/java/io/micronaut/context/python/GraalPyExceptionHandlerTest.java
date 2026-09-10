@@ -20,7 +20,7 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 

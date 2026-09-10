@@ -104,6 +104,46 @@ class PerBeanLockingScopeSpec extends Specification {
         !second.destroyed
     }
 
+    void "under a lock per bean remove by definition destroys the bean and the next resolution creates a new one"() {
+        given:
+        def scope = context.getBean(PerBeanScopeImpl)
+        def definition = context.getBeanDefinition(PerBeanRemoved)
+        def first = context.getBean(PerBeanRemoved)
+
+        expect:
+        scope.findBeanRegistration(definition).get().bean.is(first)
+
+        when:
+        def removed = scope.remove(definition)
+
+        then:
+        removed.present
+        removed.get().is(first)
+        first.destroyed
+        !scope.findBeanRegistration(definition).present
+
+        when:
+        def second = context.getBean(PerBeanRemoved)
+
+        then:
+        !second.is(first)
+        !second.destroyed
+    }
+
+    void "under a lock per bean remove by an unknown definition is empty and leaves the scope untouched"() {
+        given:
+        def scope = context.getBean(PerBeanScopeImpl)
+        def bean = context.getBean(PerBeanOther)
+
+        when:
+        def removed = scope.remove(context.getBeanDefinition(PerBeanFaulty))
+
+        then:
+        !removed.present
+        context.getBean(PerBeanOther).is(bean)
+        !bean.destroyed
+    }
+
     void "under a lock per bean the scope answers the registration of a bean it holds"() {
         given:
         def bean = context.getBean(PerBeanOther)
@@ -111,5 +151,21 @@ class PerBeanLockingScopeSpec extends Specification {
         expect:
         context.getBean(PerBeanScopeImpl).findBeanRegistration(bean).get().bean.is(bean)
         context.findBeanRegistration(bean).present
+    }
+
+    void "under a lock per bean a destruction that resolves another bean of the scope reaches the instance held"() {
+        given: "two beans of the scope, each resolving the other as it is destroyed"
+        def referrer = context.getBean(PerBeanReferrer)
+        def referent = context.getBean(PerBeanReferent)
+        def constructions = PerBeanReferent.CONSTRUCTIONS.get()
+
+        when: "the scope is destroyed"
+        context.getBean(PerBeanScopeImpl).close()
+
+        then: "whichever was destroyed first, the other reached the instance the scope held, not a fresh one"
+        referrer.resolvedOnDestroy.is(referent)
+        referent.resolvedOnDestroy.is(referrer)
+        PerBeanReferent.CONSTRUCTIONS.get() == constructions
+        context.getBean(PerBeanScopeImpl).beans.isEmpty()
     }
 }

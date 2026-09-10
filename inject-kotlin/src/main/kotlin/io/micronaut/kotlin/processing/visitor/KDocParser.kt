@@ -86,30 +86,14 @@ internal fun parseKDoc(docString: String): ParsedKDoc {
             // A new block tag begins: close the previous one, then split off its name if named.
             match != null -> {
                 commitOpenTag()
-                openTag = match.groupValues[1]
-                openName = null
-                var rest = match.groupValues[2].trim()
-                if (openTag in NAMED_TAGS && rest.isNotEmpty()) {
-                    val separator = rest.indexOfFirst { it.isWhitespace() }
-                    if (separator >= 0) {
-                        openName = rest.substring(0, separator)
-                        rest = rest.substring(separator + 1).trim()
-                    } else {
-                        openName = rest
-                        rest = ""
-                    }
-                }
+                val tag = match.groupValues[1]
+                val (name, rest) = splitTagName(tag, match.groupValues[2].trim())
+                openTag = tag
+                openName = name
                 openContent.append(rest)
             }
             // A continuation line for the open tag: join to its content with a single space.
-            openTag != null -> {
-                if (line.isNotBlank()) {
-                    if (openContent.isNotEmpty()) {
-                        openContent.append(" ")
-                    }
-                    openContent.append(line.trim())
-                }
-            }
+            openTag != null -> openContent.appendContinuationLine(line)
             // Still before the first tag: this line is part of the prose description.
             // Trim per line to drop the leading space KSP leaves after stripping ` * `,
             // while keeping blank lines so paragraph breaks survive.
@@ -119,4 +103,34 @@ internal fun parseKDoc(docString: String): ParsedKDoc {
     commitOpenTag()
 
     return ParsedKDoc(descriptionLines.joinToString("\n").trim(), blockTags)
+}
+
+/**
+ * Splits the text following a tag keyword into the name of the documented element and the
+ * remaining content. Only tags in [NAMED_TAGS] document a named element; for every other tag,
+ * and for a named tag with no text at all, the whole [rest] is content and the name is `null`.
+ */
+private fun splitTagName(tag: String, rest: String): Pair<String?, String> {
+    if (tag !in NAMED_TAGS || rest.isEmpty()) {
+        return null to rest
+    }
+    val separator = rest.indexOfFirst { it.isWhitespace() }
+    if (separator < 0) {
+        return rest to ""
+    }
+    return rest.substring(0, separator) to rest.substring(separator + 1).trim()
+}
+
+/**
+ * Appends a continuation line of the open tag, separated from what is already there by a single
+ * space. Blank lines are dropped.
+ */
+private fun StringBuilder.appendContinuationLine(line: String) {
+    if (line.isBlank()) {
+        return
+    }
+    if (isNotEmpty()) {
+        append(" ")
+    }
+    append(line.trim())
 }

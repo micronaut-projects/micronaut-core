@@ -153,17 +153,31 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     }
 
     @Override
+    public AnnotationMetadata getDeclaredMetadata() {
+        // a clone is used to retain the build time only state, such as the repeatable containers
+        // of the annotations that are not on the classpath of the compiled sources,
+        // and to detach the returned view from the subsequent mutations of this metadata
+        MutableAnnotationMetadata declared = clone();
+        declared.allAnnotations = declared.declaredAnnotations == null ? null : cloneMapOfMapValue(declared.declaredAnnotations);
+        declared.allStereotypes = declared.declaredStereotypes == null ? null : cloneMapOfMapValue(declared.declaredStereotypes);
+        declared.annotationsByStereotype = declared.declaredAnnotationsByStereotype();
+        return declared;
+    }
+
+    @Override
     public Map<CharSequence, Object> getDefaultValues(String annotation) {
-        Map<CharSequence, Object> values = super.getDefaultValues(annotation);
-        if (!values.isEmpty() || annotationDefaultValues == null) {
-            return values;
+        // the defaults recorded on this metadata are preferred over the ones the shared registry holds under
+        // the same name. The registry is keyed by annotation name and filled in as classes load, so the same
+        // annotation name defined by two deployments resolves there to whichever registered last; what was
+        // recorded when this metadata was built belongs to the annotation this metadata was built from
+        if (annotationDefaultValues != null) {
+            final Map<CharSequence, Object> recorded = annotationDefaultValues.get(annotation);
+            if (recorded != null && !recorded.isEmpty()) {
+                return recorded.entrySet().stream()
+                        .collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue));
+            }
         }
-        final Map<CharSequence, Object> compileTimeDefaults = annotationDefaultValues.get(annotation);
-        if (compileTimeDefaults != null && !compileTimeDefaults.isEmpty()) {
-            return compileTimeDefaults.entrySet().stream()
-                    .collect(Collectors.toMap(e -> e.getKey().toString(), Map.Entry::getValue));
-        }
-        return values;
+        return super.getDefaultValues(annotation);
     }
 
     private boolean computeHasPropertyExpressions(Map<CharSequence, Object> values, RetentionPolicy retentionPolicy) {

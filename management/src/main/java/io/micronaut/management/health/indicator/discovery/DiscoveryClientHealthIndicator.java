@@ -16,7 +16,10 @@
 package io.micronaut.management.health.indicator.discovery;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.discovery.CompositeDiscoveryClient;
+import io.micronaut.discovery.DefaultCompositeDiscoveryClient;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.health.HealthStatus;
@@ -47,16 +50,50 @@ import java.util.stream.Stream;
 public class DiscoveryClientHealthIndicator implements HealthIndicator {
 
     private final DiscoveryClient discoveryClient;
+    private final DiscoveryClient uncachedDiscoveryClient;
+    private final String description;
+    private final boolean hasNoChildClients;
 
     /**
      * @param discoveryClient The Discovery client
      */
     public DiscoveryClientHealthIndicator(DiscoveryClient discoveryClient) {
         this.discoveryClient = discoveryClient;
+        this.description = discoveryClient.getDescription();
+        if (discoveryClient instanceof CompositeDiscoveryClient compositeDiscoveryClient) {
+            DiscoveryClient[] childClients = compositeDiscoveryClient.getDiscoveryClients();
+            this.hasNoChildClients = childClients.length == 0;
+            this.uncachedDiscoveryClient = hasNoChildClients
+                ? discoveryClient
+                : new DefaultCompositeDiscoveryClient(childClients);
+        } else {
+            this.uncachedDiscoveryClient = discoveryClient;
+            this.hasNoChildClients = false;
+        }
     }
 
     @Override
     public Publisher<HealthResult> getResult() {
+        if (hasNoChildClients) {
+            return Flux.just(HealthResult.builder(description, HealthStatus.UP)
+                .details(Collections.singletonMap("services", Collections.emptyMap()))
+                .build());
+        }
+        return Flux.defer(() -> getResult(discoveryClient))
+            .onErrorResume(ConfigurationException.class, throwable -> {
+                if (uncachedDiscoveryClient == discoveryClient) {
+                    return Flux.error(throwable);
+                }
+                return Flux.defer(() -> getResult(uncachedDiscoveryClient));
+            })
+            .onErrorResume(throwable -> {
+                HealthResult.Builder builder = HealthResult.builder(description, HealthStatus.DOWN);
+                builder.exception(throwable);
+                return Flux.just(builder.build());
+            });
+    }
+
+    private Publisher<HealthResult> getResult(DiscoveryClient discoveryClient) {
         return Flux.from(discoveryClient.getServiceIds())
             .flatMap((Function<List<String>, Publisher<HealthResult>>) ids -> {
                 List<Flux<Map<String, List<ServiceInstance>>>> serviceMap = ids.stream()
@@ -89,10 +126,6 @@ public class DiscoveryClientHealthIndicator implements HealthIndicator {
                     ));
                     return builder.build();
                 }).flux();
-            }).onErrorResume(throwable -> {
-                HealthResult.Builder builder = HealthResult.builder(discoveryClient.getDescription(), HealthStatus.DOWN);
-                builder.exception(throwable);
-                return Flux.just(builder.build());
             });
     }
 }

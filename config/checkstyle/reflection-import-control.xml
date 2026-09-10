@@ -1,0 +1,172 @@
+<?xml version="1.0"?>
+
+<!DOCTYPE import-control PUBLIC
+  "-//Checkstyle//DTD ImportControl Configuration 1.4//EN"
+  "https://checkstyle.org/dtds/import_control_1_4.dtd">
+
+<!--
+  Where reflection may be read from.
+
+  The framework describes a type through the metadata the annotation processors generate, and reading a class
+  back at runtime is what that is built to avoid. This says where java.lang.reflect may be imported: the
+  packages listed below are the ones that already read a class, and nothing else may start to. A package that
+  has to be added here is a decision to make deliberately, not one to make by writing an import.
+
+  This file is listed in .rsync-filter, so a template update does not remove it.
+-->
+<import-control pkg="io.micronaut" strategyOnMismatch="allowed">
+
+    <!-- denied everywhere, and allowed back below for the packages that already read a class -->
+    <disallow pkg="java.lang.reflect"/>
+
+    <subpackage name="annotation">
+        <subpackage name="processing">
+            <allow pkg="java.lang.reflect"/>
+            <subpackage name="test">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+            <subpackage name="visitor">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+    </subpackage>
+    <subpackage name="aop">
+        <subpackage name="beandefinition">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="chain">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="writer">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+    </subpackage>
+    <subpackage name="ast">
+        <subpackage name="groovy">
+            <subpackage name="annotation">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+            <subpackage name="visitor">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+    </subpackage>
+    <subpackage name="context">
+        <allow pkg="java.lang.reflect"/>
+        <subpackage name="conditions">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="python">
+            <allow pkg="java.lang.reflect"/>
+            <subpackage name="aop">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+    </subpackage>
+    <subpackage name="core">
+        <subpackage name="annotation">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="beans">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="convert">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="graal">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="io">
+            <subpackage name="service">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+        <subpackage name="reflect">
+            <allow pkg="java.lang.reflect"/>
+            <subpackage name="exception">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+        <subpackage name="type">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="util">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+    </subpackage>
+    <subpackage name="expressions">
+        <allow pkg="java.lang.reflect"/>
+        <subpackage name="parser">
+            <subpackage name="ast">
+                <subpackage name="access">
+                    <allow pkg="java.lang.reflect"/>
+                </subpackage>
+                <subpackage name="conditional">
+                    <allow pkg="java.lang.reflect"/>
+                </subpackage>
+                <subpackage name="operator">
+                    <subpackage name="binary">
+                        <allow pkg="java.lang.reflect"/>
+                    </subpackage>
+                </subpackage>
+            </subpackage>
+        </subpackage>
+    </subpackage>
+    <subpackage name="http">
+        <subpackage name="netty">
+            <subpackage name="channel">
+                <subpackage name="converters">
+                    <allow pkg="java.lang.reflect"/>
+                </subpackage>
+                <subpackage name="loom">
+                    <allow pkg="java.lang.reflect"/>
+                </subpackage>
+            </subpackage>
+        </subpackage>
+        <subpackage name="server">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+    </subpackage>
+    <subpackage name="inject">
+        <allow pkg="java.lang.reflect"/>
+        <subpackage name="annotation">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="ast">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="beans">
+            <allow pkg="java.lang.reflect"/>
+            <subpackage name="visitor">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+        <subpackage name="qualifiers">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+        <subpackage name="writer">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+    </subpackage>
+    <subpackage name="jackson">
+        <allow pkg="java.lang.reflect"/>
+    </subpackage>
+    <subpackage name="python">
+        <subpackage name="processing">
+            <subpackage name="annotation">
+                <allow pkg="java.lang.reflect"/>
+            </subpackage>
+        </subpackage>
+    </subpackage>
+    <subpackage name="reflection">
+        <allow pkg="java.lang.reflect"/>
+    </subpackage>
+    <subpackage name="retry">
+        <allow pkg="java.lang.reflect"/>
+    </subpackage>
+    <subpackage name="web">
+        <subpackage name="router">
+            <allow pkg="java.lang.reflect"/>
+        </subpackage>
+    </subpackage>
+</import-control>

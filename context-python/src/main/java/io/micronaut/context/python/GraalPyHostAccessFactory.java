@@ -50,6 +50,9 @@ final class GraalPyHostAccessFactory {
 
     public static final String CLASS_META = "__class__";
 
+    /** The name of the Python datetime module, which its own datetime type shares. */
+    private static final String DATETIME = "datetime";
+
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
      *
@@ -57,7 +60,7 @@ final class GraalPyHostAccessFactory {
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
-    @Named(GraalPyRuntimeUtil.PYTHON)
+    @Named(PythonContextRuntime.PYTHON)
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
         PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings);
@@ -88,23 +91,23 @@ final class GraalPyHostAccessFactory {
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
         builder.targetTypeMapping(Value.class, LocalDate.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "date"),
-            GraalPyRuntimeUtil::convertLocalDate);
+            value -> PythonCoercion.isPythonType(value, DATETIME, "date"),
+            PythonConversion::convertLocalDate);
         builder.targetTypeMapping(Value.class, LocalTime.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "time"),
-            GraalPyRuntimeUtil::convertLocalTime);
+            value -> PythonCoercion.isPythonType(value, DATETIME, "time"),
+            PythonConversion::convertLocalTime);
         builder.targetTypeMapping(Value.class, LocalDateTime.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "datetime"),
-            GraalPyRuntimeUtil::convertLocalDateTime);
+            value -> PythonCoercion.isPythonType(value, DATETIME, DATETIME),
+            PythonConversion::convertLocalDateTime);
         builder.targetTypeMapping(Value.class, Duration.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timedelta"),
-            GraalPyRuntimeUtil::convertDuration);
+            value -> PythonCoercion.isPythonType(value, DATETIME, "timedelta"),
+            PythonConversion::convertDuration);
         builder.targetTypeMapping(Value.class, ZoneOffset.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "datetime", "timezone"),
-            GraalPyRuntimeUtil::convertZoneOffset);
+            value -> PythonCoercion.isPythonType(value, DATETIME, "timezone"),
+            PythonConversion::convertZoneOffset);
         builder.targetTypeMapping(Value.class, UUID.class,
-            value -> GraalPyRuntimeUtil.isPythonType(value, "uuid", "UUID"),
-            GraalPyRuntimeUtil::convertUuid);
+            value -> PythonCoercion.isPythonType(value, "uuid", "UUID"),
+            PythonConversion::convertUuid);
     }
 
     /**
@@ -123,7 +126,7 @@ final class GraalPyHostAccessFactory {
             Value.class,
             target,
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return true;
                 }
@@ -140,7 +143,7 @@ final class GraalPyHostAccessFactory {
                 return target.equals(pythonClassResolver.findPythonClass(cls));
             },
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return target.cast(host);
                 }
@@ -158,14 +161,14 @@ final class GraalPyHostAccessFactory {
             Value.class,
             (Class) target,
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return true;
                 }
                 return findAssignableMapping(v, targetMappings, pythonClassResolver) != null;
             },
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null && target.isInstance(host)) {
                     return target.cast(host);
                 }
@@ -184,9 +187,9 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             Value.class,
             Object.class,
-            v -> ValueCoercible.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
+            v -> ValueCoercibles.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null) {
                     return host;
                 }
@@ -201,10 +204,10 @@ final class GraalPyHostAccessFactory {
             Value.class,
             target,
             v -> {
-                ValueCoercible host = ValueCoercible.hostObject(v);
+                ValueCoercible host = ValueCoercibles.hostObject(v);
                 return host != null && target.isInstance(host);
             },
-            v -> target.cast(ValueCoercible.hostObject(v))
+            v -> target.cast(ValueCoercibles.hostObject(v))
         );
     }
 
@@ -223,8 +226,8 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             ProxyObject.class,
             (Class) target,
-            value -> ValueCoercible.hostObject(value, target) != null,
-            value -> target.cast(ValueCoercible.hostObject(value, target))
+            value -> ValueCoercibles.hostObject(value, target) != null,
+            value -> target.cast(ValueCoercibles.hostObject(value, target))
         );
     }
 
@@ -232,15 +235,40 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             Value.class,
             Class.class,
-            v -> pythonClassResolver.findPythonClass(v) != null,
+            v -> resolvePythonClass(v, pythonClassResolver) != null,
             v -> {
-                Class<?> target = pythonClassResolver.findPythonClass(v);
+                Class<?> target = resolvePythonClass(v, pythonClassResolver);
                 if (target == null) {
                     throw new IllegalArgumentException("Cannot resolve Python class to a generated Java stub");
                 }
                 return target;
             }
         );
+    }
+
+    private static @Nullable Class<?> resolvePythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
+        try {
+            if (value != null && !value.isNull() && value.hasMembers()
+                && value.hasMember("_target") && value.hasMember("_resolved")) {
+                Value target = value.getMember("_target");
+                if (target != null && target.isString()) {
+                    target = value.invokeMember("_resolved");
+                }
+                if (target != null && !target.isNull()) {
+                    Class<?> facadeTarget = target.as(Class.class);
+                    if (facadeTarget != null) {
+                        return facadeTarget;
+                    }
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // Fall through to regular generated Python class resolution.
+        }
+        try {
+            return pythonClassResolver.findPythonClass(value);
+        } catch (RuntimeException ignored) {
+            return null;
+        }
     }
 
     private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, PythonClassResolver pythonClassResolver) {

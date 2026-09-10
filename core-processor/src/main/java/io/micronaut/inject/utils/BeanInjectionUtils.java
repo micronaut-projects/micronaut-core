@@ -277,7 +277,9 @@ public class BeanInjectionUtils {
                 ClassElement injectBeanType = genericType.getFirstTypeArgument().orElse(objectType);
                 return new BeanRegistrationInjectionPoint<>(genericType, annotationMetadata, injectBeanType);
             }
-            return new BeanInjectionPoint<>(genericType, annotationMetadata);
+            return visitorContext.getBeanDefinitionInjectionPointResolver()
+                .resolve(beanType, genericType, annotationMetadata, parameterName, visitorContext)
+                .orElseGet(() -> new BeanInjectionPoint<>(genericType, annotationMetadata));
         } catch (IllegalArgumentException e) {
             throw toProcessingException(annotationMetadata, e);
         }

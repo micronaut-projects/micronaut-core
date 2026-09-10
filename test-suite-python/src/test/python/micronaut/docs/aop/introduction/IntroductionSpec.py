@@ -18,5 +18,4 @@ class IntroductionSpec:
         assert self.example.get_number() == 10, "Should be 10"
         assert self.example.get_date() is None, "Should be none"
     # end::test[]
-
-
+# end::class[]

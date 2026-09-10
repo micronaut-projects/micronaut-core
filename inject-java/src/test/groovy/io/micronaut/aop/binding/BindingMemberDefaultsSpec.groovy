@@ -18,6 +18,7 @@ package io.micronaut.aop.binding
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier
 
 /**
  * An interceptor binding whose members take part in the binding is compared by the members the annotation has,
@@ -34,8 +35,8 @@ import java.lang.annotation.*;
 import java.util.ArrayList;
 import java.util.List;
 
-// no @Around: an annotation carrying both @Around and @InterceptorBinding(bindMembers = true) records two
-// interceptor bindings, and the one @Around produces carries no members and so matches anything
+// no @Around here: an annotation carrying both records a second binding which binds no members, which
+// AroundBindingMembersSpec covers
 @Retention(RetentionPolicy.RUNTIME)
 @Target({ElementType.TYPE, ElementType.METHOD})
 @InterceptorBinding(kind = InterceptorKind.AROUND, bindMembers = true)
@@ -102,11 +103,12 @@ class OtherTarget {
         context.close()
     }
 
-    void 'the values recorded for an element are the ones it declared'() {
+    void 'the occurrences compared for an element are the ones it declared'() {
         given:
         def context = buildContext(SOURCE)
 
-        expect: 'nothing about what is generated changed, so metadata of an earlier version compares alike'
+        expect: 'the binding carries no copy of the occurrence; the occurrence itself is compared'
+        bindings(context, 'bindingdefaults.DefaultedTarget').every { !it.isPresent('$bindingValues') }
         bindingValues(context, 'bindingdefaults.DefaultedTarget').first().getValues().isEmpty()
         bindingValues(context, 'bindingdefaults.DeclaredTarget').first().stringValue().get() == 'north'
 
@@ -114,12 +116,18 @@ class OtherTarget {
         context.close()
     }
 
-    private static List<AnnotationValue<?>> bindingValues(context, String type) {
+    private static List<AnnotationValue<?>> bindings(context, String type) {
         def definition = context.getBeanDefinition(context.classLoader.loadClass(type))
         definition.getAnnotationMetadata()
                 .getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
                 .findAll { it.stringValue().isPresent() }
-                .collect { it.getAnnotation('$bindingValues').orElse(null) }
+    }
+
+    private static List<AnnotationValue<?>> bindingValues(context, String type) {
+        def metadata = context.getBeanDefinition(context.classLoader.loadClass(type)).getAnnotationMetadata()
+        bindings(context, type)
+                .collect { InterceptorBindingQualifier.resolveBoundOccurrences(it, metadata) }
                 .findAll { it != null }
+                .flatten()
     }
 }

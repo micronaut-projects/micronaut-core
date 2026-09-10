@@ -21,4 +21,4 @@ public interface ProductMappers2 {
         return "Great Product Company";
     }
 }
-// tag::end[]
+// end::class[]

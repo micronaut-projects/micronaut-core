@@ -13,6 +13,166 @@ class AnnotationValueSpec extends Specification {
         av.toString() == "@test.Foo(value=10)"
     }
 
+    void "toString() renders the members in name order, whichever order they are held in"() {
+        given: "the same annotation with its members held in either order"
+        def declared = new AnnotationValue("test.Sized", [min: 2, max: 4] as Map<CharSequence, Object>)
+        def reversed = new AnnotationValue("test.Sized", [max: 4, min: 2] as Map<CharSequence, Object>)
+
+        expect: "a builder fills the map in whichever order it reads the members, which the rendering does not follow"
+        declared.toString() == "@test.Sized(max=4, min=2)"
+        reversed.toString() == declared.toString()
+    }
+
+    /**
+     * A metadata built at runtime accumulates the occurrences of a repeatable annotation in a collection, where a
+     * generated one holds them in an array. The accessors that map over a member value by value are to answer the
+     * same over either shape, rather than stringifying the whole collection as one value.
+     */
+    void "the accessors read a member held in a collection value by value, as they read an array"() {
+        given:
+        def one = AnnotationValue.builder("test.Tag").value("one").build()
+        def two = AnnotationValue.builder("test.Tag").value("two").build()
+        def collected = new AnnotationValue("test.Tags", [value: [one, two] as LinkedHashSet] as Map<CharSequence, Object>)
+        def arrayed = new AnnotationValue("test.Tags", [value: [one, two] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect: "one string per occurrence, rather than one string holding the whole collection"
+        collected.stringValues("value") == arrayed.stringValues("value")
+        collected.stringValues("value").length == 2
+
+        and: "the same for the accessors that parse each string"
+        def numbers = new AnnotationValue("test.Nums", [value: ["1", "2"] as LinkedHashSet] as Map<CharSequence, Object>)
+        numbers.intValues("value") == [1, 2] as int[]
+        numbers.longValues("value") == [1L, 2L] as long[]
+        numbers.doubleValues("value") == [1d, 2d] as double[]
+
+        and: "and for the ones that read a member holding classes"
+        def classes = new AnnotationValue("test.Types", [value: [new AnnotationClassValue<Object>(AnnotationValueSpec),
+                                                                new AnnotationClassValue<Object>(Specification)] as LinkedHashSet] as Map<CharSequence, Object>)
+        classes.classValues("value") == [AnnotationValueSpec, Specification] as Class[]
+        classes.annotationClassValues("value").length == 2
+
+        and: "the singular accessors answer from the first occurrence, as they do over an array"
+        collected.stringValue("value") == arrayed.stringValue("value")
+        collected.getAnnotation("value") == arrayed.getAnnotation("value")
+        collected.getAnnotations("value") == arrayed.getAnnotations("value")
+    }
+
+    void "the reserved stereotypes member is read through getStereotypes() and hidden from the attributes"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+        def plain = new AnnotationValue("test.Composed", [min: 3] as Map<CharSequence, Object>)
+
+        expect: "the member is the stereotypes"
+        retaining.getStereotypes() == [size]
+        plain.getStereotypes() == null
+
+        and: "it is not an attribute"
+        retaining.getValues() == [min: 3]
+        retaining.getMemberNames() == ["min"] as Set
+        retaining.toString() == "@test.Composed(min=3)"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "it takes no part in equality"
+        retaining == plain
+        retaining.hashCode() == plain.hashCode()
+
+        and: "it survives mutation"
+        retaining.mutate().member("min", 4).build().getStereotypes() == [size]
+    }
+
+    /**
+     * {@code AnnotationValueBuilder} copies the values it is seeded with from {@link AnnotationValue#getValues()},
+     * which hides the reserved member, and separately copies {@link AnnotationValue#getStereotypes()} into the
+     * transient {@code stereotypes} field. So {@code mutate()} and {@code AnnotationValue.builder(value)} move
+     * the tree out of the member and into the field.
+     *
+     * <p>The field is the representation the writer does not emit — moving the tree there is what this PR set
+     * out to avoid. Reads are unaffected, because {@code getStereotypes()} answers from the field, so a mutated
+     * value looks correct in memory and silently writes no tree. The assertion above covers exactly that reading
+     * path, which is what masks it.</p>
+     *
+     * <p>It also leaves the two accessors disagreeing: {@code getStereotypes()} answers while
+     * {@code contains($stereotypes)} does not.</p>
+     */
+    void "mutating an annotation keeps the stereotypes in the member the writer emits"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect: "the value it is seeded from carries the member"
+        retaining.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "and so does the mutated value, not only its transient field"
+        retaining.mutate().member("min", 4).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "the same for a builder seeded from it"
+        AnnotationValue.builder(retaining).build().contains(AnnotationUtil.STEREOTYPES_MEMBER)
+    }
+
+    /**
+     * Seeding a builder from a retaining value and adding a stereotype is the shape an integration takes to opt
+     * an annotation in: {@code micronaut-validation}'s remapper does exactly
+     * {@code annotation.mutate().stereotype(...).build()}. The added stereotype has to reach the member too,
+     * otherwise the rebuilt value writes the tree it was seeded with and silently drops the addition.
+     */
+    void "a stereotype added to a seeded builder reaches the member as well as the field"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def notNull = AnnotationValue.builder("jakarta.validation.constraints.NotNull").build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        when:
+        def rebuilt = retaining.mutate().stereotype(notNull).build()
+
+        then: "the addition is readable"
+        rebuilt.getStereotypes() == [size, notNull]
+
+        and: "and is in the member the writer emits, not only in the transient field"
+        rebuilt.getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER) == [size, notNull]
+    }
+
+    /**
+     * A builder that was never seeded from a retaining value must stay untouched, because the transient field
+     * carries the mapping protocol there: null means "fill the stereotypes from the annotation definition" and
+     * empty means "skip". Writing the member for those would turn a mapping instruction into retained state.
+     */
+    void "a builder not seeded from a retaining value gains no reserved member"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+
+        expect: "a stereotype on a fresh builder stays in the field only"
+        def built = AnnotationValue.builder("test.Composed").stereotype(size).build()
+        built.getStereotypes() == [size]
+        !built.contains(AnnotationUtil.STEREOTYPES_MEMBER)
+
+        and: "and a plain value seeded from a non-retaining one gains nothing"
+        !AnnotationValue.builder(new AnnotationValue("test.Plain", [min: 3] as Map<CharSequence, Object>))
+                .build()
+                .contains(AnnotationUtil.STEREOTYPES_MEMBER)
+    }
+
+    /**
+     * {@code convertibleValues} is built once in the constructor from the raw values map, before
+     * {@link AnnotationValue#getValues()} gets the chance to hide the reserved member, so every bulk view
+     * reached through {@link AnnotationValue#getConvertibleValues()} — {@code names()}, {@code values()},
+     * {@code asMap()}, iteration — reports {@code $stereotypes} as if it were an attribute of the annotation.
+     *
+     * <p>Anything walking the members of an annotation generically goes through that view: it is what
+     * {@code AnnotationValueResolver} is backed by. The member is hidden from {@code getValues()},
+     * {@code getMemberNames()} and {@code toString()}, so this is the one hole left in "it is not an
+     * attribute", and it widens the blast radius of the reserved member beyond the opted-in consumers.</p>
+     */
+    void "the reserved stereotypes member is hidden from the convertible values"() {
+        given:
+        def size = AnnotationValue.builder("jakarta.validation.constraints.Size").member("min", 3).build()
+        def retaining = new AnnotationValue("test.Composed", [min: 3, (AnnotationUtil.STEREOTYPES_MEMBER): [size] as AnnotationValue[]] as Map<CharSequence, Object>)
+
+        expect:
+        retaining.getConvertibleValues().names() == ["min"] as Set
+        retaining.getConvertibleValues().asMap().keySet() == ["min"] as Set
+    }
+
     void "test get properties"() {
         given:
         def av = AnnotationValue.builder("test.Foo")
@@ -204,6 +364,52 @@ class AnnotationValueSpec extends Specification {
         av.isFalse("six")
     }
 
+    void "a member held in a collection is read through every branch an array is read through"() {
+        given:
+        def bar = AnnotationValue.builder(Bar).build()
+
+        expect: "a collection of class names reads as class values, as an array of them does"
+        def names = new AnnotationValue("test.Types", [value: ["java.lang.String", "java.util.Random"] as LinkedHashSet] as Map<CharSequence, Object>)
+        names.annotationClassValues("value")*.name == ["java.lang.String", "java.util.Random"]
+        names.annotationClassValues("absent").length == 0
+
+        and: "a collection holding only annotations is read as the array of them a generated metadata would hold"
+        def annotations = new AnnotationValue("test.Types", [value: [bar] as LinkedHashSet] as Map<CharSequence, Object>)
+        annotations.classValues("value") == [] as Class[]
+        annotations.annotationClassValues("value").length == 0
+
+        and: "an empty collection holds nothing to read"
+        def empty = new AnnotationValue("test.Types", [value: [] as LinkedHashSet] as Map<CharSequence, Object>)
+        empty.classValues("value") == [] as Class[]
+        !empty.getAnnotation("value").isPresent()
+
+        and: "an entry bound to null is rendered as one, rather than failing"
+        def nulls = new AnnotationValue("test.Strings", [value: ["a", null]] as Map<CharSequence, Object>)
+        nulls.stringValues("value") == ["a", null] as String[]
+    }
+
+    void "getAnnotation() reads the first occurrence out of a collection, as it does out of an array"() {
+        given:
+        def bar = AnnotationValue.builder(Bar).build()
+        def held = new AnnotationValue("test.Foo",
+            [bars: [bar] as LinkedHashSet, plain: ["one"] as LinkedHashSet] as Map<CharSequence, Object>)
+
+        expect: "the occurrence is read when its type matches, and not when it does not"
+        held.getAnnotation("bars", Bar).get() == bar
+        !held.getAnnotation("bars", Baz).isPresent()
+        held.getAnnotation("bars").get() == bar
+
+        and: "a collection holding something other than an annotation holds no occurrence"
+        !held.getAnnotation("plain", Bar).isPresent()
+        !held.getAnnotation("plain").isPresent()
+
+        and: "nor does an empty collection, or a member the annotation does not bind"
+        def empty = new AnnotationValue("test.Foo", [bars: [] as LinkedHashSet] as Map<CharSequence, Object>)
+        !empty.getAnnotation("bars", Bar).isPresent()
+        !held.getAnnotation("missing", Bar).isPresent()
+        !held.getAnnotation("missing").isPresent()
+    }
+
     void "test getAnnotation()"() {
         given:
         def innerAv = AnnotationValue.builder(Bar.class).build()
@@ -289,3 +495,5 @@ class AnnotationValueSpec extends Specification {
 }
 
 @interface Bar {}
+
+@interface Baz {}

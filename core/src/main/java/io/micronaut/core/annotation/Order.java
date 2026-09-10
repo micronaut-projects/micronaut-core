@@ -36,6 +36,18 @@ import java.lang.annotation.Target;
  * <p>This annotation can be used to control the order by specifying a numerical value
  * that sorts components in the desired order</p>
  *
+ * <p>The lowest value takes precedence: a component annotated {@code @Order(1)} comes before one
+ * annotated {@code @Order(100)}, and {@link io.micronaut.core.order.Ordered#HIGHEST_PRECEDENCE} is
+ * the most negative value rather than the largest one.</p>
+ *
+ * <p>{@code jakarta.annotation.Priority} is mapped to this annotation at compile time with its
+ * value unchanged, so a bean annotated {@code @Priority(10)} orders as {@code @Order(10)} and the
+ * lowest priority value wins. That is the direction Jakarta Interceptors and Jakarta RESTful Web
+ * Services give the priorities they define; a specification that prefers the highest value instead,
+ * such as the selection of a CDI alternative, needs the value negated by whoever reads it. The
+ * mapping adds to the metadata rather than replacing it, so {@code jakarta.annotation.Priority} is
+ * still readable as written alongside the mapped order.</p>
+ *
  * @author Sean Carroll
  * @since 2.0
  * @see io.micronaut.core.order.Ordered

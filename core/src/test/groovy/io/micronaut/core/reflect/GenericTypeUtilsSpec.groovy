@@ -47,5 +47,48 @@ class GenericTypeUtilsSpec extends Specification {
     static abstract class A<T> implements Iface<T> {}
 
     static class B extends A<String> implements Iface<String> {}
+
+    // =======================
+
+    void "test resolveTypeArguments substitutes the bindings of every level"() {
+        expect: 'an argument bound at an intermediate generic type, which the deprecated methods lose'
+        GenericTypeUtils.resolveTypeArguments(Leaf, Iface) == [String] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Baz, Foo) == [String] as Class[]
+        and: 'the deprecated methods answering nothing is what this replaces'
+        GenericTypeUtils.resolveInterfaceTypeArguments(Leaf, Iface) == [] as Class[]
+        GenericTypeUtils.resolveSuperTypeGenericArguments(Baz, Foo) == [] as Class[]
+    }
+
+    void "test resolveTypeArguments reads a directly bound type as the deprecated methods do"() {
+        expect:
+        GenericTypeUtils.resolveTypeArguments(B, Iface) == [String] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Baz, Bar) == [String] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Both, First) == [String] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Both, Second) == [Integer] as Class[]
+    }
+
+    void "test resolveTypeArguments answers nothing when there is nothing to answer"() {
+        expect: 'not a super type, no type parameter, raw, and an argument left unresolved'
+        GenericTypeUtils.resolveTypeArguments(Baz, Iface) == [] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Leaf, Runnable) == [] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Raw, Iface) == [] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Mid, Iface) == [] as Class[]
+        GenericTypeUtils.resolveTypeArguments(null, Iface) == [] as Class[]
+        GenericTypeUtils.resolveTypeArguments(Leaf, null) == [] as Class[]
+    }
+
+    static class Mid<T> implements Iface<T> {}
+
+    static class Leaf extends Mid<String> {}
+
+    static class Raw implements Iface {}
+
+    static interface First<T> {}
+
+    static interface Second<T> {}
+
+    static abstract class FirstAndSecond<X, Y> implements First<X>, Second<Y> {}
+
+    static class Both extends FirstAndSecond<String, Integer> {}
 }
 

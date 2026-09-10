@@ -648,6 +648,16 @@ internal open class KotlinClassElement(
 
     override fun isAbstract(): Boolean = declaration.isAbstract()
 
+    override fun isSealed() = declaration.modifiers.contains(Modifier.SEALED)
+
+    // KSP resolves the sealed subclasses through the current round's resolver, so this has to be read while
+    // that session is live rather than from an element retained past it
+    override fun getPermittedSubclasses(): Collection<ClassElement> =
+        declaration.getSealedSubclasses()
+            .mapNotNull { it.qualifiedName?.asString() }
+            .mapNotNull { visitorContext.getClassElement(it).orElse(null) }
+            .toList()
+
     override fun withAnnotationMetadata(annotationMetadata: AnnotationMetadata) =
         super<AbstractKotlinElement>.withAnnotationMetadata(annotationMetadata) as ClassElement
 

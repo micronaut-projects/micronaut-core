@@ -72,9 +72,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.OptionalDouble;
-import java.util.OptionalInt;
-import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -90,6 +87,8 @@ import java.util.stream.Collectors;
 @Internal
 public class JavaClassElement extends AbstractTypeAwareJavaElement implements ArrayableClassElement {
     private static final String KOTLIN_METADATA = "kotlin.Metadata";
+    private static final Set<String> OPTIONAL_TYPE_NAMES = Set.of(
+        "java.util.Optional", "java.util.OptionalInt", "java.util.OptionalLong", "java.util.OptionalDouble");
     private static final String PREFIX_IS = "is";
     protected final TypeElement classElement;
     protected final int arrayDimensions;
@@ -487,12 +486,10 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     private JavaPropertyElement mapToPropertyElement(AstBeanPropertiesUtils.BeanPropertyData value) {
         AnnotationMetadata propertyAnnotationMetadata = null;
         if (isRecord()) {
-            for (Element enclosedElement : classElement.getEnclosedElements()) {
-                if (JavaModelUtils.isRecordComponent(enclosedElement) && enclosedElement instanceof RecordComponentElement recordComponentElement) {
-                    if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
-                        propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
-                        break;
-                    }
+            for (RecordComponentElement recordComponentElement : classElement.getRecordComponents()) {
+                if (recordComponentElement.getSimpleName().toString().equals(value.propertyName)) {
+                    propertyAnnotationMetadata = visitorContext.getAnnotationMetadataBuilder().build(recordComponentElement);
+                    break;
                 }
             }
         }
@@ -535,28 +532,20 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     private List<MethodElement> getRecordMethods() {
-        var recordComponents = new HashSet<String>();
+        // NOTE: the accessors are resolved from the record components rather than by scanning
+        // getEnclosedElements(), because the order and the relative position of the record
+        // components and their accessors within the enclosed elements is compiler specific
+        // (javac reports declaration order, the Eclipse JDT compiler reports alphabetical order),
+        // whereas getRecordComponents() is specified to be in declaration order.
         var methodElements = new ArrayList<MethodElement>();
-        for (Element enclosedElement : classElement.getEnclosedElements()) {
-            if (JavaModelUtils.isRecordComponent(enclosedElement) || enclosedElement instanceof ExecutableElement) {
-                if (enclosedElement.getKind() == ElementKind.CONSTRUCTOR) {
-                    continue;
-                }
-                String name = enclosedElement.getSimpleName().toString();
-                if (enclosedElement instanceof ExecutableElement executableElement) {
-                    if (recordComponents.contains(name)) {
-                        methodElements.add(
-                            new JavaMethodElement(
-                                JavaClassElement.this,
-                                new JavaNativeElement.Method(executableElement),
-                                elementAnnotationMetadataFactory,
-                                visitorContext)
-                        );
-                    }
-                } else if (enclosedElement instanceof VariableElement) {
-                    recordComponents.add(name);
-                }
-            }
+        for (RecordComponentElement recordComponent : classElement.getRecordComponents()) {
+            methodElements.add(
+                new JavaMethodElement(
+                    JavaClassElement.this,
+                    new JavaNativeElement.Method(recordComponent.getAccessor()),
+                    elementAnnotationMetadataFactory,
+                    visitorContext)
+            );
         }
         return methodElements;
     }
@@ -667,7 +656,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         if (getName().equals(type)) {
             return true; // Same type
         }
-        TypeElement otherElement = visitorContext.getElements().getTypeElement(type);
+        TypeElement otherElement = visitorContext.getTypeElement(type);
         if (otherElement != null) {
             return isAssignable(otherElement);
         }
@@ -689,20 +678,28 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     }
 
     @Override
+    public boolean isOptional() {
+        // the four optional types are final and isAssignable compares erasures, so matching the
+        // erased name is exactly what the default does - without four type lookups per property
+        return OPTIONAL_TYPE_NAMES.contains(erasedName());
+    }
+
+    @Override
     public Optional<ClassElement> getOptionalValueType() {
-        if (isAssignable(Optional.class)) {
-            return getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
-        }
-        if (isAssignable(OptionalLong.class)) {
-            return visitorContext.getClassElement(Long.class);
-        }
-        if (isAssignable(OptionalDouble.class)) {
-            return visitorContext.getClassElement(Double.class);
-        }
-        if (isAssignable(OptionalInt.class)) {
-            return visitorContext.getClassElement(Integer.class);
-        }
-        return Optional.empty();
+        return switch (erasedName()) {
+            case "java.util.Optional" -> getFirstTypeArgument().or(() -> visitorContext.getClassElement(Object.class));
+            case "java.util.OptionalLong" -> visitorContext.getClassElement(Long.class);
+            case "java.util.OptionalDouble" -> visitorContext.getClassElement(Double.class);
+            case "java.util.OptionalInt" -> visitorContext.getClassElement(Integer.class);
+            default -> Optional.empty();
+        };
+    }
+
+    /**
+     * @return the qualified name of the erasure of this type, which is what {@link #isAssignable(String)} compares
+     */
+    private String erasedName() {
+        return classElement.getQualifiedName().toString();
     }
 
     private boolean isAssignable(TypeElement otherElement) {
@@ -768,7 +765,21 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         if (!staticCreators.isEmpty()) {
             return staticCreators;
         }
-        return visitorContext.getClassElement(getName() + "$Companion", elementAnnotationMetadataFactory)
+        // a companion is a nested type of this class, so find it among the members already loaded
+        // rather than resolving "<name>$Companion" through the compiler's global type lookup, which
+        // for a class that has no companion is a guaranteed miss - and then a second one, because
+        // getClassElement retries the name with '$' replaced by '.'
+        TypeElement companion = null;
+        for (Element enclosed : classElement.getEnclosedElements()) {
+            if (enclosed instanceof TypeElement nested && nested.getSimpleName().contentEquals("Companion")) {
+                companion = nested;
+                break;
+            }
+        }
+        if (companion == null) {
+            return List.of();
+        }
+        return Optional.of((ClassElement) visitorContext.getElementFactory().newClassElement(companion, elementAnnotationMetadataFactory))
             .filter(io.micronaut.inject.ast.Element::isStatic)
             .flatMap(typeElement -> typeElement.getEnclosedElements(ElementQuery.ALL_METHODS
                 .annotated(am -> am.hasStereotype(Creator.class))).stream().findFirst()

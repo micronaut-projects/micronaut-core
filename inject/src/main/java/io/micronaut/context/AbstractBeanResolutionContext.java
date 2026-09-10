@@ -731,8 +731,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                     ConstructorSegment constructorSegment = new ConstructorArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments);
                     detectCircularDependency(declaringType, argument, constructorSegment);
                 } else {
-                    Segment<?, ?> previous = peek();
-                    MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
+                    MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
                     if (contains(methodSegment)) {
                         push(methodSegment);
                         throw new CircularDependencyException(AbstractBeanResolutionContext.this, argument, CIRCULAR_ERROR_MSG);
@@ -770,9 +769,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, MethodInjectionPoint methodInjectionPoint, Argument argument) {
             try {
-                Segment<?, ?> previous = peek();
                 MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodInjectionPoint.getName(), argument,
-                    methodInjectionPoint.getArguments(), previous instanceof MethodSegment ms ? ms : null);
+                    methodInjectionPoint.getArguments(), (CallableInjectionPoint<Object>) methodInjectionPoint);
                 if (contains(methodSegment)) {
                     push(methodSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, methodInjectionPoint, argument, CIRCULAR_ERROR_MSG);
@@ -789,8 +787,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         @Override
         public Path pushMethodArgumentResolve(BeanDefinition declaringType, String methodName, Argument argument, Argument[] arguments) {
             try {
-                Segment<?, ?> previous = peek();
-                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, previous instanceof MethodSegment ms ? ms : null);
+                MethodSegment<?, ?> methodSegment = new MethodArgumentSegment(declaringType, (Qualifier<Object>) getCurrentQualifier(), methodName, argument, arguments, null);
                 if (contains(methodSegment)) {
                     push(methodSegment);
                     throw new CircularDependencyException(AbstractBeanResolutionContext.this, declaringType, methodName, argument, CIRCULAR_ERROR_MSG);
@@ -1050,28 +1047,72 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
-     * A segment that represents a method argument.
+     * A segment that represents a method argument. Its {@link #getOuterInjectionPoint()} is
+     * the method the argument belongs to: for an injected method that is the bean's
+     * {@link MethodInjectionPoint}, and for a factory method argument it is the bean's
+     * {@link ConstructorInjectionPoint}, as for a constructor argument.
      */
     public static final class MethodArgumentSegment extends MethodSegment<Object, Object> implements ArgumentInjectionPoint<Object, Object> {
         @Nullable
-        private final MethodSegment<Object, Object> outer;
+        private CallableInjectionPoint<Object> outer;
 
+        /**
+         * @param declaringType The declaring type
+         * @param qualifier     The qualifier
+         * @param methodName    The method name
+         * @param argument      The argument
+         * @param arguments     The arguments
+         * @param outer         The method the argument belongs to, or {@code null} to find it
+         *                      among the declaring type's methods on demand
+         */
         public MethodArgumentSegment(BeanDefinition<Object> declaringType,
                                      @Nullable Qualifier<Object> qualifier,
                                      String methodName,
                                      Argument<Object> argument,
                                      Argument<Object>[] arguments,
-                                     @Nullable MethodSegment<Object, Object> outer) {
+                                     @Nullable CallableInjectionPoint<Object> outer) {
             super(declaringType, qualifier, methodName, argument, arguments);
             this.outer = outer;
         }
 
+        /**
+         * The method this argument belongs to. When the segment was pushed without a
+         * {@link MethodInjectionPoint}, the declaring type's factory method and injected
+         * methods are searched for the method by name and arguments; when none matches (a
+         * setter that is not an injected method, for example) this segment, which is itself
+         * the {@link CallableInjectionPoint} of the method, is answered.
+         *
+         * @return The method the argument belongs to, never {@code null}
+         */
         @Override
         public CallableInjectionPoint<Object> getOuterInjectionPoint() {
+            CallableInjectionPoint<Object> outer = this.outer;
             if (outer == null) {
-                throw new IllegalStateException("Outer argument inaccessible");
+                outer = findMethod();
+                this.outer = outer;
             }
             return outer;
+        }
+
+        private CallableInjectionPoint<Object> findMethod() {
+            BeanDefinition<Object> declaringType = getDeclaringType();
+            ConstructorInjectionPoint<Object> constructor = declaringType.getConstructor();
+            if (isThisMethod(constructor)) {
+                // a factory method
+                return constructor;
+            }
+            for (MethodInjectionPoint<Object, ?> methodInjectionPoint : declaringType.getInjectedMethods()) {
+                if (isThisMethod(methodInjectionPoint)) {
+                    return methodInjectionPoint;
+                }
+            }
+            return this;
+        }
+
+        private boolean isThisMethod(@Nullable CallableInjectionPoint<Object> callable) {
+            return callable instanceof MethodInjectionPoint<?, ?> method
+                && getName().equals(method.getName())
+                && Arrays.equals(getArguments(), callable.getArguments());
         }
 
         @Override

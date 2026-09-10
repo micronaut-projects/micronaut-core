@@ -157,6 +157,22 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Whether this argument stands for a type written without its type arguments, a raw type: {@code List}
+     * rather than {@code List<String>} or {@code List<T>}.
+     *
+     * <p>A raw type keeps the type parameters the declaring type declares, so it reads like a usage written
+     * with those variables; this is what tells the two apart. It answers a different question than
+     * {@link #isTypeVariable()}, which says whether this argument itself stands where a type variable was
+     * written.</p>
+     *
+     * @return True if the type was written raw
+     * @since 5.2.0
+     */
+    default boolean isRawType() {
+        return false;
+    }
+
+    /**
      * Whether the given argument is an instance.
      *
      * @param o The object
@@ -376,6 +392,76 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
     }
 
     /**
+     * Creates a new argument for the given type and name that is a type variable, keeping the bounds declared
+     * for the variable. See {@link GenericPlaceholder#getBounds()}.
+     *
+     * @param type               The type the variable erases to
+     * @param argumentName       The name of the argument
+     * @param variableName       The variable name, {@code null} when it is the argument name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters
+     * @param bounds             The declared bounds, {@code null} when they are not recorded
+     * @param <T>                The generic type
+     * @return The argument instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofTypeVariable(Class<T> type,
+                                          @Nullable String argumentName,
+                                          @Nullable String variableName,
+                                          @Nullable AnnotationMetadata annotationMetadata,
+                                          Argument<?> @Nullable [] typeParameters,
+                                          Argument<?> @Nullable [] bounds) {
+        return new DefaultGenericPlaceholder<>(type, argumentName, variableName, annotationMetadata, typeParameters, bounds);
+    }
+
+    /**
+     * Creates a new argument for a type written without its type arguments, a raw type.
+     *
+     * <p>The type parameters are the ones the declaring type declares, the same as they are for a usage
+     * written with those variables; {@link Argument#isRawType()} is what tells the two apart.</p>
+     *
+     * @param type               The type
+     * @param name               The name
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters, as the declaring type declares them
+     * @param <T>                The generic type
+     * @return The argument instance
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofRawType(Class<T> type,
+                                     @Nullable String name,
+                                     @Nullable AnnotationMetadata annotationMetadata,
+                                     Argument<?> @Nullable [] typeParameters) {
+        return new DefaultRawArgument<>(type, name, annotationMetadata, typeParameters);
+    }
+
+    /**
+     * Creates an argument that stands for a wildcard type argument, compiled to the type it is bounded by.
+     * See {@link WildcardArgument}.
+     *
+     * @param type               The type the wildcard is bounded by
+     * @param name               The name of the type parameter the wildcard stands for
+     * @param annotationMetadata The annotation metadata
+     * @param typeParameters     The type parameters of the type
+     * @param upperBounds        The explicit upper bounds, {@code null} for {@code Object}
+     * @param lowerBounds        The explicit lower bounds, {@code null} for none
+     * @param <T>                The generic type
+     * @return The argument
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    static <T> Argument<T> ofWildcard(Class<T> type,
+                                      @Nullable String name,
+                                      @Nullable AnnotationMetadata annotationMetadata,
+                                      Argument<?> @Nullable [] typeParameters,
+                                      Argument<?> @Nullable [] upperBounds,
+                                      Argument<?> @Nullable [] lowerBounds) {
+        return new DefaultWildcardArgument<>(type, name, annotationMetadata, typeParameters, upperBounds, lowerBounds);
+    }
+
+    /**
      * Creates a new argument for the given type and name.
      *
      * @param type               The type
@@ -446,6 +532,13 @@ public interface Argument<T> extends TypeInformation<T>, AnnotatedElement, Type 
 
     /**
      * Allows coercing a {@link Type} instance to an {@link Argument}.
+     *
+     * <p>Only a {@link Class} and a {@link ParameterizedType} are coerced. A type argument that is neither -
+     * a wildcard, a type variable - makes the whole containing type raw, so {@code List<?>} yields {@code List};
+     * a wildcard, a {@link TypeVariable} or a {@link java.lang.reflect.GenericArrayType} on its own is rejected.
+     * A caller holding an arbitrary reflected type, rather than one it wrote itself, wants
+     * {@code io.micronaut.reflection.ReflectionArguments#of(Type)} of the {@code micronaut-reflection} module,
+     * which resolves all five and carries the type-use annotations.</p>
      *
      * @param type The type
      * @return The argument

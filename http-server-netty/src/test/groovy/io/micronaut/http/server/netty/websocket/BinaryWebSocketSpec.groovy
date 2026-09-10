@@ -22,6 +22,7 @@ import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.http.client.netty.NettyClientCustomizer
 import io.micronaut.http.server.netty.NettyServerCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.websocket.CloseReason
 import io.micronaut.websocket.WebSocketClient
 import io.netty.buffer.Unpooled
 import io.netty.channel.Channel
@@ -175,6 +176,39 @@ class BinaryWebSocketSpec extends Specification {
         then:
         conditions.eventually {
             bob.replies.contains("[fred] abcdef")
+        }
+
+        cleanup:
+        fred.close()
+        bob.close()
+        wsClient.close()
+        embeddedServer.close()
+    }
+
+    void "test rejects a fragmented message larger than max payload length"() {
+        given:
+        EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec').run(EmbeddedServer)
+        PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
+        WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
+        BinaryChatClientWebSocket fred = wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred").blockFirst()
+        BinaryChatClientWebSocket bob = wsClient.connect(BinaryChatClientWebSocket, [topic: "stuff", username: "bob"]).blockFirst()
+
+        when:
+        fred.sendMaxSizedFragmentedMessage()
+
+        then:
+        conditions.eventually {
+            bob.replies.contains('[fred] ' + 'c'.repeat(16) + 'd'.repeat(16))
+        }
+
+        when:
+        fred.sendOversizedFragmentedMessage()
+
+        then:
+        conditions.eventually {
+            !fred.session.isOpen()
+            fred.closeReason == CloseReason.MESSAGE_TO_BIG
+            !bob.replies.any { it.contains('a'.repeat(20) + 'b'.repeat(20)) }
         }
 
         cleanup:

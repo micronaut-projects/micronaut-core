@@ -1,6 +1,7 @@
 package io.micronaut.inject.annotation
 
 import io.micronaut.context.annotation.EachBean
+import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.core.annotation.AnnotationValue
@@ -111,6 +112,35 @@ class AnnotationMetadataSpec extends Specification {
         noExceptionThrown()
         deprecated != null
         deprecated.annotationType() == Deprecated
+    }
+
+    void "test getAnnotationValuesByName resolves a repeatable annotation stored under its own name"() {
+        given:
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata()
+        metadata.addAnnotation(Requires.name, [property: "foo"])
+
+        when: "the repeatable annotation is not wrapped in its container"
+        List<AnnotationValue<Requires>> values = metadata.getAnnotationValuesByName(Requires.name)
+
+        then: "it is resolved by its own name, consistently with the type based variant"
+        values.size() == 1
+        values[0].stringValue("property").get() == "foo"
+        metadata.getAnnotationValuesByType(Requires).size() == 1
+    }
+
+    void "test the occurrences of a repeatable annotation are read out one value per occurrence"() {
+        given: "a repeatable annotation added twice, which a metadata built at runtime accumulates in a collection"
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata()
+        metadata.addDeclaredRepeatable("foo.Tags", AnnotationValue.builder("foo.Tag").value("one").build(), RetentionPolicy.RUNTIME)
+        metadata.addDeclaredRepeatable("foo.Tags", AnnotationValue.builder("foo.Tag").value("two").build(), RetentionPolicy.RUNTIME)
+
+        expect: "the member holds both occurrences"
+        metadata.getAnnotationValuesByName("foo.Tag").size() == 2
+
+        and: "and the accessors that map over it answer one value per occurrence, not one holding the whole collection"
+        metadata.stringValues("foo.Tags", AnnotationMetadata.VALUE_MEMBER).length == 2
+        metadata.stringValues("foo.Tags", AnnotationMetadata.VALUE_MEMBER) ==
+            ['@foo.Tag(value=one)', '@foo.Tag(value=two)'] as String[]
     }
 
     AnnotationMetadata newMetadata(AnnotationValueBuilder... builders) {

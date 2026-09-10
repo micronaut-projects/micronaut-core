@@ -25,4 +25,4 @@ class ProductMappers(ABC):
 
     def get_distributor(self) -> str:
         return "Great Product Company"
-# tag::end[]
+# end::class[]

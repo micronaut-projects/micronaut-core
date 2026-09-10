@@ -25,6 +25,7 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Implementation of {@link ServerCookieEncoder} which uses {@link HttpCookie} to encode cookies.
@@ -45,8 +46,9 @@ public final class DefaultServerCookieEncoder implements ServerCookieEncoder {
 
     private String encodeCookie(Cookie cookie) {
         String name = cookie.getName();
-        String value = cookie.getValue();
-        value = value == null ? "" : value;
+        // the value is non-null by the contract of Cookie, and an implementation that breaks it must
+        // not encode the four characters of "null": the fallback keeps what this encoder always emitted
+        String value = Objects.requireNonNullElse(cookie.getValue(), "");
         String path = cookie.getPath();
         String domain = cookie.getDomain();
         CookieUtils.verifyCookieName(name);

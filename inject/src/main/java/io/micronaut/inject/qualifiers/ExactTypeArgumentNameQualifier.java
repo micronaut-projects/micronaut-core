@@ -73,11 +73,7 @@ final class ExactTypeArgumentNameQualifier<T> extends FilteringQualifier<T> {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
         } else {
-            if (beanType.isInterface()) {
-                return Arrays.asList(GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType));
-            } else {
-                return Arrays.asList(GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType));
-            }
+            return Arrays.asList(GenericTypeUtils.resolveTypeArguments(candidate.getBeanType(), beanType));
         }
     }
 

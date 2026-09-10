@@ -1,0 +1,35 @@
+package io.micronaut.docs.propagation
+
+import io.micronaut.context.annotation.Requires
+import io.micronaut.context.propagation.slf4j.MdcPropagationContext
+import io.micronaut.core.propagation.PropagatedContext
+import jakarta.inject.Singleton
+import org.slf4j.MDC
+
+import java.util.function.Supplier
+
+@Requires(property = "mdc.example.service.enabled")
+@Singleton
+class MdcService {
+
+    // tag::createUser[]
+    String createUser(String name) {
+        try {
+            UUID newUserId = UUID.randomUUID()
+            MDC.put("userId", newUserId.toString())
+            return PropagatedContext.getOrEmpty()
+                    .plus(new MdcPropagationContext())
+                    .propagate({ createUserInternal(newUserId, name) } as Supplier<String>)
+        } finally {
+            MDC.remove("userId")
+        }
+    }
+    // end::createUser[]
+
+    private String createUserInternal(UUID id, String name) {
+        if (MDC.get("userId") == null) {
+            throw new IllegalStateException("Missing userId")
+        }
+        "New user id: $id name: $name"
+    }
+}

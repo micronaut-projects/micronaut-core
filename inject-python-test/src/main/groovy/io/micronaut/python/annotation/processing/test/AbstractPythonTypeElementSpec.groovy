@@ -36,7 +36,7 @@ import io.micronaut.inject.provider.JakartaProviderBeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement
+import io.micronaut.python.processing.element.AbstractPythonClassElement
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 

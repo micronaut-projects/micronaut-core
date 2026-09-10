@@ -51,6 +51,7 @@ import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedOptions;
 import javax.lang.model.element.Element;
+import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.type.TypeMirror;
 import java.io.OutputStream;
@@ -244,6 +245,7 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
         "It should not be possible to process elements without at least one annotation present and this call breaks that assumption")
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
+        javaVisitorContext.newRound();
         if (loadedVisitors != null && !loadedVisitors.isEmpty() && !processingGeneratedAnnotation(annotations)) {
 
             TypeElement groovyObjectTypeElement = elementUtils.getTypeElement("groovy.lang.GroovyObject");
@@ -253,6 +255,11 @@ public class TypeElementVisitorProcessor extends AbstractInjectAnnotationProcess
             var elements = new LinkedHashSet<TypeElement>();
 
             for (TypeElement annotation : annotations) {
+                if (annotation.getKind() != ElementKind.ANNOTATION_TYPE) {
+                    // an annotation the compiler could not resolve arrives here as a plain class; asking
+                    // the round for its annotated elements would throw and mask the real compile error
+                    continue;
+                }
                 modelUtils.resolveTypeElements(
                     roundEnv.getElementsAnnotatedWith(annotation)
                 ).filter(notGroovyObject).forEach(elements::add);

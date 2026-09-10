@@ -35,7 +35,7 @@ class MessageEndpointSpec: StringSpec() {
             var response = Flux.from(client.exchange(HttpRequest.POST<Map<String, Any>>("/message", mapOf("newMessage" to "A new message"))
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED), String::class.java)).blockFirst()
 
-            response.code() shouldBe HttpStatus.OK.code
+            response!!.code() shouldBe HttpStatus.OK.code
             response.body() shouldBe "Message updated"
             response.contentType.get() shouldBe MediaType.TEXT_PLAIN_TYPE
 

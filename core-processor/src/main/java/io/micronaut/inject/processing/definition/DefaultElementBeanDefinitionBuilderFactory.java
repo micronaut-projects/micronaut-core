@@ -38,6 +38,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.processing.ProxyableTypeValidator;
 import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -157,9 +158,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
                                                             AnnotationMetadata aopElementAnnotationProcessor,
                                                             ElementBeanDefinitionBuilder<OutputObjectDef> targetBeanDefinitionBuilder) {
 
-        if (targetType.isFinal()) {
-            throw new ProcessingException(targetType, "Cannot apply AOP advice to final class. Class must be made non-final to support proxying: " + targetType.getName());
-        }
+        ProxyableTypeValidator.validateProxyable(targetType, targetType);
         BeanDefinitionWriter targetBeanWriter = (BeanDefinitionWriter) targetBeanDefinitionBuilder;
         MemberDefinition<ClassElement> elementProducerDefinition = targetBeanWriter.getElementProducerDefinition();
         boolean isFactoryMethod = !(elementProducerDefinition instanceof ConstructorDefinition<ClassElement, ?>);
@@ -211,6 +210,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
 
     @Override
     public ElementProxyBuilder<OutputObjectDef> introductionProxy(ClassElement target) {
+        ProxyableTypeValidator.validateProxyable(target, target);
         AnnotationMetadata annotationMetadata = target.getAnnotationMetadata();
 
         List<ClassElement> interfaceTypes = Arrays.stream(annotationMetadata.getValue(Introduction.class, "interfaces", String[].class).orElse(EMPTY_STRING_ARRAY))

@@ -19,6 +19,7 @@ import io.micronaut.context.expressions.AbstractEvaluatedExpression;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationDefaultValuesProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullUnmarked;
@@ -35,10 +36,12 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 
 import javax.lang.model.element.Modifier;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
@@ -461,7 +464,7 @@ public final class AnnotationMetadataGenUtils {
         }
 
         return GenUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
-            attributes -> GenUtils.stringMapOf(attributes, true, null,
+            attributes -> GenUtils.stringMapOf(writableValues(attributes), true, null,
                 value -> asValueExpression(value, loadClassValueExpressionFn)));
     }
 
@@ -521,7 +524,7 @@ public final class AnnotationMetadataGenUtils {
                 .instantiate(
                     CONSTRUCTOR_ANNOTATION_VALUE_AND_MAP,
                     ExpressionDef.constant(data.getAnnotationName()),
-                    stringMapOf(data.getValues(), loadClassValueExpressionFn),
+                    stringMapOf(writableValues(data), loadClassValueExpressionFn),
                     ClassTypeDef.of(AnnotationMetadataSupport.class).getStaticField(ANNOTATION_DEFAULT_VALUES_PROVIDER)
                 );
         }
@@ -539,6 +542,43 @@ public final class AnnotationMetadataGenUtils {
             }
         }
         throw new IllegalStateException("Unsupported Map value:  " + value + " " + value.getClass().getName());
+    }
+
+    /**
+     * The values of an annotation as they are written: the reserved {@link AnnotationUtil#STEREOTYPES_MEMBER}
+     * member keeps only the retained annotations that are available at runtime, and is dropped when none is.
+     *
+     * @param values The annotation values
+     * @return The values to write
+     */
+    private static Map<CharSequence, Object> writableValues(Map<CharSequence, Object> values) {
+        Object retained = values.get(AnnotationUtil.STEREOTYPES_MEMBER);
+        if (retained == null) {
+            return values;
+        }
+        Object[] stereotypes = retained instanceof Collection<?> collection ? collection.toArray() : (Object[]) retained;
+        List<AnnotationValue<?>> runtimeStereotypes = new ArrayList<>(stereotypes.length);
+        for (Object stereotype : stereotypes) {
+            if (stereotype instanceof AnnotationValue<?> annotationValue && annotationValue.getRetentionPolicy() == RetentionPolicy.RUNTIME) {
+                runtimeStereotypes.add(annotationValue);
+            }
+        }
+        Map<CharSequence, Object> writable = new LinkedHashMap<>(values);
+        if (runtimeStereotypes.isEmpty()) {
+            writable.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+        } else {
+            writable.put(AnnotationUtil.STEREOTYPES_MEMBER, runtimeStereotypes.toArray(AnnotationValue[]::new));
+        }
+        return writable;
+    }
+
+    private static Map<CharSequence, Object> writableValues(AnnotationValue<?> annotationValue) {
+        if (!annotationValue.contains(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return annotationValue.getValues();
+        }
+        Map<CharSequence, Object> values = new LinkedHashMap<>(annotationValue.getValues());
+        values.put(AnnotationUtil.STEREOTYPES_MEMBER, annotationValue.getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER).toArray(AnnotationValue[]::new));
+        return writableValues(values);
     }
 
     private static <T> ExpressionDef stringMapOf(Map<? extends CharSequence, T> annotationData,

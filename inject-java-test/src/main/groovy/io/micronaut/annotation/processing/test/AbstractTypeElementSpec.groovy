@@ -46,6 +46,7 @@ import io.micronaut.inject.BeanDefinitionReference
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder
 import io.micronaut.inject.annotation.AnnotationMapper
 import io.micronaut.inject.annotation.AnnotationMetadataWriter
+import io.micronaut.inject.annotation.AnnotationRemapper
 import io.micronaut.inject.annotation.AnnotationTransformer
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.GenericPlaceholderElement
@@ -512,6 +513,15 @@ class Test {
     }
 
     /**
+     * Retrieve additional annotation remappers to apply
+     * @param packageName The annotation package name
+     * @return The remappers for the annotation package
+     */
+    protected List<AnnotationRemapper> getLocalAnnotationRemappers(@NonNull String packageName) {
+        return Collections.emptyList()
+    }
+
+    /**
      * Retrieve additional annotation transformers  to apply
      * @param annotationName The annotation name
      * @return The transformers for the annotation
@@ -630,6 +640,21 @@ class Test {
                     } else {
                         return loadedTransformers
                     }
+                }
+
+                @Override
+                protected List<AnnotationRemapper> getAnnotationRemappers(@NonNull String packageName) {
+                    def loadedRemappers = super.getAnnotationRemappers(packageName)
+                    def localRemappers = getLocalAnnotationRemappers(packageName)
+                    if (localRemappers) {
+                        def newList = []
+                        if (loadedRemappers) {
+                            newList.addAll(loadedRemappers)
+                        }
+                        newList.addAll(localRemappers)
+                        return newList
+                    }
+                    return loadedRemappers
                 }
             }
             return builder

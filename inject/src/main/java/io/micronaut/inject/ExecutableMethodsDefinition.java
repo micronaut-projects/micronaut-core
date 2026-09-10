@@ -59,6 +59,28 @@ public interface ExecutableMethodsDefinition<T> {
     List<ExecutableMethod<T, ?>> getExecutableMethods();
 
     /**
+     * The {@link jakarta.annotation.PostConstruct} callbacks of the bean, in invocation order, when the bean
+     * intercepts its post-construct phase. They are not part of {@link #getExecutableMethods()}.
+     *
+     * @return The post-construct callbacks, or an empty list when none were compiled in
+     * @since 5.2.0
+     */
+    default List<ExecutableMethod<T, ?>> getPostConstructExecutableMethods() {
+        return List.of();
+    }
+
+    /**
+     * The {@link jakarta.annotation.PreDestroy} callbacks of the bean, in invocation order, when the bean
+     * intercepts its pre-destroy phase. They are not part of {@link #getExecutableMethods()}.
+     *
+     * @return The pre-destroy callbacks, or an empty list when none were compiled in
+     * @since 5.2.0
+     */
+    default List<ExecutableMethod<T, ?>> getPreDestroyExecutableMethods() {
+        return List.of();
+    }
+
+    /**
      * By default, when the {@link io.micronaut.context.BeanContext} is started, the
      * {@link BeanDefinition#getExecutableMethods()} are not processed by registered
      * {@link io.micronaut.context.processor.ExecutableMethodProcessor} instances unless this method returns true.

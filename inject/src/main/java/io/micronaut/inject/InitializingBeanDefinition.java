@@ -19,6 +19,8 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DefaultBeanResolutionContext;
 
+import java.util.List;
+
 /**
  * A bean definition that is provides initialization hooks normally in the form of methods annotated with
  * {@link jakarta.annotation.PostConstruct}.
@@ -50,4 +52,19 @@ public interface InitializingBeanDefinition<T> extends BeanDefinition<T> {
      * @return The bean instance
      */
     T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean);
+
+    /**
+     * The {@link jakarta.annotation.PostConstruct} callbacks of the bean as reflection-free executable methods, in
+     * the order {@link #initialize(BeanResolutionContext, BeanContext, Object)} invokes them.
+     *
+     * <p>Only available for a bean that intercepts its post-construct phase, that is one bound with
+     * {@code @InterceptorBinding(kind = POST_CONSTRUCT)}; every other definition, including one compiled by an
+     * earlier version, returns an empty list. The callbacks are not part of {@link #getExecutableMethods()}.</p>
+     *
+     * @return The post-construct callbacks, or an empty list
+     * @since 5.2.0
+     */
+    default List<ExecutableMethod<T, ?>> getPostConstructExecutableMethods() {
+        return List.of();
+    }
 }

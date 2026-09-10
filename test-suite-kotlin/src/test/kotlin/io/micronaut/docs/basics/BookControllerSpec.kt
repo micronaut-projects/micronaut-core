@@ -30,7 +30,7 @@ class BookControllerSpec: StringSpec() {
             // end::posturitemplate[]
 
             val response = Flux.from(call).blockFirst()
-            val message = response.getBody(Book::class.java) // <2>
+            val message = response!!.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
             // check the body
@@ -48,7 +48,7 @@ class BookControllerSpec: StringSpec() {
             // end::postform[]
 
             val response = Flux.from(call).blockFirst()
-            val message = response.getBody(Book::class.java) // <2>
+            val message = response!!.getBody(Book::class.java) // <2>
             // check the status
             response.status shouldBe HttpStatus.CREATED // <3>
             // check the body

@@ -21,6 +21,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.InitializingBeanDefinition;
 
 import java.util.Collection;
@@ -38,6 +39,9 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
 
     @Override
     default T initialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
+        // One chain runs for the post-construct event of the bean: proceeding it reaches doInitialize, which invokes
+        // every @PostConstruct callback of the bean, superclass callbacks first. An interceptor that does not proceed
+        // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
         Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
@@ -47,6 +51,25 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
             bean,
             shared
         ));
+    }
+
+    /**
+     * Invokes one {@link jakarta.annotation.PostConstruct} callback of the bean. Called by the generated
+     * {@link #doInitialize(BeanResolutionContext, BeanContext, Object)} for each callback, in invocation order, with
+     * the arguments it resolved for the callback, once the interceptor chain of the event has proceeded.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The bean context
+     * @param bean              The bean
+     * @param index             The index of the callback in {@link #getPostConstructExecutableMethods()}
+     * @param arguments         The resolved arguments of the callback
+     * @return The bean
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    default T interceptPostConstruct(BeanResolutionContext resolutionContext, BeanContext context, T bean, int index, Object[] arguments) {
+        LifecycleCallbacks.invoke(getPostConstructExecutableMethods().get(index), bean, arguments);
+        return bean;
     }
 
     /**

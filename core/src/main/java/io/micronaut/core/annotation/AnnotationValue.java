@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.value.ConvertibleValues;
 import io.micronaut.core.expressions.EvaluatedExpression;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
@@ -31,10 +32,12 @@ import org.jspecify.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Array;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -65,6 +68,26 @@ import static io.micronaut.core.reflect.ReflectionUtils.EMPTY_CLASS_ARRAY;
  * @since 1.0
  */
 public class AnnotationValue<A extends Annotation> implements AnnotationValueResolver {
+
+    private static final String ANNOTATION_PARAMETER = "annotation";
+
+    /**
+     * The members of each annotation type, by name, in declaration order: the zero-argument methods it declares,
+     * looked up once per type rather than on every read of an instance.
+     */
+    private static final ClassValue<Map<String, Method>> ANNOTATION_MEMBERS = new ClassValue<>() {
+        @Override
+        protected Map<String, Method> computeValue(Class<?> annotationType) {
+            Method[] declared = annotationType.getDeclaredMethods();
+            Map<String, Method> members = CollectionUtils.newLinkedHashMap(declared.length);
+            for (Method member : declared) {
+                if (member.getParameterCount() == 0 && !member.isSynthetic()) {
+                    members.put(member.getName(), member);
+                }
+            }
+            return Collections.unmodifiableMap(members);
+        }
+    };
 
     private final String annotationName;
     private final ConvertibleValues<Object> convertibleValues;
@@ -271,11 +294,19 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
-     * @return The stereotypes of the annotation
+     * The stereotypes of the annotation: the annotations it is meta-annotated with while it is being mapped or
+     * remapped, or the {@link Retainable} annotations it composes, retained in the reserved
+     * {@link AnnotationUtil#STEREOTYPES_MEMBER} member with member overrides applied.
+     *
+     * @return The stereotypes of the annotation, or {@code null} if they are not known
      */
     @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
     public List<AnnotationValue<?>> getStereotypes() {
-        return stereotypes;
+        if (stereotypes != null || !values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return stereotypes;
+        }
+        return (List) getAnnotations(AnnotationUtil.STEREOTYPES_MEMBER);
     }
 
     /**
@@ -709,6 +740,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
         }
         Object o = values.get(member);
+        if (o instanceof Collection<?> collection) {
+            o = heldValues(collection);
+        }
         if (o instanceof AnnotationClassValue<?> annotationClassValue) {
             return new AnnotationClassValue[]{annotationClassValue};
         }
@@ -720,6 +754,17 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         }
         if (o instanceof String[] classNames) {
             return Arrays.stream(classNames).map(AnnotationValue::getAnnotationClassValue).toArray(AnnotationClassValue[]::new);
+        }
+        if (o instanceof Object[] entries) {
+            List<AnnotationClassValue<?>> classValues = new ArrayList<>(entries.length);
+            for (Object entry : entries) {
+                if (entry instanceof AnnotationClassValue<?> annotationClassValue) {
+                    classValues.add(annotationClassValue);
+                } else if (entry instanceof CharSequence className) {
+                    classValues.add(getAnnotationClassValue(className.toString()));
+                }
+            }
+            return classValues.toArray(AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES);
         }
         return AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
     }
@@ -1151,14 +1196,25 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The names of the members
      */
     public final Set<CharSequence> getMemberNames() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            return getValues().keySet();
+        }
         return values.keySet();
     }
 
     /**
+     * The attribute values. The reserved {@link AnnotationUtil#STEREOTYPES_MEMBER} member is not an attribute and
+     * is not included; it is read through {@link #getStereotypes()}.
+     *
      * @return The attribute values
      */
     @Override
     public Map<CharSequence, Object> getValues() {
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return Collections.unmodifiableMap(attributes);
+        }
         return Collections.unmodifiableMap(values);
     }
 
@@ -1349,6 +1405,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
             return Optional.empty();
         }
+        if (v instanceof Collection<?> collection) {
+            Iterator<?> i = collection.iterator();
+            if (i.hasNext() && i.next() instanceof AnnotationValue<?> value && value.getAnnotationName().equals(typeName)) {
+                return Optional.of((AnnotationValue<T>) value);
+            }
+        }
         return Optional.empty();
     }
 
@@ -1373,6 +1435,12 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             }
             return Optional.empty();
         }
+        if (v instanceof Collection<?> collection) {
+            Iterator<?> i = collection.iterator();
+            if (i.hasNext() && i.next() instanceof AnnotationValue<?> value) {
+                return Optional.of((AnnotationValue<T>) value);
+            }
+        }
         return Optional.empty();
     }
 
@@ -1389,11 +1457,16 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
 
     @Override
     public String toString() {
-        if (values.isEmpty()) {
+        Map<CharSequence, Object> attributes = getValues();
+        if (attributes.isEmpty()) {
             return "@" + annotationName;
         } else {
-            return "@" + annotationName + "(" + values.entrySet().stream().map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue())).collect(
-                    Collectors.joining(", ")) + ")";
+            // the members in name order: the map holds them in whichever order the builder filled it in, so a
+            // rendering that followed it would read differently for the same annotation described two ways
+            return "@" + annotationName + "(" + attributes.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey(Comparator.comparing(CharSequence::toString)))
+                .map(entry -> entry.getKey() + "=" + toStringValue(entry.getValue()))
+                .collect(Collectors.joining(", ")) + ")";
         }
     }
 
@@ -1547,7 +1620,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @since 4.0.0
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(AnnotationValue<T> annotation) {
-        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
         return new AnnotationValueBuilder<>(annotation, annotation.getRetentionPolicy());
     }
 
@@ -1560,8 +1633,110 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
      * @return The builder
      */
     public static <T extends Annotation> AnnotationValueBuilder<T> builder(AnnotationValue<T> annotation, @Nullable RetentionPolicy retentionPolicy) {
-        ArgumentUtils.requireNonNull("annotation", annotation);
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
         return new AnnotationValueBuilder<>(annotation, retentionPolicy);
+    }
+
+    /**
+     * Reads a live annotation instance as an annotation value.
+     *
+     * <p>Code handed annotation instances at runtime, such as a qualifier passed to a bean lookup, needs them in
+     * the form compiled metadata records them so that the two compare equal. Every zero-argument member of the
+     * annotation is read, the ones left at their default included since an instance answers every one of its
+     * members, and converted the way an annotation processor records it:</p>
+     *
+     * <ul>
+     *     <li>a {@link Class} becomes an {@link AnnotationClassValue}</li>
+     *     <li>an {@link Enum} becomes the name of its constant</li>
+     *     <li>a nested {@link Annotation} becomes an {@link AnnotationValue} of every one of its members, recursively</li>
+     *     <li>an array of any of the above becomes an array of the converted form</li>
+     *     <li>any other value, such as a primitive, a {@link String} or an array of either, is kept as it is</li>
+     * </ul>
+     *
+     * <p>No member is left out. Whether a member takes part in the comparison of two qualifiers is a concern of the
+     * qualifier rather than of the conversion, so {@code @NonBinding} is not applied here.</p>
+     *
+     * @param annotation The annotation instance
+     * @param <T>        The annotation type
+     * @return The annotation value, with {@link RetentionPolicy#RUNTIME} retention
+     * @throws IllegalStateException When a member cannot be read, because the annotation type is not open to this
+     *                               module or because the instance does not answer for it
+     * @since 5.2.0
+     */
+    public static <T extends Annotation> AnnotationValue<T> of(T annotation) {
+        ArgumentUtils.requireNonNull(ANNOTATION_PARAMETER, annotation);
+        Class<? extends Annotation> annotationType = annotation.annotationType();
+        Map<String, Method> members = ANNOTATION_MEMBERS.get(annotationType);
+        Map<CharSequence, Object> values = CollectionUtils.newLinkedHashMap(members.size());
+        for (Map.Entry<String, Method> member : members.entrySet()) {
+            values.put(member.getKey(), toMemberValue(readMember(annotation, member.getValue())));
+        }
+        return new AnnotationValue<>(annotationType.getName(), values, RetentionPolicy.RUNTIME);
+    }
+
+    /**
+     * A member read off an annotation instance.
+     *
+     * @param annotation The annotation instance
+     * @param member     The member
+     * @return The value, never null
+     * @throws IllegalStateException When the member cannot be read
+     */
+    private static Object readMember(Annotation annotation, Method member) {
+        Object value;
+        try {
+            value = ReflectionUtils.invokeInaccessibleMethod(annotation, member);
+        } catch (RuntimeException e) {
+            // the reflective wrappers say nothing an invocation target's own exception does not say better
+            Throwable cause = e;
+            while (cause.getCause() != null) {
+                cause = cause.getCause();
+            }
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: " + cause, e);
+        }
+        if (value == null) {
+            throw new IllegalStateException("Cannot read member [" + member.getName() + "] of annotation ["
+                + annotation.annotationType().getName() + "]: the instance answered null");
+        }
+        return value;
+    }
+
+    /**
+     * A member value read off an annotation instance, in the form compiled metadata records it.
+     *
+     * @param value The value as reflection returns it
+     * @return The value as metadata records it
+     */
+    private static Object toMemberValue(Object value) {
+        return switch (value) {
+            case Class<?> type -> new AnnotationClassValue<>(type);
+            case Enum<?> constant -> constant.name();
+            case Annotation nested -> of(nested);
+            case Annotation[] nested -> {
+                AnnotationValue<?>[] annotationValues = new AnnotationValue[nested.length];
+                for (int i = 0; i < nested.length; i++) {
+                    annotationValues[i] = of(nested[i]);
+                }
+                yield annotationValues;
+            }
+            // a generic array type is not a pattern the parser accepts, so the two are matched by a guard
+            case Object[] array when array instanceof Class<?>[] types -> {
+                AnnotationClassValue<?>[] classValues = new AnnotationClassValue[types.length];
+                for (int i = 0; i < types.length; i++) {
+                    classValues[i] = new AnnotationClassValue<>(types[i]);
+                }
+                yield classValues;
+            }
+            case Object[] array when array instanceof Enum<?>[] constants -> {
+                String[] names = new String[constants.length];
+                for (int i = 0; i < constants.length; i++) {
+                    names[i] = constants[i].name();
+                }
+                yield names;
+            }
+            default -> value;
+        };
     }
 
     /**
@@ -1599,6 +1774,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
                 if (entry != null) {
                     newArray[i] = entry.toString();
                 }
+            }
+            return newArray;
+        }
+        if (value instanceof Collection<?> collection) {
+            String[] newArray = new String[collection.size()];
+            int i = 0;
+            for (Object entry : collection) {
+                newArray[i++] = entry == null ? null : entry.toString();
             }
             return newArray;
         }
@@ -1658,6 +1841,24 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     }
 
     /**
+     * The values a collection holds, in an array of the type they would be held in had the metadata been
+     * generated: a metadata built at runtime accumulates the occurrences of a repeatable annotation in a
+     * collection, where a generated one holds them in an {@link AnnotationValue} array, and the accessors that
+     * map over a member value by value are to answer the same either way.
+     *
+     * @param collection The collection
+     * @return The values it holds, in an array
+     */
+    private static Object[] heldValues(Collection<?> collection) {
+        for (Object held : collection) {
+            if (!(held instanceof AnnotationValue)) {
+                return collection.toArray();
+            }
+        }
+        return collection.toArray(new AnnotationValue<?>[0]);
+    }
+
+    /**
      * The class values for the given value.
      *
      * @param value The value
@@ -1670,6 +1871,9 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
         // A class can be present at compilation time
         if (value == null) {
             return null;
+        }
+        if (value instanceof Collection<?> collection) {
+            value = heldValues(collection);
         }
         if (value instanceof AnnotationClassValue<?> annotationClassValue) {
             Class<?> type = annotationClassValue.getType().orElse(null);
@@ -1729,9 +1933,14 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
     private ConvertibleValues<Object> newConvertibleValues(Map<CharSequence, Object> values) {
         if (CollectionUtils.isEmpty(values)) {
             return ConvertibleValues.EMPTY;
-        } else {
-            return ConvertibleValues.of(values);
         }
+        if (values.containsKey(AnnotationUtil.STEREOTYPES_MEMBER)) {
+            // The reserved member is not an attribute, so it is not part of the convertible view either
+            Map<CharSequence, Object> attributes = new LinkedHashMap<>(values);
+            attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
+            return attributes.isEmpty() ? ConvertibleValues.EMPTY : ConvertibleValues.of(attributes);
+        }
+        return ConvertibleValues.of(values);
     }
 
     @Nullable

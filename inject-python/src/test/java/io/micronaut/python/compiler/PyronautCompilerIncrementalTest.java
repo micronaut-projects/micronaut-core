@@ -1096,8 +1096,9 @@ final class PyronautCompilerIncrementalTest {
         Path alpha = python.resolve("alpha.py");
         Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
         Files.writeString(python.resolve("dynamic.py"), """
+            import importlib
             class Dynamic:
-                value: object = getattr(object(), "value", None)
+                value: object = importlib.import_module("alpha")
             """);
         compilePython(python, java, output, cache);
         Path dynamicVfs = output.resolve(
@@ -1112,6 +1113,227 @@ final class PyronautCompilerIncrementalTest {
     }
 
     @Test
+    void getattrOnAnObjectDoesNotForceReprocessingOfEveryPythonSource(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("plain.py"), """
+            class Plain:
+                value: object = getattr(object(), "value", None)
+            """);
+        compilePython(python, java, output, cache);
+        Path plainVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/plain.py"
+        );
+        Files.setLastModifiedTime(plainVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(plainVfs));
+    }
+
+    @Test
+    void getattrOnAnImportedModuleReprocessesEveryPythonSource(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("dynamic.py"), """
+            from alpha import (
+                Alpha,
+                Alpha as module,  # the name bound on a continuation line still counts
+            )
+            class Dynamic:
+                value: object = getattr(module, "value", None)
+            """);
+        compilePython(python, java, output, cache);
+        Path dynamicVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/dynamic.py"
+        );
+        Files.setLastModifiedTime(dynamicVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(dynamicVfs));
+    }
+
+    @Test
+    void getattrOnAModuleBoundByAnImportClauseReprocessesEveryPythonSource(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("dynamic.py"), """
+            import os, alpha as module  # the second clause binds the name getattr reads
+            class Dynamic:
+                value: object = getattr(module, "Alpha", None)
+            """);
+        compilePython(python, java, output, cache);
+        Path dynamicVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/dynamic.py"
+        );
+        Files.setLastModifiedTime(dynamicVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(dynamicVfs));
+    }
+
+    @Test
+    void getattrOnAModuleBoundOnAContinuedImportLineReprocessesEveryPythonSource(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
+        Files.writeString(python.resolve("dynamic.py"), "import os, \\\n    alpha as module\nclass Dynamic:\n    value: object = getattr(module, \"Alpha\", None)\n");
+        compilePython(python, java, output, cache);
+        Path dynamicVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/dynamic.py"
+        );
+        Files.setLastModifiedTime(dynamicVfs, UNCHANGED_MARKER);
+
+        Files.writeString(alpha, "class Alpha:\n    value: int = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(dynamicVfs));
+    }
+
+    @Test
+    void everyClauseOfADirectImportIsADependency(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("alpha.py"), "class Alpha:\n    value: int = 1\n");
+        Path beta = python.resolve("beta.py");
+        Files.writeString(beta, "class Beta:\n    value: int = 1\n");
+        Files.writeString(python.resolve("user.py"), """
+            import alpha, beta
+            class User:
+                value: beta.Beta = beta.Beta()
+            """);
+        compilePython(python, java, output, cache);
+        Path userVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/user.py"
+        );
+        Files.setLastModifiedTime(userVfs, UNCHANGED_MARKER);
+
+        // only the second clause's module changes
+        Files.writeString(beta, "class Beta:\n    value: int = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(userVfs));
+    }
+
+    @Test
+    void anImportAfterASemicolonIsADependency(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Files.writeString(python.resolve("alpha.py"), "value = 1\n");
+        Path beta = python.resolve("beta.py");
+        Files.writeString(beta, "value = 1\n");
+        // no type of beta is named, so only the import graph can relate user.py to beta.py
+        Path gamma = python.resolve("gamma.py");
+        Files.writeString(gamma, "value = 1\n");
+        Files.writeString(python.resolve("user.py"), """
+            label = "a; b"; import alpha; import beta  # the quoted semicolon is not a statement boundary
+            text = \"\"\"a string spanning
+            import gamma
+            lines\"\"\"; import beta
+            class User:
+                value: int = beta.value
+            """);
+        compilePython(python, java, output, cache);
+        Path userVfs = output.resolve(
+            "META-INF/GRAALPY-VFS/micronaut-application/src/user.py"
+        );
+        Files.setLastModifiedTime(userVfs, UNCHANGED_MARKER);
+
+        Files.writeString(beta, "value = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(userVfs));
+
+        // the import inside the string is text, not a dependency: a change to gamma leaves user alone
+        Files.setLastModifiedTime(userVfs, UNCHANGED_MARKER);
+        Files.writeString(gamma, "value = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(userVfs));
+    }
+
+    @Test
+    void anArrayDeclarationDefaultOutOfRangeIsRejected(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        // a Python annotation declaration whose int[] default overflows the int range (a Python float is
+        // a Java double, so the range check is only observable on the integral members)
+        Files.writeString(python.resolve("ratio.py"), """
+            from jakarta.inject import Singleton
+            @Singleton
+            def Ratio(values: list[int] = [1099511627776]):
+                def decorator(target):
+                    return target
+                return decorator
+            """);
+
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> compilePython(python, java, output, cache));
+
+        assertTrue(String.valueOf(failure.getMessage()).contains("out of range") || String.valueOf(failure.getCause()).contains("out of range"),
+            "expected the int range error, got " + failure);
+    }
+
+    @Test
+    void aSubmoduleImportedFromItsPackageIsADependency(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        // the package initialiser is generated by the compiler; a source one is refused
+        Path pkg = Files.createDirectories(python.resolve("pkg"));
+        Path beta = pkg.resolve("beta.py");
+        Files.writeString(beta, "value = 1\n");
+        // no type of beta is named: only the import edge to pkg.beta, not pkg/__init__.py, can relate them
+        Files.writeString(python.resolve("user.py"), """
+            from pkg import beta
+            class User:
+                value: int = beta.value
+            """);
+        Files.writeString(pkg.resolve("sibling.py"), """
+            from . import beta
+            class Sibling:
+                value: int = beta.value
+            """);
+        compilePython(python, java, output, cache);
+        Path userVfs = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src/user.py");
+        Path siblingVfs = output.resolve("META-INF/GRAALPY-VFS/micronaut-application/src/pkg/sibling.py");
+        Files.setLastModifiedTime(userVfs, UNCHANGED_MARKER);
+        Files.setLastModifiedTime(siblingVfs, UNCHANGED_MARKER);
+
+        Files.writeString(beta, "value = 2\n");
+        compilePython(python, java, output, cache);
+
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(userVfs), "from pkg import beta was not a dependency on pkg/beta.py");
+        assertNotEquals(UNCHANGED_MARKER, Files.getLastModifiedTime(siblingVfs), "from . import beta was not a dependency on pkg/beta.py");
+    }
+
+    @Test
     void optimisticModeDoesNotExpandDynamicPythonRelationships(@TempDir Path directory) throws Exception {
         Path python = Files.createDirectories(directory.resolve("python"));
         Path java = Files.createDirectories(directory.resolve("java"));
@@ -1120,8 +1342,9 @@ final class PyronautCompilerIncrementalTest {
         Path alpha = python.resolve("alpha.py");
         Files.writeString(alpha, "class Alpha:\n    value: int = 1\n");
         Files.writeString(python.resolve("dynamic.py"), """
+            import importlib
             class Dynamic:
-                value: object = getattr(object(), "value", None)
+                value: object = importlib.import_module("alpha")
             """);
         compilePython(python, java, output, cache, PythonIncrementalMode.OPTIMISTIC);
         Path dynamicVfs = output.resolve(
@@ -1196,8 +1419,9 @@ final class PyronautCompilerIncrementalTest {
         Path output = directory.resolve("classes");
         Path cache = directory.resolve("incremental");
         Files.writeString(python.resolve("dynamic.py"), """
+            import importlib
             class Dynamic:
-                value: object = getattr(object(), "value", None)
+                value: object = importlib.import_module("alpha")
             """);
         Path unrelatedJava = java.resolve("Unrelated.java");
         Files.writeString(unrelatedJava, "class Unrelated { int value = 1; }\n");
@@ -1339,8 +1563,9 @@ final class PyronautCompilerIncrementalTest {
                 value: SharedJava
             """);
         Files.writeString(python.resolve("dynamic.py"), """
+            import importlib
             class Dynamic:
-                value: object = getattr(object(), "value", None)
+                value: object = importlib.import_module("alpha")
             """);
 
         compilePython(python, directory.resolve("java"), output, cache);

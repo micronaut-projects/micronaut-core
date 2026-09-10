@@ -25,9 +25,9 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.annotation.PythonElementAnnotationMetadataFactory;
-import io.micronaut.python.processing.visitor.ClassDef;
-import io.micronaut.python.processing.visitor.PythonClassElement;
-import io.micronaut.python.processing.visitor.PythonEnumElement;
+import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.element.PythonClassElement;
+import io.micronaut.python.processing.element.PythonEnumElement;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 
 import javax.lang.model.element.Element;
@@ -211,11 +211,11 @@ public record PythonProcessingEnvironment(
         return scriptsCache.get();
     }
 
-    private static Map<String, ClassElement> toMapOfScriptElement(java.util.Map<String, io.micronaut.python.processing.visitor.ScriptDef> scripts, PythonProcessingEnvironment environment) {
+    private static Map<String, ClassElement> toMapOfScriptElement(java.util.Map<String, io.micronaut.python.processing.model.ScriptDef> scripts, PythonProcessingEnvironment environment) {
         return scripts.entrySet().stream()
             .collect(Collectors.toMap(
                 entry -> entry.getValue().qualifiedName(),
-                entry -> new io.micronaut.python.processing.visitor.PythonScriptElement(entry.getValue(), environment)
+                entry -> new io.micronaut.python.processing.element.PythonScriptElement(entry.getValue(), environment)
             ));
     }
 

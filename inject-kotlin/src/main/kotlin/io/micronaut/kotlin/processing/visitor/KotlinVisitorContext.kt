@@ -19,6 +19,7 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.JvmPlatformInfo
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
@@ -66,7 +67,12 @@ internal class KotlinVisitorContext(
     var resolver: Resolver
 ) : VisitorContext {
 
-    init {
+    private companion object {
+        /**
+         * The `-jvm-default` modes emitting no `DefaultImpls` class: `no-compatibility` and the
+         * `-Xjvm-default=all` it replaced.
+         */
+        private val MODES_WITHOUT_DEFAULT_IMPLS = setOf("no-compatibility", "all")
     }
 
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
@@ -152,36 +158,22 @@ internal class KotlinVisitorContext(
         binaryNameCache.getOrPut(declaration) { computeBinaryName(declaration) }
 
     private fun computeBinaryName(decl: KSDeclaration): String {
-        var declaration = decl
-        if (declaration is KSFunctionDeclaration) {
-            val parent = declaration.parentDeclaration
-            if (parent != null) {
-                declaration = parent
-            }
-        }
-        val binaryName = if (declaration.qualifiedName != null) resolver.mapKotlinNameToJava(declaration.qualifiedName!!)?.asString() else null
-        if (binaryName != null) {
-            return binaryName
+        val declaration = enclosingDeclaration(decl)
+        val mappedName = mapQualifiedNameToJava(declaration)
+        if (mappedName != null) {
+            return mappedName
         }
         if (declaration.qualifiedName == null) {
             return "java.lang.Object" // Anonymous
         }
-        val classDeclaration = getClassDeclaration(declaration)
-        val qn = classDeclaration.qualifiedName
-        if (qn != null) {
-            val asString = resolver.mapKotlinNameToJava(qn)?.asString()
-            if (asString != null) {
-                return asString
-            }
+        val mappedClassName = mapQualifiedNameToJava(getClassDeclaration(declaration))
+        if (mappedClassName != null) {
+            return mappedClassName
         }
         if (declaration is KSClassDeclaration) {
-            val qualifiedName = declaration.qualifiedName
-            if (qualifiedName != null && qualifiedName.asString() == "kotlin.Unit") {
-                return "kotlin.Unit"
-            }
-            val signature = resolver.mapToJvmSignature(declaration)
-            if (signature != null) {
-                return Type.getType(signature).className
+            val classBinaryName = computeClassBinaryName(declaration)
+            if (classBinaryName != null) {
+                return classBinaryName
             }
         }
         if (declaration is KSTypeAlias) {
@@ -192,6 +184,36 @@ internal class KotlinVisitorContext(
         } else {
             declaration.simpleName.asString()
         }
+    }
+
+    /**
+     * A function is named after the class that declares it, so resolve to the parent when there is one.
+     */
+    private fun enclosingDeclaration(declaration: KSDeclaration): KSDeclaration =
+        if (declaration is KSFunctionDeclaration) {
+            declaration.parentDeclaration ?: declaration
+        } else {
+            declaration
+        }
+
+    /**
+     * The declaration's qualified name mapped to its Java counterpart, or `null` if it has no
+     * qualified name or no mapping exists.
+     */
+    private fun mapQualifiedNameToJava(declaration: KSDeclaration): String? {
+        val qualifiedName = declaration.qualifiedName ?: return null
+        return resolver.mapKotlinNameToJava(qualifiedName)?.asString()
+    }
+
+    /**
+     * The binary name derived from a class declaration's JVM signature, or `null` if it has none.
+     */
+    private fun computeClassBinaryName(declaration: KSClassDeclaration): String? {
+        if (declaration.qualifiedName?.asString() == "kotlin.Unit") {
+            return "kotlin.Unit"
+        }
+        val signature = resolver.mapToJvmSignature(declaration) ?: return null
+        return Type.getType(signature).className
     }
 
     private fun computeName(declaration: KSDeclaration): String {
@@ -280,6 +302,22 @@ internal class KotlinVisitorContext(
         return value
     }
 
+    /**
+     * Whether the sources of this compilation emit a `DefaultImpls` class for their interfaces,
+     * which is where the synthetic `$default` method of an interface method with default
+     * arguments then lives.
+     *
+     * Only the modes in [MODES_WITHOUT_DEFAULT_IMPLS] drop `DefaultImpls`; every other mode emits
+     * it, including `enable`, which emits the `$default` method on the interface as well. A
+     * compilation reporting no JVM platform at all is therefore taken to emit it, which is also
+     * what KSP's own default mode of `disable` would say.
+     */
+    val hasDefaultImpls: Boolean by lazy {
+        environment.platforms
+            .filterIsInstance<JvmPlatformInfo>()
+            .none { it.jvmDefaultMode in MODES_WITHOUT_DEFAULT_IMPLS }
+    }
+
     val extraOpenAnnotations: Array<String> by lazy {
         var allOpenAnnotations = environment.options["kotlin.allopen.annotations"]
         if (allOpenAnnotations.isNullOrEmpty()) {
@@ -297,12 +335,14 @@ internal class KotlinVisitorContext(
         // old session, so they must go: reading one afterwards throws
         // KaInvalidLifetimeOwnerAccessException ("PSI has changed since creation"). The
         // node-keyed memos would merely miss, since the nodes are new objects, but classByNameCache
-        // is keyed on a String and would hit and hand back a dead declaration.
+        // and the builder's remembered annotation types are keyed on a String and would hit and hand
+        // back a dead declaration.
         binaryNameCache.clear()
         annotationTypeCache.clear()
         repeatableContainerCache.clear()
         jvmNameCache.clear()
         classByNameCache.clear()
+        annotationMetadataBuilder.clearProcessedAnnotationTypes()
         this.resolver = resolver
         annotationMetadataBuilder.resolver = resolver
         nativeElementsHelper.resolver = resolver

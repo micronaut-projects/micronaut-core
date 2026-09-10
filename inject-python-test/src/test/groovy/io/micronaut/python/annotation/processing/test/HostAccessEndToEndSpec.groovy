@@ -5,7 +5,7 @@ import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.context.python.PooledValueCoercible
 import io.micronaut.context.python.PythonPool
 import io.micronaut.context.python.GraalPyContextFactory
-import io.micronaut.context.python.GraalPyRuntimeUtil
+import io.micronaut.context.python.PythonConversion
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.core.io.Writable
 import io.micronaut.json.JsonMapper
@@ -812,7 +812,7 @@ class TemplateWritable(Writable):
         when:
         Context polyglot = ctx.getBean(Context)
         def value = polyglot.eval("python", "TemplateWritable('generated')")
-        Writable writable = GraalPyRuntimeUtil.convertValue(value, Writable.class)
+        Writable writable = PythonConversion.convertValue(value, Writable.class)
         def out = new ByteArrayOutputStream()
         writable.writeTo(out, StandardCharsets.UTF_8)
 

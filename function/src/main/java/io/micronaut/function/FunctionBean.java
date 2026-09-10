@@ -15,6 +15,7 @@
  */
 package io.micronaut.function;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.EntryPoint;
@@ -41,6 +42,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Singleton
 @Executable
 @EntryPoint
+@Indexed(FunctionBean.class)
 public @interface FunctionBean {
 
     /**

@@ -26,7 +26,7 @@ class PetControllerSpec: StringSpec() {
             val client = embeddedServer.applicationContext.getBean(PetClient::class.java)
 
             // tag::post[]
-            val pet = Mono.from(client.save("Dino", 10)).block()
+            val pet = requireNotNull(Mono.from(client.save("Dino", 10)).block())
 
             pet.name shouldBe "Dino"
             pet.age.toLong() shouldBe 10

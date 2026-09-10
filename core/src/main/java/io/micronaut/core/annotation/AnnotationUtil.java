@@ -62,6 +62,8 @@ public class AnnotationUtil {
             "kotlin.annotation.Target",
             Experimental.class.getName(),
             KOTLIN_METADATA,
+            // the Groovy compiler marks the members it synthesises, as the Kotlin one marks a class
+            "groovy.transform.Generated",
             "jdk.internal.ValueBased"
     );
 
@@ -196,6 +198,16 @@ public class AnnotationUtil {
      * The annotation attribute containing all the attributes marked as non-binding.
      */
     public static final String NON_BINDING_ATTRIBUTE = "$nonBinding";
+
+    /**
+     * The reserved member holding the {@link Retainable} annotations composed by an annotation, as an array of
+     * {@link AnnotationValue}. It is stored, copied and written like
+     * any other member value, but it is not an attribute of the annotation: it is hidden from
+     * {@link AnnotationValue#getValues()} and read through {@link AnnotationValue#getStereotypes()}.
+     *
+     * @since 5.2.0
+     */
+    public static final String STEREOTYPES_MEMBER = "$stereotypes";
 
     /**
      * The inherited annotation.

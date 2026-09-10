@@ -40,7 +40,8 @@ public enum Mode {
      * Finds the request mode for the given wire value.
      *
      * @param value The request mode value
-     * @return The matching mode, or {@code null} if there is no match
+     * @return The matching mode, or {@code null} if there is no match. {@link SecFetch}
+     * reports such a value as a {@code null} component and keeps the rest of the metadata readable
      * @since 5.1.12
      */
     public static @Nullable Mode of(String value) {

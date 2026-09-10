@@ -21,6 +21,7 @@ import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.sourcegen.model.FieldDef;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -157,7 +158,45 @@ public final class DispatchWriter implements ClassOutputWriter {
         if (beanField.isReflectionRequired(ClassElement.of(thisType))) {
             return addDispatchTarget(new FieldGetReflectionDispatchTarget(beanField));
         }
+
         return addDispatchTarget(new FieldGetDispatchTarget(beanField));
+    }
+
+    /**
+     * Adds a dispatch target reading a field hidden by a field of the same name in a sub class: the field is
+     * read through the class declaring it, where a read through the owning type finds the field hiding it.
+     * The generated code names the declaring class, so the field can only be read when that class is
+     * accessible from the generated type.
+     *
+     * @param beanField The hidden field
+     * @return The dispatch index, or -1 when the declaring class cannot be named
+     * @since 5.2.0
+     */
+    public int addGetHiddenField(FieldElement beanField) {
+        ClassElement declaringType = beanField.getDeclaringType();
+        if (!isAccessibleType(declaringType)) {
+            return -1;
+        }
+        if (beanField.isReflectionRequired(ClassElement.of(thisType))) {
+            return addDispatchTarget(new FieldGetReflectionDispatchTarget(beanField, declaringType));
+        }
+        return addDispatchTarget(new FieldGetDispatchTarget(beanField, declaringType));
+    }
+
+    /**
+     * Whether the generated type can name a type: a public one, its enclosing types included, or one of
+     * the package of the generated type.
+     */
+    private boolean isAccessibleType(ClassElement type) {
+        if (type.getPackageName().equals(NameUtils.getPackageName(thisType))) {
+            return true;
+        }
+        for (ClassElement current = type; current != null; current = current.getEnclosingType().orElse(null)) {
+            if (!current.isPublic()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -694,7 +733,18 @@ public final class DispatchWriter implements ClassOutputWriter {
     }
 
     private static String methodKey(MethodElement methodElement) {
-        return methodElement.getName() +
+        // A private method cannot be overridden, and a package-private method can only be overridden from the same
+        // package. Include the narrowest owner that distinguishes methods which cannot override one another.
+        String owner;
+        if (methodElement.isPrivate()) {
+            owner = methodElement.getDeclaringType().getName() + "#";
+        } else if (methodElement.isPackagePrivate()) {
+            owner = methodElement.getDeclaringType().getPackageName() + "#";
+        } else {
+            owner = "";
+        }
+        return owner +
+            methodElement.getName() +
             "(" +
             Arrays.stream(methodElement.getSuspendParameters())
                 .map(p -> toTypeString(p.getType()))
@@ -867,9 +917,21 @@ public final class DispatchWriter implements ClassOutputWriter {
     @Internal
     public static final class FieldGetDispatchTarget extends AbstractDispatchTarget {
         final FieldElement beanField;
+        private final ClassElement accessType;
 
         public FieldGetDispatchTarget(FieldElement beanField) {
+            this(beanField, beanField.getOwningType());
+        }
+
+        /**
+         * @param beanField  The field
+         * @param accessType The type the field is read through: the owning type, or the declaring type of a
+         *                   field hidden in the owning type
+         * @since 5.2.0
+         */
+        public FieldGetDispatchTarget(FieldElement beanField, ClassElement accessType) {
             this.beanField = beanField;
+            this.accessType = accessType;
         }
 
         @Override
@@ -894,8 +956,11 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public ExpressionDef dispatchExpression(ExpressionDef bean) {
-            return bean.cast(ClassTypeDef.of(beanField.getOwningType()))
-                .field(beanField)
+            // the field is named on the type it is read through, as javac names it on the qualifying type: a
+            // reference naming the declaring class fails to resolve when that class is a package-private super
+            // class of another package, though the field itself is accessible
+            return bean.cast(ClassTypeDef.of(accessType))
+                .field(beanField.getName(), TypeDef.of(beanField.getType()))
                 .cast(TypeDef.of(beanField.getType()));
         }
 
@@ -910,9 +975,21 @@ public final class DispatchWriter implements ClassOutputWriter {
     @Internal
     public static final class FieldGetReflectionDispatchTarget extends AbstractDispatchTarget {
         final FieldElement beanField;
+        private final ClassElement accessType;
 
         public FieldGetReflectionDispatchTarget(FieldElement beanField) {
+            this(beanField, beanField.getOwningType());
+        }
+
+        /**
+         * @param beanField  The field
+         * @param accessType The type the lookup of the field starts from: the owning type, or the declaring
+         *                   type of a field hidden in the owning type
+         * @since 5.2.0
+         */
+        public FieldGetReflectionDispatchTarget(FieldElement beanField, ClassElement accessType) {
             this.beanField = beanField;
+            this.accessType = accessType;
         }
 
         @Override
@@ -939,7 +1016,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         public ExpressionDef dispatchExpression(ExpressionDef bean) {
             return TYPE_REFLECTION_UTILS.invokeStatic(
                 METHOD_GET_FIELD_VALUE,
-                ExpressionDef.constant(ClassTypeDef.of(beanField.getOwningType())), // Target class
+                ExpressionDef.constant(ClassTypeDef.of(accessType)), // Target class, the lookup walks up from it
                 ExpressionDef.constant(beanField.getName()), // Field name,
                 bean // Target instance
             ).cast(TypeDef.of(beanField.getType()));
@@ -983,8 +1060,9 @@ public final class DispatchWriter implements ClassOutputWriter {
 
         @Override
         public StatementDef dispatchOne(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
+            // named on the owning type, as javac names it on the qualifying type: see FieldGetDispatchTarget
             return target.cast(ClassTypeDef.of(beanField.getOwningType()))
-                .field(beanField)
+                .field(beanField.getName(), TypeDef.of(beanField.getType()))
                 .put(value.cast(TypeDef.of(beanField.getType())))
                 .after(ExpressionDef.nullValue().returning());
         }
@@ -992,7 +1070,7 @@ public final class DispatchWriter implements ClassOutputWriter {
         @Override
         public StatementDef dispatchOneVoid(int caseValue, ExpressionDef caseExpression, ExpressionDef target, ExpressionDef value) {
             return target.cast(ClassTypeDef.of(beanField.getOwningType()))
-                .field(beanField)
+                .field(beanField.getName(), TypeDef.of(beanField.getType()))
                 .put(value.cast(TypeDef.of(beanField.getType())));
         }
 

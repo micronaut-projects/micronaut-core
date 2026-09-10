@@ -22,13 +22,13 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
-import io.micronaut.python.processing.visitor.ElementDef;
-import io.micronaut.python.processing.visitor.DecoratorDef;
-import io.micronaut.python.processing.visitor.FunctionDef;
-import io.micronaut.python.processing.visitor.PythonMethodElement;
-import io.micronaut.python.processing.visitor.PythonScriptElement;
-import io.micronaut.python.processing.visitor.ScriptDef;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.model.ElementDef;
+import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.FunctionDef;
+import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonScriptElement;
+import io.micronaut.python.processing.model.ScriptDef;
 
 /**
  * Factory for creating and managing annotation metadata for Python elements.

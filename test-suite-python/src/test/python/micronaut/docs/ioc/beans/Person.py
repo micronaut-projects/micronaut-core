@@ -1,7 +1,9 @@
-# tag::class[]
+# tag::imports[]
 from dataclasses import dataclass
 from micronaut.core.annotation import Introspected
+# end::imports[]
 
+# tag::class[]
 @dataclass
 @Introspected
 class Person:

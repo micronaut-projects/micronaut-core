@@ -15,6 +15,7 @@
  */
 package io.micronaut.core.type
 
+import io.micronaut.core.annotation.AnnotationMetadata
 import spock.lang.Specification
 import spock.lang.Unroll
 /**
@@ -167,6 +168,37 @@ class ArgumentSpec extends Specification {
         arg.getType() == List.class
         arg.getTypeParameters()[0].getType() == List.class
         arg.getTypeParameters()[0].getTypeParameters()[0].getType() == Long.class
+    }
+
+    void "a raw argument keeps the type parameters it is given and says it is raw"() {
+        given:
+        def raw = Argument.ofRawType(List, 'raw', null, [Argument.ofTypeVariable(Object, 'E')] as Argument[])
+
+        expect:
+        raw.isRawType()
+        raw.type == List
+        raw.name == 'raw'
+        raw.typeParameters*.type == [Object]
+
+        and: 'an argument written with its type arguments is not raw, nor is a variable'
+        !Argument.of(List, 'concrete', Argument.of(String, 'E')).isRawType()
+        !Argument.ofTypeVariable(Object, 'E').isRawType()
+        !Argument.OBJECT_ARGUMENT.isRawType()
+
+        and: 'renaming it or giving it other metadata keeps it raw'
+        raw.withName('other').isRawType()
+        raw.withName('other').name == 'other'
+        raw.withName('other').typeParameters*.type == [Object]
+        raw.withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).isRawType()
+
+        and: 'a raw argument of no name is not given one by being rebuilt, as a placeholder is not'
+        Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS)
+                .withAnnotationMetadata(AnnotationMetadata.EMPTY_METADATA).toString() ==
+                Argument.ofRawType(List, null, null, Argument.ZERO_ARGUMENTS).toString()
+
+        and: 'rawness does not take part in equality, as it does not for a type variable'
+        raw == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E'))
+        raw.hashCode() == Argument.of(List, 'raw', Argument.ofTypeVariable(Object, 'E')).hashCode()
     }
 
     @Unroll

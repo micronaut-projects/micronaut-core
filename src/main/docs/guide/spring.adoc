@@ -1,2 +1,0 @@
-The Micronaut framework provides support for adding Micronaut beans to a
-Spring Application Context.

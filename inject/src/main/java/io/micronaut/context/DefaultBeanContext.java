@@ -44,6 +44,7 @@ import io.micronaut.context.exceptions.BeanCreationException;
 import io.micronaut.context.exceptions.BeanDestructionException;
 import io.micronaut.context.exceptions.BeanInstantiationException;
 import io.micronaut.context.exceptions.ConfigurationException;
+import io.micronaut.context.exceptions.ConstructorAdviceException;
 import io.micronaut.context.exceptions.DependencyInjectionException;
 import io.micronaut.context.exceptions.DisabledBeanException;
 import io.micronaut.context.exceptions.NoSuchBeanException;
@@ -115,11 +116,13 @@ import org.slf4j.LoggerFactory;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.AbstractMap;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Deque;
 import java.util.EventListener;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -135,10 +138,14 @@ import java.util.PriorityQueue;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -159,6 +166,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     protected static final Logger LOG_LIFECYCLE = LoggerFactory.getLogger(DefaultBeanContext.class.getPackage().getName() + ".lifecycle");
     private static final String SCOPED_PROXY_ANN = "io.micronaut.runtime.context.scope.ScopedProxy";
     private static final String INTRODUCTION_TYPE = "io.micronaut.aop.Introduction";
+    /**
+     * The maximum number of additional destruction passes performed during {@link #stop()} to destroy
+     * singletons created by {@code @PreDestroy} hooks, bounding a hook that always creates a new bean.
+     */
+    private static final int MAX_SHUTDOWN_PASSES = 10;
 
     private static final Predicate<BeanDefinition<?>> FILTER_OUT_ANY_PROVIDERS = new Predicate<BeanDefinition<?>>() { // Keep anonymous for hot path
         @Override
@@ -169,6 +181,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private static final String MSG_COULD_NOT_BE_LOADED = "] could not be loaded: ";
     public static final String MSG_BEAN_DEFINITION = "Bean definition [";
+
+    private static final String PARALLEL_BEAN_DISCOVERY_THREAD = "micronaut-parallel-bean-discovery";
+
+    /**
+     * How long {@link #stop()} waits for the parallel bean discovery thread and any in-flight
+     * parallel bean initializations before it proceeds to destroy the singletons.
+     */
+    private static final long PARALLEL_SHUTDOWN_TIMEOUT_MS = 10_000L;
 
     protected final AtomicBoolean running = new AtomicBoolean(false);
     protected final AtomicBoolean configured = new AtomicBoolean(false);
@@ -227,6 +247,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final boolean eagerBeansEnabled;
 
     private @Nullable ForkJoinTask<?> checkEnabledBeans;
+
+    /**
+     * The thread that discovers {@link Parallel} beans, retained so that {@link #stop()} can
+     * interrupt and join it instead of letting it outlive the context. An {@link AtomicReference}
+     * so that the shutdown claims the thread and clears the field in one step, and a discovery
+     * started concurrently cannot have its thread dropped without being joined.
+     */
+    private final AtomicReference<Thread> parallelBeanDiscoveryThread = new AtomicReference<>();
+
+    /**
+     * The in-flight parallel bean initializations. Each entry is completed by its worker when the
+     * initialization finishes, successfully or not.
+     */
+    private final Set<ParallelInitialization> parallelInitializationTasks = ConcurrentHashMap.newKeySet();
+
+    /**
+     * The parallel initialization a worker thread is currently running, so that a shutdown
+     * triggered from that worker does not wait for the worker itself.
+     */
+    private final ThreadLocal<ParallelInitialization> currentParallelInitialization = new ThreadLocal<>();
 
     protected MutableConversionService conversionService;
 
@@ -400,47 +440,41 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     @Override
     public synchronized BeanContext stop() {
-        if (terminating.compareAndSet(false, true) && isRunning()) {
+        // Only mark as terminating if a shutdown is actually going to run, otherwise the flag would be left set forever
+        if (isRunning() && terminating.compareAndSet(false, true)) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Stopping BeanContext");
             }
             publishEvent(new ShutdownEvent(this));
             attributes.clear();
 
-            // need to sort registered singletons so that beans with that require other beans appear first
-            List<BeanRegistration> objects = topologicalSort(singletonScope.getBeanRegistrations());
+            // wait for parallel bean startup to finish so that the singletons it creates are
+            // included in the destruction pass below instead of being registered behind it
+            awaitParallelStartupTermination();
 
-            Map<Boolean, List<BeanRegistration>> result = objects.stream().collect(Collectors.groupingBy(br -> br.bean != null
-                && (br.bean instanceof BeanPreDestroyEventListener || br.bean instanceof BeanDestroyedEventListener)));
+            // dedup by identity: identity hash codes are not unique across live objects
+            Set<Object> processed = Collections.newSetFromMap(new IdentityHashMap<>());
+            destroySingletons(singletonScope.getBeanRegistrations(), processed);
 
-            List<BeanRegistration> listeners = result.get(true);
-            if (listeners != null) {
-                // destroy all bean destroy listeners at the end
-                objects.clear();
-                objects.addAll(result.get(false));
-                objects.addAll(listeners);
-            }
-
-            Set<Integer> processed = new HashSet<>();
-            for (BeanRegistration beanRegistration : objects) {
-                Object bean = beanRegistration.bean;
-                int sysId = System.identityHashCode(bean);
-                if (processed.contains(sysId)) {
-                    continue;
+            // a @PreDestroy hook is free to resolve beans, which may create brand-new singletons
+            // registered after the snapshot above was taken. Destroy those stragglers too, with a
+            // bound so a pathological hook that always creates a bean cannot spin forever
+            for (int pass = 0; ; pass++) {
+                List<BeanRegistration> stragglers = singletonScope.getBeanRegistrations()
+                    .stream()
+                    .filter(br -> !processed.contains(br.bean))
+                    .toList();
+                if (stragglers.isEmpty()) {
+                    break;
                 }
-
-                if (LOG_LIFECYCLE.isDebugEnabled()) {
-                    LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanRegistration.identifier);
-                }
-
-                processed.add(sysId);
-                try {
-                    destroyBean(beanRegistration);
-                } catch (BeanDestructionException e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error(e.getMessage(), e);
+                if (pass == MAX_SHUTDOWN_PASSES) {
+                    if (LOG.isWarnEnabled()) {
+                        LOG.warn("Singletons are still being created during shutdown after {} destruction passes. "
+                            + "Giving up, {} bean(s) will not be destroyed.", MAX_SHUTDOWN_PASSES, stragglers.size());
                     }
+                    break;
                 }
+                destroySingletons(stragglers, processed);
             }
 
             if (checkEnabledBeans != null) {
@@ -628,11 +662,16 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanType == null) {
             return Optional.empty();
         }
-        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanType);
-        if (definitions.isEmpty()) {
+        Argument<T> beanArgument = Argument.of(beanType);
+        Collection<BeanDefinition<T>> definitions = getBeanDefinitions(beanArgument);
+        // a bean enumerable by this type only because it is @Indexed by it does not have the type's methods
+        BeanDefinition<T> beanDefinition = definitions.stream()
+            .filter(definition -> isInjectableCandidate(beanArgument, definition))
+            .findFirst()
+            .orElse(null);
+        if (beanDefinition == null) {
             return Optional.empty();
         }
-        BeanDefinition<T> beanDefinition = definitions.iterator().next();
         Optional<ExecutableMethod<T, R>> foundMethod = beanDefinition.findMethod(method, arguments);
         if (foundMethod.isPresent()) {
             return foundMethod;
@@ -1191,6 +1230,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         destroyBean(registration, false);
     }
 
+    /**
+     * Destroys a bean that another bean, or another bean's disposal, owns as a dependent object.
+     *
+     * <p>This is the destruction the dependents of a bean receive when that bean is destroyed, which leaves
+     * {@link LifeCycle#stop()} alone: stopping a bean is for a bean destroyed in its own right, not for one
+     * destroyed because whatever it was resolved for is gone.</p>
+     *
+     * @param registration The registration of the dependent
+     * @param <T>          The bean type
+     * @since 5.2.0
+     */
+    <T> void destroyDependentBean(BeanRegistration<T> registration) {
+        destroyBean(registration, true);
+    }
+
     private <T> void destroyBean(BeanRegistration<T> registration, boolean dependent) {
         if (LOG_LIFECYCLE.isDebugEnabled()) {
             LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", registration.bean, registration.identifier);
@@ -1622,6 +1676,21 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Override
+    public <T> Optional<BeanDefinition<T>> findBeanDefinitionByDefinitionClass(Class<? extends BeanDefinition<T>> definitionClass) {
+        ArgumentUtils.requireNonNull("definitionClass", definitionClass);
+        return Optional.ofNullable(beanDefinitionProvider.findBeanDefinitionByDefinitionClass(this, definitionClass));
+    }
+
+    @Override
+    public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(BeanDefinition<T> proxyBeanDefinition) {
+        ArgumentUtils.requireNonNull("proxyBeanDefinition", proxyBeanDefinition);
+        if (proxyBeanDefinition instanceof ProxyBeanDefinition<T> proxyDefinition) {
+            return findBeanDefinitionByDefinitionClass(proxyDefinition.getTargetDefinitionType());
+        }
+        return Optional.empty();
+    }
+
+    @Override
     @SuppressWarnings("java:S2789") // performance optimization
     public <T> Optional<BeanDefinition<T>> findProxyTargetBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
@@ -1645,6 +1714,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Collection<BeanDefinition<Object>> candidates;
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
+            @SuppressWarnings("unchecked")
+            Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
+            if (indexedArgument != null) {
+                // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
+                return getBeanDefinitions(indexedArgument);
+            }
             // Keep anonymous
             Predicate<BeanDefinitionReference<Object>> predicate = new Predicate<>() {
                 @Override
@@ -1694,20 +1769,42 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Override
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
-        Class<B> beanType = definition.getBeanType();
-        purgeCacheForBeanType(beanType);
-        if (CustomScope.class.isAssignableFrom(beanType)) {
+        purgeCacheForBeanDefinition(definition);
+        if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
         }
         return this;
     }
 
-    private <B> void purgeCacheForBeanType(Class<B> beanType) {
-        beanCandidateCache.entrySet().removeIf(entry -> entry.getKey().isAssignableFrom(beanType));
-        beanConcreteCandidateCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        singletonBeanRegistrations.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
-        containsBeanCache.entrySet().removeIf(entry -> entry.getKey().beanType.isAssignableFrom(beanType));
+    private void purgeCacheForBeanDefinition(RuntimeBeanDefinition<?> definition) {
+        if (beanCandidateCache.isEmpty() && beanConcreteCandidateCache.isEmpty() &&
+            singletonBeanRegistrations.isEmpty() && containsBeanCache.isEmpty()) {
+            return;
+        }
+        Class<?> beanType = definition.getBeanType();
+        Class<?>[] indexedTypes = definition.getIndexes();
+        Predicate<Argument<?>> isAffected = cachedType ->
+            isAffectedByRegistration(cachedType, beanType, indexedTypes);
+        beanCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey()));
+        beanConcreteCandidateCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        singletonBeanRegistrations.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+        containsBeanCache.entrySet().removeIf(entry -> isAffected.test(entry.getKey().beanType));
+    }
+
+    private static boolean isAffectedByRegistration(Argument<?> cachedType,
+                                                     Class<?> beanType,
+                                                     Class<?>[] indexedTypes) {
+        if (cachedType.isAssignableFrom(beanType)) {
+            return true;
+        }
+        Class<?> rawCachedType = cachedType.getType();
+        for (Class<?> indexedType : indexedTypes) {
+            if (indexedType == rawCachedType) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1860,7 +1957,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> Optional<BeanDefinition<T>> findProxyBeanDefinition(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         ArgumentUtils.requireNonNull("beanType", beanType);
         for (BeanDefinition<T> beanDefinition : getBeanDefinitions(beanType, qualifier)) {
-            if (beanDefinition.isProxy()) {
+            // a bean enumerable by this type only because it is @Indexed by it is never a proxy of it
+            if (beanDefinition.isProxy() && isInjectableCandidate(beanType, beanDefinition)) {
                 return Optional.of(beanDefinition);
             }
         }
@@ -1918,12 +2016,17 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private <T extends EventListener> Map<Class<?>, List<BeanDefinition<T>>> getTypeToListenerMap(Class<T> listenerType) {
-        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerType);
+        Argument<T> listenerArgument = Argument.of(listenerType);
+        final Collection<BeanDefinition<T>> beanDefinitions = getBeanDefinitions(listenerArgument);
         if (beanDefinitions.isEmpty()) {
             return Collections.emptyMap();
         }
         final HashMap<Class<?>, List<BeanDefinition<T>>> typeToListener = CollectionUtils.newHashMap(beanDefinitions.size());
         for (BeanDefinition<T> beanCreatedDefinition : beanDefinitions) {
+            // A bean only indexed by the listener type, without implementing it, is enumerable but is not a listener
+            if (!isInjectableCandidate(listenerArgument, beanCreatedDefinition)) {
+                continue;
+            }
             List<Argument<?>> typeArguments = beanCreatedDefinition.getTypeArguments(listenerType);
             Argument<?> argument = CollectionUtils.last(typeArguments);
             if (argument == null) {
@@ -2040,7 +2143,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public final <T> Collection<BeanDefinition<T>> findBeanCandidates(@Nullable BeanResolutionContext resolutionContext,
                                                                       Argument<T> beanType,
                                                                       @Nullable BeanDefinition<?> filter) {
-        Predicate<BeanDefinition<T>> predicate = filter == null ? null : definition -> !definition.equals(filter);
+        Predicate<BeanDefinition<T>> predicate = candidate ->
+            isInjectableCandidate(beanType, candidate) && (filter == null || !candidate.equals(filter));
         return findBeanCandidates(resolutionContext, beanType, true, predicate);
     }
 
@@ -2093,7 +2197,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Iterator<BeanDefinition<T>> iterator = beanDefinitions.iterator();
         Set<BeanDefinition<T>> candidates;
         if (iterator.hasNext()) {
-            candidates = new HashSet<>();
+            candidates = new LinkedHashSet<>();
             while (iterator.hasNext()) {
                 BeanDefinition<T> candidate = iterator.next();
                 if (collectIterables && candidate.isConfigurationProperties()) {
@@ -2224,6 +2328,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 qualified.$withBeanQualifier(declaredQualifier);
             }
             return bean;
+        } catch (ConstructorAdviceException e) {
+            // Advice around the constructor rejected the construction. An exception thrown by advice reaches
+            // its caller as it was thrown when the advice is around a method, so it does here too.
+            throw e.getAdviceCause();
         } catch (DependencyInjectionException | DisabledBeanException |
                  BeanInstantiationException e) {
             throw e;
@@ -2372,37 +2480,223 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (!eagerBeansEnabled) {
             return;
         }
-        new Thread(() -> {
-            Iterable<BeanDefinition<Object>> parallelBeans = beanDefinitionProvider.getParallelBeans(this);
-            Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>(20);
-            parallelBeans.forEach(beanDefinition -> {
+        Thread thread = new Thread(this::discoverParallelBeans, PARALLEL_BEAN_DISCOVERY_THREAD);
+        // a daemon thread cannot keep the JVM alive if condition evaluation below blocks
+        thread.setDaemon(true);
+        parallelBeanDiscoveryThread.set(thread);
+        thread.start();
+    }
+
+    private void discoverParallelBeans() {
+        try {
+            runParallelBeanDiscovery();
+        } catch (Exception e) {
+            // the discovery thread is the last handler for its own failures. the definitions are
+            // iterated lazily, so a condition that throws fails in the loop header rather than in
+            // the guarded body below, and would otherwise vanish with the thread
+            LOG.error("Parallel bean discovery failed: {}", e.getMessage(), e);
+        } finally {
+            // there is nothing left to join: drop the reference rather than hold a terminated
+            // thread, and its thread locals, for as long as the context runs. only this thread's
+            // own registration is cleared, never one a later discovery has installed
+            parallelBeanDiscoveryThread.compareAndSet(Thread.currentThread(), null);
+        }
+    }
+
+    private void runParallelBeanDiscovery() {
+        Iterable<BeanDefinition<Object>> parallelBeans = beanDefinitionProvider.getParallelBeans(this);
+        Collection<BeanDefinition<Object>> parallelDefinitions = new ArrayList<>(20);
+        for (BeanDefinition<Object> beanDefinition : parallelBeans) {
+            if (isParallelStartupAborted()) {
+                return;
+            }
+            try {
+                loadEagerBeans(beanDefinition, parallelDefinitions);
+            } catch (Throwable e) {
+                LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
+                if (isShutdownOnError(beanDefinition)) {
+                    stopFromParallelWorker();
+                    return;
+                }
+            }
+        }
+
+        filterReplacedBeans(parallelDefinitions);
+
+        for (BeanDefinition<Object> beanDefinition : parallelDefinitions) {
+            if (isParallelStartupAborted()) {
+                return;
+            }
+            submitParallelInitialization(beanDefinition);
+        }
+        parallelDefinitions.clear();
+    }
+
+    /**
+     * Submits a parallel bean initialization, tracking it so that {@link #stop()} can wait for it.
+     *
+     * @param beanDefinition The definition to initialize
+     */
+    @SuppressWarnings("java:S1181") // an Error from a bean constructor must still honour shutdownOnError; it is logged, not swallowed
+    private void submitParallelInitialization(BeanDefinition<Object> beanDefinition) {
+        ParallelInitialization task = new ParallelInitialization();
+        // register before submitting so that a task can never run unobserved by stop()
+        parallelInitializationTasks.add(task);
+        if (isParallelStartupAborted()) {
+            completeParallelInitialization(task);
+            return;
+        }
+        try {
+            ForkJoinPool.commonPool().execute(() -> {
+                currentParallelInitialization.set(task);
                 try {
-                    loadEagerBeans(beanDefinition, parallelDefinitions);
+                    initializeParallelBean(beanDefinition);
                 } catch (Throwable e) {
                     LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                    boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
+                    if (isShutdownOnError(beanDefinition)) {
+                        stopFromParallelWorker();
                     }
+                } finally {
+                    currentParallelInitialization.remove();
+                    completeParallelInitialization(task);
                 }
             });
+        } catch (Throwable e) {
+            completeParallelInitialization(task);
+            throw e;
+        }
+    }
 
-            filterReplacedBeans(parallelDefinitions);
+    private void completeParallelInitialization(ParallelInitialization task) {
+        // count down before removing, so that a task is only ever absent from the set once its
+        // latch has fired. the other order leaves a window where the set looks empty to a waiter
+        // that has not yet taken this task's latch
+        task.completed.countDown();
+        parallelInitializationTasks.remove(task);
+    }
 
-            parallelDefinitions.forEach(beanDefinition -> ForkJoinPool.commonPool().execute(() -> {
-                try {
-                    initializeEagerBean(beanDefinition);
-                } catch (Throwable e) {
-                    LOG.error("Parallel Bean definition [{}{}{}]", beanDefinition.getName(), MSG_COULD_NOT_BE_LOADED, e.getMessage(), e);
-                    Boolean shutdownOnError = beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
-                    if (shutdownOnError) {
-                        stop();
-                    }
+    private void initializeParallelBean(BeanDefinition<Object> beanDefinition) {
+        if (isParallelStartupAborted()) {
+            // shutdown began before this bean was created: never register it in the first place
+            return;
+        }
+        List<BeanRegistration<Object>> registrations = new ArrayList<>(1);
+        initializeEagerBean(beanDefinition, registrations::add);
+        if (isShuttingDown()) {
+            // shutdown began while this bean was being constructed. stop() waits for in-flight
+            // initializations, so normally it will have seen these registrations; if it timed out
+            // waiting they landed too late for the destruction pass and are destroyed here instead
+            for (BeanRegistration<Object> registration : registrations) {
+                destroyLateParallelBean(registration);
+            }
+        }
+    }
+
+    private void destroyLateParallelBean(BeanRegistration<Object> registration) {
+        try {
+            // only destroy a registration that is still active, so a bean the destruction pass
+            // already picked up is not destroyed twice
+            BeanRegistration<Object> active = singletonScope.findBeanRegistration(registration.beanDefinition);
+            if (active != null) {
+                destroyBean(active);
+            }
+        } catch (Exception e) {
+            LOG.error("Error destroying parallel bean [{}] registered after the context was stopped: {}", registration.beanDefinition.getName(), e.getMessage(), e);
+        }
+    }
+
+    private static boolean isShutdownOnError(BeanDefinition<?> beanDefinition) {
+        return beanDefinition.getAnnotationMetadata().booleanValue(Parallel.class, "shutdownOnError").orElse(true);
+    }
+
+    /**
+     * @return Whether parallel startup work should stop because the context is shutting down or has
+     * already been shut down
+     */
+    private boolean isParallelStartupAborted() {
+        return Thread.currentThread().isInterrupted() || isShuttingDown();
+    }
+
+    /**
+     * @return Whether the context is shutting down or has already been shut down
+     */
+    private boolean isShuttingDown() {
+        return terminating.get() || (!running.get() && !initializing.get());
+    }
+
+    /**
+     * Stops the context from a parallel startup worker. The worker is one of the threads
+     * {@link #stop()} waits for, so it must not trigger a shutdown that is already under way.
+     */
+    private void stopFromParallelWorker() {
+        if (terminating.get()) {
+            return;
+        }
+        stop();
+    }
+
+    /**
+     * Waits for the parallel startup work to finish, so that {@link #stop()} does not race the
+     * registration of parallel singletons. Bounded: a blocked discovery or initialization delays
+     * shutdown by at most {@link #PARALLEL_SHUTDOWN_TIMEOUT_MS}.
+     */
+    private void awaitParallelStartupTermination() {
+        long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(PARALLEL_SHUTDOWN_TIMEOUT_MS);
+        Thread discoveryThread = parallelBeanDiscoveryThread.getAndSet(null);
+        if (discoveryThread != null && discoveryThread.isAlive() && discoveryThread != Thread.currentThread()) {
+            discoveryThread.interrupt();
+            try {
+                long remaining = TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime());
+                discoveryThread.join(Math.max(1, remaining));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            if (discoveryThread.isAlive() && LOG.isWarnEnabled()) {
+                LOG.warn("Parallel bean discovery thread [{}] did not terminate within {}ms of the context being stopped", discoveryThread.getName(), PARALLEL_SHUTDOWN_TIMEOUT_MS);
+            }
+        }
+
+        ParallelInitialization ownTask = currentParallelInitialization.get();
+        if (ownTask != null) {
+            // this shutdown was triggered from within a parallel initialization; that task cannot
+            // complete until stop() returns, so waiting for it would deadlock
+            parallelInitializationTasks.remove(ownTask);
+        }
+        while (true) {
+            ParallelInitialization task = parallelInitializationTasks.stream().findFirst().orElse(null);
+            if (task == null) {
+                return;
+            }
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0 || !task.await(remaining)) {
+                if (LOG.isWarnEnabled()) {
+                    LOG.warn("{} parallel bean initialization(s) did not complete within {}ms of the context being stopped", parallelInitializationTasks.size(), PARALLEL_SHUTDOWN_TIMEOUT_MS);
                 }
-            }));
-            parallelDefinitions.clear();
+                return;
+            }
+            parallelInitializationTasks.remove(task);
+        }
+    }
 
-        }).start();
+    /**
+     * An in-flight parallel bean initialization, tracked so that {@link #stop()} can wait for it.
+     */
+    private static final class ParallelInitialization {
+
+        private final CountDownLatch completed = new CountDownLatch(1);
+
+        /**
+         * @param timeoutNanos How long to wait
+         * @return Whether the initialization finished within the given time
+         */
+        private boolean await(long timeoutNanos) {
+            try {
+                return completed.await(timeoutNanos, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return false;
+            }
+        }
     }
 
     private <T> void filterReplacedBeans(Collection<BeanDefinition<T>> candidates) {
@@ -2473,6 +2767,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     private void initializeEagerBean(BeanDefinition<Object> beanDefinition) {
+        initializeEagerBean(beanDefinition, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private void initializeEagerBean(BeanDefinition<Object> beanDefinition, @Nullable Consumer<BeanRegistration<Object>> registrationConsumer) {
         if (beanDefinition.isIterable() || beanDefinition.hasStereotype(ConfigurationReader.class.getName())) {
             Set<BeanDefinition<Object>> beanCandidates = new HashSet<>(5);
 
@@ -2483,16 +2782,22 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 Argument.OBJECT_ARGUMENT
             );
             for (BeanDefinition beanCandidate : beanCandidates) {
-                intializeEagerBean(
+                BeanRegistration<Object> registration = intializeEagerBean(
                     null,
                     beanCandidate,
                     beanCandidate.asArgument(),
                     beanCandidate.hasAnnotation(Context.class) ? null : beanDefinition.getDeclaredQualifier()
                 );
+                if (registrationConsumer != null) {
+                    registrationConsumer.accept(registration);
+                }
             }
 
         } else {
-            intializeEagerBean(null, beanDefinition, beanDefinition.asArgument(), null);
+            BeanRegistration<Object> registration = intializeEagerBean(null, beanDefinition, beanDefinition.asArgument(), null);
+            if (registrationConsumer != null) {
+                registrationConsumer.accept(registration);
+            }
         }
     }
 
@@ -2523,7 +2828,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 true,
                 null,
                 ReflectionUtils.EMPTY_CLASS_ARRAY,
-                java.util.Collections.emptyMap()
+                java.util.Collections.emptyMap(),
+                new DefaultRuntimeBeanDefinition.InjectionPointSpec[0]
             );
             return BeanRegistration.of(this, BeanIdentifier.of(beanClass.getName()), def, (T) this);
         }
@@ -2899,7 +3205,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (scopeAnnotation == Prototype.class) {
                 // a prototype bean has no lifecycle of its own, so a scope declared on the
                 // injection point (such as @InjectScope) still applies to it
-                return findInjectionPointDeclaredScope(resolutionContext);
+                return findInjectionPointDeclaredScope(resolutionContext, definition);
             }
             CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
             if (customScope != null) {
@@ -2912,7 +3218,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (Prototype.class.getName().equals(scopeAnnotation)) {
                     // a prototype bean has no lifecycle of its own, so a scope declared on the
                     // injection point (such as @InjectScope) still applies to it
-                    return findInjectionPointDeclaredScope(resolutionContext);
+                    return findInjectionPointDeclaredScope(resolutionContext, definition);
                 }
                 CustomScope<?> customScope = customScopeRegistry.findScope(scopeAnnotation).orElse(null);
                 if (customScope != null) {
@@ -2921,7 +3227,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext);
+        CustomScope<?> injectionPointScope = findInjectionPointDeclaredScope(resolutionContext, definition);
         if (injectionPointScope != null) {
             return injectionPointScope;
         }
@@ -2933,18 +3239,37 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     @Nullable
-    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext) {
+    private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext,
+                                                           @Nullable BeanDefinition<?> definition) {
         if (resolutionContext != null) {
             BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext
                 .getPath()
                 .currentSegment()
                 .orElse(null);
             if (currentSegment != null) {
+                if (definition != null && isFactoryOf(definition, currentSegment.getDeclaringType())) {
+                    // the bean is the factory that produces the segment's bean rather than an injection point of
+                    // it, and a scope declared on the produced bean does not apply to its factory. Applying it
+                    // would resolve the factory through the very scope that is creating the produced bean,
+                    // re-entering that scope for a second bean while the first is still being created.
+                    return null;
+                }
                 Argument<?> argument = currentSegment.getArgument();
                 return customScopeRegistry.findDeclaredScope(argument).orElse(null);
             }
         }
         return null;
+    }
+
+    /**
+     * Whether the given definition is the factory the produced bean's definition declares its factory method on.
+     *
+     * @param definition   The definition being resolved
+     * @param producedBean The definition of the bean the current segment produces
+     * @return True if the definition is the factory of the produced bean
+     */
+    private static boolean isFactoryOf(BeanDefinition<?> definition, @Nullable BeanDefinition<?> producedBean) {
+        return producedBean != null && producedBean.getDeclaringType().orElse(null) == definition.getBeanType();
     }
 
     private <T> BeanRegistration<T> getOrCreateScopedRegistration(@Nullable BeanResolutionContext resolutionContext,
@@ -3080,7 +3405,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                          @Nullable Qualifier<T> qualifier,
                                                                          boolean throwNonUnique) {
 
-        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract();
+        Predicate<BeanDefinition<T>> predicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(beanType, candidate);
         Collection<BeanDefinition<T>> candidates = findBeanCandidates(resolutionContext, beanType, true, predicate);
         Optional<BeanDefinition<T>> beanDefinition = pickOneBean(beanType, qualifier, throwNonUnique, candidates);
         if (beanDefinition.isPresent()) {
@@ -3088,7 +3413,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         if (!lookupBeanType.equals(beanType)) {
-            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, predicate);
+            Predicate<BeanDefinition<T>> lookupPredicate = candidate -> !candidate.isAbstract() && isInjectableCandidate(lookupBeanType, candidate);
+            candidates = findBeanCandidates(resolutionContext, lookupBeanType, true, lookupPredicate);
             return pickOneBean(lookupBeanType, qualifier, throwNonUnique, candidates);
         }
         return Optional.empty();
@@ -3176,8 +3502,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (candidates.size() == 1) {
             return candidates.iterator().next();
         }
-        if (candidates.isEmpty()) {
-            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
+        // When every candidate is @Secondary none of them is preferable to another, but lowering the
+        // precedence of all of them shouldn't remove the ability to decide between them: carry on with
+        // the original candidates so that the order and @DefaultImplementation still get a say.
+        boolean allSecondary = candidates.isEmpty();
+        if (allSecondary) {
+            candidates = originalCandidates;
         }
         // pick the bean with the highest priority
         ArrayList<BeanDefinition<T>> listCandidates = new ArrayList<>(candidates);
@@ -3205,6 +3535,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         Collection<BeanDefinition<T>> exactMatches = filterExactMatch(beanType.getType(), candidates);
         if (exactMatches.size() == 1) {
             return exactMatches.iterator().next();
+        }
+        if (allSecondary) {
+            throw new NonUniqueBeanException(beanType.getType(), originalCandidates.iterator());
         }
         if (throwNonUnique) {
             return findConcreteCandidate(beanType.getType(), qualifier, candidates);
@@ -3320,7 +3653,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         Collection<BeanDefinition<T>> beanDefinitions = findBeanCandidatesInternal(resolutionContext, beanType);
         if (!beanDefinitions.isEmpty()) {
-            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanDefinitions);
+            beanDefinitions = applyBeanResolutionFilters(resolutionContext, beanType, beanDefinitions);
             if (qualifier != null) {
                 beanDefinitions = qualifier.filterQualified(beanType.getType(), beanDefinitions);
             }
@@ -3385,7 +3718,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext, Collection<BeanDefinition<T>> candidates) {
+    private <T> Collection<BeanDefinition<T>> applyBeanResolutionFilters(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Argument<T> beanType,
+                                                                         Collection<BeanDefinition<T>> candidates) {
+        Argument<T> lookupBeanType = resolveBeanLookupArgument(beanType);
         BeanResolutionContext.Segment<?, ?> segment = resolutionContext != null ? resolutionContext.getPath().peek() : null;
         BeanDefinition<?> declaringBean = null;
         Class<?> proxyTargetDefinitionType = null;
@@ -3402,9 +3738,43 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             BeanDefinition<T> c = iterator.next();
             if (c.isAbstract() || declaringBean != null && c.equals(declaringBean) || proxyTargetDefinitionType != null && proxyTargetDefinitionType.equals(c.getClass())) {
                 iterator.remove();
+            } else if (!isInjectableCandidate(beanType, c) && (lookupBeanType.equals(beanType) || !isInjectableCandidate(lookupBeanType, c))) {
+                iterator.remove();
             }
         }
         return candidates;
+    }
+
+    /**
+     * Whether the candidate can be provided as the requested type. A bean that is only enumerable by the
+     * requested type because it is {@link io.micronaut.core.annotation.Indexed} by it, without implementing it,
+     * can be listed via {@link #getBeanDefinitions(Argument)} but cannot be instantiated or injected as that type.
+     *
+     * @param beanType  The requested bean type
+     * @param candidate The candidate
+     * @param <T>       The bean type
+     * @return True if the candidate is a candidate for the requested type
+     */
+    private <T> boolean isInjectableCandidate(Argument<T> beanType, BeanDefinition<T> candidate) {
+        return beanType.getType() == Object.class || beanResolutionCustomizer.isCandidateBean(beanType, candidate);
+    }
+
+    /**
+     * Whether exactly one injectable bean candidate exists for the requested type and qualifier.
+     *
+     * @param beanType  The requested bean type
+     * @param qualifier The requested qualifier
+     * @param <T>       The bean type
+     * @return True if exactly one injectable candidate exists
+     */
+    @Internal
+    public <T> boolean isUniqueBeanCandidate(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        Collection<BeanDefinition<T>> candidates = findBeanCandidatesInternal(null, beanType);
+        candidates = applyBeanResolutionFilters(null, beanType, candidates);
+        if (qualifier != null && !candidates.isEmpty()) {
+            candidates = qualifier.filterQualified(beanType.getType(), candidates);
+        }
+        return candidates.size() == 1;
     }
 
     private <T> void addCandidateToList(@Nullable BeanResolutionContext resolutionContext,
@@ -3431,11 +3801,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         if (beanRegistration != null) {
             if (candidate.isContainerType()) {
-                Object container = beanRegistration.bean;
-                if (container instanceof Object[] array) {
-                    container = Arrays.asList(array);
-                }
-                if (container instanceof Iterable<?> iterable) {
+                Iterable<?> iterable = asIterable(beanRegistration.bean);
+                if (iterable != null) {
                     int i = 0;
                     for (Object o : iterable) {
                         if (o == null || !beanType.isInstance(o)) {
@@ -3457,8 +3824,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
+    @Nullable
+    private Iterable<?> asIterable(@Nullable Object container) {
+        if (container == null) {
+            return null;
+        }
+        if (container instanceof Object[] array) {
+            return Arrays.asList(array);
+        }
+        if (container instanceof Iterable<?> iterable) {
+            return iterable;
+        }
+        // a language integration may model a container that is not a java.lang.Iterable
+        return getConversionService().convert(container, Iterable.class).orElse(null);
+    }
+
     private <T> boolean isCandidatePresent(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, null);
+        final Collection<BeanDefinition<T>> candidates = findBeanCandidates(null, beanType, true, candidate -> isInjectableCandidate(beanType, candidate));
         if (!candidates.isEmpty()) {
             filterReplacedBeans(candidates);
             if (qualifier != null) {
@@ -3474,12 +3856,54 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      *
      * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
      * from {@link DependsOn}, so that a dependency outlives its dependents. Where the dependencies leave the order
-     * open, beans are destroyed in bean name order so that the sequence is stable between runs. Dependency cycles are
-     * broken by destroying the first bean of the cycle in that order.</p>
+     * open, beans are destroyed in bean name order so that the sequence is stable between runs. A dependency cycle
+     * cannot satisfy that guarantee for every one of its members, so it is broken by destroying the first bean in
+     * name order that lies on a cycle; beans that merely depend on a cycle are never chosen to break it.</p>
      *
      * @param beans The registrations
      * @return The registrations in destruction order
      */
+    /**
+     * Destroys the given singleton registrations, skipping any bean already present in {@code processed}.
+     *
+     * @param registrations The registrations to destroy
+     * @param processed     The identity set of already destroyed beans, added to as beans are destroyed
+     */
+    private void destroySingletons(Collection<BeanRegistration> registrations, Set<Object> processed) {
+        // need to sort registered singletons so that beans with that require other beans appear first
+        List<BeanRegistration> objects = topologicalSort(registrations);
+
+        Map<Boolean, List<BeanRegistration>> result = objects.stream().collect(Collectors.groupingBy(br -> br.bean != null
+            && (br.bean instanceof BeanPreDestroyEventListener || br.bean instanceof BeanDestroyedEventListener)));
+
+        List<BeanRegistration> listeners = result.get(true);
+        if (listeners != null) {
+            // destroy all bean destroy listeners at the end
+            objects.clear();
+            objects.addAll(result.getOrDefault(false, Collections.emptyList()));
+            objects.addAll(listeners);
+        }
+
+        for (BeanRegistration beanRegistration : objects) {
+            Object bean = beanRegistration.bean;
+            if (!processed.add(bean)) {
+                continue;
+            }
+
+            if (LOG_LIFECYCLE.isDebugEnabled()) {
+                LOG_LIFECYCLE.debug("Destroying bean [{}] with identifier [{}]", bean, beanRegistration.identifier);
+            }
+
+            try {
+                destroyBean(beanRegistration);
+            } catch (BeanDestructionException e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error(e.getMessage(), e);
+                }
+            }
+        }
+    }
+
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
         final int size = beans.size();
         // Nodes are indexed in bean name order so that the destruction sequence is deterministic
@@ -3528,14 +3952,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 ready.add(i);
             }
         }
-        int nextCycleCandidate = 0;
         while (sorted.size() < size) {
             if (ready.isEmpty()) {
-                // every remaining bean is part of a dependency cycle, break it at the first bean
-                while (destroyed[nextCycleCandidate]) {
-                    nextCycleCandidate++;
-                }
-                ready.add(nextCycleCandidate);
+                // the remaining beans are a cycle plus whatever the cycle requires, so break the cycle itself
+                ready.add(findCycleNode(dependencies, destroyed));
             }
             final int i = ready.poll();
             if (destroyed[i]) {
@@ -3550,6 +3970,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return sorted;
+    }
+
+    /**
+     * Finds the first not yet destroyed node in index order that lies on a dependency cycle of the remaining graph.
+     *
+     * @param dependencies The dependencies of every node
+     * @param destroyed    The nodes that have already been sorted
+     * @return The index of the node to break the cycle at
+     */
+    private int findCycleNode(List<List<Integer>> dependencies, boolean[] destroyed) {
+        final boolean[] visited = new boolean[destroyed.length];
+        final Deque<Integer> stack = new ArrayDeque<>();
+        for (int candidate = 0; candidate < destroyed.length; candidate++) {
+            if (destroyed[candidate]) {
+                continue;
+            }
+            // the candidate is on a cycle when it can reach itself along the dependencies of the remaining nodes
+            Arrays.fill(visited, false);
+            stack.clear();
+            stack.push(candidate);
+            while (!stack.isEmpty()) {
+                for (int next : dependencies.get(stack.pop())) {
+                    if (next == candidate) {
+                        return candidate;
+                    }
+                    if (!destroyed[next] && !visited[next]) {
+                        visited[next] = true;
+                        stack.push(next);
+                    }
+                }
+            }
+        }
+        throw new IllegalStateException("No dependency cycle found among the remaining singletons");
     }
 
     @Override

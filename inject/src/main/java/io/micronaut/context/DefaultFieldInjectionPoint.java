@@ -49,6 +49,7 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
     private final String field;
     private final AnnotationMetadata annotationMetadata;
     private final Argument[] typeArguments;
+    private final boolean rawType;
     @Nullable
     private Environment environment;
 
@@ -67,7 +68,28 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
         String field,
         @Nullable AnnotationMetadata annotationMetadata,
         Argument @Nullable [] typeArguments) {
+        this(declaringBean, declaringType, fieldType, field, annotationMetadata, typeArguments, false);
+    }
 
+    /**
+     * @param declaringBean      The declaring bean
+     * @param declaringType      The declaring type
+     * @param fieldType          The field type
+     * @param field              The name of the field
+     * @param annotationMetadata The annotation metadata
+     * @param typeArguments      the generic type arguments
+     * @param rawType            Whether the field type was written raw
+     */
+    DefaultFieldInjectionPoint(
+        BeanDefinition<?> declaringBean,
+        Class<?> declaringType,
+        Class<T> fieldType,
+        String field,
+        @Nullable AnnotationMetadata annotationMetadata,
+        Argument<?> @Nullable [] typeArguments,
+        boolean rawType) {
+
+        this.rawType = rawType;
         this.declaringBean = declaringBean;
         this.declaringType = declaringType;
         this.fieldType = fieldType;
@@ -127,6 +149,14 @@ class DefaultFieldInjectionPoint<B, T> implements FieldInjectionPoint<B, T>, Env
 
     @Override
     public Argument<T> asArgument() {
+        if (rawType) {
+            return Argument.ofRawType(
+                fieldType,
+                field,
+                annotationMetadata,
+                typeArguments
+            );
+        }
         return Argument.of(
             fieldType,
             field,

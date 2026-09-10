@@ -28,9 +28,11 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpParameters;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -213,7 +215,10 @@ public final class RouteExecutor {
             mutableHttpResponse = errorResponseProcessor.processResponse(
                 ErrorContext.builder(httpRequest)
                     .cause(cause)
-                    .errorMessage("Internal Server Error: " + cause.getMessage())
+                    .exceptionMessage(cause.getMessage())
+                    .errorMessage(shouldIncludeErrorResponseMessage(httpRequest)
+                        ? "Internal Server Error: " + cause.getMessage()
+                        : "Internal Server Error")
                     .build(), mutableHttpResponse);
         } catch (Exception e) {
             logException(e);
@@ -223,6 +228,17 @@ public final class RouteExecutor {
             return mutableHttpResponse.contentType(MediaType.APPLICATION_JSON_TYPE);
         }
         return mutableHttpResponse;
+    }
+
+    private boolean shouldIncludeErrorResponseMessage(HttpRequest<?> httpRequest) {
+        return switch (serverConfiguration.getErrorResponseIncludeMessage()) {
+            case NEVER -> false;
+            case ALWAYS -> true;
+            case ON_PARAM -> {
+                HttpParameters parameters = httpRequest.getParameters();
+                yield parameters.names().contains("message") && !StringUtils.FALSE.equalsIgnoreCase(parameters.get("message"));
+            }
+        };
     }
 
     /**
@@ -434,27 +450,34 @@ public final class RouteExecutor {
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
             if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView)).toPublisher()
-                        );
-                    }));
+                // a suspend function runs synchronously on the caller until its first suspension point, and its
+                // coroutine context decides where it resumes, so honouring the executor needs both: applying it to
+                // the publisher moves the body off the event loop, and passing it on to the coroutine context keeps
+                // the continuation there. publishOn is deliberate - it holds the same "the response is assembled off
+                // the event loop" invariant the blocking branch below gets from ExecutionFlow.async
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(
+                    applyExecutorToPublisher(
+                        Mono.deferContextual(contextView -> Mono.from(
+                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, executorService)).toPublisher()
+                        )),
+                        executorService,
+                        propagatedContext
+                    )
+                );
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ReactiveExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             } else {
-                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             }
         } else {
             if (routeInfo.isSuspended()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> {
-                        return Mono.from(
-                            ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView)).toPublisher()
-                        );
-                    }));
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> Mono.from(
+                    ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, null)).toPublisher()
+                )));
             } else if (routeInfo.isReactive()) {
-                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null));
+                executeMethodResponseFlow = ReactiveExecutionFlow.fromFlow(executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             } else {
-                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null);
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null);
             }
         }
         return executeMethodResponseFlow;
@@ -464,12 +487,13 @@ public final class RouteExecutor {
                                                                       RouteMatch<?> routeMatch,
                                                                       HttpRequest<?> httpRequest,
                                                                       boolean isKotlinCoroutine,
-                                                                      @Nullable ContextView contextView) {
+                                                                      @Nullable ContextView contextView,
+                                                                      @Nullable ExecutorService executorService) {
         PropagatedContext routePropagatedContext = propagatedContext.plus(new ServerHttpRequestContext(httpRequest));
         return routePropagatedContext.propagate(() -> {
             try {
                 if (isKotlinCoroutine && contextView != null) {
-                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext));
+                    coroutineHelper.ifPresent(helper -> helper.setupCoroutineContext(httpRequest, contextView, routePropagatedContext, executorService));
                 }
                 requestArgumentSatisfier.fulfillArgumentRequirementsAfterFilters(routeMatch, httpRequest);
                 Object body = routeMatch.execute();
@@ -571,8 +595,11 @@ public final class RouteExecutor {
         boolean isKotlinFunctionReturnTypeUnit =
             routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
                 isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
-        final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
         if (isKotlinCoroutineSuspended(body)) {
+            final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
+            if (supplier == null) {
+                return ExecutionFlow.error(new IllegalStateException("Missing coroutine continuation for suspended route"));
+            }
             Mono<MutableHttpResponse<?>> responsePublisher = Mono.fromCompletionStage(supplier)
                 .flatMap(obj -> {
                     MutableHttpResponse<?> response;

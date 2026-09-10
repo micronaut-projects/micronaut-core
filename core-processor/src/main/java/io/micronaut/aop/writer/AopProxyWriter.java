@@ -183,8 +183,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
 
     private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
-
-
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
@@ -507,26 +505,28 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addField(interceptorsField);
 
-        FieldDef interceptorRegistrationsField;
-        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
-            interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
-                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-                .build();
-            proxyBuilder.addField(interceptorRegistrationsField);
-            proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
-                .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
+        // Every proxy retains the registrations its constructor was given, so a proxy can always report the
+        // interceptors bound to it. For an around-only proxy that is exactly the around/introduction set it already
+        // receives; only a proxy with intercepted lifecycle widens the constructor qualifier below.
+        FieldDef interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
+            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+            .build();
+        proxyBuilder.addField(interceptorRegistrationsField);
+        proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
+            .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
 
+        if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
             // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
             // with the lifecycle bindings so the retained list is a superset of what lifecycle interception needs,
             // otherwise a lifecycle interceptor bound by a different annotation would be dropped.
             // This is the compile-time half of the same rule InterceptedBeanDefinition#resolveInterceptors applies at
             // runtime for beans that get no proxy: whatever a bean binds for construction, post-construct and
             // pre-destroy is resolved as one set. Keep the two in step.
+            // Only widen here: doing it for every proxy would change which interceptors are injected into every
+            // proxied bean in every application.
             AnnotationMetadata targetAnnotationMetadata = targetType.getAnnotationMetadata();
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.POST_CONSTRUCT));
             visitInterceptorBinding(InterceptedMethodUtil.resolveInterceptorBinding(targetAnnotationMetadata, InterceptorKind.PRE_DESTROY));
-        } else {
-            interceptorRegistrationsField = null;
         }
 
         FieldDef proxyMethodsField = FieldDef.builder(FIELD_PROXY_METHODS, ExecutableMethod[].class)
@@ -550,15 +550,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         if (!targetType.isInterface()) {
             proxyBuilder.superclass(classTargetType);
         }
-        List<ClassTypeDef> interfaces = new ArrayList<>();
-        Set<String> interfaceNames = new HashSet<>();
-        interfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
-        defaultMethodInterfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
-        if (targetType.isInterface() && implementInterface) {
-            addInterface(interfaces, interfaceNames, classTargetType);
-        }
-        interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
-        interfaces.forEach(proxyBuilder::addSuperinterface);
 
         proxyBuilder.addAnnotation(Generated.class);
 
@@ -575,6 +566,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 addInterceptedIfNeeded(proxyBuilder, aroundMethod, uniqueInterceptedMethodsRefs, interceptedMethods);
             }
         }
+
+        List<ClassTypeDef> interfaces = new ArrayList<>();
+        Set<String> interfaceNames = new HashSet<>();
+        interfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
+        defaultMethodInterfaceTypes.stream().map(typedElement -> (ClassTypeDef) TypeDef.erasure(typedElement)).forEach(interfaceType -> addInterface(interfaces, interfaceNames, interfaceType));
+        if (targetType.isInterface() && implementInterface) {
+            addInterface(interfaces, interfaceNames, classTargetType);
+        }
+        interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
+        interfaces.forEach(proxyBuilder::addSuperinterface);
 
         int index = 0;
         for (MethodElement method : interceptedMethods) {
@@ -627,16 +628,14 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
                                 FieldDef interceptorsField,
-                                @Nullable FieldDef interceptorRegistrationsField,
+                                FieldDef interceptorRegistrationsField,
                                 FieldDef proxyMethodsField,
                                 List<MethodElement> interceptedMethods) {
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
-        if (interceptorRegistrationsField != null) {
-            bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
-                methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
-            ));
-        }
+        bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
+            methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+        ));
 
         if (isProxyTarget) {
 
@@ -747,6 +746,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addSuperinterface(TypeDef.parameterized(InterceptedProxy.class, targetType));
                     interceptedTargetMethod = getSimpleInterceptedTargetMethod(targetField);
                 }
+
+                // The target of a non-lazy proxy is resolved by the constructor and held by the proxy, so it is
+                // always cached. Saying so is what lets the context destroy the target when the proxy is destroyed.
+                proxyBuilder.addMethod(getHasCachedInterceptedTargetMethod(targetField));
 
                 // Non-lazy target
                 bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
