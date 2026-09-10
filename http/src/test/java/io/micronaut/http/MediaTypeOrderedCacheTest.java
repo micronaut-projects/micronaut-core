@@ -51,10 +51,13 @@ class MediaTypeOrderedCacheTest {
         List<MediaType> first = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
         List<MediaType> second = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
 
-        assertEquals(first, second);
-        assertEquals(describe(first), describe(second));
-        // the second call is served from the cache
+        // the second call is served from the cache, which makes any comparison of the two lists
+        // with each other trivially true: the content is asserted once instead
         assertSame(first, second);
+        assertEquals(
+            "text/plain;q=1;text/html;q=0.9;application/xhtml+xml;q=0.9;application/xml;q=0.8;*/*;q=0.7",
+            describe(second)
+        );
     }
 
     @Test
