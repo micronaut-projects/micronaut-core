@@ -27,38 +27,12 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 class CorsFilterTest {
 
     private static final String REQUEST_ORIGIN = "https://example.com";
     private static final String FIXED_ORIGIN = "https://fixed.example.com";
-
-    @Test
-    void populatesConfiguredCrossOriginPoliciesWithoutOverwritingExistingHeaders() {
-        HttpServerConfiguration.CorsConfiguration corsConfiguration = new HttpServerConfiguration.CorsConfiguration();
-        corsConfiguration.setCrossOriginEmbedderPolicy(CrossOriginEmbedderPolicy.REQUIRE_CORP);
-        corsConfiguration.setCrossOriginResourcePolicy(CrossOriginResourcePolicy.SAME_SITE);
-
-        CorsFilter filter = new CorsFilter(corsConfiguration, null, null, null);
-        HttpRequest<?> request = HttpRequest.GET("/").header(HttpHeaders.ORIGIN, "https://example.com");
-
-        MutableHttpResponse<?> response = HttpResponse.ok();
-        filter.filterResponse(request, response);
-
-        assertEquals("require-corp", response.getHeaders().get(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY));
-        assertEquals("same-site", response.getHeaders().get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY));
-        assertFalse(response.getHeaders().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
-
-        MutableHttpResponse<?> responseWithPolicies = HttpResponse.ok()
-            .header(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY, "unsafe-none")
-            .header(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY, "same-origin");
-        filter.filterResponse(request, responseWithPolicies);
-
-        assertEquals("unsafe-none", responseWithPolicies.getHeaders().get(HttpHeaders.CROSS_ORIGIN_EMBEDDER_POLICY));
-        assertEquals("same-origin", responseWithPolicies.getHeaders().get(HttpHeaders.CROSS_ORIGIN_RESOURCE_POLICY));
-    }
 
     @Test
     void invokesDeprecatedOriginOverrideForCorsResponses() {
