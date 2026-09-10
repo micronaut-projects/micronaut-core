@@ -34,7 +34,7 @@ class SharedBufferSizeAccountingTest {
      */
     @Test
     @Timeout(10)
-    public void initialBufferIsNotCountedTwiceAgainstBufferLimit() throws InterruptedException {
+    void initialBufferIsNotCountedTwiceAgainstBufferLimit() throws InterruptedException {
         ByteBodyFactory factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
         BufferConsumer.Upstream upstream = bytesConsumed -> {
         };
