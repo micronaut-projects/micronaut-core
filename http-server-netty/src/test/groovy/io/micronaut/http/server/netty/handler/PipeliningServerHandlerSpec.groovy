@@ -1076,6 +1076,53 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'graceful shutdown sets connection close on an already prepared response'() {
+        given:
+        def streamed = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        streamed.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            int i = 0
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                if (i++ == 0) {
+                    outboundAccess.write(streamed, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
+                } else {
+                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+        def ch = new EmbeddedChannel(handler)
+
+        when:
+        // the second response is fully prepared while the first one is still streaming
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER))
+        handler.shutdownGracefully()
+        sink.tryEmitComplete()
+        ch.runPendingTasks()
+
+        then:
+        ch.checkException()
+        ch.readOutbound() == streamed
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        FullHttpResponse second = ch.readOutbound()
+        second.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)
+        ch.readOutbound() == null
+        !ch.open
+
+        cleanup:
+        second?.release()
+        ch.finishAndReleaseAll()
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0

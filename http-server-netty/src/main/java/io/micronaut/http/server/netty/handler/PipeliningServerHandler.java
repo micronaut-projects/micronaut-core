@@ -186,6 +186,23 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             status == HttpResponseStatus.NOT_MODIFIED);
     }
 
+    /**
+     * Declare that this connection will be closed after the given response, on a message that has
+     * not been sent yet.
+     *
+     * @param message The response message to add the connection header to
+     */
+    private static void addConnectionClose(HttpResponse message) {
+        if (message.protocolVersion().isKeepAliveDefault()) {
+            if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
+                message.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
+            }
+        } else {
+            // closing is the default for this version, but a keep-alive header would contradict it
+            message.headers().remove(HttpHeaderNames.CONNECTION);
+        }
+    }
+
     private static boolean hasBody(HttpRequest request) {
         // if there's a decoder failure (e.g. invalid header), don't expect the body to come in
         if (request.decoderResult().isFailure()) {
@@ -382,8 +399,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             requiredCtx().close();
         } else {
             OutboundAccessImpl lastResponse = outboundQueue.peekLast();
+            if (lastResponse == null && outboundHandler != null) {
+                // the last response is the one that is being written right now
+                lastResponse = outboundHandler.outboundAccess;
+            }
             if (lastResponse != null) {
-                lastResponse.closeAfterWrite = true;
+                lastResponse.closeAfterWriteInEventLoop();
             }
         }
     }
@@ -937,6 +958,21 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             closeAfterWrite = true;
         }
 
+        /**
+         * Mark this channel to be closed after this response has been written, from inside the
+         * event loop. Unlike {@link #closeAfterWrite()} this also adds the {@code connection}
+         * header to the response if {@link #preprocess} has already run for it.
+         */
+        private void closeAfterWriteInEventLoop() {
+            closeAfterWrite = true;
+            OutboundHandler handler = this.handler;
+            if (handler != null) {
+                // the response has already been prepared, so preprocess did not see this flag. The
+                // message has not been written yet though, so we can still add the header.
+                handler.markCloseAfterWrite();
+            }
+        }
+
         private void preprocess(HttpResponse message) {
             if (!message.protocolVersion().equals(request.protocolVersion())) {
                 // if the response includes features not supported by http/1.0, well that's just too bad, isn't it?
@@ -1195,6 +1231,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         abstract void writeSome();
 
         /**
+         * The connection will be closed after this response. Add the {@code connection} header to
+         * the response message, unless it has been sent already.
+         */
+        void markCloseAfterWrite() {
+        }
+
+        /**
          * Discard the remaining data.
          */
         void discardOutbound() {
@@ -1234,6 +1277,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        void markCloseAfterWrite() {
+            if (next != null) {
+                next.markCloseAfterWrite();
+            }
+        }
+
+        @Override
         void discardOutbound() {
             super.discardOutbound();
             if (next != null) {
@@ -1248,6 +1298,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class FullOutboundHandler extends OutboundHandler {
         private final FullHttpResponse message;
+        private boolean written = false;
 
         FullOutboundHandler(OutboundAccessImpl outboundAccess, FullHttpResponse message) {
             super(outboundAccess);
@@ -1255,7 +1306,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        void markCloseAfterWrite() {
+            if (!written) {
+                addConnectionClose(message);
+            }
+        }
+
+        @Override
         void writeSome() {
+            written = true;
             writeCompressing(message, true, true);
             outboundHandler = null;
             markResponseWritten();
@@ -1298,6 +1357,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
             this.outboundAccess = outboundAccess;
             this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
+        }
+
+        @Override
+        void markCloseAfterWrite() {
+            HttpResponse initialMessage = this.initialMessage;
+            if (initialMessage != null) {
+                addConnectionClose(initialMessage);
+            }
         }
 
         @Override
