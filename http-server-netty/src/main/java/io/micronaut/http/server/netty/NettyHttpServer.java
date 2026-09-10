@@ -809,6 +809,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 for (Listener listener : listenersToClose) {
                     listener.closeServerChannel();
                 }
+                // Closing the listening channels only stops new connections from being accepted.
+                // The connections that were accepted before still have a fully functional pipeline
+                // on the worker group, which is normally shared and therefore not shut down here at
+                // all, so a client holding a keep-alive connection could dispatch a brand new
+                // request after this method returned. Close those connections too, so that the
+                // server is quiescent once stop()/stopServerOnly() returns.
+                for (Listener listener : listenersToClose) {
+                    listener.closeConnections();
+                }
             }
             if (shutdownParent) {
                 Objects.requireNonNull(parentGroup);
@@ -1118,6 +1127,30 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             // the event loop group shutdown that follows) moves on.
             if (!eventLoop.isShuttingDown()) {
                 eventLoop.submit(() -> { }).awaitUninterruptibly();
+            }
+        }
+
+        /**
+         * Close the connections this listener has accepted and wait for them to be closed, so
+         * that no further request can be dispatched on any of them once this method returns.
+         * <p>This is the abrupt counterpart of {@link #shutdownGracefully()}: a caller that wants
+         * in-flight requests to complete first triggers the graceful shutdown and waits for it
+         * before stopping the server, in which case there is nothing left for this method to
+         * close.
+         */
+        void closeConnections() {
+            List<ChannelFuture> closeFutures = new ArrayList<>();
+            for (HttpPipelineBuilder.ConnectionPipeline connection : activeConnections) {
+                Channel channel = connection.channel;
+                ChannelFuture closeFuture = channel.close()
+                    .addListener(NettyHttpServer.this::logShutdownErrorIfNecessary);
+                // waiting on the event loop of the channel itself would deadlock
+                if (!channel.eventLoop().inEventLoop()) {
+                    closeFutures.add(closeFuture);
+                }
+            }
+            for (ChannelFuture closeFuture : closeFutures) {
+                closeFuture.awaitUninterruptibly();
             }
         }
 
