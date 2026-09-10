@@ -29,6 +29,7 @@ import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.EmptyHttpHeaders
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod
@@ -141,6 +142,67 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == new DefaultHttpContent(c2)
         ch.readOutbound() == null
         ch.checkException()
+    }
+
+    def 'transient writability does not resume streaming responses'() {
+        given:
+        int emitted = 0
+        boolean blockWrites = true
+        def ch = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (blockWrites && msg instanceof HttpContent) {
+                    ctx.channel().unsafe().outboundBuffer().setUserDefinedWritability(1, false)
+                }
+                ctx.write(msg, promise)
+            }
+        }, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                def content = Flux.range(0, 4)
+                    .map { Unpooled.wrappedBuffer(new byte[1024]) }
+                    .doOnNext { emitted++ }
+                outboundAccess.write(response, new NettyByteBodyFactory(ctx.channel()).adaptNetty(content))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                throw cause
+            }
+        }))
+        def outboundBuffer = ch.unsafe().outboundBuffer()
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        int initiallyEmitted = emitted
+
+        then:
+        initiallyEmitted > 0
+        initiallyEmitted < 4
+        !ch.isWritable()
+
+        when:
+        blockWrites = false
+        // QUIC can signal writability while draining queued writes, then exhaust its capacity.
+        outboundBuffer.setUserDefinedWritability(1, true)
+        ch.pipeline().fireChannelWritabilityChanged()
+        outboundBuffer.setUserDefinedWritability(1, false)
+        ch.runPendingTasks()
+
+        then:
+        emitted == initiallyEmitted
+
+        when:
+        outboundBuffer.setUserDefinedWritability(1, true)
+        ch.runPendingTasks()
+
+        then:
+        emitted == 4
+
+        cleanup:
+        ch.finishAndReleaseAll()
     }
 
     def 'requests that come in a single packet are accumulated'() {

@@ -270,7 +270,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        writeSome();
+        // QUIC can briefly report writable while draining its write queue, before updating its
+        // remaining capacity. Wait for that update before requesting more response content.
+        ctx.executor().execute(this::writeSome);
     }
 
     @Override
