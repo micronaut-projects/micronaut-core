@@ -40,6 +40,9 @@ import java.util.function.Predicate;
 @Internal
 final class DefaultMethodAnnotationMetadata implements MutableAnnotationMetadataDelegate<AnnotationMetadata> {
 
+    private static final String ADDING = "adding";
+    private static final String REMOVING = "removing";
+
     private final MethodElement methodElement;
 
     DefaultMethodAnnotationMetadata(MethodElement methodElement) {
@@ -53,27 +56,27 @@ final class DefaultMethodAnnotationMetadata implements MutableAnnotationMetadata
 
     @Override
     public <T extends Annotation> AnnotationMetadata annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
-        throw unsupported("adding");
+        throw unsupported(ADDING);
     }
 
     @Override
     public <T extends Annotation> AnnotationMetadata annotate(AnnotationValue<T> annotationValue) {
-        throw unsupported("adding");
+        throw unsupported(ADDING);
     }
 
     @Override
     public AnnotationMetadata removeAnnotation(String annotationType) {
-        throw unsupported("removing");
+        throw unsupported(REMOVING);
     }
 
     @Override
     public <T extends Annotation> AnnotationMetadata removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
-        throw unsupported("removing");
+        throw unsupported(REMOVING);
     }
 
     @Override
     public AnnotationMetadata removeStereotype(String annotationType) {
-        throw unsupported("removing");
+        throw unsupported(REMOVING);
     }
 
     /**

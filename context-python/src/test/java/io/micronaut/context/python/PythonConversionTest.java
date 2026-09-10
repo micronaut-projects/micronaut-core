@@ -123,6 +123,7 @@ class PythonConversionTest {
 
                 @Override
                 public void onComplete() {
+                    // the result is asserted once the synchronous publisher has completed
                 }
             });
 
