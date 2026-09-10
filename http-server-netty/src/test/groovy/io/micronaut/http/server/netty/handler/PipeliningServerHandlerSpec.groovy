@@ -6,6 +6,7 @@ import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableAvailableByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BodySizeLimits
+import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.netty.buffer.ByteBuf
@@ -1134,6 +1135,260 @@ class PipeliningServerHandlerSpec extends Specification {
         cleanup:
         second?.release()
         ch.finishAndReleaseAll()
+    }
+
+    def 'a queued streaming response that fails is handled when it is up for writing'() {
+        given:
+        def firstResp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        firstResp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def secondResp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        secondResp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
+        def upstream = new RecordingUpstream()
+        def secondBody = null
+        def cleaned = 0
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            int i = 0
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def factory = new NettyByteBodyFactory(ctx.channel())
+                if (i++ == 0) {
+                    outboundAccess.write(firstResp, factory.adaptNetty(sink.asFlux()))
+                } else {
+                    secondBody = factory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                    outboundAccess.write(secondResp, secondBody.rootBody())
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        // the second response is queued behind the first one, which is still streaming
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER))
+        secondBody.sharedBuffer().error(new RuntimeException("second failed"))
+        ch.runPendingTasks()
+
+        then:
+        ch.checkException()
+        // the response that is currently being written is not cut off by the failure of the
+        // queued one, and the failed response is not started
+        ch.open
+        cleaned == 0
+        upstream.starts == 0
+        upstream.discards == 0
+
+        when:
+        def c1 = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        sink.emitNext(c1, Sinks.EmitFailureHandler.FAIL_FAST)
+        sink.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST)
+        ch.runPendingTasks()
+
+        then:
+        ch.checkException()
+        ch.readOutbound() == firstResp
+        ch.readOutbound() == new DefaultHttpContent(c1)
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        // the failed response is discarded instead of being written, and the connection is closed
+        ch.readOutbound() == null
+        !ch.open
+        cleaned == 2
+        upstream.discards == 1
+        errors.empty
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'an error after the handler was removed is ignored'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        def cleaned = 0
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
+        then:
+        // the response is up for writing, but has not completed
+        upstream.starts == 1
+        cleaned == 0
+
+        when:
+        // the connection goes away while the response is still streaming
+        ch.finishAndReleaseAll()
+        then:
+        cleaned == 1
+        upstream.discards == 1
+
+        when:
+        // the publisher only finds out afterwards
+        def errorsOnClose = errors.size()
+        streamingBody.sharedBuffer().error(new RuntimeException("stream failed"))
+        then:
+        // the late error does not clean up or discard the response a second time
+        ch.checkException()
+        cleaned == 1
+        upstream.discards == 1
+        errors.size() == errorsOnClose
+    }
+
+    def 'graceful shutdown sets connection close on a queued streaming response'() {
+        given:
+        def firstResp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        firstResp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def secondResp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        secondResp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def first = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
+        def second = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
+        def errors = []
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            int i = 0
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def factory = new NettyByteBodyFactory(ctx.channel())
+                if (i++ == 0) {
+                    outboundAccess.write(firstResp, factory.adaptNetty(first.asFlux()))
+                } else {
+                    outboundAccess.write(secondResp, factory.adaptNetty(second.asFlux()))
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+        })
+        def ch = new EmbeddedChannel(handler)
+
+        when:
+        // the second response is prepared, but its message has not been written yet
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first", Unpooled.EMPTY_BUFFER))
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER))
+        handler.shutdownGracefully()
+        first.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST)
+        second.emitComplete(Sinks.EmitFailureHandler.FAIL_FAST)
+        ch.runPendingTasks()
+
+        then:
+        ch.checkException()
+        ch.readOutbound() == firstResp
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        HttpResponse second2 = ch.readOutbound()
+        second2.headers().getAll(HttpHeaderNames.CONNECTION) == [HttpHeaderValues.CLOSE.toString()]
+        ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
+        ch.readOutbound() == null
+        !ch.open
+        errors.empty
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
+    def 'graceful shutdown sets connection close on a response that is still being prepared'() {
+        given:
+        def errors = []
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                Flux.from(body.toByteArrayPublisher()).collectList().subscribe { outboundAccess.write(resp, NettyByteBodyFactory.empty()) }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+        })
+        def ch = new EmbeddedChannel(handler)
+
+        when:
+        // the request is accepted and the continue response written, but the response itself is
+        // not prepared yet: there is nothing queued that could be marked
+        def req = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        req.headers().add(HttpHeaderNames.EXPECT, HttpHeaderValues.CONTINUE)
+        req.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        ch.writeInbound(req)
+        then:
+        HttpResponse cont = ch.readOutbound()
+        cont.status() == HttpResponseStatus.CONTINUE
+        ch.readOutbound() == null
+
+        when:
+        handler.shutdownGracefully()
+        ch.writeInbound(new DefaultLastHttpContent(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        ch.runPendingTasks()
+
+        then:
+        ch.checkException()
+        FullHttpResponse full = ch.readOutbound()
+        full.status() == HttpResponseStatus.NO_CONTENT
+        full.headers().getAll(HttpHeaderNames.CONNECTION) == [HttpHeaderValues.CLOSE.toString()]
+        ch.readOutbound() == null
+        !ch.open
+        errors.empty
+
+        cleanup:
+        full?.release()
+        ch.finishAndReleaseAll()
+    }
+
+    /**
+     * {@link BufferConsumer.Upstream} that records the calls made to it.
+     */
+    static class RecordingUpstream implements BufferConsumer.Upstream {
+        int starts = 0
+        int discards = 0
+        long consumed = 0
+
+        @Override
+        void start() {
+            starts++
+        }
+
+        @Override
+        void onBytesConsumed(long bytesConsumed) {
+            consumed += bytesConsumed
+        }
+
+        @Override
+        void allowDiscard() {
+            discards++
+        }
     }
 
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {

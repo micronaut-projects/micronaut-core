@@ -1230,8 +1230,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          * The connection will be closed after this response. Add the {@code connection} header to
          * the response message, unless it has been sent already.
          */
-        void markCloseAfterWrite() {
-        }
+        abstract void markCloseAfterWrite();
 
         /**
          * Discard the remaining data.
