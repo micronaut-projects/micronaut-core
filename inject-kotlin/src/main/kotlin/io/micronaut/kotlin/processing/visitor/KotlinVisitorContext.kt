@@ -19,6 +19,7 @@ import com.google.devtools.ksp.KspExperimental
 import com.google.devtools.ksp.getClassDeclarationByName
 import com.google.devtools.ksp.getJavaClassByName
 import com.google.devtools.ksp.processing.Dependencies
+import com.google.devtools.ksp.processing.JvmPlatformInfo
 import com.google.devtools.ksp.processing.Resolver
 import com.google.devtools.ksp.processing.SymbolProcessorEnvironment
 import com.google.devtools.ksp.symbol.KSAnnotated
@@ -65,6 +66,14 @@ internal class KotlinVisitorContext(
     private val environment: SymbolProcessorEnvironment,
     var resolver: Resolver
 ) : VisitorContext {
+
+    private companion object {
+        /**
+         * The `-jvm-default` modes emitting no `DefaultImpls` class: `no-compatibility` and the
+         * `-Xjvm-default=all` it replaced.
+         */
+        private val MODES_WITHOUT_DEFAULT_IMPLS = setOf("no-compatibility", "all")
+    }
 
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
     private val elementFactory: KotlinElementFactory = KotlinElementFactory(this)
@@ -291,6 +300,22 @@ internal class KotlinVisitorContext(
         val value = block()
         this[key] = value
         return value
+    }
+
+    /**
+     * Whether the sources of this compilation emit a `DefaultImpls` class for their interfaces,
+     * which is where the synthetic `$default` method of an interface method with default
+     * arguments then lives.
+     *
+     * Only the modes in [MODES_WITHOUT_DEFAULT_IMPLS] drop `DefaultImpls`; every other mode emits
+     * it, including `enable`, which emits the `$default` method on the interface as well. A
+     * compilation reporting no JVM platform at all is therefore taken to emit it, which is also
+     * what KSP's own default mode of `disable` would say.
+     */
+    val hasDefaultImpls: Boolean by lazy {
+        environment.platforms
+            .filterIsInstance<JvmPlatformInfo>()
+            .none { it.jvmDefaultMode in MODES_WITHOUT_DEFAULT_IMPLS }
     }
 
     val extraOpenAnnotations: Array<String> by lazy {

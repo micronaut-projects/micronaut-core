@@ -72,9 +72,11 @@ import java.util.stream.Stream;
  */
 public class KotlinCompiler {
 
+    private static String jvmDefaultMode = "enable";
+
     private static KotlinCompilation newKotlinCompilation() {
         KotlinCompilation compilation = new KotlinCompilation();
-        compilation.setJvmDefault("enable");
+        compilation.setJvmDefault(jvmDefaultMode);
         compilation.setInheritClassPath(true);
         compilation.setLanguageVersion("2.0");
         compilation.setKotlincArguments(Arrays.asList("-Xsuppress-version-warnings", "-Xannotation-default-target=first-only"));
@@ -84,6 +86,7 @@ public class KotlinCompiler {
 
     private static KotlinCompilation newKspCompilation(KotlinCompilation sourceCompilation) {
         KotlinCompilation compilation = new KotlinCompilation();
+        compilation.setJvmDefault(jvmDefaultMode);
         Ksp2Kt.useKsp2(compilation);
         compilation.setInheritClassPath(true);
         compilation.setLanguageVersion("2.0");
@@ -93,6 +96,20 @@ public class KotlinCompiler {
             new File(compilation.getWorkingDir(), "ksp/sources/resources"),
             sourceCompilation.getClassesDir()));
         return compilation;
+    }
+
+    /**
+     * Sets the {@code -jvm-default} mode the compilations run with. The mode decides whether the
+     * synthetic {@code $default} method of an interface method with default arguments is emitted
+     * on the interface, on its {@code DefaultImpls} class, or on both.
+     *
+     * <p>The mode does not reach KSP, which always reports the {@code disable} it defaults to, so
+     * only the modes emitting {@code DefaultImpls} can be told apart here.</p>
+     *
+     * @param mode The mode, one of {@code disable}, {@code enable} or {@code no-compatibility}
+     */
+    public static void setJvmDefaultMode(String mode) {
+        jvmDefaultMode = mode;
     }
 
     public static URLClassLoader buildClassLoader(String name, @Language("kotlin") String clazz) {

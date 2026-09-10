@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.KotlinMethodElement;
 import io.micronaut.inject.ast.KotlinParameterElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
@@ -285,7 +286,7 @@ public final class MethodGenUtils {
         newValues.addAll(List.of(masks)); // Bit mask of defaults
         newValues.add(ExpressionDef.nullValue()); // The last parameter is just a marker and is always null
 
-        return ClassTypeDef.of(declaringType).invokeStatic(
+        return kotlinDefaultsType(declaringType, methodElement).invokeStatic(
             MethodGenUtils.asDefaultKotlinMethod(TypeDef.erasure(declaringType), methodElement, numberOfMasks),
             newValues
         );
@@ -419,6 +420,26 @@ public final class MethodGenUtils {
                 .addParameters(parameters)
                 .returns(method.isSuspend() ? TypeDef.OBJECT : TypeDef.erasure(method.getReturnType()))
                 .build();
+    }
+
+    /**
+     * Resolves the type declaring the synthetic {@code $default} method to invoke.
+     *
+     * <p>The default is applied by the type declaring the method, which for an interface method
+     * is either the interface itself or its {@code DefaultImpls} class, so the Kotlin element is
+     * asked rather than assumed.</p>
+     */
+    private static ClassTypeDef kotlinDefaultsType(ClassElement declaringType, MethodElement methodElement) {
+        if (methodElement instanceof KotlinMethodElement kotlinMethodElement) {
+            // Both names are binary names, the form ClassElement#getName() and ClassTypeDef#getName()
+            // are in, so they compare directly; a name other than the declaring type is the nested
+            // DefaultImpls class of it
+            String typeName = kotlinMethodElement.getKotlinDefaultsTypeName();
+            if (!typeName.equals(declaringType.getName())) {
+                return ClassTypeDef.of(typeName, true);
+            }
+        }
+        return ClassTypeDef.of(declaringType);
     }
 
     private static ExpressionDef[] computeKotlinDefaultsMask(int numberOfMasks,
