@@ -219,6 +219,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
+    /**
+     * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type.
+     */
+    private final Map<Argument<?>, Boolean> indexExhaustiveCache = new ConcurrentHashMap<>(5);
+
     private final ClassLoader classLoader;
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
         BeanDefinitionRegistry.class,
@@ -487,6 +492,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanCandidateCache.clear();
             beanProxyTargetCache.clear();
             containsBeanCache.clear();
+            indexExhaustiveCache.clear();
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
@@ -1716,7 +1722,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (qualifier instanceof FilteringQualifier<Object> filteringQualifier) {
             @SuppressWarnings("unchecked")
             Argument<Object> indexedArgument = (Argument<Object>) filteringQualifier.getIndexedArgument();
-            if (indexedArgument != null) {
+            if (indexedArgument != null && isIndexExhaustive(indexedArgument, filteringQualifier)) {
                 // the compile-time index holds every bean this qualifier selects, so there is nothing to filter
                 return getBeanDefinitions(indexedArgument);
             }
@@ -1738,6 +1744,41 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
         filterReplacedBeans(candidates);
         return candidates;
+    }
+
+    /**
+     * Whether every bean the qualifier selects is indexed by the annotation type it reports. A bean compiled
+     * before that annotation was indexed by itself carries the annotation without the index, as every module
+     * released against an earlier version does, so only filtering every reference finds it. That is checked
+     * once per annotation type, and the index is taken only when no such bean is present.
+     *
+     * @param indexedArgument The type the qualifier reports the beans it selects are indexed by
+     * @param qualifier       The qualifier
+     * @return True if the index holds every bean the qualifier selects
+     */
+    private boolean isIndexExhaustive(Argument<?> indexedArgument, FilteringQualifier<Object> qualifier) {
+        Boolean exhaustive = indexExhaustiveCache.get(indexedArgument);
+        if (exhaustive == null) {
+            exhaustive = Boolean.TRUE;
+            Class<?> indexedType = indexedArgument.getType();
+            for (BeanDefinitionReference<Object> reference : beanDefinitionProvider.getBeanReferences()) {
+                if (!isIndexedBy(reference, indexedType) && qualifier.doesQualify(Object.class, reference)) {
+                    exhaustive = Boolean.FALSE;
+                    break;
+                }
+            }
+            indexExhaustiveCache.put(indexedArgument, exhaustive);
+        }
+        return exhaustive;
+    }
+
+    private static boolean isIndexedBy(BeanDefinitionReference<?> reference, Class<?> indexedType) {
+        for (Class<?> index : reference.getIndexes()) {
+            if (index == indexedType) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -1770,6 +1811,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
         purgeCacheForBeanDefinition(definition);
+        indexExhaustiveCache.clear();
         if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
@@ -1973,6 +2015,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         beanCandidateCache.clear();
         beanConcreteCandidateCache.clear();
         singletonBeanRegistrations.clear();
+        indexExhaustiveCache.clear();
     }
 
     /**
