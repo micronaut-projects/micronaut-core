@@ -99,6 +99,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -421,10 +422,13 @@ final class HttpPipelineBuilder {
         private void insertIdleStateHandler() {
             final Duration idleTime = server.getServerConfiguration().getIdleTimeout();
             if (idleTime != null && !idleTime.isNegative()) {
+                // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
+                // which IdleStateHandler treats as "disabled"
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                        (int) server.getServerConfiguration().getReadIdleTimeout().getSeconds(),
-                        (int) server.getServerConfiguration().getWriteIdleTimeout().getSeconds(),
-                        (int) idleTime.getSeconds()));
+                        server.getServerConfiguration().getReadIdleTimeout().toMillis(),
+                        server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
+                        idleTime.toMillis(),
+                        TimeUnit.MILLISECONDS));
             }
         }
 
