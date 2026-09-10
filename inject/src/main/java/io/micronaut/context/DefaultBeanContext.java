@@ -144,6 +144,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -220,9 +221,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final Map<Argument, Collection<BeanDefinition>> beanCandidateCache = new ConcurrentLinkedHashMap.Builder<Argument, Collection<BeanDefinition>>().maximumWeightedCapacity(30).build();
 
     /**
-     * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type.
+     * Whether the compile-time index of a self-indexed annotation holds every bean carrying it, by annotation type,
+     * with the {@link #beanDefinitionsEpoch} it was computed at.
      */
-    private final Map<Argument<?>, Boolean> indexExhaustiveCache = new ConcurrentHashMap<>(5);
+    private final Map<Argument<?>, IndexExhaustiveness> indexExhaustiveCache = new ConcurrentHashMap<>(5);
+
+    /**
+     * Advanced after bean definitions are added, so that an index exhaustiveness computed before is not used.
+     */
+    private final AtomicLong beanDefinitionsEpoch = new AtomicLong();
 
     private final ClassLoader classLoader;
     private final Set<Class<?>> thisInterfaces = CollectionUtils.setOf(
@@ -1757,18 +1764,23 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @return True if the index holds every bean the qualifier selects
      */
     private boolean isIndexExhaustive(Argument<?> indexedArgument, FilteringQualifier<Object> qualifier) {
-        Boolean exhaustive = indexExhaustiveCache.get(indexedArgument);
-        if (exhaustive == null) {
-            exhaustive = Boolean.TRUE;
-            Class<?> indexedType = indexedArgument.getType();
-            for (BeanDefinitionReference<Object> reference : beanDefinitionProvider.getBeanReferences()) {
-                if (!isIndexedBy(reference, indexedType) && qualifier.doesQualify(Object.class, reference)) {
-                    exhaustive = Boolean.FALSE;
-                    break;
-                }
-            }
-            indexExhaustiveCache.put(indexedArgument, exhaustive);
+        long epoch = beanDefinitionsEpoch.get();
+        IndexExhaustiveness cached = indexExhaustiveCache.get(indexedArgument);
+        if (cached != null && cached.epoch() == epoch) {
+            return cached.exhaustive();
         }
+        boolean exhaustive = true;
+        Class<?> indexedType = indexedArgument.getType();
+        for (BeanDefinitionReference<Object> reference : beanDefinitionProvider.getBeanReferences()) {
+            // the qualifier first: few references match it, and getIndexes() reads the annotation metadata of
+            // any reference that was compiled without indexes
+            if (qualifier.doesQualify(Object.class, reference) && !isIndexedBy(reference, indexedType)) {
+                exhaustive = false;
+                break;
+            }
+        }
+        // stored with the epoch read before computing, so a result that raced a registration is never used
+        indexExhaustiveCache.put(indexedArgument, new IndexExhaustiveness(epoch, exhaustive));
         return exhaustive;
     }
 
@@ -1779,6 +1791,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return false;
+    }
+
+    /**
+     * Whether the compile-time index of an annotation holds every bean carrying it.
+     *
+     * @param epoch      The {@link #beanDefinitionsEpoch} it was computed at
+     * @param exhaustive True if the index holds every bean carrying the annotation
+     */
+    private record IndexExhaustiveness(long epoch, boolean exhaustive) {
     }
 
     @Override
@@ -1811,7 +1832,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <B> BeanContext registerBeanDefinition(RuntimeBeanDefinition<B> definition) {
         beanDefinitionProvider.addBeanDefinition(definition);
         purgeCacheForBeanDefinition(definition);
-        indexExhaustiveCache.clear();
+        beanDefinitionsEpoch.incrementAndGet();
         if (CustomScope.class.isAssignableFrom(definition.getBeanType())) {
             // a bean of this scope resolved earlier left the scope's absence recorded in the registry
             customScopeRegistry.invalidate();
@@ -4123,6 +4144,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (configured.compareAndSet(false, true)) {
             readAllBeanConfigurations();
             beanDefinitionProvider.initialize(this);
+            // an index exhaustiveness computed before the bean definitions were read does not hold for them
+            beanDefinitionsEpoch.incrementAndGet();
         }
     }
 
