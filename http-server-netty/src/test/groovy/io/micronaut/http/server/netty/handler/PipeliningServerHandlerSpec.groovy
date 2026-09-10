@@ -1085,6 +1085,7 @@ class PipeliningServerHandlerSpec extends Specification {
 
     def 'graceful shutdown sets connection close on an already prepared response'() {
         given:
+        def errors = []
         def streamed = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
         streamed.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
         def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
@@ -1097,13 +1098,16 @@ class PipeliningServerHandlerSpec extends Specification {
                 if (i++ == 0) {
                     outboundAccess.write(streamed, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
                 } else {
-                    outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+                    def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT)
+                    // the response was prepared for a connection that is still expected to be reused
+                    resp.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE)
+                    outboundAccess.write(resp, NettyByteBodyFactory.empty())
                 }
             }
 
             @Override
             void handleUnboundError(Throwable cause) {
-                cause.printStackTrace()
+                errors << cause
             }
         })
         def ch = new EmbeddedChannel(handler)
@@ -1121,9 +1125,11 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == streamed
         ch.readOutbound() == LastHttpContent.EMPTY_LAST_CONTENT
         FullHttpResponse second = ch.readOutbound()
-        second.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)
+        // exactly one connection directive, the keep-alive it was prepared with is replaced
+        second.headers().getAll(HttpHeaderNames.CONNECTION) == [HttpHeaderValues.CLOSE.toString()]
         ch.readOutbound() == null
         !ch.open
+        errors.empty
 
         cleanup:
         second?.release()

@@ -188,19 +188,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     /**
      * Declare that this connection will be closed after the given response, on a message that has
-     * not been sent yet.
+     * not been sent yet. Any {@code connection} header the response already carries is replaced,
+     * so that the message never contains contradictory directives.
      *
      * @param message The response message to add the connection header to
      */
     private static void addConnectionClose(HttpResponse message) {
-        if (message.protocolVersion().isKeepAliveDefault()) {
-            if (!message.headers().contains(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE, true)) {
-                message.headers().add(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            }
-        } else {
-            // closing is the default for this version, but a keep-alive header would contradict it
-            message.headers().remove(HttpHeaderNames.CONNECTION);
-        }
+        // for a version where keep-alive is the default this sets `connection: close`, for one
+        // where closing is the default it removes a contradicting `connection: keep-alive`
+        HttpUtil.setKeepAlive(message, false);
     }
 
     private static boolean hasBody(HttpRequest request) {
