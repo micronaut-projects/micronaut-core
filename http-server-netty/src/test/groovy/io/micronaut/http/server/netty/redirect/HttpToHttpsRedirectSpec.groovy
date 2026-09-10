@@ -69,4 +69,43 @@ class HttpToHttpsRedirectSpec extends Specification {
         location.rawPath == '/hello'
         location.rawQuery == 'foo=bar&baz=a%20b'
     }
+
+    void 'test http to https redirect retains an empty query string'() {
+        when: 'the request target ends in "?", which is a query component that happens to be empty'
+        String location = redirectLocationOf('/hello?')
+
+        then: 'the delimiter is kept, because an empty query and an absent query are distinct URI forms'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?')
+    }
+
+    void 'test http to https redirect reproduces the query string verbatim'() {
+        when: 'the query uses reserved and percent encoded characters'
+        String location = redirectLocationOf('/hello?a=1%2F2&b=x:y@z&c=p,q$r&d=%7Bjson%7D')
+
+        then: 'the Location header carries the original bytes without a decode or re-encode round trip'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?a=1%2F2&b=x:y@z&c=p,q$r&d=%7Bjson%7D')
+    }
+
+    /**
+     * Sends a request line verbatim so the request target is not normalised by a client, and returns
+     * the value of the Location header of the response.
+     */
+    private String redirectLocationOf(String requestTarget) {
+        int port = (embeddedServer.boundPorts - embeddedServer.port).first() as int
+        new Socket('localhost', port).withCloseable { Socket socket ->
+            socket.soTimeout = 10_000
+            socket.outputStream.with {
+                write("GET ${requestTarget} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes('ISO-8859-1'))
+                flush()
+            }
+            String response = new String(socket.inputStream.readAllBytes(), 'ISO-8859-1')
+            assert response.startsWith('HTTP/1.1 308 Permanent Redirect')
+            return response.readLines()
+                    .find { it.toLowerCase(Locale.ROOT).startsWith('location:') }
+                    .substring('location:'.length())
+                    .trim()
+        }
+    }
 }

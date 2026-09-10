@@ -17,7 +17,6 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -72,9 +71,11 @@ record HttpToHttpsRedirectHandler(
         uriBuilder.path(path);
 
         StringBuilder location = new StringBuilder(uriBuilder.build().toASCIIString());
+        // a null raw query is the only case that means the request target had no query component. An
+        // empty one means it ended in '?', which is a distinct URI form and is reproduced as such.
         // UriBuilder only models decoded query parameters, so the query string is carried over verbatim
         // and the header value is assembled directly rather than round-tripped through URI again.
-        if (StringUtils.isNotEmpty(rawQuery)) {
+        if (rawQuery != null) {
             location.append('?').append(rawQuery);
         }
 
