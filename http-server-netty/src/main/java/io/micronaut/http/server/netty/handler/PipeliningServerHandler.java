@@ -1252,9 +1252,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Handler that writes a 100 CONTINUE response and then proceeds with the {@link #next} handler.
      */
     final class ContinueOutboundHandler extends OutboundHandler {
+        // there is no HTTP/1.0 equivalent: HttpUtil.is100ContinueExpected is always false for
+        // HTTP/1.0, so a continue response is never requested for that version.
         static final FullHttpResponse CONTINUE_11 =
-            new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
-        private static final FullHttpResponse CONTINUE_10 =
             new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.CONTINUE, Unpooled.EMPTY_BUFFER);
 
         boolean written = false;
@@ -1268,7 +1268,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void writeSome() {
             if (!written) {
-                write(outboundAccess.request.protocolVersion().equals(HttpVersion.HTTP_1_0) ? CONTINUE_10 : CONTINUE_11, true, false, false);
+                write(CONTINUE_11, true, false, false);
                 written = true;
             }
             if (next != null) {
