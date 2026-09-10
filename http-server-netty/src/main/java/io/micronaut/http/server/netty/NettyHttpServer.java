@@ -68,6 +68,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
@@ -798,6 +799,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private void stopInternal(boolean stopServerOnly) {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
+            // Close the listening channels first, so that the addresses they are bound to are
+            // released by the time this method returns. This has to happen independently of the
+            // event loop groups: those are only shut down here if this server created them, and
+            // even then the listening channel would otherwise stay open for the duration of the
+            // shutdown quiet period.
+            List<Listener> listenersToClose = this.activeListeners;
+            if (listenersToClose != null) {
+                for (Listener listener : listenersToClose) {
+                    listener.closeServerChannel();
+                }
+            }
             if (shutdownParent) {
                 Objects.requireNonNull(parentGroup);
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
@@ -1081,6 +1093,32 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void clean() {
             contextWrapper.clear();
+        }
+
+        /**
+         * Close the channel this listener accepts connections on and wait for the close to
+         * complete, so that the address it is bound to is free again once this method returns.
+         */
+        void closeServerChannel() {
+            Channel channel = serverChannel;
+            if (channel == null) {
+                return;
+            }
+            ChannelFuture closeFuture = channel.close()
+                .addListener(NettyHttpServer.this::logShutdownErrorIfNecessary);
+            EventLoop eventLoop = channel.eventLoop();
+            if (eventLoop.inEventLoop()) {
+                // waiting on the event loop of the channel itself would deadlock
+                return;
+            }
+            closeFuture.awaitUninterruptibly();
+            // Completing the close future is not the last step: the event loop still has to
+            // deregister the channel from its selector before the socket is given up. Wait for a
+            // round trip through the event loop so that this has happened before the caller (or
+            // the event loop group shutdown that follows) moves on.
+            if (!eventLoop.isShuttingDown()) {
+                eventLoop.submit(() -> { }).awaitUninterruptibly();
+            }
         }
 
         void refresh() {
