@@ -215,6 +215,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             // These bytes are handed to the caller, this buffer no longer holds them. The caller
             // does its own accounting (e.g. AsFlux), so leaving them counted here would
             // permanently shrink the remaining buffer budget for the rest of the body.
+            // The pieces are counted before they are composed, the same way discardBuffer() counts
+            // them before it closes them: compose() consumes them and closes them all if it fails
+            // part way, so they can only be counted while this buffer still owns them.
             long n = 0;
             for (ReadBuffer piece : pieces) {
                 n += piece.readable();

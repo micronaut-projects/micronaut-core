@@ -11,6 +11,8 @@ import reactor.core.publisher.Flux;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -32,7 +34,7 @@ class SharedBufferSizeAccountingTest {
      */
     @Test
     @Timeout(10)
-    public void initialBufferIsNotCountedTwiceAgainstBufferLimit() {
+    public void initialBufferIsNotCountedTwiceAgainstBufferLimit() throws InterruptedException {
         ByteBodyFactory factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
         BufferConsumer.Upstream upstream = bytesConsumed -> {
         };
@@ -45,21 +47,36 @@ class SharedBufferSizeAccountingTest {
         List<byte[]> received = new ArrayList<>();
         AtomicReference<Throwable> error = new AtomicReference<>();
         AtomicBoolean complete = new AtomicBoolean();
+        // the second chunk must not be added until the first has been through the subscriber, and
+        // nothing may be asserted until the body has terminated, so both are waited for explicitly
+        CountDownLatch firstConsumed = new CountDownLatch(1);
+        CountDownLatch terminated = new CountDownLatch(1);
         try (CloseableByteBody root = streamingBody.rootBody()) {
             Flux.from(root.toReadBufferPublisher()).subscribe(
                 rb -> {
                     try (rb) {
                         received.add(rb.toArray());
                     }
+                    firstConsumed.countDown();
                 },
-                error::set,
-                () -> complete.set(true));
+                e -> {
+                    error.set(e);
+                    // an error before the first chunk terminates the body without one
+                    firstConsumed.countDown();
+                    terminated.countDown();
+                },
+                () -> {
+                    complete.set(true);
+                    terminated.countDown();
+                });
 
+            assertTrue(firstConsumed.await(10, TimeUnit.SECONDS), "the buffered bytes never reached the subscriber");
             // the first 60 bytes have been consumed by now, so there is room for 60 more
             streamingBody.sharedBuffer().add(bytes(factory, 60, (byte) 'b'));
             streamingBody.sharedBuffer().complete();
         }
 
+        assertTrue(terminated.await(10, TimeUnit.SECONDS), "the body neither completed nor failed");
         assertNull(error.get());
         assertTrue(complete.get());
         assertEquals(120, received.stream().mapToInt(a -> a.length).sum());
