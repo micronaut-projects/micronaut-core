@@ -22,7 +22,11 @@ import spock.lang.Specification
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executor
 import java.util.concurrent.ThreadFactory
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantLock
 
 @spock.lang.Requires({ jvm.isJava21Compatible() })
 class LoomCarrierSpec extends Specification {
@@ -94,9 +98,74 @@ class LoomCarrierSpec extends Specification {
         ctx.close()
     }
 
+    def 'continuation submitted from an external thread reaches a parked carrier'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'spec.name': 'LoomCarrierSpec',
+                'micronaut.netty.event-loops.default.loom-carrier': true,
+                'micronaut.netty.event-loops.default.num-threads': 1,
+                'micronaut.netty.loom-carrier.normal-warmup-tasks': 0
+        ])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+        def client = ctx.createBean(HttpClient, server.URI).toBlocking()
+        client.retrieve("/loom-carrier/capture-scheduler")
+        EventLoopVirtualThreadScheduler scheduler = MyCtrl.capturedScheduler
+        assert scheduler != null
+
+        def lock = new ReentrantLock()
+        def held = new CountDownLatch(1)
+        def release = new CountDownLatch(1)
+        def ioResumed = new CountDownLatch(1)
+        def ran = new CountDownLatch(1)
+        Thread holder = new Thread({
+            lock.lock()
+            held.countDown()
+            release.await()
+            lock.unlock()
+        }, "loom-carrier-spec-holder")
+
+        when: "the io thread of the loop parks on a lock, so its carrier waits outside of the io operation"
+        holder.start()
+        held.await(10, TimeUnit.SECONDS)
+        scheduler.eventLoop().execute({
+            lock.lock()
+            lock.unlock()
+            ioResumed.countDown()
+        })
+        long deadline = System.currentTimeMillis() + 10_000
+        while (!lock.hasQueuedThreads() && System.currentTimeMillis() < deadline) {
+            Thread.sleep(10)
+        }
+        // let the carrier finish the loop iteration and settle
+        Thread.sleep(500)
+
+        and: "a continuation is submitted from a thread that is not part of the loop"
+        Thread submitter = new Thread({
+            ((Executor) scheduler).execute({ ran.countDown() })
+        }, "loom-carrier-spec-submitter")
+        submitter.start()
+
+        then: "the continuation runs even though the io thread is still parked"
+        lock.hasQueuedThreads()
+        ran.await(10, TimeUnit.SECONDS)
+        ioResumed.count == 1
+
+        cleanup:
+        release.countDown()
+        ioResumed.await(10, TimeUnit.SECONDS)
+        holder.join(10_000)
+        submitter.join(10_000)
+        MyCtrl.capturedScheduler = null
+        ctx.close()
+    }
+
     @Controller("/loom-carrier")
     @Requires(property = "spec.name", value = "LoomCarrierSpec")
     static class MyCtrl {
+
+        static volatile EventLoopVirtualThreadScheduler capturedScheduler
+
         @Inject
         EmbeddedServer embeddedServer
 
@@ -114,6 +183,13 @@ class LoomCarrierSpec extends Specification {
                     Thread.currentThread().getName(),
                     PrivateLoomSupport.getCarrierThread(Thread.currentThread()).getName()
             )
+        }
+
+        @ExecuteOn(TaskExecutors.BLOCKING)
+        @Get("/capture-scheduler")
+        String captureScheduler() {
+            capturedScheduler = EventLoopVirtualThreadScheduler.current()
+            return "ok"
         }
 
         @ExecuteOn(TaskExecutors.BLOCKING)
