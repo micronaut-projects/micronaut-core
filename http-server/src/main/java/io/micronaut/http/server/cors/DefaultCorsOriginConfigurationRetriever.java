@@ -21,11 +21,9 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.Optional;
 
 import static io.micronaut.http.server.HttpServerConfiguration.CorsConfiguration;
 import static io.micronaut.http.server.cors.CrossOriginUtil.getCorsOriginConfigForAnnotationMetadataProvider;
-import static io.micronaut.http.server.cors.CrossOriginUtil.getCorsOriginConfigurationForAnnotationMetadataProvider;
 import static io.micronaut.http.server.cors.CrossOriginUtil.matchesOrigin;
 
 /**

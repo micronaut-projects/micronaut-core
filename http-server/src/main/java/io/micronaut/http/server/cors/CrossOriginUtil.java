@@ -288,6 +288,7 @@ public final class CrossOriginUtil {
         return config;
 
     }
+
     /**
      * Creates CORS configuration from {@link CrossOrigin} annotation metadata.
      *
