@@ -220,6 +220,25 @@ class JsonCounterSpec extends Specification {
         ]
     }
 
+    def 'non-zero reader index'() {
+        when: "a buffer that only becomes legal UTF-8 JSON at its reader index"
+        def buf = Unpooled.wrappedBuffer([0, 0, 0, 0, 0x7b, 0x7d] as byte[])
+        buf.readerIndex(4)
+        def counter = new JsonCounter()
+        counter.feed(buf)
+
+        then: "the bytes before the reader index are not part of the input"
+        counter.pollFlushedRegion() == new JsonCounter.BufferRegion(0, 2)
+
+        when: "a buffer that is utf-16 at its reader index"
+        def utf16 = Unpooled.wrappedBuffer([0x78, 0x78, 0x78, 0x78, 0x22, 0x00, 0x22, 0x5b, 0x22, 0x00] as byte[])
+        utf16.readerIndex(4)
+        new JsonCounter().feed(utf16)
+
+        then:
+        thrown JsonSyntaxException
+    }
+
     def 'illegal inputs unwrapTopLevelArray'(byte[] input) {
         when:
         splitUtf8(input, true, false)

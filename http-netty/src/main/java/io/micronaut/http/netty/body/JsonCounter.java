@@ -86,13 +86,13 @@ public final class JsonCounter {
             // If the input is utf-16 or utf-32, one of the first four bytes will be 0. Checking
             // this separately and only for four bytes allows us to avoid the work in the hot loops
             // below.
-            int r = buf.readableBytes();
-            if ((r >= 1 && buf.getByte(0) == 0)
-                || (r >= 2 && buf.getByte(1) == 0)
-                || (r >= 3 && buf.getByte(2) == 0)
-                || (r >= 4 && buf.getByte(3) == 0)) {
-
-                throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+            int i = buf.readerIndex();
+            // only look at the bytes of this buffer that are among the first four bytes of the input
+            int end = i + Math.min(buf.readableBytes(), 4 - (int) position);
+            for (; i < end; i++) {
+                if (buf.getByte(i) == 0) {
+                    throw new JsonSyntaxException("Input must be legal UTF-8 JSON");
+                }
             }
         }
         if (!isBuffering()) {
