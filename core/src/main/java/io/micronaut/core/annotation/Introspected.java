@@ -151,6 +151,29 @@ public @interface Introspected {
     boolean annotationMetadata() default true;
 
     /**
+     * Whether the individual members (the field, the read method and the write method) that each property is composed
+     * of should be included in the introspection.
+     *
+     * <p>A {@link io.micronaut.core.beans.BeanProperty} normally merges its members, and what the super types
+     * declare on them, into a single element with a single merged {@link AnnotationMetadata}. When this is set to
+     * {@code true} {@link io.micronaut.core.beans.BeanProperty#getMembers()} additionally exposes each member
+     * separately - the field, and the read and write method of every type of the hierarchy declaring one - with
+     * its own annotation metadata, its own {@link io.micronaut.core.type.Argument} and its own accessor, and
+     * {@link io.micronaut.core.beans.BeanIntrospection#separatesDeclarations()} reports it. This is required by
+     * specifications such as Jakarta Bean Validation that treat a field and a getter as two distinct constrained
+     * elements, and attribute a constraint to the type declaring it.</p>
+     *
+     * <p>Defaults to {@code false} since the additional metadata increases the size of the generated
+     * introspection. Has no effect when {@link #annotationMetadata()} is {@code false}, since the members carry
+     * nothing but their own annotation metadata.</p>
+     *
+     * @return True if the property members should be included.
+     * @since 5.2.0
+     */
+    @Experimental
+    boolean members() default false;
+
+    /**
      * The annotation types that should be indexed for lookup via {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperties(Class)} or {@link io.micronaut.core.beans.BeanIntrospection#getIndexedProperty(Class, String)} if {@link IndexedAnnotation#member()} is specified.
      *
      * <p>Property lookup indexing allows building indexes at compilation time for performing reverse property lookups. Consider for example a property with an annotation such as {@code @Column(name = "foo_bar"}. To lookup the property by "foo_bar" you can specify:</p>

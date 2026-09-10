@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.EnumConstantElement;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.jspecify.annotations.Nullable;
 
@@ -39,6 +41,8 @@ import java.util.Objects;
  */
 @Internal
 class JavaEnumElement extends JavaClassElement implements EnumElement {
+
+    private static final String VALUE_OF_PARAMETER = "name";
 
     @Nullable
     protected List<EnumConstantElement> enumConstants;
@@ -114,6 +118,35 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
         }
         values = Collections.unmodifiableList(values);
         enumConstants = Collections.unmodifiableList(enumConstants);
+    }
+
+    @Override
+    public List<MethodElement> getAccessibleStaticCreators() {
+        List<MethodElement> creators = super.getAccessibleStaticCreators();
+        return creators.stream().map(JavaEnumElement::normalizeValueOf).toList();
+    }
+
+    /**
+     * {@code valueOf(String)} is synthesized by the compiler, so the name of its parameter is
+     * compiler specific: javac reports {@code name} while the Eclipse JDT compiler reports
+     * {@code arg0}. Its name is always rewritten, rather than only when it differs, so that the
+     * generated introspection does not depend on which compiler produced it.
+     *
+     * <p>A creator that is not the synthesized {@code valueOf}, such as a method annotated with
+     * {@link io.micronaut.core.annotation.Creator}, is returned untouched: its parameter names come
+     * from the source.</p>
+     *
+     * @param creator The static creator
+     * @return The creator with a stable parameter name
+     */
+    private static MethodElement normalizeValueOf(MethodElement creator) {
+        ParameterElement[] parameters = creator.getParameters();
+        if (parameters.length != 1 || !creator.getName().equals("valueOf")) {
+            return creator;
+        }
+        return creator.withParameters(
+            ParameterElement.of(parameters[0].getGenericType(), VALUE_OF_PARAMETER)
+        );
     }
 
     @Override

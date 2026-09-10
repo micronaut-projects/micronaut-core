@@ -50,8 +50,13 @@ import java.util.stream.Stream;
  *
  * @author Denis Stepanov
  * @since 4.6.0
+ * @deprecated Use {@code io.micronaut.reflection.ReflectionArguments} of the {@code micronaut-reflection} module
+ * instead. It carries this resolution and the rest of the conversion from {@code java.lang.reflect} to the
+ * metadata the annotation processors generate, so that the two do not drift apart; it also resolves a type
+ * variable inside its own bound, which this class recurses on.
  */
 @Internal
+@Deprecated(since = "5.2", forRemoval = true)
 public final class AnnotationReflectionUtils {
 
     private AnnotationReflectionUtils() {
@@ -65,8 +70,11 @@ public final class AnnotationReflectionUtils {
      * @param <T>                T
      * @return The argument of the interface with types and annotations
      * @since 4.6
+     * @deprecated Use {@code io.micronaut.reflection.ReflectionArguments#resolveGenericToArgument(Class, Class)},
+     * which takes the same arguments and answers the same.
      */
     @Nullable
+    @Deprecated(since = "5.2", forRemoval = true)
     public static <T> Argument<T> resolveGenericToArgument(Class<?> runtimeGenericType,
                                                            Class<T> rawSuperType) {
         if (ClassUtils.REFLECTION_LOGGER.isDebugEnabled()) {

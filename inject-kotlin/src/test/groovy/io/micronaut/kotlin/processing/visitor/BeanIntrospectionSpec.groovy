@@ -5,8 +5,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore
 import com.fasterxml.jackson.annotation.JsonProperty
 import io.micronaut.annotation.processing.test.AbstractKotlinCompilerSpec
 import io.micronaut.context.annotation.Executable
+import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospection
+import io.micronaut.inject.test.IntrospectionMetadataShape
 import io.micronaut.core.beans.BeanIntrospectionReference
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.core.beans.BeanMethod
@@ -31,6 +33,7 @@ import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Size
+import java.lang.annotation.ElementType
 import java.lang.reflect.Field
 
 class BeanIntrospectionSpec extends AbstractKotlinCompilerSpec {
@@ -2564,6 +2567,94 @@ class MyMessage: Message()
         noExceptionThrown()
     }
 
+    void 'test property members'() {
+        given:
+        BeanIntrospection introspection = buildBeanIntrospection('test.Person', '''
+package test
+
+import io.micronaut.core.annotation.Introspected
+import jakarta.validation.constraints.NotNull
+
+@Introspected(members = true)
+class Person {
+    @field:NotNull
+    var name: String? = null
+}
+''')
+        def members = introspection.getProperty("name").get().members
+
+        expect: "only the backing field is listed, the Kotlin generated accessors are synthetic"
+        members*.name == ["name"]
+        members*.elementType == [ElementType.FIELD]
+        members[0].annotationMetadata.hasAnnotation(NotNull)
+        members[0].readable
+        members[0].read(introspection.instantiate()) == null
+    }
+
+    void "the members do not change the metadata the previous API answers"() {
+        given: "the same hierarchy, introspected with and without the members"
+        def source = { boolean members -> """
+package test
+
+import io.micronaut.core.annotation.Introspected
+import io.micronaut.context.annotation.Executable
+import jakarta.validation.constraints.*
+
+@Introspected(accessKind = [Introspected.AccessKind.FIELD, Introspected.AccessKind.METHOD], visibility = [Introspected.Visibility.ANY]${members ? ", members = true" : ""})
+@Marker("type")
+open class Child : Parent(), Holder<String> {
+    @field:Marker("child-field") @field:Size(max = 3)
+    private val shadow: String = "shadow"
+    @get:Marker("child-getter") @get:Positive
+    override val name: String get() = "child"
+    override val value: String get() = "value"
+    @Executable @Marker("child-describe") @Negative
+    override fun describe(@Min(2) level: Int): String = "c"
+    @Executable @NotNull
+    fun other(): String = "o"
+}
+
+interface Named {
+    @get:Marker("interface-getter") @get:NotNull @get:Size(min = 1)
+    val name: String
+    @Executable @NotNull
+    fun describe(@Min(1) level: Int): String
+}
+
+interface Holder<T> {
+    @get:NotNull
+    val value: T
+}
+
+open class Parent : Named {
+    @field:Marker("field") @field:NotBlank
+    var tag: String = "parent"
+    @get:Marker("parent-getter") @get:Size(max = 10)
+    override val name: String get() = tag
+    @Executable @Size(max = 5)
+    override fun describe(@Max(9) level: Int): String = "p"
+}
+
+@Retention(AnnotationRetention.RUNTIME)
+@java.lang.annotation.Inherited
+@Target(AnnotationTarget.CLASS, AnnotationTarget.FIELD, AnnotationTarget.FUNCTION, AnnotationTarget.PROPERTY_GETTER)
+annotation class Marker(val value: String)
+""" }
+        def plain = buildBeanIntrospection('test.Child', source(false))
+        def withMembers = buildBeanIntrospection('test.Child', source(true))
+
+        expect: "the members are there in the one and not in the other"
+        withMembers.separatesDeclarations()
+        !plain.separatesDeclarations()
+        !withMembers.getProperty("tag").get().members.isEmpty()
+        plain.getProperty("tag").get().members.isEmpty()
+
+        and: "the metadata the previous API answers is the same in both"
+        withMembers.propertyNames == plain.propertyNames
+        withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+    }
+
     void "constructors = true does not change the constructor beans are built with"() {
         when: 'the same type is built with and without the member'
         def source = '''
@@ -2811,4 +2902,5 @@ class Order(val name: String) {
         introspection.getConstructors().size() == 1
         introspection.getConstructors()[0].arguments.length == introspection.constructor.arguments.length
     }
+
 }

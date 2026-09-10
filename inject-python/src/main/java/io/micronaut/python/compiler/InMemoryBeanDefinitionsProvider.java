@@ -24,7 +24,7 @@ import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.provider.BeanProviderDefinition;
 import io.micronaut.inject.provider.JakartaProviderBeanDefinition;
-import io.micronaut.python.processing.visitor.AbstractPythonClassElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
 
 import java.net.URL;
 import java.net.URLDecoder;

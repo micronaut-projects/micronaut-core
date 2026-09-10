@@ -261,6 +261,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     }
 
     @Override
+    public boolean isSealed() {
+        return classNode.isSealed();
+    }
+
+    @Override
+    public Collection<ClassElement> getPermittedSubclasses() {
+        return classNode.getPermittedSubclasses().stream()
+            .map(this::newClassElement)
+            .toList();
+    }
+
+    @Override
     public <T extends Element> @NonNull List<T> getEnclosedElements(@NonNull ElementQuery<T> query) {
         return groovyEnclosedElementsQuery.getEnclosedElements(this, query);
     }

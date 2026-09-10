@@ -23,6 +23,21 @@ dependencies {
     testImplementation(projects.micronautInject)
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(libs.managed.netty.pkitesting)
+    // the transport tests run over every native transport available on the machine
+    testImplementation(libs.managed.netty.transport.native.epoll) {
+        artifact {
+            classifier = "linux-x86_64"
+        }
+    }
+    testImplementation(libs.managed.netty.transport.native.kqueue) {
+        artifact {
+            classifier = if (org.apache.tools.ant.taskdefs.condition.Os.isArch("aarch64")) {
+                "osx-aarch_64"
+            } else {
+                "osx-x86_64"
+            }
+        }
+    }
 }
 
 tasks.withType<Test>().configureEach {

@@ -58,18 +58,18 @@ class MessageController {
 
     // tag::request-context[]
     @Get("/hello-reactor")
-    fun helloReactor(): Mono<HttpResponse<String>?>? {
+    fun helloReactor(): Mono<HttpResponse<String>> {
         return Mono.deferContextual { ctx: ContextView ->  // <1>
-            val request = ctx.get<HttpRequest<*>>(ServerRequestContext.KEY) // <2>
+            val request = ServerRequestContext.currentRequest<Any>(ctx) // <2>
+                .orElseThrow { IllegalStateException("No request present") }
             val name = request.parameters
                 .getFirst("name")
                 .orElse("Nobody")
-            Mono.just(HttpResponse.ok("Hello $name!!")
-                    .header("X-My-Header", "Foo"))
+            Mono.just<HttpResponse<String>>(HttpResponse.ok("Hello $name!!")
+                .header("X-My-Header", "Foo"))
         }
     }
     // end::request-context[]
 // tag::endclass[]
 }
 // end::endclass[]
-

@@ -66,9 +66,6 @@ internal class KotlinVisitorContext(
     var resolver: Resolver
 ) : VisitorContext {
 
-    init {
-    }
-
     private val visitorAttributes: MutableConvertibleValues<Any> = MutableConvertibleValuesMap()
     private val elementFactory: KotlinElementFactory = KotlinElementFactory(this)
     private val outputVisitor = KotlinOutputVisitor(environment, this)

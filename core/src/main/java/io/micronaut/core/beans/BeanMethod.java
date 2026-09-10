@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 package io.micronaut.core.beans;
+
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.naming.Named;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.ReturnType;
@@ -36,7 +38,22 @@ public interface BeanMethod<B, T> extends Executable<B, T>, Named {
     /**
      * @return The return type.
      */
- ReturnType<T> getReturnType();
+    ReturnType<T> getReturnType();
+
+    /**
+     * The annotations this method declares itself: without the ones of the bean type, which
+     * {@link #getAnnotationMetadata()} combines with the ones of the method, and without the ones inherited
+     * from the methods it overrides, which {@link #getDeclaredMetadata()} keeps. The runtime counterpart of
+     * {@code MethodElement.getDeclaredMethodAnnotationMetadata()} of the annotation processors.
+     *
+     * @return The annotation metadata of this method declaration only
+     * @since 5.2.0
+     */
+    default AnnotationMetadata getDeclaredMethodAnnotationMetadata() {
+        // the first call narrows the metadata of the bean type and the method to the one of the method, the
+        // second one narrows the method metadata to what this declaration carries
+        return getAnnotationMetadata().getDeclaredMetadata().getDeclaredMetadata();
+    }
 
     @Override
     default Class<B> getDeclaringType() {

@@ -15,9 +15,11 @@ class MyRepoIntroductionSpec extends Specification {
         def bean = applicationContext.getBean(MyRepo)
         def interceptorDeclaredMethods = Arrays.stream(bean.getClass().getMethods())
                 .filter(m -> m.getDeclaringClass() == bean.getClass())
-                .filter(m -> m.name != "interceptedMethods")
+                .filter(m -> m.name != "interceptedMethods" && !m.name.startsWith('$'))
                 .collect(Collectors.toList())
-        def repoDeclaredMethods = Arrays.stream(MyRepo.class.getMethods()).filter(m -> m.getDeclaringClass() == MyRepo.class).collect(Collectors.toList())
+        def repoDeclaredMethods = Arrays.stream(MyRepo.class.getMethods())
+                .filter(m -> m.getDeclaringClass() == MyRepo.class && !m.isBridge())
+                .collect(Collectors.toList())
         def myRepoIntroducer = applicationContext.getBean(MyRepoIntroducer)
 
         then:

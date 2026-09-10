@@ -15,6 +15,7 @@
  */
 package io.micronaut.management.endpoint.annotation;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.context.annotation.AliasFor;
 import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Requires;
@@ -41,6 +42,7 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Singleton
 @ConfigurationReader(basePrefix = EndpointConfiguration.PREFIX)
 @Requires(condition = EndpointEnabledCondition.class)
+@Indexed(Endpoint.class)
 public @interface Endpoint {
 
     /**

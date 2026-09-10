@@ -403,6 +403,17 @@ public class FilterRunner {
 
         @Override
         public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
+            // The route match and the resolution of the post-matching filters need to run with the
+            // context propagated by the pre-matching filters, otherwise elements added there
+            // (e.g. the MDC) are not in scope for the route matching
+            PropagatedContext propagatedContext = context.propagatedContext();
+            if (propagatedContext.isBound()) {
+                return resolveRouteMatch(context);
+            }
+            return propagatedContext.propagate(() -> resolveRouteMatch(context));
+        }
+
+        private ExecutionFlow<FilterContext> resolveRouteMatch(FilterContext context) {
             HttpRequest<?> request = context.request();
             try {
                 doRouteMatch(request);

@@ -1,4 +1,4 @@
-All the Micronaut framework provided health indicators are exposed on `/health` and `/health/readiness` endpoints.
+The Micronaut framework provided health indicators are exposed on the `/health` endpoint. They are additionally exposed on `/health/readiness`, except for `DeadlockedThreadsHealthIndicator`, which is a liveness indicator and is exposed on `/health/liveness` instead.
 
 |===
 | Indicator | Configuration Toggle | Default Value

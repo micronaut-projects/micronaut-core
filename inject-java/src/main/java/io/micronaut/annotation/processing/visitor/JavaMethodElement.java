@@ -362,6 +362,10 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
 
     @Nullable
     private static String findReturnDoc(String javadocString) {
+        if (javadocString == null || javadocString.isBlank()) {
+            // the parser rejects a missing comment by throwing, and most members have none
+            return null;
+        }
         try {
             Javadoc javadoc = StaticJavaParser.parseJavadoc(javadocString, false);
             if (javadoc == null) {

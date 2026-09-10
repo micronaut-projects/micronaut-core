@@ -296,6 +296,34 @@ class B {
         log.EVENTS == ['a', 'b']
     }
 
+    void "a bean required by a dependency cycle is not used to break the cycle"() {
+        given:
+        ApplicationContext ctx = buildContext(HEADER + '''
+@Singleton
+class Aardvark {
+    @PreDestroy void close() { Log.add("aardvark"); }
+}
+@Singleton
+class Beta {
+    Beta(BeanProvider<Gamma> gamma, Aardvark aardvark) {}
+    @PreDestroy void close() { Log.add("beta"); }
+}
+@Singleton
+class Gamma {
+    Gamma(BeanProvider<Beta> beta) {}
+    @PreDestroy void close() { Log.add("gamma"); }
+}
+''')
+        def log = ctx.classLoader.loadClass('test.Log')
+        ['Aardvark', 'Beta', 'Gamma'].each { ctx.getBean(ctx.classLoader.loadClass("test.$it")) }
+
+        when:
+        ctx.close()
+
+        then: "the cycle is broken at Beta, the first bean on the cycle, so Aardvark still outlives it"
+        log.EVENTS == ['beta', 'aardvark', 'gamma']
+    }
+
     void "@Order on @EventListener methods orders ShutdownEvent listeners"() {
         given:
         ApplicationContext ctx = buildContext(HEADER + '''

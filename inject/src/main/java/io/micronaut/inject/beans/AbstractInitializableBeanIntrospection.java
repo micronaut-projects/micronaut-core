@@ -15,6 +15,7 @@
  */
 package io.micronaut.inject.beans;
 
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -25,6 +26,7 @@ import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
+import io.micronaut.core.beans.BeanPropertyMember;
 import io.micronaut.core.beans.BeanReadProperty;
 import io.micronaut.core.beans.BeanWriteProperty;
 import io.micronaut.core.beans.UnsafeBeanInstantiationIntrospection;
@@ -48,6 +50,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
 import java.lang.reflect.Method;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
@@ -979,6 +982,35 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         return beanType;
     }
 
+    /**
+     * The type arguments this bean binds in each of its super types, keyed by the super type name. The generated
+     * subclass overrides this when the bean binds at least one type argument somewhere in its hierarchy.
+     *
+     * @return The map of super type name to bound arguments, or {@code null} if the bean binds none
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    protected @Nullable Map<String, Argument<?>[]> getTypeArgumentsMap() {
+        return null;
+    }
+
+    @Override
+    public final List<Argument<?>> getTypeArguments(@Nullable String type) {
+        if (type == null) {
+            return Collections.emptyList();
+        }
+        Map<String, Argument<?>[]> typeArgumentsMap = getTypeArgumentsMap();
+        if (typeArgumentsMap == null) {
+            return Collections.emptyList();
+        }
+        Argument<?>[] arguments = typeArgumentsMap.get(type);
+        if (arguments == null) {
+            return Collections.emptyList();
+        }
+        return Arrays.asList(arguments);
+    }
+
     @Override
     public Collection<BeanMethod<B, Object>> getBeanMethods() {
         return beanMethodsList;
@@ -1414,6 +1446,11 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final BeanPropertyRef<P> ref;
         private final Class<?> typeOrWrapperType;
         private final AnnotationMetadata annotationMetadata;
+        // The list is immutable and its computation idempotent, so we allow it to be
+        // initialized more than once when getMembers() is called concurrently.
+        @SuppressWarnings("java:S3077")
+        @Nullable
+        private volatile List<BeanPropertyMember<B, ?>> members;
 
         private BeanPropertyImpl(BeanPropertyRef<P> ref) {
             this.ref = ref;
@@ -1606,12 +1643,127 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         }
 
         @Override
+        public List<BeanPropertyMember<B, ?>> getMembers() {
+            BeanPropertyMemberRef @Nullable [] memberRefs = ref.members;
+            if (memberRefs == null || memberRefs.length == 0) {
+                return Collections.emptyList();
+            }
+            List<BeanPropertyMember<B, ?>> members = this.members;
+            if (members == null) {
+                List<BeanPropertyMember<B, ?>> newMembers = new ArrayList<>(memberRefs.length);
+                for (BeanPropertyMemberRef memberRef : memberRefs) {
+                    newMembers.add(new BeanPropertyMemberImpl<>(memberRef));
+                }
+                members = Collections.unmodifiableList(newMembers);
+                this.members = members;
+            }
+            return members;
+        }
+
+        @Override
         public String toString() {
             return "BeanProperty{" +
                     "beanType=" + beanType +
                     ", type=" + ref.argument.getType() +
                     ", name='" + ref.argument.getName() + '\'' +
                     '}';
+        }
+    }
+
+    /**
+     * Implementation of {@link BeanPropertyMember} that is using {@link BeanPropertyMemberRef} and method dispatch.
+     *
+     * @param <P> The member type
+     */
+    private final class BeanPropertyMemberImpl<P> implements BeanPropertyMember<B, P> {
+
+        private final BeanPropertyMemberRef ref;
+        private final AnnotationMetadata annotationMetadata;
+        // resolving the declaring type is idempotent and yields the same class, so the field is allowed to be
+        // initialized more than once when getDeclaringType() is called concurrently
+        @SuppressWarnings("java:S3077")
+        @Nullable
+        private volatile Class<?> declaringType;
+
+        private BeanPropertyMemberImpl(BeanPropertyMemberRef ref) {
+            this.ref = ref;
+            this.annotationMetadata = EvaluatedAnnotationMetadata.wrapIfNecessary(ref.argument().getAnnotationMetadata());
+        }
+
+        @Override
+        public String getName() {
+            return ref.name();
+        }
+
+        @Override
+        public ElementType getElementType() {
+            return ref.elementType();
+        }
+
+        @Override
+        public Class<?> getDeclaringType() {
+            Class<?> resolved = declaringType;
+            if (resolved == null) {
+                resolved = resolveDeclaringType();
+                declaringType = resolved;
+            }
+            return resolved;
+        }
+
+        /**
+         * The generated code cannot name a package-private super class of another package as a class constant,
+         * so the class value of the declaring type carries its name when the constant fails, and the class is
+         * loaded by that name through the loader of the bean type. The lookup runs once per member: it loads a
+         * class and builds a message on the failing path, where a member is described repeatedly.
+         */
+        private Class<?> resolveDeclaringType() {
+            AnnotationClassValue<?> value = ref.declaringType();
+            Class<?> type = value.getType().orElse(null);
+            if (type != null) {
+                return type;
+            }
+            return ClassUtils.forName(value.getName(), getBeanType().getClassLoader())
+                .orElseThrow(() -> new IllegalStateException("The type declaring the member " + ref.name()
+                    + " of " + getBeanType().getName() + " cannot be loaded: " + value.getName()));
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public Argument<P> asArgument() {
+            return (Argument<P>) ref.argument();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public boolean isReadable() {
+            return ref.readMethodIndex() != -1;
+        }
+
+        @Nullable
+        @Override
+        public P read(B bean) {
+            ArgumentUtils.requireNonNull("bean", bean);
+            if (!beanType.isInstance(bean)) {
+                throw new IllegalArgumentException("Invalid bean [" + bean + "] for type: " + beanType);
+            }
+            if (!isReadable()) {
+                throw new UnsupportedOperationException("Cannot read from the property member: " + getName());
+            }
+            return dispatchOne(ref.readMethodIndex(), bean, null);
+        }
+
+        @Override
+        public String toString() {
+            return "BeanPropertyMember{" +
+                "beanType=" + beanType +
+                ", elementType=" + ref.elementType() +
+                ", declaringType=" + ref.declaringType() +
+                ", name='" + ref.name() + '\'' +
+                '}';
         }
     }
 
@@ -2016,6 +2168,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final Argument<P> readArgument;
         @Nullable
         final Argument<P> writeArgument;
+        final BeanPropertyMemberRef @Nullable [] members;
 
         public BeanPropertyRef(Argument<P> argument,
                                int getMethodIndex,
@@ -2034,6 +2187,18 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
                                int withMethodIndex,
                                boolean readyOnly,
                                boolean mutable) {
+            this(argument, readArgument, writeArgument, getMethodIndex, setMethodIndex, withMethodIndex, readyOnly, mutable, null);
+        }
+
+        public BeanPropertyRef(Argument<P> argument,
+                               @Nullable Argument<P> readArgument,
+                               @Nullable Argument<P> writeArgument,
+                               int getMethodIndex,
+                               int setMethodIndex,
+                               int withMethodIndex,
+                               boolean readyOnly,
+                               boolean mutable,
+                               BeanPropertyMemberRef @Nullable [] members) {
             this.argument = argument;
             this.getMethodIndex = getMethodIndex;
             this.setMethodIndex = setMethodIndex;
@@ -2043,6 +2208,45 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.writeOnly = getMethodIndex == -1 && (setMethodIndex != -1 || withMethodIndex != -1);
             this.writeArgument = writeArgument == null && (setMethodIndex != -1 || withMethodIndex != -1) ? argument : writeArgument;
             this.readArgument = readArgument == null && (getMethodIndex != -1) ? argument : readArgument;
+            this.members = members;
+        }
+    }
+
+    /**
+     * Bean property member compile-time data container.
+     *
+     * @param elementType    The kind of the member, either {@link ElementType#FIELD} or {@link ElementType#METHOD}
+     * @param declaringType  The type declaring the member, by name when the generated code cannot name it
+     * @param name           The name of the member
+     * @param argument       The type of the member including its own annotation metadata
+     * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
+     * @since 5.2.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public record BeanPropertyMemberRef(ElementType elementType,
+                                        AnnotationClassValue<?> declaringType,
+                                        String name,
+                                        Argument<?> argument,
+                                        int readMethodIndex) {
+
+        /**
+         * The shape the generated code named the declaring type by before it was carried as a class value;
+         * kept for the introspections compiled against it.
+         *
+         * @param elementType     The kind of the member
+         * @param declaringType   The type declaring the member
+         * @param name            The name of the member
+         * @param argument        The type of the member including its own annotation metadata
+         * @param readMethodIndex The dispatch index used to read the member, or {@code -1} if it cannot be read
+         */
+        @UsedByGeneratedCode
+        public BeanPropertyMemberRef(ElementType elementType,
+                                     Class<?> declaringType,
+                                     String name,
+                                     Argument<?> argument,
+                                     int readMethodIndex) {
+            this(elementType, new AnnotationClassValue<>(declaringType), name, argument, readMethodIndex);
         }
     }
 

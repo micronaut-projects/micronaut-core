@@ -232,8 +232,16 @@ public interface HttpRequest<B> extends HttpMessage<B> {
     /**
      * Gets the Fetch Metadata request headers.
      *
-     * @return The Fetch Metadata, or {@code null} if the request does not contain
-     * all recognized Fetch Metadata headers
+     * <p>Individual components of the result are {@code null} when the corresponding header is
+     * absent or carries an unrecognised value; the headers that did parse stay readable.
+     *
+     * @return The Fetch Metadata, or {@code null} if the request carries none of the
+     * {@code Sec-Fetch-*} headers.
+     * <p><strong>A {@code null} return means only that the client sent no Fetch Metadata</strong>
+     * — an older browser, or a non-browser client — and is not an indication that the request is
+     * safe. Resource isolation policies should decide deliberately what to do with unclassified
+     * requests rather than treating {@code null} as an implicit allow
+     * @see SecFetch#of(HttpHeaders)
      * @see SecFetch
      * @since 5.1.12
      */

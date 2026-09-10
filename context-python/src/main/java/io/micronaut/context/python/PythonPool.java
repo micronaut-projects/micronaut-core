@@ -49,9 +49,10 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 
 /**
  * Provides a pool of GraalPy {@link Context} instances built on a shared {@link Engine}.
@@ -72,6 +73,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private final @Nullable Duration warnThreshold;
 
     private final Context primaryContext;
+    private final PythonApplicationRuntime runtime;
 
     private @Nullable Thread creatingContext = null;
     private final Queue<Context> pooledQueue = new ArrayDeque<>();
@@ -80,9 +82,17 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private final Map<Context, Map<String, Value>> cache = new ConcurrentHashMap<>();
 
     private final Map<String, Map<String, Object>> scriptInjections = new ConcurrentHashMap<>();
+    /** Bumped by every injection; a context applies the injections of a script when it is behind. */
+    private final AtomicLong injectionVersion = new AtomicLong();
+    /** The injection version each context has applied, per script. */
+    private final Map<Context, Map<String, Long>> appliedInjections = new ConcurrentHashMap<>();
     private final Map<String, java.util.Set<String>> asyncScriptInjections = new ConcurrentHashMap<>();
 
     private final AtomicInteger size = new AtomicInteger(0);
+    private final AtomicLong borrows = new AtomicLong();
+    private final AtomicLong waits = new AtomicLong();
+    private final AtomicLong totalWaitNanos = new AtomicLong();
+    private final AtomicLong maxWaitNanos = new AtomicLong();
     private final AtomicBoolean gracefulShutdownStarted = new AtomicBoolean();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
     private final int targetSize;
@@ -97,17 +107,20 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @param engine The shared GraalPy engine
      * @param hostAccess The host access policy used for newly created contexts
      * @param primaryContext The primary context used by non-pooled runtime calls
+     * @param runtime The runtime of the application that registers the pool
      * @param applicationContext The application context used to obtain the class loader
      * @param configuration The Python pool configuration
      */
     @Inject
-    PythonPool(@Named(GraalPyRuntimeUtil.PYTHON) Engine engine,
-               @Named(GraalPyRuntimeUtil.PYTHON) HostAccess hostAccess,
-               @Named(GraalPyRuntimeUtil.PYTHON) Context primaryContext,
+    PythonPool(@Named(PythonContextRuntime.PYTHON) Engine engine,
+               @Named(PythonContextRuntime.PYTHON) HostAccess hostAccess,
+               @Named(PythonContextRuntime.PYTHON) Context primaryContext,
+               PythonApplicationRuntime runtime,
                ApplicationContext applicationContext,
                GraalPyContextConfiguration contextConfiguration,
                PythonPoolConfiguration configuration) {
         this.engine = engine;
+        this.runtime = runtime;
         this.primaryContext = primaryContext;
         this.hostAccess = hostAccess;
         this.applicationContext = applicationContext;
@@ -131,7 +144,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * Initialize the optional pool around the already-created primary context.
      * <p>
      * When pooling is disabled or context reuse is enabled this method deliberately unregisters
-     * the pool from {@link PythonContextRuntime}. Otherwise it exposes the pool immediately and
+     * the pool from the {@link PythonApplicationRuntime}. Otherwise it exposes the pool immediately and
      * prepares the primary context cache. Pooled contexts are created lazily by {@link #borrow()}.
      */
     @PostConstruct
@@ -139,16 +152,16 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         // If reuseContext is enabled, skip pool initialization entirely
         if (PythonContextRuntime.isReuseContext()) {
             LOG.debug("Context reuse enabled; skipping Python context pool initialization");
-            PythonContextRuntime.setPythonPool(null);
+            runtime.pool(null);
             return;
         }
         // Register pool and prepare caches if enabled
         if (targetSize <= 0) {
             LOG.debug("Python context pool disabled via configuration; skipping initialization");
-            PythonContextRuntime.setPythonPool(null);
+            runtime.pool(null);
             return;
         }
-        PythonContextRuntime.setPythonPool(this);
+        runtime.pool(this);
         cache.put(primaryContext, new ConcurrentHashMap<>());
     }
 
@@ -170,12 +183,20 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * @param c The context previously obtained from {@link #borrow()}
      */
     void release(Context c) {
+        boolean closeNow;
         synchronized (this) {
             if (closed) {
-                return;
+                // The pool is closing or closed. A context still tracked in pooledContexts is closed by
+                // closePool once idle; one that was already removed would otherwise leak.
+                closeNow = !pooledContexts.contains(c);
+            } else {
+                closeNow = false;
+                pooledQueue.add(c);
+                notifyAll();
             }
-            pooledQueue.add(c);
-            notifyAll();
+        }
+        if (closeNow) {
+            closeContext(c);
         }
     }
 
@@ -198,12 +219,13 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
         if (eventLoop != null) {
             Context eventLoopContext = getEventLoopContext(eventLoop);
-            return PythonContextRuntime.withContextLock(eventLoopContext,
-                () -> PythonContextRuntime.withExecutionFrame(eventLoopContext, () -> callback.apply(eventLoopContext)));
+            // the GraalPy GIL serialises guest execution; a Java monitor held across it can deadlock.
+            // A tracked frame: a closing event-loop context refuses the call instead of being revived.
+            return PythonContextRegistry.withTrackedExecutionFrame(eventLoopContext, () -> callback.apply(eventLoopContext));
         }
         Context borrowed = borrow();
         try {
-            return PythonContextRuntime.withExecutionFrame(borrowed, () -> callback.apply(borrowed));
+            return PythonContextRegistry.withExecutionFrame(borrowed, () -> callback.apply(borrowed));
         } finally {
             release(borrowed);
         }
@@ -220,8 +242,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     <T> T withClass(PythonContextRuntime.PythonClassReference classReference, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
-            Value v = getOrCreateClass(c, classReference);
-            return fn.apply(v);
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateClass(c, classReference)));
         } finally {
             release(c);
         }
@@ -240,11 +261,58 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     <T> T withScript(String packageName, String scriptName, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
-            Value v = getOrCreateScript(c, packageName, scriptName);
-            return fn.apply(v);
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
         } finally {
             release(c);
         }
+    }
+
+    /**
+     * Borrow a context, resolve a cached class value in it and keep the context leased until the
+     * stage the callback returns completes.
+     * <p>
+     * A coroutine returned by a bridge call runs on the context that created it, so that context is
+     * not idle, and must not be lent to another caller, until the coroutine is done.
+     *
+     * @param classReference The Python class reference
+     * @param fn The callback that receives the context-local class value and returns the stage
+     * @return The stage
+     */
+    CompletionStage<?> withClassUntilComplete(PythonContextRuntime.PythonClassReference classReference, Function<Value, CompletionStage<?>> fn) {
+        return leaseUntilComplete(c -> fn.apply(getOrCreateClass(c, classReference)));
+    }
+
+    /**
+     * Borrow a context, resolve a cached script value in it and keep the context leased until the
+     * stage the callback returns completes; see {@link #withClassUntilComplete}.
+     *
+     * @param packageName The Python package, or {@code python} for top-level scripts
+     * @param scriptName The script/module name
+     * @param fn The callback that receives the context-local script value and returns the stage
+     * @return The stage
+     */
+    CompletionStage<?> withScriptUntilComplete(String packageName, String scriptName, Function<Value, CompletionStage<?>> fn) {
+        return leaseUntilComplete(c -> fn.apply(getOrCreateScript(c, packageName, scriptName)));
+    }
+
+    private CompletionStage<?> leaseUntilComplete(Function<Context, CompletionStage<?>> fn) {
+        Context c = borrow();
+        CompletionStage<?> stage = null;
+        try {
+            stage = Objects.requireNonNull(PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(c)), "stage");
+        } finally {
+            if (stage == null) {
+                // the coroutine was never produced: the lease ends with the failure
+                release(c);
+            }
+        }
+        AtomicBoolean released = new AtomicBoolean();
+        stage.whenComplete((ignored, ignoredFailure) -> {
+            if (released.compareAndSet(false, true)) {
+                release(c);
+            }
+        });
+        return stage;
     }
 
     /**
@@ -259,31 +327,26 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     <T> T withValue(String expression, java.util.function.Function<Value, T> fn) {
         Context c = borrow();
         try {
-            Value v = getOrCreateValue(c, expression);
-            return fn.apply(v);
+            return PythonContextRegistry.withExecutionFrame(c, () -> fn.apply(getOrCreateValue(c, expression)));
         } finally {
             release(c);
         }
     }
 
     /**
-     * Resolve a class instance from an available pooled context without borrowing it.
+     * Resolve a class instance for a caller that owns no context.
      * <p>
-     * This is intended for callers that only need a cached class value and do not require exclusive
-     * context ownership. The primary context is used as a fallback when the pool has not warmed yet.
+     * The value comes from the primary context, which the pool never hands out for exclusive use: a
+     * value taken from an idle pooled context would be shared with whichever thread borrows that
+     * context next. Callers that need the value in a pooled context re-coerce it there through
+     * {@link PooledValueCoercible#asPolyglotValue(Context)}.
      *
      * @param classReference The class reference
-     * @return A context-local class value
+     * @return A class value of the primary context
      */
     Value getAnyClass(PythonContextRuntime.PythonClassReference classReference) {
-        Context c;
-        synchronized (this) {
-            c = pooledQueue.peek();
-        }
-        if (c == null) {
-            c = primaryContext;
-        }
-        return getOrCreateClass(c, classReference);
+        // the primary context is shared: the load runs inside a frame of it
+        return PythonContextRegistry.withExecutionFrame(primaryContext, () -> getOrCreateClass(primaryContext, classReference));
     }
 
     /**
@@ -298,23 +361,15 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
-     * Resolve a script/module from an available pooled context without borrowing it.
-     * <p>
-     * The primary context is used as a fallback when no pooled context is currently available.
+     * Resolve a script/module for a caller that owns no context; see {@link #getAnyClass}.
      *
      * @param packageName The Python package, or {@code python} for top-level scripts
      * @param scriptName The script/module name
-     * @return A context-local script value
+     * @return A script value of the primary context
      */
     Value getAnyScript(String packageName, String scriptName) {
-        Context c;
-        synchronized (this) {
-            c = pooledQueue.peek();
-        }
-        if (c == null) {
-            c = primaryContext;
-        }
-        return getOrCreateScript(c, packageName, scriptName);
+        // the primary context is shared: the load and any pending injection run inside a frame of it
+        return PythonContextRegistry.withExecutionFrame(primaryContext, () -> getOrCreateScript(primaryContext, packageName, scriptName));
     }
 
     /**
@@ -395,16 +450,27 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         if (async) {
             asyncScriptInjections.computeIfAbsent(key, ignored -> ConcurrentHashMap.newKeySet()).add(attribute);
         }
-        for (Context context : snapshotIncludingPrimary()) {
-            Map<String, Value> values = cache.get(context);
-            if (values == null) {
-                continue;
-            }
-            Value script = values.get(key);
-            if (script != null) {
-                script.putMember(attribute, coerceInjectedValue(script, value, async));
-            }
+        // recorded only: a pooled context may be borrowed by another thread and an event-loop context
+        // belongs to its loop's thread, so each context applies the injection itself, inside its
+        // owner's execution frame, the next time the script is asked for
+        injectionVersion.incrementAndGet();
+    }
+
+    /**
+     * Apply the injections recorded for a script that this context has not applied yet. Called by the
+     * context's owner: a borrowed pooled context, an event-loop context on its loop, or the primary
+     * context inside a frame.
+     */
+    private void applyPendingInjections(Context context, String key, Value script) {
+        Map<String, Long> applied = appliedInjections.computeIfAbsent(context, ignored -> new ConcurrentHashMap<>());
+        long version = injectionVersion.get();
+        Long done = applied.get(key);
+        if (done != null && done == version) {
+            return;
         }
+        // the version is read before the injections, so one recorded meanwhile is applied again later
+        applyInjections(key, script);
+        applied.put(key, version);
     }
 
     Context getEventLoopContext(PythonEventLoop eventLoop) {
@@ -446,6 +512,8 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     private Context borrow0(boolean pooled) {
         long start = System.nanoTime();
         long lastWarned = start;
+        borrows.incrementAndGet();
+        boolean waited = false;
         synchronized (this) {
             while (true) {
                 if (closed) {
@@ -457,6 +525,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
                         size.decrementAndGet();
                         pooledContexts.remove(polled);
                     }
+                    recordWait(start, waited);
                     return polled;
                 }
                 if (creatingContext == null && (!pooled || size.get() < targetSize)) {
@@ -464,6 +533,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
                     creatingContext = Thread.currentThread();
                     break;
                 }
+                waited = true;
                 try {
                     // Another thread is creating a context; wait for it or for a release.
                     if (warnThreshold == null || !warnThreshold.isPositive() || !LOG.isWarnEnabled()) {
@@ -486,6 +556,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
                 // We were notified, retry polling after checking the closed state.
             }
         }
+        recordWait(start, waited);
         assert creatingContext == Thread.currentThread();
         try {
             Context created = createBorrowedPooledContext(pooled);
@@ -501,6 +572,28 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         }
     }
 
+    private void recordWait(long start, boolean waited) {
+        if (!waited) {
+            return;
+        }
+        long elapsed = System.nanoTime() - start;
+        waits.incrementAndGet();
+        totalWaitNanos.addAndGet(elapsed);
+        maxWaitNanos.accumulateAndGet(elapsed, Math::max);
+    }
+
+    @Override
+    public PythonPoolStatistics statistics() {
+        int idle;
+        boolean poolClosed;
+        synchronized (this) {
+            idle = pooledQueue.size();
+            poolClosed = closed;
+        }
+        return new PythonPoolStatistics(targetSize > 0, targetSize, size.get(), idle, eventLoopContexts.size(),
+            borrows.get(), waits.get(), totalWaitNanos.get() / 1_000_000, maxWaitNanos.get() / 1_000_000, poolClosed);
+    }
+
     private @Nullable Context createBorrowedPooledContext(boolean pooled) {
         assert Thread.currentThread() == creatingContext;
 
@@ -511,16 +604,20 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             LOG.debug("Creating Pooled Python context {}", size.get());
         }
         Context c = createContext();
-        if (closed) {
-            closeContext(c);
-            return null;
+        // Registration and the closed check share the pool monitor with closePool's snapshot, so a
+        // context created while the pool closes is either in that snapshot or closed right here.
+        synchronized (this) {
+            if (!closed) {
+                cache.put(c, new ConcurrentHashMap<>());
+                if (pooled) {
+                    pooledContexts.add(c);
+                    size.incrementAndGet();
+                }
+                return c;
+            }
         }
-        cache.put(c, new ConcurrentHashMap<>());
-        if (pooled) {
-            pooledContexts.add(c);
-            size.incrementAndGet();
-        }
-        return c;
+        closeContext(c);
+        return null;
     }
 
     private Context createContext() {
@@ -562,41 +659,61 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         return contexts;
     }
 
+    /*
+     * Guest code never runs inside a ConcurrentHashMap remapping function: the map holds a bin lock
+     * there, and Python code re-entering the runtime for the same key would fail with a recursive
+     * update, or wait for the bin while its thread owns the GIL that the loading thread waits for.
+     * A duplicate load settles with putIfAbsent instead.
+     */
     private Value getOrCreateClass(Context c, PythonContextRuntime.PythonClassReference classReference) {
         Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = classReference.cacheKey();
-        return m.computeIfAbsent(key, _ -> {
-            Value cls = loadClass(c, classReference);
-            if (cls.canInstantiate()) {
-                return cls.newInstance();
-            }
-            return cls;
-        });
+        Value existing = m.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        Value cls = loadClass(c, classReference);
+        Value created = cls.canInstantiate() ? cls.newInstance() : cls;
+        Value prior = m.putIfAbsent(key, created);
+        return prior != null ? prior : created;
     }
 
     private Value getOrCreateScript(Context c, String packageName, String scriptName) {
         Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = scriptKey(packageName, scriptName);
-        return m.computeIfAbsent(key, _ -> {
+        Value existing = m.get(key);
+        if (existing == null) {
             Value script = loadScript(c, packageName, scriptName);
-            scriptInjections.getOrDefault(key, Map.of())
-                .forEach((attribute, value) -> script.putMember(
-                    attribute,
-                    coerceInjectedValue(script, value, asyncScriptInjections.getOrDefault(key, java.util.Set.of()).contains(attribute))
-                ));
-            return script;
-        });
+            Value prior = m.putIfAbsent(key, script);
+            existing = prior != null ? prior : script;
+        }
+        applyPendingInjections(c, key, existing);
+        return existing;
+    }
+
+    private void applyInjections(String key, Value script) {
+        scriptInjections.getOrDefault(key, Map.of())
+            .forEach((attribute, value) -> script.putMember(
+                attribute,
+                coerceInjectedValue(script, value, asyncScriptInjections.getOrDefault(key, java.util.Set.of()).contains(attribute))
+            ));
     }
 
     private Value getOrCreateValue(Context c, String expression) {
         Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = valueKey(expression);
-        return m.computeIfAbsent(key, _ -> PythonContextRuntime.withContextLock(c, () -> c.eval(PYTHON, expression)));
+        Value existing = m.get(key);
+        if (existing != null) {
+            return existing;
+        }
+        Value created = c.eval(PYTHON, expression);
+        Value prior = m.putIfAbsent(key, created);
+        return prior != null ? prior : created;
     }
 
     private static @Nullable Object coerceInjectedValue(Value script, Object value, boolean async) {
         if (async) {
-            return GraalPyRuntimeUtil.asyncMemberValue(script, value);
+            return PythonCoercion.asyncMemberValue(script, value);
         }
         // Introduction and other stateful Python wrappers cannot be reconstructed from Java-side
         // state. Keep them as host proxies when injecting them into pooled modules, as they were
@@ -604,7 +721,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
         if (value instanceof ValueCoercible && !(value instanceof PooledValueCoercible)) {
             return value;
         }
-        return GraalPyRuntimeUtil.coerceToContext(value, script.getContext());
+        return PythonCoercion.coerceToContext(value, script.getContext());
     }
 
     private static String scriptKey(String pkg, String script) {
@@ -625,29 +742,47 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
 
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
-        PythonContextRuntime.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), this::closePool);
+        if (PythonContextRuntime.isReuseContext()) {
+            return;
+        }
+        PythonContextRegistry.onNoActiveExecutionsAfterCurrentFrame(event.getBean(), this::closePool);
     }
 
+    /**
+     * Complete once every pooled, event-loop and primary context is idle.
+     * <p>
+     * The pool keeps serving borrows while the application drains: requests that are still in flight
+     * may need a context, and the contexts are only closed when the primary context bean is destroyed.
+     */
     @Override
     public CompletionStage<?> shutdownGracefully() {
         if (gracefulShutdownStarted.compareAndSet(false, true)) {
             List<Context> contexts;
             synchronized (this) {
-                closed = true;
-                notifyAll();
                 contexts = snapshotIncludingPrimary();
             }
-            PythonContextRuntime.onNoActiveExecutions(contexts, () -> gracefulShutdown.complete(null));
+            PythonContextRegistry.onNoActiveExecutions(contexts, () -> gracefulShutdown.complete(null));
         }
         return gracefulShutdown;
     }
 
+    /**
+     * Stop handing out contexts and close them once none of them executes Python any more.
+     */
     private void closePool() {
-        List<Context> snapshot;
-        List<Context> eventLoopSnapshot;
+        List<Context> contexts;
         synchronized (this) {
             closed = true;
             notifyAll();
+            contexts = snapshotIncludingPrimary();
+        }
+        PythonContextRegistry.closeWhenIdle(contexts, this::closeContexts);
+    }
+
+    private void closeContexts() {
+        List<Context> snapshot;
+        List<Context> eventLoopSnapshot;
+        synchronized (this) {
             snapshot = new ArrayList<>(pooledContexts);
             pooledContexts.removeAll(snapshot);
             pooledQueue.removeAll(snapshot);
@@ -656,13 +791,17 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             eventLoopContexts.clear();
         }
         cache.clear();
+        appliedInjections.clear();
         scriptInjections.clear();
         asyncScriptInjections.clear();
         List<Context> contexts = new ArrayList<>(snapshot.size() + eventLoopSnapshot.size());
         contexts.addAll(snapshot);
         contexts.addAll(eventLoopSnapshot);
+        // every context is closed; the first failure is reported after the last close
+        List<Runnable> closes = new ArrayList<>(contexts.size());
         for (Context context : contexts) {
-            GraalPyContextFactory.closeContext(context);
+            closes.add(() -> GraalPyContextFactory.closeContext(context));
         }
+        PythonContextRegistry.runEach(closes);
     }
 }

@@ -803,6 +803,14 @@ public interface ClassElement extends TypedElement {
     /**
      * Create a class element for the given simple type.
      *
+     * <p>The returned element is an immutable type reference, not a model of the type: it reports no
+     * {@link #getEnclosedElements(ElementQuery) enclosed elements} and does not support adding or
+     * removing annotations at compilation time. It is intended for describing a type in generated code.
+     * A language module resolving a type from the compilation classpath should not place the result into
+     * a model that a {@link io.micronaut.inject.visitor.TypeElementVisitor} traverses; it should resolve
+     * the type through {@link io.micronaut.inject.visitor.VisitorContext#getClassElement(String)} or its
+     * own {@link ElementFactory} instead.</p>
+     *
      * @param type The type
      * @return The class element
      */
@@ -814,6 +822,14 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Create a class element for the given complex type.
+     *
+     * <p>The returned element is an immutable type reference, not a model of the type: it reports no
+     * {@link #getEnclosedElements(ElementQuery) enclosed elements} and does not support adding or
+     * removing annotations at compilation time. It is intended for describing a type in generated code.
+     * A language module resolving a type from the compilation classpath should not place the result into
+     * a model that a {@link io.micronaut.inject.visitor.TypeElementVisitor} traverses; it should resolve
+     * the type through {@link io.micronaut.inject.visitor.VisitorContext#getClassElement(String)} or its
+     * own {@link ElementFactory} instead.</p>
      *
      * @param type The type
      * @return The class element
@@ -848,6 +864,14 @@ public interface ClassElement extends TypedElement {
 
     /**
      * Create a class element for the given simple type.
+     *
+     * <p>The returned element is an immutable type reference, not a model of the type: it reports no
+     * {@link #getEnclosedElements(ElementQuery) enclosed elements} and does not support adding or
+     * removing annotations at compilation time. It is intended for describing a type in generated code.
+     * A language module resolving a type from the compilation classpath should not place the result into
+     * a model that a {@link io.micronaut.inject.visitor.TypeElementVisitor} traverses; it should resolve
+     * the type through {@link io.micronaut.inject.visitor.VisitorContext#getClassElement(String)} or its
+     * own {@link ElementFactory} instead.</p>
      *
      * @param type               The type
      * @param annotationMetadata The annotation metadata

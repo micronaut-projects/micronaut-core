@@ -25,7 +25,7 @@ import io.micronaut.inject.InjectionPoint;
 public class KindFactory {
 
     @Prototype
-    KindBean kindBean(InjectionPoint<KindBean> injectionPoint) {
+    KindBean kindBean(InjectionPoint<KindBean> injectionPoint, KindDependency dependency) {
         return new KindBean(injectionPoint);
     }
 }

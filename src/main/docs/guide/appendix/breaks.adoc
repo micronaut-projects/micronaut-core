@@ -8,6 +8,14 @@ This applies to both normal redirects and preserve-body redirects (`307` and `30
 
 If needed, this behavior can be customized through `HttpClientConfiguration`.
 
+=== Header values may no longer contain characters above U+00FF
+
+`SimpleHttpHeaders` (and the `CaseInsensitiveMutableHttpHeaders` behind it, used when Netty is not on the classpath) now rejects a header value containing a character above `U+00FF` with an `IllegalArgumentException`.
+
+RFC 7230 defines a header value over octets — `field-vchar = VCHAR / obs-text`, where `obs-text` is `%x80-FF` — so a character that is not representable as a single octet is not a valid header value. Previously such a value was accepted and then handled inconsistently by whichever transport sent it: Netty substitutes `?` for each offending character, while the JDK HTTP client throws from its own request builder. The value is now rejected where it is set, naming the header and the offending index.
+
+Characters in `%x80-FF` are unaffected and remain valid, so a `Content-Disposition` filename using Latin-1 accented characters continues to work. Only characters above `U+00FF` — for example CJK text or emoji — are rejected, and those were already being replaced with `?` on the wire.
+
 == 5.0
 
 === Core Changes
@@ -41,7 +49,7 @@ Check https://groovy-lang.org/releasenotes/groovy-5.0.html#Groovy5.0-breaking[Gr
 
 ==== JSpecify Nullability Annotations
 
-The Micronaut APIs use <<jspecify, JSpecify Annotations>>, and we recommend users to embrace JSpecify nullability annotations.
+The Micronaut APIs use https://jspecify.dev[JSpecify] annotations, and we recommend users to embrace JSpecify nullability annotations.
 
 ==== Bean context changes
 
@@ -440,7 +448,7 @@ Micronaut Framework 4 changes `@CrossOrigin` behavior to match configuration-bas
 
 Micronaut Framework 5 changes the default value of `@CrossOrigin.allowCredentials` from `true` to `false`. If your application relies on credentialed cross-origin requests, set `allowCredentials = true` explicitly.
 
-==== `@EachBean` requires a `@Named qualifier
+==== `@EachBean` requires a `@Named` qualifier
 
 `@EachBean` throws a "multiple possible bean candidates found" exception if any parent bean lacks a name qualifier.
 
@@ -463,3 +471,9 @@ If the previous behavior is desired, configure the retryable annotation explicit
 ----
 @Retryable(includes = RuntimeException.class)
 ----
+
+==== Kotlin `suspend` routes honour the selected executor
+
+In Micronaut Framework 4, a Kotlin `suspend` route ignored ann:scheduling.annotation.ExecuteOn[] and the `micronaut.server.thread-selection` setting: the route ran on the event loop and resumed on `Dispatchers.Default`. In Micronaut 5 the selected executor is applied, and it is also the dispatcher the coroutine resumes on.
+
+This changes which thread a `suspend` route runs on for applications that annotate one with ann:scheduling.annotation.ExecuteOn[], or that set `micronaut.server.thread-selection` to `AUTO`, `IO` or `BLOCKING` (the default is `MANUAL`, which selects no executor and is unaffected). To keep a `suspend` route on the event loop under `AUTO`, annotate it with ann:core.annotation.NonBlocking[].

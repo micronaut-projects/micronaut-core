@@ -46,6 +46,7 @@ ioc:
     title: Bean Introspection
     atIntrospected: Use the @Introspected Annotation
     staticAtCreator: Static Creator Methods
+    introspectedAnnotationOnAConfigurationClass: Use the @Introspected Annotation on a Configuration Class
     beanWrapperApi: The BeanWrapper API
   beanMappers:
     title: Bean Mappers
@@ -79,6 +80,7 @@ aop:
   introductionAdvice: Introduction Advice
   adapterAdvice: Method Adapter Advice
   lifecycleAdvice: Bean Life Cycle Advice
+  interceptorLifecycle: Interceptor Life Cycle
   validation:
     title: Validation Advice
   caching:
@@ -108,6 +110,7 @@ httpServer:
   jsonBinding:
     title: JSON Binding
     serializeUsingMicronautSerialization: Serialize using Micronaut Serialization
+    serializationUsingJacksonDatabind: Serialization using Jackson Databind
     jsonMapper: JsonMapper
     bindingUsingReactiveFrameworks: Binding using Reactive Frameworks
     bindingUsingCompletableFuture: Binding Using CompletableFuture
@@ -217,7 +220,6 @@ httpClient:
     clientJackson: Customizing Jackson Settings
     clientRetry: Retry and Circuit Breaker
     clientFallback: Client Fallbacks
-    netflixHystrix: Netflix Hystrix Support
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
@@ -249,7 +251,6 @@ cloud:
     serviceDiscoveryManual: Manual Service Discovery Configuration
   clientSideLoadBalancing:
     title: Client Side Load Balancing
-    netflixRibbon: Netflix Ribbon Support
   distributedTracing: Distributed Tracing
 serverlessFunctions:
   title: Serverless Functions
@@ -290,12 +291,20 @@ languageSupport:
     title: Micronaut for Python
     pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
+    standardTypes: Standard Library Type Conversions
     keywords: Python Keywords in Java APIs
+    moduleScripts:
+      title: Module Scripts
+      testing: JUnit 5 Module Tests
+    graalTools: GraalPy Tools
     asyncAwait:
       title: Async/Await
       asyncioRuntime: Netty-Backed Asyncio Runtime
       asyncioNetworking: Asyncio Networking and TLS
       asyncioUnsupported: Unsupported Asyncio APIs
+  graal:
+    title: Micronaut for GraalVM
+    graalServices: Microservices as GraalVM native images
 management:
   title: Management & Monitoring
   buildingEndpoints:
@@ -319,6 +328,7 @@ management:
         title: Provided Indicators
         diskSpaceHealthIndicator: Disk Space Health Indicator
         jdbcHealthIndicator: JDBC Health Indicator
+        discoveryClientHealthIndicator: Discovery Client Health Indicator
         deadlockedThreads: Deadlocked Threads
     metricsEndpoint: The Metrics Endpoint
     refreshEndpoint: The Refresh Endpoint
@@ -339,6 +349,7 @@ cli:
     comparingVersions: Comparing Versions
   features: Features
   commands: Commands
+  proxy: Proxy Configuration
 i18n:
   title: Internationalization
   bundle: Resource Bundles

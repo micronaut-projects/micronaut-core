@@ -26,7 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -44,18 +44,18 @@ final class PythonContextRuntimeTest {
              Context second = Context.newBuilder(PYTHON).engine(sharedEngine).build();
              Context unrelated = Context.newBuilder(PYTHON).engine(otherEngine).build()) {
             AtomicInteger invocations = new AtomicInteger();
-            PythonContextRuntime.registerContext(first);
-            PythonContextRuntime.registerContext(second);
-            PythonContextRuntime.registerContext(unrelated);
+            PythonContextRegistry.registerContext(first);
+            PythonContextRegistry.registerContext(second);
+            PythonContextRegistry.registerContext(unrelated);
 
-            PythonContextRuntime.onNoContexts(sharedEngine, invocations::incrementAndGet);
-            PythonContextRuntime.unregisterContext(unrelated);
+            PythonContextRegistry.onNoContexts(sharedEngine, invocations::incrementAndGet);
+            PythonContextRegistry.unregisterContext(unrelated);
             assertEquals(0, invocations.get());
 
-            PythonContextRuntime.unregisterContext(first);
+            PythonContextRegistry.unregisterContext(first);
             assertEquals(0, invocations.get());
 
-            PythonContextRuntime.unregisterContext(second);
+            PythonContextRegistry.unregisterContext(second);
             assertEquals(1, invocations.get());
         }
     }

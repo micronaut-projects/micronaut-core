@@ -52,6 +52,40 @@ final class GraalPyExceptionHandler {
         }
     }
 
+    /**
+     * Resolve the host throwable represented by a guest exception value.
+     * <p>
+     * Host exceptions that crossed into Python keep their identity, generated Python exception wrappers
+     * are instantiated, and any other Python exception is reported as the {@link PolyglotException}
+     * that {@link Value#throwException()} produces for it.
+     *
+     * @param exception The exception value
+     * @return The throwable to report to Java
+     */
+    static Throwable toHostThrowable(Value exception) {
+        if (exception.isHostObject() && exception.asHostObject() instanceof Throwable throwable) {
+            return throwable;
+        }
+        if (exception.hasMembers() && exception.hasMember("java_exception")) {
+            Value javaException = exception.getMember("java_exception");
+            if (javaException != null && javaException.isHostObject() && javaException.asHostObject() instanceof Throwable throwable) {
+                return throwable;
+            }
+        }
+        if (exception.isException()) {
+            try {
+                exception.throwException();
+            } catch (PolyglotException polyglotException) {
+                if (polyglotException.isHostException()) {
+                    return polyglotException.asHostException();
+                }
+                RuntimeException generated = toGeneratedRuntimeException(polyglotException);
+                return generated != null ? generated : polyglotException;
+            }
+        }
+        return new RuntimeException(exception.toString());
+    }
+
     private static @Nullable RuntimeException toGeneratedRuntimeException(PolyglotException exception) {
         Value guestObject = null;
         try {
@@ -101,7 +135,7 @@ final class GraalPyExceptionHandler {
         Value pythonClass = guestObject.hasMember("__class__") ? guestObject.getMember("__class__") : null;
         String moduleName = stringMember(pythonClass, "__module__");
         if (simpleName != null && !simpleName.isBlank()) {
-            addCandidate(candidates, GraalPyRuntimeUtil.PYTHON + "." + simpleName);
+            addCandidate(candidates, PythonContextRuntime.PYTHON + "." + simpleName);
             if (moduleName != null && !moduleName.isBlank()) {
                 addCandidate(candidates, moduleName);
                 addCandidate(candidates, moduleName + "." + simpleName);

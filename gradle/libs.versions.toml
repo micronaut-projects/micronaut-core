@@ -7,7 +7,8 @@ brotli4j = "1.23.0"
 bytebuddy = "1.18.12"
 caffeine = "2.9.3"
 classgraph = "4.8.192"
-compile-testing = "0.21.0"
+compile-testing = "0.23.0"
+ecj = "3.46.100"
 
 geb = "7.0"
 h2 = "2.4.240"
@@ -52,7 +53,7 @@ micronaut-kotlin = "5.1.0"
 native-gradle-plugin = "0.11.4"
 neo4j-java-driver = "5.17.0"
 selenium = "4.27.0"
-okio = "3.18.1"
+okio = "3.18.2"
 slf4j = "2.0.17"
 smallrye = "6.9.2"
 spock = "2.4-groovy-5.0"
@@ -67,32 +68,32 @@ micronaut-sourcegen = "2.1.0"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
-zacsweers-kotlin-compile-testing = "0.12.1"
+zacsweers-kotlin-compile-testing = "0.13.0"
 errorprone-gradle-plugin = "4.4.0"
 nullaway = "0.13.8"
 error_prone_core = "2.48.0"
-jackson2 = "2.22.1"
+jackson2 = "2.21.6"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
 # that they will appear in the Micronaut BOM as <properties>
 #
 # be sure to update graal version in gradle.properties as well
-managed-graal = "25.0.3"
+managed-graal = "25.3.4.1"
 managed-groovy = "5.0.8"
 managed-jakarta-annotation-api = "2.1.1"
-managed-jackson = "3.2.1"
+managed-jackson = "3.2.2"
 managed-jackson-annotations = "2.22"
-managed-kotlin = "2.3.21"
+managed-kotlin = "2.4.10"
 managed-kotlin-coroutines = "1.10.2"
-managed-graalpy = "25.2.4"
+managed-graalpy = "25.3.4.1"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.17.Final"
 managed-netty-tcnative = "2.0.81.Final"
 managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.7.12"
+managed-reactor = "3.8.7"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.28.2"
 managed-ksp = "2.3.10"
@@ -211,6 +212,7 @@ caffeine = { module = "com.github.ben-manes.caffeine:caffeine", version.ref = "c
 classgraph = { module = "io.github.classgraph:classgraph", version.ref= "classgraph" }
 
 compile-testing = { module = "com.google.testing.compile:compile-testing", version.ref = "compile-testing" }
+ecj = { module = "org.eclipse.jdt:ecj", version.ref = "ecj" }
 
 geb-spock = { module = "org.gebish:geb-spock", version.ref = "geb" }
 groovy-test-junit5 = { module = "org.apache.groovy:groovy-test-junit5", version.ref = "managed-groovy" }

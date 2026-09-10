@@ -33,7 +33,11 @@ public interface Intercepted extends InterceptedBean {
     /**
      * The interceptor registrations that were resolved for this proxy.
      *
-     * <p>The scenario this exists for is an advised bean that also declares lifecycle advice:</p>
+     * <p>Every generated proxy retains the registrations its constructor was given, so a proxy can always report the
+     * interceptors bound to it. For an around- or introduction-only proxy that is the set matching its around
+     * bindings; a proxy whose target also declares lifecycle advice is given a wider set, described below.</p>
+     *
+     * <p>The scenario the retention was introduced for is an advised bean that also declares lifecycle advice:</p>
      *
      * <pre>{@code
      * @Retention(RUNTIME)
@@ -52,8 +56,8 @@ public interface Intercepted extends InterceptedBean {
      * particular has no other route to them: it runs with a fresh resolution context, and the proxy instance is the
      * only thing that survives from creation to destruction.</p>
      *
-     * <p>Proxies whose target declares no lifecycle binding, and proxies generated before this existed, keep the
-     * empty default; the runtime then resolves interceptors by binding as it always did.</p>
+     * <p>Proxies generated before this existed keep the empty default; the runtime then resolves interceptors by
+     * binding as it always did.</p>
      *
      * <p>The context reads the same list through {@link InterceptedBean#$interceptorRegistrations()} when
      * {@code destroyBean(Object)} is handed a proxy it tracks no registration for, so the non-singleton interceptors

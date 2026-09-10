@@ -20,6 +20,13 @@ import io.micronaut.core.annotation.Experimental;
 /**
  * Represents a Kotlin parameter to a method or constructor.
  *
+ * <p>Implementing this interface additionally signals that defaulted parameters follow
+ * <i>Kotlin's</i> calling convention: a defaults bitmask plus the synthetic {@code $default}
+ * overload. It is therefore not a general marker for optional parameters — use
+ * {@link ParameterElement#hasDefault()} for that, and
+ * {@code io.micronaut.inject.writer.ParameterDefaultValueProvider} for languages that evaluate the
+ * default in the caller.</p>
+ *
  * @author Denis Stepanov
  * @since 4.1.0
  */
@@ -29,6 +36,7 @@ public interface KotlinParameterElement extends ParameterElement {
     /**
      * @return True if the parameter has a default value
      */
+    @Override
     boolean hasDefault();
 
 }

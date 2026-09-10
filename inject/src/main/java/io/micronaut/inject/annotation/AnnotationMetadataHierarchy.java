@@ -464,6 +464,27 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
     }
 
     @Override
+    public Set<String> getStereotypeAnnotationNames() {
+        Set<String> set = new HashSet<>();
+        for (AnnotationMetadata am : hierarchy) {
+            set.addAll(am.getStereotypeAnnotationNames());
+        }
+        return set;
+    }
+
+    @Override
+    public Set<String> getDeclaredStereotypeAnnotationNames() {
+        if (delegateDeclaredToAllElements) {
+            Set<String> set = new HashSet<>();
+            for (AnnotationMetadata am : hierarchy) {
+                set.addAll(am.getDeclaredStereotypeAnnotationNames());
+            }
+            return set;
+        }
+        return hierarchy[0].getDeclaredStereotypeAnnotationNames();
+    }
+
+    @Override
     public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
         for (AnnotationMetadata annotationMetadata : hierarchy) {
             final OptionalValues<T> values = annotationMetadata.getValues(annotation, valueType);

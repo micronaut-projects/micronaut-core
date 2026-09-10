@@ -21,5 +21,4 @@ class AroundSpec:
         except Exception as e:
             assert str(e) == 'Null parameter [taskName] is not allowed'
     # end::test[]
-
-
+# end::class[]

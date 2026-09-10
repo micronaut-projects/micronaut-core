@@ -24,14 +24,17 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanContextConditional;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
+import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.InstantiatableBeanDefinition;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -70,15 +73,9 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
     default List<Argument<?>> getTypeArguments(Class<?> type) {
         Class<T> beanType = getBeanType();
         if (type != null && type.isAssignableFrom(beanType)) {
-            if (type.isInterface()) {
-                return Arrays.stream(GenericTypeUtils.resolveInterfaceTypeArguments(beanType, type))
-                    .map(Argument::of)
-                    .collect(Collectors.toList());
-            } else {
-                return Arrays.stream(GenericTypeUtils.resolveSuperTypeGenericArguments(beanType, type))
-                    .map(Argument::of)
-                    .collect(Collectors.toList());
-            }
+            return Arrays.stream(GenericTypeUtils.resolveTypeArguments(beanType, type))
+                .map(Argument::of)
+                .collect(Collectors.toList());
         } else {
             return Collections.emptyList();
         }
@@ -195,19 +192,19 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
 
     /**
      * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the current {@link BeanResolutionContext}.
+     * receives the {@link CreationContext} of each creation.
      *
-     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
-     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
-     * the bean is being created for.</p>
+     * <p>The creation context carries the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)} and the injection point the bean is being created for.</p>
      *
      * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @param beanFactory The bean factory that receives the {@link CreationContext}
      * @return The builder
      * @param <B> The bean type
      * @since 5.2.0
      */
-    static <B> Builder<B> builder(Class<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+    @Experimental
+    static <B> Builder<B> builder(Class<B> beanType, Function<CreationContext, B> beanFactory) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             Argument.of(beanType),
             beanFactory
@@ -216,23 +213,210 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
 
     /**
      * A new builder for constructing and configuring runtime created beans where the bean factory
-     * receives the current {@link BeanResolutionContext}.
+     * receives the {@link CreationContext} of each creation.
      *
-     * <p>The resolution context allows the factory to introspect where in a resolution the bean is being
-     * created, for example via {@link BeanResolutionContext#getPath()} to discover the injection point
-     * the bean is being created for.</p>
+     * <p>The creation context carries the beans resolved for the injection points declared with
+     * {@link Builder#injectionPoint(Argument)} and the injection point the bean is being created for.</p>
      *
      * @param beanType The bean type
-     * @param beanFactory The bean factory that receives the current {@link BeanResolutionContext}
+     * @param beanFactory The bean factory that receives the {@link CreationContext}
      * @return The builder
      * @param <B> The bean type
      * @since 5.2.0
      */
-    static <B> Builder<B> builder(Argument<B> beanType, Function<BeanResolutionContext, B> beanFactory) {
+    @Experimental
+    static <B> Builder<B> builder(Argument<B> beanType, Function<CreationContext, B> beanFactory) {
         return new DefaultRuntimeBeanDefinition.RuntimeBeanBuilder<>(
             beanType,
             beanFactory
         );
+    }
+
+    /**
+     * The lookups a runtime built bean can perform while it is being created or disposed of.
+     *
+     * <p>Every lookup here is resolved through the {@link BeanResolutionContext} of the creation or of the
+     * disposal, which is what makes core's own dependency handling apply to it: a dependent object
+     * (a {@code @Prototype} or {@code @Dependent} bean, for example) that a lookup resolves becomes a dependent
+     * of that creation or disposal and is destroyed with it, a circular dependency is detected, and an
+     * unsatisfied {@link #getBean(Argument)} fails with the usual
+     * {@link io.micronaut.context.exceptions.DependencyInjectionException}. Resolving the same bean from
+     * {@link #getBeanContext()} instead resolves it outside that context, where none of that applies.</p>
+     *
+     * <p>How long what a lookup resolves lives is decided by the context it was made from:
+     * a dependent resolved from a {@link CreationContext} is destroyed when the created bean is, and one
+     * resolved from a {@link DisposalContext} is destroyed when the disposer returns.</p>
+     *
+     * @since 5.2.0
+     */
+    @Experimental
+    interface LookupContext {
+
+        /**
+         * @return The bean context the bean belongs to
+         */
+        BeanContext getBeanContext();
+
+        /**
+         * Looks up a bean of the given type.
+         *
+         * @param type The type to look up
+         * @return The bean, never {@code null}
+         * @param <V> The looked up type
+         * @throws io.micronaut.context.exceptions.DependencyInjectionException If no bean of the type exists
+         */
+        default <V> V getBean(Argument<V> type) {
+            return getBean(type, null);
+        }
+
+        /**
+         * Looks up a bean of the given type and qualifier.
+         *
+         * @param type The type to look up
+         * @param qualifier The qualifier, or {@code null} for none
+         * @return The bean, never {@code null}
+         * @param <V> The looked up type
+         * @throws io.micronaut.context.exceptions.DependencyInjectionException If no such bean exists
+         */
+        <V> V getBean(Argument<V> type, @Nullable Qualifier<V> qualifier);
+
+        /**
+         * Looks up a bean of the given type if one exists.
+         *
+         * @param type The type to look up
+         * @return The bean, or empty if none exists
+         * @param <V> The looked up type
+         */
+        default <V> Optional<V> findBean(Argument<V> type) {
+            return findBean(type, null);
+        }
+
+        /**
+         * Looks up a bean of the given type and qualifier if one exists.
+         *
+         * @param type The type to look up
+         * @param qualifier The qualifier, or {@code null} for none
+         * @return The bean, or empty if none exists
+         * @param <V> The looked up type
+         */
+        <V> Optional<V> findBean(Argument<V> type, @Nullable Qualifier<V> qualifier);
+
+        /**
+         * Looks up all the beans of the given type.
+         *
+         * @param type The type to look up
+         * @return The beans, empty if there are none
+         * @param <V> The looked up type
+         */
+        default <V> Collection<V> getBeansOfType(Argument<V> type) {
+            return getBeansOfType(type, null);
+        }
+
+        /**
+         * Looks up all the beans of the given type and qualifier.
+         *
+         * @param type The type to look up
+         * @param qualifier The qualifier, or {@code null} for none
+         * @return The beans, empty if there are none
+         * @param <V> The looked up type
+         */
+        <V> Collection<V> getBeansOfType(Argument<V> type, @Nullable Qualifier<V> qualifier);
+    }
+
+    /**
+     * The context of a single creation of a bean built at runtime, passed to the bean factory of a definition
+     * built with {@link #builder(Argument, Function)}.
+     *
+     * <p>It carries the beans resolved for the injection points the definition declared with
+     * {@link Builder#injectionPoint(Argument)}, the injection point the bean is being created for, and the
+     * lookups of {@link LookupContext} for anything the definition could not declare up front.</p>
+     *
+     * <p>The injected beans were resolved through the resolution context of this creation, so any of them that
+     * is a dependent object (a {@code @Prototype} or {@code @Dependent} bean, for example) is a dependent of the
+     * created bean and is destroyed with it. A bean the factory looks up itself with
+     * {@link #getBean(Argument)} is resolved through the same resolution context and has the same lifetime; the
+     * difference between the two is only that a declared injection point is described by the definition and
+     * resolved before the factory runs, while a lookup is decided by the factory as it runs. The exception is a
+     * bean obtained from {@link BeanContext#createBean(Class)}, which records no dependents for any bean,
+     * runtime built or compiled.</p>
+     *
+     * @since 5.2.0
+     */
+    @Experimental
+    interface CreationContext extends LookupContext {
+
+        /**
+         * The injection point the bean is being created for.
+         *
+         * <p>For a constructor or method argument this is an
+         * {@link io.micronaut.inject.ArgumentInjectionPoint}, which exposes the argument and the bean that
+         * declares it. It is empty when the bean is not being created for an injection point, as it is for a
+         * direct {@link BeanContext#getBean(Class)} lookup.</p>
+         *
+         * @return The injection point, or empty if there is none
+         */
+        Optional<InjectionPoint<?>> getInjectionPoint();
+
+        /**
+         * @return The number of injection points the definition declared
+         */
+        int getInjectedBeanCount();
+
+        /**
+         * The bean resolved for the injection point at the given index, in the order the injection points were
+         * declared on the builder.
+         *
+         * @param index The index
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IndexOutOfBoundsException If the index is out of range
+         */
+        <V> @Nullable V getInjectedBean(int index);
+
+        /**
+         * The bean resolved for the injection point declared with the given type and no qualifier.
+         *
+         * @param type The type the injection point was declared with
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IllegalArgumentException If no such injection point was declared
+         */
+        default <V> @Nullable V getInjectedBean(Argument<V> type) {
+            return getInjectedBean(type, null);
+        }
+
+        /**
+         * The bean resolved for the injection point declared with the given type and qualifier.
+         *
+         * @param type The type the injection point was declared with
+         * @param qualifier The qualifier the injection point was declared with
+         * @return The resolved bean, which is {@code null} only when the injection point was declared with a
+         *         nullable argument and no bean was found
+         * @param <V> The injected type
+         * @throws IllegalArgumentException If no such injection point was declared
+         */
+        <V> @Nullable V getInjectedBean(Argument<V> type, @Nullable Qualifier<V> qualifier);
+    }
+
+    /**
+     * The context of a single disposal of a bean built at runtime, passed to the disposer of a definition built
+     * with {@link Builder#injectedDisposer(BiConsumer)}.
+     *
+     * <p>It offers the same lookups as the {@link CreationContext} of a creation, resolved fresh for this
+     * disposal: the disposer shares neither the resolution context nor the resolved instances with the creation
+     * of the bean it is disposing of, so a lookup of a dependent object returns an instance of its own, not the
+     * one the factory received for the same type.</p>
+     *
+     * <p>What a lookup resolves is destroyed when the disposer returns, unlike a bean resolved during creation,
+     * which is destroyed with the created bean. A bean whose lifetime the context manages, a singleton for
+     * example, is of course not destroyed by the disposal.</p>
+     *
+     * @since 5.2.0
+     */
+    @Experimental
+    interface DisposalContext extends LookupContext {
     }
 
     /**
@@ -314,6 +498,45 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
         Builder<B> annotationMetadata(@Nullable AnnotationMetadata annotationMetadata);
 
         /**
+         * Declares an injection point of this bean.
+         *
+         * <p>The declared injection points are resolved through the resolution context of the bean creation,
+         * in the order they were declared, and are handed to the bean factory of a definition built
+         * with {@link RuntimeBeanDefinition#builder(Argument, Function)} as its {@link CreationContext}. Resolving them
+         * this way is what makes core's own dependency handling apply to a runtime built bean: a dependent object
+         * resolved for an injection point becomes a dependent of the created bean and is destroyed with it,
+         * a circular dependency is detected, and an unsatisfied injection point fails the creation with the usual
+         * {@link io.micronaut.context.exceptions.DependencyInjectionException}.</p>
+         *
+         * <p>An injection point declared with a {@link Argument#isDeclaredNullable() nullable} argument resolves
+         * to {@code null} instead of failing when no bean is found.</p>
+         *
+         * <p>The declared injection points are also the arguments of {@link BeanDefinition#getConstructor()} and
+         * the types of {@link BeanDefinition#getRequiredComponents()}, so that the bean's dependencies can be
+         * described the way a compiled bean's are.</p>
+         *
+         * @param type The type to inject
+         * @return This builder
+         * @since 5.2.0
+         */
+        @Experimental
+        default Builder<B> injectionPoint(Argument<?> type) {
+            return injectionPoint(type, null);
+        }
+
+        /**
+         * Declares a qualified injection point of this bean.
+         *
+         * @param type The type to inject
+         * @param qualifier The qualifier, or {@code null} for none
+         * @return This builder
+         * @see #injectionPoint(Argument)
+         * @since 5.2.0
+         */
+        @Experimental
+        Builder<B> injectionPoint(Argument<?> type, @Nullable Qualifier<?> qualifier);
+
+        /**
          * The disposer to run when an instance created by this definition is destroyed.
          *
          * <p>The disposer is invoked once per instance, after the
@@ -325,12 +548,36 @@ public interface RuntimeBeanDefinition<T> extends BeanDefinitionReference<T>, In
          * <p>A definition built with a disposer is a {@link io.micronaut.inject.DisposableBeanDefinition}; a
          * definition built without one is not, so existing definitions keep their current behaviour.</p>
          *
+         * <p>A disposer that needs to resolve beans of its own takes a {@link DisposalContext} instead, see
+         * {@link #injectedDisposer(BiConsumer)}. The two forms are alternatives: setting one clears the
+         * other.</p>
+         *
          * @param disposer The disposer, receiving the bean context and the instance being destroyed, or {@code null}
          *                 to clear a previously set disposer
          * @return This builder
          * @since 5.2.0
          */
         Builder<B> disposer(@Nullable BiConsumer<BeanContext, B> disposer);
+
+        /**
+         * The disposer to run when an instance created by this definition is destroyed, receiving a
+         * {@link DisposalContext} with which it can resolve the beans it needs to do the disposal.
+         *
+         * <p>It is invoked at the same point in the destruction of the instance as
+         * {@link #disposer(BiConsumer)}, and the two forms are alternatives: setting one clears the other.</p>
+         *
+         * <p>The lookups of the disposal context are resolved through a resolution context created for the
+         * disposal, which shares nothing with the creation of the bean being disposed of: what the disposer
+         * resolves is resolved fresh, and a dependent object among what it resolved is destroyed when the
+         * disposer returns rather than being kept for the lifetime of anything.</p>
+         *
+         * @param disposer The disposer, receiving the disposal context and the instance being destroyed, or
+         *                 {@code null} to clear a previously set disposer
+         * @return This builder
+         * @since 5.2.0
+         */
+        @Experimental
+        Builder<B> injectedDisposer(@Nullable BiConsumer<DisposalContext, B> disposer);
 
         /**
          * Builds the runtime bean.

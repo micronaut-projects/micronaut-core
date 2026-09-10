@@ -20,6 +20,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.inject.BeanType;
 
+import io.micronaut.core.annotation.Indexed;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.core.type.Argument;
+
+import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,10 +40,49 @@ final class AnnotationStereotypeQualifier<T> extends FilteringQualifier<T> {
     final String stereotype;
 
     /**
+     * The annotation type when this qualifier selects the beans that a self-indexed annotation is declared on,
+     * which the compile-time index answers exhaustively. Null otherwise.
+     */
+    @Nullable
+    private final Argument<?> indexedArgument;
+
+    /**
      * @param stereotype The stereotype
      */
     AnnotationStereotypeQualifier(String stereotype) {
         this.stereotype = Objects.requireNonNull(stereotype, "Stereotype cannot be null");
+        this.indexedArgument = null;
+    }
+
+    /**
+     * @param stereotype The stereotype annotation
+     */
+    AnnotationStereotypeQualifier(Class<? extends Annotation> stereotype) {
+        Objects.requireNonNull(stereotype, "Stereotype cannot be null");
+        this.stereotype = stereotype.getName();
+        this.indexedArgument = isSelfIndexed(stereotype) ? Argument.of(stereotype) : null;
+    }
+
+    /**
+     * An annotation meta-annotated with {@link Indexed} by its own type indexes every bean it is declared on,
+     * so the index holds all of them and nothing else.
+     *
+     * @param stereotype The stereotype annotation
+     * @return True if the annotation indexes the beans carrying it by itself
+     */
+    private static boolean isSelfIndexed(Class<? extends Annotation> stereotype) {
+        for (Indexed indexed : stereotype.getAnnotationsByType(Indexed.class)) {
+            if (indexed.value() == stereotype) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @Override
+    @Nullable
+    public Argument<?> getIndexedArgument() {
+        return indexedArgument;
     }
 
     @Override

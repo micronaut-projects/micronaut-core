@@ -27,7 +27,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-import static io.micronaut.context.python.GraalPyRuntimeUtil.PYTHON;
+import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 
@@ -238,10 +238,10 @@ final class ValueCoercibleProxyObjectTest {
                 """);
             PythonMappedBatchLoader batchLoader = new PythonMappedBatchLoader(loaderValue);
 
-            Value result = GraalPyRuntimeUtil.invokePythonMethod(
+            Value result = PythonInvocation.invokePythonMethod(
                 factory,
                 "data_loader_registry",
-                new Object[] {GraalPyRuntimeUtil.coerceToContext(batchLoader, factory.getContext())}
+                new Object[] {PythonCoercion.coerceToContext(batchLoader, factory.getContext())}
             );
 
             assertNotNull(result.asHostObject());

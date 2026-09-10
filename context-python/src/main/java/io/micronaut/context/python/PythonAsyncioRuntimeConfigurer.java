@@ -35,15 +35,21 @@ import java.util.concurrent.ExecutorService;
 @Singleton
 final class PythonAsyncioRuntimeConfigurer {
 
+    private final PythonApplicationRuntime runtime;
+
     @Inject
     PythonAsyncioRuntimeConfigurer(PythonAsyncioConfiguration configuration,
+                                   PythonPoolConfiguration poolConfiguration,
+                                   PythonApplicationRuntime runtime,
                                    Collection<PythonEventLoopProvider> eventLoopProviders,
                                    @Nullable @Named(TaskExecutors.IO) BeanProvider<ExecutorService> executorServiceProvider) {
         PythonAsyncioRuntime.setEnabled(configuration.enabled());
+        PythonAsyncioRuntime.setMaxEventLoops(poolConfiguration.maxEventLoopContexts());
         PythonAsyncioRuntime.setEventLoopProviders(eventLoopProviders);
         PythonAsyncioRuntime.setExecutorService(null);
         PythonAsyncioRuntime.setExecutorServiceProvider(executorServiceProvider);
-        PythonContextRuntime.setPooledExecutorServiceProvider(executorServiceProvider);
+        this.runtime = runtime;
+        runtime.pooledExecutorServiceProvider(executorServiceProvider);
     }
 
     /**
@@ -52,9 +58,10 @@ final class PythonAsyncioRuntimeConfigurer {
     @PreDestroy
     void reset() {
         PythonAsyncioRuntime.setEnabled(true);
+        PythonAsyncioRuntime.setMaxEventLoops(0);
         PythonAsyncioRuntime.setEventLoopProviders(List.of());
         PythonAsyncioRuntime.setExecutorService(null);
         PythonAsyncioRuntime.setExecutorServiceProvider(null);
-        PythonContextRuntime.setPooledExecutorServiceProvider(null);
+        runtime.pooledExecutorServiceProvider(null);
     }
 }

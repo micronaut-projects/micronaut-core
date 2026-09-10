@@ -353,6 +353,36 @@ class TestService:
         thrown(IllegalStateException)
     }
 
+    def "test a numeric char array member is rejected"() {
+        when:
+        buildClassElement('''
+from micronaut.python.compiler import PrimitiveTypesAnnotation
+
+@PrimitiveTypesAnnotation(charArray=[1, 2])
+class NumericChars:
+    pass
+''') { ClassElement element -> element }
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("char") || String.valueOf(e.cause).contains("char")
+    }
+
+    def "test a float array member out of the float range is rejected"() {
+        when:
+        buildClassElement('''
+from micronaut.python.compiler import PrimitiveTypesAnnotation
+
+@PrimitiveTypesAnnotation(floatArray=[1e100])
+class HugeFloats:
+    pass
+''') { ClassElement element -> element }
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("out of range") || String.valueOf(e.cause).contains("out of range")
+    }
+
     def "test getDeclaredGenericPlaceholders returns type variables"() {
         given:
         def pythonCode = '''
@@ -373,6 +403,31 @@ class MyBase(Generic[T]):
             def placeholder = placeholders[0]
             assert placeholder.getVariableName() == "T"
 
+            return element
+        }
+    }
+
+    def "an async method returning a Python class has the same CompletionStage return type as its stub"() {
+        expect:
+        buildClassElement('''
+from dataclasses import dataclass
+
+@dataclass
+class Note:
+    text: str | None = None
+
+class NoteService:
+    async def load(self) -> Note:
+        return Note("hi")
+''', "NoteService") { ClassElement element ->
+            def method = element.findMethod("load").get()
+
+            // the bean definition dispatches through getReturnType, the stub is generated from the
+            // generic return type: both must say CompletionStage<Note> or the dispatch fails at runtime
+            assert method.returnType.name == 'java.util.concurrent.CompletionStage'
+            assert method.returnType.typeArguments["T"].name == 'python.Note'
+            assert method.genericReturnType.name == 'java.util.concurrent.CompletionStage'
+            assert method.genericReturnType.typeArguments["T"].name == 'python.Note'
             return element
         }
     }
@@ -1100,6 +1155,42 @@ class TypeTestService:
             assert method2ReturnType.isAssignable(Iterable)
             assert method1ReturnType.isAssignable(List)
             assert method2ReturnType.isAssignable(List)
+            return element
+        }
+    }
+
+    def "test set return types resolve to java sets with their element type"() {
+        expect:
+        buildClassElement('''
+from typing import Set, FrozenSet
+
+class SetService:
+    def method1(self) -> set[str]:
+        return set()
+
+    def method2(self) -> Set[int]:
+        return set()
+
+    def method3(self) -> FrozenSet[str]:
+        return frozenset()
+
+    def method4(self, values: set[str]) -> None:
+        pass
+''') { ClassElement element ->
+            def method1ReturnType = element.findMethod("method1").get().returnType
+            def method2ReturnType = element.findMethod("method2").get().returnType
+            def method3ReturnType = element.findMethod("method3").get().returnType
+            def parameterType = element.findMethod("method4").get().parameters[0].type
+
+            assert method1ReturnType.isAssignable(java.util.Set)
+            assert method1ReturnType.isAssignable(Iterable)
+            assert method1ReturnType.firstTypeArgument.get().name == String.name
+            assert method2ReturnType.isAssignable(java.util.Set)
+            assert method2ReturnType.firstTypeArgument.get().name == Integer.name
+            assert method3ReturnType.isAssignable(java.util.Set)
+            assert method3ReturnType.firstTypeArgument.get().name == String.name
+            assert parameterType.isAssignable(java.util.Set)
+            assert parameterType.firstTypeArgument.get().name == String.name
             return element
         }
     }

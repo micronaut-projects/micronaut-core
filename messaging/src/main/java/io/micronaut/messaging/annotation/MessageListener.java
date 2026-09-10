@@ -15,6 +15,7 @@
  */
 package io.micronaut.messaging.annotation;
 
+import io.micronaut.core.annotation.Indexed;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.DefaultScope;
 import jakarta.inject.Singleton;
@@ -38,5 +39,6 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 @Target({ElementType.ANNOTATION_TYPE, ElementType.TYPE})
 @Bean
 @DefaultScope(Singleton.class)
+@Indexed(MessageListener.class)
 public @interface MessageListener {
 }

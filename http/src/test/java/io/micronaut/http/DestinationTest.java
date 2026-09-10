@@ -15,16 +15,63 @@
  */
 package io.micronaut.http;
 
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
+import java.util.Set;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 class DestinationTest {
+
+    /**
+     * The destination values the specification lists, so that this enum drifting away from the
+     * specification fails here rather than silently dropping metadata at runtime.
+     *
+     * @see <a href="https://fetch.spec.whatwg.org/#concept-request-destination">Destination</a>
+     */
+    private static final Set<String> SPECIFICATION_VALUES = Set.of(
+        "empty",
+        "audio",
+        "audioworklet",
+        "document",
+        "embed",
+        "fencedframe",
+        "font",
+        "frame",
+        "iframe",
+        "image",
+        "json",
+        "manifest",
+        "object",
+        "paintworklet",
+        "report",
+        "script",
+        "serviceworker",
+        "sharedworker",
+        "speculationrules",
+        "style",
+        "text",
+        "track",
+        "video",
+        "webidentity",
+        "worker",
+        "xslt"
+    );
+
+    @Test
+    void listsExactlyTheDestinationValuesOfTheSpecification() {
+        Set<String> declared = Stream.of(Destination.values())
+            .map(Destination::toString)
+            .collect(Collectors.toSet());
+
+        assertEquals(SPECIFICATION_VALUES, declared);
+    }
 
     @ParameterizedTest
     @MethodSource

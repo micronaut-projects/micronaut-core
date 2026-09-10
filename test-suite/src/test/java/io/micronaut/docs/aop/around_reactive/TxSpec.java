@@ -110,5 +110,4 @@ public class TxSpec {
     }
 
 
-    // end::test[]
 }

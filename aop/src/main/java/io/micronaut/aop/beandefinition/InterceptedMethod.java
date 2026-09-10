@@ -19,7 +19,6 @@ import io.micronaut.context.EnvironmentConfigurable;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
@@ -30,7 +29,6 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Map;
@@ -47,7 +45,7 @@ import java.util.Objects;
  * @since 5.1.0
  */
 @Internal
-abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod, LifecycleCallbackMethod {
+abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>, ExecutableMethod<T, R>, EnvironmentConfigurable, io.micronaut.core.type.Executable<T, R> permits InterceptedDisposeMethod, InitializableInterceptedMethod {
 
     protected final Class<T> declaringType;
     protected final String methodName;
@@ -60,8 +58,6 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
     private Environment environment;
     @Nullable
     private AnnotationMetadata methodAnnotationMetadata;
-    @Nullable
-    private Method method;
 
     /**
      * Creates a new executable method descriptor.
@@ -222,22 +218,6 @@ abstract sealed class InterceptedMethod<T, R> implements UnsafeExecutable<T, R>,
     @Override
     public Argument<?>[] getArguments() {
         return arguments;
-    }
-
-    /**
-     * Soft resolves the target {@link Method} avoiding reflection until as late as possible.
-     *
-     * @return The method
-     * @throws NoSuchMethodError if the method doesn't exist
-     */
-    @Override
-    public Method getTargetMethod() {
-        if (method == null) {
-            Method resolvedMethod = ReflectionUtils.getRequiredMethod(declaringType, methodName, argTypes);
-            resolvedMethod.setAccessible(true);
-            this.method = resolvedMethod;
-        }
-        return this.method;
     }
 
     /**

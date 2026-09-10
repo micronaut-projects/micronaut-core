@@ -551,7 +551,8 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     fieldReference.argument.getType(),
                     fieldReference.argument.getName(),
                     fieldReference.argument.getAnnotationMetadata(),
-                    fieldReference.argument.getTypeParameters()
+                    fieldReference.argument.getTypeParameters(),
+                    fieldReference.argument.isRawType()
             );
             if (environment != null) {
                 ((EnvironmentConfigurable) fieldInjectionPoint).configure(environment);
@@ -1116,9 +1117,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                                         String value) {
         MethodReference methodRef = Objects.requireNonNull(methodInjection)[methodIndex];
         Argument<?> argument = methodRef.arguments[argIndex];
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodRef.methodName, argument, methodRef.arguments)) {
-            return resolutionContext.resolvePropertyValue(argument, value, null, true);
+            Object val = resolutionContext.resolvePropertyValue(argument, value, null, true);
+            validateBeanArgument(resolutionContext, path, argument, argIndex, val);
+            return val;
         }
     }
 
@@ -1186,9 +1189,11 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                                 String setterName,
                                                                 Argument<?> argument,
                                                                 String value) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
+        try (BeanResolutionContext.Path path = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, setterName, argument, new Argument[]{argument})) {
-            return resolutionContext.resolvePropertyValue(argument, value, null, true);
+            Object val = resolutionContext.resolvePropertyValue(argument, value, null, true);
+            validateBeanArgument(resolutionContext, path, argument, 0, val);
+            return val;
         }
     }
 
@@ -1906,8 +1911,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Nullable
     protected final Object getValueForField(BeanResolutionContext resolutionContext, BeanContext context, int fieldIndex, Qualifier qualifier) {
         FieldReference fieldRef = Objects.requireNonNull(fieldInjection)[fieldIndex];
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, fieldRef.argument)) {
-            return resolveValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, qualifier);
+        try (BeanResolutionContext.Path path = resolutionContext.getPath().pushFieldResolve(this, fieldRef.argument)) {
+            Object val = resolveValue(resolutionContext, context, fieldRef.argument.getAnnotationMetadata(), fieldRef.argument, qualifier);
+            validateBeanArgument(resolutionContext, path, fieldRef.argument, 0, val);
+            return val;
         }
     }
 
@@ -1928,8 +1935,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     @Nullable
     protected final Object getPropertyValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String propertyValue, String cliProperty) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
+        try (BeanResolutionContext.Path path = resolutionContext.getPath().pushFieldResolve(this, argument)) {
+            Object val = resolutionContext.resolvePropertyValue(argument, propertyValue, cliProperty, false);
+            validateBeanArgument(resolutionContext, path, argument, 0, val);
+            return val;
         }
     }
 
@@ -1949,8 +1958,40 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     @Deprecated
     @Nullable
     protected final Object getPropertyPlaceholderValueForField(BeanResolutionContext resolutionContext, BeanContext context, Argument argument, String placeholder) {
-        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolutionContext.resolvePropertyValue(argument, placeholder, null, true);
+        try (BeanResolutionContext.Path path = resolutionContext.getPath().pushFieldResolve(this, argument)) {
+            Object val = resolutionContext.resolvePropertyValue(argument, placeholder, null, true);
+            validateBeanArgument(resolutionContext, path, argument, 0, val);
+            return val;
+        }
+    }
+
+    /**
+     * Validates an injected value against the constraints declared on its injection point when this
+     * definition is a {@link ValidatedBeanDefinition}. The injection point is the segment on top of
+     * the given path, so this covers fields (a {@link FieldInjectionPoint}) as well as method
+     * arguments. Beans that only carry constraints on {@code @Value}/{@code @Property} injection
+     * points rely on this call because the generated {@code validate} does not run full bean
+     * validation for them.
+     *
+     * @param resolutionContext The resolution context
+     * @param path              The resolution path whose top segment is the injection point
+     * @param argument          The argument being injected
+     * @param index             The argument index
+     * @param value             The resolved value
+     */
+    private void validateBeanArgument(BeanResolutionContext resolutionContext,
+                                      BeanResolutionContext.Path path,
+                                      Argument<?> argument,
+                                      int index,
+                                      @Nullable Object value) {
+        if (this instanceof ValidatedBeanDefinition validatedBeanDefinition) {
+            validatedBeanDefinition.validateBeanArgument(
+                resolutionContext,
+                Objects.requireNonNull(path.peek()).getInjectionPoint(),
+                argument,
+                index,
+                value
+            );
         }
     }
 

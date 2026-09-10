@@ -87,16 +87,28 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
             BeanDefinition<BT> definition = (BeanDefinition<BT>) candidate;
             return definition.getTypeArguments(beanType).stream().map(Argument::getType).collect(Collectors.toList());
         } else {
-            if (beanType.isInterface()) {
-                return Arrays.asList(GenericTypeUtils.resolveInterfaceTypeArguments(candidate.getBeanType(), beanType));
-            } else {
-                return Arrays.asList(GenericTypeUtils.resolveSuperTypeGenericArguments(candidate.getBeanType(), beanType));
-            }
+            return Arrays.asList(GenericTypeUtils.resolveTypeArguments(candidate.getBeanType(), beanType));
         }
     }
 
     /**
      * Are the given types compatible.
+     *
+     * <p>A candidate that answers no type argument matches any parameterization: it is raw, which is the
+     * equivalent of using {@link Object}. The rule holds every bean whose parameterization is not knowable,
+     * not only one that has none:</p>
+     *
+     * <ul>
+     *   <li>a {@link BeanDefinition} that records no argument for this type;</li>
+     *   <li>an open generic - {@code class OpenRepo<T> implements Repo<T>} - whose argument is bound at the
+     *   injection point rather than by the bean;</li>
+     *   <li>a {@link io.micronaut.inject.BeanType} that is not a {@link BeanDefinition} and whose class
+     *   implements the type raw.</li>
+     * </ul>
+     *
+     * <p>What the rule must no longer hold is a bean whose parameterization simply failed to resolve. That is
+     * fixed at the resolution instead, by
+     * {@link io.micronaut.core.reflect.GenericTypeUtils#resolveTypeArguments(Class, Class)}.</p>
      *
      * @param typeArguments The type arguments
      * @param classes       The classes to check for alignments
@@ -104,7 +116,6 @@ public final class TypeArgumentQualifier<T> extends FilteringQualifier<T> {
      */
     public static boolean areTypesCompatible(Class<?>[] typeArguments, List<Class<?>> classes) {
         if (classes.isEmpty()) {
-            // in this case the type doesn't specify type arguments, so this is the equivalent of using Object
             return true;
         } else {
             if (classes.size() != typeArguments.length) {

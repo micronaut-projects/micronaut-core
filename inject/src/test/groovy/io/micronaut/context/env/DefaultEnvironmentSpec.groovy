@@ -1458,4 +1458,56 @@ micronaut:
                     new DefaultEnvironment({ ["test"] }).start()
                 })
     }
+
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12941")
+    void "test property value is never null when refresh method is executed"() {
+        given:
+        def propertyMap = ['testPropKey': 'testPropValueOld']
+        def propertySource = new MapPropertySource('CustomPS', propertyMap)
+        def env = new DefaultEnvironment({['test']})
+        env.addPropertySource(propertySource)
+        env.start()
+
+        def testFinished = new AtomicBoolean(false)
+        def oldValueObserved = new CountDownLatch(1)
+        def newValueObserved = new CountDownLatch(1)
+        Set<String> observedValues = Collections.synchronizedSet(new HashSet<>())
+        def executor = Executors.newSingleThreadExecutor()
+        def task = executor.submit(new Runnable() {
+            @Override
+            void run() {
+                while (!testFinished.get() && !Thread.currentThread().isInterrupted()) {
+                    String value = env.getProperty("testPropKey", String.class).orElse(null)
+                    observedValues.add(value)
+                    if (value == 'testPropValueOld') {
+                        oldValueObserved.countDown()
+                    } else if (value == 'testPropValueNew') {
+                        newValueObserved.countDown()
+                    }
+                }
+            }
+        })
+        assert oldValueObserved.await(5, TimeUnit.SECONDS)
+
+        when:
+        propertyMap.put('testPropKey', 'testPropValueNew')
+        def diff = env.refreshAndDiff()
+        assert newValueObserved.await(5, TimeUnit.SECONDS)
+        testFinished.set(true)
+        executor.shutdown()
+
+        then:
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        env.getRequiredProperty("testPropKey", String.class) == 'testPropValueNew'
+        diff.get('test-prop-key') == 'testPropValueOld'
+        observedValues.containsAll(['testPropValueOld', 'testPropValueNew'])
+        !observedValues.contains(null)
+
+        cleanup:
+        testFinished.set(true)
+        executor.shutdownNow()
+        assert executor.awaitTermination(5, TimeUnit.SECONDS)
+        task.get(0, TimeUnit.MILLISECONDS)
+        env.stop()
+    }
 }

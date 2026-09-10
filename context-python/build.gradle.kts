@@ -34,6 +34,8 @@ dependencies {
     }
     implementation(projects.micronautCoreReactive)
     compileOnlyApi(projects.micronautHttp)
+    // the pythonpool management endpoint; the bean is skipped when management is absent
+    compileOnly(projects.micronautManagement)
     compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautHttp)
@@ -48,6 +50,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     useJUnitPlatform()
+    // several GraalPy contexts live at once in the lifecycle tests; the default worker heap runs out
+    maxHeapSize = "2G"
 }
 
 val compileVfsPythonBytecode = tasks.register<PythonVfsBytecodeCompile>("compileVfsPythonBytecode") {

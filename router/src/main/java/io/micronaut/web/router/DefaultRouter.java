@@ -270,6 +270,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         uriRoutes = resolveAmbiguity(request, uriRoutes);
         if (uriRoutes.size() > 1) {
+            uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(path, (List) uriRoutes);
         } else if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);

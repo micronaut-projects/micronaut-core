@@ -15,6 +15,7 @@ dependencies {
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testCompileOnly(projects.micronautInjectGroovy)
+    testImplementation(projects.micronautInjectTestUtils)
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(libs.javax.persistence)
     testImplementation(projects.micronautRuntime)

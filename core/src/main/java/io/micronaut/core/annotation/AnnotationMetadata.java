@@ -74,6 +74,12 @@ public interface AnnotationMetadata extends AnnotationSource {
 
     /**
      * Gets the declared metadata without inherited metdata.
+     *
+     * <p>A metadata that combines multiple elements, such as the class and the method annotations, is narrowed
+     * to the metadata of the element it is declared on; a subsequent call narrows that metadata to the
+     * annotations the element itself declares, excluding the ones inherited from the super elements.
+     * A metadata that is already declared only is returned unchanged.</p>
+     *
      * @return The declared metadata
      * @since 3.0.0
      */

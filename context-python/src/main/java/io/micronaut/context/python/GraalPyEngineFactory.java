@@ -31,8 +31,10 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -55,16 +57,25 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
      * @return The shared Python polyglot engine.
      */
     @Singleton
-    @Named(GraalPyRuntimeUtil.PYTHON)
+    @Named(PythonContextRuntime.PYTHON)
     Engine pythonEngine(GraalPyEngineConfiguration engineConfiguration) {
+        if (PythonContextRuntime.isInitialized() && PythonContextRuntime.isReuseContext()) {
+            // A reusable bootstrap context brings its own engine. Sharing it keeps compiled code
+            // and one compiler queue for the primary and the pooled contexts; the reusable context
+            // stays registered, so the destruction listener never closes this engine.
+            Engine engine = PythonContextRuntime.getContext().getEngine();
+            LOG.info("Sharing the GraalPy engine of the reusable context using the {} runtime", engine.getImplementationName());
+            return engine;
+        }
         // Keep defaults; options and instruments are configured on contexts.
         LOG.debug("Creating GraalPy Engine");
         long now = System.currentTimeMillis();
-        try {
-            return buildPythonEngine(engineConfiguration);
-        } finally {
-            LOG.debug("Created GraalPy Engine in {}ms", System.currentTimeMillis() - now);
-        }
+        Engine engine = buildPythonEngine(engineConfiguration);
+        // "Interpreted" means the fallback Truffle runtime: Python runs 30-60x slower than with a
+        // GraalVM JDK whose Truffle version matches the GraalPy artifacts. Truffle logs its own
+        // warning for that case; this line makes the active runtime visible in every startup log.
+        LOG.info("GraalPy engine created in {}ms using the {} runtime", System.currentTimeMillis() - now, engine.getImplementationName());
+        return engine;
     }
 
     /**
@@ -82,18 +93,34 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
             .logHandler(new GraalPySlf4jLogHandler());
         // Engine.Builder#options accumulates, so an unsupported option cannot be removed once set.
         // The support check has to happen before it is applied, not as a retry.
+        Map<String, String> supported = optionalOptionsToApply(engineConfiguration);
+        if (!supported.isEmpty()) {
+            builder.options(supported);
+        }
+        return builder.build();
+    }
+
+    /**
+     * The optional (best effort) engine options that should be applied on top of the configured ones.
+     *
+     * <p>An option the user configured explicitly through {@code graalpy.engine.options} always wins over
+     * the built-in default, and an option the active runtime does not know is left unset.</p>
+     *
+     * @param engineConfiguration The engine configuration
+     * @return The options to apply, in configuration order
+     */
+    static Map<String, String> optionalOptionsToApply(GraalPyEngineConfiguration engineConfiguration) {
         Map<String, String> supported = new LinkedHashMap<>();
         for (Map.Entry<String, String> option : engineConfiguration.optionalOptions.entrySet()) {
-            if (isEngineOptionSupported(option.getKey())) {
+            if (engineConfiguration.configuredOptions.contains(option.getKey())) {
+                LOG.debug("Engine option {} is configured explicitly, not applying the default {}", option.getKey(), option.getValue());
+            } else if (isEngineOptionSupported(option.getKey())) {
                 supported.put(option.getKey(), option.getValue());
             } else {
                 LOG.debug("GraalPy runtime does not support engine option {}, leaving it unset", option.getKey());
             }
         }
-        if (!supported.isEmpty()) {
-            builder.options(supported);
-        }
-        return builder.build();
+        return supported;
     }
 
     /**
@@ -147,7 +174,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
     @Override
     public void onDestroyed(@NonNull BeanDestroyedEvent<Engine> event) {
         Engine engine = event.getBean();
-        PythonContextRuntime.onNoContexts(engine, () -> closeEngine(engine));
+        PythonContextRegistry.onNoContexts(engine, () -> closeEngine(engine));
     }
 
     /**
@@ -181,9 +208,14 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
         public static final String PREFIX = "graalpy.engine";
 
         /**
-         * Options to apply only if the runtime recognises them.
+         * Options to apply only if the runtime recognises them and the user did not configure them.
          */
         final Map<String, String> optionalOptions = new LinkedHashMap<>();
+
+        /**
+         * Option names configured explicitly through {@code graalpy.engine.options}.
+         */
+        final Set<String> configuredOptions = new HashSet<>();
 
         @ConfigurationBuilder(prefixes = "", excludes = {"out", "in", "err", "exceptionHandler", "messageTransport"})
         Engine.Builder builder = Engine.newBuilder(
@@ -207,6 +239,7 @@ final class GraalPyEngineFactory implements BeanDestroyedEventListener<Engine> {
         void setOptions(@MapFormat(keyFormat = StringConvention.RAW, transformation = MapFormat.MapTransformation.FLAT) @Nullable Map<String, String> options) {
             if (options != null) {
                 GraalPyEngineFactory.LOG.debug("Using GraalPy engine options {}", options);
+                configuredOptions.addAll(options.keySet());
                 builder.options(options);
             }
         }

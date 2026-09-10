@@ -76,7 +76,7 @@ from micronaut.http.annotation import Get
 async def message() -> str:
     return "ok"
 ''', '''
-return (CompletionStage<String>) PythonAsyncioRuntime.toCompletionStage(pythonCoroutine);
+return (CompletionStage<String>) PythonContextRuntime.invokePooledScriptAsync(
 ''')
     }
 

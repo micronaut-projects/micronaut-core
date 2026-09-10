@@ -38,6 +38,7 @@ import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashSet;
@@ -127,6 +128,11 @@ public abstract class HttpClientConfiguration {
      * The default value.
      */
     public static final boolean DEFAULT_EXCEPTION_ON_ERROR_STATUS = true;
+
+    /**
+     * The default buffer error body for streaming value.
+     */
+    public static final boolean DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING = false;
 
     /**
      * The default value.
@@ -221,6 +227,7 @@ public abstract class HttpClientConfiguration {
     private int maxRedirects = DEFAULT_MAX_REDIRECTS;
 
     private boolean exceptionOnErrorStatus = DEFAULT_EXCEPTION_ON_ERROR_STATUS;
+    private boolean bufferErrorBodyForStreaming = DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING;
     private boolean decompressionEnabled = true;
 
     private SslConfiguration sslConfiguration = new ClientSslConfiguration();
@@ -280,8 +287,10 @@ public abstract class HttpClientConfiguration {
             this.numOfThreads = copy.numOfThreads;
             this.connectTimeout = copy.connectTimeout;
             this.connectTtl = copy.connectTtl;
+            this.bufferErrorBodyForStreaming = copy.bufferErrorBodyForStreaming;
             this.defaultCharset = copy.defaultCharset;
             this.exceptionOnErrorStatus = copy.exceptionOnErrorStatus;
+            this.decompressionEnabled = copy.decompressionEnabled;
             this.eventLoopGroup = copy.eventLoopGroup;
             this.followRedirects = copy.followRedirects;
             this.redirectAlwaysFilteredHeaders = copy.redirectAlwaysFilteredHeaders;
@@ -299,6 +308,7 @@ public abstract class HttpClientConfiguration {
             this.proxySelector = copy.proxySelector;
             this.proxyType = copy.proxyType;
             this.proxyUsername = copy.proxyUsername;
+            this.requestTimeout = copy.requestTimeout;
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
@@ -307,6 +317,20 @@ public abstract class HttpClientConfiguration {
             this.sslConfiguration = copy.sslConfiguration;
             this.threadFactory = copy.threadFactory;
             this.httpVersion = copy.httpVersion;
+            // these have non-null defaults, so only overwrite them when the source
+            // actually carries a value
+            if (copy.plaintextMode != null) {
+                this.plaintextMode = copy.plaintextMode;
+            }
+            if (copy.alpnModes != null) {
+                this.alpnModes = new ArrayList<>(copy.alpnModes);
+            }
+            this.allowBlockEventLoop = copy.allowBlockEventLoop;
+            if (copy.dnsResolutionMode != null) {
+                this.dnsResolutionMode = copy.dnsResolutionMode;
+            }
+            this.addressResolverGroupName = copy.addressResolverGroupName;
+            this.pcapLoggingPathPattern = copy.pcapLoggingPathPattern;
         }
     }
 
@@ -404,6 +428,32 @@ public abstract class HttpClientConfiguration {
     @Nullable
     public WebSocketCompressionConfiguration getWebSocketCompressionConfiguration() {
         return null;
+    }
+
+    /**
+     * Whether the error response body should be buffered for streaming clients when no error type is set,
+     * configured by {@code micronaut.http.client.buffer-error-body-for-streaming}.
+     *
+     * @return Whether the error response body should be buffered for streaming clients when no error type is set
+     * @since 5.2.0
+     */
+    public boolean isBufferErrorBodyForStreaming() {
+        return bufferErrorBodyForStreaming;
+    }
+
+    /**
+     * Sets whether the error response body should be buffered for streaming clients when no error type is set, so
+     * that {@code getResponse().getBody(..)} is populated on error. Configured by
+     * {@code micronaut.http.client.buffer-error-body-for-streaming}. Default value
+     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_BUFFER_ERROR_BODY_FOR_STREAMING}), because
+     * the error body has no size limit of its own: enabling this holds the whole of it in memory for every
+     * streaming request that fails.
+     *
+     * @param bufferErrorBodyForStreaming Whether the error response body should be buffered for streaming clients
+     * @since 5.2.0
+     */
+    public void setBufferErrorBodyForStreaming(boolean bufferErrorBodyForStreaming) {
+        this.bufferErrorBodyForStreaming = bufferErrorBodyForStreaming;
     }
 
     /**

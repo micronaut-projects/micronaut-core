@@ -43,33 +43,65 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interc
 <2> `@PostConstruct` interception is handled
 <3> `@PreDestroy` interception is handled
 
-=== Intercepted Callbacks
+=== Exceptions Thrown by Construct Advice
 
-Each `@PostConstruct` and `@PreDestroy` method of the bean is intercepted separately, in invocation order, superclass
-callbacks first. The api:aop.MethodInvocationContext[] passed to the interceptor describes the callback:
-`getExecutableMethod()` is the callback as a reflection-free api:inject.ExecutableMethod[], with the declaring type,
-name, arguments and annotation metadata of the method, `getTargetMethod()` resolves to it, and `getParameterValues()`
-holds the arguments the framework resolved for it. `proceed()` invokes that one callback with those arguments and
-returns the bean:
+An exception thrown by a api:aop.ConstructorInterceptor[] reaches whoever asked for the bean as it was thrown,
+the same way an exception thrown by a api:aop.MethodInterceptor[] reaches the caller of the method it advises.
+It is not wrapped in a api:context.exceptions.BeanInstantiationException[]. This holds whether the interceptor
+throws before `proceed()`, rejecting the arguments the constructor was about to receive, or after it, rejecting
+the instance the constructor produced:
 
 [source,java]
 ----
-@Override
-public Object intercept(MethodInvocationContext<Object, Object> context) {
-    if (context.getKind() == InterceptorKind.POST_CONSTRUCT) {
-        LOG.info("Initializing {} via {}", context.getTarget(), context.getExecutableMethod().getName()); // <1>
+@InterceptorBean(ProductBean.class)
+class ProductInterceptor implements ConstructorInterceptor<Product> {
+    @Override
+    public Product intercept(ConstructorInvocationContext<Product> context) {
+        if (context.getParameterValues()[0] == null) {
+            throw new IllegalArgumentException("A product needs a name"); // <1>
+        }
+        return context.proceed();
     }
-    return context.proceed(); // <2>
 }
 ----
 
-<1> The intercepted method carries the annotation metadata of the callback, for example its `@PostConstruct` annotation
-<2> `proceed()` invokes the callback; invoking `getExecutableMethod()` on the target runs it in addition
+<1> `context.getBean(Product.class)` throws this `IllegalArgumentException`, not a `BeanInstantiationException`
 
-A bean that binds the interception kind but declares no callback of that kind is still intercepted once, as a phase, so
-that the binding on the class can be relied on regardless of what the bean declares. In that case
-`getExecutableMethod()` describes the phase rather than a method of the bean. The same applies to a bean compiled by an
-earlier version of the framework.
+This lets advice reject a construction in its own terms. It is what allows constraints declared on a
+constructor to be enforced when the container creates the bean, so that the caller catches the validation
+exception rather than a wrapper around it.
+
+An exception thrown by the constructor's own body is not advice throwing, and is wrapped in a
+api:context.exceptions.BeanInstantiationException[] as it is for a bean with no construct advice at all. So is
+any failure during eager initialization at startup, where the bean is not being created on anyone's behalf.
+
+=== Intercepted Callbacks
+
+A `@PostConstruct` or `@PreDestroy` interception runs once per lifecycle event of the bean, not once per callback.
+The interceptor chain bound to the event runs first, and `proceed()` in the last interceptor invokes every callback
+of that kind declared by the bean, superclass callbacks first, in the same order for both events. An interceptor that
+does not call `proceed()` keeps all of them from running, and the bean it returns replaces the instance.
+
+The api:aop.MethodInvocationContext[] passed to the interceptor stands for the event: `getKind()` is
+`POST_CONSTRUCT` or `PRE_DESTROY`, `getTarget()` is the bean, and `proceed()` returns the bean.
+`getExecutableMethod()` stands for the whole event, and names it after the last callback the event will run: the
+most derived one, which is the one the bean itself declares where it declares any. Its `getDeclaringType()` and
+`getMethodName()` are that callback's, and `getTargetMethod()` resolves to that callback's `Method`; only when the
+bean declares no callback of that kind does the name fall back to `initialize` or `dispose`. It still describes the
+event rather than that one callback, so it carries the annotation metadata of the bean class and declares no
+parameters, a callback's own arguments being resolved only once the event proceeds.
+
+The callbacks the event is about to run are available from the bean definition of the intercepted bean:
+api:inject.InitializingBeanDefinition[] exposes `getPostConstructExecutableMethods()` and
+api:inject.DisposableBeanDefinition[] exposes `getPreDestroyExecutableMethods()`, each a list of reflection-free
+api:inject.ExecutableMethod[] instances in invocation order. Every entry carries the annotation metadata of its
+callback, for example the `@PostConstruct` annotation, and can be invoked on the target by an interceptor that needs
+to run a callback itself. The lists are only populated for a bean that binds the corresponding interception kind.
 
 The callbacks are not part of the bean definition's executable methods: `BeanDefinition.getExecutableMethods()` does
-not include them, so executable method processors and adapters are not affected.
+not include them, so executable method processors and adapters are not affected. A bean compiled by an earlier
+version of the framework reports no callbacks.
+
+An interceptor bound to these lifecycle kinds is a singleton by default, and one instance is then shared by every bean
+it is applied to. To give each intercepted bean its own interceptor, so that state set up in `@PostConstruct` is still
+available in `@PreDestroy`, see <<interceptorLifecycle, Interceptor Life Cycle>>.

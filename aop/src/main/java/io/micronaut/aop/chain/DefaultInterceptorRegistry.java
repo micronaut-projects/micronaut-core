@@ -205,6 +205,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
         final List<AnnotationValue<?>> interceptorOccurrences =
             InterceptorBindingQualifier.resolveBoundOccurrences(interceptorAnnotationValue, interceptorMetadata);
+        boolean boundByOccurrences = false;
+        boolean boundByNoOccurrences = false;
         for (AnnotationValue<?> applicableValue : interceptPointBindings) {
             String interceptPointAnnotation = applicableValue.stringValue().orElse(null);
             if (!annotationName.equals(interceptPointAnnotation)) {
@@ -215,12 +217,20 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             }
             final List<AnnotationValue<?>> interceptPointOccurrences =
                 InterceptorBindingQualifier.resolveBoundOccurrences(applicableValue, interceptPointMetadata, true);
-            if (interceptPointOccurrences != null && !InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
+            if (interceptPointOccurrences == null) {
+                // an annotation carrying both @Around and @InterceptorBinding(bindMembers = true) records a
+                // second binding which binds no members, and it must not decide the match while a binding
+                // carrying the occurrences the intercept point binds by is present
+                boundByNoOccurrences = true;
                 continue;
             }
-            return true;
+            boundByOccurrences = true;
+            if (InterceptorBindingQualifier.anyMatch(interceptorOccurrences, interceptPointOccurrences)) {
+                return true;
+            }
         }
-        return false;
+        // an intercept point binding no members at all is one compiled before the interceptor bound by them
+        return boundByNoOccurrences && !boundByOccurrences;
     }
 
     private <T> boolean isApplicableByType(BeanRegistration<Interceptor<T, ?>> beanRegistration,

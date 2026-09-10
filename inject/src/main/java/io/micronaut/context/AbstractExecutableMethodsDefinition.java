@@ -520,7 +520,12 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
                     returnTypeAnnotationMetadata = annotationMetadata;
                 }
                 if (returnTypeArgument.getAnnotationMetadata() != returnTypeAnnotationMetadata) {
-                    returnTypeArgument = Argument.of(
+                    returnTypeArgument = returnTypeArgument.isRawType() ? Argument.ofRawType(
+                            returnTypeArgument.getType(),
+                            null,
+                            returnTypeAnnotationMetadata,
+                            returnTypeArgument.getTypeParameters()
+                    ) : Argument.of(
                             returnTypeArgument.getType(),
                             returnTypeAnnotationMetadata,
                             returnTypeArgument.getTypeParameters()

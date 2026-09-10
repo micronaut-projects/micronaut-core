@@ -191,7 +191,8 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Objects.requireNonNull(beans).all.add(producer);
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
-        for (Class<?> exposedType : reference.getExposedTypes()) {
+        Set<Class<?>> exposedTypes = reference.getExposedTypes();
+        for (Class<?> exposedType : exposedTypes) {
             resolveTypeIndex(exposedType).add(producer);
             if (beanType.equals(exposedType)) {
                 beanTypeIndexAdded = true;
@@ -199,6 +200,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         }
         if (!beanTypeIndexAdded) {
             resolveTypeIndex(beanType).add(producer);
+        }
+        for (Class<?> indexedType : reference.getIndexes()) {
+            if (indexedType != beanType && !exposedTypes.contains(indexedType)) {
+                resolveTypeIndex(indexedType).add(producer);
+            }
         }
     }
 
@@ -617,11 +623,20 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         for (Class<?> indexedType : exposedTypes) {
             indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN).add(beanDefinitionProducer);
         }
+        // A bean can also be enumerated by the types it is @Indexed by, even ones it does not implement
+        for (Class<?> indexedType : reference.getIndexes()) {
+            if (!exposedTypes.contains(indexedType)) {
+                indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN).add(beanDefinitionProducer);
+            }
+        }
     }
 
     private static void indexDisabledBean(Map<Class<?>, List<BeanDefinitionProducer>> indexByType, BeanDefinitionReference<?> reference) {
         // For disabled beans we want to initialize the index collection, otherwise MISS will cause N search
         for (Class<?> indexedType : reference.getExposedTypes()) {
+            indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
+        }
+        for (Class<?> indexedType : reference.getIndexes()) {
             indexByType.computeIfAbsent(indexedType, COMPUTE_INDEXES_FN);
         }
     }
@@ -750,7 +765,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                     }
                 }
                 BeanDefinition<T> def = (BeanDefinition<T>) defObject;
-                if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, def))) {
+                if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, def) || isIndexedBy(beanType))) {
                     return null;
                 }
                 if (defPredicate != null && !defPredicate.test(def)) {
@@ -766,7 +781,7 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 }
                 return null;
             }
-            if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, ref))) {
+            if (beanType != null && !(beanType.getType().equals(Object.class) || beanResolutionCustomizer.isCandidateBean(beanType, ref) || isIndexedBy(beanType))) {
                 return null;
             }
             if (refPredicate != null && !refPredicate.test(ref)) {
@@ -790,6 +805,27 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
                 this.definition = DEFINITION_DISABLED_SENTINEL;
                 return null;
             }
+        }
+
+        /**
+         * Whether the bean is explicitly indexed by the requested type. A bean annotated with
+         * {@code @Indexed(Marker.class)} is enumerable by {@code Marker} even when it does not implement it.
+         *
+         * @param beanType The requested bean type
+         * @return True if the bean declares an index for exactly the requested type
+         */
+        private boolean isIndexedBy(Argument<?> beanType) {
+            BeanDefinitionReference<?> ref = reference;
+            if (ref == null) {
+                return false;
+            }
+            Class<?> type = beanType.getType();
+            for (Class<?> indexedType : ref.getIndexes()) {
+                if (indexedType == type) {
+                    return true;
+                }
+            }
+            return false;
         }
 
         void disableIfMatch(BeanDefinitionReference<?> toDisable) {
