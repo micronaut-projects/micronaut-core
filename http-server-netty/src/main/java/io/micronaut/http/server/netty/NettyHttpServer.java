@@ -136,6 +136,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
 
+    /**
+     * The default number of threads of a server-owned acceptor ("parent") event loop group.
+     */
+    private static final int DEFAULT_PARENT_THREADS = 1;
+
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private final NettyEmbeddedServices nettyEmbeddedServices;
     private final NettyHttpServerConfiguration serverConfiguration;
@@ -496,6 +501,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     /**
+     * @return The acceptor ("parent") event loop group in use, or {@code null} if the server has not been started
+     */
+    @Nullable
+    EventLoopGroup getParentGroup() {
+        return parentGroup;
+    }
+
+    /**
      * @return The parent event loop group
      */
     @SuppressWarnings("WeakerAccess")
@@ -504,10 +517,53 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(parent);
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
                     shutdownParent = true;
                     return newGroup;
                 });
+    }
+
+    /**
+     * Build the configuration for an acceptor ("parent") event loop group that is created and owned
+     * by this server. The acceptor group only accepts incoming connections and hands them to the
+     * worker group, so unless a thread count is configured explicitly it is sized to
+     * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
+     * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
+     *
+     * @param parent The configured parent event loop group settings, if any
+     * @return The configuration to create the acceptor group from
+     */
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+        if (parent == null) {
+            return new DefaultEventLoopGroupConfiguration(
+                NettyHttpServerConfiguration.Parent.NAME,
+                DEFAULT_PARENT_THREADS,
+                EventLoopGroupConfiguration.DEFAULT_THREAD_CORE_RATIO,
+                null,
+                false,
+                null,
+                null,
+                null,
+                null,
+                false
+            );
+        }
+        if (parent.getNumThreads() != 0) {
+            // explicitly configured, honour it as-is
+            return parent;
+        }
+        return new DefaultEventLoopGroupConfiguration(
+            parent.getName(),
+            DEFAULT_PARENT_THREADS,
+            parent.getThreadCoreRatio(),
+            parent.getIoRatio().orElse(null),
+            parent.isPreferNativeTransport(),
+            parent.getTransport(),
+            parent.getExecutorName().orElse(null),
+            parent.getShutdownQuietPeriod(),
+            parent.getShutdownTimeout(),
+            parent.isLoomCarrier()
+        );
     }
 
     /**
