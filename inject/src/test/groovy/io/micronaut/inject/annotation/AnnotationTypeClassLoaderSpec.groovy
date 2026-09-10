@@ -1,5 +1,6 @@
 package io.micronaut.inject.annotation
 
+import io.micronaut.core.annotation.AnnotationClassValue
 import spock.lang.Specification
 
 class AnnotationTypeClassLoaderSpec extends Specification {
@@ -36,6 +37,24 @@ class AnnotationTypeClassLoaderSpec extends Specification {
         expect: "the bootstrap loader defines no copy of an application annotation, so resolving again would only\
  answer from whatever loader the fallback picks"
         AnnotationMetadataSupport.getAnnotationType(Portable.name, null).get().is(Portable)
+    }
+
+    void "a caller naming no loader is served the type a deployment loader registered"() {
+        given: "a child-first deployment loader defining its own copy of an annotation the application loader also sees"
+        def child = new OwnCopy()
+        def own = child.define(Deployed.name)
+
+        and: "the generated metadata of that deployment registering its copy"
+        AnnotationMetadataSupport.registerAnnotationType(new AnnotationClassValue<>(own))
+
+        and: "metadata of that deployment carrying the annotation"
+        def metadata = new MutableAnnotationMetadata()
+        metadata.addAnnotation(Deployed.name, [:])
+
+        expect: "the registered copy is answered, not the one the loader of the support class resolves again"
+        !own.is(Deployed)
+        AnnotationMetadataSupport.getAnnotationType(Deployed.name).get().is(own)
+        metadata.getAnnotationType(Deployed.name).get().is(own)
     }
 
     void "an annotation type of the JDK is served whatever the loader asks"() {

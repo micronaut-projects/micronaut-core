@@ -342,6 +342,13 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
+        // a caller naming no loader has no copy of its own to be served: the registered type is the one the
+        // generated metadata of its deployment registered, and resolving the name again through the loader of
+        // this class would answer the application's copy where a child-first deployment loader defines another
+        final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
+        if (type != null) {
+            return Optional.of(type);
+        }
         return getAnnotationType(name, AnnotationMetadataSupport.class.getClassLoader());
     }
 
