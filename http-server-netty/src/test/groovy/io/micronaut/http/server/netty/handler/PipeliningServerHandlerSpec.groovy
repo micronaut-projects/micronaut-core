@@ -1029,6 +1029,53 @@ class PipeliningServerHandlerSpec extends Specification {
         cleaned == 1
     }
 
+    def 'inbound state is reset when the request handler rejects a buffered request'() {
+        given:
+        def requests = []
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            boolean fail = true
+
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                requests << request.uri()
+                if (fail) {
+                    fail = false
+                    throw new RuntimeException("accept failed")
+                }
+                body.close()
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+        }))
+
+        when:
+        def first = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/first")
+        first.headers().add(HttpHeaderNames.CONTENT_LENGTH, 3)
+        def content = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        ch.writeInbound(
+                first,
+                new DefaultLastHttpContent(content),
+                new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second", Unpooled.EMPTY_BUFFER)
+        )
+
+        then:
+        // the failure is reported, the request body is released, and the next request is not
+        // misinterpreted as content of the failed one
+        errors.size() == 1
+        errors[0].message == "accept failed"
+        content.refCnt() == 0
+        requests == ["/first", "/second"]
+        !ch.open
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0

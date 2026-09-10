@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
@@ -613,9 +614,17 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 assert ctx != null;
                 assert request != null;
                 assert outboundAccess != null;
-                requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), byteBodyFactory().createChecked(bodySizeLimits, fullBody), Objects.requireNonNull(outboundAccess));
-
+                CloseableByteBody body = byteBodyFactory().createChecked(bodySizeLimits, fullBody);
+                // reset the inbound state before the request is handed off, so that the next
+                // request on this connection is processed correctly even if the handoff fails
                 inboundHandler = baseInboundHandler;
+                try {
+                    requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
+                } catch (Throwable e) {
+                    body.close();
+                    requestHandler.handleUnboundError(e);
+                    requiredCtx().close();
+                }
             }
         }
 
