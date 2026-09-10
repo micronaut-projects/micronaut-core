@@ -42,6 +42,7 @@ import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2StreamFrame
+import io.netty.handler.timeout.IdleStateEvent
 import io.netty.util.AsciiString
 import org.jspecify.annotations.NonNull
 import org.junit.jupiter.api.Assertions
@@ -751,8 +752,11 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(client, server)
     }
 
-    def "unrecognized user events are forwarded down the pipeline"() {
-        given: "a server pipeline with a handler downstream of the http2 connection handler"
+    /**
+     * A bare server channel with the HTTP/2 connection handler and a handler behind it that
+     * records the user events that make it that far.
+     */
+    private static Tuple2<EmbeddedChannel, List<Object>> configureWithEventRecorder() {
         def received = []
         def server = new EmbeddedChannel()
         server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
@@ -773,13 +777,38 @@ class Http2ServerHandlerSpec extends Specification {
                 super.userEventTriggered(ctx, evt)
             }
         })
+        return new Tuple2<>(server, received)
+    }
+
+    def "unrecognized user events are forwarded down the pipeline"() {
+        given: "a server pipeline with a handler downstream of the http2 connection handler"
+        def (server, received) = configureWithEventRecorder()
 
         when: "an event the connection handler does not consume is fired"
-        def event = new Object()
         server.pipeline().fireUserEventTriggered(event)
 
-        then: "it reaches the next handler"
+        then: "it reaches the next handler and the connection stays up"
         received == [event]
+        server.isOpen()
+
+        cleanup:
+        server.checkException()
+        server.finishAndReleaseAll()
+
+        where:
+        event << [new Object(), IdleStateEvent.FIRST_READER_IDLE_STATE_EVENT]
+    }
+
+    def "an all-idle event closes the connection"() {
+        given:
+        def (server, received) = configureWithEventRecorder()
+
+        when: "the connection has been idle for too long"
+        server.pipeline().fireUserEventTriggered(IdleStateEvent.FIRST_ALL_IDLE_STATE_EVENT)
+
+        then: "it is closed instead of the event being passed on"
+        !server.isOpen()
+        received == []
 
         cleanup:
         server.checkException()
