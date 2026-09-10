@@ -535,35 +535,22 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @return The configuration to create the acceptor group from
      */
     private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
-        if (parent == null) {
-            return new DefaultEventLoopGroupConfiguration(
-                NettyHttpServerConfiguration.Parent.NAME,
-                DEFAULT_PARENT_THREADS,
-                EventLoopGroupConfiguration.DEFAULT_THREAD_CORE_RATIO,
-                null,
-                false,
-                null,
-                null,
-                null,
-                null,
-                false
-            );
-        }
-        if (parent.getNumThreads() != 0) {
+        EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
+        if (source.getNumThreads() != 0) {
             // explicitly configured, honour it as-is
-            return parent;
+            return source;
         }
         return new DefaultEventLoopGroupConfiguration(
-            parent.getName(),
+            NettyHttpServerConfiguration.Parent.NAME,
             DEFAULT_PARENT_THREADS,
-            parent.getThreadCoreRatio(),
-            parent.getIoRatio().orElse(null),
-            parent.isPreferNativeTransport(),
-            parent.getTransport(),
-            parent.getExecutorName().orElse(null),
-            parent.getShutdownQuietPeriod(),
-            parent.getShutdownTimeout(),
-            parent.isLoomCarrier()
+            source.getThreadCoreRatio(),
+            source.getIoRatio().orElse(null),
+            source.isPreferNativeTransport(),
+            source.getTransport(),
+            source.getExecutorName().orElse(null),
+            source.getShutdownQuietPeriod(),
+            source.getShutdownTimeout(),
+            source.isLoomCarrier()
         );
     }
 
