@@ -212,6 +212,14 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         } else if (discardBuffer) {
             List<ReadBuffer> pieces = buffer;
             buffer = null;
+            // These bytes are handed to the caller, this buffer no longer holds them. The caller
+            // does its own accounting (e.g. AsFlux), so leaving them counted here would
+            // permanently shrink the remaining buffer budget for the rest of the body.
+            long n = 0;
+            for (ReadBuffer piece : pieces) {
+                n += piece.readable();
+            }
+            sizeLimitTrackers.bufferedSize().subtract(n);
             return readBufferFactory.compose(pieces);
         } else {
             List<ReadBuffer> pieces = new ArrayList<>(buffer.size());
