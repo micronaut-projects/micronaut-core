@@ -259,10 +259,14 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 }
                 io.netty.handler.codec.http2.Http2Stream cs = connection().stream(1);
                 handleFakeRequest(cs, fhr);
-            } else if (evt instanceof IdleStateEvent idle) {
-                if (idle.state() == IdleState.ALL_IDLE) {
+            } else {
+                if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.ALL_IDLE) {
                     ctx.close();
                 }
+                // forward everything we do not consume ourselves. Our superclass
+                // ByteToMessageDecoder needs ChannelInputShutdownEvent, and handlers further down
+                // the pipeline may be interested in other events, e.g. SslCloseCompletionEvent or
+                // CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent.
                 super.userEventTriggered(ctx, evt);
             }
         }

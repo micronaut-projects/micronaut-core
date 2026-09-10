@@ -11,6 +11,7 @@ import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.http.DefaultFullHttpResponse
 import io.netty.handler.codec.http.DefaultHttpResponse
@@ -748,6 +749,41 @@ class Http2ServerHandlerSpec extends Specification {
         client.finishAndReleaseAll()
         server.finishAndReleaseAll()
         EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "unrecognized user events are forwarded down the pipeline"() {
+        given: "a server pipeline with a handler downstream of the http2 connection handler"
+        def received = []
+        def server = new EmbeddedChannel()
+        server.pipeline().addLast(new Http2ServerHandler.ConnectionHandlerBuilder(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }).build())
+        server.pipeline().addLast(new ChannelInboundHandlerAdapter() {
+            @Override
+            void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                received.add(evt)
+                super.userEventTriggered(ctx, evt)
+            }
+        })
+
+        when: "an event the connection handler does not consume is fired"
+        def event = new Object()
+        server.pipeline().fireUserEventTriggered(event)
+
+        then: "it reaches the next handler"
+        received == [event]
+
+        cleanup:
+        server.checkException()
+        server.finishAndReleaseAll()
     }
 
     def "ping response"() {
