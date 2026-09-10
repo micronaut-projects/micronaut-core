@@ -243,13 +243,13 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         }
 
         @Override
-        public void add(ReadBuffer rb) {
+        protected boolean addGuarded(ReadBuffer rb, boolean completeAfter) {
             if (!eventLoop.inEventLoop()) {
                 throw new IllegalStateException("Must only be called on event loop");
             }
             adding = true;
             try {
-                super.add(rb);
+                return super.addGuarded(rb, completeAfter);
             } finally {
                 adding = false;
             }

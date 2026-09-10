@@ -1317,6 +1317,31 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         }
 
         @Override
+        public void addAndComplete(ReadBuffer buf) {
+            if (flow.executeNow(() -> addAndComplete0(buf))) {
+                addAndComplete0(buf);
+            }
+        }
+
+        private void addAndComplete0(ReadBuffer buf) {
+            if (outboundHandler != this || writtenLast || removed) {
+                // not the normal steady state (e.g. the response has not started yet, or the
+                // connection is already gone). those cases are handled by the separate paths.
+                add0(buf);
+                complete0();
+                return;
+            }
+
+            // the final bytes go out as the LastHttpContent that terminates the response, instead
+            // of a content message of their own followed by an empty terminator
+            outboundHandler = null;
+            writeCompressing(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
+            writtenLast = true;
+            requestHandler.responseWritten(outboundAccess.attachment);
+            PipeliningServerHandler.this.writeSome();
+        }
+
+        @Override
         public void error(Throwable t) {
             if (flow.executeNow(() -> error0(t))) {
                 error0(t);

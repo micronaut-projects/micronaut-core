@@ -336,6 +336,36 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void add(ReadBuffer rb) {
+        addGuarded(rb, false);
+    }
+
+    /**
+     * Add a given buffer to this {@link BaseSharedBuffer} and complete it, in one operation. This
+     * allows subscribers that implement {@link BufferConsumer#addAndComplete(ReadBuffer)} to
+     * combine the final bytes and the completion signal into a single downstream message.<br>
+     * Not thread safe, caller must handle concurrency.
+     */
+    @Override
+    public void addAndComplete(ReadBuffer rb) {
+        boolean subscribersCompleted = addGuarded(rb, true);
+        complete0(!subscribersCompleted);
+    }
+
+    /**
+     * Hook for subclasses that need to apply a concurrency guard around the {@link #add} portion
+     * of {@link #add(ReadBuffer)} and {@link #addAndComplete(ReadBuffer)}. Subclasses must call
+     * {@code super.addGuarded(rb, completeAfter)} and return its result.
+     *
+     * @param rb           The buffer to add
+     * @param completeAfter Whether the subscribers should be completed together with this buffer
+     * @return {@code true} iff the subscribers have been completed as part of this call
+     */
+    protected boolean addGuarded(ReadBuffer rb, boolean completeAfter) {
+        return add0(rb, completeAfter);
+    }
+
+    private boolean add0(ReadBuffer rb, boolean completeAfter) {
+        boolean subscribersCompleted = false;
         try (rb) {
             assert !working;
 
@@ -349,7 +379,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
-                return;
+                return false;
             }
             if (expectedLength == -1) {
                 Exception totalSizeException = sizeLimitTrackers.totalSize().add(rb.readable());
@@ -357,14 +387,19 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     // for maxBodySize, all subscribers get the error
                     error(totalSizeException);
                     rootUpstream.allowDiscard();
-                    return;
+                    return false;
                 }
             } // else, already checked the Content-Length
 
             working = true;
             if (subscribers != null) {
+                subscribersCompleted = completeAfter;
                 for (BufferConsumer consumer : subscribers) {
-                    consumer.add(rb.duplicate());
+                    if (completeAfter) {
+                        consumer.addAndComplete(rb.duplicate());
+                    } else {
+                        consumer.add(rb.duplicate());
+                    }
                 }
             }
             if (reserved > 0 || fullSubscribers != null) {
@@ -391,6 +426,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             }
             working = false;
         }
+        return subscribersCompleted;
     }
 
     /**
@@ -399,12 +435,16 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void complete() {
+        complete0(true);
+    }
+
+    private void complete0(boolean notifySubscribers) {
         if (expectedLength > lengthSoFar) {
             throw new IncorrectContentLengthException("Received fewer bytes than specified by Content-Length");
         }
         complete = true;
         expectedLength = lengthSoFar;
-        if (subscribers != null) {
+        if (notifySubscribers && subscribers != null) {
             for (BufferConsumer subscriber : subscribers) {
                 subscriber.complete();
             }
