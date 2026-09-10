@@ -844,7 +844,10 @@ public class MediaType implements CharSequence {
      * miss path only, next to a parse that is far more expensive.</p>
      *
      * <p>Reading an entry is a volatile array read, a hash comparison and a string comparison, and
-     * allocates nothing; only admitting a value allocates, and only after it has been parsed. The
+     * allocates nothing; only admitting a value allocates, and only after it has been parsed. Credit
+     * stops being given once an entry reaches the cap, so the read of a header that recurs for the
+     * life of the process writes nothing at all after its first few reads and cannot bounce the
+     * entry's cache line between cores. The
      * volatile read also guarantees that a thread observing an entry observes everything the
      * inserting thread did beforehand, which is what makes it safe to share the parsed
      * {@link MediaType} instances across threads.</p>
