@@ -41,6 +41,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
 import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Optional;
 
 /**
@@ -160,8 +162,15 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
      * {@code Content-Type} with a {@code charset} parameter, and that charset governs the value of
      * the part (RFC 7578, section 4.5), independently of the charset of the request.
      *
+     * <p>The part metadata is client input and is not validated by the parser, so the declared
+     * charset may be malformed or unknown to this JVM. Such a declaration is ignored and the
+     * charset of the request is used instead, the same fallback that
+     * {@link io.micronaut.http.util.HttpUtil#resolveCharset} applies to the charset of a
+     * message.</p>
+     *
      * @param part The part
-     * @return The charset declared by the part, or {@code null} if it declares none
+     * @return The charset declared by the part, or {@code null} if it declares none or the one it
+     * declares cannot be resolved
      */
     @Nullable
     private static Charset declaredCharset(CompletedPart part) {
@@ -169,6 +178,10 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
         if (mediaType == null) {
             return null;
         }
-        return mediaType.getCharset().orElse(null);
+        try {
+            return mediaType.getCharset().orElse(null);
+        } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
+            return null;
+        }
     }
 }
