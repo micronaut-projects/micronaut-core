@@ -21,10 +21,7 @@ import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
 import io.micronaut.http.multipart.PartData;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.channel.WriteBufferWaterMark;
-import io.netty.handler.codec.http.multipart.HttpData;
 import io.netty.handler.logging.LogLevel;
 
 import java.util.Map;
@@ -71,40 +68,6 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                         }
                     }
                     return Optional.empty();
-                }
-        );
-
-        conversionService.addConverter(
-                HttpData.class,
-                byte[].class,
-                (upload, targetType, context) -> {
-                    try {
-                        if (!upload.isCompleted()) {
-                            return Optional.empty();
-                        }
-                        ByteBuf byteBuf1 = upload.getByteBuf();
-                        return Optional.of(ByteBufUtil.getBytes(byteBuf1));
-                    } catch (Exception e1) {
-                        context.reject(e1);
-                        return Optional.empty();
-                    }
-                }
-        );
-
-        conversionService.addConverter(
-                HttpData.class,
-                CharSequence.class,
-                (upload, targetType, context) -> {
-                    try {
-                        if (!upload.isCompleted()) {
-                            return Optional.empty();
-                        }
-                        ByteBuf byteBuf = upload.getByteBuf();
-                        return Optional.of(byteBuf.toString(context.getCharset()));
-                    } catch (Exception e) {
-                        context.reject(e);
-                        return Optional.empty();
-                    }
                 }
         );
     }
