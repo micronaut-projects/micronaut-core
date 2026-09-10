@@ -35,7 +35,8 @@ import java.util.Collection;
  * @author Graeme Rocher
  * @since 1.0
  * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead. This interface
- * is no longer used or implemented by the server and will be removed in a future release.
+ * has not been used or implemented by the server since 4.0.0, and, as with any API marked for
+ * removal, it will be removed in a future major release rather than in a 5.x minor.
  */
 @Deprecated(forRemoval = true, since = "4.0.0")
 public interface HttpContentProcessor extends Toggleable {
