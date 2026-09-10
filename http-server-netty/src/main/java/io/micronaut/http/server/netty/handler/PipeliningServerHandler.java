@@ -637,7 +637,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 inboundHandler = baseInboundHandler;
                 try {
                     requestHandler.accept(requiredCtx(), Objects.requireNonNull(request), body, Objects.requireNonNull(outboundAccess));
-                } catch (Throwable e) {
+                } catch (Exception e) {
                     body.close();
                     requestHandler.handleUnboundError(e);
                     requiredCtx().close();
@@ -961,11 +961,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
          */
         private void closeAfterWriteInEventLoop() {
             closeAfterWrite = true;
-            OutboundHandler handler = this.handler;
-            if (handler != null) {
+            OutboundHandler current = this.handler;
+            if (current != null) {
                 // the response has already been prepared, so preprocess did not see this flag. The
                 // message has not been written yet though, so we can still add the header.
-                handler.markCloseAfterWrite();
+                current.markCloseAfterWrite();
             }
         }
 
@@ -1331,7 +1331,6 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private final class StreamingOutboundHandler extends OutboundHandler implements BufferConsumer {
         private final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
-        private final OutboundAccessImpl outboundAccess;
         @Nullable
         private HttpResponse initialMessage;
         private BufferConsumer. @Nullable Upstream upstream;
@@ -1350,15 +1349,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (initialMessage instanceof FullHttpResponse) {
                 throw new IllegalArgumentException("Cannot have a full response as the initial message of a streaming response");
             }
-            this.outboundAccess = outboundAccess;
             this.initialMessage = Objects.requireNonNull(initialMessage, "initialMessage");
         }
 
         @Override
         void markCloseAfterWrite() {
-            HttpResponse initialMessage = this.initialMessage;
-            if (initialMessage != null) {
-                addConnectionClose(initialMessage);
+            HttpResponse message = this.initialMessage;
+            if (message != null) {
+                addConnectionClose(message);
             }
         }
 
