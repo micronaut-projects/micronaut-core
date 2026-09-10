@@ -20,6 +20,11 @@ import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,6 +110,67 @@ class MediaTypeOrderedCacheTest {
             String header = "application/vnd.example" + i + "+json,*/*;q=0.5";
             assertEquals("application/vnd.example" + i + "+json;q=1;*/*;q=0.5", expected.get(i));
             assertEquals(expected.get(i), describe(MediaType.orderedOf(List.of(header))));
+        }
+    }
+
+    @Test
+    void theCacheRemainsBoundedUnderConcurrentMisses() throws Exception {
+        int threads = 64;
+        ExecutorService executor = Executors.newFixedThreadPool(threads);
+        try {
+            for (int attempt = 0; attempt < 25; attempt++) {
+                MediaType.clearOrderedCache();
+                for (int i = 0; i < 255; i++) {
+                    MediaType.orderedOf(List.of("application/x-prefill-" + i + ",*/*"));
+                }
+
+                CyclicBarrier barrier = new CyclicBarrier(threads);
+                List<Future<?>> futures = new ArrayList<>();
+                for (int i = 0; i < threads; i++) {
+                    String header = "application/x-concurrent-" + attempt + '-' + i + ",text/plain";
+                    futures.add(executor.submit(() -> {
+                        barrier.await();
+                        MediaType.orderedOf(List.of(header));
+                        return null;
+                    }));
+                }
+                for (Future<?> future : futures) {
+                    future.get(10, TimeUnit.SECONDS);
+                }
+                if (MediaType.orderedCacheSize() > 256) {
+                    break;
+                }
+            }
+        } finally {
+            executor.shutdownNow();
+        }
+
+        assertTrue(MediaType.orderedCacheSize() <= 256,
+            "cache grew to " + MediaType.orderedCacheSize() + " entries");
+    }
+
+    @Test
+    void aCommonHeaderCanStillBeCachedAfterDistinctUntrustedValues() {
+        for (int i = 0; i < 256; i++) {
+            MediaType.orderedOf(List.of("application/x-untrusted-" + i + ",*/*"));
+        }
+
+        List<MediaType> first = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
+        List<MediaType> second = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
+
+        assertSame(first, second);
+    }
+
+    @Test
+    void aRecurringHeaderKeepsItsSlotWhileOneOffValuesComeAndGo() {
+        List<MediaType> cached = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
+        // read it again so that it stops being a first seen value on probation
+        assertSame(cached, MediaType.orderedOf(List.of(BROWSER_ACCEPT)));
+
+        for (int i = 0; i < 5_000; i++) {
+            MediaType.orderedOf(List.of("application/x-one-off-" + i + ",*/*"));
+            assertSame(cached, MediaType.orderedOf(List.of(BROWSER_ACCEPT)),
+                "the recurring header lost its slot after " + i + " one-off values");
         }
     }
 
