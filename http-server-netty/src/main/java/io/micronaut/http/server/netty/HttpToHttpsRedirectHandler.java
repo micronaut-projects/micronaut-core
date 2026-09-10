@@ -17,6 +17,7 @@ package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
@@ -29,6 +30,8 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+
+import java.net.URI;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
@@ -53,6 +56,7 @@ record HttpToHttpsRedirectHandler(
         NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
         UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
+        String rawQuery = strippedRequest.getUri().getRawQuery();
         strippedRequest.release();
         uriBuilder.scheme("https");
         int port = sslConfiguration.getPort();
@@ -63,9 +67,15 @@ record HttpToHttpsRedirectHandler(
         }
         uriBuilder.path(strippedRequest.getPath());
 
+        URI location = uriBuilder.build();
+        if (StringUtils.isNotEmpty(rawQuery)) {
+            // UriBuilder only models decoded query parameters, so append the original query string verbatim
+            location = URI.create(location.toASCIIString() + "?" + rawQuery);
+        }
+
         outboundAccess.closeAfterWrite();
         outboundAccess.write(
-            NettyHttpResponseBuilder.toHttpResponse(HttpResponse.permanentRedirect(uriBuilder.build())),
+            NettyHttpResponseBuilder.toHttpResponse(HttpResponse.permanentRedirect(location)),
                 NettyByteBodyFactory.empty()
         );
     }

@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.redirect
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
@@ -55,5 +56,17 @@ class HttpToHttpsRedirectSpec extends Specification {
         response.status == HttpStatus.PERMANENT_REDIRECT
         response.header(HttpHeaders.LOCATION).startsWith("https://localhost")
         response.header(HttpHeaders.CONNECTION) == 'close'
+    }
+
+    void 'test http to https redirect retains the query string'() {
+        when:
+        HttpResponse response = httpClient.toBlocking().exchange(HttpRequest.GET('/hello?foo=bar&baz=a%20b'))
+
+        then:
+        response.status == HttpStatus.PERMANENT_REDIRECT
+        def location = URI.create(response.header(HttpHeaders.LOCATION))
+        location.scheme == 'https'
+        location.rawPath == '/hello'
+        location.rawQuery == 'foo=bar&baz=a%20b'
     }
 }
