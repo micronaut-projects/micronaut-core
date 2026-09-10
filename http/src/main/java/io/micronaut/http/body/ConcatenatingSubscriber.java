@@ -155,10 +155,10 @@ public class ConcatenatingSubscriber implements BufferConsumer.Upstream, CoreSub
 
     @Override
     public final void onNext(ByteBody body) {
-        boolean first = this.first;
+        boolean isFirst = this.first;
         this.first = false;
 
-        BufferConsumer.Upstream component = forward(body, first ? separators.beforeFirst : separators.between);
+        BufferConsumer.Upstream component = forward(body, isFirst ? separators.beforeFirst : separators.between);
         if (component == null) {
             return;
         }
