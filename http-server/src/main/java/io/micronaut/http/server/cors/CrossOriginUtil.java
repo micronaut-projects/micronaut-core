@@ -47,13 +47,6 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD;
  * @since 3.9.0
  */
 public final class CrossOriginUtil {
-    /**
-     * Conversion context for the HTTP method supplied by a CORS preflight request.
-     *
-     * @since 5.2.0
-     */
-    public static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
-
     /** The {@link CrossOrigin#allowedOrigins()} annotation member. */
     public static final String MEMBER_ALLOWED_ORIGINS = "allowedOrigins";
     /** The {@link CrossOrigin#allowedOriginsRegex()} annotation member. */
@@ -70,6 +63,12 @@ public final class CrossOriginUtil {
     public static final String MEMBER_ALLOW_PRIVATE_NETWORK = "allowPrivateNetwork";
     /** The {@link CrossOrigin#maxAge()} annotation member. */
     public static final String MEMBER_MAX_AGE = "maxAge";
+    /**
+     * Conversion context for the HTTP method supplied by a CORS preflight request.
+     *
+     * @since 5.2.0
+     */
+    static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     private CrossOriginUtil() {
     }
