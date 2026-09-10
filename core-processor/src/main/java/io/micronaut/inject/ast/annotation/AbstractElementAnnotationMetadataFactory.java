@@ -178,10 +178,48 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
      * @return The annotation metadata
      */
     protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement) {
+        return lookupForField(fieldElement, false);
+    }
+
+    /**
+     * Lookup annotation metadata for the field read through its owning type. A mutation made on the field is keyed
+     * by the declaring type, a mutation made on the field as a component of a bean property belongs to the owning
+     * type.
+     *
+     * @param fieldElement      The element
+     * @param propertyComponent Whether a mutation is made on the field as a component of a bean property
+     * @return The annotation metadata
+     * @see AbstractAnnotationMetadataBuilder#lookupOrBuildForField(Object, Object, Object, boolean)
+     * @since 5.2.1
+     */
+    protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookupForField(FieldElement fieldElement, boolean propertyComponent) {
         return metadataBuilder.lookupOrBuildForField(
+            getNativeElement(fieldElement.getOwningType()),
             getNativeElement(fieldElement.getDeclaringType()),
-            getNativeElement(fieldElement)
+            getNativeElement(fieldElement),
+            propertyComponent
         );
+    }
+
+    /**
+     * Build the annotation metadata of a field as a component of a bean property of the field's owning type.
+     *
+     * @param fieldElement The field element
+     * @return The element annotation metadata
+     */
+    ElementAnnotationMetadata buildForPropertyField(FieldElement fieldElement) {
+        return new AbstractElementAnnotationMetadata() {
+
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return lookupForField(fieldElement, true);
+            }
+
+            @Override
+            public String toString() {
+                return fieldElement.toString();
+            }
+        };
     }
 
     /**

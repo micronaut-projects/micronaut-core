@@ -347,6 +347,42 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     }
 
     /**
+     * Build the metadata for the given field element read through the given owning type, excluding any class
+     * metadata. A mutation made on the field itself is keyed by the declaring type, as with
+     * {@link #lookupOrBuildForField(Object, Object)}, and is visible through every type the field is read through.
+     * A mutation made on the field as a component of a bean property belongs to the owning type: a bean property is
+     * resolved for the type it is read through, as its accessor methods are, so annotating the property of a super
+     * type must not annotate the same property read through a subclass. Once the owning type holds such a mutation,
+     * the field read or mutated through the owning type uses it.
+     *
+     * @param owningType        The type the field is read through
+     * @param declaringType     The type declaring the field
+     * @param element           The element
+     * @param propertyComponent Whether a mutation is made on the field as a component of a bean property
+     * @return The {@link CachedAnnotationMetadata}
+     * @since 5.2.1
+     */
+    public CachedAnnotationMetadata lookupOrBuildForField(T owningType, T declaringType, T element, boolean propertyComponent) {
+        return lookupOrBuildForOwner(new Key2<>(declaringType, element), new OwnerKey2<>(owningType, element), element, propertyComponent);
+    }
+
+    /**
+     * Lookup or build the metadata of a member shared by the types it is read through, keeping the mutations made
+     * for one owning type apart from the shared metadata.
+     *
+     * @param sharedKey     The cache key of the metadata shared by every owning type
+     * @param ownerKey      The cache key of the metadata mutated for the owning type
+     * @param element       The element
+     * @param ownerMutation Whether a mutation belongs to the owning type
+     * @return The {@link CachedAnnotationMetadata}
+     * @see #lookupOrBuildForField(Object, Object, Object, boolean)
+     * @since 5.2.1
+     */
+    public CachedAnnotationMetadata lookupOrBuildForOwner(Object sharedKey, Object ownerKey, T element, boolean ownerMutation) {
+        return new OwnerCachedAnnotationMetadata(sharedKey, ownerKey, element, ownerMutation);
+    }
+
+    /**
      * Lookup or build new annotation metadata.
      *
      * @param key     The cache key
@@ -2326,6 +2362,78 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         @Override
         public Iterator<T> iterator() {
             return List.of(type, e2, e3).iterator();
+        }
+    }
+
+    /**
+     * Key used to reference the metadata a member is mutated with for one owning type. The first element is the
+     * owning type so that {@link #clearMutated(Object)} can drop the entry when that type is cleared.
+     *
+     * @param owningType The owning type
+     * @param e2         The element 2
+     * @param <T>        the element type
+     */
+    @Internal
+    private record OwnerKey2<T>(T owningType, T e2) implements Iterable<T> {
+        @Override
+        public Iterator<T> iterator() {
+            return List.of(owningType, e2).iterator();
+        }
+    }
+
+    /**
+     * The metadata of a member read through one owning type: the metadata mutated for the owning type when there
+     * is one, otherwise the metadata shared by every owning type. The shared metadata is built when the entry is
+     * looked up, while the element can still be read, and the metadata of the owning type is looked for until it
+     * is found, as a mutation for the owning type can be made after the entry was looked up.
+     */
+    private final class OwnerCachedAnnotationMetadata implements CachedAnnotationMetadata {
+
+        private final CachedAnnotationMetadata shared;
+        private final Object ownerKey;
+        private final boolean ownerMutation;
+        @Nullable
+        private CachedAnnotationMetadata owned;
+
+        OwnerCachedAnnotationMetadata(Object sharedKey, Object ownerKey, T element, boolean ownerMutation) {
+            this.shared = lookupOrBuild(sharedKey, element);
+            this.ownerKey = ownerKey;
+            this.ownerMutation = ownerMutation;
+        }
+
+        private CachedAnnotationMetadata current() {
+            if (owned == null) {
+                owned = MUTATED_ANNOTATION_METADATA.get(ownerKey);
+            }
+            return owned != null ? owned : shared;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return current().getAnnotationMetadata();
+        }
+
+        @Override
+        public boolean isMutated() {
+            return current().isMutated();
+        }
+
+        @Override
+        public void update(AnnotationMetadata annotationMetadata) {
+            if (ownerMutation && !MUTATED_ANNOTATION_METADATA.containsKey(ownerKey)) {
+                MUTATED_ANNOTATION_METADATA.put(ownerKey, new DefaultCachedAnnotationMetadata(annotationMetadata));
+            }
+            current().update(annotationMetadata);
+        }
+
+        @Override
+        public boolean wasCleared() {
+            return current().wasCleared();
+        }
+
+        @Override
+        public void markCleared() {
+            current().markCleared();
         }
     }
 
