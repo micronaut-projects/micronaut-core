@@ -11,9 +11,12 @@ import io.micronaut.http.annotation.Get
 import io.micronaut.http.annotation.Post
 import io.micronaut.http.annotation.Produces
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.DefaultHttpClientConfiguration
+import io.micronaut.http.client.HttpClientConfiguration
 import io.micronaut.http.client.HttpVersionSelection
 import io.micronaut.http.client.annotation.Client
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
+import io.micronaut.runtime.server.EmbeddedServer
 import jakarta.inject.Inject
 import spock.lang.Specification
 
@@ -30,6 +33,28 @@ class Http2Spec extends Specification {
     @Inject
     @Client(value = "/", alpnModes = HttpVersionSelection.ALPN_HTTP_2)
     HttpClient client
+
+    @Inject
+    EmbeddedServer server
+
+    def "test http2 with absent optional configuration"() {
+        given:
+        def configuration = new DefaultHttpClientConfiguration() {
+            @Override
+            HttpClientConfiguration.Http2ClientConfiguration getHttp2Configuration() {
+                return null
+            }
+        }
+        configuration.alpnModes = [HttpVersionSelection.ALPN_HTTP_2]
+        configuration.sslConfiguration.insecureTrustAllCertificates = true
+        def customClient = HttpClient.create(server.URL, configuration)
+
+        expect:
+        customClient.toBlocking().retrieve(HttpRequest.GET("/http2")) == "hello"
+
+        cleanup:
+        customClient.close()
+    }
 
     def "test http2"() {
         when:
