@@ -104,10 +104,52 @@ class FileUploadSpec extends Specification {
         server.stop()
     }
 
+    def 'attribute is decoded with the charset declared by the part'() {
+        given:
+        def ctx = ApplicationContext.run(['spec.name': 'FileUploadSpec'])
+        def server = ctx.getBean(EmbeddedServer)
+        server.start()
+
+        // everything but the value is US-ASCII, so the whole body can be encoded with the part
+        // charset. The value is the single byte 0xE9 in ISO-8859-1, which is not valid UTF-8.
+        byte[] body = ("--boundary\r\n" +
+                "Content-Disposition: form-data; name=\"value\"\r\n" +
+                "Content-Type: text/plain; charset=" + charset + "\r\n" +
+                "\r\n" +
+                "\u00e9" +
+                "\r\n--boundary--\r\n").getBytes(charset)
+
+        when:
+        def connection = (HttpURLConnection) new URL("http://$server.host:$server.port/multipart/attribute").openConnection()
+        connection.setRequestMethod("POST")
+        connection.addRequestProperty("Content-Type", "multipart/form-data; boundary=boundary")
+        connection.setDoOutput(true)
+        connection.setDoInput(true)
+        connection.connect()
+        connection.outputStream.write(body)
+        connection.outputStream.close()
+        def response = new String(connection.inputStream.readAllBytes(), StandardCharsets.UTF_8)
+
+        then:
+        response == "\u00e9"
+
+        cleanup:
+        server.stop()
+        ctx.close()
+
+        where:
+        charset << ["ISO-8859-1", "UTF-8"]
+    }
+
     @Controller('/multipart')
     @Requires(property = 'spec.name', value = 'FileUploadSpec')
     @Produces(MediaType.TEXT_PLAIN)
     static class MultipartController {
+        @Post(value = '/attribute', consumes = MediaType.MULTIPART_FORM_DATA)
+        String attribute(@Part String value) {
+            return value
+        }
+
         @Post(value = '/complete-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)
         String completeFileUpload(CompletedFileUpload data) {
             def bytes = data.inputStream.bytes

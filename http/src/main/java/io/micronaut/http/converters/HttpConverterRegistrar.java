@@ -32,12 +32,15 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
 import java.util.Optional;
 
 /**
@@ -130,13 +133,19 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
             } else if (argument.isAssignableFrom(InputStream.class)) {
                 return Optional.of(object.getInputStream());
             } else {
+                Charset declaredCharset = declaredCharset(object);
                 try (ReadBuffer rb = object.toReadBuffer()) {
+                    if (declaredCharset != null && targetType.isAssignableFrom(String.class)) {
+                        // the generic ReadBuffer conversion below would decode with the charset of
+                        // the request, but this part declares one of its own
+                        return Optional.of(rb.toString(declaredCharset));
+                    }
                     Optional<Object> direct = conversionService.convert(rb, targetType, context);
                     // This detects Optional.empty and Optional[Optional.empty]
                     if (direct.isPresent() && (!targetType.equals(Optional.class) || ((Optional<?>) direct.get()).isPresent())) {
                         return direct;
                     }
-                    String s = rb.toString(context.getCharset());
+                    String s = rb.toString(declaredCharset != null ? declaredCharset : context.getCharset());
                     if (targetType.isAssignableFrom(String.class)) {
                         return Optional.of(s);
                     }
@@ -144,5 +153,22 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         });
+    }
+
+    /**
+     * Get the charset declared by the part itself. A multipart part may carry its own
+     * {@code Content-Type} with a {@code charset} parameter, and that charset governs the value of
+     * the part (RFC 7578, section 4.5), independently of the charset of the request.
+     *
+     * @param part The part
+     * @return The charset declared by the part, or {@code null} if it declares none
+     */
+    @Nullable
+    private static Charset declaredCharset(CompletedPart part) {
+        MediaType mediaType = part.getMetadata().mediaType();
+        if (mediaType == null) {
+            return null;
+        }
+        return mediaType.getCharset().orElse(null);
     }
 }
