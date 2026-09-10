@@ -233,7 +233,8 @@ class DefaultBeanIntrospector implements BeanIntrospector {
 
     /**
      * Whether the given class loader resolves {@link BeanIntrospectionReference} to this class' own, so that the
-     * introspections and fallbacks it lists as services can be used here.
+     * introspections and fallbacks it lists as services can be used here. A class loader that fails to answer, as a
+     * restricted or custom class loader may with any runtime exception, is taken as not sharing them.
      *
      * @param otherClassLoader The class loader
      * @return Whether it shares the introspection types of this class
@@ -241,7 +242,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static boolean sharesBeanIntrospectionReference(ClassLoader otherClassLoader) {
         try {
             return Class.forName(BeanIntrospectionReference.class.getName(), false, otherClassLoader) == BeanIntrospectionReference.class;
-        } catch (ClassNotFoundException | LinkageError e) {
+        } catch (ClassNotFoundException | RuntimeException | LinkageError e) {
             return false;
         }
     }
