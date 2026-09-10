@@ -34,9 +34,10 @@ import java.util.Collection;
  *
  * @author Graeme Rocher
  * @since 1.0
- * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead
+ * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead. This interface
+ * is no longer used or implemented by the server and will be removed in a future release.
  */
-@Deprecated
+@Deprecated(forRemoval = true, since = "4.0.0")
 public interface HttpContentProcessor extends Toggleable {
     /**
      * Process more data.
@@ -63,8 +64,7 @@ public interface HttpContentProcessor extends Toggleable {
 
     /**
      * Set the type of the values returned by this processor. Most processors do not respect this
-     * setting, but e.g. the {@link io.micronaut.http.server.netty.jackson.JsonContentProcessor}
-     * does.
+     * setting.
      *
      * @param type The type produced by this processor
      * @return This processor, for chaining
