@@ -236,10 +236,15 @@ class H2cSpec extends Specification {
     }
 
     /**
-     * Send a request over a connection that speaks HTTP/2 straight away, without an upgrade.
+     * Send a request over a connection that speaks HTTP/2 straight away, without an upgrade, and
+     * wait for the response. The connection and its event loop are always torn down before this
+     * method returns, whether the request succeeded or not.
+     *
+     * @param request The request to send
+     * @return The response, which the caller has to release
      */
-    private CompletableFuture requestPriorKnowledge(DefaultFullHttpRequest request) {
-        def responseFuture = new CompletableFuture()
+    private FullHttpResponse requestPriorKnowledge(DefaultFullHttpRequest request) {
+        CompletableFuture<FullHttpResponse> responseFuture = new CompletableFuture<>()
 
         def group = new NioEventLoopGroup(1)
         def bootstrap = new Bootstrap()
@@ -270,7 +275,7 @@ class H2cSpec extends Specification {
                                             if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 3) {
                                                 responseFuture.completeExceptionally(new AssertionError("Response must be on stream 3"));
                                             }
-                                            responseFuture.complete(ReferenceCountUtil.retain(msg))
+                                            responseFuture.complete((FullHttpResponse) ReferenceCountUtil.retain(msg))
                                         }
                                         super.channelRead(ctx, msg)
                                     }
@@ -286,24 +291,27 @@ class H2cSpec extends Specification {
                     }
                 })
 
-        def channel = (SocketChannel) bootstrap.connect().await().channel()
+        try {
+            def channel = (SocketChannel) bootstrap.connect().await().channel()
+            try {
+                request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
+                channel.writeAndFlush(request)
+                channel.read()
 
-        request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
-        channel.writeAndFlush(request)
-        channel.read()
-
-        return responseFuture.whenComplete((r, e) -> {
-            channel.close()
+                return responseFuture.get(10, TimeUnit.SECONDS)
+            } finally {
+                channel.close().await(10, TimeUnit.SECONDS)
+            }
+        } finally {
             group.shutdownGracefully()
-        })
+        }
     }
 
     def 'prior knowledge'() {
-        given:
-        def responseFuture = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
+        when:
+        def resp = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
 
-        expect:
-        def resp = responseFuture.get(10, TimeUnit.SECONDS)
+        then:
         resp != null
 
         cleanup:
@@ -320,7 +328,6 @@ class H2cSpec extends Specification {
 
         when:
         def resp = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
-                .get(10, TimeUnit.SECONDS)
 
         then:
         resp != null

@@ -59,6 +59,7 @@ import spock.util.concurrent.PollingConditions
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.BlockingQueue
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
@@ -463,7 +464,10 @@ class GracefulShutdownSpec extends Specification {
                 .connect(server.host, server.port).sync().channel()
 
         def sink = Sinks.<String> one()
-        server.applicationContext.getBean(MyCtrl).publisher = sink.asMono()
+        // the controller subscribes to this publisher while it is producing the response, so the
+        // latch tells us the request has actually reached the server and is still in flight
+        def requestInFlight = new CountDownLatch(1)
+        server.applicationContext.getBean(MyCtrl).publisher = sink.asMono().doOnSubscribe(s -> requestInFlight.countDown())
 
         expect:
         inbound.take() instanceof Http2SettingsFrame
@@ -477,7 +481,7 @@ class GracefulShutdownSpec extends Specification {
                 .authority("localhost")
                 .scheme("http"), true
         ).stream(stream1), ch.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE))
-        TimeUnit.SECONDS.sleep(1)
+        assert requestInFlight.await(10, TimeUnit.SECONDS)
         def shFuture = gracefulShutdown.shutdownGracefully().toCompletableFuture()
 
         then: "the client gets a GOAWAY and the connection stays up for the in-flight request"
@@ -501,6 +505,7 @@ class GracefulShutdownSpec extends Specification {
         cleanup:
         data?.release()
         goAway?.release()
+        ch?.close()?.await(10, TimeUnit.SECONDS)
         loop.shutdownGracefully()
         server.close()
     }
