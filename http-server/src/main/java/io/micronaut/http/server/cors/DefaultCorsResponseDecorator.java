@@ -98,7 +98,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param config the resolved CORS configuration
      * @param response the response to decorate
      */
-    public void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+    void setAllowCredentials(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowCredentials()) {
             response.header(ACCESS_CONTROL_ALLOW_CREDENTIALS, StringUtils.TRUE);
         }
@@ -111,7 +111,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param config the resolved CORS configuration
      * @param response the response to decorate
      */
-    public void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
+    void setAllowPrivateNetwork(CorsOriginConfiguration config, MutableHttpResponse<?> response) {
         if (config.isAllowPrivateNetwork()) {
             response.header(ACCESS_CONTROL_ALLOW_PRIVATE_NETWORK, StringUtils.TRUE);
         }
@@ -124,7 +124,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param exposedHeaders the header names exposed to the client
      * @param response the response to decorate
      */
-    public void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
+    void setExposeHeaders(List<String> exposedHeaders, MutableHttpResponse<?> response) {
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", exposedHeaders);
             if (StringUtils.isNotEmpty(headerValue)) {
@@ -140,7 +140,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      *
      * @param response the response to decorate
      */
-    public void setVary(MutableHttpResponse<?> response) {
+    void setVary(MutableHttpResponse<?> response) {
         response.header(VARY, ORIGIN);
     }
 
@@ -150,7 +150,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param origin the request origin, or {@code null} if absent
      * @param response the response to decorate
      */
-    public void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
+    void setOrigin(@Nullable String origin, MutableHttpResponse<?> response) {
         if (origin != null) {
             response.header(ACCESS_CONTROL_ALLOW_ORIGIN, origin);
         }
@@ -162,7 +162,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param method the method requested by the preflight request
      * @param response the response to decorate
      */
-    public void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
+    void setAllowMethods(HttpMethod method, MutableHttpResponse<?> response) {
         response.header(ACCESS_CONTROL_ALLOW_METHODS, method);
     }
 
@@ -173,7 +173,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param optionalAllowHeaders the header names requested by the preflight request
      * @param response the response to decorate
      */
-    public void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
+    void setAllowHeaders(List<?> optionalAllowHeaders, MutableHttpResponse<?> response) {
         List<String> allowHeaders = optionalAllowHeaders.stream().map(Object::toString).toList();
         if (corsConfiguration.isSingleHeader()) {
             String headerValue = String.join(",", allowHeaders);
@@ -194,7 +194,7 @@ final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
      * @param maxAge the maximum cache duration in seconds, or a negative value to omit the header
      * @param response the response to decorate
      */
-    public void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
+    void setMaxAge(long maxAge, MutableHttpResponse<?> response) {
         if (maxAge > -1) {
             response.header(ACCESS_CONTROL_MAX_AGE, Long.toString(maxAge));
         }
