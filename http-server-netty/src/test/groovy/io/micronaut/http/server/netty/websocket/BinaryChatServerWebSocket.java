@@ -24,10 +24,18 @@ import io.micronaut.websocket.annotation.OnOpen;
 import io.micronaut.websocket.annotation.ServerWebSocket;
 
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Requires(property = "spec.name", value = "BinaryWebSocketSpec")
 @ServerWebSocket("/binary/chat/{topic}/{username}")
 public class BinaryChatServerWebSocket {
+    /**
+     * Usernames whose {@link #onOpen} handler has completed. This handler is blocking and so runs on the
+     * executor, i.e. after the client's connect() has already returned. Tests that need a deterministic
+     * "Joined!" broadcast order should wait for a username to appear here before connecting the next client.
+     */
+    private final Set<String> openedUsernames = ConcurrentHashMap.newKeySet();
+
     @OnOpen
     public void onOpen(String topic, String username, WebSocketSession session) {
         assert ServerRequestContext.currentRequest().isPresent();
@@ -41,6 +49,11 @@ public class BinaryChatServerWebSocket {
                 openSession.sendAsync(msg.getBytes());
             }
         }
+        openedUsernames.add(username);
+    }
+
+    public Set<String> getOpenedUsernames() {
+        return openedUsernames;
     }
 
     @OnMessage(maxPayloadLength = 32)
