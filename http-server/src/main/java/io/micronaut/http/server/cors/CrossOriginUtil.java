@@ -24,6 +24,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteAttributes;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.List;
@@ -221,10 +222,24 @@ public final class CrossOriginUtil {
      * @param annotationMetadataProvider the annotation metadata provider
      * @return the CORS configuration declared by the provider, or an empty optional if it
      * does not declare {@link CrossOrigin}
+     * @deprecated Use {@link CrossOriginUtil#getCorsOriginConfigForAnnotationMetadataProvider(AnnotationMetadataProvider)} instead.
      * @since 5.2.0
      */
+    @Deprecated(forRemoval = true, since = "5.3.0")
     public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
         return getCorsOriginConfiguration(annotationMetadataProvider.getAnnotationMetadata());
+    }
+
+    /**
+     * Resolves CORS configuration from an annotation metadata provider.
+     *
+     * @param annotationMetadataProvider the annotation metadata provider
+     * @return the CORS configuration declared by the provider, or an empty optional if it
+     * does not declare {@link CrossOrigin}
+     * @since 5.4.0
+     */
+    public static @Nullable CorsOriginConfiguration getCorsOriginConfigForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
+        return getCorsOriginConfig(annotationMetadataProvider.getAnnotationMetadata());
     }
 
     /**
@@ -239,11 +254,10 @@ public final class CrossOriginUtil {
      * @return the resolved CORS configuration, or an empty optional if the metadata does not
      * contain {@link CrossOrigin}
      */
-    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(AnnotationMetadata annotationMetadata) {
+    public static @Nullable CorsOriginConfiguration getCorsOriginConfig(AnnotationMetadata annotationMetadata) {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
-            return Optional.empty();
+            return null;
         }
-
         CorsOriginConfiguration config = new CorsOriginConfiguration();
         String[] allowedOrigins = annotationMetadata.stringValues(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS);
         annotationMetadata.stringValue(CrossOrigin.class, MEMBER_ALLOWED_ORIGINS_REGEX).ifPresentOrElse(
@@ -269,9 +283,27 @@ public final class CrossOriginUtil {
         annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOW_CREDENTIALS)
             .ifPresent(config::setAllowCredentials);
         annotationMetadata.booleanValue(CrossOrigin.class, MEMBER_ALLOW_PRIVATE_NETWORK)
-                .ifPresent(config::setAllowPrivateNetwork);
+            .ifPresent(config::setAllowPrivateNetwork);
         annotationMetadata.longValue(CrossOrigin.class, MEMBER_MAX_AGE)
             .ifPresent(config::setMaxAge);
-        return Optional.of(config);
+        return config;
+
+    }
+    /**
+     * Creates CORS configuration from {@link CrossOrigin} annotation metadata.
+     *
+     * <p>Empty annotation members are mapped to the defaults understood by the server: any
+     * origin, header, or method. If an origin regular expression is present, the wildcard
+     * origin default is not added, so only the expression and explicitly declared origins
+     * are considered.</p>
+     *
+     * @param annotationMetadata the route annotation metadata
+     * @return the resolved CORS configuration, or an empty optional if the metadata does not
+     * contain {@link CrossOrigin}
+     * @deprecated Use {@link CrossOriginUtil#getCorsOriginConfig(AnnotationMetadata)} instead.
+     */
+    @Deprecated(forRemoval = true, since = "5.3.0")
+    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(AnnotationMetadata annotationMetadata) {
+        return Optional.ofNullable(getCorsOriginConfig(annotationMetadata));
     }
 }

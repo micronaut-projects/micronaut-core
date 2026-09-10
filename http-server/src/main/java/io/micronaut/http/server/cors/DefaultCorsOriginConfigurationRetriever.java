@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static io.micronaut.http.server.HttpServerConfiguration.CorsConfiguration;
+import static io.micronaut.http.server.cors.CrossOriginUtil.getCorsOriginConfigForAnnotationMetadataProvider;
 import static io.micronaut.http.server.cors.CrossOriginUtil.getCorsOriginConfigurationForAnnotationMetadataProvider;
 import static io.micronaut.http.server.cors.CrossOriginUtil.matchesOrigin;
 
@@ -54,10 +55,9 @@ final class DefaultCorsOriginConfigurationRetriever implements CorsOriginConfigu
             return null;
         }
         for (RouteMatch<?> routeMatch : routeMatches) {
-            Optional<CorsOriginConfiguration> originConfigurationOptional =
-                getCorsOriginConfigurationForAnnotationMetadataProvider(routeMatch);
-            if (originConfigurationOptional.isPresent()) {
-                CorsOriginConfiguration originConfiguration = originConfigurationOptional.get();
+            CorsOriginConfiguration originConfiguration =
+                getCorsOriginConfigForAnnotationMetadataProvider(routeMatch);
+            if (originConfiguration != null) {
                 if (matchesOrigin(originConfiguration, origin)) {
                     return originConfiguration;
                 }
