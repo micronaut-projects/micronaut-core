@@ -639,7 +639,8 @@ class PipeliningServerHandlerSpec extends Specification {
                 failure = cause
             }
         })
-        handler.setBodySizeLimits(new BodySizeLimits(64, 64))
+        // Keep the decoder allocation limit above the cumulative body limit tested here.
+        handler.setBodySizeLimits(new BodySizeLimits(64, 1024))
         def ch = new EmbeddedChannel(handler)
         def compChannel = new EmbeddedChannel(compressor)
         def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
@@ -651,6 +652,11 @@ class PipeliningServerHandlerSpec extends Specification {
         when:
         compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
         forwardCompressed(compChannel, ch)
+
+        then:
+        failure == null
+
+        when:
         compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
         forwardCompressed(compChannel, ch)
 
