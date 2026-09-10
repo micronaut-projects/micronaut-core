@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 
 /**
@@ -787,6 +788,38 @@ public class MediaType implements CharSequence {
     private static final char SEMICOLON = ';';
     private static final String WILDCARD = "*";
 
+    /**
+     * The longest header value that {@link #orderedOf(List)} will cache. Real world {@code Accept}
+     * headers are well under this; anything longer is parsed on every call rather than taking up a
+     * cache slot.
+     */
+    private static final int MAX_CACHED_HEADER_LENGTH = 256;
+
+    /**
+     * The maximum number of entries held by {@link #ORDERED_CACHE}.
+     */
+    private static final int MAX_CACHED_HEADERS = 256;
+
+    /**
+     * Cache of parsed and sorted media type lists, keyed by the single header value they were
+     * parsed from. A handful of distinct {@code Accept} header values typically recur for the
+     * whole life of a process, so parsing them once is worth a small map. Header values naming a
+     * single media type are served by the fast path in {@link #orderedOf(List)} instead and never
+     * reach the cache.
+     *
+     * <p>The cache is bounded: once it holds {@link #MAX_CACHED_HEADERS} entries no further entries
+     * are added, so a stream of distinct header values cannot make it grow. There is no eviction,
+     * which keeps every access allocation free and lock free; the cost is that a header value first
+     * seen after the map filled up is parsed on every call, exactly as it was before this cache
+     * existed.</p>
+     *
+     * <p>A {@link ConcurrentHashMap} is used rather than a plain map behind a lock both for
+     * concurrency and because it guarantees that a reader observing an entry also observes
+     * everything the writing thread did before inserting it, which is what makes it safe to share
+     * the parsed {@link MediaType} instances across threads.</p>
+     */
+    private static final Map<String, List<MediaType>> ORDERED_CACHE = new ConcurrentHashMap<>();
+
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     // Sonar java:S3077: the table is an immutable map, a Map.copyOf of the parsed table or an empty map
@@ -1293,16 +1326,51 @@ public class MediaType implements CharSequence {
             return Collections.emptyList();
         }
         if (headerCount == 1) {
-            // fast path for single header with single media type
             String singleHeader = values.get(0).toString();
             if (singleHeader.indexOf(',') == -1) {
+                // fast path for single header with single media type
                 try {
                     return List.of(MediaType.of(singleHeader));
                 } catch (IllegalArgumentException ignored) {
                 }
+            } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
+                // a single header listing several media types has to be split, parsed and sorted,
+                // which is what the cache is for. It is also the only case whose raw text can be
+                // used as a key without building one.
+                return orderedOfCached(singleHeader, values);
             }
         }
+        return parseOrdered(values);
+    }
 
+    /**
+     * Return the parsed media types of a single header value, parsing it only if it is not already
+     * cached.
+     *
+     * @param singleHeader The header value, also the cache key
+     * @param values       The header values, a singleton list of {@code singleHeader}
+     * @return The media types, ordered
+     */
+    private static List<MediaType> orderedOfCached(String singleHeader, List<? extends CharSequence> values) {
+        List<MediaType> cached = ORDERED_CACHE.get(singleHeader);
+        if (cached != null) {
+            return cached;
+        }
+        List<MediaType> parsed = parseOrdered(values);
+        if (ORDERED_CACHE.size() < MAX_CACHED_HEADERS) {
+            ORDERED_CACHE.putIfAbsent(singleHeader, parsed);
+        }
+        return parsed;
+    }
+
+    /**
+     * Parse and sort the media types of the given header values. The returned list is immutable and,
+     * because the list it wraps is not published anywhere else, safe to hand out repeatedly.
+     *
+     * @param values The header values
+     * @return The media types, ordered
+     */
+    private static List<MediaType> parseOrdered(List<? extends CharSequence> values) {
         var mediaTypes = new ArrayList<MediaType>(values.size());
         for (CharSequence value : values) {
             for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
@@ -1315,6 +1383,24 @@ public class MediaType implements CharSequence {
         }
         mediaTypes.sort(MediaType::naturalSort);
         return Collections.unmodifiableList(mediaTypes);
+    }
+
+    /**
+     * The number of entries currently held by the ordered media type cache. For tests only.
+     *
+     * @return The cache size
+     */
+    @Internal
+    static int orderedCacheSize() {
+        return ORDERED_CACHE.size();
+    }
+
+    /**
+     * Empty the ordered media type cache. For tests only.
+     */
+    @Internal
+    static void clearOrderedCache() {
+        ORDERED_CACHE.clear();
     }
 
     private static int naturalSort(MediaType o1, MediaType o2)  {
