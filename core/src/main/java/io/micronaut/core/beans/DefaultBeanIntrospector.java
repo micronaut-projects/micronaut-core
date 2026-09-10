@@ -112,7 +112,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         ArgumentUtils.requireNonNull("beanType", beanType);
         ClassLoader effectiveClassLoader = resolveClassLoader();
         @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> reference =
-                (BeanIntrospectionReference<T>) findIntrospectionReference(beanType);
+                (BeanIntrospectionReference<T>) findIntrospectionReference(beanType, effectiveClassLoader);
         try {
             if (reference != null) {
                 return Optional.of(reference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
@@ -121,21 +121,6 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                     }
                     return ref.load();
                 });
-            }
-            if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
-                ClassLoader beanClassLoader = beanType.getClassLoader();
-                if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
-                    @SuppressWarnings("unchecked") final BeanIntrospectionReference<T> beanClassLoaderReference =
-                            (BeanIntrospectionReference<T>) getIntrospections(beanClassLoader).get(beanType.getName());
-                    if (beanClassLoaderReference != null) {
-                        return Optional.of(beanClassLoaderReference).map((Function<BeanIntrospectionReference<T>, BeanIntrospection<T>>) ref -> {
-                            if (LOG.isDebugEnabled()) {
-                                LOG.debug("Found BeanIntrospection for type: {},", ref.getBeanType());
-                            }
-                            return ref.load();
-                        });
-                    }
-                }
             }
         } catch (Throwable e) {
             throw new IntrospectionException("Error loading BeanIntrospection for type [" + beanType + "]: " + e.getMessage(), e);
@@ -165,16 +150,22 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         return Optional.empty();
     }
 
+    /**
+     * The introspection reference of the class loader the introspections are resolved with, or else of the class loader
+     * of the bean type, which may be a child class loader that the introspector cannot see.
+     * The class loader of the bean type is only asked when it shares this class' {@link BeanIntrospectionReference}:
+     * one that loads Micronaut on its own, as the application class loader does under a test harness that runs Micronaut
+     * in a class loader of its own, has introspections that cannot be cast to it, and a type from there is a lookup miss.
+     */
     @Nullable
-    private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType) {
+    private BeanIntrospectionReference<Object> findIntrospectionReference(Class<?> beanType, ClassLoader effectiveClassLoader) {
         String beanTypeName = beanType.getName();
-        BeanIntrospectionReference<Object> reference = getIntrospections().get(beanTypeName);
+        BeanIntrospectionReference<Object> reference = getIntrospections(effectiveClassLoader).get(beanTypeName);
         if (reference != null) {
             return reference;
         }
         ClassLoader beanClassLoader = beanType.getClassLoader();
-        ClassLoader effectiveClassLoader = resolveClassLoader();
-        if (beanClassLoader != null && beanClassLoader != effectiveClassLoader) {
+        if (beanClassLoader != null && beanClassLoader != effectiveClassLoader && sharesBeanIntrospectionReference(beanClassLoader)) {
             return resolveIntrospections(beanClassLoader).get(beanTypeName);
         }
         return null;
@@ -233,11 +224,26 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private ClassLoader resolveClassLoader() {
         if (useContextClassLoader && Boolean.getBoolean(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER)) {
             ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
-            if (contextClassLoader != null) {
+            if (contextClassLoader != null && (contextClassLoader == classLoader || sharesBeanIntrospectionReference(contextClassLoader))) {
                 return contextClassLoader;
             }
         }
         return classLoader;
+    }
+
+    /**
+     * Whether the given class loader resolves {@link BeanIntrospectionReference} to this class' own, so that the
+     * introspections and fallbacks it lists as services can be used here.
+     *
+     * @param otherClassLoader The class loader
+     * @return Whether it shares the introspection types of this class
+     */
+    private static boolean sharesBeanIntrospectionReference(ClassLoader otherClassLoader) {
+        try {
+            return Class.forName(BeanIntrospectionReference.class.getName(), false, otherClassLoader) == BeanIntrospectionReference.class;
+        } catch (ClassNotFoundException | LinkageError e) {
+            return false;
+        }
     }
 
     /**
