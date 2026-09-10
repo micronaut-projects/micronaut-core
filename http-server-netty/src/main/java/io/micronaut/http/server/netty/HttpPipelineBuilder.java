@@ -508,15 +508,11 @@ final class HttpPipelineBuilder {
 
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof SslHandshakeCompletionEvent event) {
-                        if (!event.isSuccess()) {
-                            final Throwable cause = event.cause();
-                            if (!(cause instanceof ClosedChannelException)) {
-                                super.userEventTriggered(ctx, evt);
-                            } else {
-                                return;
-                            }
-                        }
+                    if (evt instanceof SslHandshakeCompletionEvent event &&
+                        !event.isSuccess() &&
+                        event.cause() instanceof ClosedChannelException) {
+                        // the peer went away before the handshake completed, nothing to report
+                        return;
                     }
                     super.userEventTriggered(ctx, evt);
                 }
