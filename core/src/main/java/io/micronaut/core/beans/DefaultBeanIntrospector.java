@@ -20,11 +20,14 @@ import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.CollectionUtils;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -46,7 +49,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
 
     @Nullable
-    @SuppressWarnings("java:S3077") // resolveIntrospections returns an immutable Map.copyOf, published once under double checked locking
+    @SuppressWarnings("java:S3077") // resolveIntrospections returns an unmodifiable map, published once under double checked locking
     private volatile Map<String, BeanIntrospectionReference<Object>> introspectionMap;
     @Nullable
     @SuppressWarnings("java:S3077") // resolveFallbacks returns an immutable List.copyOf, published once under double checked locking
@@ -100,7 +103,7 @@ class DefaultBeanIntrospector implements BeanIntrospector {
                 .stream()
                 .filter(filter)
                 .map(BeanIntrospectionReference::getBeanType)
-                .collect(Collectors.toSet());
+                .collect(Collectors.toCollection(LinkedHashSet::new));
     }
 
     @Override
@@ -237,12 +240,18 @@ class DefaultBeanIntrospector implements BeanIntrospector {
         return classLoader;
     }
 
+    /**
+     * The introspections keyed by name, in a {@link HashMap}. {@link #findIntrospections(Predicate)} and
+     * {@link #findIntrospectedTypes(Predicate)} iterate this map, so its order is what they return: a {@code HashMap}
+     * of names iterates the same way on every run, where a {@code Map.copyOf} is randomized per JVM. The order is
+     * kept as it was before the map was made immutable, since consumers came to depend on it.
+     */
     private Map<String, BeanIntrospectionReference<Object>> resolveIntrospections(ClassLoader classLoader) {
-        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = new HashMap<>(30);
         List<BeanIntrospectionReference<Object>> beanIntrospectionReferences = BeanIntrospectionProviders.get().provide(classLoader);
+        Map<String, BeanIntrospectionReference<Object>> resolvedIntrospectionMap = CollectionUtils.newHashMap(beanIntrospectionReferences.size());
         for (BeanIntrospectionReference<Object> reference : beanIntrospectionReferences) {
             resolvedIntrospectionMap.put(reference.getName(), reference);
         }
-        return Map.copyOf(resolvedIntrospectionMap);
+        return Collections.unmodifiableMap(resolvedIntrospectionMap);
     }
 }
