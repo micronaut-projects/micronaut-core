@@ -36,6 +36,7 @@ import static io.micronaut.http.HttpHeaders.ORIGIN;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CrossOriginUtilTest {
@@ -166,8 +167,8 @@ class CrossOriginUtilTest {
         AnnotationMetadataProvider withoutCrossOrigin = metadataProvider(AnnotationMetadata.EMPTY_METADATA);
         AnnotationMetadataProvider withCrossOrigin = metadataProvider(crossOriginMetadata(Map.of()));
 
-        assertTrue(CrossOriginUtil.getCorsOriginConfigurationForAnnotationMetadataProvider(withoutCrossOrigin).isEmpty());
-        assertTrue(CrossOriginUtil.getCorsOriginConfigurationForAnnotationMetadataProvider(withCrossOrigin).isPresent());
+        assertNull(CrossOriginUtil.getCorsOriginConfigForAnnotationMetadataProvider(withoutCrossOrigin));
+        assertNotNull(CrossOriginUtil.getCorsOriginConfigForAnnotationMetadataProvider(withCrossOrigin));
     }
 
     @Test

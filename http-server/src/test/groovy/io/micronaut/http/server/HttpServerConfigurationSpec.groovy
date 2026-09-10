@@ -126,4 +126,19 @@ class HttpServerConfigurationSpec extends Specification {
         cleanup:
         applicationContext.close()
     }
+
+    void corsFilterCanBeEnabledViaConfigurationAlthoughItIsEnabledByDefault() {
+        given:
+        ApplicationContext applicationContext = ApplicationContext.run([
+                'micronaut.server.cors.filter.enabled': StringUtils.TRUE
+        ])
+        HttpServerConfiguration httpServerConfiguration = applicationContext.getBean(HttpServerConfiguration)
+
+        expect:
+        httpServerConfiguration.cors.filter.enabled
+        applicationContext.containsBean(CorsFilter)
+
+        cleanup:
+        applicationContext.close()
+    }
 }

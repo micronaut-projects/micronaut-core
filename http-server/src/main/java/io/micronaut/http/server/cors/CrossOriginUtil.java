@@ -81,7 +81,7 @@ public final class CrossOriginUtil {
      * @return {@code true} if the origin is allowed
      * @since 5.2.0
      */
-    public static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
+    static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
         if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
             return true;
         }
@@ -99,7 +99,7 @@ public final class CrossOriginUtil {
      * @param requestOrigin the origin supplied by the request
      * @return {@code true} if the complete request origin matches the expression
      */
-    public static boolean matchesOrigin(String originRegex, String requestOrigin) {
+    static boolean matchesOrigin(String originRegex, String requestOrigin) {
         Pattern p = Pattern.compile(originRegex);
         Matcher m = p.matcher(requestOrigin);
         return m.matches();
@@ -111,7 +111,7 @@ public final class CrossOriginUtil {
      * @param values the configured values
      * @return {@code true} if the values allow any value
      */
-    public static boolean isAny(List<String> values) {
+    static boolean isAny(List<String> values) {
         return Objects.equals(values, CorsOriginConfiguration.ANY);
     }
 
@@ -121,7 +121,7 @@ public final class CrossOriginUtil {
      * @param allowedMethods the configured methods
      * @return {@code true} if every HTTP method is allowed
      */
-    public static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
+    static boolean isAnyMethod(List<HttpMethod> allowedMethods) {
         return Objects.equals(allowedMethods, CorsOriginConfiguration.ANY_METHOD);
     }
 
@@ -133,7 +133,7 @@ public final class CrossOriginUtil {
      * @return {@code true} if the method is allowed
      * @since 5.2.0
      */
-    public static boolean methodAllowed(CorsOriginConfiguration config,
+    static boolean methodAllowed(CorsOriginConfiguration config,
                                         HttpMethod methodToMatch) {
         List<HttpMethod> allowedMethods = config.getAllowedMethods();
         return isAnyMethod(allowedMethods) || allowedMethods.stream().anyMatch(method -> method.equals(methodToMatch));
@@ -146,7 +146,7 @@ public final class CrossOriginUtil {
      * @return the requested method for a preflight request, or the request method otherwise
      * @since 5.2.0
      */
-    public static HttpMethod methodToMatch(HttpRequest<?> request) {
+    static HttpMethod methodToMatch(HttpRequest<?> request) {
         HttpMethod requestMethod = request.getMethod();
         return CorsUtil.isPreflightRequest(request) ? request.getHeaders().getFirst(ACCESS_CONTROL_REQUEST_METHOD, CONVERSION_CONTEXT_HTTP_METHOD).orElse(requestMethod) : requestMethod;
     }
@@ -159,7 +159,7 @@ public final class CrossOriginUtil {
      * @return {@code true} if all requested headers are allowed
      * @since 5.2.0
      */
-    public static boolean hasAllowedHeaders(HttpRequest<?> request, CorsOriginConfiguration config) {
+    static boolean hasAllowedHeaders(HttpRequest<?> request, CorsOriginConfiguration config) {
         Optional<List<String>> accessControlHeaders = request.getHeaders().get(ACCESS_CONTROL_REQUEST_HEADERS, ConversionContext.LIST_OF_STRING);
         List<String> allowedHeaders = config.getAllowedHeaders();
         return isAny(allowedHeaders) || (
@@ -176,7 +176,7 @@ public final class CrossOriginUtil {
      * @return the requested method if it is allowed, or an empty optional otherwise
      * @since 5.2.0
      */
-    public static Optional<HttpMethod> validateMethodToMatch(HttpRequest<?> request,
+    static Optional<HttpMethod> validateMethodToMatch(HttpRequest<?> request,
                                                               CorsOriginConfiguration config) {
         HttpMethod methodToMatch = methodToMatch(request);
         if (!methodAllowed(config, methodToMatch)) {
@@ -198,7 +198,7 @@ public final class CrossOriginUtil {
      * @return {@code true} if the request method is allowed
      * @since 5.2.0
      */
-    public static boolean matchesMethod(HttpRequest<?> request,
+    static boolean matchesMethod(HttpRequest<?> request,
                                         CorsOriginConfiguration config) {
         return validateMethodToMatch(request, config).isPresent();
     }
@@ -212,33 +212,33 @@ public final class CrossOriginUtil {
      */
     public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForRequest(HttpRequest<?> request) {
         return RouteAttributes.getRouteMatch(request)
-            .flatMap(CrossOriginUtil::getCorsOriginConfigurationForAnnotationMetadataProvider);
+            .map(CrossOriginUtil::getCorsOriginConfigForAnnotationMetadataProvider)
+            .filter(Objects::nonNull);
     }
 
     /**
      * Resolves CORS configuration from an annotation metadata provider.
      *
      * @param annotationMetadataProvider the annotation metadata provider
-     * @return the CORS configuration declared by the provider, or an empty optional if it
-     * does not declare {@link CrossOrigin}
-     * @deprecated Use {@link CrossOriginUtil#getCorsOriginConfigForAnnotationMetadataProvider(AnnotationMetadataProvider)} instead.
-     * @since 5.2.0
+     * @return the CORS configuration declared by the provider, or {@code null} if it does not
+     * declare {@link CrossOrigin}
      */
-    @Deprecated(forRemoval = true, since = "5.3.0")
-    public static Optional<CorsOriginConfiguration> getCorsOriginConfigurationForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
-        return getCorsOriginConfiguration(annotationMetadataProvider.getAnnotationMetadata());
-    }
-
-    /**
-     * Resolves CORS configuration from an annotation metadata provider.
-     *
-     * @param annotationMetadataProvider the annotation metadata provider
-     * @return the CORS configuration declared by the provider, or an empty optional if it
-     * does not declare {@link CrossOrigin}
-     * @since 5.4.0
-     */
-    public static @Nullable CorsOriginConfiguration getCorsOriginConfigForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
+    static @Nullable CorsOriginConfiguration getCorsOriginConfigForAnnotationMetadataProvider(AnnotationMetadataProvider annotationMetadataProvider) {
         return getCorsOriginConfig(annotationMetadataProvider.getAnnotationMetadata());
+    }
+
+    /**
+     * Creates CORS configuration from {@link CrossOrigin} annotation metadata.
+     *
+     * @param annotationMetadata the route annotation metadata
+     * @return the resolved CORS configuration, or an empty optional if the metadata does not
+     * contain {@link CrossOrigin}
+     * @deprecated This class is an internal utility; resolving CORS configuration from
+     * annotation metadata is no longer part of the public API.
+     */
+    @Deprecated(forRemoval = true, since = "5.2.1")
+    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(AnnotationMetadata annotationMetadata) {
+        return Optional.ofNullable(getCorsOriginConfig(annotationMetadata));
     }
 
     /**
@@ -250,10 +250,10 @@ public final class CrossOriginUtil {
      * are considered.</p>
      *
      * @param annotationMetadata the route annotation metadata
-     * @return the resolved CORS configuration, or an empty optional if the metadata does not
+     * @return the resolved CORS configuration, or {@code null} if the metadata does not
      * contain {@link CrossOrigin}
      */
-    public static @Nullable CorsOriginConfiguration getCorsOriginConfig(AnnotationMetadata annotationMetadata) {
+    static @Nullable CorsOriginConfiguration getCorsOriginConfig(AnnotationMetadata annotationMetadata) {
         if (!annotationMetadata.hasAnnotation(CrossOrigin.class)) {
             return null;
         }
@@ -287,23 +287,5 @@ public final class CrossOriginUtil {
             .ifPresent(config::setMaxAge);
         return config;
 
-    }
-
-    /**
-     * Creates CORS configuration from {@link CrossOrigin} annotation metadata.
-     *
-     * <p>Empty annotation members are mapped to the defaults understood by the server: any
-     * origin, header, or method. If an origin regular expression is present, the wildcard
-     * origin default is not added, so only the expression and explicitly declared origins
-     * are considered.</p>
-     *
-     * @param annotationMetadata the route annotation metadata
-     * @return the resolved CORS configuration, or an empty optional if the metadata does not
-     * contain {@link CrossOrigin}
-     * @deprecated Use {@link CrossOriginUtil#getCorsOriginConfig(AnnotationMetadata)} instead.
-     */
-    @Deprecated(forRemoval = true, since = "5.3.0")
-    public static Optional<CorsOriginConfiguration> getCorsOriginConfiguration(AnnotationMetadata annotationMetadata) {
-        return Optional.ofNullable(getCorsOriginConfig(annotationMetadata));
     }
 }
