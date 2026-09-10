@@ -18,7 +18,9 @@ package io.micronaut.http.server.netty;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.netty.NettyHttpResponseBuilder;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -30,8 +32,6 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
-
-import java.net.URI;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
@@ -55,9 +55,13 @@ record HttpToHttpsRedirectHandler(
     public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
 
-        UriBuilder uriBuilder = UriBuilder.of(hostResolver.resolve(strippedRequest));
+        // read everything that is needed off the request before releasing it
+        String host = hostResolver.resolve(strippedRequest);
+        String path = strippedRequest.getPath();
         String rawQuery = strippedRequest.getUri().getRawQuery();
         strippedRequest.release();
+
+        UriBuilder uriBuilder = UriBuilder.of(host);
         uriBuilder.scheme("https");
         int port = sslConfiguration.getPort();
         if (port == 443) {
@@ -65,17 +69,19 @@ record HttpToHttpsRedirectHandler(
         } else {
             uriBuilder.port(port);
         }
-        uriBuilder.path(strippedRequest.getPath());
+        uriBuilder.path(path);
 
-        URI location = uriBuilder.build();
+        StringBuilder location = new StringBuilder(uriBuilder.build().toASCIIString());
+        // UriBuilder only models decoded query parameters, so the query string is carried over verbatim
+        // and the header value is assembled directly rather than round-tripped through URI again.
         if (StringUtils.isNotEmpty(rawQuery)) {
-            // UriBuilder only models decoded query parameters, so append the original query string verbatim
-            location = URI.create(location.toASCIIString() + "?" + rawQuery);
+            location.append('?').append(rawQuery);
         }
 
         outboundAccess.closeAfterWrite();
         outboundAccess.write(
-            NettyHttpResponseBuilder.toHttpResponse(HttpResponse.permanentRedirect(location)),
+            NettyHttpResponseBuilder.toHttpResponse(
+                HttpResponse.status(HttpStatus.PERMANENT_REDIRECT).header(HttpHeaders.LOCATION, location.toString())),
                 NettyByteBodyFactory.empty()
         );
     }
