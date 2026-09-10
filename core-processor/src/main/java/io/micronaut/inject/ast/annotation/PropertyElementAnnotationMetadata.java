@@ -103,8 +103,9 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
                     }
                 }
             } else {
-                writeElements.add(field);
-                readElements.add(field);
+                MutableAnnotationMetadataDelegate<?> fieldAnnotationMetadata = propertyFieldAnnotationMetadata(field);
+                writeElements.add(fieldAnnotationMetadata);
+                readElements.add(fieldAnnotationMetadata);
                 MutableAnnotationMetadataDelegate<?> typeAnnotationMetadata = field.getType().getTypeAnnotationMetadata();
                 if (!typeAnnotationMetadata.isEmpty()) {
                     writeElements.add(typeAnnotationMetadata);
@@ -132,6 +133,23 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
         this.propertyWriteAnnotationMetadata =
             writeHierarchy.length == 1 ? writeHierarchy[0] : new AnnotationMetadataHierarchy(true, writeHierarchy);
         this.writeElements = writeElements;
+    }
+
+    /**
+     * The annotation metadata of the field as a component of the property. A property is resolved for the type it is
+     * read through, so annotating it annotates the field for that type only, not for the other types the field is
+     * inherited by.
+     *
+     * @param field The field
+     * @return The annotation metadata to read and write
+     */
+    private static MutableAnnotationMetadataDelegate<?> propertyFieldAnnotationMetadata(FieldElement field) {
+        if (field instanceof AbstractAnnotationElement element
+            && element.presetAnnotationMetadata == null
+            && element.getElementAnnotationMetadataFactory() instanceof AbstractElementAnnotationMetadataFactory<?, ?> factory) {
+            return factory.buildForPropertyField(field);
+        }
+        return field;
     }
 
     @Override

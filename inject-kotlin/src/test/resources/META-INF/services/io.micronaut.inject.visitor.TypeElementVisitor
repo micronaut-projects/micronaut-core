@@ -14,3 +14,5 @@ io.micronaut.kotlin.processing.annotations.AddsUnseenRepeatableAnnotationSpec$Ad
 io.micronaut.kotlin.processing.aop.introduction.MyRepo3Spec$MyRepositoryVisitor
 io.micronaut.kotlin.processing.aop.introduction.MyIsEnumInTypeArgumentSpec$MyControllerVisitor
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$InheritedVisitor
+io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsVisitor
+io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsRecordingVisitor
