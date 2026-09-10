@@ -139,11 +139,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     public void writeTo(Argument<T> type, @Nullable MediaType mediaType, T object, MutableHeaders outgoingHeaders, OutputStream outputStream) throws CodecException {
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
-            if (type.getType() == Object.class && object instanceof CharSequence charSequence) {
-                outputStream.write(charSequence.toString().getBytes(MessageBodyWriter.findCharset(mediaType, outgoingHeaders).orElse(StandardCharsets.UTF_8)));
-                return;
-            }
-            jsonMapper.writeValue(outputStream, type, object);
+            writeValue(type, mediaType, outgoingHeaders, object, outputStream);
         } catch (IOException e) {
             throw decorateWrite(object, e);
         }
@@ -152,9 +148,22 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     @Override
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         try {
-            return bodyFactory.buffer(s -> jsonMapper.writeValue(s, object));
+            return bodyFactory.buffer(s -> writeValue(type, mediaType, response.getHeaders(), object, s));
         } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+            throw decorateWrite(object, e);
+        }
+    }
+
+    /**
+     * Write a single value, either through unchanged if it is an already serialized JSON document,
+     * or using the {@link JsonMapper} with the declared type.
+     */
+    private void writeValue(Argument<T> type, @Nullable MediaType mediaType, Headers headers, T object, OutputStream outputStream) throws IOException {
+        if (type.getType() == Object.class && object instanceof CharSequence charSequence) {
+            // the value is already a JSON document, write it through unchanged
+            outputStream.write(charSequence.toString().getBytes(MessageBodyWriter.findCharset(mediaType, headers).orElse(StandardCharsets.UTF_8)));
+        } else {
+            jsonMapper.writeValue(outputStream, type, object);
         }
     }
 
