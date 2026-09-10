@@ -8,18 +8,22 @@ import javax.tools.JavaCompiler;
 import javax.tools.JavaFileObject;
 import javax.tools.StandardJavaFileManager;
 import javax.tools.ToolProvider;
+import java.io.File;
 import java.lang.reflect.Proxy;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Predicate;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -55,6 +59,91 @@ class DefaultBeanIntrospectorTest {
             } else {
                 System.setProperty(CONTEXT_CLASSLOADER_PROPERTY, previousProperty);
             }
+        }
+    }
+
+    @Test
+    void beanClassLoaderWithItsOwnCoreIsALookupMiss() throws Exception {
+        // the Fn testing harness runs Micronaut in its own class loader while the test types come from the application
+        // class loader, whose introspections implement a BeanIntrospectionReference that is not the one of the introspector
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        String previousProperty = System.getProperty(CONTEXT_CLASSLOADER_PROPERTY);
+        try (URLClassLoader isolatedCoreClassLoader = isolatedCoreClassLoader();
+             URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            System.clearProperty(CONTEXT_CLASSLOADER_PROPERTY);
+            Class<?> isolatedIntrospector = isolatedCoreClassLoader.loadClass(BeanIntrospector.class.getName());
+            assertNotEquals(BeanIntrospector.class, isolatedIntrospector);
+            Object shared = isolatedIntrospector.getField("SHARED").get(null);
+
+            Class<?> beanType = childClassLoader.loadClass("example.ChildBean");
+            Optional<?> introspection = (Optional<?>) isolatedIntrospector.getMethod("findIntrospection", Class.class).invoke(shared, beanType);
+
+            assertTrue(introspection.isEmpty());
+        } finally {
+            restoreProperty(previousProperty);
+        }
+    }
+
+    @Test
+    void contextClassLoaderWithItsOwnCoreIsIgnored() throws Exception {
+        Path classesDir = tempDir.resolve("classes");
+        compileChildLoaderIntrospection(classesDir);
+        writeMicronautServiceEntry(classesDir);
+
+        Thread thread = Thread.currentThread();
+        ClassLoader previousContextClassLoader = thread.getContextClassLoader();
+        String previousProperty = System.getProperty(CONTEXT_CLASSLOADER_PROPERTY);
+        try (URLClassLoader isolatedCoreClassLoader = isolatedCoreClassLoader();
+             URLClassLoader childClassLoader = new URLClassLoader(new URL[] { classesDir.toUri().toURL() }, getClass().getClassLoader())) {
+            System.setProperty(CONTEXT_CLASSLOADER_PROPERTY, "true");
+            thread.setContextClassLoader(childClassLoader);
+            Class<?> isolatedIntrospector = isolatedCoreClassLoader.loadClass(BeanIntrospector.class.getName());
+            Object shared = isolatedIntrospector.getField("SHARED").get(null);
+
+            Class<?> beanType = childClassLoader.loadClass("example.ChildBean");
+            Optional<?> introspection = (Optional<?>) isolatedIntrospector.getMethod("findIntrospection", Class.class).invoke(shared, beanType);
+            Collection<?> introspectedTypes = (Collection<?>) isolatedIntrospector.getMethod("findIntrospectedTypes", Predicate.class)
+                .invoke(shared, (Predicate<Object>) ref -> true);
+
+            assertTrue(introspection.isEmpty());
+            assertFalse(introspectedTypes.contains(beanType));
+        } finally {
+            thread.setContextClassLoader(previousContextClassLoader);
+            restoreProperty(previousProperty);
+        }
+    }
+
+    /**
+     * A class loader that loads Micronaut core again, from the test class path, apart from the class loader of this test.
+     * Its {@link BeanIntrospector} is initialized with the class loader as the context class loader, since the static
+     * optimizations it initializes are service loaded through the context class loader.
+     */
+    private static URLClassLoader isolatedCoreClassLoader() throws Exception {
+        String[] entries = System.getProperty("java.class.path").split(File.pathSeparator);
+        URL[] urls = new URL[entries.length];
+        for (int i = 0; i < entries.length; i++) {
+            urls[i] = Path.of(entries[i]).toUri().toURL();
+        }
+        URLClassLoader classLoader = new URLClassLoader(urls, ClassLoader.getPlatformClassLoader());
+        Thread thread = Thread.currentThread();
+        ClassLoader previousContextClassLoader = thread.getContextClassLoader();
+        try {
+            thread.setContextClassLoader(classLoader);
+            Class.forName(BeanIntrospector.class.getName(), true, classLoader);
+        } finally {
+            thread.setContextClassLoader(previousContextClassLoader);
+        }
+        return classLoader;
+    }
+
+    private static void restoreProperty(String previousProperty) {
+        if (previousProperty == null) {
+            System.clearProperty(CONTEXT_CLASSLOADER_PROPERTY);
+        } else {
+            System.setProperty(CONTEXT_CLASSLOADER_PROPERTY, previousProperty);
         }
     }
 
