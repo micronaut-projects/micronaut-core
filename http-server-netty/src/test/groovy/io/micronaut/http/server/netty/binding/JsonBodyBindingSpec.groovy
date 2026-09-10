@@ -265,6 +265,20 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         response.body() == "[Foo(Fred, 10)]".toString()
     }
 
+    void "test truncated json array with publisher argument"() {
+        when:
+        Flux.from(httpClient.exchange(
+                HttpRequest.POST('/json/publisher-object', json), String
+        )).blockFirst()
+
+        then: "the request is rejected instead of completing as an empty stream"
+        def e = thrown(HttpClientResponseException)
+        e.response.status == HttpStatus.INTERNAL_SERVER_ERROR
+
+        where:
+        json << ['[', '[ ']
+    }
+
     void "test singe argument handling"() {
         when:
         String json = '{"message":"foo"}'

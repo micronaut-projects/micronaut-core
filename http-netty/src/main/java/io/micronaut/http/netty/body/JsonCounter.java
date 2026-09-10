@@ -59,7 +59,7 @@ public final class JsonCounter {
      *
      * @see #unwrapTopLevelArray()
      */
-    private boolean allowUnwrappingArrayComma;
+    private boolean expectUnwrappingArrayComma;
 
     /**
      * The region of the last complete top-level JSON node we have visited. Polled by the user.
@@ -100,6 +100,18 @@ public final class JsonCounter {
         }
         if (isBuffering()) {
             proceedUntilNonBuffering(buf);
+        }
+    }
+
+    /**
+     * Signal that the input has ended. A top-level array that is being
+     * {@link #unwrapTopLevelArray() unwrapped} must have been closed at this point.
+     *
+     * @throws JsonSyntaxException If the input ended inside the top-level array
+     */
+    public void noMoreInput() throws JsonSyntaxException {
+        if (unwrappingArray && state != State.AFTER_UNWRAP_ARRAY) {
+            throw new JsonSyntaxException("Unexpected end of input inside the top-level array");
         }
     }
 
@@ -219,12 +231,21 @@ public final class JsonCounter {
                 throw new JsonSyntaxException("UTF-8 BOM not allowed");
             }
 
-            // if we are unwrapping a top-level array, search for a comma
-            if (allowUnwrappingArrayComma) {
+            // if we are unwrapping a top-level array, the elements must be separated by commas
+            if (unwrappingArray) {
                 i = skipWs(buf, i, end);
-                if (i < end && buf.getByte(i) == ',') {
-                    allowUnwrappingArrayComma = false;
-                    i++;
+                if (i < end) {
+                    byte b = buf.getByte(i);
+                    if (expectUnwrappingArrayComma) {
+                        if (b == ',') {
+                            expectUnwrappingArrayComma = false;
+                            i++;
+                        } else if (b != ']') {
+                            failMissingComma();
+                        }
+                    } else if (b == ',') {
+                        failUnexpectedComma();
+                    }
                 }
             }
             i = skipWs(buf, i, end);
@@ -266,6 +287,7 @@ public final class JsonCounter {
             case ']' -> {
                 if (unwrappingArray) {
                     state = State.AFTER_UNWRAP_ARRAY;
+                    expectUnwrappingArrayComma = false;
                 } else {
                     failMismatchedBrackets();
                 }
@@ -311,7 +333,7 @@ public final class JsonCounter {
             position--;
             flushAfter();
             position++;
-            allowUnwrappingArrayComma = unwrappingArray;
+            expectUnwrappingArrayComma = unwrappingArray;
             state = State.BASE;
         } else if (unwrappingArray && (b == ',' || b == ']')) {
             position--;
@@ -322,7 +344,7 @@ public final class JsonCounter {
             } else {
                 state = State.AFTER_UNWRAP_ARRAY;
             }
-            allowUnwrappingArrayComma = false;
+            expectUnwrappingArrayComma = false;
         } else {
             failMissingWs();
         }
@@ -397,7 +419,7 @@ public final class JsonCounter {
         assert position >= bufferStart;
         lastFlushedRegion = new BufferRegion(bufferStart, position + 1);
         bufferStart = -1;
-        allowUnwrappingArrayComma = unwrappingArray;
+        expectUnwrappingArrayComma = unwrappingArray;
     }
 
     /**
@@ -450,6 +472,14 @@ public final class JsonCounter {
 
     private static void failMismatchedBrackets() throws JsonSyntaxException {
         throw new JsonSyntaxException("JSON has mismatched brackets");
+    }
+
+    private static void failMissingComma() throws JsonSyntaxException {
+        throw new JsonSyntaxException("Expected a comma between the elements of the top-level array");
+    }
+
+    private static void failUnexpectedComma() throws JsonSyntaxException {
+        throw new JsonSyntaxException("Expected an element of the top-level array, not a comma");
     }
 
     private static void failMissingWs() throws JsonSyntaxException {

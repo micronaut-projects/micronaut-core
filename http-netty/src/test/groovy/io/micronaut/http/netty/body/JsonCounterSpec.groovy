@@ -69,6 +69,46 @@ class JsonCounterSpec extends Specification {
             def start = (int) (counter.bufferStart() - bias)
             parts.add(ByteBufUtil.getBytes(buf.slice(start, buf.writerIndex() - start)))
         }
+        counter.noMoreInput()
+        return parts
+    }
+
+    /**
+     * Same as {@link #splitUtf8}, but feeds the input in {@code chunkSize} byte chunks, the way
+     * {@code JsonChunkedProcessor} does for a chunked request body.
+     */
+    static List<byte[]> splitUtf8Chunked(byte[] s, boolean unwrapTopLevelArray = false, int chunkSize = 1) {
+        def parts = []
+        def counter = new JsonCounter()
+        if (unwrapTopLevelArray) {
+            counter.unwrapTopLevelArray()
+        }
+        def pending = new ByteArrayOutputStream()
+        for (int offset = 0; offset < s.length; offset += chunkSize) {
+            def buf = Unpooled.wrappedBuffer(Arrays.copyOfRange(s, offset, (int) Math.min(offset + chunkSize, s.length)))
+            def initialPosition = counter.position()
+            def bias = initialPosition - buf.readerIndex()
+            while (buf.isReadable()) {
+                counter.feed(buf)
+                def flushedRegion = counter.pollFlushedRegion()
+                if (flushedRegion != null) {
+                    def start = Math.max(initialPosition, flushedRegion.start())
+                    def bytes = ByteBufUtil.getBytes(buf.slice((int) (start - bias), (int) (flushedRegion.end() - start)))
+                    pending.write(bytes, 0, bytes.length)
+                    parts.add(pending.toByteArray())
+                    pending.reset()
+                }
+            }
+            if (counter.isBuffering()) {
+                def start = (int) (Math.max(initialPosition, counter.bufferStart()) - bias)
+                def bytes = ByteBufUtil.getBytes(buf.slice(start, buf.writerIndex() - start))
+                pending.write(bytes, 0, bytes.length)
+            }
+        }
+        counter.noMoreInput()
+        if (pending.size() > 0) {
+            parts.add(pending.toByteArray())
+        }
         return parts
     }
 
@@ -127,6 +167,12 @@ class JsonCounterSpec extends Specification {
         then:
         partsWithoutOptional.collectMany { toTokens(it) } == fullTokens
 
+        when: "the input is fed one byte at a time"
+        def chunkedParts = splitUtf8Chunked(stream.getBytes(StandardCharsets.UTF_8), true)
+                .collect { new String(it, StandardCharsets.UTF_8) }
+        then:
+        chunkedParts == expectedParts
+
         where:
         stream          | expectedParts
         '{}'            | ['{}']
@@ -183,12 +229,28 @@ class JsonCounterSpec extends Specification {
         splitUtf8(input, true, true)
         then:
         thrown JsonSyntaxException
+        when: "the input is fed one byte at a time"
+        splitUtf8Chunked(input, true)
+        then:
+        thrown JsonSyntaxException
 
         where:
         input << [
                 '[] 42',
                 '[{}] "foo"',
                 '[{}] true',
+                // missing element separator
+                '[1 2]',
+                '[{}{}]',
+                '["foo""bar"]',
+                // stray element separator
+                '[1,,2]',
+                '[,1]',
+                // unterminated array
+                '[',
+                '[1,2',
+                '[{}',
+                '[{"foo":',
         ]
     }
 }
