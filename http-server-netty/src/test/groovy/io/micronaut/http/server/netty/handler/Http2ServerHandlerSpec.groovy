@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
@@ -565,9 +566,10 @@ class Http2ServerHandlerSpec extends Specification {
         EmbeddedTestUtil.advance(client, server)
 
         where:
-        exception                             | expectedCode
-        new Exception()                       | Http2Error.INTERNAL_ERROR
-        new Http2Exception(Http2Error.CANCEL) | Http2Error.CANCEL
+        exception                              | expectedCode
+        new Exception()                        | Http2Error.INTERNAL_ERROR
+        new Http2Exception(Http2Error.CANCEL)  | Http2Error.CANCEL
+        ByteBody.BodyDiscardedException.create() | Http2Error.CANCEL
     }
 
     def "closeIfNoSubscriber"() {
@@ -616,7 +618,53 @@ class Http2ServerHandlerSpec extends Specification {
         AsciiString.contentEquals(response.headers().status(), HttpResponseStatus.OK.codeAsText())
         Http2ResetFrame rst = client.readInbound()
         rst.stream() == stream1
-        rst.errorCode() == Http2Error.CANCEL.code()
+        // the response was delivered in full, so this is not a failure for the client
+        rst.errorCode() == Http2Error.NO_ERROR.code()
+
+        cleanup:
+        data1.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    def "complete response before request body is finished resets with NO_ERROR"() {
+        given: "a handler that answers without reading the request body"
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.UNAUTHORIZED), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when: "the client starts an upload that it has not finished"
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.POST.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, false).stream(stream1))
+        def data1 = randomData(500)
+        client.writeOutbound(new DefaultHttp2DataFrame(data1.retainedSlice(), false).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+
+        then: "the complete response is followed by a reset that does not signal an error"
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        Http2HeadersFrame response = client.readInbound()
+        AsciiString.contentEquals(response.headers().status(), HttpResponseStatus.UNAUTHORIZED.codeAsText())
+        Http2ResetFrame rst = client.readInbound()
+        rst.stream() == stream1
+        rst.errorCode() == Http2Error.NO_ERROR.code()
 
         cleanup:
         data1.release()

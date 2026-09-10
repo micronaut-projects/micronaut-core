@@ -402,7 +402,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         void closeInput() {
             closeInput = true;
             if (stream.state() == io.netty.handler.codec.http2.Http2Stream.State.HALF_CLOSED_LOCAL) {
-                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.CANCEL.code(), requiredCtx().voidPromise());
+                // We have sent a complete response, but the peer is still sending the request body.
+                // RFC 9113 §8.1 allows us to stop reading it, but the response was delivered in
+                // full, so this is not an error: NO_ERROR keeps clients from reporting the request
+                // as failed. Genuine cancellation is signalled with CANCEL in reset(Throwable).
+                requiredConnectionHandler().encoder().writeRstStream(requiredCtx(), stream.id(), Http2Error.NO_ERROR.code(), requiredCtx().voidPromise());
                 flush();
             }
         }
