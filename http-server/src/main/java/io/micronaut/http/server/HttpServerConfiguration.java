@@ -1097,7 +1097,9 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
             }
 
             /**
-             * Sets whether the CORS server filter is enabled.
+             * Sets whether the CORS server filter is enabled. Default value {@value #DEFAULT_ENABLED}.
+             * Setting this to false disables all server-side CORS processing, including rules
+             * declared with the CrossOrigin annotation.
              *
              * @param enabled {@code true} to enable the CORS server filter
              */
