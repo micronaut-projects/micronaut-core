@@ -19,6 +19,7 @@ import io.netty.util.concurrent.ThreadPerTaskExecutor
 import jakarta.inject.Inject
 import spock.lang.IgnoreIf
 import spock.lang.Specification
+import spock.util.concurrent.PollingConditions
 
 import java.net.http.HttpRequest
 import java.net.http.HttpResponse
@@ -112,7 +113,12 @@ class LoomCarrierSpec extends Specification {
         client.retrieve("/loom-carrier/capture-scheduler")
         EventLoopVirtualThreadScheduler scheduler = MyCtrl.capturedScheduler
         assert scheduler != null
+        Thread carrier = MyCtrl.capturedCarrier
+        // the loop has a single thread, so this is the carrier of the whole loop
+        assert carrier != null
+        assert carrier.name.matches("default-nioEventLoopGroup-\\d+-1")
 
+        def conditions = new PollingConditions(timeout: 30, delay: 0.005)
         def lock = new ReentrantLock()
         def held = new CountDownLatch(1)
         def release = new CountDownLatch(1)
@@ -127,18 +133,19 @@ class LoomCarrierSpec extends Specification {
 
         when: "the io thread of the loop parks on a lock, so its carrier waits outside of the io operation"
         holder.start()
-        held.await(10, TimeUnit.SECONDS)
+        assert held.await(10, TimeUnit.SECONDS)
         scheduler.eventLoop().execute({
             lock.lock()
             lock.unlock()
             ioResumed.countDown()
         })
-        long deadline = System.currentTimeMillis() + 10_000
-        while (!lock.hasQueuedThreads() && System.currentTimeMillis() < deadline) {
-            Thread.sleep(10)
+        // the io thread queues on the lock, unmounts, and the carrier then finishes the loop
+        // iteration and parks in LockSupport.park() - WAITING is the state it settles in and
+        // stays in until something wakes it
+        conditions.eventually {
+            assert lock.hasQueuedThreads()
+            assert carrier.state == Thread.State.WAITING
         }
-        // let the carrier finish the loop iteration and settle
-        Thread.sleep(500)
 
         and: "a continuation is submitted from a thread that is not part of the loop"
         Thread submitter = new Thread({
@@ -157,6 +164,7 @@ class LoomCarrierSpec extends Specification {
         holder.join(10_000)
         submitter.join(10_000)
         MyCtrl.capturedScheduler = null
+        MyCtrl.capturedCarrier = null
         ctx.close()
     }
 
@@ -165,6 +173,7 @@ class LoomCarrierSpec extends Specification {
     static class MyCtrl {
 
         static volatile EventLoopVirtualThreadScheduler capturedScheduler
+        static volatile Thread capturedCarrier
 
         @Inject
         EmbeddedServer embeddedServer
@@ -189,6 +198,7 @@ class LoomCarrierSpec extends Specification {
         @Get("/capture-scheduler")
         String captureScheduler() {
             capturedScheduler = EventLoopVirtualThreadScheduler.current()
+            capturedCarrier = PrivateLoomSupport.getCarrierThread(Thread.currentThread())
             return "ok"
         }
 

@@ -51,6 +51,13 @@ class Http2AccessLogConnectionEncoderSpec extends Specification {
         promise.isDone()
         !promise.isSuccess()
         data.refCnt() == 0
+
+        cleanup:
+        // the success path releases the buffer, but a regression that throws out of writeData
+        // would leave it behind
+        if (data.refCnt() > 0) {
+            data.release(data.refCnt())
+        }
     }
 
     void "writeHeaders for a stream that is not in the connection fails the promise"() {
