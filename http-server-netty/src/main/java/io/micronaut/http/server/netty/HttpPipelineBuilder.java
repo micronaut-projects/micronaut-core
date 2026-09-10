@@ -756,7 +756,8 @@ final class HttpPipelineBuilder {
             }
 
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
-            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
+            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(
+                requestHandler, channel instanceof QuicStreamChannel);
             pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());

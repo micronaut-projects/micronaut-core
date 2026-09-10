@@ -144,7 +144,7 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
     }
 
-    def 'transient writability does not resume streaming responses'() {
+    def 'writability handling is protocol-specific'() {
         given:
         int emitted = 0
         boolean blockWrites = true
@@ -171,7 +171,7 @@ class PipeliningServerHandlerSpec extends Specification {
             void handleUnboundError(Throwable cause) {
                 throw cause
             }
-        }))
+        }, quic))
         def outboundBuffer = ch.unsafe().outboundBuffer()
 
         when:
@@ -189,10 +189,15 @@ class PipeliningServerHandlerSpec extends Specification {
         outboundBuffer.setUserDefinedWritability(1, true)
         ch.pipeline().fireChannelWritabilityChanged()
         outboundBuffer.setUserDefinedWritability(1, false)
+
+        then:
+        emitted == (quic ? initiallyEmitted : 4)
+
+        when:
         ch.runPendingTasks()
 
         then:
-        emitted == initiallyEmitted
+        emitted == (quic ? initiallyEmitted : 4)
 
         when:
         outboundBuffer.setUserDefinedWritability(1, true)
@@ -203,6 +208,9 @@ class PipeliningServerHandlerSpec extends Specification {
 
         cleanup:
         ch.finishAndReleaseAll()
+
+        where:
+        quic << [false, true]
     }
 
     def 'requests that come in a single packet are accumulated'() {
