@@ -986,6 +986,49 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.checkException()
     }
 
+    def 'responseWritten called once when a streaming response fails after some data'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def sink = Sinks.many().unicast().<ByteBuf> onBackpressureBuffer()
+        def cleaned = 0
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                outboundAccess.write(resp, new NettyByteBodyFactory(ctx.channel()).adaptNetty(sink.asFlux()))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
+        def c1 = Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)
+        sink.emitNext(c1, Sinks.EmitFailureHandler.FAIL_FAST)
+        then:
+        ch.checkException()
+        ch.readOutbound() == resp
+        ch.readOutbound() == new DefaultHttpContent(c1)
+        cleaned == 0
+
+        when:
+        sink.emitError(new RuntimeException("stream failed"), Sinks.EmitFailureHandler.FAIL_FAST)
+        ch.runPendingTasks()
+        ch.finishAndReleaseAll()
+        then:
+        ch.checkException()
+        cleaned == 1
+    }
+
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
         int flush = 0
         int read = 0

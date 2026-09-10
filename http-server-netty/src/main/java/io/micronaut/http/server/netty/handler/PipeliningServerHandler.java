@@ -1094,8 +1094,26 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         Compressor. @Nullable Session compressionSession;
 
+        /**
+         * {@code true} iff {@link RequestHandler#responseWritten} has been called for this
+         * response already.
+         */
+        private boolean responseWritten = false;
+
         private OutboundHandler(OutboundAccessImpl outboundAccess) {
             this.outboundAccess = outboundAccess;
+        }
+
+        /**
+         * Signal to the {@link RequestHandler} that this response is done, so that it can clean up
+         * the request. This is idempotent: the request handler sees exactly one call per response,
+         * no matter how many times this method is called.
+         */
+        final void markResponseWritten() {
+            if (!responseWritten) {
+                responseWritten = true;
+                requestHandler.responseWritten(outboundAccess.attachment);
+            }
         }
 
         private boolean shouldCloseAfterContent(boolean last) {
@@ -1231,7 +1249,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void writeSome() {
             writeCompressing(message, true, true);
             outboundHandler = null;
-            requestHandler.responseWritten(outboundAccess.attachment);
+            markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
 
@@ -1240,7 +1258,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             super.discardOutbound();
             outboundHandler = null;
             // pretend we wrote to clean up resources
-            requestHandler.responseWritten(outboundAccess.attachment);
+            markResponseWritten();
             message.release();
         }
     }
@@ -1255,6 +1273,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         private HttpResponse initialMessage;
         private BufferConsumer. @Nullable Upstream upstream;
         private boolean earlyComplete = false;
+        /**
+         * Error that arrived before this handler became the current outbound handler. It is
+         * handled when this response is up for writing.
+         */
+        @Nullable
+        private Throwable earlyError = null;
         private boolean writtenLast = false;
         private long incompleteWrittenBytes = 0;
 
@@ -1270,6 +1294,14 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Override
         void writeSome() {
             assert upstream != null;
+            if (earlyError != null) {
+                // the response failed before it was up for writing. Handle the error now that we
+                // are the current outbound handler.
+                Throwable t = earlyError;
+                earlyError = null;
+                error0(t);
+                return;
+            }
             if (initialMessage != null) {
                 write(initialMessage, false, false, false);
                 initialMessage = null;
@@ -1325,14 +1357,28 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private void error0(Throwable t) {
             assert ctx != null;
-            if (!removed) {
-                if (LOG.isWarnEnabled()) {
-                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
-                }
-                requiredCtx().close();
-
-                requestHandler.responseWritten(outboundAccess.attachment);
+            if (removed) {
+                return;
             }
+            if (outboundHandler != this) {
+                // this response is still queued behind another one. Deal with the error when it is
+                // up for writing, so that we do not cut off the response that is currently being
+                // written.
+                earlyError = t;
+                return;
+            }
+            if (LOG.isWarnEnabled()) {
+                if (initialMessage == null) {
+                    LOG.warn("Reactive response received an error after some data has already been written. This error cannot be forwarded to the client.", t);
+                } else {
+                    LOG.warn("Reactive response received an error before the response was written. This error cannot be forwarded to the client.", t);
+                }
+            }
+            // clear the handler and clean up the request before closing, so that the cleanup does
+            // not happen a second time when the pipeline is torn down.
+            outboundHandler = null;
+            markResponseWritten();
+            requiredCtx().close();
         }
 
         @Override
@@ -1360,7 +1406,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     writeCompressing(LastHttpContent.EMPTY_LAST_CONTENT, true, true);
                     writtenLast = true;
                 }
-                requestHandler.responseWritten(outboundAccess.attachment);
+                markResponseWritten();
                 PipeliningServerHandler.this.writeSome();
             }
         }
@@ -1369,11 +1415,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         void discardOutbound() {
             super.discardOutbound();
             // this is safe because:
-            // - onComplete/onError cannot have been called yet, because otherwise outboundHandler
-            //   would be null and discard couldn't have been called
             // - while cancel() may trigger onComplete/onError, `removed` is true at this point, so
             //   they won't call responseWritten in turn
-            requestHandler.responseWritten(outboundAccess.attachment);
+            // - markResponseWritten only forwards the first call, so a response that already
+            //   reported an error is not cleaned up twice
+            markResponseWritten();
             Objects.requireNonNull(upstream).allowDiscard();
             outboundHandler = null;
         }
