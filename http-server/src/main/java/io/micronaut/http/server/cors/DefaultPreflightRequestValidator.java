@@ -44,7 +44,7 @@ import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_REQUEST_PRIVATE_NETWO
  */
 @Singleton
 @Internal
-class DefaultPreflightRequestValidator implements PreflightRequestValidator {
+final class DefaultPreflightRequestValidator implements PreflightRequestValidator {
     private final @Nullable StaticResourceResolver staticResourceResolver;
     private final Router router;
 

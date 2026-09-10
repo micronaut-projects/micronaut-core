@@ -53,7 +53,7 @@ import static io.micronaut.http.server.cors.CrossOriginUtil.CONVERSION_CONTEXT_H
  */
 @Singleton
 @Internal
-class DefaultCorsResponseDecorator implements CorsResponseDecorator {
+final class DefaultCorsResponseDecorator implements CorsResponseDecorator {
     private final HttpServerConfiguration.CorsConfiguration corsConfiguration;
 
     /**
