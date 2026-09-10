@@ -433,6 +433,78 @@ class GracefulShutdownSpec extends Specification {
         server.close()
     }
 
+    def "h2c prior knowledge"() {
+        given:
+        def server = ApplicationContext.<EmbeddedServer> run(EmbeddedServer, [
+                'spec.name'                    : 'GracefulShutdownSpec',
+                'micronaut.server.ssl.enabled' : false,
+                'micronaut.server.http-version': '2.0'
+        ])
+        def gracefulShutdown = server.applicationContext.getBean(GracefulShutdownManager)
+
+        def loop = new NioEventLoopGroup(1)
+        BlockingQueue<Object> inbound = new LinkedBlockingQueue<>()
+        def duplexHandler = new Http2ChannelDuplexHandler() {
+            @Override
+            void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
+                inbound.add(msg)
+            }
+        }
+        def ch = new Bootstrap()
+                .group(loop)
+                .channel(NioSocketChannel)
+                .handler(new ChannelInitializer<Channel>() {
+                    @Override
+                    protected void initChannel(@NonNull Channel c) throws Exception {
+                        // no h2c upgrade: this client speaks HTTP/2 from the first byte
+                        c.pipeline().addLast(Http2FrameCodecBuilder.forClient().build(), duplexHandler)
+                    }
+                })
+                .connect(server.host, server.port).sync().channel()
+
+        def sink = Sinks.<String> one()
+        server.applicationContext.getBean(MyCtrl).publisher = sink.asMono()
+
+        expect:
+        inbound.take() instanceof Http2SettingsFrame
+        inbound.take() instanceof Http2SettingsAckFrame
+
+        when: "the server shuts down while a request is still in flight"
+        def stream1 = duplexHandler.newStream()
+        ch.writeAndFlush(new DefaultHttp2HeadersFrame(new DefaultHttp2Headers()
+                .path("/graceful-shutdown/single")
+                .method("GET")
+                .authority("localhost")
+                .scheme("http"), true
+        ).stream(stream1), ch.newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE))
+        TimeUnit.SECONDS.sleep(1)
+        def shFuture = gracefulShutdown.shutdownGracefully().toCompletableFuture()
+
+        then: "the client gets a GOAWAY and the connection stays up for the in-flight request"
+        def goAwayMsg = inbound.poll(10, TimeUnit.SECONDS)
+        goAwayMsg instanceof Http2GoAwayFrame
+        Http2GoAwayFrame goAway = (Http2GoAwayFrame) goAwayMsg
+        goAway.errorCode() == Http2Error.NO_ERROR.code()
+        goAway.lastStreamId() == stream1.id()
+        !shFuture.isDone()
+
+        when: "the in-flight request completes"
+        sink.tryEmitValue("foo")
+
+        then:
+        Http2HeadersFrame resp = inbound.take()
+        !resp.isEndStream()
+        resp.headers().status().toString() == "200"
+        Http2DataFrame data = inbound.take()
+        data.isEndStream()
+
+        cleanup:
+        data?.release()
+        goAway?.release()
+        loop.shutdownGracefully()
+        server.close()
+    }
+
     def "http3"() {
         given:
         def server = ApplicationContext.<EmbeddedServer> run(EmbeddedServer, [

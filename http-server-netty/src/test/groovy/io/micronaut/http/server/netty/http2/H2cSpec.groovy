@@ -19,6 +19,7 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
+import io.netty.channel.ChannelPipeline
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -46,6 +47,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 @MicronautTest
@@ -233,8 +235,10 @@ class H2cSpec extends Specification {
         content.release()
     }
 
-    def 'prior knowledge'() {
-        given:
+    /**
+     * Send a request over a connection that speaks HTTP/2 straight away, without an upgrade.
+     */
+    private CompletableFuture requestPriorKnowledge(DefaultFullHttpRequest request) {
         def responseFuture = new CompletableFuture()
 
         def group = new NioEventLoopGroup(1)
@@ -284,19 +288,46 @@ class H2cSpec extends Specification {
 
         def channel = (SocketChannel) bootstrap.connect().await().channel()
 
-        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test')
         request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
         channel.writeAndFlush(request)
         channel.read()
+
+        return responseFuture.whenComplete((r, e) -> {
+            channel.close()
+            group.shutdownGracefully()
+        })
+    }
+
+    def 'prior knowledge'() {
+        given:
+        def responseFuture = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
 
         expect:
         def resp = responseFuture.get(10, TimeUnit.SECONDS)
         resp != null
 
         cleanup:
-        channel.close()
-        resp.release()
-        group.shutdownGracefully()
+        resp?.release()
+    }
+
+    def 'prior knowledge triggers the pipeline listeners'() {
+        given:
+        def pipelines = new LinkedBlockingQueue<ChannelPipeline>()
+        ((ChannelPipelineCustomizer) embeddedServer).doOnConnect(p -> {
+            pipelines.add(p)
+            return p
+        })
+
+        when:
+        def resp = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
+                .get(10, TimeUnit.SECONDS)
+
+        then:
+        resp != null
+        pipelines.poll(10, TimeUnit.SECONDS) != null
+
+        cleanup:
+        resp?.release()
     }
 
     @Controller("/h2c")

@@ -580,9 +580,7 @@ final class HttpPipelineBuilder {
                         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
                             super.upgradeTo(ctx, upgradeRequest);
                             pipeline.remove(fallbackHandlerName);
-                            new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
-                            specificGracefulShutdown = new Http2GracefulShutdown(ctx.pipeline().context(connectionHandler), connectionHandler);
-                            onRequestPipelineBuilt();
+                            afterH2cEstablished(connectionHandler);
                         }
                     }
 
@@ -614,6 +612,18 @@ final class HttpPipelineBuilder {
             pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
             pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
                 @Override
+                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                    if (evt instanceof CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent) {
+                        // the client spoke HTTP/2 straight away, so this fallback is not needed.
+                        // The connection handler is already in the pipeline, but the rest of the
+                        // set-up still has to run, same as for the h2c upgrade above.
+                        ctx.pipeline().remove(this);
+                        afterH2cEstablished(connectionHandler);
+                    }
+                    super.userEventTriggered(ctx, evt);
+                }
+
+                @Override
                 protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                     // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
                     ChannelPipeline cp = ctx.pipeline();
@@ -638,6 +648,18 @@ final class HttpPipelineBuilder {
                 }
             });
             connectionCustomizer.onInitialPipelineBuilt();
+        }
+
+        /**
+         * Complete the pipeline set-up for an established h2c connection. Called both for the
+         * HTTP/1.1 upgrade path and for prior-knowledge connections.
+         *
+         * @param connectionHandler The HTTP/2 connection handler that is now in the pipeline
+         */
+        private void afterH2cEstablished(Http2ConnectionHandler connectionHandler) {
+            new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
+            specificGracefulShutdown = new Http2GracefulShutdown(pipeline.context(connectionHandler), connectionHandler);
+            onRequestPipelineBuilt();
         }
 
         private Http2MultiplexHandler makeHttp2Handler() {
