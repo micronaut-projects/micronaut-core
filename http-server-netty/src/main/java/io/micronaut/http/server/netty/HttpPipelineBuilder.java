@@ -44,6 +44,7 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpDecoderConfig;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
@@ -652,12 +653,14 @@ final class HttpPipelineBuilder {
         }
 
         private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    server.getServerConfiguration().getMaxInitialLineLength(),
-                    server.getServerConfiguration().getMaxHeaderSize(),
-                    server.getServerConfiguration().getMaxChunkSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    server.getServerConfiguration().getInitialBufferSize()
+            NettyHttpServerConfiguration configuration = server.getServerConfiguration();
+            return new HttpServerCodec(new HttpDecoderConfig()
+                    .setMaxInitialLineLength(configuration.getMaxInitialLineLength())
+                    .setMaxHeaderSize(configuration.getMaxHeaderSize())
+                    .setMaxChunkSize(configuration.getMaxChunkSize())
+                    .setValidateHeaders(configuration.isValidateHeaders())
+                    .setInitialBufferSize(configuration.getInitialBufferSize())
+                    .setChunkedSupported(configuration.isChunkedSupported())
             );
         }
 
