@@ -90,7 +90,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public Sinks.EmitResult tryEmitValue(T value) {
+    public Sinks.EmitResult tryEmitValue(@Nullable T value) {
         lock.lock();
         try {
             if (complete) {
@@ -107,7 +107,7 @@ final class CancellableMonoSink<T> implements Publisher<T>, Sinks.One<T>, Subscr
     }
 
     @Override
-    public void emitValue(T value, Sinks. EmitFailureHandler failureHandler) {
+    public void emitValue(@Nullable T value, Sinks. EmitFailureHandler failureHandler) {
         throw new UnsupportedOperationException();
     }
 

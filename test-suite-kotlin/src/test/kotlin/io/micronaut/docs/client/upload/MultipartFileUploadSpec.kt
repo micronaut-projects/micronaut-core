@@ -66,7 +66,7 @@ class MultipartFileUploadSpec: StringSpec() {
                     String::class.java
             ))
             val response = flowable.blockFirst()
-            val body = response.body.get()
+            val body = response!!.body.get()
 
             body shouldBe "Uploaded 9 bytes"
         }
@@ -85,7 +85,7 @@ class MultipartFileUploadSpec: StringSpec() {
                     String::class.java
             ))
             val response = flowable.blockFirst()
-            val body = response.body.get()
+            val body = response!!.body.get()
 
             body shouldBe "Uploaded 12 bytes"
         }
@@ -105,7 +105,7 @@ class MultipartFileUploadSpec: StringSpec() {
                     String::class.java
             ))
             val response = flowable.blockFirst()
-            val body = response.body.get()
+            val body = response!!.body.get()
 
             body shouldBe "Uploaded 9 bytes"
         }

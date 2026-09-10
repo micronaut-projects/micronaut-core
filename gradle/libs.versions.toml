@@ -72,7 +72,7 @@ zacsweers-kotlin-compile-testing = "0.13.0"
 errorprone-gradle-plugin = "4.4.0"
 nullaway = "0.13.8"
 error_prone_core = "2.48.0"
-jackson2 = "2.22.1"
+jackson2 = "2.21.6"
 
 #
 # Versions which start with managed- are managed by Micronaut in the sense
@@ -93,7 +93,7 @@ managed-netty-tcnative = "2.0.81.Final"
 managed-netty-contrib-multipart = "1.0.0.Final"
 managed-reactive-streams = "1.0.4"
 # This should be kept aligned with https://github.com/micronaut-projects/micronaut-reactor/blob/master/gradle.properties from the BOM
-managed-reactor = "3.7.12"
+managed-reactor = "3.8.7"
 managed-snakeyaml = "2.4"
 managed-java-parser-core = "3.28.2"
 managed-ksp = "2.3.10"

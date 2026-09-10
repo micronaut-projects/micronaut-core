@@ -34,6 +34,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -95,6 +96,9 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
                 }
                 case SYNCHRONOUS -> {
                     FunctionDefinition def = functionDefinition.blockFirst();
+                    if (def == null) {
+                        throw new FunctionNotFoundException(functionName);
+                    }
                     FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
                     return functionInvoker.invoke(def, body, context.getReturnType().asArgument());
                 }
@@ -110,10 +114,13 @@ public class FunctionClientAdvice implements MethodInterceptor<Object, Object> {
     private Flux<Object> invokeFn(@Nullable Object body, String functionName, Flux<FunctionDefinition> functionDefinition, Argument<?> valueType) {
         return functionDefinition.next().flatMap(def -> {
             FunctionInvoker functionInvoker = functionInvokerChooser.choose(def).orElseThrow(() -> new FunctionNotFoundException(def.getName()));
-            return Mono.from((Publisher<Object>) functionInvoker.invoke(
-                def,
-                body,
-                Argument.of(Publisher.class, valueType)
+            return Mono.from(Objects.requireNonNull(
+                (Publisher<Object>) functionInvoker.invoke(
+                    def,
+                    body,
+                    Argument.of(Publisher.class, valueType)
+                ),
+                "The function invoker returned no publisher"
             ));
         }).switchIfEmpty(Mono.error(() -> new FunctionNotFoundException(functionName))).flux();
     }

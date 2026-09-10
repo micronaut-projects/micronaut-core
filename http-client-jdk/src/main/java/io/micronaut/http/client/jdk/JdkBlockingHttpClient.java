@@ -34,6 +34,7 @@ import io.micronaut.http.filter.HttpFilterResolver;
 import org.slf4j.LoggerFactory;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * {@link io.micronaut.http.client.HttpClient} implementation for {@literal java.net.http.*} HTTP Client.
@@ -90,7 +91,10 @@ public class JdkBlockingHttpClient extends AbstractJdkHttpClient implements Bloc
     public <I, O, E> io.micronaut.http.HttpResponse<O> exchange(io.micronaut.http.HttpRequest<I> request,
                                                                 @Nullable Argument<O> bodyType,
                                                                 @Nullable Argument<E> errorType) {
-        return exchangeImpl(request, bodyType).blockFirst();
+        return Objects.requireNonNull(
+            exchangeImpl(request, bodyType).blockFirst(),
+            "The blocking HTTP client returned no response"
+        );
     }
 
     @Override

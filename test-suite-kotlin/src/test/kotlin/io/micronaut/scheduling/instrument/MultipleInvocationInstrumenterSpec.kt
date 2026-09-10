@@ -24,7 +24,7 @@ class MultipleInvocationInstrumenterSpec {
                 .retrieve(
                         HttpRequest.GET<Any>("/tryout/100"),
                         MutableList::class.java
-                )).blockFirst()
+                )).blockFirst().let(::requireNotNull)
 
         assertTrue(map.isNotEmpty())
     }

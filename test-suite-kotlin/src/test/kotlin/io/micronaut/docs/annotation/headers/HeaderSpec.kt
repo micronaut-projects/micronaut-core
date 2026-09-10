@@ -2,7 +2,6 @@ package io.micronaut.docs.annotation.headers
 
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.runtime.server.EmbeddedServer
@@ -18,9 +17,8 @@ class HeaderSpec: StringSpec() {
         "test sender headers" {
             val client = embeddedServer.applicationContext.getBean(PetClient::class.java)
 
-            val pet = Mono.from(client["Fred"]).block()
+            val pet = requireNotNull(Mono.from(client["Fred"]).block())
 
-            pet shouldNotBe null
             pet.age.toLong() shouldBe 11
         }
     }
