@@ -131,10 +131,12 @@ public enum MethodConvention {
      * @return An optional of the method convention
      */
     public static Optional<MethodConvention> forMethod(String name) {
-        try {
-            return Optional.of(valueOf(name.toUpperCase(Locale.ENGLISH)));
-        } catch (IllegalArgumentException e) {
-            return Optional.empty();
+        String upperCase = name.toUpperCase(Locale.ENGLISH);
+        for (MethodConvention convention : values()) {
+            if (convention.name().equals(upperCase)) {
+                return Optional.of(convention);
+            }
         }
+        return Optional.empty();
     }
 }

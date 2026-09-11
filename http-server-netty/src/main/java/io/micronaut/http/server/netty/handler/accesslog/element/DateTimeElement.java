@@ -24,8 +24,6 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.Collections;
-import java.util.EnumSet;
 import java.util.Locale;
 import java.util.Set;
 
@@ -48,7 +46,7 @@ final class DateTimeElement implements LogElement {
 
     private static final String COMMON_LOG_PATTERN = "'['dd/MMM/yyyy:HH:mm:ss Z']'";
 
-    private static final Set<Event> LAST_RESPONSE_EVENTS = Collections.unmodifiableSet(EnumSet.of(Event.ON_LAST_RESPONSE_WRITE));
+    private static final Set<Event> LAST_RESPONSE_EVENTS = Set.of(Event.ON_LAST_RESPONSE_WRITE);
 
     private final DateTimeFormatter formatter;
     private final Set<Event> events;

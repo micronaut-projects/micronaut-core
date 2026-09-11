@@ -76,8 +76,13 @@ public enum BeanResolutionTraceMode {
             .ofNullable(CachedEnvironment.getProperty(MODE_SYS_PROP))
             .orElseGet(() -> CachedEnvironment.getenv(MODE_ENV_VAR));
         if (mode != null) {
-            return BeanResolutionTraceMode
-                .valueOf(NameUtils.environmentName(mode));
+            String name = NameUtils.environmentName(mode);
+            for (BeanResolutionTraceMode traceMode : values()) {
+                if (traceMode.name().equals(name)) {
+                    return traceMode;
+                }
+            }
+            throw new IllegalArgumentException("No enum constant " + BeanResolutionTraceMode.class.getName() + "." + name);
         }
         if (traceClasses.isEmpty()) {
             return LOGGER.isTraceEnabled() ? BeanResolutionTraceMode.LOG : BeanResolutionTraceMode.NONE;
