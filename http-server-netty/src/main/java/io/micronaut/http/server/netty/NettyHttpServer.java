@@ -548,7 +548,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             DEFAULT_PARENT_THREADS,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
-            source.isPreferNativeTransport(),
+            // the transport list below already reflects the (deprecated) native preference
+            false,
             source.getTransport(),
             source.getExecutorName().orElse(null),
             source.getShutdownQuietPeriod(),
