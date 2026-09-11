@@ -20,6 +20,7 @@ import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InvocationException;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.StringUtils;
 
 import java.lang.reflect.Constructor;
@@ -225,6 +226,36 @@ public class ReflectionUtils {
             throw new InvocationException("Illegal access invoking method [" + method + "]: " + e.getMessage(), e);
         } catch (InvocationTargetException e) {
             throw new InvocationException("Exception occurred invoking method [" + method + "]: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Invokes a method the way generated dispatch invokes a method it can call directly: the throwable the method
+     * throws, a checked exception included, propagates unchanged instead of being wrapped in an
+     * {@link InvocationException}. An {@link InvocationException} is only thrown when the reflective call itself
+     * fails before the method runs.
+     *
+     * <p>Generated code dispatches a method that is not accessible to it, for example a private
+     * {@code @Executable} method, through this, so that {@code ExecutableMethod.invoke} throws the same exception
+     * whatever the visibility of the method.</p>
+     *
+     * @param instance  The instance, {@code null} for a static method
+     * @param method    The method, already made accessible
+     * @param arguments The arguments
+     * @param <R>       The return type
+     * @param <T>       The instance type
+     * @return The result
+     * @since 5.3.0
+     */
+    @Nullable
+    @UsedByGeneratedCode
+    public static <R, T> R invokeMethodPropagating(@Nullable T instance, Method method, @Nullable Object... arguments) {
+        try {
+            return (R) method.invoke(instance, arguments);
+        } catch (InvocationTargetException e) {
+            return ExceptionUtils.sneakyThrow(e.getTargetException());
+        } catch (IllegalAccessException e) {
+            throw new InvocationException("Illegal access invoking method [" + method + "]: " + e.getMessage(), e);
         }
     }
 

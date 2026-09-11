@@ -17,6 +17,7 @@ package io.micronaut.aop.beandefinition;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.exception.InvocationException;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
@@ -39,8 +40,12 @@ final class LifecycleCallbacks {
      * Invokes a callback on the bean and discards what it returns, since lifecycle interception always yields the
      * bean instance.
      *
-     * <p>A private callback is dispatched reflectively, which wraps what it threw. It is unwrapped so that the
-     * interceptor chain of the event sees the same exception whether or not the callback needed reflection.</p>
+     * <p>A private callback is dispatched reflectively. Generated code dispatches it through
+     * {@link io.micronaut.core.reflect.ReflectionUtils#invokeMethodPropagating}, which lets what the callback threw
+     * through unchanged, but a bean definition compiled before 5.3 dispatches it through
+     * {@link io.micronaut.core.reflect.ReflectionUtils#invokeMethod}, which wraps it. It is unwrapped so that the
+     * interceptor chain of the event sees the same exception whether or not the callback needed reflection, a
+     * checked one included.</p>
      *
      * @param callback  The callback
      * @param bean      The bean
@@ -55,12 +60,8 @@ final class LifecycleCallbacks {
         try {
             callback.invoke(bean, arguments);
         } catch (InvocationException e) {
-            Throwable cause = e.getCause() instanceof InvocationTargetException targetException ? targetException.getCause() : null;
-            if (cause instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            if (cause instanceof Error error) {
-                throw error;
+            if (e.getCause() instanceof InvocationTargetException targetException && targetException.getCause() != null) {
+                ExceptionUtils.sneakyThrow(targetException.getCause());
             }
             throw e;
         }

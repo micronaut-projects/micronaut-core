@@ -101,7 +101,7 @@ public final class DispatchWriter implements ClassOutputWriter {
 
     private static final Method METHOD_GET_REQUIRED_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getRequiredMethod", Class.class, String.class, Class[].class);
 
-    private static final Method METHOD_INVOKE_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethod", Object.class, java.lang.reflect.Method.class, Object[].class);
+    private static final Method METHOD_INVOKE_METHOD = ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "invokeMethodPropagating", Object.class, java.lang.reflect.Method.class, Object[].class);
 
     private static final Method METHOD_GET_FIELD_VALUE =
         ReflectionUtils.getRequiredInternalMethod(ReflectionUtils.class, "getField", Class.class, String.class, Object.class);
