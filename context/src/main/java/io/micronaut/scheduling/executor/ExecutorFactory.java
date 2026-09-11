@@ -22,7 +22,6 @@ import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.reflect.InstantiationUtils;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
-import io.micronaut.scheduling.LoomSupport;
 import jakarta.inject.Inject;
 import org.jspecify.annotations.Nullable;
 
@@ -76,7 +75,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
                 name = "virtual";
             }
             String prefix = name + "-executor-";
-            return r -> LoomSupport.unstarted(prefix + ThreadLocalRandom.current().nextInt(), null, r);
+            return r -> Thread.ofVirtual().name(prefix + ThreadLocalRandom.current().nextInt()).unstarted(r);
         }
         if (name != null) {
             return new NamedThreadFactory(name + "-executor");
@@ -114,7 +113,7 @@ public class ExecutorFactory implements GracefulShutdownCapable {
                 if ("false".equals(System.getProperty("jdk.trackAllThreads"))) {
                     return new FastThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
                 } else {
-                    return LoomSupport.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
+                    return Executors.newThreadPerTaskExecutor(getThreadFactory(executorConfiguration));
                 }
             default:
                 throw new IllegalStateException("Could not create Executor service for enum value: " + executorType);

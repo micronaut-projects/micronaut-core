@@ -22,6 +22,7 @@ import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.io.service.ServiceScanner.ExclusiveStaticServiceDefinitions;
 
 import java.io.Closeable;
+import java.io.File;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
@@ -34,6 +35,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -43,6 +45,8 @@ import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * The loader of Micronaut services under META-INF/micronaut/.
@@ -168,6 +172,9 @@ public final class MicronautMetaServiceLoaderUtils {
         List<Closeable> toClose = new ArrayList<>();
         try {
             for (URI uri : resourceDefs) {
+                if (collectJarServices(uri, services)) {
+                    continue;
+                }
                 Path myPath = IOUtils.resolvePath(uri, MICRONAUT_SERVICES_PATH, toClose);
                 if (myPath != null) {
                     Files.walkFileTree(myPath, Collections.emptySet(), 2, visitor);
@@ -184,6 +191,72 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
         return services;
+    }
+
+    /**
+     * Collects the services of a jar file by listing the entries of the jar. Opening the jar as a zip file system
+     * reads and indexes its whole central directory again, which for an application jar costs several times more than
+     * listing the entries of the zip file the class loader has already opened.
+     *
+     * <p>The entries are added in the order walking the zip file system visits them, the reverse of the order the
+     * jar stores them in, so the services are found in the same order as before.</p>
+     *
+     * @param uri      The URI of the {@code META-INF/micronaut/} resource
+     * @param services The services to add to
+     * @return True if the URI names a directory in a jar file and its services were collected
+     */
+    private static boolean collectJarServices(URI uri, Map<String, Set<String>> services) {
+        if (!"jar".equals(uri.getScheme())) {
+            return false;
+        }
+        String spec = uri.getRawSchemeSpecificPart();
+        int sep = spec.indexOf("!/");
+        // nested jars and the WebLogic form without a file: URL are left to the zip file system
+        if (sep == -1 || spec.indexOf("!/", sep + 2) != -1 || !spec.startsWith("file:")) {
+            return false;
+        }
+        List<String> names = new ArrayList<>();
+        try (ZipFile zipFile = new ZipFile(new File(URI.create(spec.substring(0, sep))))) {
+            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+            while (entries.hasMoreElements()) {
+                String name = entries.nextElement().getName();
+                if (name.startsWith(MICRONAUT_SERVICES_PATH)) {
+                    names.add(name);
+                }
+            }
+        } catch (IOException | RuntimeException e) {
+            return false;
+        }
+        for (int i = names.size() - 1; i >= 0; i--) {
+            addJarEntry(names.get(i), services);
+        }
+        return true;
+    }
+
+    /**
+     * Adds a {@code META-INF/micronaut/<service>/<entry>} jar entry. As walking two levels of the file system does,
+     * a directory below the service counts as an entry, and a file directly in {@code META-INF/micronaut/} is not one.
+     *
+     * @param name     The name of the jar entry
+     * @param services The services to add to
+     */
+    private static void addJarEntry(String name, Map<String, Set<String>> services) {
+        int start = MICRONAUT_SERVICES_PATH.length();
+        int serviceEnd = name.indexOf('/', start);
+        if (serviceEnd <= start) {
+            return;
+        }
+        String serviceName = name.substring(start, serviceEnd);
+        Set<String> definitions = services.get(serviceName);
+        if (definitions == null) {
+            definitions = new LinkedHashSet<>();
+            services.put(serviceName, definitions);
+        }
+        int entryEnd = name.indexOf('/', serviceEnd + 1);
+        String entry = entryEnd == -1 ? name.substring(serviceEnd + 1) : name.substring(serviceEnd + 1, entryEnd);
+        if (!entry.isEmpty()) {
+            definitions.add(entry);
+        }
     }
 
     @Nullable

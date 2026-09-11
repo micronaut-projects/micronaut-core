@@ -804,7 +804,12 @@ public class MediaType implements CharSequence {
     private final String strRepr;
     private final String lowerName;
 
-    private BigDecimal qualityNumberField = BigDecimal.ONE;
+    /**
+     * The quality, or null for the default of one. Assigning {@link BigDecimal#ONE} to every media type would
+     * initialize {@link BigDecimal}, which computes its caches, while the media type constants are created.
+     */
+    @Nullable
+    private BigDecimal qualityNumberField;
 
     private boolean valid;
 
@@ -1109,14 +1114,15 @@ public class MediaType implements CharSequence {
      * @return The quality of the Mime type
      */
     public String getQuality() {
-        return qualityNumberField.toString();
+        return getQualityAsNumber().toString();
     }
 
     /**
      * @return The quality in BigDecimal form
      */
     public BigDecimal getQualityAsNumber() {
-        return this.qualityNumberField;
+        BigDecimal quality = this.qualityNumberField;
+        return quality == null ? BigDecimal.ONE : quality;
     }
 
     /**

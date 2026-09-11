@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.util.NativeImageUtils;
-import io.micronaut.scheduling.LoomSupport;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoop;
 import io.netty.channel.IoHandler;
@@ -50,6 +49,7 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
+import java.util.function.Consumer;
 
 /**
  * Netty {@link EventLoopGroup} that can also carry virtual threads.
@@ -83,7 +83,6 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
      * Factory for creating {@link LoomCarrierGroup} instances.
      */
     @Singleton
-    @Requires(condition = LoomSupport.LoomCondition.class)
     @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
     public static final class Factory {
         final EventLoopLoomFactory holder;
@@ -216,7 +215,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
 
         private boolean isOnRunner(Thread thread) {
-            if (!LoomSupport.isVirtual(thread)) {
+            if (!thread.isVirtual()) {
                 return false;
             }
             if (LoomBranchSupport.isSupported()) {
@@ -238,7 +237,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
 
         @Override
         public Thread newThread(Runnable r) {
-            return LoomSupport.unstarted("loom-on-netty-" + id + "-" + Long.toHexString(ThreadLocalRandom.current().nextLong()), b -> {
+            return unstartedVirtualThread("loom-on-netty-" + id + "-" + Long.toHexString(ThreadLocalRandom.current().nextLong()), b -> {
                 if (warmupTasks > 0) {
                     warmupTasks--;
                     if (!LoomBranchSupport.isSupported()) {
@@ -271,7 +270,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         public void run() {
             carrier = Thread.currentThread();
 
-            ioThread = LoomSupport.unstarted(
+            ioThread = unstartedVirtualThread(
                 "loom-on-netty-" + id + "-io",
                 b -> {
                     if (LoomBranchSupport.isSupported()) {
@@ -528,6 +527,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         }
     }
 
+    private static Thread unstartedVirtualThread(String name, Consumer<Thread.Builder.OfVirtual> builderModifier, Runnable task) {
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(name);
+        builderModifier.accept(builder);
+        return builder.unstarted(task);
+    }
+
     record IoScheduler(Runner runner) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
         @Override
         public AttributeMap attributeMap() {
@@ -557,7 +562,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             Executor dst;
             if (currentThread instanceof ForkJoinWorkerThread fjwt && fjwt.getPool() == PrivateLoomSupport.getDefaultScheduler()) {
                 dst = PrivateLoomSupport.getDefaultScheduler();
-            } else if (LoomSupport.isVirtual(currentThread) && PrivateLoomSupport.getScheduler(currentThread) == PrivateLoomSupport.getDefaultScheduler()) {
+            } else if (currentThread.isVirtual() && PrivateLoomSupport.getScheduler(currentThread) == PrivateLoomSupport.getDefaultScheduler()) {
                 dst = PrivateLoomSupport.getDefaultScheduler();
             } else {
                 // move back to event loop whenever possible (e.g. after sleep)
@@ -569,7 +574,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         @Override
         public void execute(Thread thread, Runnable task) {
             LoomBranchSupport.VirtualThreadSchedulerProxy dst;
-            if (LoomSupport.isVirtual(Thread.currentThread())) {
+            if (Thread.currentThread().isVirtual()) {
                 dst = LoomBranchSupport.currentScheduler();
                 if (dst instanceof EventLoopVirtualThreadScheduler) {
                     if (dst instanceof IoScheduler s) {
