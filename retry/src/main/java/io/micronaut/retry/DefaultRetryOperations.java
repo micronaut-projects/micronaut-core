@@ -46,17 +46,17 @@ final class DefaultRetryOperations implements RetryOperations {
 
     @Override
     public <T> T execute(Supplier<T> supplier) {
-        return retryRunner.executeSync(supplier, newRetryState(), DefaultRetryOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeSync(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
     }
 
     @Override
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier) {
-        return retryRunner.executeCompletionStage(supplier, newRetryState(), DefaultRetryOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeCompletionStage(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
     }
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
-        return retryRunner.executePublisher(supplier, newRetryState(), DefaultRetryOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executePublisher(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
     }
 
     private MutableRetryState newRetryState() {

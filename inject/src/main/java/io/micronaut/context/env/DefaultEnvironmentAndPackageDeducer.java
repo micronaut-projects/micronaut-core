@@ -321,11 +321,12 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
     private static ComputePlatform determineCloudProvider() {
         String computePlatform = CachedEnvironment.getProperty(CLOUD_PLATFORM_PROPERTY);
         if (computePlatform != null) {
-            try {
-                return ComputePlatform.valueOf(computePlatform);
-            } catch (IllegalArgumentException e) {
-                throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
+            for (ComputePlatform platform : ComputePlatform.values()) {
+                if (platform.name().equals(computePlatform)) {
+                    return platform;
+                }
             }
+            throw new ConfigurationException("Illegal value specified for [" + CLOUD_PLATFORM_PROPERTY + "]: " + computePlatform);
 
         }
         boolean isWindows = Objects.requireNonNullElse(CachedEnvironment.getProperty("os.name"), "unknown")

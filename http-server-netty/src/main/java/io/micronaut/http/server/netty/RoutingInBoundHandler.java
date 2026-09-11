@@ -228,7 +228,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
         if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
-            AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+            AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf("NettyHttpRequest");
             ctx.channel().attr(key).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);

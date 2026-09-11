@@ -60,20 +60,20 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
     @Override
     public <T> T execute(Supplier<T> supplier) {
         retryState.open();
-        return retryRunner.executeSync(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeSync(supplier, retryState, "DefaultCircuitBreakerOperations", retryEventEmitter);
     }
 
     @Override
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier) {
         retryState.open();
-        return retryRunner.executeCompletionStage(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeCompletionStage(supplier, retryState, "DefaultCircuitBreakerOperations", retryEventEmitter);
     }
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
         return Flux.defer(() -> {
             retryState.open();
-            return Flux.from(retryRunner.executePublisher(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter));
+            return Flux.from(retryRunner.executePublisher(supplier, retryState, "DefaultCircuitBreakerOperations", retryEventEmitter));
         });
     }
 

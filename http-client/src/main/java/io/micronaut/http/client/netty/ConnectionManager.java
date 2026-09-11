@@ -718,7 +718,14 @@ public class ConnectionManager {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
                 final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                    switch (logLevel) {
+                        case TRACE -> LogLevel.TRACE;
+                        case DEBUG -> LogLevel.DEBUG;
+                        case INFO -> LogLevel.INFO;
+                        case WARN -> LogLevel.WARN;
+                        case ERROR -> LogLevel.ERROR;
+                        default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
+                    };
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -758,7 +765,14 @@ public class ConnectionManager {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
                 final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                    switch (logLevel) {
+                        case TRACE -> LogLevel.TRACE;
+                        case DEBUG -> LogLevel.DEBUG;
+                        case INFO -> LogLevel.INFO;
+                        case WARN -> LogLevel.WARN;
+                        case ERROR -> LogLevel.ERROR;
+                        default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
+                    };
                 ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));

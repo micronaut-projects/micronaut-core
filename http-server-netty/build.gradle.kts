@@ -145,12 +145,5 @@ tasks.withType<Test>().configureEach {
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 
 noReflection {
-    allowIn("io.micronaut.http.server.netty.RoutingInBoundHandler", "CLASS_NAMES")
-    allowIn("io.micronaut.http.server.netty.handler.Http2ServerHandler", "ENUM_CONSTANTS")
     allowIn("io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser", "SERVICE_LOADING")
-    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.BytesSentElement", "ENUM_CONSTANTS")
-    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.ConstantElement", "ENUM_CONSTANTS")
-    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.DateTimeElement", "ENUM_CONSTANTS")
-    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.ElapseTimeElement", "ENUM_CONSTANTS")
-    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.LogElement", "ENUM_CONSTANTS")
 }

@@ -21,9 +21,6 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullUnmarked;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -38,44 +35,11 @@ public final class LoomSupport {
     private static final boolean SUPPORTED;
     private static Throwable failure;
 
-    private static final MethodHandle MH_NEW_THREAD_PER_TASK_EXECUTOR;
-    private static final MethodHandle MH_OF_VIRTUAL;
-    private static final MethodHandle MH_NAME;
-    private static final MethodHandle MH_NAME_COUNT;
-    private static final MethodHandle MH_FACTORY;
-    private static final MethodHandle MH_UNSTARTED;
-    private static final MethodHandle MH_IS_VIRTUAL;
-
     static {
         boolean sup;
-        MethodHandle newThreadPerTaskExecutor;
-        MethodHandle ofVirtual;
-        MethodHandle name;
-        MethodHandle nameCount;
-        MethodHandle factory;
-        MethodHandle unstarted;
-        MethodHandle isVirtual;
         try {
-            newThreadPerTaskExecutor = MethodHandles.lookup()
-                .findStatic(Executors.class, "newThreadPerTaskExecutor", MethodType.methodType(ExecutorService.class, ThreadFactory.class));
-            Class<?> builderCl = Class.forName("java.lang.Thread$Builder");
-            Class<?> ofVirtualCl = Class.forName("java.lang.Thread$Builder$OfVirtual");
-            ofVirtual = MethodHandles.lookup()
-                .findStatic(Thread.class, "ofVirtual", MethodType.methodType(ofVirtualCl));
-            name = MethodHandles.lookup()
-                .findVirtual(builderCl, "name", MethodType.methodType(builderCl, String.class));
-            nameCount = MethodHandles.lookup()
-                .findVirtual(builderCl, "name", MethodType.methodType(builderCl, String.class, long.class));
-            factory = MethodHandles.lookup()
-                .findVirtual(builderCl, "factory", MethodType.methodType(ThreadFactory.class));
-            unstarted = MethodHandles.lookup()
-                .findVirtual(builderCl, "unstarted", MethodType.methodType(Thread.class, Runnable.class));
-            isVirtual = MethodHandles.lookup()
-                .findVirtual(Thread.class, "isVirtual", MethodType.methodType(boolean.class));
-
-            // This will throw if this Java doesn't support Loom, or if it does but only with
-            // --enable-preview.
-            Thread probe = (Thread) unstarted.invoke(ofVirtual.invoke(), (Runnable) () -> { });
+            // This will throw if this JVM cannot create virtual threads.
+            Thread probe = Thread.ofVirtual().unstarted(() -> { });
 
             // This checks if the JVM actually creates real virtual threads, or if it uses
             // 'bound threads' which are just platform threads. As of June 2025 the Espresso JVM
@@ -86,25 +50,11 @@ public final class LoomSupport {
                 failure = new Exception("This JVM doesn't fully implement virtual threads and produces regular platform threads instead.");
             }
         } catch (Throwable e) {
-            newThreadPerTaskExecutor = null;
-            ofVirtual = null;
-            name = null;
-            nameCount = null;
-            factory = null;
-            unstarted = null;
-            isVirtual = null;
             sup = false;
             failure = e;
         }
 
         SUPPORTED = sup;
-        MH_NEW_THREAD_PER_TASK_EXECUTOR = newThreadPerTaskExecutor;
-        MH_OF_VIRTUAL = ofVirtual;
-        MH_NAME = name;
-        MH_NAME_COUNT = nameCount;
-        MH_FACTORY = factory;
-        MH_UNSTARTED = unstarted;
-        MH_IS_VIRTUAL = isVirtual;
     }
 
     private LoomSupport() {
@@ -124,12 +74,11 @@ public final class LoomSupport {
     public static ThreadFactory newVirtualThreadFactory(String namePrefix, Consumer<Object> builderModifier) {
         checkSupported();
         try {
-            Object builder = MH_OF_VIRTUAL.invoke();
-            builder = MH_NAME_COUNT.invoke(builder, namePrefix, 1L);
+            Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(namePrefix, 1L);
             if (builderModifier != null) {
                 builderModifier.accept(builder);
             }
-            return (ThreadFactory) MH_FACTORY.invoke(builder);
+            return builder.factory();
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -139,12 +88,11 @@ public final class LoomSupport {
     public static Thread unstarted(String name, Consumer<Object> builderModifier, Runnable task) {
         checkSupported();
         try {
-            Object builder = MH_OF_VIRTUAL.invoke();
-            builder = MH_NAME.invoke(builder, name);
+            Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(name);
             if (builderModifier != null) {
                 builderModifier.accept(builder);
             }
-            return (Thread) MH_UNSTARTED.invoke(builder, task);
+            return builder.unstarted(task);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -153,7 +101,7 @@ public final class LoomSupport {
     public static ExecutorService newThreadPerTaskExecutor(ThreadFactory threadFactory) {
         checkSupported();
         try {
-            return (ExecutorService) MH_NEW_THREAD_PER_TASK_EXECUTOR.invokeExact(threadFactory);
+            return Executors.newThreadPerTaskExecutor(threadFactory);
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }
@@ -169,7 +117,7 @@ public final class LoomSupport {
             return false;
         }
         try {
-            return (boolean) MH_IS_VIRTUAL.invokeExact(thread);
+            return thread.isVirtual();
         } catch (Throwable e) {
             throw new RuntimeException(e);
         }

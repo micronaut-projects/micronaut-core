@@ -80,7 +80,6 @@ noReflection {
     allowIn("io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils", "CLASS_LOADING", "HANDLES")
     allowIn("io.micronaut.core.io.service.ServiceLoaderFeature", "ANNOTATIONS", "CLASS_MEMBERS", "REFLECTIVE_ACCESS", "SERVICE_LOADING")
     allowIn("io.micronaut.core.io.service.SoftServiceLoader", "CLASS_LOADING", "CLASS_MEMBERS", "HANDLES", "REFLECTIVE_ACCESS", "SERVICE_LOADING")
-    allowIn("io.micronaut.core.naming.conventions.MethodConvention", "ENUM_CONSTANTS")
     allowIn("io.micronaut.core.naming.conventions.TypeConvention", "CLASS_NAMES")
     allowIn("io.micronaut.core.optim.StaticOptimizations", "SERVICE_LOADING")
     allowIn("io.micronaut.core.reflect.ClassUtils", "CLASS_LOADING", "INTERFACES")

@@ -78,7 +78,7 @@ dependencies {
 //}
 
 noReflection {
-    allowIn("io.micronaut.http.client.netty.ConnectionManager", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.http.client.netty.ConnectionManager", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.http.client.netty.NettyHttpClient", "CLASS_NAMES")
     allowIn("io.micronaut.http.client.netty.Pool49", "CLASS_NAMES")
     allowIn("io.micronaut.http.client.netty.websocket.NettyWebSocketClientHandler", "CLASS_NAMES")
