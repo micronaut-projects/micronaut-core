@@ -347,8 +347,21 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      */
     @Override
     public void addAndComplete(ReadBuffer rb) {
-        boolean subscribersCompleted = addGuarded(rb, true);
-        complete0(!subscribersCompleted);
+        // The final bytes are stored and this buffer is marked complete before any streaming
+        // subscriber learns of the completion. A subscriber may consume a reserved split from
+        // inside its completion callback (the servlet integration does), and that consumer has
+        // to find the final bytes in the buffer and a completed state, or it would miss them and
+        // then wait for a completion that is never delivered.
+        List<ReadBuffer> deferred = addGuarded(rb, true);
+        complete0(deferred == null);
+        if (deferred != null) {
+            // a snapshot: a subscriber added reentrantly by a callback below is completed by
+            // subscribe0 itself, since the buffer is complete by now
+            List<BufferConsumer> targets = new ArrayList<>(subscribers);
+            for (int i = 0; i < targets.size(); i++) {
+                targets.get(i).addAndComplete(deferred.get(i));
+            }
+        }
     }
 
     /**
@@ -358,14 +371,18 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
      *
      * @param rb           The buffer to add
      * @param completeAfter Whether the subscribers should be completed together with this buffer
-     * @return {@code true} iff the subscribers have been completed as part of this call
+     * @return With {@code completeAfter}, the copies of {@code rb} still to be delivered to the
+     * streaming subscribers together with their completion, one per subscriber in order, or
+     * {@code null} if there are none to deliver. Always {@code null} without {@code completeAfter}.
      */
-    protected boolean addGuarded(ReadBuffer rb, boolean completeAfter) {
+    @Nullable
+    protected List<ReadBuffer> addGuarded(ReadBuffer rb, boolean completeAfter) {
         return add0(rb, completeAfter);
     }
 
-    private boolean add0(ReadBuffer rb, boolean completeAfter) {
-        boolean subscribersCompleted = false;
+    @Nullable
+    private List<ReadBuffer> add0(ReadBuffer rb, boolean completeAfter) {
+        List<ReadBuffer> deferred = null;
         try (rb) {
             assert !working;
 
@@ -379,7 +396,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
 
             // drop messages if we're done with all subscribers
             if (complete || error != null) {
-                return false;
+                return null;
             }
             if (expectedLength == -1) {
                 Exception totalSizeException = sizeLimitTrackers.totalSize().add(rb.readable());
@@ -387,17 +404,20 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
                     // for maxBodySize, all subscribers get the error
                     error(totalSizeException);
                     rootUpstream.allowDiscard();
-                    return false;
+                    return null;
                 }
             } // else, already checked the Content-Length
 
             working = true;
             if (subscribers != null) {
-                subscribersCompleted = completeAfter;
-                for (BufferConsumer consumer : subscribers) {
-                    if (completeAfter) {
-                        consumer.addAndComplete(rb.duplicate());
-                    } else {
+                if (completeAfter) {
+                    // delivered by addAndComplete once the state below is final
+                    deferred = new ArrayList<>(subscribers.size());
+                    for (int i = 0; i < subscribers.size(); i++) {
+                        deferred.add(rb.duplicate());
+                    }
+                } else {
+                    for (BufferConsumer consumer : subscribers) {
                         consumer.add(rb.duplicate());
                     }
                 }
@@ -426,7 +446,7 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
             }
             working = false;
         }
-        return subscribersCompleted;
+        return deferred;
     }
 
     /**
