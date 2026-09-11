@@ -683,6 +683,12 @@ final class HttpPipelineBuilder {
 
     final class StreamPipeline {
         HttpVersion httpVersion = HttpVersion.HTTP_1_1;
+        /**
+         * Whether this pipeline carries the {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER}
+         * handler, see {@link #hasAccessLogHandler()}. {@code null} until first needed.
+         */
+        @Nullable
+        private Boolean hasAccessLogHandler;
         private final Channel channel;
         private final ChannelPipeline pipeline;
         @Nullable
@@ -695,6 +701,27 @@ final class HttpPipelineBuilder {
             this.pipeline = channel.pipeline();
             this.sslHandler = sslHandler;
             this.streamCustomizer = streamCustomizer;
+        }
+
+        /**
+         * Whether this pipeline carries the {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER}
+         * handler, which is where the {@link RoutingInBoundHandler} stores the current request in
+         * a channel attribute for the access log. HTTP/1 pipelines and the per-stream pipelines of
+         * the legacy HTTP/2 handlers carry it; the connection pipeline of the default HTTP/2
+         * handler logs through the {@link Http2AccessLogManager} instead and does not (a single
+         * channel attribute could not tell concurrent streams apart). The pipeline is inspected
+         * once, on the first request, so that customizers that add or remove the handler while
+         * the pipeline is built are taken into account.
+         *
+         * @return Whether the access log handler is in this pipeline
+         */
+        boolean hasAccessLogHandler() {
+            Boolean has = hasAccessLogHandler;
+            if (has == null) {
+                has = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null;
+                hasAccessLogHandler = has;
+            }
+            return has;
         }
 
         void initializeChildPipelineForPushPromise(Channel childChannel) {

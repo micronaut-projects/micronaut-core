@@ -226,12 +226,27 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
-        if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
+        if (supportLoggingHandler && hasAccessLogHandler(ctx)) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
             AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
             ctx.channel().attr(key).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
+    }
+
+    /**
+     * Whether the pipeline of this context carries the
+     * {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER} handler. The
+     * {@link HttpPipelineBuilder.StreamPipeline} remembers this per pipeline, so it does not have
+     * to be looked up in the pipeline for every request.
+     */
+    private static boolean hasAccessLogHandler(ChannelHandlerContext ctx) {
+        HttpPipelineBuilder.StreamPipeline streamPipeline = ctx.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
+        if (streamPipeline == null) {
+            // not built by the HttpPipelineBuilder
+            return ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null;
+        }
+        return streamPipeline.hasAccessLogHandler();
     }
 
     private void handleException(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> request, Throwable throwable) {
