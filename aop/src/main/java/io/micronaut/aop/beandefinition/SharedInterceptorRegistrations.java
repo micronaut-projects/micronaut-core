@@ -50,10 +50,10 @@ import java.util.List;
  *
  * <p>A bean definition is a stateless singleton shared by every instance, so the resolved registrations cannot be kept
  * on it. They are kept on the {@link BeanResolutionContext} instead, which is one instance for the whole of a bean's
- * creation. The window is narrower than it looks: for a bean with constructor advice the generated
- * {@code doInstantiate} runs post-construct interception from <em>inside</em> the constructor interceptor chain, so
- * the registrations are pushed before construction and popped after it, and entries are keyed by definition so that a
- * bean created while another is being constructed reads its own.</p>
+ * creation. The window is narrower than it looks: for a bean with constructor advice the registrations are pushed
+ * before the constructor interceptor chain runs and popped once the instance the chain returned has been injected and
+ * its post-construct interception has run, and entries are keyed by definition so that a bean created while another
+ * is being constructed or injected reads its own.</p>
  *
  * <p>Destruction happens later with a fresh resolution context, so nothing is shared with it here; see
  * {@code MethodInterceptorChain} for how pre-destroy reaches the interceptors a bean owns.</p>
@@ -76,8 +76,8 @@ public final class SharedInterceptorRegistrations {
      * Makes the registrations resolved for a bean visible to the post-construct interception of that same bean.
      *
      * <p>Called immediately before the constructor interceptor chain runs, and matched by {@link #pop} in a
-     * {@code finally}. Because post-construct interception happens inside that chain, this is the only window in
-     * which {@link #peek} can see the entry.</p>
+     * {@code finally} after the instance the chain returned has been injected and initialized. Post-construct
+     * interception happens within that window, which is the only one in which {@link #peek} can see the entry.</p>
      *
      * <p>Nesting is handled by the stack: if the constructor of one bean, or one of its {@code @AroundConstruct}
      * interceptors, causes another bean to be created, that bean pushes and pops its own entry above this one.</p>

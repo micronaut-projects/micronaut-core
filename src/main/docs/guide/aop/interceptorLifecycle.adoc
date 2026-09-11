@@ -82,6 +82,7 @@ For one intercepted bean, in order:
 
 . The interceptors bound to that bean are resolved once, while the bean is being created.
 . `AROUND_CONSTRUCT` interception runs, then the bean's constructor.
+. Once every `AROUND_CONSTRUCT` interceptor has returned, the bean's fields and methods are injected.
 . `POST_CONSTRUCT` interception runs once, then the bean's `@PostConstruct` methods, superclass methods first.
 . `AROUND` or `INTRODUCTION` interception runs on each method call, for as long as the bean lives.
 . `PRE_DESTROY` interception runs once, then the bean's `@PreDestroy` methods, superclass methods first.

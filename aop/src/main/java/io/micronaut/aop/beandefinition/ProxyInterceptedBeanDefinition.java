@@ -50,7 +50,7 @@ public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefini
             "Resolved instantiation values cannot be null"
         );
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
-        return ConstructorInterceptorChain.instantiate(
+        T instance = ConstructorInterceptorChain.instantiate(
             resolutionContext,
             context,
             interceptors,
@@ -59,5 +59,6 @@ public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefini
             ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT,
             constructorValues
         );
+        return injectAndInitialize(resolutionContext, context, instance);
     }
 }

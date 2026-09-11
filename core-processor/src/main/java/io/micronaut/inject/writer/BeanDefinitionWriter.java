@@ -641,6 +641,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(InstantiatableBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
     private static final Method DO_INSTANTIATE_INTERCEPTED_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "doInstantiate", BeanResolutionContext.class, BeanContext.class, Object[].class);
     private static final Method INTERCEPTED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
+    private static final Method INJECT_AND_INITIALIZE_INTERCEPTED_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "injectAndInitialize", BeanResolutionContext.class, BeanContext.class, Object.class);
     private static final Method RESOLVE_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class);
     private static final Method RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD = ReflectionUtils.getRequiredMethod(ParameterizedInterceptedBeanDefinition.class, "resolveInstantiationValues", BeanResolutionContext.class, BeanContext.class, Map.class);
     private static final Method INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD = ReflectionUtils.getRequiredMethod(ParameterizedInterceptedBeanDefinition.class, "instantiate", BeanResolutionContext.class, BeanContext.class);
@@ -1639,9 +1640,16 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         .<ExpressionDef>mapToObj(index -> constructorValuesArray.arrayElement(index).cast(TypeDef.erasure(parameterElements[index].getType())))
                         .toList();
                     ExpressionDef newInstance = buildNewInstance(aThis, methodParameters, statements, extractedValues);
-                    statements.add(injectAndReturn(aThis, methodParameters, newInstance));
+                    // The terminal call of the constructor interceptor chain only creates the instance: injection and
+                    // post-construct run in injectAndInitialize once every construction interceptor has returned
+                    statements.add(newInstance.returning());
                     return StatementDef.multi(statements);
                 }));
+            if (needsInjectOrInitialize()) {
+                classDefBuilder.addMethod(MethodDef.override(INJECT_AND_INITIALIZE_INTERCEPTED_METHOD)
+                    .build((aThis, methodParameters) ->
+                        injectAndReturn(aThis, methodParameters, methodParameters.get(2).cast(beanTypeDef))));
+            }
         } else {
             MethodDef.MethodDefBuilder buildMethodBuilder;
             if (isParametrized) {
@@ -1861,10 +1869,18 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             && parameters[1].getType().isAssignable(TimeUnit.class);
     }
 
+    private boolean needsInjectOrInitialize() {
+        return needsInjectMethod() || hasInjectScope() || needsPostConstruct();
+    }
+
+    private boolean needsInjectMethod() {
+        return !injectCommands.isEmpty() || superBeanDefinition;
+    }
+
     private StatementDef injectAndReturn(VariableDef.This aThis,
                                          List<VariableDef.MethodParameter> methodParameters,
                                          ExpressionDef beanInstance) {
-        boolean needsInjectMethod = !injectCommands.isEmpty() || superBeanDefinition;
+        boolean needsInjectMethod = needsInjectMethod();
         boolean needsInjectScope = hasInjectScope();
         boolean needsPostConstruct = needsPostConstruct();
         if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
