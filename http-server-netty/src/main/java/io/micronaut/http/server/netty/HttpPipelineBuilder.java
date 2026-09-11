@@ -44,6 +44,7 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpDecoderConfig;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
@@ -98,6 +99,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -420,10 +422,13 @@ final class HttpPipelineBuilder {
         private void insertIdleStateHandler() {
             final Duration idleTime = server.getServerConfiguration().getIdleTimeout();
             if (idleTime != null && !idleTime.isNegative()) {
+                // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
+                // which IdleStateHandler treats as "disabled"
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                        (int) server.getServerConfiguration().getReadIdleTimeout().getSeconds(),
-                        (int) server.getServerConfiguration().getWriteIdleTimeout().getSeconds(),
-                        (int) idleTime.getSeconds()));
+                        server.getServerConfiguration().getReadIdleTimeout().toMillis(),
+                        server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
+                        idleTime.toMillis(),
+                        TimeUnit.MILLISECONDS));
             }
         }
 
@@ -507,15 +512,11 @@ final class HttpPipelineBuilder {
 
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof SslHandshakeCompletionEvent event) {
-                        if (!event.isSuccess()) {
-                            final Throwable cause = event.cause();
-                            if (!(cause instanceof ClosedChannelException)) {
-                                super.userEventTriggered(ctx, evt);
-                            } else {
-                                return;
-                            }
-                        }
+                    if (evt instanceof SslHandshakeCompletionEvent event &&
+                        !event.isSuccess() &&
+                        event.cause() instanceof ClosedChannelException) {
+                        // the peer went away before the handshake completed, nothing to report
+                        return;
                     }
                     super.userEventTriggered(ctx, evt);
                 }
@@ -674,12 +675,14 @@ final class HttpPipelineBuilder {
         }
 
         private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    server.getServerConfiguration().getMaxInitialLineLength(),
-                    server.getServerConfiguration().getMaxHeaderSize(),
-                    server.getServerConfiguration().getMaxChunkSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    server.getServerConfiguration().getInitialBufferSize()
+            NettyHttpServerConfiguration configuration = server.getServerConfiguration();
+            return new HttpServerCodec(new HttpDecoderConfig()
+                    .setMaxInitialLineLength(configuration.getMaxInitialLineLength())
+                    .setMaxHeaderSize(configuration.getMaxHeaderSize())
+                    .setMaxChunkSize(configuration.getMaxChunkSize())
+                    .setValidateHeaders(configuration.isValidateHeaders())
+                    .setInitialBufferSize(configuration.getInitialBufferSize())
+                    .setChunkedSupported(configuration.isChunkedSupported())
             );
         }
 
