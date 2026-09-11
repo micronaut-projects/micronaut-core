@@ -48,6 +48,15 @@ import java.util.List;
  * @since 4.10.0
  */
 public final class NettyReadBufferFactory extends ReadBufferFactory {
+    /**
+     * Maximum number of components of a buffer returned by {@link #compose(Iterable)} before the
+     * pieces are copied into one contiguous buffer. The allocator default is 16, which is exceeded
+     * by any body larger than a few pieces (a body of a few MiB arrives in 8 KiB pieces). This bound
+     * covers 32 MiB of 8 KiB pieces, so bodies of the usual sizes keep their pieces in place; a
+     * body split into more pieces than this is consolidated once, at the end, as before.
+     */
+    static final int MAX_COMPOSITE_COMPONENTS = 4096;
+
     private final ByteBufAllocator allocator;
 
     private NettyReadBufferFactory(ByteBufAllocator allocator) {
@@ -281,10 +290,11 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
             }
             throw e;
         }
-        CompositeByteBuf composite = allocator.compositeBuffer();
+        CompositeByteBuf composite = allocator.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
         try {
-            // addComponents consolidates at most once, at the end. Adding components one at a time
-            // calls consolidateIfNeeded() after each one, and each consolidation copies everything
+            // addComponents consolidates at most once, at the end, and only when there are more
+            // than MAX_COMPOSITE_COMPONENTS pieces. Adding components one at a time calls
+            // consolidateIfNeeded() after each one, and each consolidation copies everything
             // accumulated so far, making aggregation O(size^2 / chunkSize). addComponents also
             // takes ownership of all components, releasing any it did not add, so from here on the
             // composite is the only thing left to release.

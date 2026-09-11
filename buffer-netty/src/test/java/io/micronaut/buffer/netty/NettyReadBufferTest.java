@@ -10,6 +10,7 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -37,25 +38,74 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
     }
 
     /**
-     * {@link io.netty.buffer.CompositeByteBuf#addComponent} calls {@code consolidateIfNeeded()}
-     * after every single component, and each consolidation copies everything accumulated so far
-     * into a freshly allocated buffer. Adding all components at once must consolidate only once,
-     * i.e. there must be exactly one large allocation instead of {@code ceil(n / 16)}.
+     * A composite created with the allocator default of 16 components consolidates (copies all the
+     * pieces into one freshly allocated buffer) as soon as there are more than 16 of them, so a
+     * body of a few hundred pieces was copied once more before it could be read. Up to
+     * {@link NettyReadBufferFactory#MAX_COMPOSITE_COMPONENTS} pieces the composite must keep the
+     * pieces in place: no large allocation.
      */
     @Test
-    void composeConsolidatesOnlyOnce() {
-        int count = 50;
+    void composeKeepsPiecesInPlace() {
+        int count = 1280; // a 10 MiB body in 8 KiB pieces
         int chunk = 100;
         CountingAllocator allocator = new CountingAllocator(chunk + 1);
         NettyReadBufferFactory factory = NettyReadBufferFactory.of(allocator);
         List<ReadBuffer> parts = new ArrayList<>(count);
+        List<ByteBuf> pieces = new ArrayList<>(count);
+        byte[] expected = new byte[count * chunk];
         for (int i = 0; i < count; i++) {
-            parts.add(factory.adapt(Unpooled.wrappedBuffer(new byte[chunk])));
+            byte[] piece = new byte[chunk];
+            Arrays.fill(piece, (byte) i);
+            System.arraycopy(piece, 0, expected, i * chunk, chunk);
+            ByteBuf byteBuf = Unpooled.wrappedBuffer(piece);
+            pieces.add(byteBuf);
+            parts.add(factory.adapt(byteBuf));
+        }
+        ReadBuffer composed = factory.compose(parts);
+        try {
+            assertEquals(0, allocator.largeAllocations);
+            assertEquals(count * chunk, composed.readable());
+            assertArrayEquals(expected, composed.toArray());
+        } finally {
+            composed.close();
+        }
+        for (ByteBuf piece : pieces) {
+            assertEquals(0, piece.refCnt());
+        }
+    }
+
+    /**
+     * {@link io.netty.buffer.CompositeByteBuf#addComponent} calls {@code consolidateIfNeeded()}
+     * after every single component, and each consolidation copies everything accumulated so far
+     * into a freshly allocated buffer. Beyond {@link NettyReadBufferFactory#MAX_COMPOSITE_COMPONENTS}
+     * pieces, adding all components at once must consolidate only once, i.e. there must be exactly
+     * one large allocation instead of {@code ceil(n / max)}, and the pieces must be released.
+     */
+    @Test
+    void composeConsolidatesOnlyOnce() {
+        int count = NettyReadBufferFactory.MAX_COMPOSITE_COMPONENTS + 1;
+        int chunk = 10;
+        CountingAllocator allocator = new CountingAllocator(chunk + 1);
+        NettyReadBufferFactory factory = NettyReadBufferFactory.of(allocator);
+        List<ReadBuffer> parts = new ArrayList<>(count);
+        List<ByteBuf> pieces = new ArrayList<>(count);
+        byte[] expected = new byte[count * chunk];
+        for (int i = 0; i < count; i++) {
+            byte[] piece = new byte[chunk];
+            Arrays.fill(piece, (byte) i);
+            System.arraycopy(piece, 0, expected, i * chunk, chunk);
+            ByteBuf byteBuf = Unpooled.wrappedBuffer(piece);
+            pieces.add(byteBuf);
+            parts.add(factory.adapt(byteBuf));
         }
         ReadBuffer composed = factory.compose(parts);
         try {
             assertEquals(1, allocator.largeAllocations);
             assertEquals(count * chunk, composed.readable());
+            for (ByteBuf piece : pieces) {
+                assertEquals(0, piece.refCnt());
+            }
+            assertArrayEquals(expected, composed.toArray());
         } finally {
             composed.close();
         }
