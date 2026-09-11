@@ -21,11 +21,11 @@ import tools.jackson.databind.SerializationFeature;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.json.JsonFeatures;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,8 +48,8 @@ public final class JacksonFeatures implements JsonFeatures {
      * Empty jackson features.
      */
     public JacksonFeatures() {
-        this.serializationFeatures = new EnumMap<>(SerializationFeature.class);
-        this.deserializationFeatures = new EnumMap<>(DeserializationFeature.class);
+        this.serializationFeatures = CollectionUtils.newEnumMap(SerializationFeature.values());
+        this.deserializationFeatures = CollectionUtils.newEnumMap(DeserializationFeature.values());
         this.additionalModules = new ArrayList<>();
     }
 
