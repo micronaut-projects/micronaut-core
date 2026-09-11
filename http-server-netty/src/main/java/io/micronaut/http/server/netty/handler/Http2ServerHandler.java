@@ -49,7 +49,9 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
+import java.util.ArrayList;
 import java.util.EnumMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -68,6 +70,12 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private Http2Connection. @Nullable PropertyKey streamKey;
     private boolean reading = false;
     private boolean upgradedFromHttp1 = false;
+    /**
+     * Streams whose request headers were read since the last read complete, without the end of
+     * the stream. These are the only streams that can still need {@link MultiplexedStream#devolveToStreaming()}
+     * at the next read complete: that call accepts every such stream, so none survive it.
+     */
+    private final List<Http2Stream> pendingStreams = new ArrayList<>();
 
     static {
         for (Http2Error value : Http2Error.values()) {
@@ -128,6 +136,27 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return;
         }
         stream.onHeadersRead(HttpConversionUtil.toHttpRequest(streamId, headers, true), endOfStream);
+        if (!endOfStream) {
+            pendingStreams.add(stream);
+        }
+    }
+
+    /**
+     * Devolve the streams whose body did not arrive in full during this read batch to streaming.
+     * Streams that were closed in the meantime (reset by either side, or by a connection error)
+     * are skipped, like the previous walk over the active streams skipped them.
+     */
+    private void devolvePendingStreams() {
+        // devolveToStreaming calls into the request handler, which may close a later pending
+        // stream synchronously, hence the state check per stream. The list itself is only
+        // changed by onHeadersRead, which the decoder cannot call while read complete runs.
+        for (int i = 0; i < pendingStreams.size(); i++) {
+            Http2Stream stream = pendingStreams.get(i);
+            if (stream.stream.state() != io.netty.handler.codec.http2.Http2Stream.State.CLOSED) {
+                stream.devolveToStreaming();
+            }
+        }
+        pendingStreams.clear();
     }
 
     @Override
@@ -226,13 +255,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         public void channelReadComplete(ChannelHandlerContext ctx) throws Exception {
-            connection().forEachActiveStream(s -> {
-                Http2ServerHandler.Http2Stream stream = s.getProperty(handler.streamKey);
-                if (stream != null) {
-                    stream.devolveToStreaming();
-                }
-                return true;
-            });
+            handler.devolvePendingStreams();
             handler.reading = false;
             super.channelReadComplete(ctx);
         }
