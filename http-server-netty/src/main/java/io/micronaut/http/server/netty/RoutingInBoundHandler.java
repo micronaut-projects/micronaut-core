@@ -58,6 +58,7 @@ import java.nio.channels.ClosedChannelException;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -78,6 +79,10 @@ public final class RoutingInBoundHandler implements RequestHandler {
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+    /**
+     * Request event listeners that take longer than this on the event loop are reported at debug level.
+     */
+    private static final long SLOW_LISTENER_THRESHOLD_NANOS = TimeUnit.MILLISECONDS.toNanos(100);
 
     final StaticResourceResolver staticResourceResolver;
     final NettyHttpServerConfiguration serverConfiguration;
@@ -140,7 +145,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
                         PropagatedContext.getOrEmpty()
                             .plus(new ServerHttpRequestContext(request))
-                            .propagate(() -> terminateEventPublisher.publishEvent(new HttpRequestTerminatedEvent(request)));
+                            .propagate(() -> publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request)));
                         return ExecutionFlow.empty();
                     });
                 }
@@ -256,9 +261,30 @@ public final class RoutingInBoundHandler implements RequestHandler {
         return ExecutionFlow.async(getRequestEventExecutor(), () -> {
             PropagatedContext.getOrEmpty()
                 .plus(new ServerHttpRequestContext(request))
-                .propagate(() -> receivedPublisher.publishEvent(new HttpRequestReceivedEvent(request)));
+                .propagate(() -> publishRequestEvent(request, receivedPublisher, new HttpRequestReceivedEvent(request)));
             return ExecutionFlow.empty();
         });
+    }
+
+    /**
+     * Publish a request event. With the default thread selection the listeners run inline on the
+     * event loop, where a slow listener holds up every connection of that loop, so at debug level
+     * the time they take is checked against {@link #SLOW_LISTENER_THRESHOLD_NANOS}.
+     */
+    private <E> void publishRequestEvent(NettyHttpRequest<?> request, ApplicationEventPublisher<E> publisher, E event) {
+        if (!LOG.isDebugEnabled()) {
+            publisher.publishEvent(event);
+            return;
+        }
+        long start = System.nanoTime();
+        try {
+            publisher.publishEvent(event);
+        } finally {
+            long taken = System.nanoTime() - start;
+            if (taken > SLOW_LISTENER_THRESHOLD_NANOS && request.getChannelHandlerContext().executor().inEventLoop()) {
+                LOG.debug("Listeners for {} took {} ms on the event loop for {}. Request event listeners must not block; use @Async on the listener or micronaut.server.thread-selection=BLOCKING", event.getClass().getSimpleName(), TimeUnit.NANOSECONDS.toMillis(taken), request);
+            }
+        }
     }
 
     public void writeResponse(OutboundAccess outboundAccess,
