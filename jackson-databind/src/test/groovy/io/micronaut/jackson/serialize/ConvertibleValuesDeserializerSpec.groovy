@@ -1,5 +1,7 @@
 package io.micronaut.jackson.serialize
 
+import java.io.IOException
+
 import tools.jackson.databind.exc.MismatchedInputException
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.convert.value.ConvertibleValues
@@ -49,7 +51,8 @@ class ConvertibleValuesDeserializerSpec extends Specification {
         when:
         mapper.readValue('[{"foo":"4","fizz":5},4]', Argument.of(ConvertibleValues))
         then:
-        thrown MismatchedInputException
+        def e = thrown IOException
+        e.cause instanceof MismatchedInputException
 
         cleanup:
         ctx.close()
