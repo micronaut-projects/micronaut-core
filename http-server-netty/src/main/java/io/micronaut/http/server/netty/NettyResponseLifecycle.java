@@ -57,7 +57,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         super(routingInBoundHandler.routeExecutor,
             routingInBoundHandler.messageBodyHandlerRegistry,
             routingInBoundHandler.conversionService,
-            new NettyByteBodyFactory(request.getChannelHandlerContext().channel()));
+            request.byteBodyFactory());
         this.routingInBoundHandler = routingInBoundHandler;
         this.request = request;
     }
@@ -83,7 +83,7 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(request.getChannelHandlerContext().channel());
+        return request.byteBodyFactory();
     }
 
     @Override

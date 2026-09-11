@@ -124,6 +124,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Nullable
     private ChannelHandlerContext ctx;
     /**
+     * Body factory for this channel, shared by all requests. Set in {@link #handlerAdded}.
+     */
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
+    /**
      * {@code true} iff we are in a read operation, before {@link #channelReadComplete}.
      */
     private boolean reading = false;
@@ -223,6 +228,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
         this.ctx = ctx;
+        this.byteBodyFactory = NettyByteBodyFactory.forChannel(ctx.channel());
         // we take control of reading now.
         ctx.channel().config().setAutoRead(false);
         refreshNeedMore();
@@ -388,8 +394,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     private NettyByteBodyFactory byteBodyFactory() {
-        assert ctx != null;
-        return new NettyByteBodyFactory(requiredCtx().channel());
+        return Objects.requireNonNull(byteBodyFactory, "byteBodyFactory");
     }
 
     /**

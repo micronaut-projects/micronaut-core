@@ -99,7 +99,7 @@ public final class FormDemuxer implements BufferConsumer {
             complete();
         } else {
             this.eventLoop = channel.eventLoop();
-            this.byteBodyFactory = new NettyByteBodyFactory(channel);
+            this.byteBodyFactory = NettyByteBodyFactory.forChannel(channel);
             this.totalTracker = SizeLimitTracker.notThreadSafe(totalLimits).makeBothAtomic();
             try (var s = byteBodyFactory.toStreaming(byteBody)) {
                 this.upstream = s.primary(this);

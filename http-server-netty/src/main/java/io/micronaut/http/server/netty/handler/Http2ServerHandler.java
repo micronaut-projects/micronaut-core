@@ -214,7 +214,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            handler.ctx = ctx;
+            handler.attach(ctx);
             super.handlerAdded(ctx);
         }
 

@@ -39,7 +39,6 @@ import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.PushCapableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
@@ -184,6 +183,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Nullable
     private NettyCookies nettyCookies;
     private final CloseableByteBody body;
+    /**
+     * The per-channel body factory, looked up lazily on first use.
+     */
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     @Nullable
     private Object legacyBody;
     @Nullable
@@ -221,8 +225,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     @Override
-    public ByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(channelHandlerContext.channel());
+    public NettyByteBodyFactory byteBodyFactory() {
+        NettyByteBodyFactory factory = byteBodyFactory;
+        if (factory == null) {
+            factory = NettyByteBodyFactory.forChannel(channelHandlerContext.channel());
+            byteBodyFactory = factory;
+        }
+        return factory;
     }
 
     public void setLegacyBody(@Nullable Object legacyBody) {
