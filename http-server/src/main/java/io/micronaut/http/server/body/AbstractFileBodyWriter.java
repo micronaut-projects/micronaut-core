@@ -117,7 +117,8 @@ abstract sealed class AbstractFileBodyWriter permits InputStreamBodyWriter, Stre
      */
     protected void setDateHeader(MutableHttpResponse response) {
         MutableHttpHeaders headers = response.getHeaders();
-        headers.add(HttpHeaders.DATE, HttpDateHeader.now());
+        // replace, not add: a 304 has the original response's headers copied in first, Date included
+        headers.set(HttpHeaders.DATE, HttpDateHeader.now());
     }
 
     protected ByteBodyHttpResponse<?> notModified(ByteBodyFactory bodyFactory, MutableHttpResponse<?> originalResponse) {
