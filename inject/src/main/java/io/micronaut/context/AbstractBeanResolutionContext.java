@@ -386,6 +386,24 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return registrations;
     }
 
+    @Override
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType,
+                                                                    @Nullable Qualifier<T> qualifier,
+                                                                    Collection<? extends BeanRegistration<?>> reusable) {
+        if (reusable.isEmpty()) {
+            return getBeanRegistrations(beanType, qualifier);
+        }
+        Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier, reusable);
+        if (tracer != null) {
+            traceBeanCollection(
+                beanType,
+                qualifier,
+                registrations.stream().map(BeanRegistration::getBean).collect(Collectors.toList())
+            );
+        }
+        return registrations;
+    }
+
     /**
      * Copy the state from a previous resolution context.
      *
@@ -472,6 +490,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
                 return;
             }
             dependentFactory = dependentBeans.removeFirst();
+        }
+    }
+
+    @Override
+    public void markDependentAsFactory(Object factoryBean) {
+        if (dependentBeans == null) {
+            return;
+        }
+        // The factory was looked up last, so search from the end. A singleton factory is not a dependent at all.
+        for (ListIterator<BeanRegistration<?>> i = dependentBeans.listIterator(dependentBeans.size()); i.hasPrevious(); ) {
+            BeanRegistration<?> dependent = i.previous();
+            if (dependent.bean == factoryBean) {
+                i.remove();
+                dependentFactory = dependent;
+                return;
+            }
         }
     }
 
@@ -617,6 +651,39 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> T getProxyTargetBean(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.getProxyTargetBean(this, definition, beanType, qualifier);
+    }
+
+    @Override
+    public <T> T getProxyTargetBean(BeanDefinition<T> definition,
+                                    Argument<T> beanType,
+                                    @Nullable Qualifier<T> qualifier,
+                                    List<? extends BeanRegistration<?>> interceptorRegistrations) {
+        if (interceptorRegistrations.isEmpty()) {
+            return getProxyTargetBean(definition, beanType, qualifier);
+        }
+        Object previous = setAttribute(
+            PROXY_INTERCEPTOR_REGISTRATIONS,
+            new ProxyInterceptorRegistrations(definition, interceptorRegistrations)
+        );
+        try {
+            return getProxyTargetBean(definition, beanType, qualifier);
+        } finally {
+            restoreAttribute(PROXY_INTERCEPTOR_REGISTRATIONS, previous);
+        }
+    }
+
+    /**
+     * Sets an attribute back to the value it had before it was replaced.
+     *
+     * @param key      The attribute key
+     * @param previous The previous value, or {@code null} to remove the attribute
+     */
+    private void restoreAttribute(CharSequence key, @Nullable Object previous) {
+        if (previous == null) {
+            removeAttribute(key);
+        } else {
+            setAttribute(key, previous);
+        }
     }
 
     /**

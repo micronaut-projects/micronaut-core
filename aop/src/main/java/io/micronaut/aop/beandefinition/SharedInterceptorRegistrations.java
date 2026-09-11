@@ -16,13 +16,19 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.context.ProxyInterceptorRegistrations;
+import io.micronaut.context.Qualifier;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.IdentityHashMap;
@@ -150,6 +156,69 @@ public final class SharedInterceptorRegistrations {
             resolutionContext.setAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS, completed);
         }
         completed.put(definition, registrations);
+    }
+
+    /**
+     * Resolves the interceptors that construction, post-construct and pre-destroy interception of a bean all select
+     * from, by every interceptor binding in the given metadata whatever its kind.
+     *
+     * <p>When the bean is the target of a proxy with {@code proxyTarget = true} that the proxy is creating, the
+     * non-singleton interceptor instances the target adopted from the proxy are used instead of creating a second
+     * instance of the same interceptor, so that the proxy's method calls and the target's lifecycle share one, see
+     * {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The definition being created
+     * @param metadata          The metadata whose interceptor bindings select the interceptors
+     * @return The registrations, or {@code null} when the metadata binds none
+     * @since 5.2.1
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static @Nullable List resolve(BeanResolutionContext resolutionContext,
+                                  BeanDefinition<?> definition,
+                                  AnnotationMetadata metadata) {
+        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
+            return null;
+        }
+        Qualifier qualifier = Qualifiers.byInterceptorBinding(metadata);
+        List<? extends BeanRegistration<?>> adopted = adoptedRegistrations(resolutionContext, definition);
+        return new ArrayList(adopted == null
+            ? resolutionContext.getBeanRegistrations(Interceptor.ARGUMENT, qualifier)
+            : resolutionContext.getBeanRegistrations(Interceptor.ARGUMENT, qualifier, adopted));
+    }
+
+    /**
+     * Resolves the interceptors of a proxy target that has no constructor advice, and stores them as if its
+     * construction had resolved them.
+     *
+     * <p>Nothing resolved interceptors before post-construct of such a bean. Resolving the whole set here, rather
+     * than only what post-construct binds, lets its post-construct use the instances adopted from the proxy and
+     * lets pre-destroy reuse the same set later.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The definition being initialized
+     * @return The registrations, or {@code null} when the bean is not a proxy target being created by its proxy
+     * @since 5.2.1
+     */
+    static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> resolveForProxyTarget(BeanResolutionContext resolutionContext,
+                                                                                         BeanDefinition<?> definition) {
+        if (adoptedRegistrations(resolutionContext, definition) == null) {
+            return null;
+        }
+        @SuppressWarnings("unchecked")
+        List<BeanRegistration<Interceptor<?, ?>>> registrations = resolve(resolutionContext, definition, definition.getAnnotationMetadata());
+        store(resolutionContext, definition, registrations);
+        return registrations;
+    }
+
+    private static @Nullable List<? extends BeanRegistration<?>> adoptedRegistrations(BeanResolutionContext resolutionContext,
+                                                                                     BeanDefinition<?> definition) {
+        if (resolutionContext.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS) instanceof ProxyInterceptorRegistrations adopted
+            && !adopted.registrations().isEmpty()
+            && adopted.isFor(definition)) {
+            return adopted.registrations();
+        }
+        return null;
     }
 
     /**

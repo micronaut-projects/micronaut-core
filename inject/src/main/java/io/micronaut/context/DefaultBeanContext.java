@@ -3386,8 +3386,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 path.pushBeanCreate(definition, resolvedBeanType);
             }
+            Object proxyInterceptorRegistrations = context.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS);
             try {
                 List<BeanRegistration<?>> parentDependentBeans = context.popDependentBeans();
+                if (proxyInterceptorRegistrations instanceof ProxyInterceptorRegistrations handedOff && handedOff.isFor(definition)) {
+                    adoptProxyInterceptorRegistrations(context, definition, handedOff, parentDependentBeans);
+                }
                 T bean;
                 if (definition instanceof InstantiatableBeanDefinition<T> instantiatableBeanDefinition) {
                     bean = resolveByBeanFactory(context, instantiatableBeanDefinition, qualifier, Collections.emptyMap());
@@ -3427,11 +3431,68 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 return beanRegistration;
             } finally {
+                if (proxyInterceptorRegistrations != null) {
+                    // undo the narrowing done while adopting, for whatever else the proxy resolves
+                    context.setAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS, proxyInterceptorRegistrations);
+                }
                 if (isNewPath) {
                     path.close();
                 }
             }
         }
+    }
+
+    /**
+     * Makes the target of a proxy the owner of the non-singleton interceptor instances the proxy was constructed with.
+     *
+     * <p>A proxy with {@code proxyTarget = true} and its target are one intercepted bean: the proxy intercepts the
+     * business methods, the target its construction, post-construct and pre-destroy. A non-singleton interceptor is
+     * one instance per intercepted bean, so both halves must use the same instance. The proxy's constructor
+     * arguments, and so its interceptors, are resolved before the proxy resolves its target, which leaves each
+     * instance a dependent of the proxy.</p>
+     *
+     * <p>The instances are moved from the dependents of the proxy to the dependents of the target, so that they are
+     * destroyed with the target, after its {@code @PreDestroy}, and exactly once. Only an instance found among the
+     * proxy's dependents is moved: finding it there is what proves the proxy owns it, and a proxy whose target is
+     * resolved with a copied context, as a scope does, has none to give. The hand-off is then narrowed to the moved
+     * instances, which lifecycle interception of the target reuses instead of creating its own; restoring it is left
+     * to the caller.</p>
+     *
+     * @param context              The resolution context the target is created with
+     * @param definition           The definition of the target
+     * @param handedOff            The registrations the proxy handed to the target
+     * @param parentDependentBeans The dependents of the proxy, being created with the same context
+     */
+    private static void adoptProxyInterceptorRegistrations(BeanResolutionContext context,
+                                                           BeanDefinition<?> definition,
+                                                           ProxyInterceptorRegistrations handedOff,
+                                                           @Nullable List<BeanRegistration<?>> parentDependentBeans) {
+        List<BeanRegistration<?>> adopted = null;
+        if (parentDependentBeans != null && !parentDependentBeans.isEmpty()) {
+            for (BeanRegistration<?> registration : handedOff.registrations()) {
+                if (!registration.beanDefinition.isSingleton() && removeIdentical(parentDependentBeans, registration)) {
+                    if (adopted == null) {
+                        adopted = new ArrayList<>(handedOff.registrations().size());
+                    }
+                    adopted.add(registration);
+                    context.addDependentBean(registration);
+                }
+            }
+        }
+        context.setAttribute(
+            BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS,
+            new ProxyInterceptorRegistrations(definition, adopted == null ? Collections.emptyList() : adopted)
+        );
+    }
+
+    private static boolean removeIdentical(List<BeanRegistration<?>> registrations, BeanRegistration<?> registration) {
+        for (Iterator<BeanRegistration<?>> i = registrations.iterator(); i.hasNext(); ) {
+            if (i.next() == registration) {
+                i.remove();
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -3695,6 +3756,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                     Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier) {
+        return getBeanRegistrations(resolutionContext, beanType, qualifier, null);
+    }
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier, using an existing registration instead of
+     * creating a non-singleton bean whose definition it belongs to.
+     *
+     * @param resolutionContext The resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param reusable          The registrations to use instead of creating a new instance of their definition
+     * @param <T>               The generic type
+     * @return A collection of {@link BeanRegistration}
+     * @since 5.2.1
+     * @see BeanResolutionContext#getBeanRegistrations(Argument, Qualifier, Collection)
+     */
+    @Internal
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
+                                                                    Argument<T> beanType,
+                                                                    @Nullable Qualifier<T> qualifier,
+                                                                    @Nullable Collection<? extends BeanRegistration<?>> reusable) {
         assertContextState();
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
@@ -3744,7 +3826,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     return holder.registrations;
                 }
             } else {
-                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
+                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, reusable);
             }
         }
         if (LOG.isDebugEnabled() && !beanRegistrations.isEmpty()) {
@@ -3764,12 +3846,36 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                          Collection<BeanDefinition<T>> beanDefinitions,
                                                                          Argument<T> beanType,
                                                                          @Nullable Qualifier<T> qualifier) {
+        return resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private <T> Collection<BeanRegistration<T>> resolveBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
+                                                                         Collection<BeanDefinition<T>> beanDefinitions,
+                                                                         Argument<T> beanType,
+                                                                         @Nullable Qualifier<T> qualifier,
+                                                                         @Nullable Collection<? extends BeanRegistration<?>> reusable) {
         List<BeanRegistration<T>> beansOfTypeList = new ArrayList<>(beanDefinitions.size());
         for (BeanDefinition<T> definition : beanDefinitions) {
-            addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
+            BeanRegistration<?> existing = reusable == null || definition.isSingleton() ? null : findRegistration(reusable, definition);
+            if (existing != null) {
+                beansOfTypeList.add((BeanRegistration<T>) existing);
+            } else {
+                addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
+            }
         }
         beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
+    }
+
+    @Nullable
+    private static BeanRegistration<?> findRegistration(Collection<? extends BeanRegistration<?>> registrations, BeanDefinition<?> definition) {
+        for (BeanRegistration<?> registration : registrations) {
+            if (registration.beanDefinition.equals(definition)) {
+                return registration;
+            }
+        }
+        return null;
     }
 
     private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {

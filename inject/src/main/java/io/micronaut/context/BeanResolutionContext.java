@@ -79,6 +79,20 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      */
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
+    /**
+     * Attribute that hands the interceptor registrations of a proxy with {@code proxyTarget = true} to the target it
+     * resolves.
+     *
+     * <p>The value is a {@link ProxyInterceptorRegistrations}. It is set by
+     * {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier, List)} for the duration of the call. When the
+     * context creates the named target, it narrows the value to the non-singleton registrations the target adopted
+     * from the proxy, so that lifecycle interception of the target reuses them. Must be treated as an implementation
+     * detail.</p>
+     *
+     * @since 5.2.1
+     */
+    String PROXY_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.proxyInterceptorRegistrations";
+
     @Override
     default void close() {
         // no-op
@@ -304,6 +318,22 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Marks the dependent holding the given factory bean as the factory.
+     *
+     * <p>Unlike {@link #markDependentAsFactory()}, which takes the first dependent, this finds the factory itself.
+     * The first dependent is not the factory when the produced bean resolved other dependents before looking up its
+     * factory, such as the non-singleton interceptors and arguments of an intercepted factory method, and the factory
+     * is no dependent at all when it is a singleton.</p>
+     *
+     * @param factoryBean The factory bean
+     * @since 5.2.1
+     */
+    @UsedByGeneratedCode
+    default void markDependentAsFactory(Object factoryBean) {
+        markDependentAsFactory();
+    }
+
+    /**
      * @return The dependent factory beans that was used to create the bean in context
      * @since 3.5.0
      */
@@ -352,6 +382,54 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the target of a proxy, handing the target the interceptor registrations the proxy was constructed with.
+     *
+     * <p>A proxy with {@code proxyTarget = true} and the target it holds are one intercepted bean, so a non-singleton
+     * interceptor must be one instance for both: the proxy intercepts the business methods, the target its
+     * construction, post-construct and pre-destroy. When this call creates the target, the target adopts the proxy's
+     * non-singleton interceptor registrations, reuses them for its own lifecycle interception and destroys them with
+     * itself, see {@link #PROXY_INTERCEPTOR_REGISTRATIONS}. A target that already exists is returned as it is.</p>
+     *
+     * @param definition               The proxy target bean definition
+     * @param beanType                 The bean type
+     * @param qualifier                The bean qualifier
+     * @param interceptorRegistrations The interceptor registrations the proxy was constructed with
+     * @param <T>                      The generic type
+     * @return The proxy target
+     * @since 5.2.1
+     */
+    @Internal
+    @UsedByGeneratedCode
+    default <T> T getProxyTargetBean(BeanDefinition<T> definition,
+                                     Argument<T> beanType,
+                                     @Nullable Qualifier<T> qualifier,
+                                     List<? extends BeanRegistration<?>> interceptorRegistrations) {
+        return getProxyTargetBean(definition, beanType, qualifier);
+    }
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier, using an existing registration instead of
+     * creating a non-singleton bean whose definition it belongs to.
+     *
+     * <p>Used by lifecycle interception of a proxy target to select from the interceptor instances it adopted from its
+     * proxy, see {@link #PROXY_INTERCEPTOR_REGISTRATIONS}, instead of creating a second instance of the same
+     * interceptor. Candidates the reusable registrations do not cover are resolved as usual.</p>
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param reusable  The registrations to use instead of creating a new instance of their definition
+     * @param <T>       The generic type
+     * @return A collection of {@link BeanRegistration}
+     * @since 5.2.1
+     */
+    @Internal
+    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType,
+                                                                     @Nullable Qualifier<T> qualifier,
+                                                                     Collection<? extends BeanRegistration<?>> reusable) {
+        return getBeanRegistrations(beanType, qualifier);
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
