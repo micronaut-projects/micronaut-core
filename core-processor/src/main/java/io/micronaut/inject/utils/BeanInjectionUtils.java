@@ -37,6 +37,7 @@ import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.ReflectiveAccess;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ConstructorElement;
@@ -135,12 +136,14 @@ public class BeanInjectionUtils {
      *
      * <p>This is {@link ClassElement#getPrimaryConstructor()} extended to private constructors, which that lookup
      * never selects. A private constructor annotated with {@link AnnotationUtil#INJECT} or {@link Creator} takes
-     * precedence over an unannotated accessible one, and a type whose only constructor is private is instantiated
-     * with it. A private constructor is invoked with reflection, as private injected fields and methods are.</p>
+     * precedence over an unannotated accessible one when it is annotated with {@link ReflectiveAccess}, and a type
+     * whose only constructor is private is instantiated with it only when it is annotated with
+     * {@link ReflectiveAccess}. A private constructor is invoked with reflection, as private injected fields and
+     * methods are.</p>
      *
      * @param classElement The bean type
      * @return The constructor, or a static creator method, if one is found
-     * @since 5.3.0
+     * @since 5.2.1
      */
     public static Optional<MethodElement> findBeanConstructor(ClassElement classElement) {
         Optional<MethodElement> primaryConstructor = classElement.getPrimaryConstructor();
@@ -150,7 +153,7 @@ public class BeanInjectionUtils {
         }
         List<ConstructorElement> privateConstructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
             .stream()
-            .filter(Element::isPrivate)
+            .filter(constructor -> constructor.isPrivate() && constructor.hasAnnotation(ReflectiveAccess.class))
             .toList();
         for (ConstructorElement privateConstructor : privateConstructors) {
             if (isAnnotatedCreator(privateConstructor)) {

@@ -269,10 +269,13 @@ class Other {}
         GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
 package test;
 
+import io.micronaut.core.annotation.ReflectiveAccess;
+
 @jakarta.inject.Singleton
 class Test {
 
     @jakarta.inject.Inject
+    @ReflectiveAccess
     private Test(Other other) {
     }
 

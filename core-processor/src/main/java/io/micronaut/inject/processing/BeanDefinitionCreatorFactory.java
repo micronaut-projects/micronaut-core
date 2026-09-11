@@ -28,6 +28,7 @@ import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.List;
@@ -100,7 +101,9 @@ public abstract class BeanDefinitionCreatorFactory {
         }
         return classElement.hasStereotype(Executable.class) ||
             classElement.hasStereotype(AnnotationUtil.QUALIFIER) ||
-            classElement.getPrimaryConstructor().map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT)).orElse(false);
+            BeanInjectionUtils.findBeanConstructor(classElement)
+                .map(constructor -> constructor.hasStereotype(AnnotationUtil.INJECT))
+                .orElse(false);
     }
 
     private static boolean containsInjectMethod(ClassElement classElement) {

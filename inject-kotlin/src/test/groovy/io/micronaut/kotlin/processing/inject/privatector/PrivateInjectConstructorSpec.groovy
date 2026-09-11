@@ -10,14 +10,33 @@ class PrivateInjectConstructorSpec extends AbstractKotlinCompilerSpec {
 package privatector.plain
 
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.core.annotation.ReflectiveAccess
 import jakarta.inject.Inject
 
 @Prototype
-class Service @Inject private constructor()
+class Service @Inject @ReflectiveAccess private constructor()
 ''')
 
         expect:
         getBean(context, 'privatector.plain.Service') != null
+
+        cleanup:
+        context.close()
+    }
+
+    void "test an unscoped bean with a private @Inject constructor is discovered"() {
+        given:
+        def context = buildContext('''
+package privatector.unscoped
+
+import io.micronaut.core.annotation.ReflectiveAccess
+import jakarta.inject.Inject
+
+class Service @Inject @ReflectiveAccess private constructor()
+''')
+
+        expect:
+        getBean(context, 'privatector.unscoped.Service') != null
 
         cleanup:
         context.close()
@@ -57,17 +76,19 @@ class Dependency
         def service = getBean(context, 'privatector.args.Service')
 
         then:
-        service.origin == 'injected'
-        service.dependency.is(getBean(context, 'privatector.args.Dependency'))
+        service.origin == expectedOrigin
+        if (expectedOrigin == 'injected') {
+            service.dependency.is(getBean(context, 'privatector.args.Dependency'))
+        }
 
         cleanup:
         context.close()
 
         where:
-        annotations << [
-            '@Inject',
-            '@Inject @io.micronaut.core.annotation.ReflectiveAccess',
-            '@io.micronaut.core.annotation.Creator'
+        [annotations, expectedOrigin] << [
+            ['@Inject', 'public'],
+            ['@Inject @io.micronaut.core.annotation.ReflectiveAccess', 'injected'],
+            ['@io.micronaut.core.annotation.Creator @io.micronaut.core.annotation.ReflectiveAccess', 'injected']
         ]
     }
 
@@ -76,10 +97,11 @@ class Dependency
         def context = buildContext('''
 package privatector.sole
 
+import io.micronaut.core.annotation.ReflectiveAccess
 import jakarta.inject.Singleton
 
 @Singleton
-class Service private constructor()
+class Service @ReflectiveAccess private constructor()
 ''')
 
         expect:
@@ -96,12 +118,13 @@ package privatector.aroundconstruct
 
 import io.micronaut.aop.*
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.core.annotation.ReflectiveAccess
 import jakarta.inject.Inject
 import jakarta.inject.Singleton
 
 @Prototype
 @Constructed
-class Service @Inject private constructor()
+class Service @Inject @ReflectiveAccess private constructor()
 
 @Retention
 @Target(AnnotationTarget.CLASS, AnnotationTarget.CONSTRUCTOR)
@@ -138,10 +161,11 @@ package privatector.around
 
 import io.micronaut.aop.*
 import io.micronaut.context.annotation.Prototype
+import io.micronaut.core.annotation.ReflectiveAccess
 import jakarta.inject.Inject
 
 @Prototype
-open class Service @Inject private constructor() {
+open class Service @Inject @ReflectiveAccess private constructor() {
 
     @Intercepting
     open fun hello() = "hello"

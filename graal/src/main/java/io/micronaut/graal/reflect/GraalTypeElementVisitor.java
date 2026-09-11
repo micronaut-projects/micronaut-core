@@ -291,13 +291,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void processBeanConstructor(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
-        final MethodElement constructor = isImport
-            ? beanElement.getPrimaryConstructor().orElse(null)
-            : BeanInjectionUtils.findBeanConstructor(beanElement).orElse(null);
+        final MethodElement constructor = BeanInjectionUtils.findBeanConstructor(beanElement).orElse(null);
         if (constructor != null &&
             (constructor.hasAnnotation(ReflectiveAccess.class) ||
-                (isImport && !constructor.isPublic()) ||
-                (!isImport && constructor.isPrivate()))) {
+                (isImport && !constructor.isPublic()))) {
             processMethodElement(constructor, reflectiveClasses);
         }
     }

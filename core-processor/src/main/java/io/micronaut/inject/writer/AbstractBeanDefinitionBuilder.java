@@ -182,7 +182,7 @@ public abstract class AbstractBeanDefinitionBuilder implements BeanElementBuilde
     }
 
     private InternalBeanConstructorElement initConstructor(ClassElement beanType) {
-        return beanType.getPrimaryConstructor().map(m -> new InternalBeanConstructorElement(
+        return BeanInjectionUtils.findBeanConstructor(beanType).map(m -> new InternalBeanConstructorElement(
             m,
             !m.isPublic(),
             initBeanParameters(m.getParameters())
