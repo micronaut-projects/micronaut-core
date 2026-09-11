@@ -24,3 +24,12 @@ dependencies {
 //    }
 //}
 //
+
+noReflection {
+    allowIn("io.micronaut.http.client.HttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.ProxyHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.RawHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.StreamingHttpClientFactoryResolver", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.client.interceptor.HttpClientIntroductionAdvice", "CLASS_NAMES")
+    allowIn("io.micronaut.http.client.sse.SseClientFactoryResolver", "SERVICE_LOADING")
+}

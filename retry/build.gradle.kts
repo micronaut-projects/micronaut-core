@@ -19,3 +19,9 @@ dependencies {
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautDiscoveryCore)
 }
+
+noReflection {
+    allowIn("io.micronaut.retry.DefaultCircuitBreakerOperations", "CLASS_NAMES")
+    allowIn("io.micronaut.retry.DefaultRetryOperations", "CLASS_NAMES")
+    allowIn("io.micronaut.retry.intercept.AnnotationRetryStateBuilder", "REFLECTIVE_ACCESS")
+}

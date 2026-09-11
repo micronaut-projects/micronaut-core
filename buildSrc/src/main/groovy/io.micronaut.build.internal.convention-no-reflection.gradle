@@ -1,0 +1,63 @@
+// Reports reflection in the main Java sources with the NoReflection check of
+// https://github.com/micronaut-projects/errorprone-no-reflection, failing the compilation on any reflection outside
+// what the module allows in its build file:
+//
+//   noReflection {
+//       allowIn("io.micronaut.core.util.Example", "CLASS_NAMES")   // the categories allowed in a class and its nested classes
+//       allowIn("io.micronaut.example.*")                          // any reflection, in a package and the packages below it
+//   }
+//
+// The classes a module allows are the reflection it already had. To regenerate them, compile with
+// -PnoReflection.record: the classes allowed are ignored, the reports are warnings, and every compileJava prints the
+// noReflection block that allows what it reported, to replace the one in the build file of its module.
+//
+//   ./gradlew compileJava -PnoReflection.record
+plugins {
+    id "io.micronaut.build.internal.convention-nullaway"
+    id "io.micronaut.errorprone.no-reflection"
+}
+
+if (providers.gradleProperty("noReflection.record").isPresent()) {
+    noReflection {
+        severity 'WARN'
+    }
+    afterEvaluate {
+        // the packages a module allows stay allowed, as they are not the reflection that is recorded
+        noReflection.allowedIn.set(noReflection.allowedIn.get().findAll { scope, categories -> scope.endsWith('.*') })
+    }
+
+    tasks.named("compileJava", JavaCompile) { task ->
+        def output = new StringBuffer()
+        StandardOutputListener listener = { CharSequence text -> output.append(text) } as StandardOutputListener
+        task.logging.addStandardOutputListener(listener)
+        task.logging.addStandardErrorListener(listener)
+
+        def sourceRoots = sourceSets.main.java.srcDirs.collect { it.toPath() }
+        def buildFile = project.buildFile
+        doLast {
+            // a report: <source root>/<package>/<File>.java:<line>: warning: [NoReflection] <message> [<CATEGORY>]
+            def report = ~/^(.+)\.java:\d+: warning: \[NoReflection\] .*\[([A-Z_]+)\]$/
+            Map<String, SortedSet<String>> allowed = new TreeMap<>()
+            output.toString().eachLine { line ->
+                def matcher = report.matcher(line.strip())
+                if (matcher.matches()) {
+                    def source = java.nio.file.Path.of(matcher.group(1))
+                    def root = sourceRoots.find { source.startsWith(it) }
+                    if (root != null) {
+                        // the top-level class of the file, whose scope takes in its nested classes
+                        def type = root.relativize(source).toString().replace(File.separator, '.')
+                        allowed.computeIfAbsent(type) { new TreeSet<String>() }.add(matcher.group(2))
+                    }
+                }
+            }
+            if (allowed.isEmpty()) {
+                logger.lifecycle("NoReflection: {} allows no class", buildFile)
+            } else {
+                def block = allowed.collect { type, categories ->
+                    "    allowIn(${([type] + categories).collect { "\"$it\"" }.join(', ')})"
+                }.join('\n')
+                logger.lifecycle("NoReflection: the classes {} allows\n\nnoReflection {\n{}\n}\n", buildFile, block)
+            }
+        }
+    }
+}

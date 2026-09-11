@@ -67,3 +67,14 @@ tasks.processResources {
         into("META-INF/GRAALPY-VFS/micronaut-application")
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.context.python.GraalPyContextCustomizers", "SERVICE_LOADING")
+    allowIn("io.micronaut.context.python.GraalPyContextFactory", "SERVICE_LOADING")
+    allowIn("io.micronaut.context.python.GraalPyExceptionHandler", "CLASS_LOADING", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.context.python.GraalPyHostAccessFactory", "CLASS_NAMES")
+    allowIn("io.micronaut.context.python.PythonCoercion", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.context.python.PythonConversion", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.context.python.PythonExecutorSelector", "ANNOTATIONS")
+    allowIn("io.micronaut.context.python.aop.PythonProxyCreator", "ANNOTATIONS", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+}

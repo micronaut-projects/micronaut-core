@@ -49,3 +49,16 @@ spotless {
         targetExclude("**/io/micronaut/http/uri/QueryStringDecoder.java")
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.http.DefaultHttpFactories", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.HttpTypeConverterRegistrar", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.http.MediaType", "ANNOTATIONS")
+    allowIn("io.micronaut.http.body.stream.UpstreamBalancer", "FIELD_UPDATERS")
+    allowIn("io.micronaut.http.converters.SharedHttpConvertersRegistrar", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.http.cookie.ClientCookieEncoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.CookieFactory", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.ServerCookieDecoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.cookie.ServerCookieEncoder", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.reactive.execution.FlowAsMono", "FIELD_UPDATERS")
+}
