@@ -699,6 +699,9 @@ public interface ClassElement extends TypedElement {
      * Builds a map of all the type parameters for a class, its super classes and interfaces.
      * The resulting map contains the name of the class to the map of the resolved generic types.
      *
+     * <p>The arguments of every super type are expressed in the type arguments of this class: for
+     * {@code class Reversed<A, B> extends HashMap<B, A>} both {@code HashMap} and {@code Map} map to {@code [B, A]}.</p>
+     *
      * @return The type arguments for this class element
      */
     default Map<String, Map<String, ClassElement>> getAllTypeArguments() {
@@ -706,7 +709,16 @@ public interface ClassElement extends TypedElement {
         Stream.concat(
                 getInterfaces().stream(),
                 getSuperType().stream()
-        ).map(ClassElement::getAllTypeArguments).forEach(result::putAll);
+        ).forEach(superType -> {
+            // The arguments of a direct super type are written in this type's variables, while those of the
+            // types above it are written in the variables of the super type, which this type binds
+            Map<String, ClassElement> superTypeArguments = superType.getTypeArguments();
+            String superTypeName = superType.getName();
+            superType.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(superTypeName) ? typeArguments : bindTypeVariables(typeArguments, superTypeArguments)
+            ));
+        });
         result.put(getName(), getTypeArguments());
         return result;
     }
@@ -963,5 +975,51 @@ public interface ClassElement extends TypedElement {
                            ClassElement superType,
                            List<ClassElement> interfaces) {
         return new SimpleClassElement(typeName, isInterface, annotationMetadata, typeArguments, interfaces, superType);
+    }
+
+    /**
+     * Replaces the type variables named in the bindings, all at once, so a variable a binding introduces is never
+     * replaced again: {@code [K, V]} bound with {@code {K=V, V=K}} gives {@code [V, K]}.
+     *
+     * @param typeArguments The type arguments
+     * @param bindings      The types bound to the variables, by variable name
+     * @return The bound type arguments, the same map if no variable was bound
+     */
+    private static Map<String, ClassElement> bindTypeVariables(Map<String, ClassElement> typeArguments,
+                                                               Map<String, ClassElement> bindings) {
+        if (typeArguments.isEmpty() || bindings.isEmpty()) {
+            return typeArguments;
+        }
+        Map<String, ClassElement> bound = CollectionUtils.newLinkedHashMap(typeArguments.size());
+        boolean changed = false;
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            ClassElement typeArgument = entry.getValue();
+            ClassElement boundTypeArgument = bindTypeVariables(typeArgument, bindings);
+            changed |= boundTypeArgument != typeArgument;
+            bound.put(entry.getKey(), boundTypeArgument);
+        }
+        return changed ? bound : typeArguments;
+    }
+
+    private static ClassElement bindTypeVariables(ClassElement type, Map<String, ClassElement> bindings) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            ClassElement binding = bindings.get(placeholder.getVariableName());
+            if (binding == null) {
+                return type;
+            }
+            // A variable resolved through a binding already counts the dimensions of the binding
+            ClassElement bound = binding;
+            while (bound.getArrayDimensions() < placeholder.getArrayDimensions()) {
+                bound = bound.toArray();
+            }
+            return bound;
+        }
+        if (type instanceof WildcardElement) {
+            ClassElement folded = type.foldBoundGenericTypes(bound -> bound instanceof GenericPlaceholderElement ? bindTypeVariables(bound, bindings) : bound);
+            return folded == null ? type : folded;
+        }
+        Map<String, ClassElement> typeArguments = type.getTypeArguments();
+        Map<String, ClassElement> boundTypeArguments = bindTypeVariables(typeArguments, bindings);
+        return boundTypeArguments == typeArguments ? type : type.withTypeArguments(boundTypeArguments);
     }
 }
