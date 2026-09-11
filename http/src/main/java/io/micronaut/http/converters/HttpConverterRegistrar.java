@@ -99,6 +99,10 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                         return Optional.empty();
                     }
                     return Optional.of(object.toReadBuffer());
+                } else if (byte[].class.equals(targetType)) {
+                    // like InputStream and ReadBuffer, a raw view of the bytes: one copy out of the
+                    // upload, rather than InputStream.readAllBytes growing an array through a reader
+                    return Optional.of(object.getBytes());
                 }
 
                 MediaType mediaType = object.getContentType().orElse(null);
