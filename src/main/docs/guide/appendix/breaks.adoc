@@ -1,6 +1,17 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Construct advice no longer wraps injection and `@PostConstruct`
+
+A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and
+its `@PostConstruct` methods run, after every construct interceptor has returned, instead of inside the call to
+`proceed()`. As a result `@PostConstruct` no longer runs before an outer construct interceptor has completed, nor when
+one throws after `proceed()`.
+
+A construct interceptor that used the injected state of the instance returned by `proceed()` should bind to
+`InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
+Beans compiled with an earlier version keep the previous order until they are recompiled.
+
 === HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
 
 The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
