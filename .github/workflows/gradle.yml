@@ -8,15 +8,24 @@ on:
   push:
     branches:
       - master
+      - main
       - '[0-9]+.[0-9]+.x'
   pull_request:
     branches:
       - master
+      - main
       - '[0-9]+.[0-9]+.x'
+    types: [opened, synchronize, reopened, ready_for_review]
+# A new push to a pull request cancels its older run, freeing the shared runner
+# pool. Pushes to branches get a group of their own and are never cancelled:
+# they publish snapshots and docs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 jobs:
   build:
     name: "build"
-    if: github.repository != 'micronaut-projects/micronaut-project-template'
+    if: github.repository != 'micronaut-projects/micronaut-project-template' && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     runs-on: ubuntu-latest
     strategy:
       matrix:

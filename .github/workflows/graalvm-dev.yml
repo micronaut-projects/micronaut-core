@@ -6,10 +6,39 @@
 name: GraalVM Dev CI
 on:
   schedule:
-    - cron: "0 1 * * 1-5" # Mon-Fri at 1am UTC
+    - cron: "0 1 * * 6" # Saturdays at 1am Europe/Madrid; the gate below runs every other Saturday
+      timezone: "Europe/Madrid"
 jobs:
-  build_matrix:
+  should_run:
     if: github.repository != 'micronaut-projects/micronaut-project-template'
+    runs-on: ubuntu-latest
+    outputs:
+      should_run: ${{ steps.biweekly.outputs.should_run }}
+    steps:
+      - name: Check biweekly schedule
+        id: biweekly
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          current_date="$(TZ=Europe/Madrid date +%F)"
+          current_day="$(date -u -d "${current_date}" +%s)"
+          anchor_day="$(date -u -d "2026-09-12" +%s)"
+          days_since_anchor=$(( (current_day - anchor_day) / 86400 ))
+          should_run=false
+
+          if (( days_since_anchor >= 0 && days_since_anchor % 14 == 0 )); then
+            should_run=true
+          fi
+
+          echo "Current date: ${current_date}"
+          echo "Days since anchor: ${days_since_anchor}"
+          echo "Run build: ${should_run}"
+          echo "should_run=${should_run}" >> "${GITHUB_OUTPUT}"
+
+  build_matrix:
+    needs: should_run
+    if: github.repository != 'micronaut-projects/micronaut-project-template' && needs.should_run.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     env:
       DEVELOCITY_ACCESS_KEY: ${{ secrets.GRADLE_ENTERPRISE_ACCESS_KEY }}
