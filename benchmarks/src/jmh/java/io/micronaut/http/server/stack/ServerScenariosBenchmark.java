@@ -94,7 +94,13 @@ public class ServerScenariosBenchmark {
 
         ApplicationContext ctx;
         EmbeddedChannel channel;
-        ByteBuf requestBytes;
+        /**
+         * The encoded request, one buffer per message the client codec wrote. Each is delivered in
+         * its own read cycle, so a chunked request reaches the server as separate reads and takes
+         * its streaming path, instead of being coalesced into one read that the server would treat
+         * as a fully available body.
+         */
+        List<ByteBuf> requestParts;
         ByteBuf responseBytes;
 
         @Setup
@@ -116,7 +122,12 @@ public class ServerScenariosBenchmark {
             }
             clientChannel.flushOutbound();
 
-            requestBytes = NettyUtil.readAllOutboundContiguous(clientChannel);
+            requestParts = NettyUtil.readAllOutboundParts(clientChannel);
+            if (scenario.name().endsWith("_CHUNKED") && requestParts.size() < 2) {
+                // otherwise the server sees one read and takes the fully-available path, and the
+                // scenario measures nothing of what it claims to
+                throw new IllegalStateException(scenario + " must reach the server in more than one read, got " + requestParts.size());
+            }
 
             // sanity check: run req/resp once and see that the response is correct
             responseBytes = exchange();
@@ -130,7 +141,9 @@ public class ServerScenariosBenchmark {
         }
 
         private void send() {
-            channel.writeInbound(requestBytes.retainedDuplicate());
+            for (ByteBuf part : requestParts) {
+                channel.writeInbound(part.retainedDuplicate());
+            }
             channel.runPendingTasks();
             // some scenarios may complete on another thread (e.g. blocking executor); wait for output
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
@@ -200,7 +213,9 @@ public class ServerScenariosBenchmark {
         @TearDown
         public void tearDown() {
             ctx.close();
-            requestBytes.release();
+            for (ByteBuf part : requestParts) {
+                part.release();
+            }
             responseBytes.release();
         }
     }
