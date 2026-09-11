@@ -95,6 +95,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
 
     private final RequestHandler requestHandler;
+    private final boolean quic;
 
     // these three handlers can be reused and are cached here
     private final DroppingInboundHandler droppingInboundHandler = new DroppingInboundHandler();
@@ -143,10 +144,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
+    private boolean quicWritePending = false;
     private boolean shuttingDown = false;
 
     public PipeliningServerHandler(RequestHandler requestHandler) {
+        this(requestHandler, false);
+    }
+
+    public PipeliningServerHandler(RequestHandler requestHandler, boolean quic) {
         this.requestHandler = requestHandler;
+        this.quic = quic;
     }
 
     private ChannelHandlerContext requiredCtx() {
@@ -270,7 +277,19 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     @Override
     public void channelWritabilityChanged(ChannelHandlerContext ctx) {
-        writeSome();
+        if (quic) {
+            // QUIC can briefly report writable while draining its write queue, before updating its
+            // remaining capacity. Wait for that update before requesting more response content.
+            if (!quicWritePending) {
+                quicWritePending = true;
+                ctx.executor().execute(() -> {
+                    quicWritePending = false;
+                    writeSome();
+                });
+            }
+        } else {
+            writeSome();
+        }
     }
 
     @Override
