@@ -235,16 +235,23 @@ public abstract class ResponseLifecycle {
             });
         } else {
             MediaType finalMediaType = mediaType;
-            boolean isJsonMediaType = finalMediaType != null && MediaType.EXTENSION_JSON.equals(finalMediaType.getExtension());
-            // there is no declared response body type here, so whether the items can be formatted
-            // as a JSON array is derived from the type of the items that are actually written. The
-            // flow below only completes once the first item has gone through the writer.
+            // A single-value publisher (Mono, Single, Maybe, ...) is one document, not a stream of
+            // elements, so it is never framed as an array. This is what the route path does too:
+            // RouteExecutor unwraps single publishers before they get here.
+            boolean single = Publishers.isSingle(body.getClass());
+            boolean isJsonMediaType = !single && finalMediaType != null && MediaType.EXTENSION_JSON.equals(finalMediaType.getExtension());
+            // There is no declared response body type here, so whether the items can be formatted
+            // as a JSON array is derived from the type of the first item that is actually written,
+            // and only the first: the flow below completes once that item has gone through the
+            // writer, and the framing has to be settled by then. Later items of another type do not
+            // change it, so a mixed stream comes out the same way regardless of timing.
             AtomicBoolean jsonFormattable = new AtomicBoolean(true);
+            AtomicBoolean first = new AtomicBoolean(true);
             isJson = () -> isJsonMediaType && jsonFormattable.get();
             httpContentPublisher = bodyPublisher
                 .concatMap(message -> {
                     Argument<Object> type = Argument.ofInstance(message);
-                    if (isJsonMediaType && !isJsonFormattable(type)) {
+                    if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
                         jsonFormattable.set(false);
                     }
                     MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
