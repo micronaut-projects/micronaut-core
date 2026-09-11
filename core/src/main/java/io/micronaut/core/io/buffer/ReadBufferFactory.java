@@ -168,7 +168,25 @@ public class ReadBufferFactory {
      * @throws T If the writer throws an exception
      */
     public <T extends Throwable> ReadBuffer buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
-        var s = new NoCopyByteArrayOutputStream(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY);
+        return buffer(NoCopyByteArrayOutputStream.DEFAULT_CAPACITY, writer);
+    }
+
+    /**
+     * Write to a new buffer using an {@link OutputStream}, like {@link #buffer(ThrowingConsumer)},
+     * with a hint for the size of the data that will be written. The buffer starts out with room
+     * for that many bytes, so a writer that produces about that much data does not have to grow
+     * the buffer while writing. The hint is only a starting capacity: writing more than that is
+     * fine.
+     *
+     * @param expectedSize The expected number of bytes the writer will produce
+     * @param writer       The writer
+     * @param <T>          An exception thrown by the writer
+     * @return The written data
+     * @throws T If the writer throws an exception
+     * @since 5.2.1
+     */
+    public <T extends Throwable> ReadBuffer buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
+        var s = new NoCopyByteArrayOutputStream(expectedSize);
         writer.accept(s);
         return adapt(s.toByteBuffer());
     }

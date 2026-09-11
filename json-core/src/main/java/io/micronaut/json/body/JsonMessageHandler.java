@@ -72,6 +72,14 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      */
     public static final int ORDER = -10;
 
+    /**
+     * Starting capacity of the buffer a JSON response is serialised into. Jackson's generator
+     * writes through an 8000 byte encoding buffer, so a response of up to that size arrives in
+     * one write; with the allocator's 256 byte default that first write already forced the
+     * buffer to grow.
+     */
+    private static final int WRITE_BUFFER_SIZE = 8192;
+
     private final JsonMapper jsonMapper;
 
     public JsonMessageHandler(JsonMapper jsonMapper) {
@@ -152,7 +160,7 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     @Override
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         try {
-            return bodyFactory.buffer(s -> jsonMapper.writeValue(s, object));
+            return bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> jsonMapper.writeValue(s, object));
         } catch (IOException e) {
             throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }

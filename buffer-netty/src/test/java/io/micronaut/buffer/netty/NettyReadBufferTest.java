@@ -9,6 +9,7 @@ import io.netty.buffer.UnpooledByteBufAllocator;
 
 import org.junit.jupiter.api.Test;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -111,6 +112,21 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
         }
     }
 
+    /**
+     * The size hint is passed to the allocator as the initial capacity, so a writer that produces
+     * up to that many bytes never grows the buffer.
+     */
+    @Test
+    void bufferWithExpectedSizeRequestsThatCapacity() throws IOException {
+        CountingAllocator allocator = new CountingAllocator(1);
+        NettyReadBufferFactory factory = NettyReadBufferFactory.of(allocator);
+        byte[] data = new byte[5000];
+        try (ReadBuffer rb = factory.buffer(8192, os -> os.write(data))) {
+            assertEquals(List.of(8192), allocator.requestedCapacities);
+            assertEquals(1, allocator.largeAllocations);
+            assertArrayEquals(data, rb.toArray());
+        }
+    }
     @Test
     void composeWithNonCollectionIterable() {
         NettyReadBufferFactory factory = NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT);
@@ -155,6 +171,7 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
     private static final class CountingAllocator extends AbstractByteBufAllocator {
         final int threshold;
         int largeAllocations;
+        final List<Integer> requestedCapacities = new ArrayList<>();
 
         CountingAllocator(int threshold) {
             super(false);
@@ -179,6 +196,7 @@ public class NettyReadBufferTest extends AbstractReadBufferTest {
         }
 
         private void count(int initialCapacity) {
+            requestedCapacities.add(initialCapacity);
             if (initialCapacity >= threshold) {
                 largeAllocations++;
             }

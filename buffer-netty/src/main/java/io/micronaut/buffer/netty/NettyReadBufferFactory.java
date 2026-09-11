@@ -189,7 +189,15 @@ public final class NettyReadBufferFactory extends ReadBufferFactory {
 
     @Override
     public <T extends Throwable> ReadBuffer buffer(ThrowingConsumer<? super OutputStream, T> writer) throws T {
-        ByteBuf buf = allocator.buffer();
+        return buffer(allocator.buffer(), writer);
+    }
+
+    @Override
+    public <T extends Throwable> ReadBuffer buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
+        return buffer(allocator.buffer(expectedSize), writer);
+    }
+
+    private <T extends Throwable> ReadBuffer buffer(ByteBuf buf, ThrowingConsumer<? super OutputStream, T> writer) throws T {
         boolean release = true;
         try {
             ByteBufOutputStream s = new ByteBufOutputStream(buf);
