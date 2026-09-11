@@ -68,6 +68,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private Qualifier<?> qualifier;
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
+    private boolean lazyProxyTarget;
     @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
     @Nullable
@@ -405,7 +406,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         if (!context.getBeanResolutionCustomizer().shouldPreserveLazyProxyTargetResolutionPath(this, proxyBeanDefinition)) {
             copy.getPath().clear();
         }
+        if (copy instanceof AbstractBeanResolutionContext abstractCopy) {
+            abstractCopy.lazyProxyTarget = true;
+        }
         return copy;
+    }
+
+    /**
+     * Whether this context was copied by {@link #copyForLazyProxyTarget(BeanDefinition)}. Such a context is retained
+     * by the lazy proxy for its whole life and the proxy target is resolved through it on every intercepted call,
+     * possibly from several threads at once, so a bean must not be created directly in it.
+     *
+     * @return True if the context is retained by a lazy proxy
+     * @since 5.2.0
+     */
+    final boolean isLazyProxyTarget() {
+        return lazyProxyTarget;
     }
 
     @Override
