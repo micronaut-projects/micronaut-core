@@ -29,7 +29,7 @@ class ErrorContextTest {
                 .exceptionMessage("Sensitive message")
                 .build();
 
-        assertEquals("Sensitive message", errorContext.getExceptionMessage().orElseThrow());
+        assertEquals("Sensitive message", errorContext.getExceptionMessage().orElseThrow(AssertionError::new));
         assertFalse(errorContext.hasErrors());
     }
 }
