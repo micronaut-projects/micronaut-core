@@ -32,6 +32,7 @@ import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFuture;
@@ -91,6 +92,13 @@ import java.util.concurrent.CompletionStage;
  */
 @Internal
 public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter implements GracefulShutdownCapable {
+    /**
+     * Maximum number of components of the composite a buffered request body is assembled from.
+     * The allocator default of 16 would consolidate (copy) the body as soon as it arrived in more
+     * than 16 pieces; see {@link #composeBody}.
+     */
+    static final int MAX_COMPOSITE_COMPONENTS = 4096;
+
     private static final Logger LOG = LoggerFactory.getLogger(PipeliningServerHandler.class);
     private static final String DECOMPRESSOR_HANDLER = "decompressor";
 
@@ -393,6 +401,30 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     /**
+     * Assemble the pieces of a request body that arrived before {@code channelReadComplete} into
+     * one buffer. All pieces are added at once so that the composite consolidates (copies the
+     * pieces into one contiguous buffer) at most once, and only beyond
+     * {@link #MAX_COMPOSITE_COMPONENTS} pieces; adding them one at a time consolidates after every
+     * 16th piece, copying everything accumulated so far each time. Ownership of the pieces
+     * transfers to the returned buffer.
+     *
+     * @param alloc  The allocator
+     * @param pieces The pieces, at least two
+     * @return The composed body
+     */
+    static ByteBuf composeBody(ByteBufAllocator alloc, List<ByteBuf> pieces) {
+        CompositeByteBuf composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        try {
+            // addComponents takes ownership of all pieces, releasing any it did not add
+            composite.addComponents(true, pieces);
+            return composite;
+        } catch (Throwable e) {
+            composite.release();
+            throw e;
+        }
+    }
+
+    /**
      * An inbound handler is responsible for all incoming messages.
      */
     private abstract static class InboundHandler {
@@ -598,11 +630,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                 } else if (buffer.size() == 1) {
                     fullBody = buffer.getFirst().content();
                 } else {
-                    CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
+                    List<ByteBuf> pieces = new ArrayList<>(buffer.size());
                     for (HttpContent c : buffer) {
-                        composite.addComponent(true, c.content());
+                        pieces.add(c.content());
                     }
-                    fullBody = composite;
+                    fullBody = composeBody(requiredCtx().alloc(), pieces);
                 }
                 buffer.clear();
                 receivedLength = 0;

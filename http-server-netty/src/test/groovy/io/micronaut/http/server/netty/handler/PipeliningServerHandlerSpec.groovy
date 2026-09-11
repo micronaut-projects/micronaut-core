@@ -8,9 +8,11 @@ import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
+import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
+import io.netty.buffer.UnpooledByteBufAllocator
 import io.netty.channel.ChannelHandler
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelOutboundHandlerAdapter
@@ -984,6 +986,85 @@ class PipeliningServerHandlerSpec extends Specification {
 
         then:
         ch.checkException()
+    }
+
+    def 'a body that arrives in many pieces before read complete is composed without copying'() {
+        given:
+        int pieces = 200
+        int pieceSize = 100
+        def allocator = new CountingAllocator(pieceSize + 1)
+        CloseableByteBody received = null
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                received = body
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.NO_CONTENT), NettyByteBodyFactory.empty())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+        ch.config().setAllocator(allocator)
+        byte[] expected = new byte[pieces * pieceSize]
+        ThreadLocalRandom.current().nextBytes(expected)
+
+        when:
+        def head = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        head.headers().add(HttpHeaderNames.CONTENT_LENGTH, expected.length)
+        ch.writeOneInbound(head)
+        for (int i = 0; i < pieces; i++) {
+            ch.writeOneInbound(new DefaultHttpContent(Unpooled.copiedBuffer(expected, i * pieceSize, pieceSize)))
+        }
+        ch.writeOneInbound(LastHttpContent.EMPTY_LAST_CONTENT)
+        ch.flushInbound()
+
+        then:
+        received != null
+        allocator.largeAllocations == 0
+        ((AvailableByteBody) received).toByteArray() == expected
+
+        cleanup:
+        received?.close()
+        ch.finishAndReleaseAll()
+    }
+
+    /**
+     * Counts allocations at least as large as the threshold, i.e. those made by
+     * {@code CompositeByteBuf.consolidate0}.
+     */
+    static class CountingAllocator extends AbstractByteBufAllocator {
+        final int threshold
+        int largeAllocations
+
+        CountingAllocator(int threshold) {
+            super(false)
+            this.threshold = threshold
+        }
+
+        @Override
+        protected ByteBuf newHeapBuffer(int initialCapacity, int maxCapacity) {
+            count(initialCapacity)
+            return UnpooledByteBufAllocator.DEFAULT.heapBuffer(initialCapacity, maxCapacity)
+        }
+
+        @Override
+        protected ByteBuf newDirectBuffer(int initialCapacity, int maxCapacity) {
+            count(initialCapacity)
+            return UnpooledByteBufAllocator.DEFAULT.directBuffer(initialCapacity, maxCapacity)
+        }
+
+        @Override
+        boolean isDirectBufferPooled() {
+            return false
+        }
+
+        private void count(int initialCapacity) {
+            if (initialCapacity >= threshold) {
+                largeAllocations++
+            }
+        }
     }
 
     static class MonitorHandler extends ChannelOutboundHandlerAdapter {
