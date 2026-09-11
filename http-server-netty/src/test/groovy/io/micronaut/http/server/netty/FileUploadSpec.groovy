@@ -120,7 +120,7 @@ class FileUploadSpec extends Specification {
                 "\r\n--boundary--\r\n").getBytes(charset)
 
         when:
-        def connection = (HttpURLConnection) new URL("http://$server.host:$server.port/multipart/attribute").openConnection()
+        def connection = (HttpURLConnection) new URL("http://$server.host:$server.port/multipart/" + path).openConnection()
         connection.setRequestMethod("POST")
         connection.addRequestProperty("Content-Type", "multipart/form-data; boundary=boundary")
         connection.setDoOutput(true)
@@ -138,7 +138,11 @@ class FileUploadSpec extends Specification {
         ctx.close()
 
         where:
-        charset << ["ISO-8859-1", "UTF-8"]
+        charset      | path
+        "ISO-8859-1" | "attribute"
+        "UTF-8"      | "attribute"
+        "ISO-8859-1" | "optional-attribute"
+        "UTF-8"      | "optional-attribute"
     }
 
     def 'attribute with an unresolvable declared charset falls back to the charset of the request'() {
@@ -189,6 +193,11 @@ class FileUploadSpec extends Specification {
         @Post(value = '/attribute', consumes = MediaType.MULTIPART_FORM_DATA)
         String attribute(@Part String value) {
             return value
+        }
+
+        @Post(value = '/optional-attribute', consumes = MediaType.MULTIPART_FORM_DATA)
+        String optionalAttribute(@Part Optional<String> value) {
+            return value.orElse("(absent)")
         }
 
         @Post(value = '/complete-file-upload', consumes = MediaType.MULTIPART_FORM_DATA)

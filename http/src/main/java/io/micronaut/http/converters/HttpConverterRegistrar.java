@@ -137,10 +137,17 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
             } else {
                 Charset declaredCharset = declaredCharset(object);
                 try (ReadBuffer rb = object.toReadBuffer()) {
-                    if (declaredCharset != null && targetType.isAssignableFrom(String.class)) {
-                        // the generic ReadBuffer conversion below would decode with the charset of
-                        // the request, but this part declares one of its own
-                        return Optional.of(rb.toString(declaredCharset));
+                    if (declaredCharset != null && !isBinary(targetType)) {
+                        // The generic ReadBuffer conversion below would decode with the charset of
+                        // the request, but this part declares one of its own. That applies to any
+                        // textual target, including wrappers such as Optional<String>, so decode
+                        // here and convert the text, rather than let the ReadBuffer conversion
+                        // decode with the wrong charset on the way to the wrapper.
+                        String s = rb.toString(declaredCharset);
+                        if (targetType.isAssignableFrom(String.class)) {
+                            return Optional.of(s);
+                        }
+                        return conversionService.convert(s, targetType, context);
                     }
                     Optional<Object> direct = conversionService.convert(rb, targetType, context);
                     // This detects Optional.empty and Optional[Optional.empty]
@@ -155,6 +162,18 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         });
+    }
+
+    /**
+     * Whether the given conversion target is a raw byte container, for which a part's declared
+     * charset is irrelevant and decoding the bytes as text would corrupt them.
+     */
+    private static boolean isBinary(Class<?> targetType) {
+        return targetType == byte[].class
+            || java.nio.ByteBuffer.class.isAssignableFrom(targetType)
+            || io.micronaut.core.io.buffer.ByteBuffer.class.isAssignableFrom(targetType)
+            || ReadBuffer.class.isAssignableFrom(targetType)
+            || InputStream.class.isAssignableFrom(targetType);
     }
 
     /**
