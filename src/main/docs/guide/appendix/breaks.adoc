@@ -1,6 +1,10 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== `HttpContentSubscriberFactory` removed from the Netty server
+
+`io.micronaut.http.server.netty.HttpContentSubscriberFactory`, deprecated for removal since 4.5.0, has been removed. It has not been consulted by the server since the 4.0 body handling rewrite: the server neither looked up nor called implementations of it, so a bean implementing it had no effect. Implementations should be deleted; request body handling is customised through `io.micronaut.http.body.MessageBodyReader` instead.
+
 === HTTP client redirect forwarding no longer retains authorization headers cross-origin by default
 
 The Netty HTTP client no longer forwards `Authorization`, `Proxy-Authorization`, or `Cookie` headers on cross-origin redirects by default.
