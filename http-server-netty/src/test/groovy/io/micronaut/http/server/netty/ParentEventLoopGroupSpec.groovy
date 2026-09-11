@@ -49,6 +49,21 @@ class ParentEventLoopGroupSpec extends Specification {
         server.stop()
     }
 
+    def 'a configured acceptor group name is kept when the server creates the group itself'() {
+        given: 'a named group that the registry does not provide, so the server creates it'
+        NettyHttpServer server = (NettyHttpServer) ApplicationContext.run(EmbeddedServer, [
+                'spec.name'                                     : 'ParentEventLoopGroupSpec',
+                'micronaut.server.netty.parent.event-loop-group': 'acceptors'
+        ])
+
+        expect: 'the single-thread default applies, under the configured name'
+        executorCount(server.parentGroup) == 1
+        threadName(server.parentGroup).startsWith('acceptors-eventLoopGroup-')
+
+        cleanup:
+        server.stop()
+    }
+
     def 'acceptor thread count configured on the server is honoured'() {
         given:
         NettyHttpServer server = (NettyHttpServer) ApplicationContext.run(EmbeddedServer, [

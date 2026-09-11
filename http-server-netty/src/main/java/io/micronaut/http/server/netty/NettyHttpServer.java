@@ -81,6 +81,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -542,7 +543,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             return source;
         }
         return new DefaultEventLoopGroupConfiguration(
-            NettyHttpServerConfiguration.Parent.NAME,
+            // keep a name the user configured; only the implicit acceptor group is called "parent"
+            parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
             DEFAULT_PARENT_THREADS,
             source.getThreadCoreRatio(),
             source.getIoRatio().orElse(null),
@@ -1131,6 +1133,29 @@ public class NettyHttpServer implements NettyEmbeddedServer {
          * close.
          */
         void closeConnections() {
+            // One deadline for everything below, since it all proceeds concurrently on the loops.
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(closeWaitMillis());
+            // A connection accepted just before the listener channel was closed may still be queued
+            // for registration with its worker event loop. Its initChannel has not run then, so it
+            // is not in activeConnections yet, and it would come up after this pass and stay usable
+            // when the worker group is shared and therefore not shut down. A round trip through
+            // every worker loop runs those queued registrations first.
+            EventLoopGroup workers = workerGroup;
+            if (workers != null) {
+                List<Future<?>> roundTrips = new ArrayList<>();
+                for (EventExecutor loop : workers) {
+                    // the current loop would deadlock, and a loop that is going away has nothing queued for us
+                    if (!loop.inEventLoop() && !loop.isShuttingDown()) {
+                        roundTrips.add(loop.submit(() -> { }));
+                    }
+                }
+                for (Future<?> roundTrip : roundTrips) {
+                    if (!awaitUntil(roundTrip, deadline)) {
+                        LOG.warn("Worker event loop did not run queued connection registrations within {}ms, continuing shutdown", closeWaitMillis());
+                        break;
+                    }
+                }
+            }
             List<ChannelFuture> closeFutures = new ArrayList<>();
             for (HttpPipelineBuilder.ConnectionPipeline connection : activeConnections) {
                 Channel channel = connection.channel;
@@ -1141,15 +1166,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     closeFutures.add(closeFuture);
                 }
             }
-            // One deadline for all of them, since they close concurrently on their event loops.
-            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(closeWaitMillis());
             for (ChannelFuture closeFuture : closeFutures) {
-                long remaining = deadline - System.nanoTime();
-                if (remaining <= 0 || !closeFuture.awaitUninterruptibly(remaining, TimeUnit.NANOSECONDS)) {
+                if (!awaitUntil(closeFuture, deadline)) {
                     LOG.warn("Connection {} did not close within {}ms, continuing shutdown", closeFuture.channel(), closeWaitMillis());
                     break;
                 }
             }
+        }
+
+        private static boolean awaitUntil(Future<?> future, long deadlineNanos) {
+            long remaining = deadlineNanos - System.nanoTime();
+            return remaining > 0 && future.awaitUninterruptibly(remaining, TimeUnit.NANOSECONDS);
         }
 
         /**
