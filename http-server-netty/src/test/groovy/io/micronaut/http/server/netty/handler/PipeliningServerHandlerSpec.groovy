@@ -29,6 +29,7 @@ import io.netty.handler.codec.http.DefaultLastHttpContent
 import io.netty.handler.codec.http.EmptyHttpHeaders
 import io.netty.handler.codec.http.FullHttpRequest
 import io.netty.handler.codec.http.FullHttpResponse
+import io.netty.handler.codec.http.HttpContent
 import io.netty.handler.codec.http.HttpHeaderNames
 import io.netty.handler.codec.http.HttpHeaderValues
 import io.netty.handler.codec.http.HttpMethod
@@ -141,6 +142,75 @@ class PipeliningServerHandlerSpec extends Specification {
         ch.readOutbound() == new DefaultHttpContent(c2)
         ch.readOutbound() == null
         ch.checkException()
+    }
+
+    def 'writability handling is protocol-specific'() {
+        given:
+        int emitted = 0
+        boolean blockWrites = true
+        def ch = new EmbeddedChannel(new ChannelOutboundHandlerAdapter() {
+            @Override
+            void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) {
+                if (blockWrites && msg instanceof HttpContent) {
+                    ctx.channel().unsafe().outboundBuffer().setUserDefinedWritability(1, false)
+                }
+                ctx.write(msg, promise)
+            }
+        }, new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                def content = Flux.range(0, 4)
+                    .map { Unpooled.wrappedBuffer(new byte[1024]) }
+                    .doOnNext { emitted++ }
+                outboundAccess.write(response, new NettyByteBodyFactory(ctx.channel()).adaptNetty(content))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                throw cause
+            }
+        }, quic))
+        def outboundBuffer = ch.unsafe().outboundBuffer()
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/"))
+        int initiallyEmitted = emitted
+
+        then:
+        initiallyEmitted > 0
+        initiallyEmitted < 4
+        !ch.isWritable()
+
+        when:
+        blockWrites = false
+        // QUIC can signal writability while draining queued writes, then exhaust its capacity.
+        outboundBuffer.setUserDefinedWritability(1, true)
+        ch.pipeline().fireChannelWritabilityChanged()
+        outboundBuffer.setUserDefinedWritability(1, false)
+
+        then:
+        emitted == (quic ? initiallyEmitted : 4)
+
+        when:
+        ch.runPendingTasks()
+
+        then:
+        emitted == (quic ? initiallyEmitted : 4)
+
+        when:
+        outboundBuffer.setUserDefinedWritability(1, true)
+        ch.runPendingTasks()
+
+        then:
+        emitted == 4
+
+        cleanup:
+        ch.finishAndReleaseAll()
+
+        where:
+        quic << [false, true]
     }
 
     def 'requests that come in a single packet are accumulated'() {
@@ -557,6 +627,103 @@ class PipeliningServerHandlerSpec extends Specification {
         failure instanceof ContentLengthExceededException
 
         cleanup:
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    def 'streaming decompression limit is cumulative across chunks'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        CloseableByteBody body = null
+        Throwable failure = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody requestBody, OutboundAccess outboundAccess) {
+                body = requestBody
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                failure = cause
+            }
+        })
+        // Netty 4.2.18 requests at least 512 writable bytes when growing the decompression
+        // buffer, including after inflating a chunk. Allow enough headroom so this test
+        // reaches the cumulative 64-byte body limit instead of the decoder allocation limit.
+        // See https://github.com/netty/netty/pull/17370
+        handler.setBodySizeLimits(new BodySizeLimits(64, 1024))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+        ch.flushInbound()
+        Flux.from(body.toByteArrayPublisher()).subscribe({ }, { failure = it })
+
+        when:
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+
+        then:
+        failure == null
+
+        when:
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[48]))
+        forwardCompressed(compChannel, ch)
+
+        then:
+        failure instanceof ContentLengthExceededException
+
+        cleanup:
+        body?.close()
+        ch.finishAndReleaseAll()
+        compChannel.finishAndReleaseAll()
+
+        where:
+        contentEncoding          | compressor
+        HttpHeaderValues.GZIP    | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.GZIP)
+        HttpHeaderValues.DEFLATE | ZlibCodecFactory.newZlibEncoder(ZlibWrapper.NONE)
+    }
+
+    def 'decompression accepts body at max size'(ChannelHandler compressor, CharSequence contentEncoding) {
+        given:
+        CloseableAvailableByteBody body = null
+        def handler = new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody requestBody, OutboundAccess outboundAccess) {
+                body = requestBody
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                throw cause
+            }
+        })
+        handler.setBodySizeLimits(new BodySizeLimits(64, Integer.MAX_VALUE))
+        def ch = new EmbeddedChannel(handler)
+        def compChannel = new EmbeddedChannel(compressor)
+        compChannel.writeOutbound(Unpooled.wrappedBuffer(new byte[64]))
+        compChannel.finish()
+        CompositeByteBuf compressed = Unpooled.compositeBuffer()
+        ByteBuf part
+        while ((part = compChannel.readOutbound()) != null) {
+            compressed.addComponent(true, part)
+        }
+
+        when:
+        def requestMessage = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/", compressed)
+        requestMessage.headers().set(HttpHeaderNames.CONTENT_ENCODING, contentEncoding)
+        ch.writeOneInbound(requestMessage)
+
+        then:
+        body.toByteArray().length == 64
+
+        cleanup:
+        body?.close()
         ch.finishAndReleaseAll()
         compChannel.finishAndReleaseAll()
 
