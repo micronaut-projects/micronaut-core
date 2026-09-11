@@ -35,6 +35,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.proxy.ProxyTargetInterceptorRegistrations;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
@@ -393,6 +394,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         Collection<AnnotationValue<?>> binding) {
 
         Object attribute = resolutionContext.getAttribute(BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS);
+        if (attribute instanceof ProxyTargetInterceptorRegistrations targetRegistrations && !targetRegistrations.isLifecycleResolved()) {
+            return resolveProxyTargetLifecycleInterceptors(resolutionContext, binding, targetRegistrations);
+        }
         if (attribute instanceof List<?> existing) {
             return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
         }
@@ -403,6 +407,46 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
                 Qualifiers.byInterceptorBindingValues(binding)
             )
             : existing;
+    }
+
+    /**
+     * Resolves the pre-destroy candidates of a proxy target that resolved no lifecycle set of its own.
+     *
+     * <p>The target's registrations then hold only the non-singleton interceptors created for its proxy, so using them
+     * as the whole candidate set would drop a singleton interceptor bound to pre-destroy. The candidates are selected by
+     * binding instead, as for a bean with nothing retained, taking each non-singleton one from the target's
+     * registrations so the instance its methods used is the one that sees it destroyed.</p>
+     *
+     * @param resolutionContext   The resolution context
+     * @param binding             The binding of the interception point
+     * @param targetRegistrations The registrations of the target
+     * @return The interceptor registrations to select from
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveProxyTargetLifecycleInterceptors(
+        BeanResolutionContext resolutionContext,
+        Collection<AnnotationValue<?>> binding,
+        ProxyTargetInterceptorRegistrations targetRegistrations) {
+
+        BeanContext beanContext = resolutionContext.getContext();
+        Collection<BeanDefinition<Interceptor<?, ?>>> definitions = beanContext.getBeanDefinitions(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBindingValues(binding)
+        );
+        List registrations = new ArrayList<>(definitions.size());
+        for (BeanDefinition<Interceptor<?, ?>> definition : definitions) {
+            BeanRegistration<?> registration = null;
+            if (!definition.isSingleton()) {
+                for (BeanRegistration<?> targetRegistration : targetRegistrations) {
+                    if (targetRegistration.getBeanDefinition().equals(definition)) {
+                        registration = targetRegistration;
+                        break;
+                    }
+                }
+            }
+            registrations.add(registration == null ? beanContext.getBeanRegistration(definition) : registration);
+        }
+        return registrations;
     }
 
     /**

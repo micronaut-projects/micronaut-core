@@ -87,6 +87,7 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
@@ -103,6 +104,7 @@ import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
 import io.micronaut.inject.proxy.InterceptedBean;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
+import io.micronaut.inject.proxy.ProxyTargetInterceptorRegistrations;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
@@ -283,7 +285,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     /**
      * The interceptor registrations created for each target of a proxy that holds its target separately.
      */
-    private final ProxyTargetInterceptorRegistrations proxyTargetInterceptorRegistrations = new ProxyTargetInterceptorRegistrations();
+    private final ProxyTargetInterceptorIndex proxyTargetInterceptorIndex = new ProxyTargetInterceptorIndex();
 
     protected MutableConversionService conversionService;
 
@@ -3401,7 +3403,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
                 List<?> interceptorRegistrations = null;
                 if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
+                    // stored under the generated definition, which a qualified @Any delegate wraps
                     Object value = registrations.remove(definition);
+                    if (value == null && definition instanceof DelegatingBeanDefinition<?>) {
+                        value = registrations.remove(unwrapDefinition(definition));
+                    }
                     if (value instanceof List<?> list) {
                         interceptorRegistrations = list;
                     }
@@ -3444,9 +3450,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * Gives the target of a proxy its own instance of every non-singleton interceptor bound to the proxy.
      *
      * <p>The scenario is a proxy that holds its target separately, such as a scoped proxy, whose non-singleton
-     * interceptor is meant to be one instance per intercepted bean. The proxy resolves its interceptors once, but a
-     * scoped proxy stands for a new target in each scope, so the instances the proxy holds cannot be the target's.
-     * The proxy therefore names them on the resolution context it resolves the target with, see
+     * interceptor is meant to be one instance per intercepted bean. A scoped proxy stands for a new target in each
+     * scope, so the instances cannot belong to the proxy. The proxy creates none for itself; it names the
+     * interceptors on the resolution context it resolves the target with, see
      * {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}, and this creates the target's own.</p>
      *
      * <p>An interceptor the target already resolved for its own construction, post-construct or pre-destroy
@@ -3469,24 +3475,40 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                 T bean,
                                                                 @Nullable List<?> interceptorRegistrations) {
         if (!(context.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS) instanceof Map.Entry<?, ?> entry)
-            || !definition.equals(entry.getKey())
-            || !(entry.getValue() instanceof List<?> proxyRegistrations)
-            || proxyRegistrations.isEmpty()) {
+            || !(entry.getKey() instanceof BeanDefinition<?> targetDefinition)
+            || !unwrapDefinition(definition).equals(unwrapDefinition(targetDefinition))
+            || !(entry.getValue() instanceof List<?> interceptorDefinitions)
+            || interceptorDefinitions.isEmpty()) {
             return interceptorRegistrations;
         }
         int resolvedCount = interceptorRegistrations == null ? 0 : interceptorRegistrations.size();
-        List<BeanRegistration<?>> targetRegistrations = new ArrayList<>(resolvedCount + proxyRegistrations.size());
+        ProxyTargetInterceptorRegistrations targetRegistrations = new ProxyTargetInterceptorRegistrations(
+            resolvedCount + interceptorDefinitions.size(),
+            interceptorRegistrations != null
+        );
         if (interceptorRegistrations != null) {
             targetRegistrations.addAll((List<BeanRegistration<?>>) interceptorRegistrations);
         }
-        for (Object proxyRegistration : proxyRegistrations) {
-            BeanDefinition<?> interceptorDefinition = ((BeanRegistration<?>) proxyRegistration).beanDefinition;
-            if (findRegistration(targetRegistrations, interceptorDefinition) == null) {
-                targetRegistrations.add(resolveBeanRegistration(context, interceptorDefinition));
+        for (Object interceptorDefinition : interceptorDefinitions) {
+            BeanDefinition<?> nonSingleton = (BeanDefinition<?>) interceptorDefinition;
+            if (findRegistration(targetRegistrations, nonSingleton) == null) {
+                targetRegistrations.add(resolveBeanRegistration(context, nonSingleton));
             }
         }
-        proxyTargetInterceptorRegistrations.put(bean, targetRegistrations);
+        proxyTargetInterceptorIndex.put(bean, targetRegistrations);
         return targetRegistrations;
+    }
+
+    /**
+     * The definition a delegate stands for, such as the qualified copy of an {@code @Any} factory product, which is
+     * what generated code and proxies refer to.
+     */
+    private static BeanDefinition<?> unwrapDefinition(BeanDefinition<?> definition) {
+        BeanDefinition<?> unwrapped = definition;
+        while (unwrapped instanceof DelegatingBeanDefinition<?> delegating) {
+            unwrapped = delegating.getTarget();
+        }
+        return unwrapped;
     }
 
     @Nullable
@@ -3502,18 +3524,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     /**
      * Returns the interceptor registrations created for a target of a proxy that holds its target separately.
      *
-     * <p>Used by generated proxies to invoke the target with the non-singleton interceptor instances created for it,
-     * rather than the ones the proxy resolved for itself. The registrations are recorded only for a target resolved
-     * through a proxy that asked for them, see {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}, and are
-     * forgotten once the target is no longer reachable.</p>
+     * <p>Used by generated proxies to invoke the target with the non-singleton interceptor instances created for it.
+     * The registrations are recorded only for a target resolved through a proxy that asked for them, see
+     * {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}, and are forgotten once the target is no longer
+     * reachable.</p>
      *
      * @param target The target
      * @return The registrations, or {@code null} if none were recorded for the target
      * @since 5.2.1
      */
     @Internal
-    public @Nullable List<BeanRegistration<?>> findProxyTargetInterceptorRegistrations(Object target) {
-        return proxyTargetInterceptorRegistrations.get(target);
+    public @Nullable ProxyTargetInterceptorRegistrations findProxyTargetInterceptorRegistrations(Object target) {
+        return proxyTargetInterceptorIndex.get(target);
     }
 
     /**

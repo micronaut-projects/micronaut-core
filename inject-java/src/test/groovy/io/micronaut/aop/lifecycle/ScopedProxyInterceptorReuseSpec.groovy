@@ -403,6 +403,146 @@ class TargetBean {
         lazy << [false, true]
     }
 
+    void 'test a hot swapped proxy invokes the new target with that target instance'() {
+        given:
+        ApplicationContext context = buildContext("""
+package scopedproxy.hotswap;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around(proxyTarget = true, hotswap = true)
+@interface Swappable {
+}
+
+@Prototype
+@InterceptorBean(Swappable.class)
+class SwapInterceptor implements MethodInterceptor<Object, Object> {
+    static int instances;
+    static final List<String> events = new ArrayList<>();
+    private final int id = ++instances;
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        events.add(id + ":" + ((SwapBean) context.getTarget()).id);
+        return context.proceed();
+    }
+}
+
+@Prototype
+@Swappable
+class SwapBean {
+    static int instances;
+    // the generated proxy extends this class, so only count the targets
+    final int id = getClass() == SwapBean.class ? ++instances : 0;
+
+    public String call() {
+        return "called " + id;
+    }
+}
+""")
+        Class<?> interceptorType = context.classLoader.loadClass('scopedproxy.hotswap.SwapInterceptor')
+        Class<?> beanType = context.classLoader.loadClass('scopedproxy.hotswap.SwapBean')
+        def first = context.getBean(beanType)
+        def second = context.getBean(beanType)
+
+        when:
+        first.call()
+        second.call()
+        Map<Integer, Integer> interceptorOfTarget = interceptorType.events.toList().collectEntries {
+            def parts = it.split(':')
+            [(parts[1] as int): parts[0] as int]
+        }
+        interceptorType.events.clear()
+        first.swap(second.interceptedTarget())
+        first.call()
+
+        then: 'the swapped in target is intercepted only by its own instance'
+        interceptorOfTarget.size() == 2
+        interceptorOfTarget[1] != interceptorOfTarget[2]
+        interceptorType.events.toList() == ["${interceptorOfTarget[2]}:2".toString()]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a singleton pre destroy interceptor still applies to a target with no post construct advice'() {
+        given:
+        ApplicationContext context = buildContext("""
+package scopedproxy.predestroyonly;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around(proxyTarget = true)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Guarded {
+}
+
+@Prototype
+@InterceptorBinding(value = Guarded.class, kind = InterceptorKind.AROUND)
+class AroundInterceptor implements MethodInterceptor<Object, Object> {
+    static final List<String> events = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        events.add("AROUND");
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() {
+        events.add("AROUND_DESTROYED");
+    }
+}
+
+@Singleton
+@InterceptorBinding(value = Guarded.class, kind = InterceptorKind.PRE_DESTROY)
+class DestroyInterceptor implements MethodInterceptor<Object, Object> {
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        AroundInterceptor.events.add("PRE_DESTROY");
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Guarded
+class GuardedBean {
+    public String call() {
+        return "called";
+    }
+
+    @PreDestroy
+    void close() {
+        AroundInterceptor.events.add("PRE_DESTROY_CALLBACK");
+    }
+}
+""")
+        Class<?> interceptorType = context.classLoader.loadClass('scopedproxy.predestroyonly.AroundInterceptor')
+        def bean = context.getBean(context.classLoader.loadClass('scopedproxy.predestroyonly.GuardedBean'))
+
+        when:
+        bean.call()
+        context.stop()
+
+        then:
+        interceptorType.events.toList() == ['AROUND', 'PRE_DESTROY', 'PRE_DESTROY_CALLBACK', 'AROUND_DESTROYED']
+
+        cleanup:
+        context.close()
+    }
+
     private static Map<Integer, Set<Integer>> interceptorsPerTarget(List<String> events) {
         Map<Integer, Set<Integer>> result = new TreeMap<>()
         for (String event : events) {

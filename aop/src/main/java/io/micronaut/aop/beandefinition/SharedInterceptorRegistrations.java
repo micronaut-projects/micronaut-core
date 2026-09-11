@@ -22,6 +22,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DelegatingBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
@@ -169,7 +171,16 @@ public final class SharedInterceptorRegistrations {
      */
     static boolean isProxyTarget(BeanResolutionContext resolutionContext, BeanDefinition<?> definition) {
         return resolutionContext.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS) instanceof Map.Entry<?, ?> entry
-            && definition.equals(entry.getKey());
+            && entry.getKey() instanceof BeanDefinition<?> targetDefinition
+            && unwrap(definition).equals(unwrap(targetDefinition));
+    }
+
+    private static BeanDefinition<?> unwrap(BeanDefinition<?> definition) {
+        BeanDefinition<?> unwrapped = definition;
+        while (unwrapped instanceof DelegatingBeanDefinition<?> delegating) {
+            unwrapped = delegating.getTarget();
+        }
+        return unwrapped;
     }
 
     /**
@@ -191,7 +202,11 @@ public final class SharedInterceptorRegistrations {
     @SuppressWarnings({"unchecked", "rawtypes"})
     static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> resolveAndStore(BeanResolutionContext resolutionContext,
                                                                                      BeanDefinition<?> definition) {
-        AnnotationMetadata metadata = definition.getAnnotationMetadata();
+        // The bean's metadata combined with its constructor's, as construction would have resolved it
+        AnnotationMetadata metadata = new AnnotationMetadataHierarchy(
+            definition.getAnnotationMetadata(),
+            definition.getConstructor().getAnnotationMetadata()
+        );
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }

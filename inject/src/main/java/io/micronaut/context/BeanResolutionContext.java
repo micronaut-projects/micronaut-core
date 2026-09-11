@@ -83,11 +83,11 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Attribute set by an AOP proxy that holds its target separately, on the resolution context it resolves that target
      * with, so that the target is given its own instance of every non-singleton interceptor bound to the proxy.
      *
-     * <p>The value is a {@code Map.Entry<BeanDefinition<?>, List<BeanRegistration<?>>>}: the definition of the target
-     * and the non-singleton interceptor registrations the proxy was constructed with. When the context creates a bean
-     * of that definition it creates a new instance of each interceptor the bean did not already resolve for its own
-     * lifecycle, as a dependent of the bean, and records the result so the proxy can find the instances of the target
-     * it is invoking. It must be treated as an implementation detail.</p>
+     * <p>The value is a {@code Map.Entry<BeanDefinition<?>, List<BeanDefinition<?>>>}: the definition of the target and
+     * the definitions of the non-singleton interceptors bound to the proxy, which the proxy creates no instance of for
+     * itself. When the context creates a bean of that definition it creates a new instance of each interceptor the
+     * bean did not already resolve for its own lifecycle, as a dependent of the bean, and records the result so the
+     * proxy can find the instances of the target it is invoking. It must be treated as an implementation detail.</p>
      *
      * @since 5.2.1
      */

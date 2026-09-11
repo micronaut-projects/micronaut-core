@@ -52,7 +52,7 @@ public class InterceptorScopeTest {
             final MyBean bean1 = beanContext.getBean(MyBean.class);
             final String result1 = bean1.printHelloWorld();
             // invoke again
-            final String result1Again = bean1.printHelloWorld();
+            bean1.printHelloWorld();
 
             assertNotNull(key1.scopedBeans);
             assertEquals(
@@ -74,13 +74,15 @@ public class InterceptorScopeTest {
             );
 
             // the prototype interceptor should inject a new instance into
-            // each newly created bean, and keep using it for that bean
-            assertEquals(result1, result1Again);
-            assertNotEquals(result1, result2);
-            assertTrue(result1.startsWith("Hello World! Interceptor1 instance: ["));
-            assertTrue(result2.startsWith("Hello World! Interceptor1 instance: ["));
-            assertTrue(result1.endsWith(" Interceptor2 created: [1] "));
-            assertTrue(result2.endsWith(" Interceptor2 created: [1] "));
+            // each newly created bean
+            assertEquals(
+                    "Hello World! Interceptor1 created: [1]  Interceptor2 created: [1] ",
+                    result1
+            );
+            assertEquals(
+                    "Hello World! Interceptor1 created: [2]  Interceptor2 created: [1] ",
+                    result2
+            );
         }
 
     }
@@ -171,11 +173,10 @@ public class InterceptorScopeTest {
     @InterceptorBean(MyIntercepted1.class)
     static class MyIntercepted1Interceptor implements MethodInterceptor<Object, Object> {
         private static int creationCount = 0;
-        private final int instance;
         public boolean destroyed;
 
         MyIntercepted1Interceptor() {
-            instance = ++creationCount;
+            creationCount++;
         }
 
         @Override
@@ -185,7 +186,7 @@ public class InterceptorScopeTest {
 
         @Override
         public Object intercept(MethodInvocationContext<Object, Object> context) {
-            return context.proceed() + " Interceptor1 instance: [" + instance + "] ";
+            return context.proceed() + " Interceptor1 created: [" + creationCount + "] ";
         }
 
         @PreDestroy

@@ -15,12 +15,12 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.inject.proxy.ProxyTargetInterceptorRegistrations;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.Reference;
 import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -38,10 +38,10 @@ import java.util.concurrent.ConcurrentHashMap;
  * @author Denis Stepanov
  * @since 5.2.1
  */
-final class ProxyTargetInterceptorRegistrations {
+final class ProxyTargetInterceptorIndex {
 
     private final ReferenceQueue<Object> collected = new ReferenceQueue<>();
-    private final Map<Object, WeakReference<List<BeanRegistration<?>>>> registrations = new ConcurrentHashMap<>();
+    private final Map<Object, WeakReference<ProxyTargetInterceptorRegistrations>> registrations = new ConcurrentHashMap<>();
 
     /**
      * Records the interceptor registrations created for a target.
@@ -49,7 +49,7 @@ final class ProxyTargetInterceptorRegistrations {
      * @param target        The target
      * @param registrations The registrations, which must be strongly reachable from the target's registration
      */
-    void put(Object target, List<BeanRegistration<?>> registrations) {
+    void put(Object target, ProxyTargetInterceptorRegistrations registrations) {
         expungeCollected();
         this.registrations.put(new WeakKey(target, collected), new WeakReference<>(registrations));
     }
@@ -59,11 +59,14 @@ final class ProxyTargetInterceptorRegistrations {
      * @return The registrations created for the target, or {@code null} if none were recorded or they are gone
      */
     @Nullable
-    List<BeanRegistration<?>> get(Object target) {
+    ProxyTargetInterceptorRegistrations get(Object target) {
         if (registrations.isEmpty()) {
             return null;
         }
-        WeakReference<List<BeanRegistration<?>>> reference = registrations.get(new LookupKey(target));
+        // Polling an empty queue is a single read, and doing it here too means a context whose scopes stop creating
+        // targets still forgets the ones that were collected
+        expungeCollected();
+        WeakReference<ProxyTargetInterceptorRegistrations> reference = registrations.get(new LookupKey(target));
         return reference == null ? null : reference.get();
     }
 
@@ -91,7 +94,7 @@ final class ProxyTargetInterceptorRegistrations {
                 return true;
             }
             if (o instanceof LookupKey lookup) {
-                return get() == lookup.target;
+                return super.get() == lookup.target;
             }
             return false;
         }
