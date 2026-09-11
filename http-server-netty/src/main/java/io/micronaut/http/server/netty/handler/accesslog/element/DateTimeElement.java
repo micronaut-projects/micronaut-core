@@ -15,10 +15,12 @@
  */
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
+import io.micronaut.http.server.util.PerSecondCache;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.jspecify.annotations.Nullable;
 
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -29,6 +31,10 @@ import java.util.Set;
 
 /**
  * DateTimeElement LogElement.
+ * <p>
+ * Unless the pattern prints a sub-second field, the formatted text only changes once per second
+ * and is cached in a {@link PerSecondCache}. The element is shared by every access log instance
+ * ({@link #copy()} returns {@code this}), so the cache is shared by all event loops.
  *
  * @author croudet
  * @since 2.0
@@ -48,6 +54,12 @@ final class DateTimeElement implements LogElement {
     private final Set<Event> events;
     @Nullable
     private final String dateFormat;
+    /**
+     * {@code null} when the pattern has a sub-second field, in which case every value is
+     * formatted from the exact current time.
+     */
+    @Nullable
+    private final PerSecondCache cache;
 
     /**
      * Create a DateTimeElement.
@@ -81,7 +93,53 @@ final class DateTimeElement implements LogElement {
         } else {
             formatter = DateTimeFormatter.ofPattern(formatSplit[0], Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
         }
+        cache = hasSubSecondField(formatSplit[0]) ? null : new PerSecondCache(this::formatSecond);
         events = fromStart ? Event.REQUEST_HEADERS_EVENTS : LAST_RESPONSE_EVENTS;
+    }
+
+    /**
+     * Whether the pattern contains an unquoted fraction-of-second ({@code S}), nano-of-second
+     * ({@code n}), nano-of-day ({@code N}) or milli-of-day ({@code A}) field. Every other pattern
+     * letter is a function of the instant truncated to the second.
+     *
+     * @param pattern The {@link DateTimeFormatter} pattern
+     * @return {@code true} if the output can change within a second
+     */
+    static boolean hasSubSecondField(String pattern) {
+        boolean quoted = false;
+        for (int i = 0; i < pattern.length(); i++) {
+            char c = pattern.charAt(i);
+            if (c == '\'') {
+                quoted = !quoted;
+            } else if (!quoted && (c == 'S' || c == 'n' || c == 'N' || c == 'A')) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private String formatSecond(long epochSecond) {
+        return ZonedDateTime.ofInstant(Instant.ofEpochSecond(epochSecond), ZoneId.systemDefault()).format(formatter);
+    }
+
+    private String now() {
+        if (cache != null) {
+            return cache.now();
+        }
+        return ZonedDateTime.now().format(formatter);
+    }
+
+    /**
+     * The value this element produces for the given instant.
+     *
+     * @param epochMillis The instant, in milliseconds since the epoch
+     * @return The formatted text
+     */
+    String value(long epochMillis) {
+        if (cache != null) {
+            return cache.get(epochMillis);
+        }
+        return ZonedDateTime.ofInstant(Instant.ofEpochMilli(epochMillis), ZoneId.systemDefault()).format(formatter);
     }
 
     @Override
@@ -92,7 +150,7 @@ final class DateTimeElement implements LogElement {
     @Override
     public String onRequestHeaders(@Nullable SocketChannel channel, String method, HttpHeaders headers, String uri, String protocol) {
         if (events.contains(Event.ON_REQUEST_HEADERS)) {
-            return ZonedDateTime.now().format(formatter);
+            return now();
         } else {
             return ConstantElement.UNKNOWN_VALUE;
         }
@@ -101,7 +159,7 @@ final class DateTimeElement implements LogElement {
     @Override
     public String onLastResponseWrite(int contentSize) {
         if (events.contains(Event.ON_LAST_RESPONSE_WRITE)) {
-            return ZonedDateTime.now().format(formatter);
+            return now();
         } else {
             return ConstantElement.UNKNOWN_VALUE;
         }
