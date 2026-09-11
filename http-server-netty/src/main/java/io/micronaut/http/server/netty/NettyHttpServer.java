@@ -96,6 +96,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnixDomainSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -1107,13 +1108,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 // waiting on the event loop of the channel itself would deadlock
                 return;
             }
-            closeFuture.awaitUninterruptibly();
+            long timeout = closeWaitMillis();
+            if (!closeFuture.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                LOG.warn("Listener channel {} did not close within {}ms, continuing shutdown", channel, timeout);
+                return;
+            }
             // Completing the close future is not the last step: the event loop still has to
             // deregister the channel from its selector before the socket is given up. Wait for a
             // round trip through the event loop so that this has happened before the caller (or
             // the event loop group shutdown that follows) moves on.
-            if (!eventLoop.isShuttingDown()) {
-                eventLoop.submit(() -> { }).awaitUninterruptibly();
+            if (!eventLoop.isShuttingDown() && !eventLoop.submit(() -> { }).awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                LOG.warn("Event loop {} did not deregister listener channel {} within {}ms, continuing shutdown", eventLoop, channel, timeout);
             }
         }
 
@@ -1136,9 +1141,29 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                     closeFutures.add(closeFuture);
                 }
             }
+            // One deadline for all of them, since they close concurrently on their event loops.
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(closeWaitMillis());
             for (ChannelFuture closeFuture : closeFutures) {
-                closeFuture.awaitUninterruptibly();
+                long remaining = deadline - System.nanoTime();
+                if (remaining <= 0 || !closeFuture.awaitUninterruptibly(remaining, TimeUnit.NANOSECONDS)) {
+                    LOG.warn("Connection {} did not close within {}ms, continuing shutdown", closeFuture.channel(), closeWaitMillis());
+                    break;
+                }
             }
+        }
+
+        /**
+         * How long {@link #closeServerChannel()} and {@link #closeConnections()} wait for a close
+         * to complete. Stopping the server must never block indefinitely on a channel that does
+         * not close, for example because its event loop is busy or blocked; after this long the
+         * shutdown continues and the event loop group shutdown that follows closes whatever is
+         * left. Uses the acceptor event loop group's shutdown timeout, which is what bounds the
+         * rest of the shutdown too.
+         */
+        private long closeWaitMillis() {
+            EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+            Duration timeout = parent != null ? parent.getShutdownTimeout() : Duration.ofSeconds(EventLoopGroupConfiguration.DEFAULT_SHUTDOWN_TIMEOUT);
+            return Math.max(1, timeout.toMillis());
         }
 
         void refresh() {
