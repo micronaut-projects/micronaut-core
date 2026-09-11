@@ -447,6 +447,7 @@ class NettyHttpServerConfigurationSpec extends Specification {
                'micronaut.server.netty.http2.push-enabled': false,
                'micronaut.server.netty.http2.header-table-size': 200,
                'micronaut.server.netty.http2.initial-window-size': 50,
+               'micronaut.server.netty.http2.initial-connection-window-size': 4194304,
                'micronaut.server.netty.http2.max-header-list-size': 150]
         ))
         beanContext.start()
@@ -466,10 +467,30 @@ class NettyHttpServerConfigurationSpec extends Specification {
         !http2.pushEnabled
         http2.headerTableSize == 200
         http2.initialWindowSize == 50
+        http2.initialConnectionWindowSize == 4194304
         http2.maxHeaderListSize == 150
 
         cleanup:
         beanContext.close()
+    }
+
+    void "test netty server http2 connection window defaults to unset"() {
+        given:
+        ApplicationContext beanContext = ApplicationContext.run("test")
+
+        expect:
+        beanContext.getBean(NettyHttpServerConfiguration).http2.initialConnectionWindowSize == null
+
+        cleanup:
+        beanContext.close()
+    }
+
+    void "test netty server http2 connection window below the protocol default is rejected"() {
+        when:
+        new NettyHttpServerConfiguration.Http2Settings().setInitialConnectionWindowSize(65534)
+
+        then:
+        thrown(IllegalArgumentException)
     }
 
     void "test configuring the parent through event-loops"() {
