@@ -2,6 +2,8 @@ package io.micronaut.http.server.netty.filters
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.http.body.ByteBodyFactory
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
@@ -75,12 +77,17 @@ class FilterJsonArrayResponseSpec extends Specification {
         "mixed-bytes-first"  | '{"n":2}{"n":1}'
     }
 
-    void "reactive byte[] response body without a route is written unchanged"() {
+    void "reactive #kind response body without a route is written unchanged"() {
         when:
-        def response = client.toBlocking().exchange(HttpRequest.GET("/filter-json/raw"), String)
+        def response = client.toBlocking().exchange(HttpRequest.GET("/filter-json/" + path), String)
 
         then:
         response.body() == '{"n":1}{"n":2}'
+
+        where:
+        kind       | path
+        'byte[]'   | 'raw'
+        'ByteBody' | 'raw-body'
     }
 
     void "reactive response body without a route and without a json content type is written unchanged"() {
@@ -117,6 +124,12 @@ class FilterJsonArrayResponseSpec extends Specification {
                             .contentType(MediaType.APPLICATION_JSON_TYPE)
                 case "/filter-json/mixed-bytes-first":
                     return HttpResponse.ok(Flux.concat(Flux.just('{"n":2}'.getBytes(StandardCharsets.UTF_8)), Mono.delay(Duration.ofMillis(50)).map { [n: 1] }))
+                            .contentType(MediaType.APPLICATION_JSON_TYPE)
+                case "/filter-json/raw-body":
+                    def factory = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+                    return HttpResponse.ok(Flux.just(
+                            factory.adapt('{"n":1}'.getBytes(StandardCharsets.UTF_8)),
+                            factory.adapt('{"n":2}'.getBytes(StandardCharsets.UTF_8))))
                             .contentType(MediaType.APPLICATION_JSON_TYPE)
                 case "/filter-json/raw":
                     return HttpResponse.ok(Flux.just(

@@ -279,7 +279,11 @@ public abstract class ResponseLifecycle {
      */
     private static boolean isJsonFormattable(Argument<?> type) {
         // it would be nice to support netty ByteBuf here, but it's not clear how.
-        return !(type.getType() == byte[].class || ByteBuffer.class.isAssignableFrom(type.getType()));
+        // A ByteBody is raw bytes too: the writer passes it through unchanged, so framing it
+        // would splice brackets and commas into a byte stream.
+        return !(type.getType() == byte[].class
+            || ByteBuffer.class.isAssignableFrom(type.getType())
+            || ByteBody.class.isAssignableFrom(type.getType()));
     }
 
     /**
