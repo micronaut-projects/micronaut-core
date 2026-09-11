@@ -38,6 +38,7 @@ import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
+import io.micronaut.http.netty.websocket.NettyWebSocketSession;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.exceptions.ServerStartupException;
@@ -56,6 +57,7 @@ import io.micronaut.runtime.server.event.ServerShutdownEvent;
 import io.micronaut.runtime.server.event.ServerStartupEvent;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.Router;
+import io.micronaut.websocket.WebSocketSession;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
@@ -98,6 +100,7 @@ import java.net.UnixDomainSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -147,6 +150,17 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private final ApplicationContext applicationContext;
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final ChannelGroup webSocketSessions = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    /**
+     * The sessions of the channels in {@link #webSocketSessions}, so that
+     * {@link #getOpenSessions()} does not have to walk the channel group and its attributes.
+     * Only websocket-gated code ({@link #addChannel}, {@link #removeChannel}) touches the
+     * websocket types, {@code micronaut-websocket} is an optional dependency.
+     */
+    private final Map<Channel, NettyWebSocketSession> webSocketSessionsByChannel = new ConcurrentHashMap<>();
+    /**
+     * Like the channel group, forget a channel when it closes even without {@link #removeChannel}.
+     */
+    private final ChannelFutureListener webSocketChannelClosed = future -> webSocketSessionsByChannel.remove(future.channel());
     private final HttpHostResolver hostResolver;
     private boolean shutdownWorker = false;
     private boolean shutdownParent = false;
@@ -829,16 +843,37 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     @Override
     public void addChannel(Channel channel) {
         this.webSocketSessions.add(channel);
+        NettyWebSocketSession session = channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+        if (session != null) {
+            this.webSocketSessionsByChannel.put(channel, session);
+            channel.closeFuture().addListener(webSocketChannelClosed);
+        }
     }
 
     @Override
     public void removeChannel(Channel channel) {
         this.webSocketSessions.remove(channel);
+        if (this.webSocketSessionsByChannel.remove(channel) != null) {
+            channel.closeFuture().removeListener(webSocketChannelClosed);
+        }
     }
 
     @Override
     public ChannelGroup getChannelGroup() {
         return this.webSocketSessions;
+    }
+
+    @Override
+    public Set<? extends WebSocketSession> getOpenSessions() {
+        Set<WebSocketSession> open = new HashSet<>();
+        for (Map.Entry<Channel, NettyWebSocketSession> entry : webSocketSessionsByChannel.entrySet()) {
+            NettyWebSocketSession session = entry.getValue();
+            // the channel group is exposed and may have been changed directly, it stays authoritative
+            if (session.isOpen() && webSocketSessions.contains(entry.getKey())) {
+                open.add(session);
+            }
+        }
+        return open;
     }
 
     /**
