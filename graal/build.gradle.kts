@@ -11,4 +11,19 @@ dependencies {
     testImplementation(libs.managed.groovy.json)
     testImplementation(libs.javax.persistence)
     testAnnotationProcessor(projects.micronautInjectJava)
+
+    testImplementation(projects.micronautInjectKotlin)
+    testImplementation(projects.micronautInjectKotlinTest)
+    testImplementation(libs.managed.kotlin.compiler.embeddable)
+    testImplementation(libs.managed.kotlin.stdlib)
+}
+
+configurations.all {
+    resolutionStrategy.eachDependency {
+        if (requested.group == "org.jetbrains.kotlin") {
+            useVersion(libs.versions.managed.kotlin.asProvider().get())
+        } else if (requested.group == "com.google.devtools.ksp") {
+            useVersion(libs.versions.managed.ksp.get())
+        }
+    }
 }
