@@ -88,6 +88,18 @@ class HttpToHttpsRedirectSpec extends Specification {
         location.endsWith('/hello?a=1%2F2&b=x:y@z&c=p,q$r&d=%7Bjson%7D')
     }
 
+    void 'test http to https redirect reproduces the query string of an absolute-form target verbatim'() {
+        given: 'a proxy-style request line whose target carries the authority'
+        int port = (embeddedServer.boundPorts - embeddedServer.port).first() as int
+
+        when: 'the query holds a percent encoded reserved character'
+        String location = redirectLocationOf("http://localhost:${port}/hello?value=a%26b&x=1")
+
+        then: 'it is neither decoded nor re-encoded on the way to the Location header'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?value=a%26b&x=1')
+    }
+
     /**
      * Sends a request line verbatim so the request target is not normalised by a client, and returns
      * the value of the Location header of the response.

@@ -31,6 +31,7 @@ import io.micronaut.http.ssl.ServerSslConfiguration;
 import io.micronaut.http.uri.UriBuilder;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Handler to automatically redirect HTTP to HTTPS request when using dual protocol.
@@ -50,6 +51,20 @@ record HttpToHttpsRedirectHandler(
     HttpHostResolver hostResolver
 ) implements RequestHandler {
 
+    /**
+     * The query component of a request target, verbatim, or {@code null} if it has none. An empty
+     * string means the target ended in {@code ?}.
+     */
+    @Nullable
+    static String rawQuery(String target) {
+        int query = target.indexOf('?');
+        if (query < 0) {
+            return null;
+        }
+        int fragment = target.indexOf('#', query);
+        return fragment < 0 ? target.substring(query + 1) : target.substring(query + 1, fragment);
+    }
+
     @Override
     public void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
         NettyHttpRequest<?> strippedRequest = new NettyHttpRequest<>(request, body, ctx, conversionService, serverConfiguration);
@@ -57,7 +72,11 @@ record HttpToHttpsRedirectHandler(
         // read everything that is needed off the request before releasing it
         String host = hostResolver.resolve(strippedRequest);
         String path = strippedRequest.getPath();
-        String rawQuery = strippedRequest.getUri().getRawQuery();
+        // Taken from the request target as received rather than from getUri(): for an
+        // absolute-form target (GET http://host/p?q HTTP/1.1, as a proxy may send) the request
+        // URI is rebuilt from decoded components, which turns a percent-encoded reserved character
+        // such as %26 back into a bare & and changes the structure of the query.
+        String rawQuery = rawQuery(request.uri());
         strippedRequest.release();
 
         UriBuilder uriBuilder = UriBuilder.of(host);
