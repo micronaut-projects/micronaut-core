@@ -444,8 +444,11 @@ internal open class KotlinClassElement(
                 }
             }
 
-        val allProperties: MutableList<PropertyElement> = mutableListOf()
-        allProperties.addAll(enclosedElementsQuery.getEnclosedElements(this, eq))
+        val allProperties: MutableMap<String, PropertyElement> = linkedMapOf()
+        enclosedElementsQuery.getEnclosedElements(this, eq).forEach { property ->
+            // KSP can return the same mapped JDK collection property through multiple hierarchy paths.
+            allProperties.putIfAbsent(property.name, property)
+        }
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
             val configurationBuilderQuery = ElementQuery.of(PropertyElement::class.java)
@@ -454,19 +457,17 @@ internal open class KotlinClassElement(
                 .onlyAccessible(this)
             enclosedElementsQuery.getEnclosedElements(this, configurationBuilderQuery)
                 .forEach { e ->
-                    if (!allProperties.contains(e)) {
-                        allProperties.add(e)
-                    }
+                    allProperties.putIfAbsent(e.name, e)
                 }
         }
-        val propertyNames = allProperties.map { it.name }.toMutableSet()
+        val propertyNames = allProperties.keys
         val resolvedProperties: MutableList<PropertyElement> = mutableListOf()
         val methods = ArrayList(getEnclosedElements(ElementQuery.ALL_METHODS))
         if (isJavaRecord(nativeType.declaration)) {
             propertyElementQuery.readPrefixes("")
             propertyElementQuery.writePrefixes(emptyArray())
         }
-        allProperties.forEach { prop ->
+        allProperties.values.forEach { prop ->
             methods.removeIf { m ->
                 prop.name == NameUtils.getPropertyNameForGetter(
                     m.name,
@@ -478,7 +479,7 @@ internal open class KotlinClassElement(
             }
         }
         val fields = ArrayList(getEnclosedElements(ElementQuery.ALL_FIELDS))
-        fields.removeIf { f -> allProperties.stream().anyMatch { p -> p.name == f.name }}
+        fields.removeIf { f -> allProperties.containsKey(f.name) }
         val methodProperties = AstBeanPropertiesUtils.resolveBeanProperties(propertyElementQuery,
             this,
             {
@@ -501,7 +502,7 @@ internal open class KotlinClassElement(
                 }
             })
         resolvedProperties.addAll(methodProperties)
-        resolvedProperties.addAll(allProperties)
+        resolvedProperties.addAll(allProperties.values)
         return resolvedProperties
     }
 
