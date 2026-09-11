@@ -121,7 +121,8 @@ public class ProxyBackpressureTest {
             subscriber.subscription.request(1);
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.received > 1024);
             TimeUnit.SECONDS.sleep(5);
-            Assertions.assertTrue(ctrl.emitted < 32 * CHUNK_SIZE);
+            Assertions.assertTrue(ctrl.emitted < 32 * CHUNK_SIZE,
+                () -> "Expected backpressure before 32 MiB, but emitted " + ctrl.emitted + " bytes");
 
             subscriber.subscription.request(Long.MAX_VALUE);
             Awaitility.await().atMost(60, TimeUnit.SECONDS).until(() -> subscriber.complete);
