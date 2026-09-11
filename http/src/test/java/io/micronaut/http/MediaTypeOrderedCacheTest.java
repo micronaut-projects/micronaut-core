@@ -19,7 +19,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -68,8 +70,10 @@ class MediaTypeOrderedCacheTest {
         assertEquals("1", html.getVersion());
 
         // the parameters are exposed as a view: mutating it must be refused, not shared
-        assertThrows(UnsupportedOperationException.class, () -> html.getParameters().values().clear());
-        assertThrows(UnsupportedOperationException.class, () -> html.getParametersMap().remove("v"));
+        Collection<String> values = html.getParameters().values();
+        assertThrows(UnsupportedOperationException.class, values::clear);
+        Map<CharSequence, String> map = html.getParametersMap();
+        assertThrows(UnsupportedOperationException.class, () -> map.remove("v"));
 
         List<MediaType> second = MediaType.orderedOf(List.of(header));
         assertEquals("1", second.get(0).getVersion());
