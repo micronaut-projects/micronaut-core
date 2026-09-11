@@ -40,6 +40,10 @@ import java.nio.charset.Charset;
 @Singleton
 @Internal
 public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<CharSequence>, ResponseBodyWriter<CharSequence> {
+    /**
+     * The type this handler is for, resolved once: isWriteable asks for it on every response.
+     */
+    private static final Argument<CharSequence> TYPE = Argument.of(CharSequence.class);
 
     private final Charset defaultCharset;
 
@@ -71,6 +75,6 @@ public final class CharSequenceBodyWriter implements TypedMessageBodyWriter<Char
 
     @Override
     public Argument<CharSequence> getType() {
-        return Argument.of(CharSequence.class);
+        return TYPE;
     }
 }
