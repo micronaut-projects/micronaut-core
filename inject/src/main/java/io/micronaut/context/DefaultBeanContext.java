@@ -280,6 +280,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private final ThreadLocal<ParallelInitialization> currentParallelInitialization = new ThreadLocal<>();
 
+    /**
+     * The interceptor registrations created for each target of a proxy that holds its target separately.
+     */
+    private final ProxyTargetInterceptorRegistrations proxyTargetInterceptorRegistrations = new ProxyTargetInterceptorRegistrations();
+
     protected MutableConversionService conversionService;
 
     protected final BeanDefinitionService beanDefinitionProvider;
@@ -3402,6 +3407,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     }
                 }
                 bean = postBeanCreated(context, definition, beanType, qualifier, bean);
+                interceptorRegistrations = addProxyTargetInterceptorRegistrations(context, definition, bean, interceptorRegistrations);
 
                 BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
                 if (dependentFactoryBean != null) {
@@ -3432,6 +3438,82 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 }
             }
         }
+    }
+
+    /**
+     * Gives the target of a proxy its own instance of every non-singleton interceptor bound to the proxy.
+     *
+     * <p>The scenario is a proxy that holds its target separately, such as a scoped proxy, whose non-singleton
+     * interceptor is meant to be one instance per intercepted bean. The proxy resolves its interceptors once, but a
+     * scoped proxy stands for a new target in each scope, so the instances the proxy holds cannot be the target's.
+     * The proxy therefore names them on the resolution context it resolves the target with, see
+     * {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}, and this creates the target's own.</p>
+     *
+     * <p>An interceptor the target already resolved for its own construction, post-construct or pre-destroy
+     * interception is reused rather than created twice, so every kind shares one instance. The ones created here are
+     * dependents of the target, so they are destroyed with it, after its {@code @PreDestroy}. The combined list is
+     * returned to become the registration's interceptor registrations, and is recorded against the target so that the
+     * proxy can find it for the target it is invoking.</p>
+     *
+     * @param context                  The resolution context the bean was created with
+     * @param definition               The definition of the bean
+     * @param bean                     The bean
+     * @param interceptorRegistrations The interceptor registrations the bean resolved for its lifecycle, if any
+     * @param <T>                      The bean type
+     * @return The interceptor registrations of the bean
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    private <T> List<?> addProxyTargetInterceptorRegistrations(BeanResolutionContext context,
+                                                                BeanDefinition<T> definition,
+                                                                T bean,
+                                                                @Nullable List<?> interceptorRegistrations) {
+        if (!(context.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS) instanceof Map.Entry<?, ?> entry)
+            || !definition.equals(entry.getKey())
+            || !(entry.getValue() instanceof List<?> proxyRegistrations)
+            || proxyRegistrations.isEmpty()) {
+            return interceptorRegistrations;
+        }
+        int resolvedCount = interceptorRegistrations == null ? 0 : interceptorRegistrations.size();
+        List<BeanRegistration<?>> targetRegistrations = new ArrayList<>(resolvedCount + proxyRegistrations.size());
+        if (interceptorRegistrations != null) {
+            targetRegistrations.addAll((List<BeanRegistration<?>>) interceptorRegistrations);
+        }
+        for (Object proxyRegistration : proxyRegistrations) {
+            BeanDefinition<?> interceptorDefinition = ((BeanRegistration<?>) proxyRegistration).beanDefinition;
+            if (findRegistration(targetRegistrations, interceptorDefinition) == null) {
+                targetRegistrations.add(resolveBeanRegistration(context, interceptorDefinition));
+            }
+        }
+        proxyTargetInterceptorRegistrations.put(bean, targetRegistrations);
+        return targetRegistrations;
+    }
+
+    @Nullable
+    private static BeanRegistration<?> findRegistration(List<BeanRegistration<?>> registrations, BeanDefinition<?> definition) {
+        for (BeanRegistration<?> registration : registrations) {
+            if (registration.beanDefinition.equals(definition)) {
+                return registration;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Returns the interceptor registrations created for a target of a proxy that holds its target separately.
+     *
+     * <p>Used by generated proxies to invoke the target with the non-singleton interceptor instances created for it,
+     * rather than the ones the proxy resolved for itself. The registrations are recorded only for a target resolved
+     * through a proxy that asked for them, see {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}, and are
+     * forgotten once the target is no longer reachable.</p>
+     *
+     * @param target The target
+     * @return The registrations, or {@code null} if none were recorded for the target
+     * @since 5.2.1
+     */
+    @Internal
+    public @Nullable List<BeanRegistration<?>> findProxyTargetInterceptorRegistrations(Object target) {
+        return proxyTargetInterceptorRegistrations.get(target);
     }
 
     /**

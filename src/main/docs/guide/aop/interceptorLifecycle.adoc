@@ -102,8 +102,12 @@ explains the one case that behaves differently:
 |construct, methods, post-construct, pre-destroy
 
 |`@Around(proxyTarget = true)`
-|The generated proxy
+|The target's registration in the context; the proxy invokes the target with them
 |construct, methods, post-construct, pre-destroy
+
+|A scoped proxy, that is `@Around(proxyTarget = true, lazy = true)`, such as ann:runtime.context.scope.ThreadLocal[], `@RequestScope` or ann:runtime.context.scope.Refreshable[]
+|The registration of each target in the context; on every call the proxy selects the instances of the target it resolved
+|construct, methods, post-construct, pre-destroy, for each target
 
 |ann:aop.Introduction[] advice
 |The generated proxy
@@ -121,6 +125,16 @@ explains the one case that behaves differently:
 |Nothing; the context tracks no registration for it
 |construct and post-construct only
 |===
+
+With `proxyTarget = true` the intercepted bean is the target, not the proxy. A scoped proxy is one instance that
+stands for a different target in each scope: one per thread for `@ThreadLocal`, one per request for `@RequestScope`.
+Each of those targets is an intercepted bean of its own, so each gets its own instance of a non-singleton interceptor.
+The instance is created with the target, calls made through the proxy while that target is current are intercepted by
+it, and it is destroyed when the scope destroys the target. Two requests calling the same proxy therefore never share
+the state of a `@Prototype` interceptor, while a singleton interceptor is still one instance for all of them.
+
+The proxy is also constructed with an instance of each interceptor bound to its methods. For a non-singleton
+interceptor that instance does not intercept a target created through the proxy; it is destroyed with the proxy.
 
 NOTE: In the last row the context has no registration for the instance, so nothing links its destruction back to what
 it was created with, and `PRE_DESTROY` resolves a new interceptor. A proxied bean created and destroyed the same way
@@ -159,4 +173,6 @@ by a different annotation are never applied to the bean.
 
 TIP: Reuse of one interceptor instance across the phases of a proxied bean is part of the generated proxy. After
 upgrading, recompile intercepted classes so that beans compiled by an earlier version pick it up; until then they
-behave as they did before, resolving an interceptor per interception point.
+behave as they did before, resolving an interceptor per interception point. The same applies to a proxy with
+`proxyTarget = true` compiled before 5.2.1, which intercepts the methods of every target with the instances it was
+constructed with.
