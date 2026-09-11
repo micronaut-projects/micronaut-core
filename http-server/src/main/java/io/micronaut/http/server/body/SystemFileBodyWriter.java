@@ -184,7 +184,21 @@ public final class SystemFileBodyWriter extends AbstractFileBodyWriter implement
         String from = value.substring(equalsIdx + 1, minusIdx).trim();
         String to = value.substring(minusIdx + 1).trim();
         try {
-            long fromPosition = from.isEmpty() ? 0 : Long.parseLong(from);
+            if (from.isEmpty()) {
+                // suffix-range (Section 14.1.2): the last suffix-length bytes of the representation
+                if (to.isEmpty()) {
+                    return null; // Malformed range
+                }
+                long suffixLength = Long.parseLong(to);
+                if (suffixLength <= 0) {
+                    // a suffix-range with a length of zero is unsatisfiable (Section 14.1.2); report
+                    // it as a range starting past the end, which is answered with 416 above
+                    return new IntRange(contentLength, contentLength - 1);
+                }
+                // if the representation is shorter than the suffix length, the whole of it is used
+                return new IntRange(Math.max(0, contentLength - suffixLength), contentLength - 1);
+            }
+            long fromPosition = Long.parseLong(from);
             long toPosition = to.isEmpty() ? contentLength - 1 : Long.parseLong(to);
             return new IntRange(fromPosition, toPosition);
         } catch (NumberFormatException e) {

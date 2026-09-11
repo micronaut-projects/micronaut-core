@@ -118,6 +118,8 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         "bytes=1-2"    | 206            | "bytes 1-2/${tempFile.length()}"                         | tempFileContents.substring(1, 3)
         "bytes=0-0"    | 206            | "bytes 0-0/${tempFile.length()}"                         | tempFileContents.substring(0, 1)
         "bytes=5-5"    | 206            | "bytes 5-5/${tempFile.length()}"                         | tempFileContents.substring(5, 6)
+        "bytes=-5"     | 206            | "bytes ${tempFile.length() - 5}-${tempFile.length() - 1}/${tempFile.length()}" | tempFileContents.substring(tempFileContents.length() - 5)
+        "bytes=-9000"  | 206            | "bytes 0-${tempFile.length() - 1}/${tempFile.length()}"  | tempFileContents
     }
 
     void "test 416 is returned for a range that starts past the end of the file"() {
@@ -133,7 +135,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
         e.response.header(CONTENT_RANGE) == "bytes */${tempFile.length()}".toString()
 
         where:
-        range << ["bytes=9000-", "bytes=9000-9100", "bytes=${tempFile.length()}-".toString()]
+        range << ["bytes=9000-", "bytes=9000-9100", "bytes=${tempFile.length()}-".toString(), "bytes=-0"]
     }
 
     void "test cache control can be overridden"() {
