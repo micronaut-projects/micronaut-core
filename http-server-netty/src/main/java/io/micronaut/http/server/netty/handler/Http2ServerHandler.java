@@ -261,7 +261,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 handleFakeRequest(cs, fhr);
             } else {
                 if (evt instanceof IdleStateEvent idle && idle.state() == IdleState.ALL_IDLE) {
+                    // consumed: the connection is going away. On a real channel close() only
+                    // schedules the teardown, so without the return the event would still be
+                    // forwarded to whatever is behind us.
                     ctx.close();
+                    return;
                 }
                 // forward everything we do not consume ourselves. Our superclass
                 // ByteToMessageDecoder needs ChannelInputShutdownEvent, and handlers further down
