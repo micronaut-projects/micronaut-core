@@ -72,6 +72,12 @@ import java.util.regex.Pattern;
 @SuppressWarnings("FileLength")
 public final class RoutingInBoundHandler implements RequestHandler {
 
+    /**
+     * Channel attribute that exposes the current request to access log elements (Micronaut
+     * Session's log element reads it by this name). Set when the pipeline has an access logger,
+     * and cleared again once the response has been written.
+     */
+    static final AttributeKey<NettyHttpRequest> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
@@ -160,7 +166,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
     @Override
     public void responseWritten(@Nullable Object attachment) {
         if (attachment != null) {
-            cleanupRequest((NettyHttpRequest<?>) attachment);
+            NettyHttpRequest<?> request = (NettyHttpRequest<?>) attachment;
+            if (supportLoggingHandler) {
+                // only clear our own request: with pipelining the attribute may already hold
+                // the next request on this connection
+                request.getChannelHandlerContext().channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+            }
+            cleanupRequest(request);
         }
     }
 
@@ -228,8 +240,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
         if (supportLoggingHandler && ctx.pipeline().get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null) {
             // Micronaut Session needs this to extract values from the Micronaut Http Request for logging
-            AttributeKey<NettyHttpRequest> key = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
-            ctx.channel().attr(key).set(mnRequest);
+            ctx.channel().attr(ACCESS_LOG_REQUEST_ATTRIBUTE).set(mnRequest);
         }
         outboundAccess.attachment(mnRequest);
     }
