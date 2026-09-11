@@ -852,7 +852,7 @@ public class MediaType implements CharSequence {
      * inserting thread did beforehand, which is what makes it safe to share the parsed
      * {@link MediaType} instances across threads.</p>
      */
-    private static final AtomicReferenceArray<CachedMediaTypes> ORDERED_CACHE = new AtomicReferenceArray<>(MAX_CACHED_HEADERS);
+    private static final AtomicReferenceArray<@Nullable CachedMediaTypes> ORDERED_CACHE = new AtomicReferenceArray<>(MAX_CACHED_HEADERS);
 
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
@@ -964,7 +964,10 @@ public class MediaType implements CharSequence {
                     this.parameters = (Map) params;
                 }
             } else {
-                this.parameters = parsedParameters;
+                // A media type is a value: nothing here mutates the parameters after parsing, and
+                // instances are shared (the well-known constants, and the parsed header cache),
+                // so the parameters must not be mutable through getParameters().values() either.
+                this.parameters = Collections.unmodifiableMap(parsedParameters);
             }
         }
         this.name = withoutArgs;

@@ -61,6 +61,22 @@ class MediaTypeOrderedCacheTest {
     }
 
     @Test
+    void aCachedMediaTypeCannotBeCorruptedThroughItsParameters() {
+        String header = "text/html;v=1,application/json";
+        List<MediaType> first = MediaType.orderedOf(List.of(header));
+        MediaType html = first.get(0);
+        assertEquals("1", html.getVersion());
+
+        // the parameters are exposed as a view: mutating it must be refused, not shared
+        assertThrows(UnsupportedOperationException.class, () -> html.getParameters().values().clear());
+        assertThrows(UnsupportedOperationException.class, () -> html.getParametersMap().remove("v"));
+
+        List<MediaType> second = MediaType.orderedOf(List.of(header));
+        assertEquals("1", second.get(0).getVersion());
+        assertEquals("text/html;v=1", second.get(0).toString());
+    }
+
+    @Test
     void aCachedHeaderParsesToTheSameResultAsAnUncachedOne() {
         List<MediaType> cold = MediaType.orderedOf(List.of(BROWSER_ACCEPT));
         String description = describe(cold);
