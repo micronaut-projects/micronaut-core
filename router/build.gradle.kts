@@ -28,3 +28,15 @@ tasks.withType<Test>().configureEach {
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileTestGroovy.groovyOptions.fork = true
+
+noReflection {
+    allowIn("io.micronaut.web.router.AbstractRouteMatch", "TARGET_MEMBERS")
+    allowIn("io.micronaut.web.router.DefaultErrorRouteInfo", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultRouteBuilder", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultRouter", "CLASS_NAMES", "ENUM_CONSTANTS", "INTERFACES")
+    allowIn("io.micronaut.web.router.DefaultStatusRouteInfo", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.DefaultUrlRouteInfo", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.RouteBuilder", "ANNOTATIONS", "CLASS_NAMES")
+    allowIn("io.micronaut.web.router.Router", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.web.router.exceptions.UnsatisfiedRouteException", "CLASS_NAMES")
+}

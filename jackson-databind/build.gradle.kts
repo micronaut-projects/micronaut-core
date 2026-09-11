@@ -35,3 +35,12 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
 }
+
+noReflection {
+    allowIn("io.micronaut.jackson.Jackson2AnnotationSupport", "ANNOTATIONS", "CLASS_LOADING", "CLASS_MEMBERS", "ENUM_CONSTANTS", "PROXY", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.jackson.ObjectMapperFactory", "ANNOTATIONS", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.jackson.codec.JacksonFeatures", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.jackson.databind.DatabindPropertyBinderExceptionHandler", "CLASS_NAMES")
+    allowIn("io.micronaut.jackson.databind.JacksonDatabindMapper", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.jackson.databind.convert.JacksonConverterRegistrar", "GENERIC_SIGNATURES")
+}

@@ -9,7 +9,7 @@ configurations.all {
     // for example, without depending on Micronaut Core
     // This block will remove dependencies added automatically by Micronaut Build (e.g slf4j)
     dependencies.removeAll {
-        !it.name.contains("error_prone") && !it.name.contains("nullaway")
+        !it.name.contains("error_prone") && !it.name.contains("nullaway") && !it.name.contains("no-reflection")
     }
 }
 
@@ -26,4 +26,8 @@ tasks.named("ossIndexAudit") {
 
 dependencies {
     compileOnly(libs.managed.jspecify)
+}
+
+noReflection {
+    allowIn("io.micronaut.module.info.MicronautModuleInfoLoader", "SERVICE_LOADING")
 }

@@ -40,3 +40,9 @@ dependencies {
     compileOnly(libs.log4j)
     testImplementation(libs.awaitility)
 }
+
+noReflection {
+    allowIn("io.micronaut.management.endpoint.loggers.impl.Log4jLoggingSystem", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.management.endpoint.loggers.impl.LogbackLoggingSystem", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.management.health.indicator.jdbc.JdbcIndicator", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+}

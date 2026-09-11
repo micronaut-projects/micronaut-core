@@ -35,3 +35,7 @@ dependencies {
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+noReflection {
+    allowIn("io.micronaut.http.server.ExecutableRouteInfo", "TARGET_MEMBERS")
+}
