@@ -42,7 +42,7 @@ final class LifecycleCallbacks {
      *
      * <p>A private callback is dispatched reflectively. Generated code dispatches it through
      * {@link io.micronaut.core.reflect.ReflectionUtils#invokeMethodPropagating}, which lets what the callback threw
-     * through unchanged, but a bean definition compiled before 5.3 dispatches it through
+     * through unchanged, but a bean definition compiled before 5.2.1 dispatches it through
      * {@link io.micronaut.core.reflect.ReflectionUtils#invokeMethod}, which wraps it. It is unwrapped so that the
      * interceptor chain of the event sees the same exception whether or not the callback needed reflection, a
      * checked one included.</p>
