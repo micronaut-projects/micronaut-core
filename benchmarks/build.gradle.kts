@@ -25,6 +25,8 @@ dependencies {
     api(projects.micronautContextPython)
     api(projects.micronautHttpServer)
     api(projects.micronautHttpServerNetty)
+    // the access logger's ConnectionMetadata resolves the QUIC channel class when it is initialized
+    api(projects.micronautHttpNettyHttp3)
     api(projects.micronautHttpClient)
     api(projects.micronautJacksonDatabind)
     api(projects.micronautRouter)
