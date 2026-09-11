@@ -38,7 +38,9 @@ spotless {
 }
 
 noReflection {
+    allowIn("io.micronaut.logging.LoggingConverterRegistrar", "ENUM_CONSTANTS")
     allowIn("io.micronaut.logging.impl.LogbackUtils", "CLASS_NAMES")
+    allowIn("io.micronaut.scheduling.cron.CronExpression", "CLASS_NAMES")
     allowIn("io.micronaut.scheduling.executor.ExecutorFactory", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.scheduling.processor.ScheduledMethodProcessor", "CLASS_NAMES")
 }

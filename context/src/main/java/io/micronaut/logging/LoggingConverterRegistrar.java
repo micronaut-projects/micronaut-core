@@ -39,13 +39,7 @@ public final class LoggingConverterRegistrar implements TypeConverterRegistrar {
                 return Optional.of(LogLevel.NOT_SPECIFIED);
             }
             try {
-                String name = object.toString().toUpperCase(Locale.ENGLISH);
-                for (LogLevel logLevel : LogLevel.values()) {
-                    if (logLevel.name().equals(name)) {
-                        return Optional.of(logLevel);
-                    }
-                }
-                throw new IllegalArgumentException("No enum constant " + LogLevel.class.getName() + "." + name);
+                return Optional.of(Enum.valueOf(LogLevel.class, object.toString().toUpperCase(Locale.ENGLISH)));
             } catch (IllegalArgumentException e) {
                 context.reject(object, e);
                 return Optional.empty();
