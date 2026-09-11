@@ -9,6 +9,9 @@ import java.util.Map;
  * System-property switches shared by the HTTP stack benchmarks.
  */
 final class BenchOptions {
+    // When running through Gradle rather than the jar, pass -Pjmh.dateHeader=true and
+    // -Pjmh.accessLog=true: a -D on the Gradle command line does not reach the forked JMH JVM,
+    // and the build forwards those properties as the system properties below.
     /**
      * {@code -Dmicronaut.bench.date-header=true} keeps the {@code Date} response header on. The
      * response then changes once per second, so only its length is verified.

@@ -55,6 +55,15 @@ val jmhPoolSizes = providers.gradleProperty("jmh.poolSizes")
     .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
 val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
     .map(layout.projectDirectory::file)
+// Benchmark switches read by BenchOptions in the forked JMH JVM. A -D on the Gradle command line
+// only reaches Gradle itself, so they are exposed as -P properties and forwarded as JVM arguments:
+// -Pjmh.dateHeader=true, -Pjmh.accessLog=true
+val jmhBenchSwitches = listOf(
+    "jmh.dateHeader" to "micronaut.bench.date-header",
+    "jmh.accessLog" to "micronaut.bench.access-log"
+).mapNotNull { (property, systemProperty) ->
+    providers.gradleProperty(property).orNull?.let { "-D$systemProperty=$it" }
+}
 
 jmh {
     includes = jmhIncludes
@@ -68,6 +77,7 @@ jmh {
         benchmarkParameters.put("poolSize", objects.listProperty(String::class.java).value(sizes))
     }
     humanOutputFile.set(jmhHumanOutput)
+    jvmArgsAppend.addAll(jmhBenchSwitches)
     duplicateClassesStrategy = DuplicatesStrategy.WARN
 }
 
