@@ -283,6 +283,23 @@ final class EnumConstantsMap<K extends Enum<K>, V extends @Nullable Object> exte
             || (otherUniverse.length == universe.length && universe.length > 0 && otherUniverse[0] == universe[0]);
     }
 
+    /**
+     * Whether the key is mapped to the value. The candidate value is compared with
+     * {@code candidate.equals(stored)}, as {@link Set#contains} specifies and {@code EnumMap} does.
+     *
+     * @param key   The candidate key
+     * @param value The candidate value
+     * @return true if the map holds the mapping
+     */
+    private boolean containsMapping(@Nullable Object key, @Nullable Object value) {
+        int index = indexOfKey(key);
+        if (index < 0) {
+            return false;
+        }
+        Object val = vals[index];
+        return val != null && mask(value).equals(val);
+    }
+
     private static Object mask(@Nullable Object value) {
         return value == null ? NULL : value;
     }
@@ -351,16 +368,17 @@ final class EnumConstantsMap<K extends Enum<K>, V extends @Nullable Object> exte
 
         @Override
         public boolean contains(@Nullable Object o) {
-            return o instanceof Entry<?, ?> entry
-                && containsKey(entry.getKey())
-                && Objects.equals(get(entry.getKey()), entry.getValue());
+            return o instanceof Entry<?, ?> entry && containsMapping(entry.getKey(), entry.getValue());
         }
 
         @Override
         public boolean remove(@Nullable Object o) {
-            if (o instanceof Entry<?, ?> entry && contains(entry)) {
-                EnumConstantsMap.this.remove(entry.getKey());
-                return true;
+            if (o instanceof Entry<?, ?> entry) {
+                Object key = entry.getKey();
+                if (containsMapping(key, entry.getValue())) {
+                    EnumConstantsMap.this.remove(key);
+                    return true;
+                }
             }
             return false;
         }

@@ -276,6 +276,27 @@ class EnumConstantsMapSpec extends Specification {
         map.isEmpty()
     }
 
+    void "entrySet contains and remove compare the candidate value with the stored one, as EnumMap does"() {
+        given: "a stored value equal to anything, which no candidate value equals"
+        def stored = new EqualToAnything()
+        Map<Colour, Object> map = CollectionUtils.newEnumMap(Colour.values())
+        map.put(Colour.RED, stored)
+        def enumMap = new EnumMap<Colour, Object>(Colour)
+        enumMap.put(Colour.RED, stored)
+        def candidate = new AbstractMap.SimpleEntry(Colour.RED, "red")
+
+        expect:
+        !enumMap.entrySet().contains(candidate)
+        !map.entrySet().contains(candidate)
+        !map.entrySet().remove(candidate)
+        map.containsKey(Colour.RED)
+
+        and: "the stored value itself is found and removed"
+        map.entrySet().contains(new AbstractMap.SimpleEntry(Colour.RED, stored))
+        map.entrySet().remove(new AbstractMap.SimpleEntry(Colour.RED, stored))
+        map.isEmpty()
+    }
+
     void "equals and hashCode agree with EnumMap and HashMap holding the same mappings"() {
         given:
         Map<Colour, String> map = CollectionUtils.newEnumMap(Colour.values())
@@ -465,6 +486,18 @@ class EnumConstantsMapSpec extends Specification {
 
         where:
         seed << [1L, 42L, 20260911L]
+    }
+
+    static class EqualToAnything {
+        @Override
+        boolean equals(Object o) {
+            true
+        }
+
+        @Override
+        int hashCode() {
+            0
+        }
     }
 
     private static String render(Map<?, ?> map) {
