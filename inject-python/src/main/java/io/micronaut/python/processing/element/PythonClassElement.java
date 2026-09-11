@@ -50,6 +50,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
+import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -446,7 +447,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
             Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
-            Map<String, ClassElement> boundGenerics = new HashMap<>(getTypeArguments());
+            Map<String, ClassElement> boundGenerics = typeVariableBindings();
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                 TypeRef typeRef = typeArguments.get(i);
@@ -467,12 +468,20 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     }
 
     private Optional<ClassElement> toJavaType(TypeRef typeRef) {
-        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, Map.of()
-        );
+        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, typeVariableBindings());
         if (baseType != null && !baseType.getName().equals(Object.class.getName())) {
             return Optional.of(baseType);
         }
         return Optional.empty();
+    }
+
+    private Map<String, ClassElement> typeVariableBindings() {
+        if (resolvedTypeArguments == null) {
+            // Bases of an open generic type must retain its variables so recursive supertype
+            // arguments can subsequently be bound through each level of the hierarchy.
+            return GenericBindings.declared(this, true);
+        }
+        return new HashMap<>(resolvedTypeArguments);
     }
 
     @Override
@@ -493,17 +502,65 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        // Python can have multiple concrete bases, so retain the native-base traversal while
+        // applying the same per-level binding used by ClassElement's default implementation.
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
         for (TypeRef base : getNativeType().bases()) {
             ClassElement baseElement = findPythonClass(base);
-            if (baseElement != null) {
-                result.putAll(resolveTypeArguments(baseElement, base).getAllTypeArguments());
-            } else {
-                toJavaType(base).ifPresent(javaType -> result.putAll(javaType.getAllTypeArguments()));
+            ClassElement resolvedBase = baseElement == null
+                ? toJavaType(base).orElse(null)
+                : resolveTypeArguments(baseElement, base);
+            if (resolvedBase == null) {
+                continue;
             }
+            Map<String, ClassElement> baseTypeArguments = resolvedBase.getTypeArguments();
+            String baseName = resolvedBase.getName();
+            resolvedBase.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(baseName) ? typeArguments : bindTypeVariables(typeArguments, baseTypeArguments)
+            ));
         }
         result.put(getName(), getTypeArguments());
         return result;
+    }
+
+    private static Map<String, ClassElement> bindTypeVariables(Map<String, ClassElement> typeArguments,
+                                                               Map<String, ClassElement> bindings) {
+        if (typeArguments.isEmpty() || bindings.isEmpty()) {
+            return typeArguments;
+        }
+        Map<String, ClassElement> bound = new LinkedHashMap<>(typeArguments.size());
+        boolean changed = false;
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            ClassElement typeArgument = entry.getValue();
+            ClassElement boundTypeArgument = bindTypeVariables(typeArgument, bindings);
+            changed |= boundTypeArgument != typeArgument;
+            bound.put(entry.getKey(), boundTypeArgument);
+        }
+        return changed ? bound : typeArguments;
+    }
+
+    private static ClassElement bindTypeVariables(ClassElement type, Map<String, ClassElement> bindings) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            ClassElement binding = bindings.get(placeholder.getVariableName());
+            if (binding == null) {
+                return type;
+            }
+            ClassElement bound = binding;
+            while (bound.getArrayDimensions() < placeholder.getArrayDimensions()) {
+                bound = bound.toArray();
+            }
+            return bound;
+        }
+        if (type instanceof WildcardElement) {
+            ClassElement folded = type.foldBoundGenericTypes(bound ->
+                bound instanceof GenericPlaceholderElement ? bindTypeVariables(bound, bindings) : bound
+            );
+            return folded == null ? type : folded;
+        }
+        Map<String, ClassElement> typeArguments = type.getTypeArguments();
+        Map<String, ClassElement> boundTypeArguments = bindTypeVariables(typeArguments, bindings);
+        return boundTypeArguments == typeArguments ? type : type.withTypeArguments(boundTypeArguments);
     }
 
     @Override
