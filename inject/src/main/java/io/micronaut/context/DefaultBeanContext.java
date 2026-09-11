@@ -3369,6 +3369,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                      @Nullable Qualifier<T> qualifier,
                                                      BeanDefinition<T> definition,
                                                      boolean dependent) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isLazyProxyTarget()) {
+            // The context is retained by a lazy proxy, which resolves its target through it on every call. Create
+            // the bean in a copy, so that the created bean is not recorded as a dependent of the retained context
+            // and the resolution path is not shared by concurrent calls.
+            resolutionContext = resolutionContext.copy();
+        }
         try (BeanResolutionContext context = newResolutionContext(definition, resolutionContext)) {
             final BeanResolutionContext.Path path = context.getPath();
             final boolean isNewPath = path.isEmpty();
