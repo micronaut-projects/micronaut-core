@@ -28,8 +28,10 @@ import io.netty.handler.codec.http2.DecoratingHttp2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2Exception;
 import io.netty.handler.codec.http2.Http2Headers;
+import io.netty.handler.codec.http2.Http2Stream;
 import io.netty.handler.codec.http2.HttpConversionUtil;
 import io.netty.util.AsciiString;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Special {@link Http2ConnectionEncoder} that logs the response data.
@@ -62,7 +64,7 @@ public final class Http2AccessLogConnectionEncoder extends DecoratingHttp2Connec
         if (AsciiString.contentEquals(headers.status(), HttpResponseStatus.CONTINUE.codeAsText())) {
             return promise;
         }
-        AccessLog accessLog = manager.connection.stream(streamId).getProperty(manager.accessLogKey);
+        AccessLog accessLog = accessLog(streamId);
         if (accessLog == null) {
             return promise;
         }
@@ -83,7 +85,7 @@ public final class Http2AccessLogConnectionEncoder extends DecoratingHttp2Connec
 
     @Override
     public ChannelFuture writeData(ChannelHandlerContext ctx, int streamId, ByteBuf data, int padding, boolean endStream, ChannelPromise promise) {
-        AccessLog accessLog = manager.connection.stream(streamId).getProperty(manager.accessLogKey);
+        AccessLog accessLog = accessLog(streamId);
         if (accessLog != null) {
             if (endStream) {
                 accessLog.onLastResponseWrite(data.readableBytes());
@@ -95,6 +97,24 @@ public final class Http2AccessLogConnectionEncoder extends DecoratingHttp2Connec
         }
 
         return super.writeData(ctx, streamId, data, padding, endStream, promise);
+    }
+
+    /**
+     * Look up the access log of the given stream. The stream may already have been removed from the
+     * connection, for example when a write is issued for a stream that has just been closed. The
+     * delegate encoder handles that case by failing the write promise, so this decorator simply has
+     * nothing to log.
+     *
+     * @param streamId The stream id
+     * @return The access log, or {@code null} if there is none for this stream
+     */
+    @Nullable
+    private AccessLog accessLog(int streamId) {
+        Http2Stream stream = manager.connection.stream(streamId);
+        if (stream == null) {
+            return null;
+        }
+        return stream.getProperty(manager.accessLogKey);
     }
 
     private void finish(AccessLog accessLog, ChannelPromise promise) {

@@ -513,6 +513,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                     }
                 } else {
                     backingHandler.wakeup();
+                    // wakeup() only interrupts a blocking IO operation. The carrier does not
+                    // always wait inside that operation: whenever the IO virtual thread is
+                    // parked, the carrier waits in LockSupport.park() in run() instead, and
+                    // only an unpark gets it back to the queues. The unpark is cheap and
+                    // idempotent, and a carrier that is not parked just skips its next park.
+                    LockSupport.unpark(carrier);
                 }
             }
         }
