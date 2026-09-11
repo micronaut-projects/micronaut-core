@@ -315,7 +315,7 @@ public final class CronExpression {
 
     @Override
     public String toString() {
-        return "CronExpression<" + expr + ">";
+        return getClass().getSimpleName() + "<" + expr + ">";
     }
 
     /**
