@@ -35,8 +35,11 @@ import io.micronaut.context.beans.definition.ConstructorDefinition;
 import io.micronaut.context.beans.definition.FieldDefinition;
 import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Creator;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
@@ -49,6 +52,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
@@ -123,7 +127,44 @@ public class BeanInjectionUtils {
      * @return The constructor definition
      */
     public static ConstructorDefinition<ClassElement, MethodElement> createConstructorDefinition(MethodElement constructorElement, VisitorContext visitorContext) {
-        return createConstructorDefinition(constructorElement, visitorContext, !constructorElement.isAccessible());
+        return createConstructorDefinition(constructorElement, visitorContext, constructorElement.isReflectionRequired());
+    }
+
+    /**
+     * Finds the constructor a bean of the given type is instantiated with.
+     *
+     * <p>This is {@link ClassElement#getPrimaryConstructor()} extended to private constructors, which that lookup
+     * never selects. A private constructor annotated with {@link AnnotationUtil#INJECT} or {@link Creator} takes
+     * precedence over an unannotated accessible one, and a type whose only constructor is private is instantiated
+     * with it. A private constructor is invoked with reflection, as private injected fields and methods are.</p>
+     *
+     * @param classElement The bean type
+     * @return The constructor, or a static creator method, if one is found
+     * @since 5.3.0
+     */
+    public static Optional<MethodElement> findBeanConstructor(ClassElement classElement) {
+        Optional<MethodElement> primaryConstructor = classElement.getPrimaryConstructor();
+        if ((primaryConstructor.isPresent() && isAnnotatedCreator(primaryConstructor.get()))
+            || (classElement.isInner() && !classElement.isStatic())) {
+            return primaryConstructor;
+        }
+        List<ConstructorElement> privateConstructors = classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)
+            .stream()
+            .filter(Element::isPrivate)
+            .toList();
+        for (ConstructorElement privateConstructor : privateConstructors) {
+            if (isAnnotatedCreator(privateConstructor)) {
+                return Optional.of(privateConstructor);
+            }
+        }
+        if (primaryConstructor.isEmpty() && privateConstructors.size() == 1 && classElement.getAccessibleConstructors().isEmpty()) {
+            return Optional.of(privateConstructors.get(0));
+        }
+        return primaryConstructor;
+    }
+
+    private static boolean isAnnotatedCreator(MethodElement constructor) {
+        return constructor.hasStereotype(AnnotationUtil.INJECT) || constructor.hasStereotype(Creator.class);
     }
 
     /**
