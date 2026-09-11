@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
@@ -41,6 +42,7 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -308,7 +310,15 @@ public abstract class ResponseLifecycle {
     protected final ExecutionFlow<? extends ByteBodyHttpResponse<?>> handleStreamingError(HttpRequest<?> request, Throwable t) {
         // limited error handling
         MutableHttpResponse<?> errorResponse;
-        if (t instanceof HttpStatusException hse) {
+        if (t instanceof ConversionErrorException cee && cee.getCause() instanceof JsonSyntaxException jse) {
+            // with delayed parsing, json syntax errors show up as conversion errors
+            t = jse;
+        }
+        if (t instanceof JsonSyntaxException) {
+            // a syntax error in a streamed request body is the client's fault, not the server's,
+            // the same way RequestLifecycle answers it for a fully buffered body
+            errorResponse = HttpResponse.badRequest().body(t.getMessage());
+        } else if (t instanceof HttpStatusException hse) {
             errorResponse = HttpResponse.status(hse.getStatus());
             if (hse.getBody().isPresent()) {
                 errorResponse.body(hse.getBody().get());
