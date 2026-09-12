@@ -37,6 +37,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.NavigableSet;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.SequencedCollection;
@@ -159,6 +160,55 @@ public class CollectionUtils {
      */
     public static <K, V> LinkedHashMap<K, V> newLinkedHashMap(int size) {
         return new LinkedHashMap<>(calculateHashSetSize(size));
+    }
+
+    /**
+     * Create a new enum-keyed map for the given constants of an enum.
+     *
+     * <p>The map behaves like {@link java.util.EnumMap}: it keeps its mappings in an array indexed by
+     * {@link Enum#ordinal()}, iterates in ordinal order, permits {@code null} values, rejects
+     * {@code null} keys, and throws {@link ClassCastException} when a key of another enum is put.
+     * Unlike {@code EnumMap}, which is given the {@link Class} of the enum and looks its constants up
+     * reflectively (a lookup of the {@code values()} method, {@code setAccessible} and a reflective
+     * invocation), it is given the constants, so it does no reflection:</p>
+     *
+     * <pre>{@code
+     * Map<TimeUnit, String> names = CollectionUtils.newEnumMap(TimeUnit.values());
+     * }</pre>
+     *
+     * <p>The array is held by the map, not copied, and must not be mutated afterwards. Passing the
+     * result of {@code values()} directly is always safe, because every call returns a new array;
+     * an array cached in a constant can be shared by many maps.</p>
+     *
+     * <p>The array must contain all the constants of a single enum in ordinal order, as its
+     * {@code values()} method returns them. This method verifies that every element is a constant of
+     * the same enum whose ordinal equals its index. It cannot detect an array that stops short of the
+     * last constants: keys past its end are then treated as keys of another enum.</p>
+     *
+     * @param constants The constants of the enum, as its {@code values()} method returns them
+     * @param <K> The enum type
+     * @param <V> The value type
+     * @return A new, empty, mutable map
+     * @throws IllegalArgumentException if an element is not the constant of the enum at its index
+     * @since 5.3.0
+     */
+    public static <K extends Enum<K>, V extends @Nullable Object> Map<K, V> newEnumMap(K[] constants) {
+        Objects.requireNonNull(constants, "constants");
+        Class<?> enumType = null;
+        for (int i = 0; i < constants.length; i++) {
+            K constant = constants[i];
+            if (constant == null) {
+                throw new IllegalArgumentException("The constant at index " + i + " is null");
+            }
+            if (enumType == null) {
+                enumType = constant.getDeclaringClass();
+            }
+            if (constant.ordinal() != i || constant.getDeclaringClass() != enumType) {
+                throw new IllegalArgumentException("The constants must be those of a single enum in ordinal order, as its values() method returns them, but found "
+                    + constant + " with ordinal " + constant.ordinal() + " at index " + i);
+            }
+        }
+        return new EnumConstantsMap<>(constants);
     }
 
     private static int calculateHashSetSize(int size) {
@@ -491,6 +541,9 @@ public class CollectionUtils {
     /**
      * Create an enum set from an array.
      * NOTE: At least one item is required
+     *
+     * <p>The set is created with {@link EnumSet#noneOf(Class)}, which looks the constants of the enum
+     * up reflectively.</p>
      *
      * @param enums The array of enums
      * @param <E> The enum type

@@ -39,7 +39,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -62,7 +61,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
 
-    private final EnumMap<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
+    private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
@@ -95,7 +94,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     public DefaultRouter(Collection<RouteBuilder> builders) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
-        EnumMap<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = new EnumMap<>(HttpMethod.class);
+        HttpMethod[] httpMethods = HttpMethod.values();
+        Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newEnumMap(httpMethods);
         Set<StatusRouteInfo<Object, Object>> statusRoutes = new LinkedHashSet<>();
         Set<ErrorRouteInfo<Object, Object>> errorRoutes = new LinkedHashSet<>();
         alwaysMatchesFilterRoutes = new ArrayList<>(20);
@@ -152,7 +152,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         } else {
             this.exposedPorts = Collections.emptySet();
         }
-        EnumMap<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = new EnumMap<>(HttpMethod.class);
+        Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(httpMethods);
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
             UriRouteInfo<Object, Object>[] values = finalizeRoutes(e.getValue());
