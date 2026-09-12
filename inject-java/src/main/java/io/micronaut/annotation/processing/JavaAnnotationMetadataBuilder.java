@@ -140,7 +140,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Nullable
     @Override
-    protected String getRepeatableContainerNameForType(Element annotationType) {
+    public String getRepeatableContainerNameForType(Element annotationType) {
         List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();
@@ -177,7 +177,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(Element annotation) {
+    public RetentionPolicy getRetentionPolicy(Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
