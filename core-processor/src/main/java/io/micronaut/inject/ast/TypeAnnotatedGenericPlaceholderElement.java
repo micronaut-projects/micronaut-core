@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
@@ -24,16 +25,22 @@ import java.util.Optional;
 
 /**
  * A type variable read through a use of it that carries type annotations of its own: the variable is the one
- * delegated to, the type annotations are those of the variable and of the use together.
+ * delegated to, the type annotations are those of the use.
  *
  * @author Denis Stepanov
  * @since 5.2.1
  */
 @Internal
-final class TypeAnnotatedGenericPlaceholderElement extends TypeAnnotatedClassElement implements GenericPlaceholderElement {
+@Experimental
+public final class TypeAnnotatedGenericPlaceholderElement extends TypeAnnotatedClassElement implements GenericPlaceholderElement {
 
-    TypeAnnotatedGenericPlaceholderElement(GenericPlaceholderElement delegate, ClassElement useSite) {
-        super(delegate, useSite);
+    /**
+     * @param delegate               The type variable
+     * @param typeAnnotationMetadata The type annotations to read it with
+     */
+    public TypeAnnotatedGenericPlaceholderElement(GenericPlaceholderElement delegate,
+                                                  MutableAnnotationMetadataDelegate<AnnotationMetadata> typeAnnotationMetadata) {
+        super(delegate, typeAnnotationMetadata);
     }
 
     @Override
@@ -53,7 +60,7 @@ final class TypeAnnotatedGenericPlaceholderElement extends TypeAnnotatedClassEle
 
     @Override
     public Optional<ClassElement> getResolved() {
-        // The type the variable resolves to is read through the same use, so the annotations survive the resolution
+        // The type the variable resolves to is read the same way, so the annotations survive the resolution
         return placeholder().getResolved().map(this::withDelegate);
     }
 
@@ -64,18 +71,13 @@ final class TypeAnnotatedGenericPlaceholderElement extends TypeAnnotatedClassEle
 
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
-        return merge(placeholder().getGenericTypeAnnotationMetadata(), getUseSite().getTypeAnnotationMetadata());
+        return typeAnnotationMetadata;
     }
 
     @Override
-    public boolean isTypeVariable() {
-        return true;
-    }
-
-    @Override
-    ClassElement withDelegate(ClassElement newDelegate) {
+    protected ClassElement withDelegate(ClassElement newDelegate) {
         if (newDelegate instanceof GenericPlaceholderElement newPlaceholder) {
-            return new TypeAnnotatedGenericPlaceholderElement(newPlaceholder, getUseSite());
+            return new TypeAnnotatedGenericPlaceholderElement(newPlaceholder, typeAnnotationMetadata);
         }
         return super.withDelegate(newDelegate);
     }

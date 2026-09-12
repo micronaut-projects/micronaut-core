@@ -1032,9 +1032,9 @@ public interface ClassElement extends TypedElement {
      * {@code interface Middle<T> extends Container<@Marker T>} read through {@code class Leaf<X> implements Middle<X>},
      * the {@code Container} argument is {@code X} and is still annotated {@code @Marker}.
      *
-     * @param bound       The type the variable is bound to
-     * @param use         The use of the variable
-     * @return The bound type, wrapped only when the use annotates it
+     * @param bound The type the variable is bound to
+     * @param use   The use of the variable
+     * @return The bound type, read through the use only when the use annotates it
      */
     private static ClassElement readThroughUse(ClassElement bound, GenericPlaceholderElement use) {
         Collection<String> useAnnotations = use.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames();
@@ -1043,10 +1043,7 @@ public interface ClassElement extends TypedElement {
             || bound.getTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().containsAll(useAnnotations)) {
             return bound;
         }
-        if (bound instanceof GenericPlaceholderElement boundPlaceholder) {
-            return new TypeAnnotatedGenericPlaceholderElement(boundPlaceholder, use);
-        }
-        return new TypeAnnotatedClassElement(bound, use);
+        return TypeAnnotatedClassElement.readThrough(bound, use);
     }
 
     /**
