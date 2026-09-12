@@ -308,10 +308,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Marks first dependent as factory.
      * Dependent can be missing which means it's a singleton or scoped bean.
      *
+     * <p>Superseded by {@link #markDependentAsFactory(Object)}, which generated code calls now; kept for bean
+     * definitions compiled by earlier versions.</p>
+     *
      * @since 3.5.0
      */
     @UsedByGeneratedCode
     default void markDependentAsFactory() {
+    }
+
+    /**
+     * Marks the dependent registration of the given factory bean as the factory that produces the bean being
+     * created, so that a factory which is itself a dependent, a prototype for instance, is destroyed once it has
+     * produced the bean. A singleton or scoped factory has no dependent registration, and nothing is marked.
+     *
+     * <p>Unlike {@link #markDependentAsFactory()}, which marks whichever dependent was resolved first, this finds
+     * the registration by the factory instance, so that dependents resolved before the factory was looked up, such
+     * as the interceptors of a bean whose creation is advised, are left alone.</p>
+     *
+     * @param factoryBean The factory bean that was just looked up
+     * @since 5.2.2
+     */
+    @UsedByGeneratedCode
+    default void markDependentAsFactory(Object factoryBean) {
+        markDependentAsFactory();
     }
 
     /**
@@ -363,6 +383,34 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the registration of the proxy target for a given proxy bean definition.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier)} returns the target alone, this
+     * returns the registration the context holds for it, which for a target that is not a singleton carries the
+     * interceptors resolved while the target was created. A generated proxy fronting such a target resolves the
+     * target of each intercepted call this way, so that the target's own interceptors apply to the call rather
+     * than a set the proxy resolved once for every target it will ever front.</p>
+     *
+     * @param definition The proxy target bean definition
+     * @param beanType   The bean type
+     * @param qualifier  The qualifier
+     * @param <T>        The generic type
+     * @return The registration of the proxy target
+     * @since 5.2.2
+     */
+    @UsedByGeneratedCode
+    default <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition,
+                                                                  Argument<T> beanType,
+                                                                  @Nullable Qualifier<T> qualifier) {
+        return BeanRegistration.of(
+            getContext(),
+            new DefaultBeanContext.BeanKey<>(beanType, qualifier),
+            definition,
+            getProxyTargetBean(definition, beanType, qualifier)
+        );
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.
