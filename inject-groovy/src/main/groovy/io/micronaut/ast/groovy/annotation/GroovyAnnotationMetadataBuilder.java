@@ -305,6 +305,12 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
+    protected List<? extends AnnotationNode> getWrittenAnnotations(AnnotatedNode element) {
+        // Unlike getAnnotationsForType, a repeatable container is kept as the source wrote it
+        return element.getAnnotations();
+    }
+
+    @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
         var expanded = new ArrayList<AnnotationNode>(annotations.size());

@@ -18,9 +18,12 @@ package io.micronaut.inject.ast.annotation;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.util.ArgumentUtils;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
@@ -160,4 +163,31 @@ public interface MutableAnnotationMetadataDelegate<R> extends AnnotationMetadata
         throw new UnsupportedOperationException("Element of type [" + getClass() + "] does not support adding annotations at compilation time");
     }
 
+    /**
+     * The annotations the source wrote on this element, type use or type variable, in source order and as
+     * written.
+     *
+     * <p>Unlike the metadata returned by {@link #getAnnotationMetadata()}, this is the declaration as the
+     * compiler sees it: a repeatable annotation written once is itself, a container the source wrote is the
+     * container, two or more repetitions arrive in the container the compiler synthesizes for them, as the
+     * class file would carry them, and nothing an {@link io.micronaut.inject.annotation.AnnotationMapper},
+     * {@link io.micronaut.inject.annotation.AnnotationRemapper},
+     * {@link io.micronaut.inject.annotation.AnnotationTransformer} or a visitor's {@code annotate(...)} added
+     * appears, nor any stereotype. Each value carries the annotation interface's retention and its defaults for
+     * the members the use left out, empty strings and arrays included.</p>
+     *
+     * <p>For a type variable it is what was written at this use of the variable (nothing, if the use wrote
+     * nothing), or the annotations of the type parameter declaration when the element comes from
+     * {@link io.micronaut.inject.ast.ClassElement#getDeclaredGenericPlaceholders()} or
+     * {@link io.micronaut.inject.ast.MethodElement#getDeclaredTypeVariables()}. It is empty for an element no
+     * source backs, such as one created by reflection or {@code ClassElement.of(String)}.</p>
+     *
+     * @return The annotations as written, or an empty list
+     * @since 5.3.0
+     */
+    @Experimental
+    @NonNull
+    default List<AnnotationValue<?>> getSourceAnnotations() {
+        return List.of();
+    }
 }

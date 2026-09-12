@@ -203,6 +203,12 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
+    protected List<? extends AnnotationMirror> getWrittenAnnotations(Element element) {
+        // Unlike getAnnotationsForType, a repeatable container is kept as the source wrote it
+        return element.getAnnotationMirrors();
+    }
+
+    @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         var expanded = new ArrayList<AnnotationMirror>();
         for (AnnotationMirror annotation : element.getAnnotationMirrors()) {

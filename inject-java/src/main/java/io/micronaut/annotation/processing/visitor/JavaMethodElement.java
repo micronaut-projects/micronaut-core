@@ -239,7 +239,7 @@ public class JavaMethodElement extends AbstractJavaMemberElement implements Meth
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredTypeVariables() {
         return executableElement.getTypeParameters().stream()
-            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+            .map(tpe -> JavaClassElement.asDeclaredPlaceholder(newClassElement(tpe.asType(), Collections.emptyMap())))
             .toList();
     }
 

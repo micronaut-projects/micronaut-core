@@ -22,6 +22,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -77,6 +78,15 @@ public abstract class AbstractAnnotationElement implements io.micronaut.inject.a
      */
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return getElementAnnotationMetadata();
+    }
+
+    @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        if (presetAnnotationMetadata != null) {
+            // The preset metadata replaced what was built from the source, which is what is asked for here
+            return elementAnnotationMetadataFactory.build(this).getSourceAnnotations();
+        }
+        return getElementAnnotationMetadata().getSourceAnnotations();
     }
 
     @Override

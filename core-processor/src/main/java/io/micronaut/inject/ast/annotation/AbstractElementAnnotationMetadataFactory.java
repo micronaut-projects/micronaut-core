@@ -36,6 +36,7 @@ import io.micronaut.inject.ast.WildcardElement;
 import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -309,6 +310,12 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             }
 
             @Override
+            public List<AnnotationValue<?>> getSourceAnnotations() {
+                // A property is synthesized from its getter, setter and field; no source writes on it
+                return List.of();
+            }
+
+            @Override
             public String toString() {
                 return propertyElement.toString();
             }
@@ -501,6 +508,12 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
                 return annotationMetadata;
             }
             return getCacheEntry();
+        }
+
+        @Override
+        public List<AnnotationValue<?>> getSourceAnnotations() {
+            // What the source wrote does not change when the metadata is mutated
+            return getCacheEntry().getSourceAnnotations();
         }
 
         @Override

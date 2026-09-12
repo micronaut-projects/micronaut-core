@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -28,6 +29,7 @@ import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.annotation.WildcardElementAnnotationMetadata;
 
 import javax.lang.model.type.WildcardType;
+import javax.lang.model.type.ArrayType;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -73,6 +75,12 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
     @Override
     public Optional<ClassElement> getResolved() {
         return Optional.of(upperBound);
+    }
+
+    @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        // What was written at this use of the variable, or on its declaration
+        return getGenericTypeAnnotationMetadata().getSourceAnnotations();
     }
 
     @Override
@@ -139,6 +147,11 @@ final class JavaWildcardElement extends JavaClassElement implements WildcardElem
             throw new UnsupportedOperationException("Can't create array of wildcard");
         }
         return this;
+    }
+
+    @Override
+    ClassElement toArray(ArrayType arrayType) {
+        return toArray();
     }
 
     @Override

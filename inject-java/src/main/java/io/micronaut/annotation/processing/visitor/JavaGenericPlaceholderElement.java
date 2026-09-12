@@ -16,6 +16,7 @@
 package io.micronaut.annotation.processing.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -29,6 +30,7 @@ import io.micronaut.inject.ast.annotation.GenericPlaceholderElementAnnotationMet
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 
 import javax.lang.model.element.TypeParameterElement;
+import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.TypeVariable;
 import java.util.List;
 import java.util.Objects;
@@ -43,7 +45,7 @@ import java.util.function.Function;
  * @since 3.1.0
  */
 @Internal
-final class JavaGenericPlaceholderElement extends JavaClassElement implements GenericPlaceholderElement {
+public final class JavaGenericPlaceholderElement extends JavaClassElement implements GenericPlaceholderElement {
     final TypeVariable realTypeVariable;
     private final JavaNativeElement.Placeholder genericNativeType;
     private final Element declaredElement;
@@ -52,6 +54,7 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     private final List<JavaClassElement> bounds;
     private final boolean isRawType;
     private final ElementAnnotationMetadata typeAnnotationMetadata;
+    private boolean declaration;
     @Nullable
     private ElementAnnotationMetadata genericTypeAnnotationMetadata;
 
@@ -118,6 +121,12 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
     }
 
     @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        // What was written at this use of the variable, or on its declaration
+        return getGenericTypeAnnotationMetadata().getSourceAnnotations();
+    }
+
+    @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {
             genericTypeAnnotationMetadata = elementAnnotationMetadataFactory.buildGenericTypeAnnotations(this);
@@ -171,12 +180,45 @@ final class JavaGenericPlaceholderElement extends JavaClassElement implements Ge
 
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
-        return new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        return copy(arrayDimensions);
+    }
+
+    @Override
+    ClassElement toArray(ArrayType arrayType) {
+        // A placeholder has no mirror per array dimension
+        return toArray();
     }
 
     @Override
     protected JavaClassElement copyThis() {
-        return new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        return copy(arrayDimensions);
+    }
+
+    private JavaGenericPlaceholderElement copy(int arrayDimensions) {
+        var copy = new JavaGenericPlaceholderElement(genericNativeType, realTypeVariable, declaredElement, resolved, bounds, elementAnnotationMetadataFactory, arrayDimensions, isRawType, doc);
+        copy.declaration = declaration;
+        return copy;
+    }
+
+    /**
+     * Whether this element is the declaration of the type variable, as returned by
+     * {@link ClassElement#getDeclaredGenericPlaceholders()} and {@link io.micronaut.inject.ast.MethodElement#getDeclaredTypeVariables()},
+     * rather than a use of it.
+     *
+     * @return True if this is the declaration
+     * @since 5.3.0
+     */
+    public boolean isDeclaration() {
+        return declaration;
+    }
+
+    /**
+     * @return A copy of this element marked as the declaration of the type variable
+     */
+    JavaGenericPlaceholderElement asDeclaration() {
+        JavaGenericPlaceholderElement copy = copy(arrayDimensions);
+        copy.declaration = true;
+        return copy;
     }
 
     @Override

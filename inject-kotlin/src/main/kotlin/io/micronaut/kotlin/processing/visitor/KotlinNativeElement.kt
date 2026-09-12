@@ -242,7 +242,12 @@ class KotlinPropertyGetterNativeElement(
 
 class KotlinTypeParameterNativeElement(
     val declaration: KSTypeParameter,
-    owner: KotlinNativeElement
+    owner: KotlinNativeElement,
+    /**
+     * The type of the use of the variable, when the element is a use rather than the declaration.
+     * Not part of the identity: a use and the declaration share their metadata.
+     */
+    val type: KSType? = null
 ) : KotlinNativeElement(declaration, owner) {
 
     override fun toString(): String {

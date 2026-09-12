@@ -243,7 +243,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         owner: KotlinNativeElement,
         typeParameter: KSTypeParameter,
         parentTypeArguments: Map<String, ClassElement>,
-        visitedTypes: MutableSet<Any> = HashSet()
+        visitedTypes: MutableSet<Any> = HashSet(),
+        useType: KSType? = null
     ): ClassElement {
         val variableName = typeParameter.name.asString()
         val found = parentTypeArguments[variableName]
@@ -278,7 +279,7 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
         }.toList()
 
         return KotlinGenericPlaceholderElement(
-            KotlinTypeParameterNativeElement(typeParameter, owner),
+            KotlinTypeParameterNativeElement(typeParameter, owner, useType),
             bound,
             bounds,
             declaringElement,
@@ -615,7 +616,8 @@ internal abstract class AbstractKotlinElement<T : KotlinNativeElement>(
                     owner!!,
                     typeDeclaration,
                     parentTypeArguments,
-                    visitedTypes
+                    visitedTypes,
+                    type
                 )
             }
         }
