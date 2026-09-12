@@ -109,6 +109,7 @@ open class Test {
 
             @Override
             void register(Class<?>... types) {
+                // only the registered methods are of interest here
             }
 
             @Override
@@ -118,14 +119,17 @@ open class Test {
 
             @Override
             void register(Field... fields) {
+                // only the registered methods are of interest here
             }
 
             @Override
             void register(Constructor<?>... constructors) {
+                // only the registered methods are of interest here
             }
 
             @Override
             void registerDynamicProxy(Class<?>... interfaces) {
+                // only the registered methods are of interest here
             }
         })
         return methods
