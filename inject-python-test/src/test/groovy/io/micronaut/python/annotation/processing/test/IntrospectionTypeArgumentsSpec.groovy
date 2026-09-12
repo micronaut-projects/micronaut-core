@@ -23,7 +23,7 @@ class IntrospectionTypeArgumentsSpec extends AbstractPythonTypeElementSpec {
     private static final String HIERARCHY = '''
 from typing import Generic, TypeVar
 from java.util import ArrayList, HashMap
-from io.micronaut.python.annotation.processing.test import TypeArgumentFlipped
+from io.micronaut.python.annotation.processing.test import TypeArgumentFlipped, TypeArgumentTable
 from io.micronaut.core.annotation import Introspected
 from jakarta.inject import Singleton
 
@@ -52,6 +52,22 @@ class Holder(TypeArgumentFlipped[X, Y], Generic[X, Y]):
 @Introspected
 @Singleton
 class Strings(ArrayList[str]):
+    pass
+
+class Pair[PK, PV]:
+    pass
+
+class Table[PK, PV](Pair[PK, PV]):
+    pass
+
+@Introspected
+@Singleton
+class PythonSwapped[K, V](Table[V, K]):
+    pass
+
+@Introspected
+@Singleton
+class JavaSwapped[K, V](TypeArgumentTable[V, K]):
     pass
 '''
 
@@ -101,6 +117,33 @@ class Strings(ArrayList[str]):
         !introspection.getTypeArguments(Iterable)[0].isTypeVariable()
         introspection.getTypeArguments(Collection)*.type == [String]
         definition.getTypeArguments(Iterable)*.type == [String]
+    }
+
+    void "a Python type above an intermediate Python base with the same variable names is bound once"() {
+        given:
+        def introspection = buildBeanIntrospection("python.PythonSwapped", HIERARCHY)
+        def definition = buildBeanDefinition("python", "PythonSwapped", HIERARCHY)
+
+        expect: 'Table<PK, PV> gets PK from V and PV from K'
+        variableNames(introspection.getTypeArguments("python.Table")) == ["V", "K"]
+
+        and: 'Pair<PK, PV> above it, whose variables Table passes on unchanged, says the same'
+        variableNames(introspection.getTypeArguments("python.Pair")) == ["V", "K"]
+        variableNames(definition.getTypeArguments("python.Pair")) == ["V", "K"]
+        introspection.getTypeArguments("python.Pair") == definition.getTypeArguments("python.Pair")
+    }
+
+    void "a Java type above an intermediate Java base with the same variable names is bound once"() {
+        given:
+        def introspection = buildBeanIntrospection("python.JavaSwapped", HIERARCHY)
+        def definition = buildBeanDefinition("python", "JavaSwapped", HIERARCHY)
+
+        expect:
+        variableNames(introspection.getTypeArguments(TypeArgumentTable)) == ["V", "K"]
+
+        and:
+        variableNames(introspection.getTypeArguments(TypeArgumentPair)) == ["V", "K"]
+        variableNames(definition.getTypeArguments(TypeArgumentPair)) == ["V", "K"]
     }
 
     private static List<String> variableNames(List<Argument<?>> arguments) {
