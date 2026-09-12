@@ -223,7 +223,11 @@ public abstract sealed class CompletedFileUpload extends CompletedPart {
             if (Schedulers.isInNonBlockingThread()) {
                 throw new IllegalStateException("CompletedFileUpload.toReadBuffer called in non-blocking thread. This is a blocking operation. You may want to annotate your controller with @ExecuteOn(TaskExecutors.BLOCKING).");
             }
-            return ReadBufferFactory.getJdkFactory().copyOf(getInputStream());
+            // copyOf(InputStream) reads the stream but does not own it: close it here, or every
+            // conversion of a disk-backed part holds a file descriptor until the stream is collected
+            try (InputStream in = getInputStream()) {
+                return ReadBufferFactory.getJdkFactory().copyOf(in);
+            }
         }
 
         @Override

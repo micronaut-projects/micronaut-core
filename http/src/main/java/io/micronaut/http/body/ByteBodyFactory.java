@@ -148,6 +148,22 @@ public class ByteBodyFactory {
     }
 
     /**
+     * Buffer any data written to an {@link OutputStream} and return it as a {@link ByteBody},
+     * with a hint for the size of the data that will be written. See
+     * {@link ReadBufferFactory#buffer(int, ThrowingConsumer)}.
+     *
+     * @param expectedSize The expected number of bytes the writer will produce
+     * @param writer       The function that will write to the {@link OutputStream}
+     * @return The data written to the stream
+     * @param <T> Exception type thrown by the consumer
+     * @throws T Exception thrown by the consumer
+     * @since 5.2.1
+     */
+    public <T extends Throwable> CloseableAvailableByteBody buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
+        return adapt(readBufferFactory().buffer(expectedSize, writer));
+    }
+
+    /**
      * Create an empty body.
      *
      * @return The empty body

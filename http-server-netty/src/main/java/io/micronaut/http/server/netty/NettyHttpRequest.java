@@ -188,6 +188,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     private Object legacyBody;
     @Nullable
     private List<Runnable> disposalResources;
+    @Nullable
+    private ParsedFormType parsedFormType;
 
     private final BodyConvertor bodyConvertor = newBodyConvertor();
 
@@ -726,13 +728,31 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         return parseFormType() != null;
     }
 
+    /**
+     * Parse the form type of this request from its {@code Content-Type}. The result is cached
+     * for the {@link MediaType} instance the header currently resolves to: every binder for a
+     * form argument asks for it, and so does {@link #getRawFormFields()}. The headers cache the
+     * parsed content type and drop it when they are modified, so a changed header produces a
+     * new instance and a fresh parse.
+     *
+     * @return The form type, or {@code null} if this is not a form request
+     */
     @Nullable
     private FormType parseFormType() {
-        Optional<MediaType> contentType = getContentType();
-        if (contentType.isEmpty()) {
+        MediaType ct = getContentType().orElse(null);
+        if (ct == null) {
             return null;
         }
-        MediaType ct = contentType.get();
+        ParsedFormType cached = parsedFormType;
+        if (cached == null || cached.contentType != ct) {
+            cached = new ParsedFormType(ct, parseFormType(ct));
+            parsedFormType = cached;
+        }
+        return cached.formType;
+    }
+
+    @Nullable
+    private static FormType parseFormType(MediaType ct) {
         if (ct.matches(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) {
             return FormTypeUrlEncoded.INSTANCE;
         } else if (ct.matches(MediaType.MULTIPART_FORM_DATA_TYPE)) {
@@ -765,6 +785,15 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     private record FormTypeMultipart(String boundary) implements FormType {
+    }
+
+    /**
+     * The form type parsed from a particular content type instance.
+     *
+     * @param contentType The content type the form type was parsed from
+     * @param formType    The parsed form type, or {@code null} if it is not a form content type
+     */
+    private record ParsedFormType(MediaType contentType, @Nullable FormType formType) {
     }
 
     /**
