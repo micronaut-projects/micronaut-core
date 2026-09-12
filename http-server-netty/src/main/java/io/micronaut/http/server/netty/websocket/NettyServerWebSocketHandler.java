@@ -76,10 +76,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.function.Function;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 /**
  * A handler for {@link WebSocketFrame} instances.
@@ -270,14 +267,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
-                return requiredWebSocketSessionRepository.getChannelGroup().stream()
-                        .flatMap((Function<Channel, Stream<WebSocketSession>>) ch -> {
-                            NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
-                            if (s != null && s.isOpen()) {
-                                return Stream.of(s);
-                            }
-                            return Stream.empty();
-                        }).collect(Collectors.toSet());
+                return requiredWebSocketSessionRepository.getOpenSessions();
             }
 
             @Override

@@ -15,8 +15,12 @@
  */
 package io.micronaut.http.netty.websocket;
 
+import io.micronaut.websocket.WebSocketSession;
 import io.netty.channel.Channel;
 import io.netty.channel.group.ChannelGroup;
+
+import java.util.HashSet;
+import java.util.Set;
 
 /**
  * Defines a ChannelGroup repository to handle WebSockets.
@@ -43,4 +47,22 @@ public interface WebSocketSessionRepository {
      * @return A {@link io.netty.channel.group.ChannelGroup}
      */
     ChannelGroup getChannelGroup();
+
+    /**
+     * Returns the sessions of the channels in this repository that are currently open, as a
+     * snapshot. The default implementation derives them from {@link #getChannelGroup()}.
+     *
+     * @return The open sessions
+     * @since 5.2.2
+     */
+    default Set<? extends WebSocketSession> getOpenSessions() {
+        Set<WebSocketSession> sessions = new HashSet<>();
+        for (Channel channel : getChannelGroup()) {
+            NettyWebSocketSession session = channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+            if (session != null && session.isOpen()) {
+                sessions.add(session);
+            }
+        }
+        return sessions;
+    }
 }
