@@ -30,6 +30,7 @@ import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -301,6 +302,11 @@ public final class SupplementedBeanIntrospection<T> implements ReflectiveIntrosp
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return reflected.getAnnotationMetadata();
+        }
+
+        @Override
+        public @Nullable Constructor<B> getTargetConstructor() {
+            return reflected.getTargetConstructor();
         }
 
         @Override

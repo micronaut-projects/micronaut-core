@@ -51,6 +51,7 @@ import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
 
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.AbstractCollection;
 import java.util.ArrayList;
@@ -879,9 +880,21 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     public BeanConstructor<B> getConstructor() {
         if (beanConstructor == null) {
             beanConstructor = new BeanConstructor<>() {
+                private @Nullable Constructor<B> targetConstructor;
+
                 @Override
                 public Class<B> getDeclaringBeanType() {
                     return beanType;
+                }
+
+                @Override
+                public @Nullable Constructor<B> getTargetConstructor() {
+                    Constructor<B> constructor = targetConstructor;
+                    if (constructor == null) {
+                        constructor = BeanConstructor.super.getTargetConstructor();
+                        targetConstructor = constructor;
+                    }
+                    return constructor;
                 }
 
                 @Override
@@ -2018,6 +2031,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final class BeanConstructorImpl implements BeanConstructor<B> {
 
         private final BeanConstructorRef ref;
+        private @Nullable Constructor<B> targetConstructor;
 
         private BeanConstructorImpl(BeanConstructorRef ref) {
             this.ref = ref;
@@ -2026,6 +2040,16 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         @Override
         public Class<B> getDeclaringBeanType() {
             return beanType;
+        }
+
+        @Override
+        public @Nullable Constructor<B> getTargetConstructor() {
+            Constructor<B> constructor = targetConstructor;
+            if (constructor == null) {
+                constructor = BeanConstructor.super.getTargetConstructor();
+                targetConstructor = constructor;
+            }
+            return constructor;
         }
 
         @Override

@@ -35,6 +35,13 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="imports,class
 <2> The constructor parameter values can be retrieved and modified as needed
 <3> The constructor can be invoked with the `proceed()` method
 
+The api:core.beans.BeanConstructor[] returned by `getConstructor()` describes the constructor being advised. For a
+bean that is also proxied with `@Around` it describes the constructor of the intercepted class, with only the
+parameters that class declares, rather than the generated proxy constructor. Its `getTargetConstructor()` resolves
+the corresponding `java.lang.reflect.Constructor` once, the way `getTargetMethod()` does for an intercepted method,
+and returns `null` when the bean is not created through a constructor of its own type, as for a bean produced by a
+factory method.
+
 Defining api:aop.MethodInterceptor[] instances that interceptor the `@PostConstruct` and `@PreDestroy` methods is no different from defining interceptors for regular methods. Note however that you can use the passed api:aop.MethodInvocationContext[] to identify what kind of interception is occurring and adapt the code accordingly like in the following example:
 
 snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interceptor", indent="0", title="Defining a constructor interceptor"]

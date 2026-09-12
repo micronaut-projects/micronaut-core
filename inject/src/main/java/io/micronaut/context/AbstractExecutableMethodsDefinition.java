@@ -429,6 +429,8 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private ReturnType<R> returnType;
         private final Argument<?>[] arguments;
         private final boolean argumentsAnnotationsWithExpressions;
+        @Nullable
+        private Method targetMethod;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
@@ -503,7 +505,13 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
 
         @Override
         public Method getTargetMethod() {
-            return dispatcher.getTargetMethodByIndex(index);
+            // The generated getTargetMethodByIndex looks the method up reflectively on every call; resolve once
+            Method method = targetMethod;
+            if (method == null) {
+                method = dispatcher.getTargetMethodByIndex(index);
+                targetMethod = method;
+            }
+            return method;
         }
 
         @Override

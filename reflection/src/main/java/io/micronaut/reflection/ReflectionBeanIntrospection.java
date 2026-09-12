@@ -1458,6 +1458,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
 
         @Override
+        public @Nullable Constructor<T> getTargetConstructor() {
+            // null when the bean is instantiated through a static creator method
+            return constructor;
+        }
+
+        @Override
         public T instantiate(@Nullable Object... parameterValues) {
             return ReflectionBeanIntrospection.this.instantiate(true, parameterValues);
         }
