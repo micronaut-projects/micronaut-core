@@ -23,7 +23,9 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
@@ -105,7 +107,9 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
                 .flatMap(f -> {
                     if (f.metadata().fileName() == null) {
                         f.close();
-                        return Flux.error(new IllegalStateException("Field was not a file upload (no filename parameter)"));
+                        // the request is malformed for this argument, not the server: same answer as
+                        // FormFactory.completeFileUpload gives for a single @Part CompletedFileUpload
+                        return Flux.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + f.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
                     }
                     return ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f));
                 })));
