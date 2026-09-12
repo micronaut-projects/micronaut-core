@@ -183,6 +183,25 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     private void forwardInitialBuffer(@Nullable BufferConsumer subscriber, boolean last) {
         if (subscriber != null) {
             if (buffer != null) {
+                if (last) {
+                    // We hand our copy of the data to a streaming subscriber and drop it, so we no
+                    // longer hold these bytes and their charge has to go, the same way
+                    // discardBuffer() releases it. From here on the subscriber is responsible for
+                    // whatever it keeps: AsFlux charges the bytes again until it delivers them,
+                    // and the other streaming consumers are not charged for anything they receive
+                    // after subscribing either. Without this the bytes that arrived before the
+                    // subscriber showed up stayed charged for the lifetime of the body, on top of
+                    // whatever the subscriber charged, and that permanently shrank the remaining
+                    // budget for the rest of the body.
+                    // The pieces are counted before they are composed, like discardBuffer() counts
+                    // them before it closes them: compose() consumes them and closes them all if it
+                    // fails part way, so they can only be counted while this buffer still owns them.
+                    long n = 0;
+                    for (ReadBuffer piece : buffer) {
+                        n += piece.readable();
+                    }
+                    sizeLimitTrackers.bufferedSize().subtract(n);
+                }
                 subscriber.add(getBufferedData(last));
             }
         } else {
@@ -201,7 +220,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
     }
 
     /**
-     * Get all data buffered so far.
+     * Get all data buffered so far. This does <i>not</i> release the buffered size charge for the
+     * data: a subscriber that asked for the full body ({@link #subscribeFull0}) keeps the data, so
+     * it is still held, and for a form field that charge is shared with the form-wide limit and
+     * must survive the field's completion. Only the hand-off to a streaming subscriber releases
+     * it, see {@link #forwardInitialBuffer}.
      *
      * @param discardBuffer {@code true} iff the buffer can and should be discarded after this call
      * @return The buffered data
