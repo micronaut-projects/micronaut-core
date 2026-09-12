@@ -508,6 +508,13 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
 
     @Override
     protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType) {
+        return readAnnotationDefaultValues(annotationName, annotationType, false);
+    }
+
+    @Override
+    protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName,
+                                                                       ElementDef annotationType,
+                                                                       boolean includeEmptyValues) {
         DecoratorDef decoratorDef = findDecoratorDef(annotationName);
         if (decoratorDef == null) {
             return Map.of();
@@ -516,9 +523,25 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         Map<ElementDef, Object> defaultValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
             String memberName = AnnotationNames.memberName(entry.getKey());
+            if (!includeEmptyValues && isEmptyStringDefault(entry.getValue())) {
+                // the same rule as JavaAnnotationMetadataBuilder#isValidDefaultValue, which documents why
+                continue;
+            }
             defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), entry.getValue());
         }
         return defaultValues;
+    }
+
+    /**
+     * Whether the default is the empty string, which the written annotation metadata omits. Only the empty string is
+     * treated as absent; an empty array default is always recorded. See
+     * {@code JavaAnnotationMetadataBuilder#isValidDefaultValue} for the rationale.
+     *
+     * @param value The declared default
+     * @return Whether the default should be left out unless empty values are requested
+     */
+    private static boolean isEmptyStringDefault(@Nullable Object value) {
+        return value instanceof String string && string.isEmpty();
     }
 
     @Override
@@ -726,11 +749,25 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
                 av.getStereotypes().stream().map(this::toDecoratorDef).toList()
             ));
         }
-        return javaVisitorContext.getClassElement(annotationName)
+        Optional<ElementDef> javaType = javaVisitorContext.getClassElement(annotationName)
             .map(annotationType -> new ClassDef(
                 annotationType.getName(),
                 toDecoratorDefs(annotationType.getAnnotationMetadata())
             ));
+        if (javaType.isPresent()) {
+            return javaType;
+        }
+        // A Python declared annotation has no compiled Java type until its generated stub is compiled, so fall back
+        // to the decorator registry. Without this the annotation type cannot be resolved during the round that
+        // declares it, and VisitorContext#getAnnotationDefaultValues answers an empty map for it.
+        DecoratorDef decoratorDef = findDecoratorDef(annotationName);
+        if (decoratorDef == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new ClassDef(
+            toBinaryClassName(decoratorDef.annotationName()),
+            decoratorDef.stereotypes()
+        ));
     }
 
     private DecoratorDef toDecoratorDef(AnnotationValue<?> av) {
@@ -808,6 +845,11 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         List<DecoratorDef> memberDecorators = decoratorDef == null
             ? List.of()
             : decoratorDef.memberDecorators().getOrDefault(memberName, List.of());
+        // The member type is deliberately left unresolved. It would let PythonAnnotationValues#normalize convert a
+        // class reference default to an AnnotationClassValue and a list default to an array, but resolving the type
+        // annotation on the decorator parameter here re-enters Python class element construction, which reads the
+        // decorator defaults again: a cycle that ends in a StackOverflowError. Resolving member types without that
+        // cycle is a separate change; until then such a member keeps the value the Python processor reported.
         return new AnnotationMemberDef(memberName, null, null, memberDecorators);
     }
 

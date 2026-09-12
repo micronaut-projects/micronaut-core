@@ -23,12 +23,14 @@ import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotatedElementValidator;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -89,6 +91,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     final CompilationUnit compilationUnit;
     final GroovyNativeElementHelper nativeElementHelper;
     final GroovyVisitorContext visitorContext;
+    private final Map<String, Map<CharSequence, Object>> allAnnotationDefaults = new LinkedHashMap<>();
 
     public GroovyAnnotationMetadataBuilder(SourceUnit sourceUnit, CompilationUnit compilationUnit) {
         this(sourceUnit, compilationUnit, new GroovyNativeElementHelper(), new GroovyVisitorContext(sourceUnit, compilationUnit));
@@ -395,30 +398,98 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
     }
 
+    /**
+     * Resolves every default declared by the given annotation type, empty values included, caching the result for the
+     * lifetime of this builder.
+     *
+     * @param annotationName The annotation type name
+     * @return The defaults, never {@code null}
+     */
+    private Map<CharSequence, Object> getAllAnnotationDefaults(String annotationName) {
+        Map<CharSequence, Object> defaults = allAnnotationDefaults.get(annotationName);
+        if (defaults == null) {
+            // not computeIfAbsent: resolving the defaults can re-enter this method for a nested annotation
+            defaults = getAnnotationDefaultValues(annotationName);
+            allAnnotationDefaults.put(annotationName, defaults);
+        }
+        return defaults;
+    }
+
     @Override
     protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(String annotationName, AnnotatedNode annotationType) {
+        return readAnnotationDefaultValues(annotationName, annotationType, false);
+    }
+
+    @Override
+    protected Map<? extends AnnotatedNode, ?> readAnnotationDefaultValues(String annotationName, AnnotatedNode annotationType, boolean includeEmptyValues) {
         var defaultValues = new LinkedHashMap<MethodNode, Expression>();
         if (annotationType instanceof ClassNode classNode) {
             var methods = new ArrayList<>(classNode.getMethods());
             for (MethodNode method : methods) {
-                Statement stmt = method.getCode();
-                Expression expression = null;
-                if (stmt instanceof ReturnStatement returnStatement) {
-                    expression = returnStatement.getExpression();
-                } else if (stmt instanceof ExpressionStatement expressionStatement) {
-                    expression = expressionStatement.getExpression();
-                }
-                if (expression instanceof ConstantExpression constantExpression) {
-                    final Object v = constantExpression.getValue();
-                    if (v instanceof String s) {
-                        defaultValues.put(method, new ConstantExpression(s));
-                    } else if (v != null) {
-                        defaultValues.put(method, expression);
-                    }
+                Expression expression = readDefaultValueExpression(method);
+                if (expression != null && isValidDefaultValue(expression, includeEmptyValues)) {
+                    defaultValues.put(method, expression);
                 }
             }
         }
         return defaultValues;
+    }
+
+    /**
+     * Reads the default value expression declared by an annotation member, if any.
+     *
+     * <p>The supported expressions mirror those understood by
+     * {@link #readAnnotationValue(AnnotatedNode, AnnotatedNode, String, String, Object)}: constants (including nested
+     * annotations), enum constants and constant fields ({@link PropertyExpression}), class literals
+     * ({@link ClassExpression}) and array literals ({@link ListExpression}).</p>
+     *
+     * @param method The annotation member
+     * @return The default value expression, or {@code null} if the member declares no readable default
+     */
+    @Nullable
+    private Expression readDefaultValueExpression(MethodNode method) {
+        Statement stmt = method.getCode();
+        Expression expression = null;
+        if (stmt instanceof ReturnStatement returnStatement) {
+            expression = returnStatement.getExpression();
+        } else if (stmt instanceof ExpressionStatement expressionStatement) {
+            expression = expressionStatement.getExpression();
+        }
+        if (expression instanceof ConstantExpression constantExpression) {
+            final Object v = constantExpression.getValue();
+            if (v instanceof String s) {
+                // normalize to a plain constant expression so that constant sub-types don't leak
+                return new ConstantExpression(s);
+            }
+            return v == null ? null : expression;
+        }
+        if (expression instanceof PropertyExpression
+            || expression instanceof ClassExpression
+            || expression instanceof ListExpression) {
+            return expression;
+        }
+        return null;
+    }
+
+    /**
+     * Whether the given default value expression should be recorded.
+     *
+     * <p>Empty string defaults are only recorded when {@code includeEmptyValues} is set, which keeps this builder
+     * aligned with {@code JavaAnnotationMetadataBuilder#isValidDefaultValue}. See the documentation there for why the
+     * distinction exists. Note that an empty <i>array</i> default is always recorded; only the empty string is
+     * treated as absent.</p>
+     *
+     * @param expression         The default value expression
+     * @param includeEmptyValues Whether empty values should be included
+     * @return Whether the default should be recorded
+     */
+    private boolean isValidDefaultValue(Expression expression, boolean includeEmptyValues) {
+        if (!includeEmptyValues
+            && expression instanceof ConstantExpression constantExpression
+            && constantExpression.getValue() instanceof String s) {
+            return StringUtils.isNotEmpty(s);
+        }
+        return true;
     }
 
     @Override
@@ -630,7 +701,10 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     AnnotatedNode annotationMember = annotationNode.getMethod(key, new Parameter[0]);
                     readAnnotationRawValues(originatingElement, annotationType.getName(), annotationMember, key, value, converted);
                 }
-                Map<CharSequence, Object> annotationDefaults = getCachedAnnotationDefaults(annotationType.getName(), annotationTypeNode);
+                // A compiled annotation's AnnotationNode reports every member, defaults included, so members that
+                // merely repeat the declared default have to be dropped here. The comparison needs the complete set
+                // of defaults, empty strings included, hence includeEmptyValues.
+                Map<CharSequence, Object> annotationDefaults = getAllAnnotationDefaults(annotationType.getName());
                 if (!annotationDefaults.isEmpty()) {
                     Iterator<Map.Entry<CharSequence, Object>> i = converted.entrySet().iterator();
                     while (i.hasNext()) {

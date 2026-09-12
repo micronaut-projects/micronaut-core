@@ -644,6 +644,15 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
     /**
      * Read the raw default annotation values from the given annotation.
      *
+     * <p>Implementations must report a default for every member that declares one, whatever the shape of the default
+     * expression: a constant, an enum constant, a class literal, an array literal (including the empty array) or a
+     * nested annotation.</p>
+     *
+     * <p>{@code includeEmptyValues} only concerns the empty <i>string</i>: when it is not set, a member whose default
+     * is the empty string is reported as having no default, which keeps the written annotation metadata smaller. An
+     * empty array default is always reported. See {@code JavaAnnotationMetadataBuilder#isValidDefaultValue} for the
+     * rationale. All language implementations must apply this rule identically.</p>
+     *
      * @param annotationName annotation name
      * @param annotationType the type
      * @param includeEmptyValues Whether empty values should be included

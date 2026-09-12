@@ -32,6 +32,7 @@ import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.symbol.KSValueArgument
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
@@ -56,6 +57,9 @@ internal class KotlinAnnotationMetadataBuilder(
     var resolver: Resolver,
     private val visitorContext: KotlinVisitorContext
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+
+    private var defaultArgumentsCacheResolver: Resolver? = null
+    private val defaultArgumentsCache = mutableMapOf<String, List<KSValueArgument>>()
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
         return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
@@ -390,20 +394,53 @@ internal class KotlinAnnotationMetadataBuilder(
         annotationType: KSAnnotated,
         includeEmptyValues: Boolean
     ): MutableMap<out KSDeclaration, *> {
-        return if (annotationType is KotlinAnnotationType) {
-            val map = mutableMapOf<KSDeclaration, Any>()
-            annotationType.type.getAllProperties().forEach { prop ->
-                val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
-                if (argument?.value != null && argument.isDefault()) {
-                    val value = argument.value!!
-                    if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
-                        map[prop] = value
-                    }
+        val declaration: KSClassDeclaration
+        val defaultArguments: List<KSValueArgument>
+        when {
+            annotationType is KotlinAnnotationType -> {
+                // an actual usage of the annotation: KSP resolves the defaults for us
+                declaration = annotationType.type
+                defaultArguments = annotationType.mirror.defaultArguments
+            }
+            annotationType is KSClassDeclaration && annotationType.classKind == ClassKind.ANNOTATION_CLASS -> {
+                // the annotation class itself, as returned by getAnnotationMirror(String). KSP exposes member
+                // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
+                declaration = annotationType
+                defaultArguments = findDefaultArguments(annotationName)
+            }
+            else -> return mutableMapOf<KSDeclaration, Any>()
+        }
+        val map = mutableMapOf<KSDeclaration, Any>()
+        declaration.getAllProperties().forEach { prop ->
+            val argument = defaultArguments.find { it.name == prop.simpleName }
+            if (argument?.value != null && argument.isDefault()) {
+                val value = argument.value!!
+                if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
+                    map[prop] = value
                 }
             }
-            map
-        } else {
-            mutableMapOf<KSDeclaration, Any>()
+        }
+        return map
+    }
+
+    /**
+     * Resolves the default arguments of the given annotation type from an arbitrary usage of it in the current round.
+     *
+     * KSP models member defaults on [KSAnnotation.defaultArguments] rather than on the annotation class declaration,
+     * so the defaults of an annotation that is never used cannot be resolved and an empty list is returned. The
+     * result is cached for the lifetime of the current [Resolver], since scanning for usages is not cheap.
+     */
+    private fun findDefaultArguments(annotationName: String): List<KSValueArgument> {
+        if (defaultArgumentsCacheResolver !== resolver) {
+            defaultArgumentsCacheResolver = resolver
+            defaultArgumentsCache.clear()
+        }
+        return defaultArgumentsCache.getOrPut(annotationName) {
+            resolver.getSymbolsWithAnnotation(annotationName)
+                .flatMap { it.annotations }
+                .firstOrNull { visitorContext.getTypeForAnnotation(it).qualifiedName?.asString() == annotationName }
+                ?.defaultArguments
+                ?: emptyList()
         }
     }
 
