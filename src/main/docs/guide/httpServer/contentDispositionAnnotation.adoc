@@ -1,0 +1,9 @@
+To send a `Content-Disposition` response header, use the `@ContentDisposition` annotation. This is independent of the return type of the method, so it works with a plain object, a reactive type, or anything else the route returns.
+
+snippet::io.micronaut.docs.server.response.ContentDispositionController[tags="attachment", indent=0]
+
+The example above results in a response with the header `Content-Disposition: attachment; filename="report.csv"; filename*=utf-8''report.csv`, prompting the browser to download the response as a file.
+
+To have the browser display the response instead of downloading it, set `type` to `ContentDisposition.Type.INLINE`:
+
+snippet::io.micronaut.docs.server.response.ContentDispositionController[tags="inline", indent=0]

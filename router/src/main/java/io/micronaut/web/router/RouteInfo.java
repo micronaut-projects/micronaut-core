@@ -293,6 +293,18 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
     HttpStatus findStatus(@Nullable HttpStatus defaultStatus);
 
     /**
+     * Finds the {@code Content-Disposition} header value declared via
+     * {@link io.micronaut.http.annotation.ContentDisposition}, if any.
+     *
+     * @return The header value, or {@code null} if none was declared
+     * @since 5.2.0
+     */
+    @Nullable
+    default String findContentDispositionHeader() {
+        return null;
+    }
+
+    /**
      * Checks if route is for web socket.
      *
      * @return true if it's web socket route
