@@ -110,9 +110,9 @@ jdk17:build-graalvm:
 ```
 
 1. Any job starting with a dot is hidden and won't be executed. In this case this line also defines a template named `build-graalvm-template` that other jobs can extend from.
-2. Use GraalVM last commit id and the job name as the cache key. This allows to reuse the same GraalVM build from source code if it hasn't changed. The `paths` option defines the output of the GraalVM compilation and that is what will be cached.
+2. Use GraalVM last commit id and the job name as the cache key. This allows reusing the same GraalVM build from source code if it hasn't changed. The `paths` option defines the output of the GraalVM compilation and that is what will be cached.
 3. The `artifact` path defines all the files that are passed automatically to the next stage in the pipeline. They expire automatically (meaning they are removed) after 5 days. Gitlab CI will save the artifacts and download them automatically in the next stage. With this configuration the GraalVM SDK we just built is available to create Micronaut native-images.
-4. Tags for this job. Jobs without tags run on Gitlab CI shared runners. All jobs with `aws` tag run on our own custom runners on AWS. Additionally, there are more tags necessary to define in which instance type the job is run. The tags will be explained bellow.
+4. Tags for this job. Jobs without tags run on Gitlab CI shared runners. All jobs with `aws` tag run on our own custom runners on AWS. Additionally, there are more tags necessary to define in which instance type the job is run. The tags will be explained below.
 5. Extend from the template and add more configuration.
 6. If the cache is present then exit the build and let the rest of the pipeline continue.
 7. If not, build GraalVM from source code.
