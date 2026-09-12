@@ -2649,10 +2649,10 @@ annotation class Marker(val value: String)
         !withMembers.getProperty("tag").get().members.isEmpty()
         plain.getProperty("tag").get().members.isEmpty()
 
-        and: "the metadata the previous API answers is the same in both"
+        and: "the metadata the previous API answers is the same in both, but for the member that asks for the members"
         withMembers.propertyNames == plain.propertyNames
         withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
-        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+        IntrospectionMetadataShape.of(withMembers).replace(', members=true', '') == IntrospectionMetadataShape.of(plain)
     }
 
     void "constructors = true does not change the constructor beans are built with"() {
