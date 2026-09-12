@@ -699,8 +699,9 @@ public interface ClassElement extends TypedElement {
      * Builds a map of all the type parameters for a class, its super classes and interfaces.
      * The resulting map contains the name of the class to the map of the resolved generic types.
      *
-     * <p>The arguments of every super type are expressed in the type arguments of this class: for
-     * {@code class Reversed<A, B> extends HashMap<B, A>} both {@code HashMap} and {@code Map} map to {@code [B, A]}.</p>
+     * <p>The arguments of every super type are expressed in the type arguments of this class: a {@code Reversed}
+     * that extends {@code HashMap} with its own two variables swapped answers with those two variables, in that
+     * swapped order, for {@code HashMap} and for {@code Map} alike.</p>
      *
      * @return The type arguments for this class element
      */
