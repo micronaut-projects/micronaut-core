@@ -33,6 +33,8 @@ import io.micronaut.http.tck.TestScenario;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -47,19 +49,36 @@ public class FormsJacksonAnnotationsTest {
     private static final String SPEC_NAME = "FormsJacksonAnnotationsTest";
     private static final String JSON_WITH_PAGES = "{\"title\":\"Building Microservices\",\"paginas\":100}";
     private static final String JSON_WITHOUT_PAGES = "{\"title\":\"Building Microservices\"}";
+    private static final String JSON_WITH_WHITESPACE = "{\"title\":\"Building Microservices\",\"notes\":\" \"}";
+    private static final String JSON_WITH_REPEATED_VALUES = "{\"title\":\"Building Microservices\",\"tags\":[\"\",\"java\",\"\"]}";
 
     @Test
     public void serverFormSubmissionsSupportJacksonAnnotations() throws IOException {
         String body = "title=Building+Microservices&paginas=100";
         assertWithBody(body, JSON_WITH_PAGES);
 
-        body = "title=Building+Microservices&pages=";
+        body = "title=Building+Microservices&paginas=";
         assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&publishedAt=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&category=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&notes=";
+        assertWithBody(body, JSON_WITHOUT_PAGES);
+
+        body = "title=Building+Microservices&notes=+";
+        assertWithBody(body, JSON_WITH_WHITESPACE);
+
+        body = "title=Building+Microservices&tags=&tags=java&tags=";
+        assertWithBody(body, JSON_WITH_REPEATED_VALUES);
     }
 
     @Test
     public void httpClientFormSubmissionsDoesNotSupportJacksonAnnotations() throws IOException {
-        Book book = new Book("Building Microservices", 100);
+        Book book = new Book("Building Microservices", 100, null, null, null, null);
         // Jackson annotations (@JsonProperty) are not supported by the HTTP Client and form-url encoded payload.
         assertWithBody(book, JSON_WITHOUT_PAGES);
     }
@@ -92,7 +111,16 @@ public class FormsJacksonAnnotationsTest {
 
     @Introspected
     @ReflectiveAccess
-    record Book(@JsonProperty("title") String title, @JsonProperty("paginas") @Nullable Integer pages) {
+    record Book(@JsonProperty("title") String title,
+                @JsonProperty("paginas") @Nullable Integer pages,
+                @JsonProperty("publishedAt") LocalDateTime publishedAt,
+                @JsonProperty("category") Category category,
+                @JsonProperty("notes") String notes,
+                @JsonProperty("tags") List<String> tags) {
+    }
+
+    enum Category {
+        TECHNICAL
     }
 
 }
