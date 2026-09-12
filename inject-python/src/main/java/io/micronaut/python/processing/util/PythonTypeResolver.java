@@ -165,13 +165,12 @@ public final class PythonTypeResolver {
         if (decorators.isEmpty()) {
             return baseType;
         }
-        AnnotationMetadata annotationMetadata = visitorContext
-            .getAnnotationMetadataBuilder()
-            .buildDeclared(new AttributeDef("$typeUse", null, null, null, decorators, null, false, null));
+        var typeUse = new AttributeDef("$typeUse", null, null, null, decorators, null, false, null);
+        AnnotationMetadata annotationMetadata = visitorContext.getAnnotationMetadataBuilder().buildDeclared(typeUse);
         if (annotationMetadata.isEmpty()) {
             return baseType;
         }
-        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        var metadata = typeUseMetadata(visitorContext, annotationMetadata, typeUse);
         return new TypeAnnotatedClassElement(baseType, metadata);
     }
 
@@ -324,14 +323,24 @@ public final class PythonTypeResolver {
         }
         ClassElement resolvedType = resolvePythonTypeToJava(members.getFirst(), visitorContext, boundGenerics);
         ClassElement boxedType = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
-        AnnotationMetadata annotationMetadata = visitorContext
-            .getAnnotationMetadataBuilder()
-            .buildDeclared(new AttributeDef("$typeUse", union.toString(), union, null, List.of(), null, false, null));
+        var typeUse = new AttributeDef("$typeUse", union.toString(), union, null, List.of(), null, false, null);
+        AnnotationMetadata annotationMetadata = visitorContext.getAnnotationMetadataBuilder().buildDeclared(typeUse);
         if (annotationMetadata.isEmpty()) {
             return boxedType;
         }
-        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        var metadata = typeUseMetadata(visitorContext, annotationMetadata, typeUse);
         return new TypeAnnotatedClassElement(boxedType, metadata);
+    }
+
+    /**
+     * The type annotation metadata of a type use, with the source view reading the decorators written on it.
+     */
+    private static ElementAnnotationMetadata typeUseMetadata(PythonVisitorContext visitorContext,
+                                                             AnnotationMetadata annotationMetadata,
+                                                             AttributeDef typeUse) {
+        var builder = visitorContext.getAnnotationMetadataBuilder();
+        return visitorContext.getElementAnnotationMetadataFactory()
+            .buildMutable(annotationMetadata, () -> builder.readSourceAnnotations(typeUse));
     }
 
     /**
