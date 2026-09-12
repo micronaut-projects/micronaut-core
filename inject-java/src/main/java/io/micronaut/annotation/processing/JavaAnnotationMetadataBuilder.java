@@ -42,6 +42,7 @@ import javax.lang.model.type.ArrayType;
 import javax.lang.model.type.DeclaredType;
 import javax.lang.model.type.NullType;
 import javax.lang.model.type.PrimitiveType;
+import javax.lang.model.type.TypeKind;
 import javax.lang.model.type.TypeMirror;
 import javax.lang.model.util.AbstractAnnotationValueVisitor8;
 import javax.lang.model.util.Elements;
@@ -575,6 +576,56 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     /**
      * Meta annotation value visitor class.
      */
+    /**
+     * The name recorded for a class literal member value: the binary name of a class, the keyword of a
+     * primitive, and for an array such as {@code String[].class} or {@code int[][].class} the name
+     * {@link Class#getName()} gives it.
+     *
+     * @param type The type of the literal
+     * @return The name, or null when the type is not one a class literal can denote
+     */
+    @Nullable
+    private static String classLiteralName(TypeMirror type) {
+        if (type instanceof DeclaredType declaredType) {
+            if (declaredType.asElement() instanceof TypeElement element) {
+                return JavaModelUtils.getClassName(element);
+            }
+            return null;
+        }
+        if (type instanceof PrimitiveType primitiveType) {
+            return primitiveType.getKind().name().toLowerCase(Locale.ENGLISH);
+        }
+        if (type instanceof ArrayType arrayType) {
+            TypeMirror componentType = arrayType.getComponentType();
+            if (componentType instanceof DeclaredType declaredType) {
+                if (declaredType.asElement() instanceof TypeElement element) {
+                    return JavaModelUtils.getClassArrayName(element);
+                }
+                return null;
+            }
+            if (componentType instanceof PrimitiveType primitiveType) {
+                return "[" + primitiveDescriptor(primitiveType.getKind());
+            }
+            String componentName = classLiteralName(componentType);
+            return componentName == null ? null : "[" + componentName;
+        }
+        return null;
+    }
+
+    private static String primitiveDescriptor(TypeKind kind) {
+        return switch (kind) {
+            case BOOLEAN -> "Z";
+            case BYTE -> "B";
+            case SHORT -> "S";
+            case INT -> "I";
+            case LONG -> "J";
+            case CHAR -> "C";
+            case FLOAT -> "F";
+            case DOUBLE -> "D";
+            default -> throw new IllegalArgumentException("Not a primitive: " + kind);
+        };
+    }
+
     private class MetadataAnnotationValueVisitor extends AbstractAnnotationValueVisitor8<Object, Object> {
         private final Element originatingElement;
         private final ExecutableElement member;
@@ -648,14 +699,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
         @Override
         public Object visitType(TypeMirror t, Object o) {
-            if (t instanceof DeclaredType type) {
-                Element typeElement = type.asElement();
-                if (typeElement instanceof TypeElement element) {
-                    String className = JavaModelUtils.getClassName(element);
-                    resolvedValue = new AnnotationClassValue<>(className);
-                }
-            } else if (t instanceof PrimitiveType primitiveType) {
-                resolvedValue = new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH));
+            String className = classLiteralName(t);
+            if (className != null) {
+                resolvedValue = new AnnotationClassValue<>(className);
             }
             return null;
         }
@@ -797,23 +843,9 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
             @Override
             public Object visitType(TypeMirror t, Object o) {
-                if (t instanceof DeclaredType type) {
-                    Element typeElement = type.asElement();
-                    if (typeElement instanceof TypeElement element) {
-                        final String className = JavaModelUtils.getClassName(element);
-                        values.add(new AnnotationClassValue<>(className));
-                    }
-                } else if (t instanceof PrimitiveType primitiveType) {
-                    values.add(new AnnotationClassValue<>(primitiveType.getKind().name().toLowerCase(Locale.ENGLISH)));
-                } else if (t instanceof ArrayType arrayType) {
-                    TypeMirror componentType = arrayType.getComponentType();
-                    if (componentType instanceof DeclaredType declaredType) {
-                        Element typeElement = declaredType.asElement();
-                        if (typeElement instanceof TypeElement element) {
-                            final String className = JavaModelUtils.getClassArrayName(element);
-                            values.add(new AnnotationClassValue<>(className));
-                        }
-                    }
+                String className = classLiteralName(t);
+                if (className != null) {
+                    values.add(new AnnotationClassValue<>(className));
                 }
                 return null;
             }
