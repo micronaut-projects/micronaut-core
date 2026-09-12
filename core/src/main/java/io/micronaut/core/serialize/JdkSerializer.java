@@ -47,7 +47,13 @@ public final class JdkSerializer implements ObjectSerializer {
      * on every stream created by this serializer. Unset by default, which preserves the previous
      * (unfiltered) behaviour.
      *
-     * @since 5.2.0
+     * <p>This is the fallback used by {@link #JdkSerializer()} and
+     * {@link #JdkSerializer(ConversionService)}. A filter passed to
+     * {@link #JdkSerializer(ConversionService, ObjectInputFilter)} takes precedence over it. Either
+     * way the filter is installed only on the streams this serializer creates; the process-wide
+     * JEP-290 policy configured through {@link ObjectInputFilter.Config} is never changed.</p>
+     *
+     * @since 5.2.2
      */
     public static final String SERIAL_FILTER_PROPERTY = "micronaut.serializer.jdk.serial-filter";
 
@@ -55,6 +61,8 @@ public final class JdkSerializer implements ObjectSerializer {
     private final @Nullable ObjectInputFilter objectInputFilter;
 
     /**
+     * Uses the filter configured through {@link #SERIAL_FILTER_PROPERTY}, if that property is set.
+     *
      * @param conversionService The conversion service
      */
     public JdkSerializer(ConversionService conversionService) {
@@ -63,8 +71,10 @@ public final class JdkSerializer implements ObjectSerializer {
 
     /**
      * @param conversionService The conversion service
-     * @param objectInputFilter The {@link ObjectInputFilter} to apply when deserializing, or {@code null} to apply none
-     * @since 5.2.0
+     * @param objectInputFilter The {@link ObjectInputFilter} to apply when deserializing, or
+     *                          {@code null} to apply none. Takes precedence over
+     *                          {@link #SERIAL_FILTER_PROPERTY}
+     * @since 5.2.2
      */
     public JdkSerializer(ConversionService conversionService, @Nullable ObjectInputFilter objectInputFilter) {
         this.conversionService = conversionService;

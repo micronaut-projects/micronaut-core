@@ -17,6 +17,7 @@ package io.micronaut.core.serialize
 
 import io.micronaut.core.convert.ConversionService
 import io.micronaut.core.serialize.exceptions.SerializationException
+import io.micronaut.core.type.Argument
 import spock.lang.Specification
 
 import java.io.ObjectInputFilter
@@ -84,6 +85,72 @@ class JdkSerializerSpec extends Specification {
 
         cleanup:
         System.clearProperty(JdkSerializer.SERIAL_FILTER_PROPERTY)
+    }
+
+    void 'test the Argument overload rejects a class the filter disallows'() {
+        given:
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter('java.lang.*;java.util.*;!*')
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Foo(name: "test")).get()
+
+        when:
+        serializer.deserialize(bytes, Argument.of(Foo))
+
+        then:
+        thrown(SerializationException)
+    }
+
+    void 'test the Argument overload accepts a class the filter allows'() {
+        given:
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter('io.micronaut.core.serialize.JdkSerializerSpec$Foo;java.lang.*;java.util.*;!*')
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Foo(name: "test")).get()
+
+        when:
+        Foo foo = serializer.deserialize(bytes, Argument.of(Foo)).get()
+
+        then:
+        foo.name == "test"
+    }
+
+    void 'test deserialization is rejected when the filter disallows a nested type'() {
+        given: 'a filter that allows the declared type but not the type of its field'
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter('io.micronaut.core.serialize.JdkSerializerSpec$Bar;java.lang.*;java.util.*;!*')
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Bar(foo: new Foo(name: "test"))).get()
+
+        when:
+        serializer.deserialize(bytes, Bar)
+
+        then:
+        thrown(SerializationException)
+    }
+
+    void 'test the filter is consulted with the class resolved by the custom class loader lookup'() {
+        given: 'a filter that records every class it is asked about'
+        def seen = []
+        ObjectInputFilter filter = new ObjectInputFilter() {
+            @Override
+            ObjectInputFilter.Status checkInput(ObjectInputFilter.FilterInfo info) {
+                if (info.serialClass() != null) {
+                    seen << info.serialClass()
+                }
+                return ObjectInputFilter.Status.ALLOWED
+            }
+        }
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Foo(name: "test")).get()
+
+        when:
+        Foo foo = serializer.deserialize(bytes, Foo).get()
+
+        then: 'the class the resolveClass override returned is the one the filter saw'
+        foo.name == "test"
+        seen.contains(Foo)
+    }
+
+    static class Bar implements Serializable {
+        Foo foo
     }
 
     static class Foo implements Serializable {
