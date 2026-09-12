@@ -2731,10 +2731,10 @@ class Parent implements Named {
         withMembers.getProperty("name").get().members*.declaringType*.simpleName == ["Child", "Parent", "Child", "Parent", "Named", "Parent", "Named"]
         plain.getProperty("name").get().members.isEmpty()
 
-        and: "the metadata the previous API answers is the same in both"
+        and: "the metadata the previous API answers is the same in both, but for the member that asks for the members"
         withMembers.propertyNames == plain.propertyNames
         withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
-        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
+        IntrospectionMetadataShape.of(withMembers).replace(', members=true', '') == IntrospectionMetadataShape.of(plain)
     }
 
     void "every declared constructor is described"() {
