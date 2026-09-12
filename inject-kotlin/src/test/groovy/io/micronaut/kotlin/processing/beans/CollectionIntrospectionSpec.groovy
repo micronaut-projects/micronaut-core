@@ -32,10 +32,15 @@ import jakarta.inject.Singleton
 class Reversed<A, B> : java.util.HashMap<B, A>()
 ''')
 
-        then:
-        introspection.beanProperties*.name == introspection.beanProperties*.name.unique()
-        introspection.getProperty('keys').isPresent()
+        then: "each mapped collection property is generated once"
+        introspection.beanProperties*.name == ['empty', 'size', 'keys', 'values', 'entries']
+
+        and: "the mapped nested type uses its JVM binary name"
         introspection.getRequiredProperty('entries', Set).asArgument().typeParameters[0].type == Map.Entry
+
+        and: "the properties can be read"
+        def instance = introspection.instantiate()
+        introspection.beanProperties.every { it.get(instance) != null }
     }
 
     void "test introspection of ArrayList subclass has unique properties"() {
@@ -51,8 +56,13 @@ import jakarta.inject.Singleton
 class Strings : java.util.ArrayList<String>()
 ''')
 
-        then:
-        introspection.beanProperties*.name == introspection.beanProperties*.name.unique()
-        introspection.getProperty('size').isPresent()
+        then: "each mapped collection property is generated once"
+        introspection.beanProperties*.name == ['empty', 'first', 'last', 'size']
+
+        and: "a Java field without accessors is not a property"
+        !introspection.getProperty('modCount').isPresent()
+
+        and: "the properties can be read"
+        introspection.getRequiredProperty('size', int).get(introspection.instantiate()) == 0
     }
 }

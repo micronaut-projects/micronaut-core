@@ -420,6 +420,11 @@ internal open class KotlinClassElement(
                 val excludedAnnotations = propertyElementQuery.excludedAnnotations
                 if (hasAnnotation(nativeEl, JvmField::class.java) || excludedAnnotations.any { hasAnnotation(nativeEl, it) }) {
                     false
+                } else if (nativeEl is KSPropertyDeclaration && nativeEl.getter == null && nativeEl.setter == null) {
+                    // KSP models a Java field as a property without accessors. It cannot be read or
+                    // written as a bean property, so leave it to the field handling below, which
+                    // applies the configured access kinds and visibility.
+                    false
                 } else {
                     !propertyElementQuery.excludes.contains(el.name)
                             && (propertyElementQuery.includes.isEmpty() || propertyElementQuery.includes.contains(el.name))
@@ -446,8 +451,12 @@ internal open class KotlinClassElement(
 
         val allProperties: MutableMap<String, PropertyElement> = linkedMapOf()
         enclosedElementsQuery.getEnclosedElements(this, eq).forEach { property ->
-            // KSP can return the same mapped JDK collection property through multiple hierarchy paths.
-            allProperties.putIfAbsent(property.name, property)
+            // KSP can return the same logical property through multiple hierarchy paths, for example
+            // the mapped JDK collection members declared by both Map and MutableMap. Only one bean
+            // property can be written per name, so collapse them onto the most specific declaration.
+            allProperties.merge(property.name, property) { existing, candidate ->
+                if (isMoreSpecific(candidate, existing)) candidate else existing
+            }
         }
         // unfortunate hack since these are not excluded?
         if (hasDeclaredStereotype(ConfigurationReader::class.java)) {
@@ -504,6 +513,18 @@ internal open class KotlinClassElement(
         resolvedProperties.addAll(methodProperties)
         resolvedProperties.addAll(allProperties.values)
         return resolvedProperties
+    }
+
+    /**
+     * Whether a duplicate property declaration should replace the one already collected. A concrete
+     * declaration wins over an abstract one, and otherwise the declaration of the most specific type
+     * wins, so that an overriding declaration and its annotations are the ones retained.
+     */
+    private fun isMoreSpecific(candidate: PropertyElement, existing: PropertyElement): Boolean {
+        if (candidate.isAbstract != existing.isAbstract) {
+            return !candidate.isAbstract
+        }
+        return candidate.declaringType.isAssignable(existing.declaringType)
     }
 
     private fun mapToPropertyElement(value: AstBeanPropertiesUtils.BeanPropertyData) =
