@@ -122,7 +122,8 @@ template repo will get propagated automatically. The files propagated are:
 * Workflow files (`.github/workflows/*`). They are copied using rsync:
   * `central-sync.yml`.
   * `graalvm-dev.yml`.
-  * `graalvm-latest.yml`.
+  * `graalvm-latest.yml`. Java CI (`gradle.yml`) calls it after its build job passes, so a repository that keeps its own
+    `gradle.yml` must add the `native` job itself.
   * `gradle.yml`.
   * `publish-snapshot.yml`.
   * `release.yml`.
@@ -140,17 +141,17 @@ way we make sure we stay up-to-date regarding Gradle versions in all repos.
 
 ##### Customised workflow files
 
-Due to limitations in the GitHub Actions design (such that they don't allow including snippets or any other kind of
-reusability), for the sync'ed workflow files listed above, it is not possible to have custom steps and still be part of
-the sync process, since any modification to those files will be overwritten the next time the files sync workflow is
-executed.
+The files sync workflow copies the workflow files listed above verbatim, so it is not possible to have custom steps in
+them and still be part of the sync process: any modification to those files will be overwritten the next time the files
+sync workflow is executed.
 
 The "Java CI" (`gradle.yml`) workflow does have the ability to have an optional setup step, though. If there is a `setup.sh`
 file in the project root, it will be executed before invoking Gradle.
 
 There are projects, such as micronaut-gcp and micronaut-kubernetes, that have made customizations to sync'ed workflows
 because it's absolutely necessary. In those projects, the sync pull requests are manually merged so that the customizations
-aren't lost.
+aren't lost. When merging them, keep `gradle.yml` and `graalvm-latest.yml` in step: Java CI calls GraalVM Latest CI as a
+reusable workflow, so taking only one of the two either stops the native tests or breaks Java CI.
 
 Note that it is perfectly possible to have new workflows that aren't part of the sync process.
 

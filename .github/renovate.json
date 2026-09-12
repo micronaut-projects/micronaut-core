@@ -6,7 +6,7 @@
     "type: dependency-upgrade"
   ],
   "schedule": [
-    "after 10pm"
+    "* 0-3 1 * *"
   ],
   "prHourlyLimit": 1,
   "prConcurrentLimit": 20,
@@ -31,6 +31,12 @@
         "gradle"
       ],
       "allowedVersions": "!/.+-SNAPSHOT$/"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["digest"],
+      "groupName": "GitHub Actions digest updates",
+      "groupSlug": "github-actions-digest"
     },
     {
       "matchUpdateTypes": [
