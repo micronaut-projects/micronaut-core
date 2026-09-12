@@ -766,7 +766,7 @@ final class NettyHttpClient implements
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            return ExecutionFlow.error(decorate(new ReadTimeoutException()));
                         }
                         return ExecutionFlow.error(throwable);
                     });
@@ -1908,7 +1908,7 @@ final class NettyHttpClient implements
         } else if (cause instanceof BufferLengthExceededException blee) {
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
-            result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            result = decorate(new ReadTimeoutException());
         } else if (cause instanceof HttpClientException hce) {
             result = decorate(hce);
         } else {
