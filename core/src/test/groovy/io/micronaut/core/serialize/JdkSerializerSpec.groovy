@@ -15,7 +15,11 @@
  */
 package io.micronaut.core.serialize
 
+import io.micronaut.core.convert.ConversionService
+import io.micronaut.core.serialize.exceptions.SerializationException
 import spock.lang.Specification
+
+import java.io.ObjectInputFilter
 
 /**
  * @author Graeme Rocher
@@ -39,6 +43,47 @@ class JdkSerializerSpec extends Specification {
 
         then:
         !foo.isPresent()
+    }
+
+    void 'test deserialization is rejected when an ObjectInputFilter disallows the class'() {
+        given:
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter('java.lang.*;java.util.*;!*')
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Foo(name: "test")).get()
+
+        when:
+        serializer.deserialize(bytes, Foo)
+
+        then:
+        thrown(SerializationException)
+    }
+
+    void 'test deserialization succeeds when an ObjectInputFilter allows the required type'() {
+        given:
+        ObjectInputFilter filter = ObjectInputFilter.Config.createFilter('io.micronaut.core.serialize.JdkSerializerSpec$Foo;java.lang.*;java.util.*;!*')
+        def serializer = new JdkSerializer(ConversionService.SHARED, filter)
+        def bytes = serializer.serialize(new Foo(name: "test")).get()
+
+        when:
+        Foo foo = serializer.deserialize(bytes, Foo).get()
+
+        then:
+        foo.name == "test"
+    }
+
+    void 'test an invalid serial-filter system property fails with a message naming the property'() {
+        given:
+        System.setProperty(JdkSerializer.SERIAL_FILTER_PROPERTY, 'maxdepth=notanumber')
+
+        when:
+        new JdkSerializer(ConversionService.SHARED)
+
+        then:
+        def e = thrown(IllegalArgumentException)
+        e.message.contains(JdkSerializer.SERIAL_FILTER_PROPERTY)
+
+        cleanup:
+        System.clearProperty(JdkSerializer.SERIAL_FILTER_PROPERTY)
     }
 
     static class Foo implements Serializable {
