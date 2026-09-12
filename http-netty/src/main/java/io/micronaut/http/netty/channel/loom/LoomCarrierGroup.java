@@ -79,6 +79,12 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         return runner.delegate;
     }
 
+    private static Thread unstartedVirtualThread(String name, Consumer<Thread.Builder.OfVirtual> builderModifier, Runnable task) {
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(name);
+        builderModifier.accept(builder);
+        return builder.unstarted(task);
+    }
+
     /**
      * Factory for creating {@link LoomCarrierGroup} instances.
      */
@@ -525,12 +531,6 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 tick.commit();
             }
         }
-    }
-
-    private static Thread unstartedVirtualThread(String name, Consumer<Thread.Builder.OfVirtual> builderModifier, Runnable task) {
-        Thread.Builder.OfVirtual builder = Thread.ofVirtual().name(name);
-        builderModifier.accept(builder);
-        return builder.unstarted(task);
     }
 
     record IoScheduler(Runner runner) implements Executor, EventLoopVirtualThreadScheduler, LoomBranchSupport.VirtualThreadSchedulerProxy {
