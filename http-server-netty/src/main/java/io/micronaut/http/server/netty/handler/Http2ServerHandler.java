@@ -208,11 +208,11 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final int connectionWindowSize;
         private boolean connectionWindowRaised;
 
-        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, @Nullable Http2AccessLogManager accessLogManager, int connectionWindowSize) {
+        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
-            this.handler = handler;
-            this.accessLogManager = accessLogManager;
-            this.connectionWindowSize = connectionWindowSize;
+            this.handler = builder.frameListener;
+            this.accessLogManager = builder.accessLogManager;
+            this.connectionWindowSize = Http2ConnectionWindow.effectiveWindowSize(initialSettings, builder.initialConnectionWindowSize);
         }
 
         @Override
@@ -389,7 +389,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManager != null) {
                 encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
             }
-            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener, accessLogManager, Http2ConnectionWindow.effectiveWindowSize(initialSettings, initialConnectionWindowSize));
+            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), this);
             frameListener.init(ch);
             return ch;
         }
