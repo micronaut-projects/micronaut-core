@@ -77,6 +77,31 @@ public final class PythonTypeResolver {
      * @param boundGenerics The generic type variables in scope, by name
      * @return The class element, or {@code Object} when the type is unknown
      */
+    /**
+     * Whether the given type name is a Python list type, whose annotation member form is a Java array.
+     *
+     * @param typeName The type name
+     * @return Whether it is a list type
+     * @since 5.3.0
+     */
+    public static boolean isPythonListType(String typeName) {
+        return "list".equals(typeName) || "List".equals(typeName) || "typing.List".equals(typeName);
+    }
+
+    /**
+     * Whether the given type is a class literal type, whose annotation member form is {@link Class}.
+     *
+     * @param typeRef The type
+     * @return Whether it is a class literal type
+     * @since 5.3.0
+     */
+    public static boolean isClassLiteralType(TypeRef typeRef) {
+        return "type".equals(typeRef.name())
+            || "typing.Type".equals(typeRef.name())
+            || "Class".equals(typeRef.name())
+            || Class.class.getName().equals(typeRef.name());
+    }
+
     public ClassElement resolve(String typeName, Map<String, ClassElement> boundGenerics) {
         return resolvePythonTypeToJava(typeName, visitorContext, boundGenerics);
     }

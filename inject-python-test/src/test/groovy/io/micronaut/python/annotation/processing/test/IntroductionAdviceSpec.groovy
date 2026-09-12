@@ -795,8 +795,11 @@ class AbstractBean(ABC):
         Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
         def interceptor = getBean(context, "python.StubIntroduction")
 
-        then: "the introduction returns the decorator's declared default, an empty string"
-        bean.invokeMember("is_abstract").asString() == ""
+        then: '''the introduction returns nothing for the decorator's empty string default. The written annotation
+                 metadata omits empty string defaults, so getValue answers an empty Optional and the interceptor
+                 returns None; Java behaves the same way for a member declared String value() default "".
+                 See JavaAnnotationMetadataBuilder#isValidDefaultValue.'''
+        bean.invokeMember("is_abstract").isNull()
         bean.invokeMember("non_abstract").asString() == "good"
         interceptor.invoked == 1
 
