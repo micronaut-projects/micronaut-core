@@ -57,6 +57,7 @@ import tools.jackson.databind.cfg.MapperBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
@@ -93,8 +94,16 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectWriter specializedWriter;
     private final boolean allowViews;
 
-    private final AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
-    private final AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
+    /**
+     * Per-type caches, only allocated for a general mapper. A specialized mapper (one with a
+     * {@link #specializedReader} and {@link #specializedWriter}) answers every lookup with those
+     * two and never touches the caches, and one such mapper is created per route, so they are
+     * {@code null} there.
+     */
+    @Nullable
+    private final AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders;
+    @Nullable
+    private final AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters;
 
     @Internal
     public JacksonDatabindMapper(ObjectMapper objectMapper) {
@@ -112,6 +121,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
         this.specializedReader = null;
         this.specializedWriter = null;
+        this.cachedReaders = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
+        this.cachedWriters = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
     }
 
     @Internal
@@ -126,6 +137,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.specializedReader = from.createReader(type);
         this.specializedWriter = from.createWriter(type);
         this.allowViews = allowViews;
+        this.cachedReaders = null;
+        this.cachedWriters = null;
     }
 
     private JacksonDatabindMapper(JacksonDatabindMapper from, ObjectReader reader, ObjectWriter writer) {
@@ -135,6 +148,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.specializedReader = reader;
         this.specializedWriter = writer;
         this.allowViews = from.allowViews;
+        this.cachedReaders = null;
+        this.cachedWriters = null;
     }
 
     private static ObjectMapper createDefaultMapper() {
@@ -172,6 +187,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedReader != null) {
             return specializedReader;
         }
+        AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders = Objects.requireNonNull(this.cachedReaders);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
         TypeCache<ObjectReader> cached = cachedReaders.get(slot);
@@ -205,6 +221,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedWriter != null) {
             return specializedWriter;
         }
+        AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters = Objects.requireNonNull(this.cachedWriters);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
         TypeCache<ObjectWriter> cached = cachedWriters.get(slot);
