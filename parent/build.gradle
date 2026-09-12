@@ -279,6 +279,10 @@ ext.extraPomInfo = {
                         buildArgs {
                             buildArg '--no-fallback'
                         }
+                        metadataRepository {
+                            enabled true
+                            delegate.version '0.3.15'
+                        }
                         environment {
                             USE_NATIVE_IMAGE_JAVA_PLATFORM_MODULE_SYSTEM(false)
                         }

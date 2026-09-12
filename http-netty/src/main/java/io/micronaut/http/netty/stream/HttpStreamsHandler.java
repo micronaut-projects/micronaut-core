@@ -324,7 +324,8 @@ abstract class HttpStreamsHandler<In extends HttpMessage, Out extends HttpMessag
                 ReferenceCountUtil.release(content, content.refCnt());
             }
         } else {
-            ReferenceCountUtil.release(content, content.refCnt());
+            // Release only this handler's reference. An upstream decoder may own another reference.
+            ReferenceCountUtil.release(content);
             if (content instanceof LastHttpContent) {
                 ignoreBodyRead = false;
                 if (currentlyStreamedMessage != null) {
