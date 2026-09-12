@@ -766,7 +766,7 @@ import java
 MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
 
 @Introduction
-def Stub(value: str = ""):
+def Stub(value: str = "stubbed"):
     def class_decorator(cls):
         return cls
     return class_decorator
@@ -795,8 +795,8 @@ class AbstractBean(ABC):
         Value bean = getBean(context, "python.AbstractBean").asPolyglotValue()
         def interceptor = getBean(context, "python.StubIntroduction")
 
-        then: "the introduction returns the decorator's declared default, an empty string"
-        bean.invokeMember("is_abstract").asString() == ""
+        then: "the introduction returns the decorator's declared default"
+        bean.invokeMember("is_abstract").asString() == "stubbed"
         bean.invokeMember("non_abstract").asString() == "good"
         interceptor.invoked == 1
 

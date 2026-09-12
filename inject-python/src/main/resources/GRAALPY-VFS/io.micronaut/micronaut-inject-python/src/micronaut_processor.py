@@ -301,7 +301,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                     # Only check for micronaut decorators on top-level functions (not nested)
                     if self.current_class is None and not was_in_function and is_micronaut_decorator(node, self):
-                        arg_dict = extract_arg_defaults(node)
+                        arg_dict = extract_arg_defaults(node, self)
                         member_decorators = extract_arg_decorators(self, node)
                         member_types = extract_arg_types(self, node)
                         # Filter out micronaut_annotation decorators as they are internal helpers
@@ -2239,10 +2239,14 @@ def _resolve_java_constant(visitor, name_parts):
 
     return None
 
-def extract_arg_defaults(func_node):
+def extract_arg_defaults(func_node, visitor=None):
     """
     Given an ast.FunctionDef node, return an ordered dictionary
     mapping argument names to their default values (or None).
+
+    Defaults are converted the same way member values given at a usage site are, so that an
+    enum constant, a class reference, a list or a nested decorator reaches the Java side in the
+    shape the stub generator expects rather than as an AST repr.
     """
     arg_names = [a.arg for a in func_node.args.args]
     defaults = func_node.args.defaults
@@ -2251,24 +2255,13 @@ def extract_arg_defaults(func_node):
     num_no_defaults = len(arg_names) - len(defaults)
     default_values = [None]*num_no_defaults + defaults
 
-    # Evaluate AST nodes to their actual values if needed
-    # (here just represent as ast.dump for illustration)
     arg_dict = {}
     for arg, default in zip(arg_names, default_values):
         member_name = normalize_python_keyword_alias(arg)
         if default is None:
             arg_dict[member_name] = None
         else:
-            try:
-                # Try to evaluate the value if it's a constant
-                val = ast.literal_eval(default)
-            except _LITERAL_EVAL_ERRORS:
-                # Handle Name nodes (class references) specially
-                if isinstance(default, ast.Name):
-                    val = default.id
-                else:
-                    val = ast.dump(default)
-            arg_dict[member_name] = val
+            arg_dict[member_name] = convert_ast_value(default, visitor)
 
     return arg_dict
 

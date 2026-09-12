@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -508,6 +509,11 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
 
     @Override
     protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType) {
+        return readAnnotationDefaultValues(annotationName, annotationType, false);
+    }
+
+    @Override
+    protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType, boolean includeEmptyValues) {
         DecoratorDef decoratorDef = findDecoratorDef(annotationName);
         if (decoratorDef == null) {
             return Map.of();
@@ -515,10 +521,33 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         ClassElement javaAnnotationType = getJavaAnnotationType(annotationName);
         Map<ElementDef, Object> defaultValues = new LinkedHashMap<>();
         for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
+            if (!isValidDefaultValue(entry.getValue(), includeEmptyValues)) {
+                continue;
+            }
             String memberName = AnnotationNames.memberName(entry.getKey());
             defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), entry.getValue());
         }
         return defaultValues;
+    }
+
+    /**
+     * A Python decorator parameter without a default is reported by the processor as a {@code null} member value,
+     * which is no default at all. Beyond that the same rule the other languages apply holds: an empty string
+     * default is only recorded when empty values are asked for, while an empty list default is always recorded.
+     * The rationale is documented on {@code JavaAnnotationMetadataBuilder#isValidDefaultValue}.
+     *
+     * @param defaultValue       The member value reported by the processor
+     * @param includeEmptyValues Whether empty values should be included
+     * @return Whether the default should be recorded
+     */
+    private static boolean isValidDefaultValue(@Nullable Object defaultValue, boolean includeEmptyValues) {
+        if (defaultValue == null) {
+            return false;
+        }
+        if (defaultValue instanceof CharSequence charSequence) {
+            return includeEmptyValues || StringUtils.isNotEmpty(charSequence);
+        }
+        return true;
     }
 
     @Override
