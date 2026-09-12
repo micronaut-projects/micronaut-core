@@ -88,6 +88,7 @@ class FileTypeHandlerSpec extends AbstractMicronautSpec {
 
         then:
         response.code() == HttpStatus.NOT_MODIFIED.code
+        response.headers.getAll(DATE).size() == 1
         response.header(DATE)
     }
 
