@@ -42,8 +42,8 @@ final class ConnectionMetadataImpl {
 
     static {
         // These types come from optional netty modules. They must be looked up by name: a class
-        // literal is resolved by the JVM and a missing class surfaces as NoClassDefFoundError, which
-        // is an Error, so a catch (Exception) around it never runs and this initializer fails.
+        // literal is resolved by the JVM and a missing class surfaces as NoClassDefFoundError, an
+        // Error that an Exception handler does not see, which would fail this initializer.
         QUIC_CHANNEL = optionalClass("io.netty.handler.codec.quic.QuicChannel");
         DOMAIN_SOCKET_ADDRESS = optionalClass("io.netty.channel.unix.DomainSocketAddress");
         DOMAIN_SOCKET_CHANNEL = optionalClass("io.netty.channel.unix.DomainSocketChannel");
