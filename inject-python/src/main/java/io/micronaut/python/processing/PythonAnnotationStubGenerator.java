@@ -24,6 +24,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.python.processing.util.AnnotationNames;
 import io.micronaut.python.processing.util.AnnotationScalars;
+import io.micronaut.python.processing.util.PythonTypeResolver;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.python.processing.model.TypeRef;
@@ -91,7 +92,10 @@ final class PythonAnnotationStubGenerator {
                     memberBuilder.addAnnotation(toAnnotationDef(memberDecorator, visitorContext));
                 }
             }
-            ExpressionDef defaultValue = annotationDefaultValue(decoratorDef.members().get(memberName), memberType);
+            ExpressionDef defaultValue = annotationDefaultValue(
+                decoratorDef.members().get(memberName),
+                memberType,
+                annotationMemberElement(memberName, decoratorDef, visitorContext));
             if (defaultValue != null) {
                 memberBuilder.withDefault(defaultValue);
             }
@@ -122,6 +126,37 @@ final class PythonAnnotationStubGenerator {
 
     private static boolean isNullAnnotationMemberValue(@Nullable Object value) {
         return value == null;
+    }
+
+    /**
+     * Resolves the declared type of an annotation member as a {@link ClassElement}, or {@code null} when the decorator
+     * parameter carries no type annotation. The element tells apart the kinds of default that need more than a plain
+     * constant &mdash; an enum constant becomes a static field reference and a class reference a class literal.
+     *
+     * @param memberName     The member name
+     * @param decoratorDef   The decorator
+     * @param visitorContext The visitor context
+     * @return The member element, or {@code null} if the member is untyped
+     */
+    @Nullable
+    private static ClassElement annotationMemberElement(String memberName,
+                                                        DecoratorDef decoratorDef,
+                                                        PythonVisitorContext visitorContext) {
+        TypeRef typeRef = decoratorDef.memberTypes().get(memberName);
+        if (typeRef == null) {
+            return null;
+        }
+        if (isPythonListType(typeRef.name()) && typeRef.typeArguments().size() == 1) {
+            TypeRef componentType = typeRef.typeArguments().getFirst();
+            if (isClassLiteralType(componentType)) {
+                return null;
+            }
+            return visitorContext.getTypeResolver().resolve(componentType, Map.of());
+        }
+        if (isClassLiteralType(typeRef)) {
+            return null;
+        }
+        return visitorContext.getTypeResolver().resolve(typeRef, Map.of());
     }
 
     private static TypeDef annotationMemberType(String memberName, DecoratorDef decoratorDef, PythonVisitorContext visitorContext) {
@@ -168,21 +203,21 @@ final class PythonAnnotationStubGenerator {
     }
 
     private static boolean isPythonListType(String typeName) {
-        return "list".equals(typeName) || "List".equals(typeName) || "typing.List".equals(typeName);
+        return PythonTypeResolver.isPythonListType(typeName);
     }
 
     private static boolean isClassLiteralType(TypeRef typeRef) {
-        return "type".equals(typeRef.name())
-            || "typing.Type".equals(typeRef.name())
-            || "Class".equals(typeRef.name())
-            || Class.class.getName().equals(typeRef.name());
+        return PythonTypeResolver.isClassLiteralType(typeRef);
     }
 
-    private static @Nullable ExpressionDef annotationDefaultValue(Object defaultValue, TypeDef memberType) {
+    private static @Nullable ExpressionDef annotationDefaultValue(Object defaultValue,
+                                                                  TypeDef memberType,
+                                                                  @Nullable ClassElement memberElement) {
         if (defaultValue == null) {
             return null;
         }
-        if (defaultValue instanceof String stringValue && stringValue.startsWith("Name(")) {
+        if (defaultValue instanceof String stringValue && isPythonAstDump(stringValue)) {
+            // a default expression the Python processor could not convert; better no default than a broken stub
             return null;
         }
         if (memberType instanceof TypeDef.Array arrayType) {
@@ -193,6 +228,17 @@ final class PythonAnnotationStubGenerator {
             if (arrayType.componentType().equals(TypeDef.STRING)) {
                 return ExpressionDef.constant(Arrays.stream(elements).map(String::valueOf).toArray(String[]::new));
             }
+            if (memberElement != null && memberElement.isEnum()) {
+                // an array of enum constants: each element is a static field reference, not a constant
+                return new ExpressionDef.NewArrayInitialized(
+                    arrayType,
+                    Arrays.stream(elements)
+                        .map(element -> ExpressionDef.constant(
+                            memberElement,
+                            arrayType.componentType(),
+                            enumConstantName(element, memberElement)))
+                        .toList());
+            }
             // each element follows the component type's rules, as the scalar defaults do
             Object[] converted = new Object[elements.length];
             for (int i = 0; i < elements.length; i++) {
@@ -200,11 +246,51 @@ final class PythonAnnotationStubGenerator {
             }
             return ExpressionDef.constant(converted);
         }
+        if (memberElement != null && memberElement.isEnum()) {
+            // Colour.GREEN, not "GREEN": the member type is the enum, so the default is a static field reference
+            return ExpressionDef.constant(memberElement, memberType, enumConstantName(defaultValue, memberElement));
+        }
+        if (memberType.equals(TypeDef.CLASS) || TypeDef.of(Class.class).equals(memberType)) {
+            return ExpressionDef.constant(ClassTypeDef.of(String.valueOf(defaultValue)));
+        }
         Object converted = convertDefaultValue(defaultValue, memberType);
         if (memberType instanceof TypeDef.Primitive) {
             return ExpressionDef.primitiveConstant(converted);
         }
         return ExpressionDef.constant(converted);
+    }
+
+    /**
+     * The simple name of an enum constant. The Python processor may report it qualified by the enum type, in which
+     * case only the trailing segment names the constant.
+     *
+     * @param value         The reported default
+     * @param memberElement The enum type
+     * @return The constant name
+     */
+    private static String enumConstantName(Object value, ClassElement memberElement) {
+        String name = String.valueOf(value);
+        int lastDot = name.lastIndexOf('.');
+        if (lastDot < 0) {
+            return name;
+        }
+        String qualifier = name.substring(0, lastDot);
+        if (qualifier.equals(memberElement.getName()) || qualifier.equals(memberElement.getSimpleName())) {
+            return name.substring(lastDot + 1);
+        }
+        return name;
+    }
+
+    /**
+     * Whether the value is a Python AST repr rather than a converted value. {@code extract_arg_defaults} converts
+     * defaults through the same path as usage site values, so this should not happen; it stays as a guard so that an
+     * expression shape the converter cannot read drops the default instead of emitting an uncompilable stub.
+     *
+     * @param value The reported default
+     * @return Whether the value is an AST repr
+     */
+    private static boolean isPythonAstDump(String value) {
+        return value.startsWith("Name(") || value.startsWith("Attribute(") || value.startsWith("Call(");
     }
 
     private static Object[] arrayElements(Object defaultValue) {

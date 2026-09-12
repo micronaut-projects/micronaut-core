@@ -96,6 +96,21 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     /**
      * Resolves the default values declared by the given annotation type.
      *
+     * <p>Every member that declares a default is reported, whatever the shape of the default: a constant, an enum
+     * constant (reported as the constant's name), a class literal (reported as an
+     * {@link io.micronaut.core.annotation.AnnotationClassValue}), an array (including the empty array), a nested
+     * annotation (reported as an {@link io.micronaut.core.annotation.AnnotationValue}) and the empty string. Java,
+     * Kotlin and Groovy report the same defaults for the equivalent annotation.</p>
+     *
+     * <p>This is deliberately more complete than the defaults carried by the written annotation metadata and read
+     * back through {@link io.micronaut.core.annotation.AnnotationValue#getDefaultValues()}, which omits empty string
+     * defaults to keep the generated metadata small. Use this method when "no default" has to be told apart from
+     * "the default is the empty string" &mdash; for instance when comparing two annotations member by member.</p>
+     *
+     * <p>Under KSP the defaults of an annotation type are only resolvable when the annotation is used at least once
+     * in the compilation round, because KSP models member defaults on the annotation usage rather than on the
+     * annotation class declaration. An unused annotation type reports no defaults.</p>
+     *
      * @param annotationName The annotation type name
      * @return The default values, or an empty map if the annotation type cannot be resolved
      * @since 5.1.0

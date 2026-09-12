@@ -53,6 +53,16 @@ public final class PythonValues {
         if (value instanceof Value polyglotValue) {
             return toJava(polyglotValue);
         }
+        if (value instanceof List<?> list) {
+            // A guest list handed to a Java parameter arrives already coerced to a polyglot list rather than as a
+            // Value, and reading it is only valid while the guest context is open. Copy it, so that a value which
+            // outlives the compilation, such as an annotation member default, holds no guest handle.
+            List<Object> copy = new ArrayList<>(list.size());
+            for (Object element : list) {
+                copy.add(toJava(element));
+            }
+            return copy;
+        }
         return value;
     }
 

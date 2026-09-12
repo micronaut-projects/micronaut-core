@@ -22,3 +22,4 @@ io.micronaut.python.annotation.processing.test.annotate.AnnotationMetadataSpec$M
 io.micronaut.python.annotation.processing.test.annotate.InheritedParameterAnnotationMutationSpec$InheritedParameterMutationVisitor
 io.micronaut.python.compiler.FailingTypeElementVisitor
 io.micronaut.python.annotation.processing.test.PythonAnnotationElementSpec$InheritedVisitor
+io.micronaut.python.annotation.processing.test.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
