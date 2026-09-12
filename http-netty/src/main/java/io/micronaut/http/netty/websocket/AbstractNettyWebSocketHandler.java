@@ -34,7 +34,6 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -350,6 +349,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Object data;
+                // the aggregated message content when the bound argument aliases it; released once the handler completes
+                ByteBuf handlerOwnedContent = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
@@ -381,32 +382,20 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
-                    data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    content.release();
-                }
-
-                if (data == null) {
-                    MediaType mediaType;
+                    boolean releaseContent = true;
                     try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
-                    } catch (IllegalArgumentException e) {
-                        exceptionCaught(ctx, e);
-                        return;
-                    }
-                    try {
-                        data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
-                            .orElse(null);
-                    } catch (CodecException e) {
+                        data = decodeMessage(ctx, content, bodyArgument, messageHandler);
+                        if (data == content || (data instanceof ByteBuffer<?> byteBuffer && byteBuffer.asNativeBuffer() == content)) {
+                            // the argument is a view of the frame content: ownership passes to the handler invocation
+                            releaseContent = false;
+                            handlerOwnedContent = content;
+                        }
+                    } catch (Throwable e) {
                         messageProcessingException(ctx, e);
                         return;
-                    }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+                    } finally {
+                        if (releaseContent) {
+                            content.release();
                         }
                     }
                 }
@@ -418,6 +407,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             Collections.singletonMap(bodyArgument, data)
                     );
 
+                    ByteBuf finalHandlerOwnedContent = handlerOwnedContent;
                     try {
                         BoundExecutable boundExecutable = executableBinder.bind(
                                 messageHandler.getExecutableMethod(),
@@ -427,13 +417,22 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object finalData = data;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
-                            if (e == null) {
-                                messageHandled(ctx, finalData);
-                            } else {
-                                messageProcessingException(ctx, e);
+                            try {
+                                if (e == null) {
+                                    messageHandled(ctx, finalData);
+                                } else {
+                                    messageProcessingException(ctx, e);
+                                }
+                            } finally {
+                                if (finalHandlerOwnedContent != null) {
+                                    finalHandlerOwnedContent.release();
+                                }
                             }
                         });
                     } catch (Throwable e) {
+                        if (finalHandlerOwnedContent != null) {
+                            finalHandlerOwnedContent.release();
+                        }
                         messageProcessingException(ctx, e);
                     }
 
@@ -492,6 +491,50 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     ctx,
                     CloseReason.UNSUPPORTED_DATA
             );
+        }
+    }
+
+    /**
+     * Decodes the aggregated content of a message into the type of the body argument. The caller keeps ownership
+     * of {@code content}; the returned value may alias it (see {@link #handleWebSocketFrame}).
+     *
+     * @param ctx            The context
+     * @param content        The aggregated message content
+     * @param bodyArgument   The body argument
+     * @param messageHandler The message handler
+     * @return The decoded message, or {@code null} if no converter, codec or reader can decode it
+     */
+    @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Object decodeMessage(ChannelHandlerContext ctx, ByteBuf content, Argument<?> bodyArgument, MethodExecutionHandle<?, ?> messageHandler) {
+        if (bodyArgument.getType().isInstance(content)) {
+            // CompositeByteBuf is Iterable, which the conversion service does not pass through unchanged
+            return content;
+        }
+        Object data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+        if (data != null) {
+            return data;
+        }
+        MediaType mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+        NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(ctx.alloc());
+        data = mediaTypeCodecRegistry.findCodec(mediaType)
+            .map(codec -> codec.decode(bodyArgument, bufferFactory.wrap(content)))
+            .orElse(null);
+        if (data != null) {
+            return data;
+        }
+        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null);
+        if (reader == null) {
+            return null;
+        }
+        // the reader takes ownership of the buffer it is given and releases it once the message has been read
+        ByteBuffer<ByteBuf> byteBuffer = bufferFactory.wrap(content.retain());
+        try {
+            return reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+        } catch (Throwable e) {
+            // readers only release on success
+            content.release();
+            throw e;
         }
     }
 
