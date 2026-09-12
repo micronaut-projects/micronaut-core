@@ -20,7 +20,9 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
@@ -40,6 +42,7 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -51,6 +54,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -204,12 +209,13 @@ public abstract class ResponseLifecycle {
         MediaType mediaType = response.getContentType().orElse(null);
         Flux<Object> bodyPublisher = Flux.from(Publishers.convertToPublisher(conversionService, body));
         Flux<ByteBody> httpContentPublisher;
-        boolean isJson;
+        BooleanSupplier isJson;
         if (routeInfo != null) {
             if (mediaType == null) {
                 mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
             }
-            isJson = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
+            boolean isJsonRoute = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
+            isJson = () -> isJsonRoute;
             MediaType finalMediaType = mediaType;
             httpContentPublisher = bodyPublisher.concatMap(message -> {
                 MessageBodyWriter<Object> messageBodyWriter = routeInfo.getMessageBodyWriter();
@@ -230,11 +236,26 @@ public abstract class ResponseLifecycle {
                 return ReactiveExecutionFlow.toPublisher(() -> flow);
             });
         } else {
-            isJson = false;
             MediaType finalMediaType = mediaType;
+            // A single-value publisher (Mono, Single, Maybe, ...) is one document, not a stream of
+            // elements, so it is never framed as an array. This is what the route path does too:
+            // RouteExecutor unwraps single publishers before they get here.
+            boolean single = Publishers.isSingle(body.getClass());
+            boolean isJsonMediaType = !single && finalMediaType != null && MediaType.EXTENSION_JSON.equals(finalMediaType.getExtension());
+            // There is no declared response body type here, so whether the items can be formatted
+            // as a JSON array is derived from the type of the first item that is actually written,
+            // and only the first: the flow below completes once that item has gone through the
+            // writer, and the framing has to be settled by then. Later items of another type do not
+            // change it, so a mixed stream comes out the same way regardless of timing.
+            AtomicBoolean jsonFormattable = new AtomicBoolean(true);
+            AtomicBoolean first = new AtomicBoolean(true);
+            isJson = () -> isJsonMediaType && jsonFormattable.get();
             httpContentPublisher = bodyPublisher
                 .concatMap(message -> {
                     Argument<Object> type = Argument.ofInstance(message);
+                    if (isJsonMediaType && first.compareAndSet(true, false) && !isJsonFormattable(type)) {
+                        jsonFormattable.set(false);
+                    }
                     MessageBodyWriter<Object> messageBodyWriter = messageBodyHandlerRegistry.getWriter(type, finalMediaType == null ? List.of() : List.of(finalMediaType));
                     ExecutionFlow<CloseableByteBody> flow = writePieceAsync(messageBodyWriter, request, response, type, finalMediaType == null ? MediaType.ALL_TYPE : finalMediaType, message);
                     return ReactiveExecutionFlow.toPublisher(() -> flow);
@@ -244,9 +265,25 @@ public abstract class ResponseLifecycle {
         httpContentPublisher = httpContentPublisher.doOnDiscard(CloseableByteBody.class, CloseableByteBody::close);
 
         return LazySendingSubscriber.create(httpContentPublisher).map(items -> {
-            CloseableByteBody byteBody = isJson ? concatenateJson(items) : concatenate(items);
+            CloseableByteBody byteBody = isJson.getAsBoolean() ? concatenateJson(items) : concatenate(items);
             return ByteBodyHttpResponseWrapper.wrap(response, byteBody);
         }).onErrorResume(t -> (ExecutionFlow) handleStreamingError(request, t));
+    }
+
+    /**
+     * Whether items of the given type can be formatted as the elements of a JSON array. Mirrors
+     * {@link RouteInfo#isResponseBodyJsonFormattable()} for responses that have no route.
+     *
+     * @param type The item type
+     * @return {@code true} if the items may be joined into a JSON array
+     */
+    private static boolean isJsonFormattable(Argument<?> type) {
+        // it would be nice to support netty ByteBuf here, but it's not clear how.
+        // A ByteBody is raw bytes too: the writer passes it through unchanged, so framing it
+        // would splice brackets and commas into a byte stream.
+        return !(type.getType() == byte[].class
+            || ByteBuffer.class.isAssignableFrom(type.getType())
+            || ByteBody.class.isAssignableFrom(type.getType()));
     }
 
     /**
@@ -277,7 +314,15 @@ public abstract class ResponseLifecycle {
     protected final ExecutionFlow<? extends ByteBodyHttpResponse<?>> handleStreamingError(HttpRequest<?> request, Throwable t) {
         // limited error handling
         MutableHttpResponse<?> errorResponse;
-        if (t instanceof HttpStatusException hse) {
+        if (t instanceof ConversionErrorException cee && cee.getCause() instanceof JsonSyntaxException jse) {
+            // with delayed parsing, json syntax errors show up as conversion errors
+            t = jse;
+        }
+        if (t instanceof JsonSyntaxException) {
+            // a syntax error in a streamed request body is the client's fault, not the server's,
+            // the same way RequestLifecycle answers it for a fully buffered body
+            errorResponse = HttpResponse.badRequest().body(t.getMessage());
+        } else if (t instanceof HttpStatusException hse) {
             errorResponse = HttpResponse.status(hse.getStatus());
             if (hse.getBody().isPresent()) {
                 errorResponse.body(hse.getBody().get());
