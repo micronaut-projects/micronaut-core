@@ -205,6 +205,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * @param services The services to add to
      * @return True if the URI names a directory in a jar file and its services were collected
      */
+    // S5042: only the names of the entries are read, nothing is expanded, so an archive cannot exhaust memory or disk here
+    @SuppressWarnings("java:S5042")
     private static boolean collectJarServices(URI uri, Map<String, Set<String>> services) {
         if (!"jar".equals(uri.getScheme())) {
             return false;
@@ -240,6 +242,8 @@ public final class MicronautMetaServiceLoaderUtils {
      * @param name     The name of the jar entry
      * @param services The services to add to
      */
+    // S3824: computeIfAbsent would add a lambda to link on the startup path this method exists to shorten
+    @SuppressWarnings("java:S3824")
     private static void addJarEntry(String name, Map<String, Set<String>> services) {
         int start = MICRONAUT_SERVICES_PATH.length();
         int serviceEnd = name.indexOf('/', start);
