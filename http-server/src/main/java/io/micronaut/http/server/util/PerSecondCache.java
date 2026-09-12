@@ -18,13 +18,14 @@ package io.micronaut.http.server.util;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.LongFunction;
 
 /**
  * Caches a string that is a pure function of the wall clock truncated to whole seconds, so that
  * callers on many threads that need the same value within the same second only compute it once.
  * <p>
- * Thread safety: the cache is a single {@code volatile} reference to an immutable
+ * Thread safety: the cache is a single atomic reference to an immutable
  * (second, text) pair. A reader loads the reference once and either returns the text, if the
  * pair's second matches its own clock reading, or computes the text for its own second and
  * publishes a new pair. Concurrent readers that both miss compute the same text for the same
@@ -37,8 +38,7 @@ import java.util.function.LongFunction;
 @Internal
 public final class PerSecondCache {
     private final LongFunction<String> formatter;
-    @Nullable
-    private volatile Entry cached;
+    private final AtomicReference<@Nullable Entry> cached = new AtomicReference<>();
 
     /**
      * Create a new cache.
@@ -66,12 +66,12 @@ public final class PerSecondCache {
      */
     public String get(long epochMillis) {
         long second = Math.floorDiv(epochMillis, 1000);
-        Entry entry = cached;
+        Entry entry = cached.get();
         if (entry != null && entry.second == second) {
             return entry.text;
         }
         String text = formatter.apply(second);
-        cached = new Entry(second, text);
+        cached.set(new Entry(second, text));
         return text;
     }
 

@@ -77,7 +77,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
      * Session's log element reads it by this name). Set when the pipeline has an access logger,
      * and cleared again once the response has been written.
      */
-    static final AttributeKey<NettyHttpRequest> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
+    static final AttributeKey<NettyHttpRequest<?>> ACCESS_LOG_REQUEST_ATTRIBUTE = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName());
     private static final Logger LOG = LoggerFactory.getLogger(RoutingInBoundHandler.class);
     /*
      * Also present in {@link RouteExecutor}.
