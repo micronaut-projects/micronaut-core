@@ -1029,9 +1029,9 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * The type a variable is bound to, keeping the type annotations written where the variable is used: for
-     * {@code interface Middle<T> extends Container<@Marker T>} read through {@code class Leaf<X> implements Middle<X>},
-     * the {@code Container} argument is {@code X} and is still annotated {@code @Marker}.
+     * The type a variable is bound to, keeping the type annotations written where the variable is used: when an
+     * intermediate interface annotates the variable it passes on to a super type, the argument reported for that
+     * super type is the type the sub type binds the variable to, and it still carries that annotation.
      *
      * @param bound The type the variable is bound to
      * @param use   The use of the variable
