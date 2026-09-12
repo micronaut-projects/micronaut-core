@@ -12,7 +12,6 @@ import io.micronaut.http.netty.channel.loom.LoomBranchSupport
 import io.micronaut.http.netty.channel.loom.PrivateLoomSupport
 import io.micronaut.json.JsonMapper
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.netty.util.concurrent.ThreadPerTaskExecutor
@@ -210,13 +209,13 @@ class LoomCarrierSpec extends Specification {
                     .executor(new ThreadPerTaskExecutor(new ThreadFactory() {
                         @Override
                         Thread newThread(@NonNull Runnable r) {
-                            return LoomSupport.unstarted("jdkclient", (b) -> {
-                                if (LoomBranchSupport.isSupported()) {
-                                    LoomBranchSupport.setScheduler(b, scheduler)
-                                } else {
-                                    PrivateLoomSupport.setScheduler(b, scheduler)
-                                }
-                            }, r)
+                            def b = Thread.ofVirtual().name("jdkclient")
+                            if (LoomBranchSupport.isSupported()) {
+                                LoomBranchSupport.setScheduler(b, scheduler)
+                            } else {
+                                PrivateLoomSupport.setScheduler(b, scheduler)
+                            }
+                            return b.unstarted(r)
                         }
                     }))
                     .build()) {

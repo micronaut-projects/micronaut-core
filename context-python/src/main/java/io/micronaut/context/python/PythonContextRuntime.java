@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.reflect.exception.InstantiationException;
-import io.micronaut.scheduling.LoomSupport;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
@@ -464,7 +463,7 @@ public final class PythonContextRuntime {
         return provider != null
             && provider.isResolvable()
             && PythonAsyncioRuntime.currentEventLoopForContext() == null
-            && LoomSupport.isVirtual(Thread.currentThread());
+            && Thread.currentThread().isVirtual();
     }
 
     private static <T> T offloadPooledExecution(Supplier<T> action) {

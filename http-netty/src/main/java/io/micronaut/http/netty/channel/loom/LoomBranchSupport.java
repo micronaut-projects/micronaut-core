@@ -18,7 +18,6 @@ package io.micronaut.http.netty.channel.loom;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.scheduling.LoomSupport;
 import org.jspecify.annotations.NullUnmarked;
 
 import java.lang.invoke.LambdaMetafactory;
@@ -101,7 +100,7 @@ public final class LoomBranchSupport {
 
         if (isSupported()) {
             FutureTask<Object> task = new FutureTask<>(LoomBranchSupport::currentPrivate);
-            DEFAULT_SCHEDULER_THREAD = LoomSupport.newVirtualThreadFactory("default-scheduler-exposer").newThread(task);
+            DEFAULT_SCHEDULER_THREAD = Thread.ofVirtual().name("default-scheduler-exposer", 1L).factory().newThread(task);
             DEFAULT_SCHEDULER_THREAD.start();
             DEFAULT_SCHEDULER = SupplierUtil.memoized(() -> {
                 try {
