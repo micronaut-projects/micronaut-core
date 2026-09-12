@@ -46,6 +46,11 @@ import java.io.OutputStream;
 @BootstrapContextCompatible
 @Internal
 final class ByteBufferBodyHandler implements TypedMessageBodyHandler<ByteBuffer<?>>, ChunkedMessageBodyReader<ByteBuffer<?>> {
+    /**
+     * The type this handler is for, resolved once: isWriteable asks for it on every response.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static final Argument<ByteBuffer<?>> TYPE = Argument.of((Class) ByteBuffer.class);
 
     private final ByteBufferFactory<?, ?> byteBufferFactory;
 
@@ -55,7 +60,7 @@ final class ByteBufferBodyHandler implements TypedMessageBodyHandler<ByteBuffer<
 
     @Override
     public Argument<ByteBuffer<?>> getType() {
-        return Argument.of((Class) ByteBuffer.class);
+        return TYPE;
     }
 
     @Override

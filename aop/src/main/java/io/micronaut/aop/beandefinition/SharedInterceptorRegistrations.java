@@ -67,8 +67,6 @@ import java.util.List;
 @Internal
 public final class SharedInterceptorRegistrations {
 
-    private static final String ATTRIBUTE = "io.micronaut.aop.sharedInterceptorRegistrations";
-
     private SharedInterceptorRegistrations() {
     }
 
@@ -94,10 +92,10 @@ public final class SharedInterceptorRegistrations {
         if (registrations == null || registrations.isEmpty()) {
             return;
         }
-        Deque<Entry> stack = (Deque<Entry>) resolutionContext.getAttribute(ATTRIBUTE);
+        Deque<Entry> stack = (Deque<Entry>) resolutionContext.getAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS);
         if (stack == null) {
             stack = new ArrayDeque<>(3);
-            resolutionContext.setAttribute(ATTRIBUTE, stack);
+            resolutionContext.setAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS, stack);
         }
         stack.push(new Entry(definition, registrations));
     }
@@ -181,7 +179,7 @@ public final class SharedInterceptorRegistrations {
 
     @SuppressWarnings("unchecked")
     private static @Nullable Deque<Entry> stack(BeanResolutionContext resolutionContext) {
-        return (Deque<Entry>) resolutionContext.getAttribute(ATTRIBUTE);
+        return (Deque<Entry>) resolutionContext.getAttribute(BeanResolutionContext.SHARED_INTERCEPTOR_REGISTRATIONS);
     }
 
     private record Entry(BeanDefinition<?> definition, List<?> registrations) {
