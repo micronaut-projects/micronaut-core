@@ -205,17 +205,35 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         private final Http2ServerHandler handler;
         @Nullable
         private final Http2AccessLogManager accessLogManager;
+        private final int connectionWindowSize;
+        private boolean connectionWindowRaised;
 
-        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, Http2ServerHandler handler, @Nullable Http2AccessLogManager accessLogManager) {
+        private ConnectionHandler(Http2ConnectionDecoder decoder, Http2ConnectionEncoder encoder, Http2Settings initialSettings, boolean decoupleCloseAndGoAway, boolean flushPreface, ConnectionHandlerBuilder builder) {
             super(decoder, encoder, initialSettings, decoupleCloseAndGoAway, flushPreface);
-            this.handler = handler;
-            this.accessLogManager = accessLogManager;
+            this.handler = builder.frameListener;
+            this.accessLogManager = builder.accessLogManager;
+            this.connectionWindowSize = Http2ConnectionWindow.effectiveWindowSize(initialSettings, builder.initialConnectionWindowSize);
         }
 
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
             handler.ctx = ctx;
             super.handlerAdded(ctx);
+            // the preface has been sent if the channel is active, the WINDOW_UPDATE must come after it
+            raiseConnectionWindow(ctx);
+        }
+
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) throws Exception {
+            super.channelActive(ctx);
+            raiseConnectionWindow(ctx);
+        }
+
+        private void raiseConnectionWindow(ChannelHandlerContext ctx) throws Http2Exception {
+            if (!connectionWindowRaised && ctx.channel().isActive()) {
+                connectionWindowRaised = true;
+                Http2ConnectionWindow.raise(ctx, connection(), connectionWindowSize);
+            }
         }
 
         @Override
@@ -305,6 +323,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         @Nullable
         private Http2AccessLogManager accessLogManager;
         private boolean decompress = true;
+        @Nullable
+        private Integer initialConnectionWindowSize;
 
         public ConnectionHandlerBuilder(RequestHandler requestHandler) {
             frameListener = new Http2ServerHandler(requestHandler);
@@ -347,6 +367,19 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             return this;
         }
 
+        /**
+         * Set the receive window of the connection as a whole (stream 0). The window is derived
+         * from the stream window in the initial settings when this is {@code null} or smaller
+         * than that, see {@link Http2ConnectionWindow#effectiveWindowSize(Http2Settings, Integer)}.
+         *
+         * @param initialConnectionWindowSize The connection window size, or {@code null} for the default
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder initialConnectionWindowSize(@Nullable Integer initialConnectionWindowSize) {
+            this.initialConnectionWindowSize = initialConnectionWindowSize;
+            return this;
+        }
+
         @Override
         public ConnectionHandler build() {
             connection(new DefaultHttp2Connection(isServer(), maxReservedStreams()));
@@ -364,7 +397,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (accessLogManager != null) {
                 encoder = new Http2AccessLogConnectionEncoder(encoder, accessLogManager);
             }
-            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), frameListener, accessLogManager);
+            ConnectionHandler ch = new ConnectionHandler(decoder, encoder, initialSettings, decoupleCloseAndGoAway(), flushPreface(), this);
             frameListener.init(ch);
             return ch;
         }
