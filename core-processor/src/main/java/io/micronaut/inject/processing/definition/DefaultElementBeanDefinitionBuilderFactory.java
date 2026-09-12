@@ -74,7 +74,7 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
 
     @Override
     public ElementBeanDefinitionBuilder<OutputObjectDef> ofType(ClassElement classElement) {
-        MethodElement constructorElement = classElement.getPrimaryConstructor().orElse(null);
+        MethodElement constructorElement = BeanInjectionUtils.findBeanConstructor(classElement).orElse(null);
         if (constructorElement != null) {
             return constructor(
                 BeanInjectionUtils.createConstructorDefinition(constructorElement, visitorContext)
@@ -162,6 +162,12 @@ public class DefaultElementBeanDefinitionBuilderFactory implements ElementBeanDe
         BeanDefinitionWriter targetBeanWriter = (BeanDefinitionWriter) targetBeanDefinitionBuilder;
         MemberDefinition<ClassElement> elementProducerDefinition = targetBeanWriter.getElementProducerDefinition();
         boolean isFactoryMethod = !(elementProducerDefinition instanceof ConstructorDefinition<ClassElement, ?>);
+        if (elementProducerDefinition instanceof ConstructorDefinition<ClassElement, ?> constructorDefinition
+            && constructorDefinition.constructorElement() instanceof MethodElement constructor
+            && constructor.isPrivate()) {
+            // The generated proxy extends the bean type, and its constructor has to invoke the bean constructor
+            throw new ProcessingException(constructor, "Cannot apply AOP advice to a bean created with a private constructor. The constructor must be made non-private to support proxying: " + targetType.getName());
+        }
 
         Map<CharSequence, Boolean> settings = new LinkedHashMap<>();
         OptionalValues<Boolean> aroundSettings = aopElementAnnotationProcessor.getValues(AnnotationUtil.ANN_AROUND, Boolean.class);

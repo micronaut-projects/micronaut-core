@@ -2,6 +2,7 @@ package io.micronaut.inject.beanimport
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.inject.beanimport.fixtures.PrivateInjectConstructorBean
 import io.smallrye.faulttolerance.CircuitBreakerMaintenanceImpl
 import io.smallrye.faulttolerance.DefaultAsyncExecutorProvider
 import io.smallrye.faulttolerance.DefaultExistingCircuitBreakerNames
@@ -39,6 +40,25 @@ class BytesFactory {
 
         expect:
         bean.toString() == 'test'
+    }
+
+    void "test bean import with a private reflective constructor"() {
+        given:
+        ApplicationContext context = buildContext('''
+package beanimporttest3;
+
+import io.micronaut.context.annotation.Import;
+import io.micronaut.inject.beanimport.fixtures.PrivateInjectConstructorBean;
+
+@Import(classes = PrivateInjectConstructorBean.class)
+class Application {}
+''')
+
+        expect:
+        context.getBean(PrivateInjectConstructorBean) != null
+
+        cleanup:
+        context.close()
     }
 
 
