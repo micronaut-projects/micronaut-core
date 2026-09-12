@@ -1010,9 +1010,13 @@ public interface ClassElement extends TypedElement {
             // A variable resolved through a binding already counts the dimensions of the binding
             ClassElement bound = binding;
             while (bound.getArrayDimensions() < placeholder.getArrayDimensions()) {
-                bound = bound.toArray();
+                ClassElement array = copy(bound, ClassElement::toArray);
+                if (array == bound) {
+                    return type;
+                }
+                bound = array;
             }
-            return bound;
+            return readThroughUse(bound, placeholder);
         }
         if (type instanceof WildcardElement) {
             ClassElement folded = type.foldBoundGenericTypes(bound -> bound instanceof GenericPlaceholderElement ? bindTypeVariables(bound, bindings) : bound);
@@ -1020,6 +1024,46 @@ public interface ClassElement extends TypedElement {
         }
         Map<String, ClassElement> typeArguments = type.getTypeArguments();
         Map<String, ClassElement> boundTypeArguments = bindTypeVariables(typeArguments, bindings);
-        return boundTypeArguments == typeArguments ? type : type.withTypeArguments(boundTypeArguments);
+        return boundTypeArguments == typeArguments ? type : copy(type, bound -> bound.withTypeArguments(boundTypeArguments));
     }
+
+    /**
+     * The type a variable is bound to, keeping the type annotations written where the variable is used: for
+     * {@code interface Middle<T> extends Container<@Marker T>} read through {@code class Leaf<X> implements Middle<X>},
+     * the {@code Container} argument is {@code X} and is still annotated {@code @Marker}.
+     *
+     * @param bound       The type the variable is bound to
+     * @param use         The use of the variable
+     * @return The bound type, wrapped only when the use annotates it
+     */
+    private static ClassElement readThroughUse(ClassElement bound, GenericPlaceholderElement use) {
+        Collection<String> useAnnotations = use.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames();
+        if (useAnnotations.isEmpty()
+            || bound instanceof WildcardElement
+            || bound.getTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().containsAll(useAnnotations)) {
+            return bound;
+        }
+        if (bound instanceof GenericPlaceholderElement boundPlaceholder) {
+            return new TypeAnnotatedGenericPlaceholderElement(boundPlaceholder, use);
+        }
+        return new TypeAnnotatedClassElement(bound, use);
+    }
+
+    /**
+     * Copies a type, which {@link #withTypeArguments(Map)} and {@link #toArray()} allow an implementation not to
+     * support. A type that cannot be copied is answered unchanged: the variables it holds stay unbound, which is
+     * what this type could say about them before.
+     *
+     * @param type The type to copy
+     * @param copy The copy to make
+     * @return The copy, or the type itself if it does not support being copied
+     */
+    private static ClassElement copy(ClassElement type, Function<ClassElement, ClassElement> copy) {
+        try {
+            return copy.apply(type);
+        } catch (UnsupportedOperationException e) {
+            return type;
+        }
+    }
+
 }

@@ -86,6 +86,11 @@ final class SimpleClassElement implements ClassElement {
     }
 
     @Override
+    public ClassElement withTypeArguments(Map<String, ClassElement> typeArguments) {
+        return new SimpleClassElement(typeName, isInterface, annotationMetadata, typeArguments, interfaces, superType);
+    }
+
+    @Override
     public boolean isInterface() {
         return isInterface;
     }

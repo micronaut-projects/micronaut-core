@@ -18,6 +18,7 @@ package io.micronaut.inject.generics
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.GenericPlaceholder
+import io.micronaut.inject.ast.ClassElement
 
 import java.util.function.Function
 
@@ -99,6 +100,38 @@ class Strings extends ArrayList<String> {
 @Introspected
 @Singleton
 class Nested<X> extends ArrayList<List<X>> {
+}
+'''
+
+    private static final String ANNOTATED = '''
+package test;
+
+import io.micronaut.core.annotation.Introspected;
+import jakarta.inject.Singleton;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE_USE})
+@interface Marker {
+}
+
+@Introspected
+@Singleton
+class AnnotatedLeaf<X> implements AnnotatedMiddle<X> {
+}
+
+interface Container2<E, F> {
+}
+
+interface AnnotatedMiddle<T> extends Container2<@Marker T, T> {
+}
+
+@Introspected
+@Singleton
+class AnnotatedStrings implements AnnotatedMiddle<String> {
 }
 '''
 
@@ -245,6 +278,67 @@ class Outer {
         expect:
         introspection.getTypeArguments(Comparable) == []
         introspection.getTypeArguments('does.not.Exist') == []
+    }
+
+    void "type annotations written where a variable is used survive the binding"() {
+        given:
+        def introspection = buildBeanIntrospection('test.AnnotatedLeaf', ANNOTATED)
+        def definition = buildBeanDefinition('test.AnnotatedLeaf', ANNOTATED)
+        def arguments = introspection.getTypeArguments('test.Container2')
+
+        expect: "the annotation written where the intermediate interface uses the variable is kept"
+        arguments[0].annotationMetadata.hasAnnotation('test.Marker')
+        !arguments[1].annotationMetadata.hasAnnotation('test.Marker')
+        definition.getTypeArguments('test.Container2')[0].annotationMetadata.hasAnnotation('test.Marker')
+
+        and: "the argument the use does not annotate is the variable of the introspected type"
+        variableNames(arguments)[1] == 'X'
+    }
+
+    void "the type a variable is bound to is read through the use that annotates it"() {
+        expect:
+        buildClassElement('''
+package test;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+class Test<X> implements AnnotatedMiddle<X> {
+}
+
+interface Container2<E, F> {
+}
+
+interface AnnotatedMiddle<T> extends Container2<@Marker T, T> {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE_USE})
+@interface Marker {
+}
+''') { ClassElement leaf ->
+            def arguments = leaf.getAllTypeArguments().get('test.Container2')
+
+            assert arguments.values()*.variableName == ['X', 'X']
+            assert arguments.E.typeAnnotationMetadata.annotationMetadata.hasAnnotation('test.Marker')
+            assert !arguments.F.typeAnnotationMetadata.annotationMetadata.hasAnnotation('test.Marker')
+            return true
+        }
+    }
+
+    void "type annotations survive the binding of a variable to a concrete type"() {
+        given:
+        def introspection = buildBeanIntrospection('test.AnnotatedStrings', ANNOTATED)
+        def definition = buildBeanDefinition('test.AnnotatedStrings', ANNOTATED)
+        def arguments = introspection.getTypeArguments('test.Container2')
+
+        expect:
+        arguments*.type == [String, String]
+        arguments[0].annotationMetadata.hasAnnotation('test.Marker')
+        !arguments[1].annotationMetadata.hasAnnotation('test.Marker')
+        definition.getTypeArguments('test.Container2')[0].annotationMetadata.hasAnnotation('test.Marker')
     }
 
     private static List<String> variableNames(List<Argument<?>> arguments) {
