@@ -24,6 +24,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.chain.ProxyTargetInterceptors;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionRegistry;
@@ -47,6 +48,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -205,11 +207,50 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     );
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
+    private static final String FIELD_PROXY_TARGET_INTERCEPTORS = "$proxyTargetInterceptors";
+    private static final String LOCAL_TARGET = "target";
     private static final String FIELD_INTERCEPTOR_REGISTRATIONS = "$interceptorRegistrations";
 
     // The proxy accessor is named after the field it returns.
     private static final Method GET_INTERCEPTOR_REGISTRATIONS_METHOD =
         ReflectionUtils.getRequiredInternalMethod(Intercepted.class, FIELD_INTERCEPTOR_REGISTRATIONS);
+
+    private static final Constructor<?> CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS = ReflectionUtils.findConstructor(
+        ProxyTargetInterceptors.class,
+        BeanContext.class,
+        InterceptorRegistry.class,
+        BeanDefinition.class,
+        ExecutableMethod[].class,
+        List.class
+    ).orElseThrow(() -> new IllegalStateException("new ProxyTargetInterceptors(..) constructor not found. Incompatible version of Micronaut?"));
+
+    private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_GET = ReflectionUtils.getRequiredInternalMethod(
+        ProxyTargetInterceptors.class,
+        "get",
+        int.class,
+        Object.class
+    );
+
+    private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_GET_PROXY_TARGET_BEAN = ReflectionUtils.getRequiredInternalMethod(
+        ProxyTargetInterceptors.class,
+        "getProxyTargetBean",
+        BeanResolutionContext.class,
+        Argument.class,
+        Qualifier.class
+    );
+
+    private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_BIND_LAZY_TARGETS = ReflectionUtils.getRequiredInternalMethod(
+        ProxyTargetInterceptors.class,
+        "bindLazyTargets",
+        BeanResolutionContext.class
+    );
+
+    private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE = ReflectionUtils.getRequiredInternalMethod(
+        ProxyTargetInterceptors.class,
+        "resolve",
+        Object.class
+    );
+
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
@@ -438,10 +479,28 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private MethodDef buildMethodIntercept(MethodElement methodElement,
                                            int index,
                                            @Nullable FieldDef targetField,
-                                           FieldDef interceptorsField,
-                                           FieldDef proxyMethodsField) {
+                                           @Nullable FieldDef interceptorsField,
+                                           FieldDef proxyMethodsField,
+                                           @Nullable FieldDef proxyTargetInterceptorsField) {
         return MethodDef.override(methodElement)
             .build((aThis, methodParameters) -> {
+                if (proxyTargetInterceptorsField != null) {
+                    // A lazy or hot-swappable proxy can invoke a different target on each call, and each target has
+                    // its own instances of the non-singleton interceptors, so they are selected for the target read.
+                    return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal(LOCAL_TARGET, targetVar ->
+                        buildMethodInterceptInvocation(
+                            methodElement,
+                            methodParameters,
+                            aThis.field(proxyTargetInterceptorsField).invoke(
+                                METHOD_PROXY_TARGET_INTERCEPTORS_GET,
+                                TypeDef.Primitive.INT.constant(index),
+                                targetVar
+                            ),
+                            targetVar,
+                            aThis.field(proxyMethodsField).arrayElement(index)
+                        )
+                    );
+                }
 
                 ExpressionDef targetArgument;
                 if (isProxyTarget) {
@@ -454,40 +513,62 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     targetArgument = aThis;
                 }
 
-                ExpressionDef.InvokeInstanceMethod invocation;
-                if (methodParameters.isEmpty()) {
-                    // invoke MethodInterceptorChain constructor without parameters
-                    invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
-                        CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS,
-
-                        // 1st argument: interceptors
-                        aThis.field(interceptorsField).arrayElement(index),
-                        // 2nd argument: this or target
-                        targetArgument,
-                        // 3rd argument: the executable method
-                        aThis.field(proxyMethodsField).arrayElement(index)
-                        // fourth argument: array of the argument values
-                    ).invoke(METHOD_PROCEED);
-                } else {
-                    // invoke MethodInterceptorChain constructor with parameters
-                    invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
-                        CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN,
-
-                        // 1st argument: interceptors
-                        aThis.field(interceptorsField).arrayElement(index),
-                        // 2nd argument: this or target
-                        targetArgument,
-                        // 3rd argument: the executable method
-                        aThis.field(proxyMethodsField).arrayElement(index),
-                        // 4th argument: array of the argument values
-                        TypeDef.OBJECT.array().instantiate(methodParameters)
-                    ).invoke(METHOD_PROCEED);
-                }
-                if (!methodElement.getReturnType().isVoid() || methodElement.isSuspend()) {
-                    return invocation.returning();
-                }
-                return invocation;
+                return buildMethodInterceptInvocation(
+                    methodElement,
+                    methodParameters,
+                    aThis.field(Objects.requireNonNull(interceptorsField)).arrayElement(index),
+                    targetArgument,
+                    aThis.field(proxyMethodsField).arrayElement(index)
+                );
             });
+    }
+
+    /**
+     * Whether the proxy can invoke a different target from one call to the next: a lazy proxy resolves its target on
+     * each call, and a hot-swappable one can have its target replaced.
+     */
+    private boolean hasVariableTarget() {
+        return lazy || hotswap;
+    }
+
+    private static StatementDef buildMethodInterceptInvocation(MethodElement methodElement,
+                                                               List<VariableDef.MethodParameter> methodParameters,
+                                                               ExpressionDef interceptors,
+                                                               ExpressionDef targetArgument,
+                                                               ExpressionDef executableMethod) {
+        ExpressionDef.InvokeInstanceMethod invocation;
+        if (methodParameters.isEmpty()) {
+            // invoke MethodInterceptorChain constructor without parameters
+            invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
+                CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS,
+
+                // 1st argument: interceptors
+                interceptors,
+                // 2nd argument: this or target
+                targetArgument,
+                // 3rd argument: the executable method
+                executableMethod
+                // fourth argument: array of the argument values
+            ).invoke(METHOD_PROCEED);
+        } else {
+            // invoke MethodInterceptorChain constructor with parameters
+            invocation = METHOD_INTERCEPTOR_CHAIN_TYPE.instantiate(
+                CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN,
+
+                // 1st argument: interceptors
+                interceptors,
+                // 2nd argument: this or target
+                targetArgument,
+                // 3rd argument: the executable method
+                executableMethod,
+                // 4th argument: array of the argument values
+                TypeDef.OBJECT.array().instantiate(methodParameters)
+            ).invoke(METHOD_PROCEED);
+        }
+        if (!methodElement.getReturnType().isVoid() || methodElement.isSuspend()) {
+            return invocation.returning();
+        }
+        return invocation;
     }
 
     @Override
@@ -499,11 +580,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
 
-        FieldDef interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-
-        proxyBuilder.addField(interceptorsField);
+        // A proxy whose target can change selects the interceptors for the target of each call, so it keeps no array
+        FieldDef interceptorsField;
+        if (hasVariableTarget()) {
+            interceptorsField = null;
+        } else {
+            interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .build();
+            proxyBuilder.addField(interceptorsField);
+        }
 
         // Every proxy retains the registrations its constructor was given, so a proxy can always report the
         // interceptors bound to it. For an around-only proxy that is exactly the around/introduction set it already
@@ -577,10 +663,20 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         interfaces.sort(Comparator.comparing(ClassTypeDef::getName));
         interfaces.forEach(proxyBuilder::addSuperinterface);
 
+        FieldDef proxyTargetInterceptorsField;
+        if (isProxyTarget) {
+            proxyTargetInterceptorsField = FieldDef.builder(FIELD_PROXY_TARGET_INTERCEPTORS, ProxyTargetInterceptors.class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .build();
+            proxyBuilder.addField(proxyTargetInterceptorsField);
+        } else {
+            proxyTargetInterceptorsField = null;
+        }
+
         int index = 0;
         for (MethodElement method : interceptedMethods) {
             proxyBuilder.addMethod(
-                buildMethodIntercept(method, index++, targetField, interceptorsField, proxyMethodsField)
+                buildMethodIntercept(method, index++, targetField, interceptorsField, proxyMethodsField, hasVariableTarget() ? proxyTargetInterceptorsField : null)
             );
         }
         if (!interceptedMethods.isEmpty()) {
@@ -595,6 +691,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
             builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
+            if (isProxyTarget) {
+                // The target is invoked with its own instances of the non-singleton interceptors, see
+                // ProxyTargetInterceptors, so the proxy is given only the singleton ones
+                builder.member(InterceptorBindingQualifier.META_SINGLETONS_ONLY, true);
+            }
         });
 
         if (parentWriter != null) {
@@ -604,7 +705,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
 
-        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, interceptedMethods);
+        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, proxyTargetInterceptorsField, interceptedMethods);
 
         List<OutputObjectDef> classes = new ArrayList<>();
         classes.add(new OutputObjectDef(proxyBuilder.build(), null, originatingElements));
@@ -627,9 +728,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private void addConstructor(ClassDef.ClassDefBuilder proxyBuilder,
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
-                                FieldDef interceptorsField,
+                                @Nullable FieldDef interceptorsField,
                                 FieldDef interceptorRegistrationsField,
                                 FieldDef proxyMethodsField,
+                                @Nullable FieldDef proxyTargetInterceptorsField,
                                 List<MethodElement> interceptedMethods) {
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
@@ -665,6 +767,23 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             proxyBuilder.addMethod(writeWithQualifierMethod(beanQualifierField));
             bodyBuilders.add((aThis, methodParameters) ->
                 aThis.field(beanQualifierField).assign(methodParameters.get(qualifierIndex)));
+
+            // The methods and the interceptor selection come before the target, which is created with its own
+            // instances of the non-singleton interceptors the selection names
+            FieldDef helperField = Objects.requireNonNull(proxyTargetInterceptorsField);
+            bodyBuilders.add((aThis, methodParameters) -> StatementDef.multi(
+                initializeProxyTargetMethods(aThis, proxyBeanDefinitionField, proxyMethodsField, interceptedMethods),
+                aThis.field(helperField).assign(
+                    ClassTypeDef.of(ProxyTargetInterceptors.class).instantiate(
+                        CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS,
+                        methodParameters.get(beanContextArgumentIndex),
+                        methodParameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
+                        aThis.field(proxyBeanDefinitionField),
+                        aThis.field(proxyMethodsField),
+                        methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
+                    )
+                )
+            ));
 
             MethodDef interceptedTargetMethod;
             if (lazy) {
@@ -706,6 +825,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     aThis.field(beanResolutionContextField).assign(
                         methodParameters.get(beanResolutionContextArgumentIndex)
                             .invoke(COPY_BEAN_CONTEXT_FOR_LAZY_PROXY_TARGET_METHOD, aThis.field(proxyBeanDefinitionField))
+                    ),
+                    // every target resolved through this context is created with its own interceptor instances
+                    aThis.field(helperField).invoke(
+                        METHOD_PROXY_TARGET_INTERCEPTORS_BIND_LAZY_TARGETS,
+                        aThis.field(beanResolutionContextField)
                     )
                 ));
                 if (shouldGenerateLazyProxyTargetToStringMethod(interceptedMethods)) {
@@ -751,27 +875,31 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 // always cached. Saying so is what lets the context destroy the target when the proxy is destroyed.
                 proxyBuilder.addMethod(getHasCachedInterceptedTargetMethod(targetField));
 
-                // Non-lazy target
+                // Non-lazy target, created with its own instances of the non-singleton interceptors
                 bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
-                        methodParameters.get(beanResolutionContextArgumentIndex)
-                            .invoke(
-                                METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
-                                // 1st argument: this.$proxyBeanDefinition
-                                aThis.field(proxyBeanDefinitionField),
-                                // 2nd argument: the type
-                                pushTargetArgument(targetType),
-                                // 3th argument: the qualifier
-                                methodParameters.get(qualifierIndex)
-                            ).cast(targetType)
-                    )
-                );
+                    aThis.field(helperField)
+                        .invoke(
+                            METHOD_PROXY_TARGET_INTERCEPTORS_GET_PROXY_TARGET_BEAN,
+                            // 1st argument: the resolution context
+                            methodParameters.get(beanResolutionContextArgumentIndex),
+                            // 2nd argument: the type
+                            pushTargetArgument(targetType),
+                            // 3rd argument: the qualifier
+                            methodParameters.get(qualifierIndex)
+                        ).cast(targetType)
+                ));
+                if (!hotswap) {
+                    // the target is fixed, so its interceptors are selected once
+                    bodyBuilders.add((aThis, methodParameters) -> aThis.field(Objects.requireNonNull(interceptorsField)).assign(
+                        aThis.field(helperField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, aThis.field(targetField))
+                    ));
+                }
             }
 
             proxyBuilder.addMethod(interceptedTargetMethod);
 
-            bodyBuilders.add((aThis, methodParameters) -> initializeProxyTargetMethodsAndInterceptors(aThis, methodParameters, proxyBeanDefinitionField, interceptorsField, proxyMethodsField, interceptedMethods));
         } else {
-            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, interceptorsField, proxyMethodsField, interceptedMethods));
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, Objects.requireNonNull(interceptorsField), proxyMethodsField, interceptedMethods));
         }
 
         proxyBuilder.addMethod(MethodDef.constructor()
@@ -842,43 +970,22 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         ));
     }
 
-    private StatementDef initializeProxyTargetMethodsAndInterceptors(VariableDef.This aThis,
-                                                                     List<VariableDef.MethodParameter> parameters,
-                                                                     FieldDef proxyBeanDefinitionField,
-                                                                     FieldDef interceptorsField,
-                                                                     FieldDef proxyMethodsField,
-                                                                     List<MethodElement> methods) {
-        AtomicInteger index = new AtomicInteger();
-        return StatementDef.multi(
-            aThis.field(proxyMethodsField).assign(
-                ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
-                    methods.stream().map(methodElement ->
-                        aThis.field(proxyBeanDefinitionField).invoke(
-                            METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD,
+    private StatementDef initializeProxyTargetMethods(VariableDef.This aThis,
+                                                      FieldDef proxyBeanDefinitionField,
+                                                      FieldDef proxyMethodsField,
+                                                      List<MethodElement> methods) {
+        return aThis.field(proxyMethodsField).assign(
+            ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
+                methods.stream().map(methodElement ->
+                    aThis.field(proxyBeanDefinitionField).invoke(
+                        METHOD_BEAN_DEFINITION_GET_REQUIRED_METHOD,
 
-                            ExpressionDef.constant(methodElement.getName()),
-                            TypeDef.CLASS.array().instantiate(
-                                Arrays.stream(methodElement.getSuspendParameters()).map(p -> ExpressionDef.constant(TypeDef.erasure(p.getGenericType()))).toList()
-                            )
+                        ExpressionDef.constant(methodElement.getName()),
+                        TypeDef.CLASS.array().instantiate(
+                            Arrays.stream(methodElement.getSuspendParameters()).map(p -> ExpressionDef.constant(TypeDef.erasure(p.getGenericType()))).toList()
                         )
-                    ).toList()
-                )
-            ),
-            aThis.field(interceptorsField).assign(
-                ClassTypeDef.of(Interceptor.class).array(2).instantiate(
-                    methods.stream().map(methodElement ->
-                        ClassTypeDef.of(InterceptorChain.class).invokeStatic(
-                            (isIntroduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
-
-                            // First argument. The interceptor registry
-                            parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                            // Second argument i.e. proxyMethods[0]
-                            aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
-                            // Third argument i.e. interceptors
-                            parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
-                        )
-                    ).toList()
-                )
+                    )
+                ).toList()
             )
         );
     }
@@ -945,7 +1052,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 return StatementDef.multi(
                     lock.invoke(LOCK_METHOD),
                     StatementDef.doTry(
-                        aThis.field(targetField).newLocal("target", targetVar -> StatementDef.multi(
+                        aThis.field(targetField).newLocal(LOCAL_TARGET, targetVar -> StatementDef.multi(
                             aThis.field(targetField).assign(methodParameters.get(0)),
                             targetVar.returning()
                         ))
@@ -1001,7 +1108,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 //                            return this.$target;
                 VariableDef.Field targetFieldAccess = aThis.field(targetField);
                 return StatementDef.multi(
-                    targetFieldAccess.newLocal("target", targetVar ->
+                    targetFieldAccess.newLocal(LOCAL_TARGET, targetVar ->
                         targetVar.ifNull(
                             new StatementDef.Synchronized(
                                 aThis,

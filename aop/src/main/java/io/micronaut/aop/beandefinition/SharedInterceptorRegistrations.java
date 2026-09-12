@@ -16,17 +16,24 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.inject.BeanDefinition;
+import io.micronaut.inject.DelegatingBeanDefinition;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Deque;
 import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Carries the interceptors resolved for a bean from its construction to its post-construct interception.
@@ -148,6 +155,65 @@ public final class SharedInterceptorRegistrations {
             resolutionContext.setAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS, completed);
         }
         completed.put(definition, registrations);
+    }
+
+    /**
+     * Whether the given definition is being created as the target of a proxy that holds its target separately and
+     * asked for the target to be given its own interceptor instances, see
+     * {@link BeanResolutionContext#PROXY_INTERCEPTOR_REGISTRATIONS}.
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The definition being created
+     * @return {@code true} if the definition is that target
+     * @since 5.2.1
+     */
+    static boolean isProxyTarget(BeanResolutionContext resolutionContext, BeanDefinition<?> definition) {
+        return resolutionContext.getAttribute(BeanResolutionContext.PROXY_INTERCEPTOR_REGISTRATIONS) instanceof Map.Entry<?, ?> entry
+            && entry.getKey() instanceof BeanDefinition<?> targetDefinition
+            && unwrap(definition).equals(unwrap(targetDefinition));
+    }
+
+    private static BeanDefinition<?> unwrap(BeanDefinition<?> definition) {
+        BeanDefinition<?> unwrapped = definition;
+        while (unwrapped instanceof DelegatingBeanDefinition<?> delegating) {
+            unwrapped = delegating.getTarget();
+        }
+        return unwrapped;
+    }
+
+    /**
+     * Resolves the interceptors a bean with no constructor advice binds, and stores them as if its construction had
+     * resolved them.
+     *
+     * <p>The scenario is the target of a proxy, such as a scoped proxy, with post-construct advice but no
+     * {@code @AroundConstruct}. Nothing resolved interceptors before post-construct, and the context gives the target
+     * its own instance of each non-singleton interceptor of the proxy only after the bean is created, reusing what the
+     * bean resolved. Storing the post-construct set is what lets it be reused, so that post-construct, the methods
+     * called through the proxy and pre-destroy share one instance. The set is resolved by every binding the bean
+     * declares, whatever its kind, which is the rule {@link InterceptedBeanDefinition#resolveInterceptors} applies.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The definition being initialized
+     * @return The registrations, or {@code null} when the bean binds none
+     * @since 5.2.1
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    static @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> resolveAndStore(BeanResolutionContext resolutionContext,
+                                                                                     BeanDefinition<?> definition) {
+        // The bean's metadata combined with its constructor's, as construction would have resolved it
+        AnnotationMetadata metadata = new AnnotationMetadataHierarchy(
+            definition.getAnnotationMetadata(),
+            definition.getConstructor().getAnnotationMetadata()
+        );
+        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
+            return null;
+        }
+        List registrations = new ArrayList(resolutionContext.getBeanRegistrations(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBinding(metadata)
+        ));
+        store(resolutionContext, definition, registrations);
+        return registrations;
     }
 
     /**
