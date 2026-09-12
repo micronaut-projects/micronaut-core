@@ -18,7 +18,6 @@ package io.micronaut.python.processing.element;
 import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -50,8 +49,8 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.ast.utils.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -446,7 +445,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            // The map is keyed in the order the base declares its variables: a bean introspection and a bean
+            // definition report the arguments of a type as a list, in that order
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
             Map<String, ClassElement> boundGenerics = typeVariableBindings();
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
@@ -458,7 +459,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             return baseElement.withTypeArguments(resolvedTypeArguments);
         }
         if (typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
             for (GenericPlaceholderElement placeholder : declaredGenericPlaceholders) {
                 resolvedTypeArguments.put(placeholder.getVariableName(), GenericBindings.firstBound(placeholder));
             }
@@ -481,7 +482,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             // arguments can subsequently be bound through each level of the hierarchy.
             return GenericBindings.declared(this, true);
         }
-        return new HashMap<>(resolvedTypeArguments);
+        return new LinkedHashMap<>(resolvedTypeArguments);
     }
 
     @Override
@@ -502,8 +503,8 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
-        // Python can have multiple concrete bases, so retain the native-base traversal while
-        // applying the same per-level binding used by ClassElement's default implementation.
+        // Python can have multiple concrete bases, so the traversal stays on the native bases instead of
+        // the super type and interfaces ClassElement's default implementation walks.
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
         for (TypeRef base : getNativeType().bases()) {
             ClassElement baseElement = findPythonClass(base);
@@ -513,54 +514,20 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             if (resolvedBase == null) {
                 continue;
             }
+            // The arguments of the base are written in this type's variables, while the types above it are read
+            // from the base as it declares them, in its own variables, and bound through what this type gives it.
+            // Reading them from the resolved base instead would bind them a second time, because resolving a base
+            // substitutes this type's arguments all the way up
+            ClassElement declaredBase = baseElement == null ? resolvedBase.getRawClassElement() : baseElement;
             Map<String, ClassElement> baseTypeArguments = resolvedBase.getTypeArguments();
             String baseName = resolvedBase.getName();
-            resolvedBase.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+            declaredBase.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
                 typeName,
-                typeName.equals(baseName) ? typeArguments : bindTypeVariables(typeArguments, baseTypeArguments)
+                typeName.equals(baseName) ? baseTypeArguments : TypeVariableBinder.bind(typeArguments, baseTypeArguments)
             ));
         }
         result.put(getName(), getTypeArguments());
         return result;
-    }
-
-    private static Map<String, ClassElement> bindTypeVariables(Map<String, ClassElement> typeArguments,
-                                                               Map<String, ClassElement> bindings) {
-        if (typeArguments.isEmpty() || bindings.isEmpty()) {
-            return typeArguments;
-        }
-        Map<String, ClassElement> bound = new LinkedHashMap<>(typeArguments.size());
-        boolean changed = false;
-        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
-            ClassElement typeArgument = entry.getValue();
-            ClassElement boundTypeArgument = bindTypeVariables(typeArgument, bindings);
-            changed |= boundTypeArgument != typeArgument;
-            bound.put(entry.getKey(), boundTypeArgument);
-        }
-        return changed ? bound : typeArguments;
-    }
-
-    private static ClassElement bindTypeVariables(ClassElement type, Map<String, ClassElement> bindings) {
-        if (type instanceof GenericPlaceholderElement placeholder) {
-            ClassElement binding = bindings.get(placeholder.getVariableName());
-            if (binding == null) {
-                return type;
-            }
-            ClassElement bound = binding;
-            while (bound.getArrayDimensions() < placeholder.getArrayDimensions()) {
-                bound = bound.toArray();
-            }
-            return bound;
-        }
-        if (type instanceof WildcardElement) {
-            ClassElement folded = type.foldBoundGenericTypes(bound ->
-                bound instanceof GenericPlaceholderElement ? bindTypeVariables(bound, bindings) : bound
-            );
-            return folded == null ? type : folded;
-        }
-        Map<String, ClassElement> typeArguments = type.getTypeArguments();
-        Map<String, ClassElement> boundTypeArguments = bindTypeVariables(typeArguments, bindings);
-        return boundTypeArguments == typeArguments ? type : type.withTypeArguments(boundTypeArguments);
     }
 
     @Override
