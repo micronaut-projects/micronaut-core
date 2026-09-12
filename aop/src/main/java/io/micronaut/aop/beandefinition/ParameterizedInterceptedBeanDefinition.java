@@ -99,13 +99,12 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (declared != null) {
             // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
             // post-construct interception of this bean, which may bind interceptors this set does not contain.
-            T instance = ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
-            return injectAndInitialize(resolutionContext, context, instance);
+            return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
         SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
         try {
-            T instance = ConstructorInterceptorChain.instantiate(
+            return ConstructorInterceptorChain.instantiate(
                 resolutionContext,
                 context,
                 interceptors,
@@ -113,9 +112,6 @@ public interface ParameterizedInterceptedBeanDefinition<T>
                 constructor,
                 values
             );
-            // Injection and post-construct run once every construction interceptor has returned, still inside the
-            // window in which post-construct interception shares the interceptors resolved above.
-            return injectAndInitialize(resolutionContext, context, instance);
         } finally {
             SharedInterceptorRegistrations.pop(resolutionContext, this, interceptors);
         }
@@ -130,19 +126,4 @@ public interface ParameterizedInterceptedBeanDefinition<T>
      * @return The intercepted result
      */
     T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, @Nullable Object[] parameterValues);
-
-    /**
-     * Injects the members of the instance the constructor interceptor chain returned and runs its post-construct
-     * callbacks. See {@link InterceptedBeanDefinition#injectAndInitialize(BeanResolutionContext, BeanContext, Object)},
-     * which this mirrors for parametrized definitions.
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param bean              The instance the constructor interceptor chain returned
-     * @return The injected and initialized instance
-     * @since 5.3.0
-     */
-    default T injectAndInitialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return bean;
-    }
 }

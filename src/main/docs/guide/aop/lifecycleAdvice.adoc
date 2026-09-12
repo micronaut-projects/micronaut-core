@@ -50,7 +50,7 @@ fields and methods have not been injected yet and its `@PostConstruct` methods h
 api:aop.ConstructorInterceptor[] in the chain has returned, on the instance the chain returned:
 
 . The construct interceptors run up to `proceed()`, outermost first
-. The constructor runs
+. The constructor runs, and any ann:context.annotation.InjectScope[] constructor argument is released
 . The construct interceptors complete after `proceed()`, innermost first
 . Fields and methods are injected
 . `@PostConstruct` interception runs, then the `@PostConstruct` methods
@@ -59,7 +59,7 @@ An interceptor that needs the injected and initialized bean should bind to `POST
 thrown by a construct interceptor after `proceed()` means the instance is neither injected nor initialized. This is
 the order the Jakarta Interceptors specification defines for `@AroundConstruct`.
 
-NOTE: A bean compiled with a Micronaut version before 5.3 keeps the previous behaviour, in which injection and
+NOTE: A bean compiled with a Micronaut version before 5.2.1 keeps the previous behaviour, in which injection and
 `@PostConstruct` ran inside the chain, until it is recompiled.
 
 === Exceptions Thrown by Construct Advice
