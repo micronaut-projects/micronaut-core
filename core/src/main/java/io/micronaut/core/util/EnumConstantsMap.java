@@ -63,9 +63,9 @@ final class EnumConstantsMap<K extends Enum<K>, V extends @Nullable Object> exte
     private final @Nullable Object[] vals;
     private int size;
 
-    private @Nullable Set<Entry<K, V>> entrySet;
-    private @Nullable Set<K> keySet;
-    private @Nullable Collection<V> values;
+    private @Nullable Set<Entry<K, V>> entrySetView;
+    private @Nullable Set<K> keySetView;
+    private @Nullable Collection<V> valuesView;
 
     /**
      * @param universe The constants of the enum in ordinal order, already validated
@@ -182,30 +182,30 @@ final class EnumConstantsMap<K extends Enum<K>, V extends @Nullable Object> exte
 
     @Override
     public Set<Entry<K, V>> entrySet() {
-        Set<Entry<K, V>> es = entrySet;
+        Set<Entry<K, V>> es = entrySetView;
         if (es == null) {
             es = new EntrySet();
-            entrySet = es;
+            entrySetView = es;
         }
         return es;
     }
 
     @Override
     public Set<K> keySet() {
-        Set<K> ks = keySet;
+        Set<K> ks = keySetView;
         if (ks == null) {
             ks = new KeySet();
-            keySet = ks;
+            keySetView = ks;
         }
         return ks;
     }
 
     @Override
     public Collection<V> values() {
-        Collection<V> vs = values;
+        Collection<V> vs = valuesView;
         if (vs == null) {
             vs = new Values();
-            values = vs;
+            valuesView = vs;
         }
         return vs;
     }
