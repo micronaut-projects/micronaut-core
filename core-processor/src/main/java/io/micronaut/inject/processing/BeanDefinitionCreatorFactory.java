@@ -48,6 +48,7 @@ public abstract class BeanDefinitionCreatorFactory {
     }
 
     private static <R> List<R> produceInternal(ClassElement classElement, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder, VisitorContext visitorContext) {
+        BeanInjectionUtils.validateBeanConstructor(classElement);
         boolean isAbstract = classElement.isAbstract();
         // An interceptor declares @InterceptorBinding(kind = INTRODUCTION) to state which advice it implements,
         // not to request advice for itself. Without the same guard that isAopProxyType applies, the interceptor is

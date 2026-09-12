@@ -85,11 +85,11 @@ class Dependency
         context.close()
 
         where:
-        [annotations, expectedOrigin] << [
-            ['@Inject', 'public'],
-            ['@Inject @io.micronaut.core.annotation.ReflectiveAccess', 'injected'],
-            ['@io.micronaut.core.annotation.Creator @io.micronaut.core.annotation.ReflectiveAccess', 'injected']
+        annotations << [
+            '@Inject @io.micronaut.core.annotation.ReflectiveAccess',
+            '@io.micronaut.core.annotation.Creator @io.micronaut.core.annotation.ReflectiveAccess'
         ]
+        expectedOrigin = 'injected'
     }
 
     void "test the only constructor of a bean is private"() {
@@ -152,6 +152,23 @@ class ConstructedInterceptor : ConstructorInterceptor<Any> {
 
         cleanup:
         context.close()
+    }
+
+    void "test a private @Inject constructor without @ReflectiveAccess fails compilation"() {
+        when:
+        buildBeanDefinition('privatector.noreflectiveaccess.Service', '''
+package privatector.noreflectiveaccess
+
+import io.micronaut.context.annotation.Prototype
+import jakarta.inject.Inject
+
+@Prototype
+class Service @Inject private constructor()
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('Constructor is declared private and is not accessible for the instantiation. To instantiate the bean using reflection annotate the constructor with @ReflectiveAccess')
     }
 
     void "test around advice on a bean with a private @Inject constructor fails compilation"() {

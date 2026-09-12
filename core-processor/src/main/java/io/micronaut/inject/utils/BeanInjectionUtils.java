@@ -166,6 +166,25 @@ public class BeanInjectionUtils {
         return primaryConstructor;
     }
 
+    /**
+     * Validates that a constructor selected for injection can be invoked.
+     *
+     * <p>A private constructor is invoked with reflection, which has to be opted into with
+     * {@link ReflectiveAccess}. Without it {@link #findBeanConstructor(ClassElement)} skips the constructor, so
+     * the injection the annotation asks for would silently not happen.</p>
+     *
+     * @param classElement The bean type
+     * @throws ProcessingException if a constructor asks for injection but cannot be invoked
+     * @since 5.2.1
+     */
+    public static void validateBeanConstructor(ClassElement classElement) {
+        for (ConstructorElement constructor : classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+            if (constructor.isPrivate() && isAnnotatedCreator(constructor) && !constructor.hasAnnotation(ReflectiveAccess.class)) {
+                throw new ProcessingException(constructor, "Constructor is declared private and is not accessible for the instantiation. To instantiate the bean using reflection annotate the constructor with @ReflectiveAccess");
+            }
+        }
+    }
+
     private static boolean isAnnotatedCreator(MethodElement constructor) {
         return constructor.hasStereotype(AnnotationUtil.INJECT) || constructor.hasStereotype(Creator.class);
     }
