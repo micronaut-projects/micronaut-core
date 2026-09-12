@@ -71,3 +71,16 @@ tasks.withType<Test>().configureEach {
 micronautBuild {
     binaryCompatibility.enabledAfter("5.0.0")
 }
+
+noReflection {
+    allowIn("io.micronaut.annotation.processing.AnnotationUtils", "SERVICE_LOADING")
+    allowIn("io.micronaut.annotation.processing.BeanDefinitionInjectProcessor", "CLASS_NAMES")
+    allowIn("io.micronaut.annotation.processing.JavaAnnotationMetadataBuilder", "CLASS_LOADING", "ENUM_CONSTANTS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.annotation.processing.LoadedVisitor", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.annotation.processing.PackageElementVisitorProcessor", "SERVICE_LOADING")
+    allowIn("io.micronaut.annotation.processing.PackageLoadedVisitor", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.annotation.processing.TypeElementVisitorProcessor", "ANNOTATIONS", "CLASS_NAMES", "SERVICE_LOADING")
+    allowIn("io.micronaut.annotation.processing.visitor.AbstractJavaElement", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.annotation.processing.visitor.JavaClassElement", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.annotation.processing.visitor.JavaVisitorContext", "REFLECTION_UTILS")
+}

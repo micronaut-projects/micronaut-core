@@ -24,3 +24,13 @@ tasks {
         failOnNoDiscoveredTests = false
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.aop.beandefinition.InitializableInterceptedMethod", "TARGET_MEMBERS")
+    allowIn("io.micronaut.aop.beandefinition.InterceptedDisposeMethod", "TARGET_MEMBERS")
+    allowIn("io.micronaut.aop.beandefinition.InterceptedMethod", "CLASS_NAMES")
+    allowIn("io.micronaut.aop.chain.InterceptorChain", "ANNOTATIONS")
+    allowIn("io.micronaut.aop.chain.MethodInterceptorChain", "TARGET_MEMBERS")
+    allowIn("io.micronaut.aop.internal.intercepted.PublisherInterceptedMethod", "CLASS_LOADING")
+    allowIn("io.micronaut.aop.internal.intercepted.ReactorInterceptedMethod", "CLASS_LOADING")
+}

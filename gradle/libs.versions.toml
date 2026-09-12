@@ -69,9 +69,10 @@ icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
 zacsweers-kotlin-compile-testing = "0.13.0"
-errorprone-gradle-plugin = "4.4.0"
+errorprone-gradle-plugin = "5.1.1"
+errorprone-no-reflection = "1.0.1"
 nullaway = "0.13.8"
-error_prone_core = "2.48.0"
+error_prone_core = "2.50.0"
 jackson2 = "2.21.6"
 
 #
@@ -341,6 +342,7 @@ nullaway = { module = "com.uber.nullaway:nullaway", version.ref = "nullaway" }
 error-prone-core = { module = "com.google.errorprone:error_prone_core", version.ref = "error_prone_core" }
 
 gradle-errorprone = { module = "net.ltgt.errorprone:net.ltgt.errorprone.gradle.plugin", version.ref = "errorprone-gradle-plugin"}
+gradle-errorprone-no-reflection = { module = "io.micronaut.errorprone:micronaut-errorprone-no-reflection-gradle-plugin", version.ref = "errorprone-no-reflection" }
 
 [plugins]
 managed-kotlin-allopen = { id = "org.jetbrains.kotlin.plugin.allopen", version.ref = "managed-kotlin" }

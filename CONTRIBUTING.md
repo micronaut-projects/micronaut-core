@@ -92,6 +92,24 @@ In this case, to fix the issues, we need to:
 The plugin also adds a new tab in IDEA's bottom view pane to run a checkstyle report to display errors and warnings.
 Run the report and fix any exposed issues before submitting a pull request. The gradle `check` task also produces an HTML report if there are errors.
 
+## No reflection
+
+The main Java sources are compiled with the `NoReflection` check of [ErrorProne No Reflection](https://github.com/micronaut-projects/errorprone-no-reflection). It fails the compilation on reflection, and on the calls that fill the reflection caches of the virtual machine such as `Class.getSimpleName` or `EnumSet.noneOf`, named by the category they belong to:
+
+```
+StringUtils.java:41: error: [NoReflection] Reflection is not allowed here [CLASS_NAMES]
+```
+
+The reflection the code base already had is allowed class by class in the `noReflection` block of each module's build file, each class with the categories it uses:
+
+```kotlin
+noReflection {
+    allowIn("io.micronaut.core.util.Example", "CLASS_NAMES")
+}
+```
+
+Prefer code that does without: the compile-time metadata, `Class.getName`, `values()` instead of `valueOf`. Where reflection is the point, allow the class and its category in the module's build file, or suppress a single call with `@SuppressWarnings("NoReflection")` on the variable that holds its result. Remove what is no longer needed: `./gradlew compileJava -PnoReflection.record` prints, for every module, the `noReflection` block that allows exactly what its code uses.
+
 ## Building on Windows 10
 
 The following prerequisites are needed for building and testing on Windows 10:

@@ -49,8 +49,6 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.EnumMap;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -61,7 +59,7 @@ import java.util.Objects;
  */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
-    private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
+    private static final Exception[] HTTP2_ERRORS = new Exception[Http2Error.values().length];
 
     @Nullable
     private Http2ConnectionHandler connectionHandler;
@@ -77,7 +75,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             } else {
                 e = new StacklessHttp2Exception(value);
             }
-            HTTP2_ERRORS.put(value, e);
+            HTTP2_ERRORS[value.ordinal()] = e;
         }
     }
 
@@ -143,7 +141,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
             if (http2Error == null) {
                 http2Error = Http2Error.INTERNAL_ERROR;
             }
-            stream.onRstStreamRead(Objects.requireNonNull(HTTP2_ERRORS.get(http2Error)));
+            stream.onRstStreamRead(Objects.requireNonNull(HTTP2_ERRORS[http2Error.ordinal()]));
         }
     }
 
@@ -178,7 +176,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         if (http2Error == null) {
             http2Error = Http2Error.INTERNAL_ERROR;
         }
-        Exception e = HTTP2_ERRORS.get(http2Error);
+        Exception e = HTTP2_ERRORS[http2Error.ordinal()];
         requiredConnectionHandler().connection().forEachActiveStream(s -> {
             Http2ServerHandler.Http2Stream stream = s.getProperty(streamKey);
             if (stream != null) {

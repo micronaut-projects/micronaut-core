@@ -14,3 +14,7 @@ dependencies {
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautInjectGroovy)
 }
+
+noReflection {
+    allowIn("io.micronaut.json.JsonMapper", "SERVICE_LOADING")
+}
