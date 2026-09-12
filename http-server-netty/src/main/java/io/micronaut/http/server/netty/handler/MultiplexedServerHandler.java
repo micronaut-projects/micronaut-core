@@ -303,11 +303,10 @@ abstract class MultiplexedServerHandler {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
             }
 
-            NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
             if (body instanceof AvailableByteBody available) {
                 writeFull(response, NettyByteBodyFactory.toByteBuf(available));
             } else {
-                StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
+                StreamingNettyByteBody snbb = byteBodyFactory().toStreaming(body);
                 var consumer = new BufferConsumer() {
                     @Nullable
                     Upstream upstream;
