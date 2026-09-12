@@ -66,8 +66,8 @@ public interface ParameterizedInterceptedBeanDefinition<T>
     @Nullable Object[] resolveInstantiationValues(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues);
 
     /**
-     * Resolves the interceptors that construction, post-construct and pre-destroy interception of this bean all
-     * select from. See
+     * Resolves the interceptors that construction, post-construct and pre-destroy interception of this bean, and the
+     * methods of a proxy fronting it when it is not a singleton, all select from. See
      * {@link InterceptedBeanDefinition#resolveInterceptors(BeanResolutionContext, AnnotationMetadataProvider)}, which
      * this mirrors for parametrized definitions.
      *

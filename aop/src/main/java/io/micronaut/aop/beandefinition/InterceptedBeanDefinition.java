@@ -59,6 +59,10 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      * needs; each interception point filters it again by its own binding and kind. Resolving once is what lets a
      * non-singleton interceptor be shared by every phase of one bean.</p>
      *
+     * <p>A bean that is the target of a proxy and is not a singleton resolves this set even without constructor
+     * advice: the proxy selects the interceptors of each call from the set of the target of that call, see
+     * {@link TargetInterceptorRegistrations}, so the same instances serve the target's methods too.</p>
+     *
      * <p>Override to supply the set another way. Returning {@code null} leaves each interception point to resolve its
      * own, which is the behaviour of a bean that declares no interceptor binding at all.</p>
      *

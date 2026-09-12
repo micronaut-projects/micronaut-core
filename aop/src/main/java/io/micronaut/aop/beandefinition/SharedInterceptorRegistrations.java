@@ -58,6 +58,10 @@ import java.util.List;
  * <p>Destruction happens later with a fresh resolution context, so nothing is shared with it here; see
  * {@code MethodInterceptorChain} for how pre-destroy reaches the interceptors a bean owns.</p>
  *
+ * <p>The registrations a bean keeps after its creation are stored as a {@link TargetInterceptorRegistrations}, so
+ * that a proxy fronting the bean can select the interceptors of each of its methods from them and keep the
+ * selection for the life of the bean.</p>
+ *
  * <p>Everything here is package-private except {@link #store}, which the runtime proxy path in
  * {@code io.micronaut.aop.runtime} calls from another package.</p>
  *
@@ -147,7 +151,7 @@ public final class SharedInterceptorRegistrations {
             completed = new IdentityHashMap<>(3);
             resolutionContext.setAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS, completed);
         }
-        completed.put(definition, registrations);
+        completed.put(definition, TargetInterceptorRegistrations.of(registrations));
     }
 
     /**

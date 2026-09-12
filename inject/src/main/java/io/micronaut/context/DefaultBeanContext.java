@@ -246,6 +246,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final CustomScopeRegistry customScopeRegistry;
     private final BeanResolutionCustomizer beanResolutionCustomizer;
+    private final ScopedBeanRegistrations scopedBeanRegistrations = new ScopedBeanRegistrations();
 
     private @Nullable BeanDefinitionValidator beanValidator;
     private @Nullable List<BeanConfiguration> beanConfigurationsList;
@@ -1272,6 +1273,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 return;
             }
         }
+        scopedBeanRegistrations.remove(registration);
         T beanToDestroy = registration.getBean();
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
@@ -1657,6 +1659,46 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
         }
         return registration.bean;
+    }
+
+    /**
+     * Resolves the registration of the proxy target for a given proxy bean definition.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanResolutionContext, BeanDefinition, Argument, Qualifier)} returns the
+     * target alone, this returns the registration the context holds for it, which for a target that is not a
+     * singleton carries the interceptors resolved while the target was created. A generated proxy fronting such a
+     * target resolves the target of each intercepted call this way and applies the target's own interceptors; see
+     * {@code io.micronaut.aop.beandefinition.TargetInterceptorRegistrations}.</p>
+     *
+     * <p>A custom scope hands back only the bean it holds, so the registration behind it is looked up by the bean's
+     * identity in the index kept since the bean was created. A bean the index does not know, because the scope
+     * obtained it some other way than through this context, comes back in a registration of its own that carries
+     * nothing, and the proxy then falls back to its own interceptors.</p>
+     *
+     * @param resolutionContext The bean resolution context
+     * @param definition        The proxy target bean definition
+     * @param beanType          The bean type
+     * @param qualifier         The bean qualifier
+     * @param <T>               The generic type
+     * @return The registration of the proxy target
+     * @since 5.2.2
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                                 BeanDefinition<T> definition,
+                                                                 Argument<T> beanType,
+                                                                 @Nullable Qualifier<T> qualifier) {
+        BeanRegistration<T> registration = Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier));
+        if (registration.bean == null) {
+            return resolveNullBeanRegistration(beanType, beanType, registration);
+        }
+        if (registration.beanDefinition.isSingleton()) {
+            // the singleton scope hands out the registration it holds
+            return registration;
+        }
+        BeanRegistration<T> held = scopedBeanRegistrations.find(registration.bean);
+        return held != null ? held : registration;
     }
 
     @Override
@@ -3356,7 +3398,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
                 @Override
                 public CreatedBean<T> create() throws BeanCreationException {
-                    return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
+                    BeanRegistration<T> created = createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
+                    // the scope will hand back only the bean; keep the way from the bean back to its registration
+                    scopedBeanRegistrations.add(created);
+                    return created;
                 }
             }
         );
