@@ -33,6 +33,7 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.StringUtils;
 import io.micronaut.expressions.context.DefaultExpressionCompilationContextFactory;
 import io.micronaut.expressions.context.ExpressionCompilationContextFactory;
 import io.micronaut.inject.ast.ClassElement;
@@ -48,6 +49,7 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.ClassNodeResolver;
 import org.codehaus.groovy.control.CompilationUnit;
+import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.Janitor;
 import org.codehaus.groovy.control.SourceUnit;
 
@@ -59,10 +61,13 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * The visitor context when visiting Groovy code.
@@ -339,14 +344,23 @@ public class GroovyVisitorContext implements VisitorContext {
     }
 
     /**
-     * Groovy options source are {@link System#getProperties()} based.
-     * <p><b>All properties MUST start with {@link GroovyVisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
+     * Groovy visitor context options from the Groovy {@link CompilerConfiguration}
+     * (joint-compilation {@code -A} flags / named values) and {@link System#getProperties()}.
+     * <p><b>System properties have priority over compiler arguments.</b></p>
+     * <p><b>All option names MUST start with {@link GroovyVisitorContext#MICRONAUT_BASE_OPTION_NAME}</b></p>
      *
      * @return options {@link Map}
      */
     @Override
     public Map<String, String> getOptions() {
-        return VisitorContextUtils.getSystemOptions();
+        Map<String, String> compilerOptions = getCompilerOptions();
+        Map<String, String> systemPropsOptions = VisitorContextUtils.getSystemOptions();
+        return Stream.of(compilerOptions, systemPropsOptions)
+            .flatMap(map -> map.entrySet().stream())
+            .collect(Collectors.toMap(
+                Map.Entry::getKey,
+                Map.Entry::getValue,
+                (v1, v2) -> StringUtils.isNotEmpty(v2) ? v2 : v1));
     }
 
     @Override
@@ -407,5 +421,114 @@ public class GroovyVisitorContext implements VisitorContext {
     @Internal
     void addBeanDefinitionBuilder(GroovyBeanDefinitionBuilder groovyBeanDefinitionBuilder) {
         this.beanDefinitionBuilders.add(groovyBeanDefinitionBuilder);
+    }
+
+    private Map<String, String> getCompilerOptions() {
+        CompilerConfiguration configuration = sourceUnit != null ? sourceUnit.getConfiguration() : null;
+        if (configuration == null && compilationUnit != null) {
+            configuration = compilationUnit.getConfiguration();
+        }
+        if (configuration == null) {
+            return Collections.emptyMap();
+        }
+        Map<String, Object> jointCompilationOptions = configuration.getJointCompilationOptions();
+        if (jointCompilationOptions == null || jointCompilationOptions.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, String> options = new LinkedHashMap<>();
+        collectProcessorFlags(jointCompilationOptions.get("flags"), options);
+        collectNamedProcessorValues(jointCompilationOptions.get("namedValues"), options);
+        for (Map.Entry<String, Object> entry : jointCompilationOptions.entrySet()) {
+            if (entry.getValue() != null) {
+                putIfMicronautOption(entry.getKey(), String.valueOf(entry.getValue()), options);
+            }
+        }
+        return options;
+    }
+
+    private static void collectProcessorFlags(Object flags, Map<String, String> options) {
+        if (flags instanceof String[] array) {
+            for (String flag : array) {
+                collectProcessorToken(flag, options);
+            }
+        } else if (flags instanceof Iterable<?> iterable) {
+            for (Object flag : iterable) {
+                if (flag != null) {
+                    collectProcessorToken(flag.toString(), options);
+                }
+            }
+        }
+    }
+
+    private static void collectNamedProcessorValues(Object namedValues, Map<String, String> options) {
+        if (namedValues instanceof String[] array) {
+            for (int i = 0; i + 1 < array.length; i += 2) {
+                collectNamedProcessorValue(array[i], array[i + 1], options);
+            }
+        } else if (namedValues instanceof List<?> list) {
+            for (int i = 0; i + 1 < list.size(); i += 2) {
+                Object name = list.get(i);
+                Object value = list.get(i + 1);
+                if (name != null && value != null) {
+                    collectNamedProcessorValue(name.toString(), value.toString(), options);
+                }
+            }
+        }
+    }
+
+    private static void collectNamedProcessorValue(String name, String value, Map<String, String> options) {
+        if (name == null || value == null) {
+            return;
+        }
+        String optionName = stripAnnotationProcessorPrefix(name);
+        if (optionName != null) {
+            putIfMicronautOption(optionName, value, options);
+            return;
+        }
+        if ("A".equals(name) || "-A".equals(name)) {
+            collectProcessorToken("-A" + value, options);
+        }
+    }
+
+    private static void collectProcessorToken(String token, Map<String, String> options) {
+        if (token == null || token.isEmpty()) {
+            return;
+        }
+        String option = stripAnnotationProcessorPrefix(token);
+        if (option == null) {
+            return;
+        }
+        int eq = option.indexOf('=');
+        if (eq < 0) {
+            putIfMicronautOption(option, "", options);
+        } else {
+            putIfMicronautOption(option.substring(0, eq), option.substring(eq + 1), options);
+        }
+    }
+
+    /**
+     * Groovy joint-compilation stores javac switches without the leading dash
+     * ({@code Amicronaut.foo=bar} becomes {@code -Amicronaut.foo=bar}).
+     *
+     * @param token a flag or named option
+     * @return the processor option without the {@code -A}/{@code A} prefix, or {@code null}
+     */
+    private static String stripAnnotationProcessorPrefix(String token) {
+        if (token.startsWith("-A")) {
+            return token.substring(2);
+        }
+        if (token.startsWith("A") && token.length() > 1) {
+            String remainder = token.substring(1);
+            if (remainder.startsWith(MICRONAUT_BASE_OPTION_NAME)) {
+                return remainder;
+            }
+        }
+        return null;
+    }
+
+    private static void putIfMicronautOption(String key, String value, Map<String, String> options) {
+        if (key != null && key.startsWith(MICRONAUT_BASE_OPTION_NAME)) {
+            options.put(key, value);
+        }
     }
 }
