@@ -21,8 +21,13 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.ConstructorInjectionPoint;
+import io.micronaut.inject.FieldInjectionPoint;
+import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
+
+import java.lang.reflect.Constructor;
 
 /**
  * The intercepted implementation of {@link io.micronaut.core.beans.BeanConstructor}.
@@ -38,6 +43,8 @@ final class InterceptedConstructor<T> implements BeanConstructor<T> {
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
+    private @Nullable Constructor<T> targetConstructor;
+    private boolean targetConstructorResolved;
 
     /**
      * @param interceptedBeanDefinition The intercepted bean definition
@@ -74,5 +81,20 @@ final class InterceptedConstructor<T> implements BeanConstructor<T> {
     @Override
     public Argument<?>[] getArguments() {
         return interceptedBeanDefinition.getConstructor().getArguments();
+    }
+
+    @Override
+    public @Nullable Constructor<T> getTargetConstructor() {
+        if (!targetConstructorResolved) {
+            ConstructorInjectionPoint<T> injectionPoint = interceptedBeanDefinition.getConstructor();
+            if (injectionPoint instanceof MethodInjectionPoint || injectionPoint instanceof FieldInjectionPoint) {
+                // A bean produced by a factory is not created through a constructor of its own type
+                targetConstructor = null;
+            } else {
+                targetConstructor = BeanConstructor.super.getTargetConstructor();
+            }
+            targetConstructorResolved = true;
+        }
+        return targetConstructor;
     }
 }

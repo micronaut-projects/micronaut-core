@@ -37,6 +37,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
+import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -322,6 +323,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
          * empty: this view only exists when the proxy constructor declares such parameters.
          */
         private final @Nullable Object[] internalParameters;
+        private @Nullable Constructor<T> targetConstructor;
 
         private InterceptedTargetConstructor(BeanConstructor<T> proxyConstructor,
                                              Class<T> declaringBeanType,
@@ -346,6 +348,18 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         @Override
         public AnnotationMetadata getAnnotationMetadata() {
             return proxyConstructor.getAnnotationMetadata();
+        }
+
+        @Override
+        public @Nullable Constructor<T> getTargetConstructor() {
+            // Resolved against the intercepted type and the parameters the bean declares, not the proxy
+            // constructor, which appends the internal parameters
+            Constructor<T> constructor = targetConstructor;
+            if (constructor == null) {
+                constructor = BeanConstructor.super.getTargetConstructor();
+                targetConstructor = constructor;
+            }
+            return constructor;
         }
 
         @Override

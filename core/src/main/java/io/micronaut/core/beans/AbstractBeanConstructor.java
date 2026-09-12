@@ -19,7 +19,9 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
+import org.jspecify.annotations.Nullable;
 
+import java.lang.reflect.Constructor;
 import java.util.Objects;
 
 /**
@@ -36,6 +38,7 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     private final Class<T> beanType;
     private final AnnotationMetadata annotationMetadata;
     private final Argument<?>[] arguments;
+    private @Nullable Constructor<T> targetConstructor;
 
     /**
      * Default constructor.
@@ -65,5 +68,15 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     @Override
     public Argument<?>[] getArguments() {
         return arguments;
+    }
+
+    @Override
+    public @Nullable Constructor<T> getTargetConstructor() {
+        Constructor<T> constructor = targetConstructor;
+        if (constructor == null) {
+            constructor = BeanConstructor.super.getTargetConstructor();
+            targetConstructor = constructor;
+        }
+        return constructor;
     }
 }

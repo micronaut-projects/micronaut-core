@@ -90,6 +90,11 @@ public final class ReflectionBeanConstructor<T> implements BeanConstructor<T> {
     }
 
     @Override
+    public Constructor<T> getTargetConstructor() {
+        return constructor;
+    }
+
+    @Override
     public T instantiate(@Nullable Object... parameterValues) {
         // the nullness annotation of a varargs parameter annotates the values, not the array: the array itself
         // is there even for a constructor taking nothing

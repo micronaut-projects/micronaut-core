@@ -17,9 +17,11 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.naming.Described;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.reflect.Constructor;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
@@ -49,6 +51,31 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      * @return The instance, never null.
      */
     T instantiate(@Nullable Object... parameterValues);
+
+    /**
+     * Returns the {@link Constructor} this bean constructor stands for: the constructor of
+     * {@link #getDeclaringBeanType()} whose parameter types are the raw types of {@link #getArguments()}.
+     *
+     * <p>This is the counterpart of {@code io.micronaut.inject.MethodReference#getTargetMethod()} for
+     * constructors. Framework implementations resolve the constructor once and hold it; this default
+     * resolves it on every call, so an implementation that knows its constructor should return it directly.</p>
+     *
+     * <p>The result is {@code null} when the bean is not created through a constructor of the declaring
+     * bean type: a bean produced by a factory method or field, or an introspection instantiating through a
+     * static creator method whose parameter types no constructor shares.</p>
+     *
+     * @return The constructor, or {@code null} if the declaring bean type declares no such constructor
+     * @since 5.2.2
+     */
+    @Nullable
+    default Constructor<T> getTargetConstructor() {
+        Argument<?>[] arguments = getArguments();
+        Class<?>[] parameterTypes = new Class<?>[arguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            parameterTypes[i] = arguments[i].getType();
+        }
+        return ReflectionUtils.findConstructor(getDeclaringBeanType(), parameterTypes).orElse(null);
+    }
 
     /**
      * The description of the constructor.
