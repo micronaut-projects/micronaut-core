@@ -27,7 +27,6 @@ import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
-import io.micronaut.inject.ast.utils.TypeVariableBinder;
 
 import java.lang.reflect.GenericArrayType;
 import java.lang.reflect.ParameterizedType;
