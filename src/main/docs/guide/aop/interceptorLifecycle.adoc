@@ -102,7 +102,7 @@ explains the one case that behaves differently:
 |construct, methods, post-construct, pre-destroy
 
 |`@Around(proxyTarget = true)`
-|The generated proxy
+|The target's registration in the context; the generated proxy uses the same instances
 |construct, methods, post-construct, pre-destroy
 
 |ann:aop.Introduction[] advice
@@ -110,8 +110,8 @@ explains the one case that behaves differently:
 |methods, post-construct, pre-destroy
 
 |Bean produced by a ann:context.annotation.Factory[] method
-|The generated proxy
-|methods, post-construct, pre-destroy
+|The target's registration in the context; the generated proxy uses the same instances
+|construct, methods, post-construct, pre-destroy
 
 |ann:aop.AroundConstruct[] advice with no ann:aop.Around[]
 |The bean's registration in the context
@@ -126,6 +126,21 @@ NOTE: In the last row the context has no registration for the instance, so nothi
 it was created with, and `PRE_DESTROY` resolves a new interceptor. A proxied bean created and destroyed the same way
 is unaffected: the proxy retained its registrations and `destroyBean(Object)` destroys the non-singleton ones with the
 target. Prototypes injected into other beans, and prototypes destroyed through their `BeanRegistration`, are unaffected.
+
+A bean proxied with `proxyTarget = true`, which includes every bean a ann:context.annotation.Factory[] method
+produces with ann:aop.Around[] advice, is made of two objects: a proxy that intercepts the business methods and the
+target it delegates to, which is constructed, initialized and destroyed. They are still one intercepted bean. The
+proxy is constructed with its interceptors and then creates its target, handing those interceptors over: the target
+takes ownership of the non-singleton instances and uses them for its own construction, post-construct and pre-destroy
+interception. The instance that saw `POST_CONSTRUCT` is therefore the one that intercepts the method calls, and it is
+destroyed once, with the target and after the target's `@PreDestroy` methods. An interceptor that only the target
+binds, for example one bound to `AROUND_CONSTRUCT` by an annotation the proxied methods do not carry, is created by
+the target as usual.
+
+This applies when the proxy creates its target, which is how such a bean is normally obtained. It does not apply to a
+lazy proxy, that is `@Around(proxyTarget = true, lazy = true)` or a scoped proxy such as
+ann:runtime.context.scope.Refreshable[], whose targets are resolved later and can be many: the proxy intercepts every
+target with the instances it was constructed with, and each target resolves its own for its lifecycle.
 
 == Ordering
 
@@ -159,4 +174,6 @@ by a different annotation are never applied to the bean.
 
 TIP: Reuse of one interceptor instance across the phases of a proxied bean is part of the generated proxy. After
 upgrading, recompile intercepted classes so that beans compiled by an earlier version pick it up; until then they
-behave as they did before, resolving an interceptor per interception point.
+behave as they did before, resolving an interceptor per interception point. A proxy with `proxyTarget = true`, or a
+proxied factory-produced bean, compiled before 5.2.1 keeps intercepting its methods with instances other than the ones
+its target used for its lifecycle.
