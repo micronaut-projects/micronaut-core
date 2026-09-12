@@ -91,7 +91,11 @@ final class PythonAnnotationStubGenerator {
                     memberBuilder.addAnnotation(toAnnotationDef(memberDecorator, visitorContext));
                 }
             }
-            ExpressionDef defaultValue = annotationDefaultValue(decoratorDef.members().get(memberName), memberType);
+            ExpressionDef defaultValue = annotationDefaultValue(
+                decoratorDef.members().get(memberName),
+                memberType,
+                annotationMemberElement(memberName, decoratorDef, visitorContext)
+            );
             if (defaultValue != null) {
                 memberBuilder.withDefault(defaultValue);
             }
@@ -148,6 +152,9 @@ final class PythonAnnotationStubGenerator {
         if (annotationArrayType != null) {
             return annotationArrayType;
         }
+        if (isClassLiteralType(typeRef)) {
+            return ClassTypeDef.of(Class.class);
+        }
         ClassElement classElement = visitorContext.getTypeResolver().resolve(typeRef, Map.of());
         if (classElement.getName().equals(Object.class.getName()) && decoratorDef.members().get(memberName) instanceof String) {
             return TypeDef.STRING;
@@ -167,6 +174,25 @@ final class PythonAnnotationStubGenerator {
         return TypeDef.of(componentElement).array();
     }
 
+    /**
+     * Resolves the element a member's default value has to satisfy: the member type itself, or, for an array
+     * member, its component type. Returns {@code null} when the member has no declared type, or when it is a
+     * {@code Class} member, which the default conversion handles from the {@link TypeDef} alone.
+     */
+    private static @Nullable ClassElement annotationMemberElement(String memberName, DecoratorDef decoratorDef, PythonVisitorContext visitorContext) {
+        TypeRef typeRef = decoratorDef.memberTypes().get(memberName);
+        if (typeRef == null) {
+            return null;
+        }
+        if (isPythonListType(typeRef.name()) && typeRef.typeArguments().size() == 1) {
+            typeRef = typeRef.typeArguments().getFirst();
+        }
+        if (isClassLiteralType(typeRef)) {
+            return null;
+        }
+        return visitorContext.getTypeResolver().resolve(typeRef, Map.of());
+    }
+
     private static boolean isPythonListType(String typeName) {
         return "list".equals(typeName) || "List".equals(typeName) || "typing.List".equals(typeName);
     }
@@ -178,17 +204,23 @@ final class PythonAnnotationStubGenerator {
             || Class.class.getName().equals(typeRef.name());
     }
 
-    private static @Nullable ExpressionDef annotationDefaultValue(Object defaultValue, TypeDef memberType) {
+    private static @Nullable ExpressionDef annotationDefaultValue(
+        Object defaultValue,
+        TypeDef memberType,
+        @Nullable ClassElement memberElement
+    ) {
         if (defaultValue == null) {
-            return null;
-        }
-        if (defaultValue instanceof String stringValue && stringValue.startsWith("Name(")) {
             return null;
         }
         if (memberType instanceof TypeDef.Array arrayType) {
             Object[] elements = arrayElements(defaultValue);
             if (elements.length == 0) {
                 return new ExpressionDef.Constant(arrayType, new Object[0]);
+            }
+            if (isEnumMemberType(memberElement) || isClassMemberType(arrayType.componentType())) {
+                return ExpressionDef.constant(Arrays.stream(elements)
+                    .map(element -> referenceDefaultValue(element, arrayType.componentType(), memberElement))
+                    .toArray());
             }
             if (arrayType.componentType().equals(TypeDef.STRING)) {
                 return ExpressionDef.constant(Arrays.stream(elements).map(String::valueOf).toArray(String[]::new));
@@ -200,11 +232,43 @@ final class PythonAnnotationStubGenerator {
             }
             return ExpressionDef.constant(converted);
         }
+        if (isEnumMemberType(memberElement) || isClassMemberType(memberType)) {
+            return referenceDefaultValue(defaultValue, memberType, memberElement);
+        }
         Object converted = convertDefaultValue(defaultValue, memberType);
         if (memberType instanceof TypeDef.Primitive) {
             return ExpressionDef.primitiveConstant(converted);
         }
         return ExpressionDef.constant(converted);
+    }
+
+    private static boolean isEnumMemberType(@Nullable ClassElement memberElement) {
+        return memberElement != null && AnnotationNames.isEnumMember(memberElement);
+    }
+
+    private static boolean isClassMemberType(TypeDef typeDef) {
+        return typeDef instanceof ClassTypeDef classTypeDef && Class.class.getName().equals(classTypeDef.getName());
+    }
+
+    /**
+     * Renders a default that has to be written as a reference rather than a literal: an enum constant as
+     * {@code Type.CONSTANT} and a {@code Class} member as {@code Type.class}, matching what a member value given
+     * at a usage site produces.
+     */
+    private static ExpressionDef referenceDefaultValue(
+        Object defaultValue,
+        TypeDef componentType,
+        @Nullable ClassElement memberElement
+    ) {
+        if (isEnumMemberType(memberElement) && componentType instanceof ClassTypeDef enumType) {
+            return enumType.getStaticField(enumConstantName(defaultValue), enumType);
+        }
+        return classLiteralDefaultValue(defaultValue, componentType);
+    }
+
+    private static ExpressionDef classLiteralDefaultValue(Object defaultValue, TypeDef componentType) {
+        String className = AnnotationNames.rawTypeName(String.valueOf(defaultValue));
+        return ClassTypeDef.of(className).getStaticField("class", componentType);
     }
 
     private static Object[] arrayElements(Object defaultValue) {

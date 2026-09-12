@@ -75,6 +75,21 @@ class FunctionShapeTest(unittest.TestCase):
         defaults = processor.extract_arg_defaults(self.func("def dec(prefix='x', count=1, flag=True, ref=Other, empty=''): pass"))
         self.assertEqual({"prefix": "x", "count": 1, "flag": True, "ref": "Other", "empty": ""}, defaults)
 
+    def test_argument_defaults_convert_non_literal_expressions(self):
+        visitor, _ = visit("""
+from enum import Enum
+class Colour(Enum):
+    RED = "RED"
+""")
+        defaults = processor.extract_arg_defaults(
+            self.func("def dec(enumValue=Colour.RED, names=['a', 'b'], ref=Colour): pass"),
+            visitor,
+        )
+        # the Java side takes the constant name from the last segment, however the reference was resolved
+        self.assertEqual("RED", defaults["enumValue"].split(".")[-1])
+        self.assertEqual(["a", "b"], defaults["names"])
+        self.assertEqual("pkg.Colour", defaults["ref"])
+
 
 class TypeAnnotationTest(unittest.TestCase):
     def test_simple_generic_forward_and_union_types(self):
