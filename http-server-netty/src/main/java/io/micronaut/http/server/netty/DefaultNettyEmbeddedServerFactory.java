@@ -28,6 +28,7 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
+import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.EventLoopGroupFactory;
 import io.micronaut.http.netty.channel.EventLoopGroupRegistry;
@@ -289,10 +290,26 @@ public class DefaultNettyEmbeddedServerFactory
     @Override
     public EventLoopGroup createEventLoopGroup(EventLoopGroupConfiguration configuration) {
         return new MultiThreadIoEventLoopGroup(
-            configuration.getNumThreads(),
-            nettyThreadFactory,
+            DefaultEventLoopGroupRegistry.numThreads(configuration),
+            threadFactory(configuration),
             eventLoopGroupFactory.createIoHandlerFactory(configuration)
         );
+    }
+
+    /**
+     * Resolve the thread factory for the given event loop group configuration. Groups other than
+     * the default one get their own thread pool name so that their threads are distinguishable in
+     * a thread dump.
+     *
+     * @param configuration The event loop group configuration
+     * @return The thread factory to create the event loop threads with
+     */
+    private ThreadFactory threadFactory(EventLoopGroupConfiguration configuration) {
+        if (nettyThreadFactory instanceof NettyThreadFactory.EventLoopCustomizableThreadFactory customizable &&
+            !EventLoopGroupConfiguration.DEFAULT.equals(configuration.getName())) {
+            return customizable.customizeForEventLoop(configuration.getName() + "-eventLoopGroup");
+        }
+        return nettyThreadFactory;
     }
 
     @Override
