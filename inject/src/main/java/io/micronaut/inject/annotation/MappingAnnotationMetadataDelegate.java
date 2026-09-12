@@ -15,9 +15,11 @@
  */
 package io.micronaut.inject.annotation;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataDelegate;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
@@ -39,16 +41,51 @@ import java.util.function.Supplier;
  * Abstract annotation metadata delegate for cases when annotation
  * values need to be mapped before being returned.
  *
+ * <p>When the target metadata is an {@link AnnotationMetadataHierarchy} the occurrence semantics of the
+ * hierarchy have to be preserved: reads that resolve a single value consult one layer at a time instead of
+ * going through the merging {@link AnnotationMetadataHierarchy#findAnnotation(String)}. That is achieved by
+ * delegating such reads to a copy of the hierarchy where every layer is itself wrapped in a mapping delegate,
+ * so that the values of the layer that answers are still mapped.</p>
+ *
  * @since 4.0.0
  * @author Sergey Gavrilov
  */
 @Experimental
-public abstract sealed class MappingAnnotationMetadataDelegate implements AnnotationMetadataDelegate permits EvaluatedAnnotationMetadata {
+public abstract sealed class MappingAnnotationMetadataDelegate implements AnnotationMetadataDelegate
+    permits EvaluatedAnnotationMetadata, MappingAnnotationMetadataDelegate.MappedLayerMetadata {
+
+    @Nullable
+    private AnnotationMetadata layeredMetadata;
+
     public abstract <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av);
 
+    /**
+     * The metadata that per-layer reads are delegated to, which is a copy of the target
+     * {@link AnnotationMetadataHierarchy} with every layer mapped by this delegate.
+     *
+     * @return The layered metadata or {@code null} if the target metadata is a single layer, in which case the
+     * mapped annotation value can be read directly
+     */
+    @Nullable
+    private AnnotationMetadata layeredMetadata() {
+        AnnotationMetadata layered = layeredMetadata;
+        if (layered == null) {
+            if (getAnnotationMetadata() instanceof AnnotationMetadataHierarchy hierarchy) {
+                layered = hierarchy.mapLayers(layer -> new MappedLayerMetadata(this, layer));
+                layeredMetadata = layered;
+            } else {
+                return null;
+            }
+        }
+        return layered;
+    }
 
     @Override
     public Optional<String> stringValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.stringValue(annotation, member);
+        }
         return findAnnotation(annotation)
                    .flatMap(av -> av.stringValue(member));
     }
@@ -70,6 +107,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public String[] stringValues(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.stringValues(annotation, member);
+        }
         return findAnnotation(annotation)
                    .map(av -> av.stringValues(member))
                    .orElse(StringUtils.EMPTY_STRING_ARRAY);
@@ -98,6 +139,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     public <E extends Enum<E>> Optional<E> enumValue(String annotation, String member,
                                                      Class<E> enumType) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.enumValue(annotation, member, enumType);
+        }
         return findAnnotation(annotation)
                    .flatMap(av -> av.enumValue(member, enumType));
     }
@@ -116,6 +161,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public <E extends Enum<E>> E[] enumValues(String annotation, String member, Class<E> enumType) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.enumValues(annotation, member, enumType);
+        }
         return findAnnotation(annotation)
                    .map(av -> av.enumValues(member, enumType))
                    .orElse((E[]) Array.newInstance(enumType, 0));
@@ -140,6 +189,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public <T> Class<T>[] classValues(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.classValues(annotation, member);
+        }
         return (Class<T>[]) findAnnotation(annotation)
                                 .map(av -> av.classValues(member))
                                 .orElse(ReflectionUtils.EMPTY_CLASS_ARRAY);
@@ -162,6 +215,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public Optional<Boolean> booleanValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.booleanValue(annotation, member);
+        }
         return findAnnotation(annotation)
                    .flatMap(av -> av.booleanValue(member));
     }
@@ -183,6 +240,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public boolean isTrue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.isTrue(annotation, member);
+        }
         return getValue(annotation, member, Boolean.class).orElse(false);
     }
 
@@ -203,6 +264,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public Optional<Class> classValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.classValue(annotation, member);
+        }
         return findAnnotation(annotation)
                    .flatMap(av -> av.classValue(member));
     }
@@ -224,8 +289,12 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public OptionalInt intValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.intValue(annotation, member);
+        }
         return findAnnotation(annotation)
-                   .map(AnnotationValue::intValue)
+                   .map(av -> av.intValue(member))
                    .orElse(OptionalInt.empty());
     }
 
@@ -241,8 +310,12 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public OptionalLong longValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.longValue(annotation, member);
+        }
         return findAnnotation(annotation)
-                   .map(AnnotationValue::longValue)
+                   .map(av -> av.longValue(member))
                    .orElse(OptionalLong.empty());
     }
 
@@ -253,6 +326,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public OptionalDouble doubleValue(String annotation, String member) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.doubleValue(annotation, member);
+        }
         return findAnnotation(annotation)
                    .map(av -> av.doubleValue(member))
                    .orElse(OptionalDouble.empty());
@@ -260,9 +337,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public OptionalDouble doubleValue(Class<? extends Annotation> annotation, String member) {
-        return findAnnotation(annotation)
-                   .map(av -> av.doubleValue(member))
-                   .orElse(OptionalDouble.empty());
+        return doubleValue(annotation.getName(), member);
     }
 
     @Override
@@ -272,6 +347,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public <T> Optional<T> getValue(String annotation, String member, Argument<T> requiredType) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.getValue(annotation, member, requiredType);
+        }
         return findAnnotation(annotation)
                    .flatMap(av -> av.get(member, requiredType));
     }
@@ -279,8 +358,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     public <T> Optional<T> getValue(Class<? extends Annotation> annotation, String member,
                                     Argument<T> requiredType) {
-        return findAnnotation(annotation)
-                   .flatMap(av -> av.get(member, requiredType));
+        return getValue(annotation.getName(), member, requiredType);
     }
 
     @Override
@@ -343,6 +421,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
 
     @Override
     public <T> OptionalValues<T> getValues(String annotation, Class<T> valueType) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.getValues(annotation, valueType);
+        }
         return OptionalValues.of(valueType, getValues(annotation));
     }
 
@@ -426,6 +508,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     @Nullable
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass) {
+        // the declared annotation is already resolved from a single element of a hierarchy
         return findDeclaredAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
                    .orElse(null);
@@ -434,6 +517,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.synthesize(annotationClass);
+        }
         return findAnnotation(annotationClass)
                    .map(av -> AnnotationMetadataSupport.buildAnnotation(annotationClass, av))
                    .orElse(null);
@@ -442,6 +529,10 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     @Nullable
     public <T extends Annotation> T synthesize(Class<T> annotationClass, String sourceAnnotation) {
+        AnnotationMetadata layered = layeredMetadata();
+        if (layered != null) {
+            return layered.synthesize(annotationClass, sourceAnnotation);
+        }
         AnnotationValue<T> av = getAnnotation(sourceAnnotation);
         if (av != null) {
             return AnnotationMetadataSupport.buildAnnotation(annotationClass, av);
@@ -452,6 +543,7 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
     @Override
     @Nullable
     public <T extends Annotation> T synthesizeDeclared(Class<T> annotationClass, String sourceAnnotation) {
+        // the declared annotation is already resolved from a single element of a hierarchy
         AnnotationValue<T> av = getDeclaredAnnotation(sourceAnnotation);
         if (av != null) {
             return AnnotationMetadataSupport.buildAnnotation(annotationClass, av);
@@ -488,5 +580,37 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
         return supplier.get().stream()
                    .map(this::mapAnnotationValue)
                    .toList();
+    }
+
+    /**
+     * One layer of a target {@link AnnotationMetadataHierarchy}, mapped by the delegate that owns the hierarchy.
+     *
+     * @since 5.2.2
+     */
+    @Internal
+    static final class MappedLayerMetadata extends MappingAnnotationMetadataDelegate {
+
+        private final MappingAnnotationMetadataDelegate owner;
+        private final AnnotationMetadata layer;
+
+        private MappedLayerMetadata(MappingAnnotationMetadataDelegate owner, AnnotationMetadata layer) {
+            this.owner = owner;
+            this.layer = layer;
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return layer;
+        }
+
+        @Override
+        public <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av) {
+            return owner.mapAnnotationValue(av);
+        }
+
+        @Override
+        public boolean hasEvaluatedExpressions() {
+            return layer.hasEvaluatedExpressions();
+        }
     }
 }
