@@ -16,11 +16,17 @@
 package io.micronaut.inject.ast;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.reflect.ClassUtils;
+import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.annotation.Annotation;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 /**
  * A {@link ClassElement} of primitive types.
@@ -43,6 +49,8 @@ public final class PrimitiveElement implements ArrayableClassElement {
     private final String boxedTypeName;
     private final AnnotationMetadata annotationMetadata;
     @Nullable
+    private final MutableAnnotationMetadataDelegate<AnnotationMetadata> typeAnnotationMetadata;
+    @Nullable
     private final String doc;
 
     /**
@@ -50,7 +58,7 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param name The type name
      */
     private PrimitiveElement(String name, @Nullable Class<?> boxedType) {
-        this(name, boxedType == null ? "<>" : boxedType.getName(), 0, AnnotationMetadata.EMPTY_METADATA, null);
+        this(name, boxedType == null ? "<>" : boxedType.getName(), 0, AnnotationMetadata.EMPTY_METADATA, null, null);
     }
 
     /**
@@ -61,11 +69,17 @@ public final class PrimitiveElement implements ArrayableClassElement {
      * @param annotationMetadata The annotation metadata
      * @param doc                The optional documentation
      */
-    private PrimitiveElement(String name, String boxedTypeName, int arrayDimensions, AnnotationMetadata annotationMetadata, @Nullable String doc) {
+    private PrimitiveElement(String name,
+                             String boxedTypeName,
+                             int arrayDimensions,
+                             AnnotationMetadata annotationMetadata,
+                             @Nullable MutableAnnotationMetadataDelegate<AnnotationMetadata> typeAnnotationMetadata,
+                             @Nullable String doc) {
         this.typeName = name;
         this.arrayDimensions = arrayDimensions;
         this.boxedTypeName = boxedTypeName;
         this.annotationMetadata = annotationMetadata;
+        this.typeAnnotationMetadata = typeAnnotationMetadata;
         this.doc = doc;
     }
 
@@ -124,21 +138,121 @@ public final class PrimitiveElement implements ArrayableClassElement {
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
+        if (typeAnnotationMetadata != null) {
+            return typeAnnotationMetadata.getAnnotationMetadata();
+        }
         return annotationMetadata;
+    }
+
+    /**
+     * The type annotations written on this use of the primitive, such as {@code @A int}, when the element
+     * was created for such a use with {@link #withTypeAnnotationMetadata(MutableAnnotationMetadataDelegate)};
+     * they are the same annotations {@link #getAnnotationMetadata()} returns. The shared constants have none.
+     *
+     * @return The type annotation metadata
+     * @since 5.3.0
+     */
+    @Override
+    public MutableAnnotationMetadataDelegate<AnnotationMetadata> getTypeAnnotationMetadata() {
+        if (typeAnnotationMetadata != null) {
+            return typeAnnotationMetadata;
+        }
+        return ArrayableClassElement.super.getTypeAnnotationMetadata();
     }
 
     @Override
     public PrimitiveElement withArrayDimensions(int arrayDimensions) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, typeAnnotationMetadata, doc);
     }
 
     @Override
     public PrimitiveElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, null, doc);
+    }
+
+    /**
+     * A copy of this element carrying the type annotations written on a use of the primitive, such as
+     * {@code @A int}. The delegate answers {@link #getAnnotationMetadata()} and
+     * {@link #getTypeAnnotationMetadata()}, and receives the annotations a visitor adds to the element, so a
+     * use of a primitive can be annotated at compilation time like a use of any other type.
+     *
+     * @param typeAnnotationMetadata The type annotation metadata of the use
+     * @return The annotated copy; it still equals the shared constant
+     * @since 5.3.0
+     */
+    public PrimitiveElement withTypeAnnotationMetadata(MutableAnnotationMetadataDelegate<AnnotationMetadata> typeAnnotationMetadata) {
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, AnnotationMetadata.EMPTY_METADATA, typeAnnotationMetadata, doc);
     }
 
     private PrimitiveElement withDoc(String doc) {
-        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, doc);
+        return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, typeAnnotationMetadata, doc);
+    }
+
+    private MutableAnnotationMetadataDelegate<AnnotationMetadata> getAnnotationMetadataToWrite() {
+        if (typeAnnotationMetadata == null) {
+            throw new UnsupportedOperationException("A primitive without type annotations cannot be annotated at compilation time");
+        }
+        return typeAnnotationMetadata;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
+        return this;
+    }
+
+    @Override
+    public Element annotate(String annotationType) {
+        getAnnotationMetadataToWrite().annotate(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        getAnnotationMetadataToWrite().annotate(annotationType, consumer);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().annotate(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element annotate(AnnotationValue<T> annotationValue) {
+        getAnnotationMetadataToWrite().annotate(annotationValue);
+        return this;
+    }
+
+    @Override
+    public Element removeAnnotation(String annotationType) {
+        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotation(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().removeAnnotation(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeAnnotationIf(Predicate<AnnotationValue<T>> predicate) {
+        getAnnotationMetadataToWrite().removeAnnotationIf(predicate);
+        return this;
+    }
+
+    @Override
+    public Element removeStereotype(String annotationType) {
+        getAnnotationMetadataToWrite().removeStereotype(annotationType);
+        return this;
+    }
+
+    @Override
+    public <T extends Annotation> Element removeStereotype(Class<T> annotationType) {
+        getAnnotationMetadataToWrite().removeStereotype(annotationType);
+        return this;
     }
 
     @Override

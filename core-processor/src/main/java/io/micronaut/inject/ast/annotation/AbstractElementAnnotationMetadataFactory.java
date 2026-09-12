@@ -122,6 +122,30 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return buildTypeAnnotationsForClass(element);
     }
 
+    /**
+     * Builds the type annotation metadata of a type use that has no element of its own to look the metadata up
+     * for, such as an annotated use of a primitive, from the cache entry the language implementation built for
+     * it. Mutations are written to the entry, so every element created for the same use sees them.
+     *
+     * @param cacheEntry  The cache entry
+     * @param description The description of the use, for {@link Object#toString()}
+     * @return The type annotation metadata
+     * @since 5.3.0
+     */
+    public ElementAnnotationMetadata buildTypeAnnotations(AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cacheEntry, Object description) {
+        return new AbstractElementAnnotationMetadata() {
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return cacheEntry;
+            }
+
+            @Override
+            public String toString() {
+                return description.toString();
+            }
+        };
+    }
+
     @Override
     public ElementAnnotationMetadata buildGenericTypeAnnotations(GenericElement element) {
         if (element instanceof GenericPlaceholderElement placeholderElement) {
