@@ -447,6 +447,259 @@ class Service {
         context.close()
     }
 
+
+    void 'test an @InjectScope constructor argument is released when the constructor has run'() {
+        given:
+        ApplicationContext context = buildContext(source('ctororder.injectscope', '', '''
+@Prototype
+class Scoped {
+    @PreDestroy
+    void close() {
+        Events.LOG.add("scoped destroyed");
+    }
+}
+
+@Prototype
+@Staged
+class Service {
+    @Inject Dependency field;
+
+    Service(@InjectScope Scoped scoped) {
+        Events.LOG.add("target constructor");
+    }
+
+    @Inject
+    void setDependency(Dependency dependency) {
+        Events.LOG.add("target setter injection, field injected: " + (field != null));
+    }
+
+    @PostConstruct
+    void init() {
+        Events.LOG.add("target postConstruct");
+    }
+}
+'''))
+
+        when:
+        getBean(context, 'ctororder.injectscope.Service')
+
+        then: 'the argument is released as soon as the constructor has run, before the chain returns'
+        events(context, 'ctororder.injectscope') == [
+                'A before proceed',
+                'B before proceed',
+                'target constructor',
+                'scoped destroyed',
+                'B after proceed',
+                'A after proceed',
+                'target setter injection, field injected: true',
+                'target postConstruct'
+        ]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test an @InjectScope constructor argument is released when an interceptor rejects the instance'() {
+        given:
+        ApplicationContext context = buildContext(source('ctororder.injectscoperejected', '', '''
+@Prototype
+class Scoped {
+    @PreDestroy
+    void close() {
+        Events.LOG.add("scoped destroyed");
+    }
+}
+
+@Prototype
+@Staged
+class Service {
+    @Inject Dependency field;
+
+    Service(@InjectScope Scoped scoped) {
+        Events.LOG.add("target constructor");
+    }
+
+    @Inject
+    void setDependency(Dependency dependency) {
+        Events.LOG.add("target setter injection, field injected: " + (field != null));
+    }
+
+    @PostConstruct
+    void init() {
+        Events.LOG.add("target postConstruct");
+    }
+}
+''', '''
+        if (id().equals("A")) {
+            throw new IllegalStateException("rejected by A");
+        }
+'''))
+
+        when:
+        getBean(context, 'ctororder.injectscoperejected.Service')
+
+        then: 'the instance is never injected, but the argument is still released'
+        IllegalStateException e = thrown()
+        e.message == 'rejected by A'
+        events(context, 'ctororder.injectscoperejected') == [
+                'A before proceed',
+                'B before proceed',
+                'target constructor',
+                'scoped destroyed',
+                'B after proceed'
+        ]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a bean constructed inside another bean construction shares its interceptor with post-construct'() {
+        given:
+        ApplicationContext context = buildContext('''
+package ctororder.nested;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+class Events {
+    static final List<String> LOG = new ArrayList<>();
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@AroundConstruct
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Managed {
+}
+
+@Prototype
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+@InterceptorBinding(value = Managed.class, kind = InterceptorKind.POST_CONSTRUCT)
+class Tracking implements Interceptor<Object, Object> {
+    final String id = "tracking@" + System.identityHashCode(this);
+
+    @Override
+    public Object intercept(InvocationContext<Object, Object> context) {
+        String kind = context instanceof ConstructorInvocationContext
+            ? "AROUND_CONSTRUCT"
+            : ((MethodInvocationContext<?, ?>) context).getKind().name();
+        Events.LOG.add(kind + " " + id);
+        return context.proceed();
+    }
+}
+
+@Prototype
+@Managed
+class Inner {
+    @PostConstruct
+    void init() {
+        Events.LOG.add("inner postConstruct");
+    }
+}
+
+@Singleton
+class Outer {
+    Outer(Inner inner) {
+        Events.LOG.add("outer constructor");
+    }
+}
+''')
+
+        when: 'the inner bean is constructed while the outer bean is being constructed'
+        getBean(context, 'ctororder.nested.Outer')
+        List<String> log = events(context, 'ctororder.nested')
+
+        then: 'both phases of the inner bean use the same interceptor instance'
+        log[0].startsWith('AROUND_CONSTRUCT tracking@')
+        log[1] == log[0].replace('AROUND_CONSTRUCT', 'POST_CONSTRUCT')
+        log[2] == 'inner postConstruct'
+        log[3] == 'outer constructor'
+        log.size() == 4
+
+        cleanup:
+        context.close()
+    }
+
+
+    void 'test a proxied bean with members exposes only its own constructor arguments to the interceptor'() {
+        given:
+        ApplicationContext context = buildContext('''
+package ctororder.proxyarguments;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import io.micronaut.core.type.Argument;
+import jakarta.annotation.PostConstruct;
+import jakarta.inject.Inject;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Around
+@AroundConstruct
+@interface Tracked {
+}
+
+@Singleton
+class Dependency {
+}
+
+@Prototype
+@Tracked
+class Service {
+    @Inject Dependency field;
+
+    Service(Dependency constructorDependency) {
+    }
+
+    @Inject
+    void setDependency(Dependency dependency) {
+    }
+
+    @PostConstruct
+    void init() {
+    }
+
+    public Dependency getField() {
+        return field;
+    }
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+class Capturing implements ConstructorInterceptor<Object> {
+    static List<String> argumentNames;
+    static int parameterCount;
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        argumentNames = Arrays.stream(context.getArguments()).map(Argument::getName).toList();
+        parameterCount = context.getParameterValues().length;
+        return context.proceed();
+    }
+}
+''')
+
+        when: 'the proxy definition runs the chain, which trims the internal proxy parameters'
+        def target = getBean(context, 'ctororder.proxyarguments.Service')
+        Class<?> capturing = context.classLoader.loadClass('ctororder.proxyarguments.Capturing')
+
+        then: 'the interceptor sees the constructor of the intercepted type, not the proxy constructor'
+        target instanceof Intercepted
+        target.field != null
+        capturing.argumentNames == ['constructorDependency']
+        capturing.parameterCount == 1
+
+        cleanup:
+        context.close()
+    }
+
     /**
      * The events of the intercepted construction. For a proxy target the proxy is created too: it calls the target's
      * constructor as its super constructor and has its own members injected, neither of which is intercepted.
@@ -473,6 +726,7 @@ import io.micronaut.aop.*;
 import io.micronaut.context.annotation.*;
 import io.micronaut.core.order.Ordered;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;

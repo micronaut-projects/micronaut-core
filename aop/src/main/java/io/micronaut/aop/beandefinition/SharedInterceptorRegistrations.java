@@ -50,10 +50,9 @@ import java.util.List;
  *
  * <p>A bean definition is a stateless singleton shared by every instance, so the resolved registrations cannot be kept
  * on it. They are kept on the {@link BeanResolutionContext} instead, which is one instance for the whole of a bean's
- * creation. The window is narrower than it looks: for a bean with constructor advice the registrations are pushed
- * before the constructor interceptor chain runs and popped once the instance the chain returned has been injected and
- * its post-construct interception has run, and entries are keyed by definition so that a bean created while another
- * is being constructed or injected reads its own.</p>
+ * creation. The registrations are pushed before the constructor interceptor chain runs and popped once it has
+ * returned, and {@link #pop} keeps them available to the post-construct interception that follows it. Entries are keyed
+ * by definition so that a bean created while another is being constructed reads its own.</p>
  *
  * <p>Destruction happens later with a fresh resolution context, so nothing is shared with it here; see
  * {@code MethodInterceptorChain} for how pre-destroy reaches the interceptors a bean owns.</p>
@@ -76,8 +75,7 @@ public final class SharedInterceptorRegistrations {
      * Makes the registrations resolved for a bean visible to the post-construct interception of that same bean.
      *
      * <p>Called immediately before the constructor interceptor chain runs, and matched by {@link #pop} in a
-     * {@code finally} after the instance the chain returned has been injected and initialized. Post-construct
-     * interception happens within that window, which is the only one in which {@link #peek} can see the entry.</p>
+     * {@code finally}.</p>
      *
      * <p>Nesting is handled by the stack: if the constructor of one bean, or one of its {@code @AroundConstruct}
      * interceptors, causes another bean to be created, that bean pushes and pops its own entry above this one.</p>
@@ -107,7 +105,8 @@ public final class SharedInterceptorRegistrations {
      * interception has run.
      *
      * <p>Removes nothing unless the top of the stack belongs to this definition, so an unbalanced push elsewhere
-     * cannot discard an entry that is still in use.</p>
+     * cannot discard an entry that is still in use. The removed entry is handed to {@link #store}, because the
+     * post-construct interception of the bean runs after the chain has returned and so after this.</p>
      *
      * @param resolutionContext The resolution context
      * @param definition        The definition being instantiated
@@ -157,7 +156,7 @@ public final class SharedInterceptorRegistrations {
      *
      * @param resolutionContext The resolution context
      * @param definition        The definition being initialized
-     * @return The registrations, or {@code null} when this initialization is not nested in that construction
+     * @return The registrations resolved while constructing the bean, or {@code null} when none were
      * @since 5.2.0
      */
     @SuppressWarnings("unchecked")
@@ -169,7 +168,8 @@ public final class SharedInterceptorRegistrations {
             if (entry.definition == definition) {
                 return (Collection<BeanRegistration<Interceptor<?, ?>>>) entry.registrations;
             }
-            return null;
+            // Not this bean's construction on top: it is another bean being constructed, which this bean's
+            // initialization can be nested in. Fall through to the entry this bean's own construction completed with
         }
         IdentityHashMap<BeanDefinition<?>, List<?>> completed = (IdentityHashMap<BeanDefinition<?>, List<?>>)
             resolutionContext.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS);

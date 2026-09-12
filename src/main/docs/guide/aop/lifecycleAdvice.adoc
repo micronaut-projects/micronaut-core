@@ -50,7 +50,7 @@ fields and methods have not been injected yet and its `@PostConstruct` methods h
 api:aop.ConstructorInterceptor[] in the chain has returned, on the instance the chain returned:
 
 . The construct interceptors run up to `proceed()`, outermost first
-. The constructor runs
+. The constructor runs, and any ann:context.annotation.InjectScope[] constructor argument is released
 . The construct interceptors complete after `proceed()`, innermost first
 . Fields and methods are injected
 . `@PostConstruct` interception runs, then the `@PostConstruct` methods

@@ -93,7 +93,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveInterceptors(resolutionContext, constructor);
         SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
         try {
-            T instance = ConstructorInterceptorChain.instantiate(
+            return ConstructorInterceptorChain.instantiate(
                 resolutionContext,
                 context,
                 interceptors,
@@ -101,9 +101,6 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
                 constructor,
                 values
             );
-            // Injection and post-construct run once every construction interceptor has returned, still inside the
-            // window in which post-construct interception shares the interceptors resolved above.
-            return injectAndInitialize(resolutionContext, context, instance);
         } finally {
             SharedInterceptorRegistrations.pop(resolutionContext, this, interceptors);
         }
@@ -112,36 +109,10 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
     /**
      * The original {@link #instantiate(BeanResolutionContext, BeanContext)} call that should be intercepted.
      *
-     * <p>This is the terminal call of the constructor interceptor chain. A definition generated since 5.2.1 only
-     * creates the instance here and injects and initializes it in
-     * {@link #injectAndInitialize(BeanResolutionContext, BeanContext, Object)}, once the chain has completed.</p>
-     *
      * @param resolutionContext The resolution context
      * @param context           The bean context
      * @param parameterValues   The construction values
      * @return The intercepted result
      */
     T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, @Nullable Object[] parameterValues);
-
-    /**
-     * Injects the members of the instance the constructor interceptor chain returned and runs its post-construct
-     * callbacks, including their interception.
-     *
-     * <p>Called after every construction interceptor has returned, so that neither injection nor
-     * {@code @PostConstruct} happens before an outer interceptor has completed, or at all when one throws after
-     * {@code proceed()}.</p>
-     *
-     * <p>A definition generated before 5.2.1 injects and initializes inside
-     * {@link #doInstantiate(BeanResolutionContext, BeanContext, Object[])} and does not override this method, which
-     * then returns the instance unchanged.</p>
-     *
-     * @param resolutionContext The resolution context
-     * @param context           The bean context
-     * @param bean              The instance the constructor interceptor chain returned
-     * @return The injected and initialized instance
-     * @since 5.2.1
-     */
-    default T injectAndInitialize(BeanResolutionContext resolutionContext, BeanContext context, T bean) {
-        return bean;
-    }
 }
