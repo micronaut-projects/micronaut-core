@@ -226,6 +226,8 @@ httpServer:
       corsAllowPrivateNetwork: Allow Private Network
       corsMaxAge: Max Age
       corsMultipleHeaderValues: Multiple Header Values
+      corsFilter: Disabling the CORS Filter
+      corsCustomization: Customizing CORS Processing
     https: Securing the Server with HTTPS
     dualProtocol: Enabling HTTP and HTTPS
     accessLogger: Enabling Access Logger

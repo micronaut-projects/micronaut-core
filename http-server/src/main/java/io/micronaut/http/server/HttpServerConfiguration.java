@@ -932,9 +932,31 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
         private @Nullable CrossOriginEmbedderPolicy crossOriginEmbedderPolicy;
         private @Nullable CrossOriginResourcePolicy crossOriginResourcePolicy;
 
+        private CorsFilterConfiguration filter = new CorsFilterConfiguration();
+
         private Map<String, CorsOriginConfiguration> configurations = Collections.emptyMap();
 
         private final Map<String, CorsOriginConfiguration> defaultConfiguration = new LinkedHashMap<>(1);
+
+        /**
+         * Returns the CORS filter configuration.
+         *
+         * @return The CORS filter configuration
+         * @since 5.2.0
+         */
+        public CorsFilterConfiguration getFilter() {
+            return filter;
+        }
+
+        /**
+         * Sets the CORS filter configuration.
+         *
+         * @param filter The CORS filter configuration
+         * @since 5.2.0
+         */
+        public void setFilter(CorsFilterConfiguration filter) {
+            this.filter = filter;
+        }
 
         /**
          * @return Whether cors is enabled. Defaults to false.
@@ -1043,6 +1065,47 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
          */
         public void setCrossOriginResourcePolicy(@Nullable CrossOriginResourcePolicy crossOriginResourcePolicy) {
             this.crossOriginResourcePolicy = crossOriginResourcePolicy;
+        }
+
+        /**
+         * Configuration for enabling or disabling the CORS server filter.
+         *
+         * <p>Disabling the filter disables all server-side CORS processing, including rules
+         * declared with {@link io.micronaut.http.server.cors.CrossOrigin}. This differs from
+         * {@link CorsConfiguration#isEnabled()}, which controls server-wide CORS
+         * configurations but still permits route-level CORS annotations.</p>
+         *
+         * @since 5.2.0
+         */
+        @ConfigurationProperties("filter")
+        public static class CorsFilterConfiguration implements Toggleable {
+            /**
+             * Whether the CORS server filter is enabled by default.
+             */
+            public static final boolean DEFAULT_ENABLED = true;
+
+            private boolean enabled = DEFAULT_ENABLED;
+
+            /**
+             * Returns whether the CORS server filter is enabled.
+             *
+             * @return {@code true} if the CORS server filter is enabled
+             */
+            @Override
+            public boolean isEnabled() {
+                return enabled;
+            }
+
+            /**
+             * Sets whether the CORS server filter is enabled. Default value {@value #DEFAULT_ENABLED}.
+             * Setting this to false disables all server-side CORS processing, including rules
+             * declared with the CrossOrigin annotation.
+             *
+             * @param enabled {@code true} to enable the CORS server filter
+             */
+            public void setEnabled(boolean enabled) {
+                this.enabled = enabled;
+            }
         }
     }
 

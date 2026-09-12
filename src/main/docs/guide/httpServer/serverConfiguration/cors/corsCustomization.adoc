@@ -1,0 +1,24 @@
+The work done by api:http.server.cors.CorsFilter[] is split across three interfaces, so that any one step can be replaced without reimplementing the others.
+
+|===
+|Interface |Responsibility
+
+|api:http.server.cors.CorsOriginConfigurationRetriever[]
+|Resolves the api:http.server.cors.CorsOriginConfiguration[] that applies to a request origin and its matching routes, considering both server-wide <<corsConfiguration, configurations>> and route-level ann:http.server.cors.CrossOrigin[] metadata. Returns `null` when no configuration permits the origin.
+
+|api:http.server.cors.PreflightRequestValidator[]
+|Decides whether a preflight request may proceed once a configuration has been resolved: the requested method and headers, private-network access, and whether the resource exists for the requested method.
+
+|api:http.server.cors.CorsResponseDecorator[]
+|Adds the CORS response headers — allowed origin, exposed headers, credentials permission and `Vary` for every CORS response, plus allowed methods, allowed headers, max age and private-network permission for a preflight response.
+|===
+
+The filter uses them in that order: retrieve the configuration, validate the request against it, then decorate the response. Origin matching happens during retrieval, so a validator is never asked about a request from a disallowed origin.
+
+Each interface is annotated with `@DefaultImplementation`. Defining your own `@Singleton` bean of the interface type is enough to take over that step; `@Replaces` is not required, because the built-in bean yields automatically to any other bean of the interface type.
+
+TIP: Most applications never need to replace these. Declare allowed origins, methods and headers through <<corsConfiguration, configuration>> or the ann:http.server.cors.CrossOrigin[] annotation, and reach for these interfaces only when the CORS rules cannot be expressed that way — for example when they are resolved at runtime from an external source.
+
+IMPORTANT: The default implementations of these three interfaces are internal and cannot be referenced or wrapped from application code. A replacement takes over its step entirely, so an implementation of api:http.server.cors.CorsResponseDecorator[] is responsible for writing every CORS response header itself.
+
+NOTE: These interfaces are only consulted while the CORS filter is registered. See <<corsFilter, Disabling the CORS Filter>>.
