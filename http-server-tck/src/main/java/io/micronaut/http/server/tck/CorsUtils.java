@@ -19,6 +19,8 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 
+import java.util.Arrays;
+
 import static org.junit.jupiter.api.Assertions.assertFalse;
 
 /**
@@ -32,10 +34,25 @@ public final class CorsUtils {
     }
 
     /**
+     * Asserts that CORS did not mark the response as varying by {@code Origin}. A server may legitimately send a
+     * {@code Vary} header for other reasons, such as {@code Vary: Accept-Encoding} when it can compress the
+     * response, so the header's presence alone says nothing about CORS.
+     *
+     * @param response HTTP Response to run the assertion against
+     * @since 5.2.1
+     */
+    public static void assertVaryDoesNotNameOrigin(HttpResponse<?> response) {
+        assertFalse(response.getHeaders().getAll(HttpHeaders.VARY).stream()
+            .flatMap(value -> Arrays.stream(value.split(",")))
+            .map(String::trim)
+            .anyMatch(HttpHeaders.ORIGIN::equalsIgnoreCase));
+    }
+
+    /**
      * @param response HTTP Response to run CORS assertions against it.
      */
     public static void assertCorsHeadersNotPresent(HttpResponse<?> response) {
-        assertFalse(response.getHeaders().names().contains(HttpHeaders.VARY));
+        assertVaryDoesNotNameOrigin(response);
         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS));
         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_MAX_AGE));
         assertFalse(response.getHeaders().names().contains(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN));
