@@ -451,13 +451,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     static ByteBuf composeBody(ByteBufAllocator alloc, List<ByteBuf> pieces) {
         CompositeByteBuf composite = alloc.compositeBuffer(MAX_COMPOSITE_COMPONENTS);
+        boolean added = false;
         try {
             // addComponents takes ownership of all pieces, releasing any it did not add
             composite.addComponents(true, pieces);
+            added = true;
             return composite;
-        } catch (Throwable e) {
-            composite.release();
-            throw e;
+        } finally {
+            if (!added) {
+                composite.release();
+            }
         }
     }
 
