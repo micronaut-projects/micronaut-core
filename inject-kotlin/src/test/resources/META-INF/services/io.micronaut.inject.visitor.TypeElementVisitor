@@ -16,3 +16,4 @@ io.micronaut.kotlin.processing.aop.introduction.MyIsEnumInTypeArgumentSpec$MyCon
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$InheritedVisitor
 io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsVisitor
 io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsRecordingVisitor
+io.micronaut.kotlin.processing.annotations.SourceAnnotationsSpec$SourceVisitor

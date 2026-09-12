@@ -69,6 +69,12 @@ public record TypeAnnotatedClassElement(
     }
 
     @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        // The declaration of the type; what was written at this use is on getTypeAnnotationMetadata()
+        return delegate.getSourceAnnotations();
+    }
+
+    @Override
     public <T extends Annotation> ClassElement annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
         typeAnnotationMetadata.annotate(annotationType, consumer);
         return this;

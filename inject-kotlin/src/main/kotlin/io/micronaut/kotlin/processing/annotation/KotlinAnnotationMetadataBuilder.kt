@@ -105,6 +105,16 @@ internal class KotlinAnnotationMetadataBuilder(
         TODO("Not yet implemented")
     }
 
+    override fun getWrittenAnnotations(element: KSAnnotated): List<KSAnnotation> {
+        // Unlike getAnnotationsForType, a repeatable container is kept as the source wrote it and the
+        // annotations of a property are not fused into those of its accessors and setter parameter
+        var annotated = element
+        if (annotated is KotlinAnnotationType) {
+            annotated = annotated.type
+        }
+        return annotated.annotations.toList()
+    }
+
     override fun getAnnotationsForType(element: KSAnnotated): MutableList<out KSAnnotation> {
         val annotationMirrors : MutableList<KSAnnotation> = mutableListOf()
 

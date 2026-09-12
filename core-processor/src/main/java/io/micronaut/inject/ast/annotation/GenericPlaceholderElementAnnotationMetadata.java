@@ -16,6 +16,7 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
@@ -53,6 +54,11 @@ public final class GenericPlaceholderElementAnnotationMetadata extends AbstractE
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return genericPlaceholderElement.getGenericTypeAnnotationMetadata();
+    }
+
+    @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        return genericPlaceholderElement.getGenericTypeAnnotationMetadata().getSourceAnnotations();
     }
 
     @Override

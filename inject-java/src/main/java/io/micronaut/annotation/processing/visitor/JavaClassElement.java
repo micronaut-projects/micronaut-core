@@ -610,6 +610,33 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
         return new JavaClassElement(nativeType, elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions, false, doc);
     }
 
+    /**
+     * The array of this element for the given array mirror, which holds the type annotations written on that
+     * dimension. The component keeps its own mirror, so every dimension of a nested array carries its own.
+     *
+     * @param arrayType The mirror of the array whose component this element is
+     * @return The array element
+     */
+    ClassElement toArray(ArrayType arrayType) {
+        JavaNativeElement.Class nativeType = getNativeType();
+        return new JavaClassElement(
+            new JavaNativeElement.Class(nativeType.element(), arrayType, nativeType.owner()),
+            elementAnnotationMetadataFactory, visitorContext, typeArguments, resolvedTypeArguments, arrayDimensions + 1, false, doc);
+    }
+
+    /**
+     * Marks a placeholder built from a type parameter as the declaration of the type variable.
+     *
+     * @param element The element built for the type parameter
+     * @return The placeholder
+     */
+    static GenericPlaceholderElement asDeclaredPlaceholder(ClassElement element) {
+        if (element instanceof JavaGenericPlaceholderElement placeholder) {
+            return placeholder.asDeclaration();
+        }
+        return (GenericPlaceholderElement) element;
+    }
+
     @Override
     public String getSimpleName() {
         if (simpleName == null) {
@@ -831,7 +858,7 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
         return classElement.getTypeParameters().stream()
             // we want the *declared* variables, so we don't pass in our genericsInfo.
-            .map(tpe -> (GenericPlaceholderElement) newClassElement(tpe.asType(), Collections.emptyMap()))
+            .map(tpe -> asDeclaredPlaceholder(newClassElement(tpe.asType(), Collections.emptyMap())))
             .toList();
     }
 

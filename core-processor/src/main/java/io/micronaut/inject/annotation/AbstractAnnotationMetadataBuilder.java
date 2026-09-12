@@ -29,6 +29,7 @@ import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.InstantiatedMember;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Retainable;
+import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.expressions.EvaluatedExpressionReference;
 import io.micronaut.core.io.service.SoftServiceLoader;
@@ -57,6 +58,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -394,7 +396,7 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         CachedAnnotationMetadata cachedAnnotationMetadata = MUTATED_ANNOTATION_METADATA.get(key);
         if (cachedAnnotationMetadata == null) {
             AnnotationMetadata annotationMetadata = buildInternal(element);
-            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadata);
+            cachedAnnotationMetadata = new DefaultCachedAnnotationMetadata(annotationMetadata, () -> readSourceAnnotations(element));
             // Don't use `computeIfAbsent` as it can lead to a concurrent exception because the cache is accessed during in `buildInternal`
             MUTATED_ANNOTATION_METADATA.put(key, cachedAnnotationMetadata);
         }
@@ -476,6 +478,81 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
      * @return The annotations
      */
     protected abstract List<? extends A> getAnnotationsForType(T element);
+
+    /**
+     * Obtain the annotations written on the given element, as written: unlike
+     * {@link #getAnnotationsForType(Object)} a repeatable container is <b>not</b> unwrapped.
+     *
+     * @param element The element
+     * @return The annotations in source order
+     * @since 5.3.0
+     */
+    protected abstract List<? extends A> getWrittenAnnotations(T element);
+
+    /**
+     * Read the annotations written on the given element as the source wrote them: in source order, a repeatable
+     * annotation written once is itself, a written container is the container, repetitions arrive in the
+     * container the compiler synthesizes for them, no mapper, remapper,
+     * transformer or stereotype is applied, and every value carries the annotation interface's retention and its
+     * defaults for the members the use left out, empty values included.
+     *
+     * @param element The element
+     * @return The annotations, or an empty list
+     * @see io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate#getSourceAnnotations()
+     * @since 5.3.0
+     */
+    @NonNull
+    public List<AnnotationValue<?>> readSourceAnnotations(T element) {
+        List<? extends A> written = getWrittenAnnotations(element);
+        if (written.isEmpty()) {
+            return List.of();
+        }
+        List<AnnotationValue<?>> result = new ArrayList<>(written.size());
+        boolean wasValidating = validating;
+        // The values were validated when the metadata was built; do not report the same problems twice
+        validating = false;
+        try {
+            for (A annotationMirror : written) {
+                result.add(readSourceAnnotation(element, annotationMirror));
+            }
+        } finally {
+            validating = wasValidating;
+        }
+        return Collections.unmodifiableList(result);
+    }
+
+    private AnnotationValue<?> readSourceAnnotation(T element, A annotationMirror) {
+        String annotationName = getAnnotationTypeName(annotationMirror);
+        T annotationType = getTypeForAnnotation(annotationMirror);
+        RetentionPolicy retentionPolicy = getRetentionPolicy(annotationType);
+        Map<? extends T, ?> elementValues = readAnnotationRawValues(annotationMirror);
+        Map<CharSequence, Object> annotationValues = CollectionUtils.newLinkedHashMap(elementValues.size());
+        for (Map.Entry<? extends T, ?> entry : elementValues.entrySet()) {
+            T member = entry.getKey();
+            if (member == null) {
+                continue;
+            }
+            readAnnotationRawValues(element, annotationName, member, getAnnotationMemberName(member), entry.getValue(), annotationValues);
+        }
+        unwrapEvaluatedExpressions(annotationValues);
+        Map<? extends T, ?> nativeDefaults = readAnnotationDefaultValues(annotationName, annotationType, true);
+        Map<CharSequence, Object> defaultValues = getAnnotationDefaults(annotationType, annotationName, nativeDefaults, new HashMap<>());
+        if (defaultValues == null) {
+            defaultValues = Collections.emptyMap();
+        } else {
+            unwrapEvaluatedExpressions(defaultValues);
+        }
+        return new AnnotationValue<>(annotationName, annotationValues, defaultValues, retentionPolicy);
+    }
+
+    private static void unwrapEvaluatedExpressions(Map<CharSequence, Object> values) {
+        // The source wrote a string; the expression reference belongs to the metadata that is compiled
+        for (Map.Entry<CharSequence, Object> entry : values.entrySet()) {
+            if (entry.getValue() instanceof EvaluatedExpressionReference reference) {
+                entry.setValue(reference.annotationValue());
+            }
+        }
+    }
 
     /**
      * Build the type hierarchy for the given element.
@@ -2329,6 +2406,18 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
          */
         void markCleared();
 
+        /**
+         * The annotations as the source wrote them on the element this entry was built for.
+         *
+         * @return The annotations as written, or an empty list
+         * @see io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate#getSourceAnnotations()
+         * @since 5.3.0
+         */
+        @NonNull
+        default List<AnnotationValue<?>> getSourceAnnotations() {
+            return List.of();
+        }
+
     }
 
     /**
@@ -2435,6 +2524,11 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         public void markCleared() {
             current().markCleared();
         }
+
+        @Override
+        public List<AnnotationValue<?>> getSourceAnnotations() {
+            return shared.getSourceAnnotations();
+        }
     }
 
     private static final class DefaultCachedAnnotationMetadata implements CachedAnnotationMetadata {
@@ -2442,12 +2536,31 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         private AnnotationMetadata annotationMetadata;
         private boolean isMutated;
         private boolean cleared;
+        @Nullable
+        private Supplier<List<AnnotationValue<?>>> sourceAnnotationsSupplier;
+        @Nullable
+        private List<AnnotationValue<?>> sourceAnnotations;
 
         public DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata) {
+            this(annotationMetadata, null);
+        }
+
+        public DefaultCachedAnnotationMetadata(AnnotationMetadata annotationMetadata,
+                                               @Nullable Supplier<List<AnnotationValue<?>>> sourceAnnotationsSupplier) {
             if (annotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
                 throw new IllegalStateException();
             }
             this.annotationMetadata = annotationMetadata;
+            this.sourceAnnotationsSupplier = sourceAnnotationsSupplier;
+        }
+
+        @Override
+        public List<AnnotationValue<?>> getSourceAnnotations() {
+            if (sourceAnnotations == null) {
+                sourceAnnotations = sourceAnnotationsSupplier == null ? List.of() : sourceAnnotationsSupplier.get();
+                sourceAnnotationsSupplier = null;
+            }
+            return sourceAnnotations;
         }
 
         @Override

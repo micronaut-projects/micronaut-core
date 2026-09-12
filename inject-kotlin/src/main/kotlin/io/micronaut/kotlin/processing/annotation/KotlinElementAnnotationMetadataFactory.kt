@@ -17,6 +17,8 @@ package io.micronaut.kotlin.processing.annotation
 
 import com.google.devtools.ksp.symbol.KSAnnotated
 import com.google.devtools.ksp.symbol.KSAnnotation
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
@@ -118,10 +120,36 @@ internal class KotlinElementAnnotationMetadataFactory(
         if (kotlinPlaceholderElement.genericNativeType.owner == null) {
             throw ProcessingException(placeholderElement, "Type annotations an a generic placeholder require the owner element to be specified!")
         }
-        return metadataBuilder.lookupOrBuild(
+        val cached = metadataBuilder.lookupOrBuild(
             kotlinPlaceholderElement.genericNativeType,
             kotlinPlaceholderElement.genericNativeType.declaration
         )
+        val useType = kotlinPlaceholderElement.genericNativeType.type ?: return cached
+        // The metadata of a use of a type variable is that of its declaration; the source view reports
+        // what was written at the use
+        return SourceAnnotationsCachedAnnotationMetadata(cached) {
+            metadataBuilder.readSourceAnnotations(KotlinAnnotations(useType.annotations))
+        }
+    }
+
+    private class SourceAnnotationsCachedAnnotationMetadata(
+        private val delegate: CachedAnnotationMetadata,
+        supplier: () -> List<AnnotationValue<*>>
+    ) : CachedAnnotationMetadata {
+
+        private val resolvedSourceAnnotations: List<AnnotationValue<*>> by lazy(supplier)
+
+        override fun getAnnotationMetadata(): AnnotationMetadata = delegate.annotationMetadata
+
+        override fun isMutated() = delegate.isMutated
+
+        override fun update(annotationMetadata: AnnotationMetadata) = delegate.update(annotationMetadata)
+
+        override fun wasCleared() = delegate.wasCleared()
+
+        override fun markCleared() = delegate.markCleared()
+
+        override fun getSourceAnnotations() = resolvedSourceAnnotations
     }
 
     override fun lookupTypeAnnotationsForWildcard(wildcardElement: WildcardElement): CachedAnnotationMetadata {

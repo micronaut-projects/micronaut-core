@@ -16,6 +16,7 @@
 package io.micronaut.kotlin.processing.visitor
 
 import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy
 import io.micronaut.inject.ast.ClassElement
 import io.micronaut.inject.ast.Element
@@ -96,6 +97,9 @@ internal class KotlinGenericPlaceholderElement(
     override fun getAnnotationMetadataToWrite() = resolvedGenericTypeAnnotationMetadata
 
     override fun getGenericTypeAnnotationMetadata() = resolvedGenericTypeAnnotationMetadata
+
+    // What was written at this use of the variable, or on its declaration
+    override fun getSourceAnnotations(): List<AnnotationValue<*>> = getGenericTypeAnnotationMetadata().sourceAnnotations
 
     override fun getTypeAnnotationMetadata() = resolvedTypeAnnotationMetadata
 

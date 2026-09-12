@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -41,6 +42,11 @@ public interface ElementMutableAnnotationMetadataDelegate<R> extends MutableAnno
 
     @Override
     MutableAnnotationMetadataDelegate<?> getAnnotationMetadata();
+
+    @Override
+    default List<AnnotationValue<?>> getSourceAnnotations() {
+        return getAnnotationMetadata().getSourceAnnotations();
+    }
 
     @Override
     default <T extends Annotation> R annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {

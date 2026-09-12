@@ -25,6 +25,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.annotation.AbstractAnnotationMetadataBuilder;
 import io.micronaut.inject.annotation.AnnotationMapper;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
@@ -52,6 +53,7 @@ import org.jetbrains.annotations.Nullable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -306,6 +308,13 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     @Override
+    protected List<? extends DecoratorDef> getWrittenAnnotations(ElementDef element) {
+        // Python writes no repeatable containers, a repeated decorator is written once per repetition, and the
+        // decorators of a synthesized annotation declaration are the decorators applied to its declaring function
+        return getAnnotationsForType(element);
+    }
+
+    @Override
     protected List<? extends DecoratorDef> getAnnotationsForType(ElementDef element) {
         if (element instanceof AnnotationMemberDef memberDef) {
             List<DecoratorDef> memberAnnotations = toDecoratorDefs(memberDef.getAnnotationMetadata());
@@ -517,6 +526,30 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
         for (Map.Entry<?, ?> entry : decoratorDef.members().entrySet()) {
             String memberName = AnnotationNames.memberName(entry.getKey());
             defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, memberName), entry.getValue());
+        }
+        return defaultValues;
+    }
+
+    @Override
+    protected Map<? extends ElementDef, ?> readAnnotationDefaultValues(String annotationName, ElementDef annotationType, boolean includeEmptyValues) {
+        Map<? extends ElementDef, ?> pythonDefaults = readAnnotationDefaultValues(annotationName, annotationType);
+        if (!pythonDefaults.isEmpty()) {
+            return pythonDefaults;
+        }
+        // A Java annotation used from Python: the defaults are the ones the Java builder reads
+        JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
+        ClassElement javaAnnotationType = getJavaAnnotationType(annotationName);
+        if (javaVisitorContext == null || javaAnnotationType == null) {
+            return pythonDefaults;
+        }
+        Map<CharSequence, Object> javaDefaults = javaVisitorContext.getAnnotationMetadataBuilder().getAnnotationDefaultValues(annotationName);
+        Map<ElementDef, Object> defaultValues = CollectionUtils.newLinkedHashMap(javaDefaults.size());
+        for (Map.Entry<CharSequence, Object> entry : javaDefaults.entrySet()) {
+            Object value = entry.getValue();
+            if (!includeEmptyValues && (value instanceof String str && str.isEmpty() || value != null && value.getClass().isArray() && Array.getLength(value) == 0)) {
+                continue;
+            }
+            defaultValues.put(resolveMemberDef(annotationName, javaAnnotationType, entry.getKey().toString()), value);
         }
         return defaultValues;
     }

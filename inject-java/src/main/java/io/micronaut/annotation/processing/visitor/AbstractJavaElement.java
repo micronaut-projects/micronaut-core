@@ -265,7 +265,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                                          Set<TypeMirror> visitedTypes,
                                          boolean isTypeVariable,
                                          @Nullable String doc) {
-        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, null, doc);
+        return newClassElement(owner, type, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, doc);
     }
 
     private ClassElement newClassElement(@Nullable JavaNativeElement owner,
@@ -277,7 +277,6 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                                          boolean isRawTypeParameter,
                                          @Nullable
                                          TypeParameterElement representedTypeParameter,
-                                         @Nullable ArrayType arrayType,
                                          @Nullable String doc) {
         if (declaredTypeArguments == null) {
             declaredTypeArguments = Collections.emptyMap();
@@ -320,7 +319,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                     );
                 }
                 return new JavaClassElement(
-                    new JavaNativeElement.Class(typeElement, arrayType == null ? type : arrayType, owner),
+                    new JavaNativeElement.Class(typeElement, type, owner),
                     elementAnnotationMetadataFactory,
                     visitorContext,
                     typeMirrorArguments,
@@ -336,9 +335,12 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             return resolveTypeVariable(owner, declaredTypeArguments, visitedTypes, tv, isRawTypeParameter, doc);
         }
         if (type instanceof ArrayType at) {
-            TypeMirror componentType = at.getComponentType();
-            return newClassElement(owner, componentType, declaredTypeArguments, visitedTypes, isTypeVariable, false, null, at, doc)
-                .toArray();
+            // The component holds its own mirror; each dimension holds the mirror of that dimension
+            ClassElement componentElement = newClassElement(owner, at.getComponentType(), declaredTypeArguments, visitedTypes, isTypeVariable, false, null, doc);
+            if (componentElement instanceof JavaClassElement javaComponentElement) {
+                return javaComponentElement.toArray(at);
+            }
+            return componentElement.toArray();
         }
         if (type instanceof PrimitiveType pt) {
             return PrimitiveElement.valueOf(pt.getKind().name(), doc);
@@ -433,7 +435,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null, null)
+                    newClassElement(getNativeType(), typeParameterMirror, parentTypeArguments, visitedTypes, typeParameterMirror instanceof TypeVariable, false, typeParameter, null)
                 );
             }
         } else {
@@ -444,7 +446,7 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 String variableName = typeParameter.getSimpleName().toString();
                 resolved.put(
                     variableName,
-                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null, null)
+                    newClassElement(getNativeType(), typeParameter.asType(), parentTypeArguments, visitedTypes, true, isRaw, null, null)
                 );
             }
         }

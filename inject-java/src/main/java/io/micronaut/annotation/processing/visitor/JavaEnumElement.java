@@ -28,6 +28,7 @@ import javax.lang.model.element.Element;
 import javax.lang.model.element.ElementKind;
 import javax.lang.model.element.TypeElement;
 import javax.lang.model.element.VariableElement;
+import javax.lang.model.type.ArrayType;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -152,6 +153,14 @@ class JavaEnumElement extends JavaClassElement implements EnumElement {
     @Override
     public ClassElement withArrayDimensions(int arrayDimensions) {
         return new JavaEnumElement(getNativeType(), elementAnnotationMetadataFactory, visitorContext, arrayDimensions, doc);
+    }
+
+    @Override
+    ClassElement toArray(ArrayType arrayType) {
+        JavaNativeElement.Class nativeType = getNativeType();
+        return new JavaEnumElement(
+            new JavaNativeElement.Class(nativeType.element(), arrayType, nativeType.owner()),
+            elementAnnotationMetadataFactory, visitorContext, getArrayDimensions() + 1, doc);
     }
 
 }

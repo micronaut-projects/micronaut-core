@@ -16,6 +16,7 @@
 package io.micronaut.ast.groovy.visitor;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -75,6 +76,12 @@ final class GroovyWildcardElement extends GroovyClassElement implements Wildcard
     }
 
     @NonNull
+    @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        // What was written at this use of the variable, or on its declaration
+        return getGenericTypeAnnotationMetadata().getSourceAnnotations();
+    }
+
     @Override
     public MutableAnnotationMetadataDelegate<AnnotationMetadata> getGenericTypeAnnotationMetadata() {
         if (genericTypeAnnotationMetadata == null) {

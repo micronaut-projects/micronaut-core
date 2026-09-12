@@ -34,10 +34,13 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.WildcardElement;
 import org.jspecify.annotations.NullUnmarked;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Abstract element annotation metadata factory.
@@ -89,6 +92,21 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
 
     @Override
     public ElementAnnotationMetadata buildMutable(AnnotationMetadata originalAnnotationMetadata) {
+        return buildMutable(originalAnnotationMetadata, List::of);
+    }
+
+    /**
+     * Builds mutable metadata that is not backed by a cache entry, such as the type annotations a language
+     * implementation builds for a type use, together with the annotations the source wrote for it.
+     *
+     * @param originalAnnotationMetadata The metadata
+     * @param sourceAnnotations          The annotations as written, read once when first asked for
+     * @return The element annotation metadata
+     * @see MutableAnnotationMetadataDelegate#getSourceAnnotations()
+     * @since 5.3.0
+     */
+    public ElementAnnotationMetadata buildMutable(AnnotationMetadata originalAnnotationMetadata,
+                                                  Supplier<List<AnnotationValue<?>>> sourceAnnotations) {
         if (originalAnnotationMetadata instanceof AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata) {
             throw new IllegalStateException();
         }
@@ -98,10 +116,20 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
         return new MutableElementAnnotationMetadata() {
 
             private AnnotationMetadata thisAnnotationMetadata = originalAnnotationMetadata;
+            @Nullable
+            private List<AnnotationValue<?>> resolvedSourceAnnotations;
 
             @Override
             public AnnotationMetadata getAnnotationMetadata() {
                 return thisAnnotationMetadata;
+            }
+
+            @Override
+            public List<AnnotationValue<?>> getSourceAnnotations() {
+                if (resolvedSourceAnnotations == null) {
+                    resolvedSourceAnnotations = sourceAnnotations.get();
+                }
+                return resolvedSourceAnnotations;
             }
 
             @Override
@@ -309,6 +337,12 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
             }
 
             @Override
+            public List<AnnotationValue<?>> getSourceAnnotations() {
+                // A property is synthesized from its getter, setter and field; no source writes on it
+                return List.of();
+            }
+
+            @Override
             public String toString() {
                 return propertyElement.toString();
             }
@@ -501,6 +535,12 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
                 return annotationMetadata;
             }
             return getCacheEntry();
+        }
+
+        @Override
+        public List<AnnotationValue<?>> getSourceAnnotations() {
+            // What the source wrote does not change when the metadata is mutated
+            return getCacheEntry().getSourceAnnotations();
         }
 
         @Override

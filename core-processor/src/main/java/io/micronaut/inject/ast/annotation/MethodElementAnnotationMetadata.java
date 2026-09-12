@@ -16,8 +16,11 @@
 package io.micronaut.inject.ast.annotation;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.MethodElement;
+
+import java.util.List;
 
 /**
  * The element annotation metadata for a method element.
@@ -53,5 +56,11 @@ public final class MethodElementAnnotationMetadata extends AbstractElementAnnota
     @Override
     protected MutableAnnotationMetadataDelegate<?> getAnnotationMetadataToWrite() {
         return writeAnnotationMetadata;
+    }
+
+    @Override
+    public List<AnnotationValue<?>> getSourceAnnotations() {
+        // The method's own annotations, not those of the owning type
+        return writeAnnotationMetadata.getSourceAnnotations();
     }
 }
