@@ -33,6 +33,10 @@ snippet::io.micronaut.docs.aop.around.AroundSpec[tags="test", indent=0, title="A
 
 NOTE: Since Micronaut injection happens at compile time, generally the advice should be packaged in a dependent JAR file that is on the classpath when the above test is compiled. It should not be in the same codebase since you don't want the test to be compiled before the advice itself is compiled.
 
+=== Around Advice and Scheduled Tasks
+
+An intercepted method may also be a <<scheduling, scheduled task>>. When the scheduler fires the task, `isScheduled()` on the api:aop.MethodInvocationContext[] returns `true`; for a direct call to the same method from application code it returns `false`. Advice that must only apply to the scheduled firings, such as a Jakarta Interceptors style around-timeout method, checks this flag before acting. See <<scheduling, Scheduled Tasks>> for the details.
+
 == Customizing Proxy Generation
 
 The default behaviour of the link:{api}/io/micronaut/aop/Around.html[Around] annotation is to generate a proxy at compile time that is a subclass of the proxied class. In other words, in the previous example a compile-time subclass of the `NotNullExample` class will be produced where proxied methods are decorated with interceptor handling, and the original behaviour is invoked via a call to `super`.

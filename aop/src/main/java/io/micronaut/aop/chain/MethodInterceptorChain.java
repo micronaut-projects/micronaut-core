@@ -22,6 +22,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.MethodInterceptor;
 import io.micronaut.aop.MethodInvocationContext;
+import io.micronaut.aop.ScheduledInvocation;
 import io.micronaut.aop.exceptions.UnimplementedAdviceException;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
@@ -60,6 +61,7 @@ import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
 public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> implements MethodInvocationContext<T, R> {
 
     private final @Nullable InterceptorKind kind;
+    private final boolean scheduled;
 
     /**
      * Constructor for empty parameters.
@@ -88,6 +90,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         @Nullable InterceptorKind kind) {
         super(interceptors, target, executionHandle, EMPTY_OBJECT_ARRAY);
         this.kind = kind;
+        this.scheduled = ScheduledInvocation.claim(target, executionHandle);
     }
 
     /**
@@ -102,6 +105,17 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     public MethodInterceptorChain(Interceptor<T, R>[] interceptors, T target, ExecutableMethod<T, R> executionHandle, @Nullable Object... originalParameters) {
         super(interceptors, target, executionHandle, originalParameters);
         this.kind = null;
+        this.scheduled = ScheduledInvocation.claim(target, executionHandle);
+    }
+
+    private MethodInterceptorChain(Interceptor<T, R>[] interceptors,
+                                   T target,
+                                   ExecutableMethod<T, R> executionHandle,
+                                   @Nullable Object[] originalParameters,
+                                   boolean scheduled) {
+        super(interceptors, target, executionHandle, originalParameters);
+        this.kind = null;
+        this.scheduled = scheduled;
     }
 
     @Override
@@ -112,12 +126,17 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     @Override
     @Nullable
     public R invoke(T instance, @Nullable Object... arguments) {
-        return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters).proceed();
+        return new MethodInterceptorChain<>(interceptors, instance, executionHandle, originalParameters, scheduled).proceed();
     }
 
     @Override
     public boolean isSuspend() {
         return executionHandle.isSuspend();
+    }
+
+    @Override
+    public boolean isScheduled() {
+        return scheduled;
     }
 
     @Override

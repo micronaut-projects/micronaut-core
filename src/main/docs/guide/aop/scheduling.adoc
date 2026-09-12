@@ -75,6 +75,41 @@ micronaut:
 
 include::{includedir}configurationProperties/io.micronaut.scheduling.executor.UserExecutorConfiguration.adoc[]
 
+== Intercepting Scheduled Invocations
+
+A `@Scheduled` method is an ordinary method: application code can call it directly, and any api:aop.Around[] advice applied to it runs for both kinds of call. When the scheduler fires the task, the api:aop.MethodInvocationContext[] passed to the interceptors reports it through `isScheduled()`, so that advice which should only apply to scheduled firings, such as a Jakarta Interceptors style around-timeout method, can tell the two apart:
+
+[source,java]
+----
+@Singleton
+public class TimeoutInterceptor implements MethodInterceptor<Object, Object> {
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        if (!context.isScheduled()) {
+            return context.proceed(); // <1>
+        }
+        // <2>
+        return context.proceed();
+    }
+}
+----
+
+<1> A direct call from application code, or a call made by a scheduled method in turn
+<2> The scheduler firing the task
+
+The flag is set for the invocation of the scheduled method only. A direct call to the same method on the same bean, a recursive call, and the methods the scheduled method calls in turn all report `false`, even when they carry the same advice.
+
+Code that fires methods on its own schedule, such as a timer service integration, can mark its invocations the same way through api:aop.ScheduledInvocation[]:
+
+[source,java]
+----
+ExecutableMethod<MyTask, Object> method = beanDefinition.getRequiredMethod("run");
+ScheduledInvocation.invoke(method, bean); // <1>
+----
+
+<1> Invokes `run()` on the bean, which may be an AOP proxy, with the marker bound for that invocation
+
 == Handling Exceptions
 
 By default, the Micronaut framework includes a api:io.micronaut.scheduling.DefaultTaskExceptionHandler[] bean that implements the api:io.micronaut.scheduling.TaskExceptionHandler[] interface and simply logs the exception if an error occurs invoking a scheduled task.
