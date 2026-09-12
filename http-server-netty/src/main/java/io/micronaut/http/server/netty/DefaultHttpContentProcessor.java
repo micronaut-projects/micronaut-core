@@ -28,10 +28,17 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * This class will handle subscribing to a stream of {@link io.netty.handler.codec.http.HttpContent}.
  *
+ * <p>Nothing in this repository uses this class any more, but it is still constructed directly by
+ * {@code MicronautNettyChannelResolver} in micronaut-spring (spring-web), so it has to stay until
+ * that module stops depending on it and the {@link HttpContentProcessor} API is removed.
+ *
  * @author Graeme Rocher
  * @since 1.0
+ * @deprecated Use the {@link io.micronaut.http.body.MessageBodyReader} API instead. Kept only for
+ * micronaut-spring; will be removed together with {@link HttpContentProcessor}.
  */
 @Internal
+@Deprecated(forRemoval = true, since = "4.0.0")
 public class DefaultHttpContentProcessor implements HttpContentProcessor {
 
     protected final NettyHttpRequest<?> nettyHttpRequest;
