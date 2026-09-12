@@ -44,9 +44,7 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import java.util.Iterator;
 import java.util.Objects;
 
 final class Compressor {
@@ -93,11 +91,7 @@ final class Compressor {
             // already encoded
             return null;
         }
-        List<String> acceptEncoding = new ArrayList<>();
-        for (String s : request.headers().getAll(HttpHeaderNames.ACCEPT_ENCODING)) {
-            acceptEncoding.addAll(Arrays.asList(s.split(",")));
-        }
-        Algorithm encoding = determineEncoding(acceptEncoding);
+        Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
             return null;
         }
@@ -116,9 +110,17 @@ final class Compressor {
         return new BrotliEncoder(Objects.requireNonNull(brotliOptions, "Brotli not available").parameters());
     }
 
+    /**
+     * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
+     * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
+     * place, without splitting the header into strings.
+     *
+     * @param acceptEncodingValues The raw header values
+     * @return The algorithm to use, or {@code null} for no compression
+     */
     @SuppressWarnings("FloatingPointEquality")
     @Nullable
-    private Algorithm determineEncoding(List<String> acceptEncoding) {
+    Algorithm determineEncoding(Iterator<String> acceptEncodingValues) {
         // from HttpContentCompressor, slightly modified
         float starQ = -1.0f;
         float brQ = -1.0f;
@@ -126,29 +128,39 @@ final class Compressor {
         float snappyQ = -1.0f;
         float gzipQ = -1.0f;
         float deflateQ = -1.0f;
-        for (String encoding : acceptEncoding) {
-            float q = 1.0f;
-            int equalsPos = encoding.indexOf('=');
-            if (equalsPos != -1) {
-                try {
-                    q = Float.parseFloat(encoding.substring(equalsPos + 1));
-                } catch (NumberFormatException e) {
-                    // Ignore encoding
-                    q = 0.0f;
+        while (acceptEncodingValues.hasNext()) {
+            String header = acceptEncodingValues.next();
+            int length = header.length();
+            int start = 0;
+            while (start <= length) {
+                int end = header.indexOf(',', start);
+                if (end == -1) {
+                    end = length;
                 }
-            }
-            if (encoding.contains("*")) {
-                starQ = q;
-            } else if (encoding.contains("br") && q > brQ) {
-                brQ = q;
-            } else if (encoding.contains("zstd") && q > zstdQ) {
-                zstdQ = q;
-            } else if (encoding.contains("snappy") && q > snappyQ) {
-                snappyQ = q;
-            } else if (encoding.contains("gzip") && q > gzipQ) {
-                gzipQ = q;
-            } else if (encoding.contains("deflate") && q > deflateQ) {
-                deflateQ = q;
+                float q = 1.0f;
+                int equalsPos = header.indexOf('=', start);
+                if (equalsPos != -1 && equalsPos < end) {
+                    try {
+                        q = Float.parseFloat(header.substring(equalsPos + 1, end));
+                    } catch (NumberFormatException e) {
+                        // Ignore encoding
+                        q = 0.0f;
+                    }
+                }
+                if (contains(header, start, end, "*")) {
+                    starQ = q;
+                } else if (contains(header, start, end, "br") && q > brQ) {
+                    brQ = q;
+                } else if (contains(header, start, end, "zstd") && q > zstdQ) {
+                    zstdQ = q;
+                } else if (contains(header, start, end, "snappy") && q > snappyQ) {
+                    snappyQ = q;
+                } else if (contains(header, start, end, "gzip") && q > gzipQ) {
+                    gzipQ = q;
+                } else if (contains(header, start, end, "deflate") && q > deflateQ) {
+                    deflateQ = q;
+                }
+                start = end + 1;
             }
         }
         if (brQ > 0.0f || zstdQ > 0.0f || snappyQ > 0.0f || gzipQ > 0.0f || deflateQ > 0.0f) {
@@ -184,7 +196,15 @@ final class Compressor {
         return null;
     }
 
-    private enum Algorithm {
+    /**
+     * Whether {@code needle} occurs inside {@code s[start, end)}.
+     */
+    private static boolean contains(String s, int start, int end, String needle) {
+        int i = s.indexOf(needle, start);
+        return i != -1 && i + needle.length() <= end;
+    }
+
+    enum Algorithm {
         BR(HttpHeaderValues.BR),
         ZSTD(HttpHeaderValues.ZSTD),
         SNAPPY(HttpHeaderValues.SNAPPY),

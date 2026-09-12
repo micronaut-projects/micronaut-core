@@ -57,7 +57,9 @@ import tools.jackson.databind.cfg.MapperBuilder;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
 
 /**
@@ -76,6 +78,13 @@ public final class JacksonDatabindMapper implements JsonMapper {
      */
     public static final String PROPERTY_JSON_VIEW_ENABLED = "jackson.json-view.enabled";
 
+    /**
+     * Number of slots in the reader and writer caches. Must be a power of two. Each slot holds
+     * the reader or writer for one type, selected by the type hash, so the caches never hold more
+     * than this many entries regardless of how many distinct types are seen.
+     */
+    private static final int TYPE_CACHE_SIZE = 64;
+
     private final ObjectMapper objectMapper;
     private final JsonStreamConfig config;
     private final JsonNodeTreeCodec treeCodec;
@@ -85,10 +94,16 @@ public final class JacksonDatabindMapper implements JsonMapper {
     private final ObjectWriter specializedWriter;
     private final boolean allowViews;
 
+    /**
+     * Per-type caches, only allocated for a general mapper. A specialized mapper (one with a
+     * {@link #specializedReader} and {@link #specializedWriter}) answers every lookup with those
+     * two and never touches the caches, and one such mapper is created per route, so they are
+     * {@code null} there.
+     */
     @Nullable
-    private TypeCache<ObjectReader> cachedReader;
+    private final AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders;
     @Nullable
-    private TypeCache<ObjectWriter> cachedWriter;
+    private final AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters;
 
     @Internal
     public JacksonDatabindMapper(ObjectMapper objectMapper) {
@@ -106,6 +121,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
         this.specializedReader = null;
         this.specializedWriter = null;
+        this.cachedReaders = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
+        this.cachedWriters = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
     }
 
     @Internal
@@ -120,6 +137,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.specializedReader = from.createReader(type);
         this.specializedWriter = from.createWriter(type);
         this.allowViews = allowViews;
+        this.cachedReaders = null;
+        this.cachedWriters = null;
     }
 
     private JacksonDatabindMapper(JacksonDatabindMapper from, ObjectReader reader, ObjectWriter writer) {
@@ -129,6 +148,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.specializedReader = reader;
         this.specializedWriter = writer;
         this.allowViews = from.allowViews;
+        this.cachedReaders = null;
+        this.cachedWriters = null;
     }
 
     private static ObjectMapper createDefaultMapper() {
@@ -155,40 +176,90 @@ public final class JacksonDatabindMapper implements JsonMapper {
         return jacksonDatabindMapper;
     }
 
-    private ObjectReader createReader(Argument<?> type) {
+    /**
+     * Get the {@link ObjectReader} for the given type. Readers are cached per type (see
+     * {@link TypeCache}); package-private for tests.
+     *
+     * @param type The type to read
+     * @return The reader
+     */
+    ObjectReader createReader(Argument<?> type) {
         if (specializedReader != null) {
             return specializedReader;
         }
-        TypeCache<ObjectReader> cachedReader = this.cachedReader;
-        if (cachedReader != null && cachedReader.type == type) {
-            return cachedReader.cachedValue;
+        AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders = Objects.requireNonNull(this.cachedReaders);
+        int typeHash = type.typeHashCode();
+        int slot = slot(typeHash, null);
+        TypeCache<ObjectReader> cached = cachedReaders.get(slot);
+        if (cached != null && cached.type == type) {
+            return cached.cachedValue;
+        }
+        Class<?> view = viewOf(type);
+        if (view != null) {
+            slot = slot(typeHash, view);
+            cached = cachedReaders.get(slot);
+        }
+        if (cached != null && cached.matches(type, view)) {
+            return cached.cachedValue;
         }
         ObjectReader reader = objectMapper.readerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
-        @SuppressWarnings("rawtypes")
-        Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
-        if (view.isPresent()) {
-            reader = reader.withView(view.get());
+        if (view != null) {
+            reader = reader.withView(view);
         }
-        this.cachedReader = new TypeCache<>(type, reader);
+        cachedReaders.set(slot, new TypeCache<>(type, view, reader));
         return reader;
     }
 
-    private ObjectWriter createWriter(Argument<?> type) {
+    /**
+     * Get the {@link ObjectWriter} for the given type. Writers are cached per type (see
+     * {@link TypeCache}); package-private for tests.
+     *
+     * @param type The type to write
+     * @return The writer
+     */
+    ObjectWriter createWriter(Argument<?> type) {
         if (specializedWriter != null) {
             return specializedWriter;
         }
-        TypeCache<ObjectWriter> cachedWriter = this.cachedWriter;
-        if (cachedWriter != null && cachedWriter.type == type) {
-            return cachedWriter.cachedValue;
+        AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters = Objects.requireNonNull(this.cachedWriters);
+        int typeHash = type.typeHashCode();
+        int slot = slot(typeHash, null);
+        TypeCache<ObjectWriter> cached = cachedWriters.get(slot);
+        if (cached != null && cached.type == type) {
+            return cached.cachedValue;
+        }
+        Class<?> view = viewOf(type);
+        if (view != null) {
+            slot = slot(typeHash, view);
+            cached = cachedWriters.get(slot);
+        }
+        if (cached != null && cached.matches(type, view)) {
+            return cached.cachedValue;
         }
         ObjectWriter writer = objectMapper.writerFor(JacksonConfiguration.constructType(type, objectMapper.getTypeFactory()));
-        @SuppressWarnings("rawtypes")
-        Optional<Class> view = type.getAnnotationMetadata().classValue(JsonView.class);
-        if (view.isPresent()) {
-            writer = writer.withView(view.get());
+        if (view != null) {
+            writer = writer.withView(view);
         }
-        this.cachedWriter = new TypeCache<>(type, writer);
+        cachedWriters.set(slot, new TypeCache<>(type, view, writer));
         return writer;
+    }
+
+    @Nullable
+    private static Class<?> viewOf(Argument<?> type) {
+        return type.getAnnotationMetadata().classValue(JsonView.class).orElse(null);
+    }
+
+    /**
+     * Cache slot for a type. Arguments without a view use the slot of the type hash alone, so
+     * the identity check in the callers can look there before resolving the view; arguments with
+     * a view use a slot derived from both, so a viewed and an unviewed argument of the same type
+     * do not evict each other.
+     */
+    private static int slot(int typeHash, @Nullable Class<?> view) {
+        int h = view == null ? typeHash : typeHash ^ (31 * view.hashCode());
+        // spread the high bits, since typeHashCode of a simple class argument is 31 * (31 + identityHash)
+        h ^= h >>> 16;
+        return h & (TYPE_CACHE_SIZE - 1);
     }
 
     @Override
@@ -339,6 +410,25 @@ public final class JacksonDatabindMapper implements JsonMapper {
         return treeCodec.treeAsTokens(tree, context);
     }
 
-    private record TypeCache<T>(Argument<?> type, T cachedValue) {
+    /**
+     * One entry of the per-type reader or writer cache. The reader or writer for a type depends
+     * on the type (including its type arguments) and on the {@link JsonView} class on the
+     * argument, so an entry matches an argument that has the same type and the same view; the
+     * {@link Argument} instance need not be the same, which matters for arguments created per
+     * request with {@link Argument#ofInstance(Object)}.
+     *
+     * <p>The caches are fixed-size arrays indexed by type hash. A type whose slot is taken by
+     * another type simply replaces that entry, so the cache never grows past its size and a
+     * lookup never allocates.
+     *
+     * @param type        The argument the value was created for
+     * @param view        The {@link JsonView} class of {@code type}, or {@code null}
+     * @param cachedValue The reader or writer
+     * @param <T>         The value type
+     */
+    private record TypeCache<T>(Argument<?> type, @Nullable Class<?> view, T cachedValue) {
+        boolean matches(Argument<?> type, @Nullable Class<?> view) {
+            return this.view == view && this.type.equalsType(type);
+        }
     }
 }
