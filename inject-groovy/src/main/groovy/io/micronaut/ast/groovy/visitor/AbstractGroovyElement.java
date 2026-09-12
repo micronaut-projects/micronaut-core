@@ -30,6 +30,7 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -217,7 +218,15 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             return newClassElement(declaredElement, getNativeType().annotatedNode(), genericsType, redirectType, parentTypeArguments, visitedTypes, isRawTypeParameter);
         }
         if (ClassHelper.isPrimitiveType(classNode)) {
-            return PrimitiveElement.valueOf(classNode.getName());
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(classNode.getName());
+            if (CollectionUtils.isNotEmpty(classNode.getTypeAnnotations())) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                var factory = (AbstractElementAnnotationMetadataFactory<?, ?>) elementAnnotationMetadataFactory;
+                return primitiveElement.withTypeAnnotationMetadata(
+                    factory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode)
+                );
+            }
+            return primitiveElement;
         }
         if (classNode.isEnum()) {
             return new GroovyEnumElement(visitorContext, new GroovyNativeElement.Class(classNode), elementAnnotationMetadataFactory);

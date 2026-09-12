@@ -32,6 +32,7 @@ import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
+import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 
 import javax.lang.model.element.Element;
@@ -341,7 +342,15 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
                 .toArray();
         }
         if (type instanceof PrimitiveType pt) {
-            return PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            if (!pt.getAnnotationMirrors().isEmpty()) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                var factory = (AbstractElementAnnotationMetadataFactory<?, ?>) elementAnnotationMetadataFactory;
+                return primitiveElement.withTypeAnnotationMetadata(
+                    factory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(pt), pt)
+                );
+            }
+            return primitiveElement;
         }
         if (type instanceof WildcardType wt) {
             return resolveWildcard(owner, declaredTypeArguments, visitedTypes, representedTypeParameter, wt, doc);
