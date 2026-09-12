@@ -16,10 +16,10 @@
 package io.micronaut.http.server.netty.handler.accesslog.element;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
 import io.netty.channel.Channel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
-import io.netty.channel.unix.DomainSocketChannel;
 import io.netty.handler.codec.quic.QuicChannel;
 
 import java.net.SocketAddress;
@@ -33,30 +33,38 @@ import java.util.Optional;
  */
 @Internal
 final class ConnectionMetadataImpl {
+    @Nullable
     static final Class<?> QUIC_CHANNEL;
+    @Nullable
     static final Class<?> DOMAIN_SOCKET_ADDRESS;
+    @Nullable
     static final Class<?> DOMAIN_SOCKET_CHANNEL;
 
     static {
-        Class<QuicChannel> quicChannelClass;
-        try {
-            quicChannelClass = QuicChannel.class;
-        } catch (Exception e) {
-            quicChannelClass = null;
-        }
-        QUIC_CHANNEL = quicChannelClass;
+        // These types come from optional netty modules. They must be looked up by name: a class
+        // literal is resolved by the JVM and a missing class surfaces as NoClassDefFoundError, an
+        // Error that an Exception handler does not see, which would fail this initializer.
+        QUIC_CHANNEL = optionalClass("io.netty.handler.codec.quic.QuicChannel");
+        DOMAIN_SOCKET_ADDRESS = optionalClass("io.netty.channel.unix.DomainSocketAddress");
+        DOMAIN_SOCKET_CHANNEL = optionalClass("io.netty.channel.unix.DomainSocketChannel");
+    }
 
-        Class<DomainSocketAddress> domainSocketAddressClass;
-        Class<DomainSocketChannel> domainSocketChannelClass;
+    private ConnectionMetadataImpl() {
+    }
+
+    /**
+     * Look up a class from an optional dependency.
+     *
+     * @param name The binary class name
+     * @return The class, or {@code null} if it, or anything it depends on, is not available
+     */
+    @Nullable
+    static Class<?> optionalClass(String name) {
         try {
-            domainSocketAddressClass = DomainSocketAddress.class;
-            domainSocketChannelClass = DomainSocketChannel.class;
-        } catch (Exception e) {
-            domainSocketAddressClass = null;
-            domainSocketChannelClass = null;
+            return Class.forName(name, false, ConnectionMetadataImpl.class.getClassLoader());
+        } catch (ClassNotFoundException | LinkageError e) {
+            return null;
         }
-        DOMAIN_SOCKET_ADDRESS = domainSocketAddressClass;
-        DOMAIN_SOCKET_CHANNEL = domainSocketChannelClass;
     }
 
     static class DomainSocketUtil {
