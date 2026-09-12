@@ -35,6 +35,7 @@ import io.netty.util.ResourceLeakDetectorFactory;
 import io.netty.util.ResourceLeakTracker;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -243,13 +244,13 @@ public final class StreamingNettyByteBody extends BaseStreamingByteBody<Streamin
         }
 
         @Override
-        public void add(ReadBuffer rb) {
+        protected @Nullable List<ReadBuffer> addGuarded(ReadBuffer rb, boolean completeAfter) {
             if (!eventLoop.inEventLoop()) {
                 throw new IllegalStateException("Must only be called on event loop");
             }
             adding = true;
             try {
-                super.add(rb);
+                return super.addGuarded(rb, completeAfter);
             } finally {
                 adding = false;
             }

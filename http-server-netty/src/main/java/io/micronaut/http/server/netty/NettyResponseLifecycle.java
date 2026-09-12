@@ -36,6 +36,7 @@ import io.micronaut.http.server.ResponseLifecycle;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.handler.codec.http.HttpContent;
 import io.netty.util.LeakPresenceDetector;
+import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
@@ -120,9 +121,9 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
         }
 
         @Override
-        protected void forwardComplete() {
-            if (flow.executeNow(super::forwardComplete)) {
-                super.forwardComplete();
+        protected void forwardComplete(@Nullable ReadBuffer trailing) {
+            if (flow.executeNow(() -> super.forwardComplete(trailing))) {
+                super.forwardComplete(trailing);
             }
         }
 

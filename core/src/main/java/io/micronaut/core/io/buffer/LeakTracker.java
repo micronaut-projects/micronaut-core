@@ -83,10 +83,15 @@ public interface LeakTracker<T> {
          */
         static <R> R staticInitializer(Supplier<R> supplier) {
             if (LeakTrackerFactoryHolder.nettyAvailable) {
-                return LeakPresenceDetector.staticInitializer(supplier);
-            } else {
-                return supplier.get();
+                try {
+                    return LeakPresenceDetector.staticInitializer(supplier);
+                } catch (LinkageError err) {
+                    // netty is not on the class path. forClass(Class) discovers the same thing, but
+                    // whichever of the two runs first has to survive it.
+                    LeakTrackerFactoryHolder.nettyAvailable = false;
+                }
             }
+            return supplier.get();
         }
     }
 }
