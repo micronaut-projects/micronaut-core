@@ -29,6 +29,20 @@ dependencies {
     testRuntimeOnly(libs.junit.jupiter.engine)
 }
 
+// javax.inject:javax.inject has no module descriptor or Automatic-Module-Name,
+// so Gradle otherwise leaves it on the classpath when compiling this module.
+val mainModulePath = configurations.compileClasspath
+tasks.named<JavaCompile>("compileJava") {
+    modularity.inferModulePath.set(false)
+    classpath = files()
+    inputs.files(mainModulePath)
+        .withPropertyName("modulePath")
+        .withNormalizer(ClasspathNormalizer::class.java)
+    options.compilerArgumentProviders.add(CommandLineArgumentProvider {
+        listOf("--module-path", mainModulePath.get().asPath)
+    })
+}
+
 tasks.withType<Test>().configureEach {
     if (JavaVersion.current().majorVersion.toInt() >= 21) {
         logger.warn("Opening java.util and java.lang, so SystemLambda can work")

@@ -25,6 +25,7 @@ import java.io.Closeable;
 import java.io.IOException;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.lang.module.ModuleReader;
 import java.net.URI;
 import java.nio.file.FileVisitResult;
 import java.nio.file.FileVisitor;
@@ -43,6 +44,7 @@ import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 /**
  * The loader of Micronaut services under META-INF/micronaut/.
@@ -55,7 +57,8 @@ public final class MicronautMetaServiceLoaderUtils {
 
     private static final String MICRONAUT_SERVICES_PATH = "META-INF/micronaut/";
 
-    private static final MethodHandles.Lookup LOOKUP = MethodHandles.publicLookup();
+    private static final MethodHandles.Lookup PUBLIC_LOOKUP = MethodHandles.publicLookup();
+    private static final MethodHandles.Lookup LOOKUP = MethodHandles.lookup();
     private static final MethodType VOID_TYPE = MethodType.methodType(void.class);
 
     @Nullable
@@ -114,10 +117,6 @@ public final class MicronautMetaServiceLoaderUtils {
      */
     public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
         List<URI> resourceDefs = IOUtils.getResources(classLoader, MICRONAUT_SERVICES_PATH);
-        if (resourceDefs.isEmpty()) {
-            return Map.of();
-        }
-
         Map<String, Set<String>> services = new LinkedHashMap<>();
 
         FileVisitor<Path> visitor = new FileVisitor<>() {
@@ -183,7 +182,44 @@ public final class MicronautMetaServiceLoaderUtils {
                 }
             }
         }
+        collectModuleServices(classLoader, services);
         return services;
+    }
+
+    private static void collectModuleServices(ClassLoader classLoader, Map<String, Set<String>> services) {
+        // ClassLoader#getResources does not enumerate resources encapsulated in named modules.
+        ModuleLayer moduleLayer = MicronautMetaServiceLoaderUtils.class.getModule().getLayer();
+        if (moduleLayer == null) {
+            return;
+        }
+        for (Module module : moduleLayer.modules()) {
+            if (module.getClassLoader() != classLoader) {
+                continue;
+            }
+            var resolvedModule = moduleLayer.configuration().findModule(module.getName());
+            if (resolvedModule.isEmpty()) {
+                continue;
+            }
+            try (ModuleReader reader = resolvedModule.get().reference().open(); Stream<String> resources = reader.list()) {
+                resources.forEach(resource -> addModuleService(resource, services));
+            } catch (IOException ignored) {
+                // Ignore unreadable modules just like unreadable classpath resources.
+            }
+        }
+    }
+
+    private static void addModuleService(String resource, Map<String, Set<String>> services) {
+        if (!resource.startsWith(MICRONAUT_SERVICES_PATH)) {
+            return;
+        }
+        String relativePath = resource.substring(MICRONAUT_SERVICES_PATH.length());
+        int separator = relativePath.indexOf('/');
+        if (separator < 1 || separator == relativePath.length() - 1 || relativePath.indexOf('/', separator + 1) >= 0) {
+            return;
+        }
+        String serviceName = relativePath.substring(0, separator);
+        String implementationName = relativePath.substring(separator + 1);
+        services.computeIfAbsent(serviceName, ignored -> new LinkedHashSet<>()).add(implementationName);
     }
 
     @Nullable
@@ -191,8 +227,19 @@ public final class MicronautMetaServiceLoaderUtils {
         try {
             @SuppressWarnings("unchecked") final Class<S> loadedClass =
                 (Class<S>) Class.forName(className, false, classLoader);
-            // MethodHandler should more performant than the basic reflection
-            return (S) LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
+            try {
+                return (S) PUBLIC_LOOKUP.findConstructor(loadedClass, VOID_TYPE).invoke();
+            } catch (IllegalAccessException e) {
+                Module loaderModule = MicronautMetaServiceLoaderUtils.class.getModule();
+                Module serviceModule = loadedClass.getModule();
+                if (!loaderModule.canRead(serviceModule)) {
+                    loaderModule.addReads(serviceModule);
+                }
+                // Generated definitions live in application packages, which named applications open to Micronaut core.
+                return (S) MethodHandles.privateLookupIn(loadedClass, LOOKUP)
+                    .findConstructor(loadedClass, VOID_TYPE)
+                    .invoke();
+            }
         } catch (NoClassDefFoundError | ClassNotFoundException | NoSuchMethodException |
                  IllegalAccessException | IllegalAccessError e) {
             // Ignore

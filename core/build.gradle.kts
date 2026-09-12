@@ -43,6 +43,9 @@ val versionInfo = tasks.register<WriteProperties>("micronautVersionInfo") {
 }
 
 tasks {
+    checkstyleMain {
+        exclude("module-info.java")
+    }
     processResources {
         from(versionInfo)
     }
