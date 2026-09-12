@@ -32,12 +32,17 @@ import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.multipart.CompletedPart;
 import io.micronaut.http.simple.SimpleHttpHeaders;
 import jakarta.inject.Inject;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URL;
+import java.nio.charset.Charset;
+import java.nio.charset.IllegalCharsetNameException;
+import java.nio.charset.UnsupportedCharsetException;
 import java.util.Optional;
 
 /**
@@ -134,13 +139,26 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
             } else if (argument.isAssignableFrom(InputStream.class)) {
                 return Optional.of(object.getInputStream());
             } else {
+                Charset declaredCharset = declaredCharset(object);
                 try (ReadBuffer rb = object.toReadBuffer()) {
+                    if (declaredCharset != null && !isBinary(targetType)) {
+                        // The generic ReadBuffer conversion below would decode with the charset of
+                        // the request, but this part declares one of its own. That applies to any
+                        // textual target, including wrappers such as Optional<String>, so decode
+                        // here and convert the text, rather than let the ReadBuffer conversion
+                        // decode with the wrong charset on the way to the wrapper.
+                        String s = rb.toString(declaredCharset);
+                        if (targetType.isAssignableFrom(String.class)) {
+                            return Optional.of(s);
+                        }
+                        return conversionService.convert(s, targetType, context);
+                    }
                     Optional<Object> direct = conversionService.convert(rb, targetType, context);
                     // This detects Optional.empty and Optional[Optional.empty]
                     if (direct.isPresent() && (!targetType.equals(Optional.class) || ((Optional<?>) direct.get()).isPresent())) {
                         return direct;
                     }
-                    String s = rb.toString(context.getCharset());
+                    String s = rb.toString(declaredCharset != null ? declaredCharset : context.getCharset());
                     if (targetType.isAssignableFrom(String.class)) {
                         return Optional.of(s);
                     }
@@ -148,5 +166,45 @@ public class HttpConverterRegistrar implements TypeConverterRegistrar {
                 }
             }
         });
+    }
+
+    /**
+     * Whether the given conversion target is a raw byte container, for which a part's declared
+     * charset is irrelevant and decoding the bytes as text would corrupt them.
+     */
+    private static boolean isBinary(Class<?> targetType) {
+        return targetType == byte[].class
+            || java.nio.ByteBuffer.class.isAssignableFrom(targetType)
+            || io.micronaut.core.io.buffer.ByteBuffer.class.isAssignableFrom(targetType)
+            || ReadBuffer.class.isAssignableFrom(targetType)
+            || InputStream.class.isAssignableFrom(targetType);
+    }
+
+    /**
+     * Get the charset declared by the part itself. A multipart part may carry its own
+     * {@code Content-Type} with a {@code charset} parameter, and that charset governs the value of
+     * the part (RFC 7578, section 4.5), independently of the charset of the request.
+     *
+     * <p>The part metadata is client input and is not validated by the parser, so the declared
+     * charset may be malformed or unknown to this JVM. Such a declaration is ignored and the
+     * charset of the request is used instead, the same fallback that
+     * {@link io.micronaut.http.util.HttpUtil#resolveCharset} applies to the charset of a
+     * message.</p>
+     *
+     * @param part The part
+     * @return The charset declared by the part, or {@code null} if it declares none or the one it
+     * declares cannot be resolved
+     */
+    @Nullable
+    private static Charset declaredCharset(CompletedPart part) {
+        MediaType mediaType = part.getMetadata().mediaType();
+        if (mediaType == null) {
+            return null;
+        }
+        try {
+            return mediaType.getCharset().orElse(null);
+        } catch (IllegalCharsetNameException | UnsupportedCharsetException e) {
+            return null;
+        }
     }
 }

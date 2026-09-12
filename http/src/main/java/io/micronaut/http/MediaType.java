@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.regex.Pattern;
 
 /**
@@ -787,6 +788,72 @@ public class MediaType implements CharSequence {
     private static final char SEMICOLON = ';';
     private static final String WILDCARD = "*";
 
+    /**
+     * The longest header value that {@link #orderedOf(List)} will cache. Real world {@code Accept}
+     * headers are well under this; anything longer is parsed on every call rather than taking up a
+     * cache slot.
+     */
+    private static final int MAX_CACHED_HEADER_LENGTH = 256;
+
+    /**
+     * The number of entries held by {@link #ORDERED_CACHE}. The table is allocated once with
+     * exactly this many slots and never grows, which is what bounds the cache.
+     */
+    private static final int MAX_CACHED_HEADERS = 256;
+
+    /**
+     * The number of slots a header value can be stored in. A value is looked up in one set of this
+     * many adjacent slots, chosen by its hash, so a lookup reads at most this many slots and an
+     * insertion considers at most this many entries as the one to replace.
+     */
+    private static final int ORDERED_CACHE_WAYS = 2;
+
+    /**
+     * Mask selecting the set of {@link #ORDERED_CACHE_WAYS} slots a hash maps to.
+     */
+    private static final int ORDERED_CACHE_SET_MASK = MAX_CACHED_HEADERS / ORDERED_CACHE_WAYS - 1;
+
+    /**
+     * The most credit an entry can accumulate by being read again. An entry with this much credit
+     * survives this many insertions of other values that map to the same set before it can be
+     * replaced.
+     */
+    private static final int MAX_ORDERED_CACHE_CREDIT = 16;
+
+    /**
+     * Cache of parsed and sorted media type lists, keyed by the single header value they were
+     * parsed from. A handful of distinct {@code Accept} header values typically recur for the
+     * whole life of a process, so parsing them once is worth a small table. Header values naming a
+     * single media type are served by the fast path in {@link #orderedOf(List)} instead and never
+     * reach the cache.
+     *
+     * <p>The table is a fixed array of {@link #MAX_CACHED_HEADERS} slots, treated as
+     * {@code MAX_CACHED_HEADERS / ORDERED_CACHE_WAYS} sets of {@link #ORDERED_CACHE_WAYS} slots. A
+     * value only ever occupies a slot of the one set its hash maps to, so the bound is structural:
+     * the table cannot hold more than it was allocated with no matter how many threads insert at
+     * once, and no size check, counter or lock is needed to keep it.</p>
+     *
+     * <p>Entries are admitted on probation and earn the right to stay by being read again. A newly
+     * admitted entry carries no credit; every read gives it one more, up to
+     * {@link #MAX_ORDERED_CACHE_CREDIT}. Inserting a value whose set is full takes one credit from
+     * the poorer of the two entries and replaces it once it has none left. An entry never read
+     * again therefore yields its slot to the next value that wants it, which is what keeps values
+     * seen once from holding the cache against values that recur; an entry that keeps being read
+     * holds its slot against a stream of one-off values, because each of them costs it one credit
+     * and every read gives one back. Eviction costs a single compare and set of one slot, on the
+     * miss path only, next to a parse that is far more expensive.</p>
+     *
+     * <p>Reading an entry is a volatile array read, a hash comparison and a string comparison, and
+     * allocates nothing; only admitting a value allocates, and only after it has been parsed. Credit
+     * stops being given once an entry reaches the cap, so the read of a header that recurs for the
+     * life of the process writes nothing at all after its first few reads and cannot bounce the
+     * entry's cache line between cores. The
+     * volatile read also guarantees that a thread observing an entry observes everything the
+     * inserting thread did beforehand, which is what makes it safe to share the parsed
+     * {@link MediaType} instances across threads.</p>
+     */
+    private static final AtomicReferenceArray<@Nullable CachedMediaTypes> ORDERED_CACHE = new AtomicReferenceArray<>(MAX_CACHED_HEADERS);
+
     @SuppressWarnings("ConstantName")
     private static final String MIME_TYPES_FILE_NAME = "META-INF/http/mime.types";
     // Sonar java:S3077: the table is an immutable map, a Map.copyOf of the parsed table or an empty map
@@ -897,7 +964,10 @@ public class MediaType implements CharSequence {
                     this.parameters = (Map) params;
                 }
             } else {
-                this.parameters = parsedParameters;
+                // A media type is a value: nothing here mutates the parameters after parsing, and
+                // instances are shared (the well-known constants, and the parsed header cache),
+                // so the parameters must not be mutable through getParameters().values() either.
+                this.parameters = Collections.unmodifiableMap(parsedParameters);
             }
         }
         this.name = withoutArgs;
@@ -1293,16 +1363,130 @@ public class MediaType implements CharSequence {
             return Collections.emptyList();
         }
         if (headerCount == 1) {
-            // fast path for single header with single media type
             String singleHeader = values.get(0).toString();
             if (singleHeader.indexOf(',') == -1) {
+                // fast path for single header with single media type
                 try {
                     return List.of(MediaType.of(singleHeader));
                 } catch (IllegalArgumentException ignored) {
                 }
+            } else if (singleHeader.length() <= MAX_CACHED_HEADER_LENGTH) {
+                // a single header listing several media types has to be split, parsed and sorted,
+                // which is what the cache is for. It is also the only case whose raw text can be
+                // used as a key without building one.
+                return orderedOfCached(singleHeader, values);
             }
         }
+        return parseOrdered(values);
+    }
 
+    /**
+     * Return the parsed media types of a single header value, parsing it only if it is not already
+     * cached.
+     *
+     * @param singleHeader The header value, also the cache key
+     * @param values       The header values, a singleton list of {@code singleHeader}
+     * @return The media types, ordered
+     */
+    private static List<MediaType> orderedOfCached(String singleHeader, List<? extends CharSequence> values) {
+        int hash = spread(singleHeader.hashCode());
+        int firstSlot = (hash & ORDERED_CACHE_SET_MASK) * ORDERED_CACHE_WAYS;
+        for (int way = 0; way < ORDERED_CACHE_WAYS; way++) {
+            CachedMediaTypes entry = ORDERED_CACHE.get(firstSlot + way);
+            if (holds(entry, hash, singleHeader)) {
+                int credit = entry.credit;
+                if (credit < MAX_ORDERED_CACHE_CREDIT) {
+                    // a lost increment only costs the entry a little of its protection, so this
+                    // deliberately does not pay for an atomic update
+                    entry.credit = credit + 1;
+                }
+                return entry.mediaTypes;
+            }
+        }
+        return admit(singleHeader, hash, firstSlot, parseOrdered(values));
+    }
+
+    /**
+     * Offer a freshly parsed header value to the cache, and return the list to hand to the caller:
+     * the given one, or the one another thread cached for the same value first.
+     *
+     * <p>The value takes a free slot of its set if there is one. If there is none it replaces the
+     * poorer of the entries already there when that entry has no credit left, and otherwise takes
+     * one credit from it and is not cached this time round. Nothing is retried: a value that loses
+     * a race is simply parsed again the next time it is seen.</p>
+     *
+     * @param singleHeader The header value, also the cache key
+     * @param hash         The spread hash of the header value
+     * @param firstSlot    The first slot of the set the header value maps to
+     * @param parsed       The media types parsed from the header value
+     * @return The media types, ordered
+     */
+    private static List<MediaType> admit(String singleHeader, int hash, int firstSlot, List<MediaType> parsed) {
+        CachedMediaTypes poorest = null;
+        int poorestSlot = -1;
+        int poorestCredit = Integer.MAX_VALUE;
+        for (int way = 0; way < ORDERED_CACHE_WAYS; way++) {
+            int slot = firstSlot + way;
+            CachedMediaTypes entry = ORDERED_CACHE.get(slot);
+            if (entry == null) {
+                if (ORDERED_CACHE.compareAndSet(slot, null, new CachedMediaTypes(hash, singleHeader, parsed))) {
+                    return parsed;
+                }
+                // another thread filled the slot while this one was parsing
+                entry = ORDERED_CACHE.get(slot);
+            }
+            if (holds(entry, hash, singleHeader)) {
+                // another thread parsed the same value first, so share the list it cached rather
+                // than handing out a second copy of it
+                return entry.mediaTypes;
+            }
+            if (entry != null && entry.credit < poorestCredit) {
+                poorest = entry;
+                poorestSlot = slot;
+                poorestCredit = entry.credit;
+            }
+        }
+        if (poorest != null) {
+            if (poorestCredit > 0) {
+                poorest.credit = poorestCredit - 1;
+            } else {
+                ORDERED_CACHE.compareAndSet(poorestSlot, poorest, new CachedMediaTypes(hash, singleHeader, parsed));
+            }
+        }
+        return parsed;
+    }
+
+    /**
+     * Whether the given entry is the cached parse of the given header value.
+     *
+     * @param entry        The entry, {@code null} for an empty slot
+     * @param hash         The spread hash of the header value
+     * @param singleHeader The header value
+     * @return {@code true} if the entry holds the header value
+     */
+    private static boolean holds(@Nullable CachedMediaTypes entry, int hash, String singleHeader) {
+        return entry != null && entry.hash == hash && entry.header.equals(singleHeader);
+    }
+
+    /**
+     * Spread the bits of a header value's hash code, so that values differing only in their high
+     * bits do not all map to the same set of the cache.
+     *
+     * @param hash The hash code
+     * @return The spread hash, never negative
+     */
+    private static int spread(int hash) {
+        return (hash ^ (hash >>> 16)) & Integer.MAX_VALUE;
+    }
+
+    /**
+     * Parse and sort the media types of the given header values. The returned list is immutable and,
+     * because the list it wraps is not published anywhere else, safe to hand out repeatedly.
+     *
+     * @param values The header values
+     * @return The media types, ordered
+     */
+    private static List<MediaType> parseOrdered(List<? extends CharSequence> values) {
         var mediaTypes = new ArrayList<MediaType>(values.size());
         for (CharSequence value : values) {
             for (String token : StringUtils.splitOmitEmptyStrings(value, ',')) {
@@ -1315,6 +1499,35 @@ public class MediaType implements CharSequence {
         }
         mediaTypes.sort(MediaType::naturalSort);
         return Collections.unmodifiableList(mediaTypes);
+    }
+
+    /**
+     * The number of occupied slots of the ordered media type cache. Internal test hook, not API:
+     * it exists so that a test can assert the cache stays within its bound and is not part of the
+     * behaviour of this class.
+     *
+     * @return The cache size
+     */
+    @Internal
+    static int orderedCacheSize() {
+        int size = 0;
+        for (int slot = 0; slot < MAX_CACHED_HEADERS; slot++) {
+            if (ORDERED_CACHE.get(slot) != null) {
+                size++;
+            }
+        }
+        return size;
+    }
+
+    /**
+     * Empty the ordered media type cache. Internal test hook, not API: it exists so that a test can
+     * start from a known state and is not part of the behaviour of this class.
+     */
+    @Internal
+    static void clearOrderedCache() {
+        for (int slot = 0; slot < MAX_CACHED_HEADERS; slot++) {
+            ORDERED_CACHE.set(slot, null);
+        }
     }
 
     private static int naturalSort(MediaType o1, MediaType o2)  {
@@ -1489,6 +1702,44 @@ public class MediaType implements CharSequence {
         }
 
         return Collections.emptyMap();
+    }
+
+    /**
+     * An entry of {@link #ORDERED_CACHE}: the media types parsed from a single header value,
+     * together with what that value has earned by being read again.
+     */
+    private static final class CachedMediaTypes {
+
+        /**
+         * The spread hash of {@link #header}, compared before the header itself so that a slot
+         * holding a different value is usually rejected without a string comparison.
+         */
+        private final int hash;
+
+        /**
+         * The header value these media types were parsed from.
+         */
+        private final String header;
+
+        /**
+         * The parsed media types. Immutable and handed to every caller that reads this entry.
+         */
+        private final List<MediaType> mediaTypes;
+
+        /**
+         * How many insertions into this entry's set it survives before it can be replaced. Read and
+         * written without synchronization on purpose: it only steers replacement, an int is never
+         * seen half written, and a lost update costs the entry a little protection rather than
+         * correctness. It is deliberately not {@code volatile}, so that reading a cached value
+         * stays as cheap as reading the slot.
+         */
+        private int credit;
+
+        private CachedMediaTypes(int hash, String header, List<MediaType> mediaTypes) {
+            this.hash = hash;
+            this.header = header;
+            this.mediaTypes = mediaTypes;
+        }
     }
 
     /**
