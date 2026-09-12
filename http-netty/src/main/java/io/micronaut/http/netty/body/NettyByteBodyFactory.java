@@ -35,6 +35,8 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.Attribute;
+import io.netty.util.AttributeKey;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -47,6 +49,8 @@ import reactor.core.publisher.Flux;
  */
 @Internal
 public final class NettyByteBodyFactory extends ByteBodyFactory {
+    private static final AttributeKey<NettyByteBodyFactory> CHANNEL_FACTORY = AttributeKey.valueOf(NettyByteBodyFactory.class, "channelFactory");
+
     private final EventLoop loop;
 
     public NettyByteBodyFactory(Channel channel) {
@@ -56,6 +60,29 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     NettyByteBodyFactory(ByteBufAllocator alloc, EventLoop loop) {
         super(new NettyByteBufferFactory(alloc), NettyReadBufferFactory.of(alloc));
         this.loop = loop;
+    }
+
+    /**
+     * Get the factory shared by all users of the given channel. A factory only carries the
+     * channel's allocator and event loop, both of which are fixed once the channel is registered,
+     * so one instance can serve every request and every body on that channel. The instance is
+     * created on first access and stored as a channel attribute.
+     *
+     * @param channel The channel
+     * @return The shared factory for the channel
+     * @since 5.2.0
+     */
+    public static NettyByteBodyFactory forChannel(Channel channel) {
+        Attribute<NettyByteBodyFactory> attribute = channel.attr(CHANNEL_FACTORY);
+        NettyByteBodyFactory factory = attribute.get();
+        if (factory == null) {
+            factory = new NettyByteBodyFactory(channel);
+            NettyByteBodyFactory existing = attribute.setIfAbsent(factory);
+            if (existing != null) {
+                factory = existing;
+            }
+        }
+        return factory;
     }
 
     @Override

@@ -58,10 +58,15 @@ import java.util.OptionalLong;
 abstract class MultiplexedServerHandler {
     final Logger LOG = LoggerFactory.getLogger(getClass());
 
-    @Nullable
-    ChannelHandlerContext ctx;
     BodySizeLimits bodySizeLimits = BodySizeLimits.UNLIMITED;
     private final RequestHandler requestHandler;
+    @Nullable
+    private ChannelHandlerContext ctx;
+    /**
+     * Body factory for this connection, shared by all streams. Set in {@link #attach}.
+     */
+    @Nullable
+    private NettyByteBodyFactory byteBodyFactory;
     @Nullable
     private Compressor compressor;
 
@@ -78,8 +83,19 @@ abstract class MultiplexedServerHandler {
      */
     abstract void flush();
 
+    /**
+     * Bind this handler to its channel. Called once when the connection handler is added to the
+     * pipeline.
+     *
+     * @param ctx The context of the connection handler
+     */
+    final void attach(ChannelHandlerContext ctx) {
+        this.ctx = ctx;
+        this.byteBodyFactory = NettyByteBodyFactory.forChannel(ctx.channel());
+    }
+
     private NettyByteBodyFactory byteBodyFactory() {
-        return new NettyByteBodyFactory(requiredCtx().channel());
+        return Objects.requireNonNull(byteBodyFactory, "byteBodyFactory");
     }
 
     protected ChannelHandlerContext requiredCtx() {
@@ -287,11 +303,10 @@ abstract class MultiplexedServerHandler {
                 response.headers().remove(HttpHeaderNames.CONTENT_LENGTH);
             }
 
-            NettyByteBodyFactory byteBodyFactory = byteBodyFactory();
             if (body instanceof AvailableByteBody available) {
                 writeFull(response, NettyByteBodyFactory.toByteBuf(available));
             } else {
-                StreamingNettyByteBody snbb = byteBodyFactory.toStreaming(body);
+                StreamingNettyByteBody snbb = byteBodyFactory().toStreaming(body);
                 var consumer = new BufferConsumer() {
                     @Nullable
                     Upstream upstream;
