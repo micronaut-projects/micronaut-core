@@ -54,6 +54,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.lang.reflect.Proxy;
 import java.lang.reflect.RecordComponent;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -131,7 +132,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         this.beanType = beanType;
         // the annotations the caller means the type to carry win where both declare the same one: a
         // specification told to handle a type says what that type is, over what the class says of itself
-        this.annotationMetadata = ReflectionAnnotations.merge(additionalAnnotationMetadata, ReflectionAnnotations.metadataOf(beanType));
+        this.annotationMetadata = ReflectionAnnotations.merge(additionalAnnotationMetadata, typeMetadataOf(beanType));
         if (requestedAccessKinds == null) {
             // the type was annotated: the introspection describes it the way the processor would have
             Set<Introspected.AccessKind> declared = annotationMetadata.enumValuesSet(Introspected.class, "accessKind", Introspected.AccessKind.class);
@@ -149,9 +150,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         this.describeAnnotations = annotationMetadata.booleanValue(Introspected.class, "annotationMetadata").orElse(true);
         this.readPrefixes = prefixes(annotationMetadata, "readPrefixes", AccessorsStyle.DEFAULT_READ_PREFIX);
         this.writePrefixes = prefixes(annotationMetadata, "writePrefixes", AccessorsStyle.DEFAULT_WRITE_PREFIX);
-        // a static @Creator factory is the instantiation route the processors select first, before any constructor
-        this.factory = selectFactoryMethod(beanType);
-        this.constructor = factory == null ? selectConstructor(beanType) : null;
+        // a static @Creator factory is the instantiation route the processors select first, before any
+        // constructor; a proxy declares neither - the constructor it carries takes its InvocationHandler and
+        // builds nothing a caller asked for - so it is not buildable, as the interfaces it stands for are not
+        boolean proxy = Proxy.isProxyClass(beanType);
+        this.factory = proxy ? null : selectFactoryMethod(beanType);
+        this.constructor = factory == null && !proxy ? selectConstructor(beanType) : null;
         if (factory != null) {
             this.constructorArguments = ReflectionArguments.argumentsOf(factory);
         } else if (constructor != null) {
@@ -169,6 +173,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         this.methods = Collections.unmodifiableList(discoverMethods());
         this.indexedAnnotations = indexedAnnotationsOf(annotationMetadata);
         this.builderSupport = ReflectionIntrospectionBuilder.Support.of(beanType, annotationMetadata);
+    }
+
+    /**
+     * The annotations of the described type: the ones the class declares, or, for a {@link Proxy}, the ones
+     * the interfaces it was created with declare. A proxy class carries no annotation of its own, and
+     * describing it as anything but the interfaces it stands for would lose what they say of themselves -
+     * {@link Introspected#accessKind()} and {@link AccessorsStyle} among it, which decide what a property is.
+     */
+    private static AnnotationMetadata typeMetadataOf(Class<?> beanType) {
+        if (Proxy.isProxyClass(beanType)) {
+            return ReflectionAnnotations.metadataOf((AnnotatedElement[]) beanType.getInterfaces());
+        }
+        return ReflectionAnnotations.metadataOf(beanType);
     }
 
     /**
@@ -295,10 +312,21 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * Whether a type can be described reflectively.
      *
      * @param type The type
-     * @return Whether the type is a class or an interface a reflective introspection can describe: not a
-     * primitive, an array, an annotation, an enum or a type of the JDK
+     * @return Whether the type is a class, an interface or a {@link Proxy} of an introspectable interface a
+     * reflective introspection can describe: not a primitive, an array, an annotation, an enum or a type of
+     * the JDK
      */
     public static boolean isIntrospectable(Class<?> type) {
+        if (Proxy.isProxyClass(type)) {
+            // a proxy is described through the interfaces it stands for, and is worth describing when any of
+            // them is: its own name is the generated one of the JDK, which the check below would turn away
+            for (Class<?> proxied : type.getInterfaces()) {
+                if (isIntrospectable(proxied)) {
+                    return true;
+                }
+            }
+            return false;
+        }
         // an interface is introspected for its declarations, it cannot be instantiated
         return !type.isPrimitive()
             && !type.isArray()
@@ -430,9 +458,13 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // reflection reports the constructors in no particular order: the others are listed by arity, then by
         // parameter types, so that the list is the same on every JVM
         List<Constructor<?>> others = new ArrayList<>();
-        for (Constructor<?> declared : beanType.getDeclaredConstructors()) {
-            if (!declared.isSynthetic() && !declared.equals(constructor)) {
-                others.add(declared);
+        // a proxy declares one constructor, taking the InvocationHandler the JDK builds it with: it is not a
+        // constructor of the interfaces the proxy stands for, and they declare none
+        if (!Proxy.isProxyClass(beanType)) {
+            for (Constructor<?> declared : beanType.getDeclaredConstructors()) {
+                if (!declared.isSynthetic() && !declared.equals(constructor)) {
+                    others.add(declared);
+                }
             }
         }
         others.sort(Comparator.<Constructor<?>>comparingInt(Constructor::getParameterCount)
@@ -658,7 +690,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         Map<String, PropertyMembers> candidates = new LinkedHashMap<>();
         // the accessors first, as the processor resolves them: a field is a member of a property they
         // discovered, it makes one of its own only when field access is asked for
-        for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+        for (Class<?> type : classHierarchy(beanType)) {
             for (Method method : type.getDeclaredMethods()) {
                 // an accessor of any visibility is a member of the property: what it declares holds
                 if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
@@ -716,7 +748,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             }
         }
         boolean fieldAccess = accessKinds.contains(Introspected.AccessKind.FIELD);
-        for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+        for (Class<?> type : classHierarchy(beanType)) {
             for (Field field : type.getDeclaredFields()) {
                 if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
                     continue;
@@ -858,8 +890,38 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         return null;
     }
 
+    /**
+     * The classes whose declared members describe the bean: the type and its super classes, {@link Object}
+     * apart.
+     *
+     * <p>A {@link Proxy} has none. Its own methods are the generated implementations of the interfaces it
+     * stands for: they carry no annotation, and taking them as members would report {@code jdk.proxyN.$ProxyN}
+     * as the type declaring a property of an interface that declares it. A proxy is described through
+     * {@link #allInterfaces(Class)} alone, so that every member it reports is the interface declaration a
+     * caller means, with the annotations of that declaration.</p>
+     *
+     * @param type The bean type
+     * @return The classes to read the declared members of, in order of precedence
+     */
+    private static List<Class<?>> classHierarchy(Class<?> type) {
+        if (Proxy.isProxyClass(type)) {
+            return List.of();
+        }
+        List<Class<?>> hierarchy = new ArrayList<>();
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            hierarchy.add(current);
+        }
+        return hierarchy;
+    }
+
     private static List<Class<?>> allInterfaces(Class<?> type) {
         List<Class<?>> interfaces = new ArrayList<>();
+        if (Proxy.isProxyClass(type)) {
+            // the proxied interfaces and what they extend; the walk below would add the ones
+            // java.lang.reflect.Proxy implements itself, which the proxy does not stand for
+            collectInterfaces(type, interfaces);
+            return interfaces;
+        }
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             collectInterfaces(current, interfaces);
         }
@@ -941,7 +1003,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     private List<BeanMethod<T, Object>> discoverMethods() {
         Map<String, Method> bySignature = new LinkedHashMap<>();
-        for (Class<?> type = beanType; type != null && type != Object.class; type = type.getSuperclass()) {
+        for (Class<?> type : classHierarchy(beanType)) {
             for (Method method : type.getDeclaredMethods()) {
                 if (!Modifier.isPublic(method.getModifiers()) || Modifier.isStatic(method.getModifiers())
                     || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
@@ -1258,24 +1320,17 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         /**
          * The rank of the type declaring a member: the bean type first, then its super classes, then the
-         * interfaces, so that the declaration of the most derived type is the one that wins.
+         * interfaces, so that the declaration of the most derived type is the one that wins. A {@link Proxy}
+         * has no class of its own in the walk, and its interfaces rank first.
          */
         private int rankOf(Class<?> declaringType) {
-            int rank = 0;
-            Class<?> type = beanType;
-            while (type != Object.class) {
-                if (type == declaringType) {
-                    return rank;
-                }
-                rank++;
-                Class<?> superclass = type.getSuperclass();
-                if (superclass == null) {
-                    break;
-                }
-                type = superclass;
+            List<Class<?>> hierarchy = classHierarchy(beanType);
+            int rank = hierarchy.indexOf(declaringType);
+            if (rank != -1) {
+                return rank;
             }
             int index = allInterfaces(beanType).indexOf(declaringType);
-            return index == -1 ? Integer.MAX_VALUE : rank + index;
+            return index == -1 ? Integer.MAX_VALUE : hierarchy.size() + index;
         }
 
         /**
