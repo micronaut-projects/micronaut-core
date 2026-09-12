@@ -17,6 +17,7 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.ConstructorInterceptor;
+import io.micronaut.aop.InterceptionPointOrdered;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
@@ -32,7 +33,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.naming.Described;
-import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.inject.ExecutableMethod;
@@ -44,7 +44,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.List;
+import java.util.function.ToIntFunction;
 
 /**
  * Default implementation of the interceptor registry interface.
@@ -57,7 +59,13 @@ import java.util.List;
 public final class DefaultInterceptorRegistry implements InterceptorRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(InterceptorChain.class);
     private static final MethodInterceptor<?, ?>[] ZERO_METHOD_INTERCEPTORS = new MethodInterceptor[0];
-    private static final Interceptor[] ZERO_INTERCEPTORS = new Interceptor[0];
+    // Keep as an anonymous class to avoid lambda overhead during the startup
+    private static final Comparator<SelectedInterceptor<?>> SELECTED_INTERCEPTOR_COMPARATOR = new Comparator<>() {
+        @Override
+        public int compare(SelectedInterceptor<?> o1, SelectedInterceptor<?> o2) {
+            return Integer.compare(o1.order(), o2.order());
+        }
+    };
     private final BeanContext beanContext;
 
     public DefaultInterceptorRegistry(BeanContext beanContext) {
@@ -89,7 +97,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             applicableBindings,
             annotationMetadata,
             true,
-            false
+            false,
+            registration -> registration.getBean() instanceof InterceptionPointOrdered pointOrdered ? pointOrdered.getOrder(method, interceptorKind) : registration.getOrder()
         );
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for method: {} - {}", resolvedInterceptors.length, interceptorKind, interceptors.size(), method.getDeclaringType(), method instanceof Described d ? d.getDescription(true) : method.toString());
@@ -117,30 +126,38 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
         }
     }
 
+    /**
+     * The interceptors of an interception point, in the order they run in.
+     *
+     * <p>The {@code order} function resolves the order of a selected interceptor at this interception point: the one
+     * its registration was created with, unless the interceptor reports one for the point.</p>
+     */
     private <T> Interceptor<T, ?>[] findInterceptors(Class<?> declaringType,
                                                      Collection<BeanRegistration<Interceptor<T, ?>>> interceptors,
                                                      InterceptorKind interceptorKind,
                                                      Collection<AnnotationValue<?>> interceptPointBindings,
                                                      AnnotationMetadata interceptPointMetadata,
                                                      boolean selectMethodInterceptor,
-                                                     boolean selectConstructorInterceptor) {
-        List<BeanRegistration<Interceptor<T, ?>>> selectedInterceptorRegistrations = new ArrayList<>(interceptors.size());
+                                                     boolean selectConstructorInterceptor,
+                                                     ToIntFunction<BeanRegistration<Interceptor<T, ?>>> order) {
+        List<SelectedInterceptor<T>> selectedInterceptors = new ArrayList<>(interceptors.size());
         for (BeanRegistration<Interceptor<T, ?>> beanRegistration : interceptors) {
-            if (selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
-                selectedInterceptorRegistrations.add(beanRegistration);
+            if (!selectInterceptor(declaringType, interceptorKind, interceptPointBindings, interceptPointMetadata, beanRegistration)) {
+                continue;
             }
-        }
-        selectedInterceptorRegistrations.sort(OrderUtil.ORDERED_COMPARATOR);
-
-        List<Interceptor<T, ?>> selectedInterceptors = new ArrayList<>(selectedInterceptorRegistrations.size());
-        for (BeanRegistration<Interceptor<T, ?>> beanRegistration : selectedInterceptorRegistrations) {
             Interceptor<T, ?> bean = beanRegistration.getBean();
             if (selectMethodInterceptor && (bean instanceof MethodInterceptor || !(bean instanceof ConstructorInterceptor))
                 || selectConstructorInterceptor && (bean instanceof ConstructorInterceptor || !(bean instanceof MethodInterceptor))) {
-                selectedInterceptors.add(bean);
+                selectedInterceptors.add(new SelectedInterceptor<>(bean, order.applyAsInt(beanRegistration)));
             }
         }
-        return selectedInterceptors.toArray(ZERO_INTERCEPTORS);
+        selectedInterceptors.sort(SELECTED_INTERCEPTOR_COMPARATOR);
+
+        Interceptor<T, ?>[] resolved = new Interceptor[selectedInterceptors.size()];
+        for (int i = 0; i < resolved.length; i++) {
+            resolved[i] = selectedInterceptors.get(i).interceptor();
+        }
+        return resolved;
     }
 
     private <T> boolean selectInterceptor(Class<?> declaringType,
@@ -263,7 +280,8 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
             applicableBindings,
             constructor.getAnnotationMetadata(),
             false,
-            true
+            true,
+            registration -> registration.getBean() instanceof InterceptionPointOrdered pointOrdered ? pointOrdered.getOrder(constructor) : registration.getOrder()
         );
         if (LOG.isTraceEnabled()) {
             LOG.trace("Resolved {} {} interceptors out of a possible {} for constructor: {} - {}", resolvedInterceptors.length, InterceptorKind.AROUND_CONSTRUCT, interceptors.size(), constructor.getDeclaringBeanType(), constructor.getDescription(true));
@@ -285,5 +303,15 @@ public final class DefaultInterceptorRegistry implements InterceptorRegistry {
                 environmentConfigurable.configure(applicationContext.getEnvironment());
             }
         }
+    }
+
+    /**
+     * An interceptor selected for an interception point, with its order at that point.
+     *
+     * @param interceptor The interceptor
+     * @param order       The order
+     * @param <T>         The intercepted type
+     */
+    private record SelectedInterceptor<T>(Interceptor<T, ?> interceptor, int order) {
     }
 }

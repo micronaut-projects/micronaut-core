@@ -150,6 +150,38 @@ public class FirstInterceptor implements Interceptor<Object, Object>, Ordered {
 }
 ----
 
+An interceptor whose position depends on the interception point implements api:aop.InterceptionPointOrdered[]
+instead. The registry then places it by the order it reports for the method or constructor being intercepted, so one
+interceptor bean can run before other advice on one method and after it on another. This is what an interceptor that
+runs a chain of its own needs, when the chain bound to an element declares where in the surrounding advice it belongs:
+
+[source,java]
+----
+@Prototype
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+public class ChainInterceptor implements MethodInterceptor<Object, Object>, InterceptionPointOrdered {
+
+    @Override
+    public int getOrder() {
+        return 2000; // the position the chain takes most often
+    }
+
+    @Override
+    public int getOrder(Executable<?, ?> method, InterceptorKind kind) {
+        return method.getAnnotationMetadata().hasAnnotation(Early.class) ? -200 : getOrder();
+    }
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        return context.proceed();
+    }
+}
+----
+
+The order is asked once for each interception point, when its interceptors are resolved. `getOrder()` still applies
+wherever else the interceptor is ordered, and to proxies compiled by a version of Micronaut that did not consult the
+point.
+
 == Selection
 
 An interceptor is selected for an interception point when its binding annotation matches the target's, *and* it is
