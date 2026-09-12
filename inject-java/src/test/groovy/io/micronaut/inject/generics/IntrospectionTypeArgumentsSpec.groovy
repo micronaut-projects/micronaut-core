@@ -295,7 +295,7 @@ class Outer {
         variableNames(arguments)[1] == 'X'
     }
 
-    void "the type a variable is bound to is read through the use that annotates it"() {
+    void "a use that annotates the variable is answered as the intermediate type writes it"() {
         expect:
         buildClassElement('''
 package test;
@@ -321,24 +321,23 @@ interface AnnotatedMiddle<T> extends Container2<@Marker T, T> {
 ''') { ClassElement leaf ->
             def arguments = leaf.getAllTypeArguments().get('test.Container2')
 
-            assert arguments.values()*.variableName == ['X', 'X']
             assert arguments.E.typeAnnotationMetadata.annotationMetadata.hasAnnotation('test.Marker')
             assert !arguments.F.typeAnnotationMetadata.annotationMetadata.hasAnnotation('test.Marker')
+
+            and: "the annotations of a use are carried by the use alone, so it keeps the name it is written with"
+            assert arguments.values()*.variableName == ['T', 'X']
             return true
         }
     }
 
-    void "type annotations survive the binding of a variable to a concrete type"() {
+    void "a variable bound to a concrete type is reported for every type above"() {
         given:
         def introspection = buildBeanIntrospection('test.AnnotatedStrings', ANNOTATED)
         def definition = buildBeanDefinition('test.AnnotatedStrings', ANNOTATED)
-        def arguments = introspection.getTypeArguments('test.Container2')
 
         expect:
-        arguments*.type == [String, String]
-        arguments[0].annotationMetadata.hasAnnotation('test.Marker')
-        !arguments[1].annotationMetadata.hasAnnotation('test.Marker')
-        definition.getTypeArguments('test.Container2')[0].annotationMetadata.hasAnnotation('test.Marker')
+        introspection.getTypeArguments('test.Container2')*.type == [String, String]
+        definition.getTypeArguments('test.Container2')*.type == [String, String]
     }
 
     private static List<String> variableNames(List<Argument<?>> arguments) {

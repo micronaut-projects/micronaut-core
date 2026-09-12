@@ -48,6 +48,7 @@ import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
 import java.util.function.Function;
+import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
 
 import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
@@ -1029,22 +1030,22 @@ public interface ClassElement extends TypedElement {
     }
 
     /**
-     * The type a variable is bound to, keeping the type annotations written where the variable is used: when an
-     * intermediate interface annotates the variable it passes on to a super type, the argument reported for that
-     * super type is the type the sub type binds the variable to, and it still carries that annotation.
+     * The type a variable is bound to, unless the use of the variable annotates it: the annotations of a use are
+     * carried by the element of the use alone, and the use already stands for what the variable is bound to, so
+     * answering it keeps them. Such a use is answered with the variable name of the type that writes it, which is
+     * the name the generated argument carries for an annotated type argument anyway.
      *
      * @param bound The type the variable is bound to
      * @param use   The use of the variable
-     * @return The bound type, read through the use only when the use annotates it
+     * @return The bound type, or the use when it annotates the variable
      */
     private static ClassElement readThroughUse(ClassElement bound, GenericPlaceholderElement use) {
         Collection<String> useAnnotations = use.getGenericTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames();
         if (useAnnotations.isEmpty()
-            || bound instanceof WildcardElement
             || bound.getTypeAnnotationMetadata().getAnnotationMetadata().getAnnotationNames().containsAll(useAnnotations)) {
             return bound;
         }
-        return TypeAnnotatedClassElement.readThrough(bound, use);
+        return use;
     }
 
     /**
@@ -1056,7 +1057,7 @@ public interface ClassElement extends TypedElement {
      * @param copy The copy to make
      * @return The copy, or the type itself if it does not support being copied
      */
-    private static ClassElement copy(ClassElement type, Function<ClassElement, ClassElement> copy) {
+    private static ClassElement copy(ClassElement type, UnaryOperator<ClassElement> copy) {
         try {
             return copy.apply(type);
         } catch (UnsupportedOperationException e) {
