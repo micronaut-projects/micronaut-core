@@ -18,7 +18,6 @@ package io.micronaut.python.processing.element;
 import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -51,6 +50,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.ast.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
@@ -445,8 +445,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
-            Map<String, ClassElement> boundGenerics = new HashMap<>(getTypeArguments());
+            // The map is keyed in the order the base declares its variables: a bean introspection and a bean
+            // definition report the arguments of a type as a list, in that order
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> boundGenerics = typeVariableBindings();
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                 TypeRef typeRef = typeArguments.get(i);
@@ -457,7 +459,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             return baseElement.withTypeArguments(resolvedTypeArguments);
         }
         if (typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
             for (GenericPlaceholderElement placeholder : declaredGenericPlaceholders) {
                 resolvedTypeArguments.put(placeholder.getVariableName(), GenericBindings.firstBound(placeholder));
             }
@@ -467,12 +469,20 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     }
 
     private Optional<ClassElement> toJavaType(TypeRef typeRef) {
-        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, Map.of()
-        );
+        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, typeVariableBindings());
         if (baseType != null && !baseType.getName().equals(Object.class.getName())) {
             return Optional.of(baseType);
         }
         return Optional.empty();
+    }
+
+    private Map<String, ClassElement> typeVariableBindings() {
+        if (resolvedTypeArguments == null) {
+            // Bases of an open generic type must retain its variables so recursive supertype
+            // arguments can subsequently be bound through each level of the hierarchy.
+            return GenericBindings.declared(this, true);
+        }
+        return new LinkedHashMap<>(resolvedTypeArguments);
     }
 
     @Override
@@ -493,14 +503,28 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        // Python can have multiple concrete bases, so the traversal stays on the native bases instead of
+        // the super type and interfaces ClassElement's default implementation walks.
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
         for (TypeRef base : getNativeType().bases()) {
             ClassElement baseElement = findPythonClass(base);
-            if (baseElement != null) {
-                result.putAll(resolveTypeArguments(baseElement, base).getAllTypeArguments());
-            } else {
-                toJavaType(base).ifPresent(javaType -> result.putAll(javaType.getAllTypeArguments()));
+            ClassElement resolvedBase = baseElement == null
+                ? toJavaType(base).orElse(null)
+                : resolveTypeArguments(baseElement, base);
+            if (resolvedBase == null) {
+                continue;
             }
+            // The arguments of the base are written in this type's variables, while the types above it are read
+            // from the base as it declares them, in its own variables, and bound through what this type gives it.
+            // Reading them from the resolved base instead would bind them a second time, because resolving a base
+            // substitutes this type's arguments all the way up
+            ClassElement declaredBase = baseElement == null ? resolvedBase.getRawClassElement() : baseElement;
+            Map<String, ClassElement> baseTypeArguments = resolvedBase.getTypeArguments();
+            String baseName = resolvedBase.getName();
+            declaredBase.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(baseName) ? baseTypeArguments : TypeVariableBinder.bind(typeArguments, baseTypeArguments)
+            ));
         }
         result.put(getName(), getTypeArguments());
         return result;
