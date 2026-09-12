@@ -332,7 +332,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         final String methodName = element.getName();
         final ClassElement declaringType = element.getDeclaringType();
         final ReflectionConfigData data = resolveClassData(declaringType.getName(), classes);
-        final List<AnnotationClassValue<?>> params = Arrays.stream(element.getParameters())
+        // a Kotlin suspend function has a trailing Continuation parameter on the JVM
+        final ParameterElement[] parameters = element.isSuspend() ? element.getSuspendParameters() : element.getParameters();
+        final List<AnnotationClassValue<?>> params = Arrays.stream(parameters)
             .map(ParameterElement::getType)
             .map(this::resolveName).collect(Collectors.toList());
         data.methods.add(
