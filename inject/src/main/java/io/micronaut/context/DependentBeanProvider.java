@@ -36,18 +36,18 @@ public interface DependentBeanProvider {
     List<BeanRegistration<?>> dependentBeans();
 
     /**
-     * Adds a bean created for this bean after this bean itself was created, so that it is destroyed with it.
+     * Opens a resolution context for the bean this registration holds, carrying the bean's dependent scope.
      *
-     * <p>A generated proxy that fronts this bean resolves the non-singleton interceptors of a method call from the
-     * dependents of the target's registration. An interceptor bound only for {@code AROUND} was never resolved while
-     * the target was created, so the proxy creates it on first use and hands it here, which keeps the rule that a
-     * non-singleton interceptor is destroyed as a dependent of the bean it intercepts.</p>
+     * <p>The dependents of the context are the dependents of the bean, as they were of the context that created it,
+     * so a lookup through {@link BeanResolutionContext#getDependentContext()} finds the beans created with the bean,
+     * among them its non-singleton interceptors. A bean created through the context is a new dependent of the bean
+     * and is handed to this registration when the context is closed, so that it is destroyed with the bean. The
+     * context must be closed.</p>
      *
-     * @param registration The registration of the dependent bean
+     * @return The resolution context
      * @since 5.3.0
      */
-    default void addDependentBean(BeanRegistration<?> registration) {
-    }
+    BeanResolutionContext newResolutionContext();
 
     /**
      * Returns state another component keeps against this registration, computing it once.

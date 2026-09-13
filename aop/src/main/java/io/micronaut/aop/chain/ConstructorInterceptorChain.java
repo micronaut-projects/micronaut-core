@@ -200,7 +200,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
             final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
             final Collection<AnnotationValue<?>> annotationValues = resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
 
-            final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getBeanRegistrations(
+            final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getDependentContext().getBeanRegistrations(
                 Interceptor.ARGUMENT,
                 Qualifiers.byInterceptorBindingValues(annotationValues)
             );

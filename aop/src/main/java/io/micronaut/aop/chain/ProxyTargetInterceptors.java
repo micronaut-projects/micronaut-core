@@ -20,15 +20,14 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.DependentBeanProvider;
 import io.micronaut.context.Qualifier;
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
@@ -70,6 +69,7 @@ public final class ProxyTargetInterceptors {
     private final ExecutableMethod<?, ?>[] methods;
     private final boolean introduction;
     private final List<BeanRegistration<?>> singletons;
+    private final Qualifier<Interceptor<?, ?>> binding;
     private final List<BeanDefinition<Interceptor<?, ?>>> nonSingletons;
     private final Interceptor<?, ?> @Nullable [][] fixed;
     private volatile @Nullable BeanRegistration<?> lastTarget;
@@ -97,10 +97,10 @@ public final class ProxyTargetInterceptors {
         this.methods = methods;
         this.introduction = introduction;
         this.singletons = new ArrayList<>(registrations);
+        // the hierarchy reverses the array it is given, so it gets a copy
+        this.binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
         List<BeanDefinition<Interceptor<?, ?>>> found = List.of();
         if (methods.length > 0) {
-            // the hierarchy reverses the array it is given, so it gets a copy
-            Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
             for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
                 if (!definition.isSingleton() && bindsMethods(definition)) {
                     if (found.isEmpty()) {
@@ -177,24 +177,13 @@ public final class ProxyTargetInterceptors {
     }
 
     /**
-     * The singletons and the target's own instances of the non-singleton interceptors, creating as a dependent of the
-     * target any it has not got yet.
+     * The interceptors of the methods for a target, resolved through the target's dependent context: the singletons,
+     * and for each non-singleton the instance the target owns, or one created for it that joins its dependents.
      */
     private List<BeanRegistration<?>> ownedBy(DependentBeanProvider target) {
-        List<BeanRegistration<?>> dependents = target.dependentBeans();
-        List<BeanRegistration<?>> registrations = new ArrayList<>(singletons.size() + nonSingletons.size());
-        registrations.addAll(singletons);
-        for (BeanDefinition<Interceptor<?, ?>> definition : nonSingletons) {
-            BeanRegistration<?> registration = find(dependents, definition);
-            if (registration == null) {
-                registration = beanContext.getBeanRegistration(definition);
-                if (isDependent(definition)) {
-                    target.addDependentBean(registration);
-                }
-            }
-            registrations.add(registration);
+        try (BeanResolutionContext resolutionContext = target.newResolutionContext()) {
+            return new ArrayList<>(resolutionContext.getDependentContext().getBeanRegistrations(Interceptor.ARGUMENT, binding));
         }
-        return registrations;
     }
 
     /**
@@ -247,33 +236,5 @@ public final class ProxyTargetInterceptors {
             }
         }
         return false;
-    }
-
-    /**
-     * Whether an interceptor of this definition belongs to the bean it is created for: a prototype, or a bean with no
-     * scope. A bean of a custom scope belongs to its scope and is not attached to a target.
-     */
-    private static boolean isDependent(BeanDefinition<?> definition) {
-        String scope = definition.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
-        return scope == null || Prototype.class.getName().equals(scope);
-    }
-
-    @Nullable
-    private static BeanRegistration<?> find(List<BeanRegistration<?>> registrations, BeanDefinition<?> definition) {
-        BeanDefinition<?> unwrapped = unwrap(definition);
-        for (BeanRegistration<?> registration : registrations) {
-            if (registration.getBean() instanceof Interceptor && unwrap(registration.getBeanDefinition()).equals(unwrapped)) {
-                return registration;
-            }
-        }
-        return null;
-    }
-
-    private static BeanDefinition<?> unwrap(BeanDefinition<?> definition) {
-        BeanDefinition<?> unwrapped = definition;
-        while (unwrapped instanceof DelegatingBeanDefinition<?> delegating) {
-            unwrapped = delegating.getTarget();
-        }
-        return unwrapped;
     }
 }

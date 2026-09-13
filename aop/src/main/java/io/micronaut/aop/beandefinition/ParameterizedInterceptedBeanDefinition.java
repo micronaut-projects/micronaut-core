@@ -85,7 +85,7 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        return new ArrayList(resolutionContext.getBeanRegistrations(
+        return new ArrayList(resolutionContext.getDependentContext().getBeanRegistrations(
             Interceptor.ARGUMENT,
             Qualifiers.byInterceptorBinding(metadata)
         ));

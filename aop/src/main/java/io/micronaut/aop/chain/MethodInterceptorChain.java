@@ -340,13 +340,10 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             // Retained by the generated proxy, which is the bean itself.
             resolved = intercepted.$interceptorRegistrations();
         } else {
-            // Resolved by binding, reusing the non-singleton instances the bean owns: the dependents of the bean,
-            // which the context carries while the bean is created and again while it is destroyed.
-            resolved = resolutionContext.getBeanRegistrations(
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(binding),
-                resolutionContext.getDependentBeans()
-            );
+            // Resolved by binding through the bean's dependent context: a non-singleton interceptor is the instance
+            // among the bean's dependents, which the context carries while the bean is created and again while it is
+            // destroyed, or is created there the first time.
+            resolved = resolutionContext.getDependentContext().getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
