@@ -89,16 +89,19 @@ public final class ReflectionBeanIntrospectionFallback implements BeanIntrospect
     /**
      * The annotations an application configured for a type, under the ones the type declares itself. A
      * configuration names types in bulk, by pattern, so it says how the types that say nothing of themselves
-     * are to be described and does not displace what one of them declares; the annotations of the class are
+     * are to be described and does not displace what one of them declares; the annotations of the type are
      * therefore merged over the configured ones here, rather than handed to
-     * {@link ReflectionBeanIntrospection#of(Class, AnnotationMetadata)} as annotations that win.
+     * {@link ReflectionBeanIntrospection#of(Class, AnnotationMetadata)} as annotations that win. They are the
+     * annotations the introspection reads: for a {@link java.lang.reflect.Proxy} - which a pattern matches
+     * when the proxy stands for a package-private interface, as the JDK names it after the package of that
+     * interface - the ones of the interfaces it stands for, since the proxy class carries none of its own.
      */
     private static AnnotationMetadata configured(Class<?> type) {
         AnnotationMetadata configured = ReflectionIntrospectionPolicy.describe(type);
         if (configured.isEmpty()) {
             return AnnotationMetadata.EMPTY_METADATA;
         }
-        return ReflectionAnnotations.merge(ReflectionAnnotations.metadataOf(type), configured);
+        return ReflectionAnnotations.merge(ReflectionBeanIntrospection.typeMetadataOf(type), configured);
     }
 
     @Override
