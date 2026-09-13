@@ -1,7 +1,10 @@
 package io.micronaut.annotation
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
+import io.micronaut.core.annotation.AnnotationValue
 import io.micronaut.inject.ast.PrimitiveElement
+import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory
+import jakarta.inject.Singleton
 
 class AnnotatedPrimitiveElementSpec extends AbstractTypeElementSpec {
 
@@ -95,5 +98,55 @@ class Test {
         array.isArray()
         array.isPrimitive()
         array.fromArray().getTypeAnnotationMetadata().stringValue('test.TypeAnn').get() == 'array'
+    }
+
+    void "test every mutation of an annotated primitive reaches the type annotations of the use"() {
+        given:
+        def element = buildClassElement(SOURCE)
+        def type = { element.getFields().find { it.name == 'field' }.getType() }
+
+        when: "annotating by name, by type, with a builder and with a value"
+        type().annotate('test.ByName')
+        type().annotate(Singleton)
+        type().annotate(Deprecated) { it.member('since', '1') }
+        type().annotate('test.WithBuilder') { it.value('v') }
+        type().annotate(AnnotationValue.builder('test.AsValue').build())
+
+        then:
+        type().hasAnnotation('test.ByName')
+        type().hasAnnotation(Singleton)
+        type().stringValue(Deprecated, 'since').get() == '1'
+        type().stringValue('test.WithBuilder').get() == 'v'
+        type().hasAnnotation('test.AsValue')
+        type().hasStereotype('jakarta.inject.Scope')
+
+        when: "removing by name, by type, by predicate and the stereotype"
+        type().removeAnnotation('test.ByName')
+        type().removeAnnotation(Deprecated)
+        type().removeAnnotationIf { AnnotationValue<?> av -> av.annotationName == 'test.AsValue' }
+        type().removeStereotype('jakarta.inject.Scope')
+        type().removeStereotype(Singleton)
+
+        then:
+        !type().hasAnnotation('test.ByName')
+        !type().hasAnnotation(Deprecated)
+        !type().hasAnnotation('test.AsValue')
+        type().hasAnnotation('test.WithBuilder')
+        type().getTypeAnnotationMetadata().toString().contains('int')
+
+        and: "the written annotation is still there and the constant untouched"
+        type().stringValue('test.TypeAnn').get() == 'f'
+        PrimitiveElement.INT.getAnnotationMetadata().isEmpty()
+    }
+
+    void "test a factory that does not build type annotations from a cache entry says so"() {
+        given:
+        def factory = [:] as ElementAnnotationMetadataFactory
+
+        when:
+        factory.buildTypeAnnotations(null, 'int')
+
+        then:
+        thrown(UnsupportedOperationException)
     }
 }
