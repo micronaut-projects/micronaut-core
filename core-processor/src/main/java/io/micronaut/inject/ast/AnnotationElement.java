@@ -15,8 +15,6 @@
  */
 package io.micronaut.inject.ast;
 
-import io.micronaut.core.annotation.NonNull;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Collections;
@@ -74,7 +72,6 @@ public interface AnnotationElement extends ClassElement {
      * @return The element types the annotation may target; never {@code null}
      * @since 5.3.0
      */
-    @NonNull
     default Set<ElementType> getTargets() {
         return DEFAULT_TARGETS;
     }
@@ -90,7 +87,6 @@ public interface AnnotationElement extends ClassElement {
      * @return The binary name of the container annotation, or empty when the annotation is not repeatable
      * @since 5.3.0
      */
-    @NonNull
     default Optional<String> getRepeatableContainer() {
         return Optional.empty();
     }
@@ -105,7 +101,6 @@ public interface AnnotationElement extends ClassElement {
      * @return The retention policy; never {@code null}
      * @since 5.3.0
      */
-    @NonNull
     default RetentionPolicy getRetentionPolicy() {
         return RetentionPolicy.RUNTIME;
     }
