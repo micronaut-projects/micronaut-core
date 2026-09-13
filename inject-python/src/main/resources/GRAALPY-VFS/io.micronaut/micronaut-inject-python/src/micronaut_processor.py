@@ -2244,11 +2244,9 @@ def extract_arg_defaults(func_node, visitor=None):
     Given an ast.FunctionDef node, return an ordered dictionary
     mapping argument names to their default values (or None).
 
-    The defaults go through convert_ast_value, the same conversion every member value written at a
-    usage site goes through, so that a default which is an enum constant, a class reference, a list
-    or a nested decorator call is reported the same way as the equivalent explicit value. Converting
-    them here by hand used to fall back to ast.dump for anything literal_eval could not read, which
-    leaked a Python AST repr into the generated annotation stub.
+    Defaults are converted the same way member values given at a usage site are, so that an
+    enum constant, a class reference, a list or a nested decorator reaches the Java side in the
+    shape the stub generator expects rather than as an AST repr.
     """
     arg_names = [a.arg for a in func_node.args.args]
     defaults = func_node.args.defaults
@@ -2263,7 +2261,7 @@ def extract_arg_defaults(func_node, visitor=None):
         if default is None:
             arg_dict[member_name] = None
         else:
-            arg_dict[member_name] = convert_annotation_member_value(None, member_name, default, visitor)
+            arg_dict[member_name] = convert_ast_value(default, visitor)
 
     return arg_dict
 

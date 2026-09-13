@@ -22,17 +22,14 @@ import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.inject.visitor.VisitorContext
 
 /**
- * Asserts that annotation member defaults of every kind are reported for Python. In Python an annotation type is a
- * decorator factory function and its member defaults are that function's keyword argument defaults.
- *
- * <p>The sibling specs of the same name in the inject-java, inject-kotlin and inject-groovy suites assert the same
- * thing for those languages; the expectation literals here are kept in step with theirs, allowing for the one
- * difference Python's model forces (a Python class reference is its own type, so the class literal default names the
- * Python type rather than a Java one).</p>
+ * Asserts that annotation member defaults of every kind declared on a Python decorator are reported identically to
+ * the three JVM languages. The sibling copies of this spec live in the inject-java, inject-kotlin and inject-groovy
+ * test suites and share the expectation literals below.
  */
 class AnnotationMemberDefaultsSpec extends AbstractPythonTypeElementSpec {
 
-    private static final String PYTHON_SOURCE = '''
+    private void compileTestSource() {
+        buildBeanDefinition('python', 'Test', '''
 from enum import Enum
 from jakarta.inject import Singleton
 
@@ -45,6 +42,9 @@ class Colour(Enum):
     RED = "RED"
     GREEN = "GREEN"
 
+class Target:
+    pass
+
 @micronaut_annotation("defaults.Nested")
 def nested_ann(name: str = "nested"):
     def decorator(target):
@@ -53,13 +53,14 @@ def nested_ann(name: str = "nested"):
 
 @micronaut_annotation("defaults.Defaults")
 def defaults_ann(
-        stringValue: str = "foo",
-        emptyStringValue: str = "",
-        intValue: int = 42,
-        enumValue: Colour = Colour.GREEN,
-        classValue: type = Colour,
-        stringArray: list[str] = ["a", "b"],
-        emptyArray: list[str] = []):
+    stringValue: str = "foo",
+    emptyStringValue: str = "",
+    intValue: int = 42,
+    enumValue: Colour = Colour.GREEN,
+    classValue: type = Target,
+    stringArray: list[str] = ["a", "b"],
+    emptyArray: list[str] = [],
+):
     def decorator(target):
         return target
     return decorator
@@ -68,14 +69,50 @@ def defaults_ann(
 @defaults_ann()
 class Test:
     pass
-'''
+''')
+    }
+
+    /**
+     * The defaults reported by {@link io.micronaut.inject.visitor.VisitorContext#getAnnotationDefaultValues(String)},
+     * which asks for every declared default including empty ones.
+     *
+     * <p>This is the JVM literal of the sibling specs minus the {@code nested} member, which has no Python
+     * equivalent: a Python decorator member cannot declare another decorator application as its default.</p>
+     */
+    static final String EXPECTED_FROM_CONTEXT =
+            "[classValue:AnnotationClassValue(python.Target), " +
+            "emptyArray:String[], " +
+            "emptyStringValue:String(), " +
+            "enumValue:String(GREEN), " +
+            "intValue:Integer(42), " +
+            "stringArray:String[String(a), String(b)], " +
+            "stringValue:String(foo)]"
+
+    /**
+     * The defaults baked into the written annotation metadata and seen through
+     * {@link io.micronaut.core.annotation.AnnotationValue#getDefaultValues()}. The empty string default is
+     * omitted, which is the deliberate metadata size optimization documented on
+     * {@code JavaAnnotationMetadataBuilder#isValidDefaultValue} and the point of the second read.
+     *
+     * <p>Two shapes differ from the JVM languages, both because the Python class is visited before its generated
+     * Java annotation type exists, so the member types are not yet known: a class value is written as the class
+     * name rather than an {@code AnnotationClassValue}, and a list value as a {@code List} rather than an array.
+     * A member value given at a usage site is written the same way, so the defaults are not a special case.</p>
+     */
+    static final String EXPECTED_FROM_ANNOTATION =
+            "[classValue:String(python.Target), " +
+            "emptyArray:List[], " +
+            "enumValue:String(GREEN), " +
+            "intValue:Integer(42), " +
+            "stringArray:List[String(a), String(b)], " +
+            "stringValue:String(foo)]"
 
     void 'test every annotation member default is reported through the visitor context'() {
         given:
         DefaultsRecordingVisitor.reset()
 
         when:
-        buildClassElement(PYTHON_SOURCE) { ClassElement ce -> ce }
+        compileTestSource()
         def defaults = DefaultsRecordingVisitor.fromContext
 
         then: 'every declared default is reported, including the empty string and the empty array'
@@ -85,19 +122,18 @@ class Test:
                 'classValue', 'stringArray', 'emptyArray'
         ] as Set
 
-        and: 'constants and enum constants resolve as they do in the other languages'
+        and: 'constants, enum constants, class literals and arrays all resolve'
         defaults['stringValue'] == 'foo'
         defaults['emptyStringValue'] == ''
         defaults['intValue'] == 42
         defaults['enumValue'] == 'GREEN'
-
-        and: '''a class reference and a list are reported as the Python processor read them. Converting them to an
-                AnnotationClassValue and to an array needs the member's declared type, and resolving that inside the
-                defaults reader re-enters Python class element construction, which reads the defaults again. See
-                PythonAnnotationMetadataBuilder#resolvePythonAnnotationMember.'''
-        defaults['classValue'] == 'python.Colour'
+        defaults['classValue'] instanceof AnnotationClassValue
+        defaults['classValue'].name == 'python.Target'
         defaults['stringArray'] as List == ['a', 'b']
-        (defaults['emptyArray'] as List).isEmpty()
+        defaults['emptyArray'].length == 0
+
+        and: 'the result is identical to the other languages'
+        DefaultsRecordingVisitor.describe(defaults) == EXPECTED_FROM_CONTEXT
     }
 
     void 'test annotation member defaults are visible on the AnnotationValue read from the element API'() {
@@ -105,7 +141,7 @@ class Test:
         DefaultsRecordingVisitor.reset()
 
         when:
-        buildClassElement(PYTHON_SOURCE) { ClassElement ce -> ce }
+        compileTestSource()
         def defaults = DefaultsRecordingVisitor.fromAnnotation
 
         then: 'the written metadata carries every default except the empty string'
@@ -116,12 +152,13 @@ class Test:
         ] as Set
 
         and:
-        defaults['stringValue'] == 'foo'
-        defaults['intValue'] == 42
         defaults['enumValue'] == 'GREEN'
-        defaults['classValue'] == 'python.Colour'
+        defaults['classValue'] == 'python.Target'
         defaults['stringArray'] as List == ['a', 'b']
-        (defaults['emptyArray'] as List).isEmpty()
+        defaults['emptyArray'].isEmpty()
+
+        and: 'the result is identical to the other languages'
+        DefaultsRecordingVisitor.describe(defaults) == EXPECTED_FROM_ANNOTATION
     }
 
     static class DefaultsRecordingVisitor implements TypeElementVisitor<Object, Object> {
@@ -135,7 +172,8 @@ class Test:
         }
 
         /**
-         * Renders the defaults in a language neutral form, matching the renderer the sibling specs use.
+         * Renders the defaults in a language neutral form so that the language suites can compare against the
+         * same literal.
          */
         static String describe(Map<CharSequence, Object> values) {
             if (values == null) {
@@ -153,6 +191,9 @@ class Test:
             if (v.getClass().isArray()) {
                 return "${v.getClass().componentType.simpleName}[" + (v as Object[]).collect { render(it) }.join(", ") + "]"
             }
+            if (v instanceof Collection) {
+                return "List[" + v.collect { render(it) }.join(", ") + "]"
+            }
             if (v instanceof AnnotationClassValue) {
                 return "AnnotationClassValue(${v.name})"
             }
@@ -164,11 +205,19 @@ class Test:
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
-            if (element.simpleName == "Test" && element.hasAnnotation("defaults.Defaults")) {
-                fromContext = context.getAnnotationDefaultValues("defaults.Defaults")
-                fromAnnotation = element.getAnnotation("defaults.Defaults")?.getDefaultValues()
-                println "PY FROM CONTEXT: " + describe(fromContext)
-                println "PY FROM ANNOTATION: " + describe(fromAnnotation)
+            if (element.simpleName != "Test") {
+                return
+            }
+            // The class is visited twice: once as the Python class, and once as the Java stub generated for it.
+            // Only the Python class carries the decorator, while the annotation type only exists as a Java class
+            // element in the second round, which is where the visitor context can resolve its defaults.
+            def contextDefaults = context.getAnnotationDefaultValues("defaults.Defaults")
+            if (contextDefaults) {
+                fromContext = contextDefaults
+            }
+            def annotation = element.getAnnotation("defaults.Defaults")
+            if (annotation != null) {
+                fromAnnotation = annotation.getDefaultValues()
             }
         }
     }

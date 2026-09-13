@@ -54,14 +54,20 @@ public final class PythonValues {
             return toJava(polyglotValue);
         }
         if (value instanceof List<?> list) {
-            // A guest list handed to a Java parameter arrives already coerced to a polyglot list rather than as a
-            // Value, and reading it is only valid while the guest context is open. Copy it, so that a value which
-            // outlives the compilation, such as an annotation member default, holds no guest handle.
-            List<Object> copy = new ArrayList<>(list.size());
+            // A Python list handed to Java as a List is a view onto the guest object, and reading it once the
+            // compilation context has closed fails with "The Context is already closed". Copy it out eagerly.
+            List<Object> converted = new ArrayList<>(list.size());
             for (Object element : list) {
-                copy.add(toJava(element));
+                converted.add(toJava(element));
             }
-            return copy;
+            return converted;
+        }
+        if (value instanceof Map<?, ?> map) {
+            Map<Object, Object> converted = new LinkedHashMap<>(map.size());
+            for (Map.Entry<?, ?> entry : map.entrySet()) {
+                converted.put(toJava(entry.getKey()), toJava(entry.getValue()));
+            }
+            return converted;
         }
         return value;
     }
