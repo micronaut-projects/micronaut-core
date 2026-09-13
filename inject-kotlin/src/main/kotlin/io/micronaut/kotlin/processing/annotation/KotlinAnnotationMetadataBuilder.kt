@@ -541,7 +541,7 @@ internal class KotlinAnnotationMetadataBuilder(
         return visitorContext
     }
 
-    override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
+    public override fun getRetentionPolicy(annotation: KSAnnotated): RetentionPolicy {
         var retention = annotation.annotations.find {
             getAnnotationTypeName(it) == java.lang.annotation.Retention::class.java.name
         }
