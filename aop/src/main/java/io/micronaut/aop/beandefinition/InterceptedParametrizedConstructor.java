@@ -20,10 +20,8 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.type.Argument;
-import io.micronaut.inject.ConstructorInjectionPoint;
-import io.micronaut.inject.FieldInjectionPoint;
-import io.micronaut.inject.MethodInjectionPoint;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import org.jspecify.annotations.Nullable;
 
@@ -43,8 +41,7 @@ final class InterceptedParametrizedConstructor<T> implements BeanConstructor<T> 
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
-    private @Nullable Constructor<T> targetConstructor;
-    private boolean targetConstructorResolved;
+    private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
     /**
      * @param interceptedInstantiateBeanDefinition The intercepted bean definition
@@ -85,16 +82,6 @@ final class InterceptedParametrizedConstructor<T> implements BeanConstructor<T> 
 
     @Override
     public @Nullable Constructor<T> getTargetConstructor() {
-        if (!targetConstructorResolved) {
-            ConstructorInjectionPoint<T> injectionPoint = interceptedInstantiateBeanDefinition.getConstructor();
-            if (injectionPoint instanceof MethodInjectionPoint || injectionPoint instanceof FieldInjectionPoint) {
-                // A bean produced by a factory is not created through a constructor of its own type
-                targetConstructor = null;
-            } else {
-                targetConstructor = BeanConstructor.super.getTargetConstructor();
-            }
-            targetConstructorResolved = true;
-        }
-        return targetConstructor;
+        return targetConstructor.get(() -> InterceptedConstructor.isFactoryProduced(interceptedInstantiateBeanDefinition) ? null : TargetConstructorCache.resolve(this));
     }
 }

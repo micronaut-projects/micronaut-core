@@ -30,6 +30,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.AdvisedBeanType;
@@ -323,7 +324,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
          * empty: this view only exists when the proxy constructor declares such parameters.
          */
         private final @Nullable Object[] internalParameters;
-        private @Nullable Constructor<T> targetConstructor;
+        private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
         private InterceptedTargetConstructor(BeanConstructor<T> proxyConstructor,
                                              Class<T> declaringBeanType,
@@ -354,12 +355,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         public @Nullable Constructor<T> getTargetConstructor() {
             // Resolved against the intercepted type and the parameters the bean declares, not the proxy
             // constructor, which appends the internal parameters
-            Constructor<T> constructor = targetConstructor;
-            if (constructor == null) {
-                constructor = BeanConstructor.super.getTargetConstructor();
-                targetConstructor = constructor;
-            }
-            return constructor;
+            return targetConstructor.get(() -> TargetConstructorCache.resolve(this));
         }
 
         @Override

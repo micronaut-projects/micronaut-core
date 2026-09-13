@@ -269,4 +269,178 @@ class MyBean {
         constructor.getTargetConstructor() == introspection.beanType.getDeclaredConstructor(String, int)
         constructor.getTargetConstructor().is(constructor.getTargetConstructor())
     }
+
+    void 'test the target constructor of an introspection instantiating through a static creator is null'() {
+        given: 'a static creator and a constructor with the same parameter types'
+        BeanIntrospection<?> introspection = buildBeanIntrospection('targetctor.creator.MyBean', '''
+package targetctor.creator;
+
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+class MyBean {
+    final String name;
+
+    MyBean(String name) {
+        this.name = name;
+    }
+
+    @Creator
+    static MyBean create(String name) {
+        return new MyBean(name + "!");
+    }
+
+    String getName() {
+        return name;
+    }
+}
+''')
+
+        when:
+        def constructor = introspection.getConstructor()
+
+        then: 'the creator instantiates the bean'
+        introspection.instantiate('a').name == 'a!'
+        constructor.arguments*.type == [String]
+        introspection.beanType.getDeclaredConstructor(String) != null
+
+        and: 'so the constructor with the same signature is not the target'
+        constructor.getTargetConstructor() == null
+        constructor.getTargetConstructor() == null
+    }
+
+    void 'test the target constructors of an introspection describing all constructors'() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('targetctor.declared.MyBean', '''
+package targetctor.declared;
+
+import io.micronaut.core.annotation.Creator;
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(constructors = true)
+class MyBean {
+    final String name;
+    final int count;
+
+    MyBean() {
+        this("", 0);
+    }
+
+    MyBean(String name, int count) {
+        this.name = name;
+        this.count = count;
+    }
+
+    @Creator
+    static MyBean create(String name, int count) {
+        return new MyBean(name, count);
+    }
+
+    String getName() {
+        return name;
+    }
+
+    int getCount() {
+        return count;
+    }
+}
+''')
+        Class<?> beanType = introspection.beanType
+
+        when:
+        def constructors = introspection.getConstructors()
+
+        then: 'the instantiating creator first, then the declared constructors'
+        constructors.size() == 3
+        constructors[0].arguments*.type == [String, int]
+        constructors[0].getTargetConstructor() == null
+        constructors[1].getTargetConstructor() == beanType.getDeclaredConstructor()
+        constructors[2].getTargetConstructor() == beanType.getDeclaredConstructor(String, int)
+        constructors[2].getTargetConstructor().is(constructors[2].getTargetConstructor())
+
+        and: 'the declared constructors instantiate through what they describe'
+        constructors[2].instantiate('x', 2).count == 2
+    }
+
+    void 'test the target constructor of an enum introspection is null'() {
+        given:
+        BeanIntrospection<?> introspection = buildBeanIntrospection('targetctor.enums.Colour', '''
+package targetctor.enums;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected
+enum Colour {
+    RED, GREEN
+}
+''')
+
+        expect:
+        introspection.getConstructor().getTargetConstructor() == null
+    }
+
+    void 'test the target constructor of a bean with parameters is its declared constructor'() {
+        given:
+        ApplicationContext context = buildContext('''
+package targetctor.parametrized;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Parameter;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.lang.reflect.Constructor;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@AroundConstruct
+@interface Tracked {
+}
+
+@Singleton
+class Alpha {
+}
+
+@Prototype
+@Tracked
+class Product {
+    final String name;
+    final Alpha alpha;
+
+    Product(@Parameter String name, Alpha alpha) {
+        this.name = name;
+        this.alpha = alpha;
+    }
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+class CapturingInterceptor implements ConstructorInterceptor<Object> {
+    static Constructor<?> first;
+    static Constructor<?> second;
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        first = context.getConstructor().getTargetConstructor();
+        second = context.getConstructor().getTargetConstructor();
+        return context.proceed();
+    }
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('targetctor.parametrized.Product')
+        Class<?> alphaType = context.classLoader.loadClass('targetctor.parametrized.Alpha')
+        Class<?> interceptorType = context.classLoader.loadClass('targetctor.parametrized.CapturingInterceptor')
+
+        when:
+        def bean = context.createBean(beanType, [name: 'widget'])
+
+        then:
+        bean.name == 'widget'
+        interceptorType.first == beanType.getDeclaredConstructor(String, alphaType)
+        interceptorType.second.is(interceptorType.first)
+
+        cleanup:
+        context.close()
+    }
 }

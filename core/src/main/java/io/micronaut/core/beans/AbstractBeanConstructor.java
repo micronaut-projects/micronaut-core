@@ -38,7 +38,7 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
     private final Class<T> beanType;
     private final AnnotationMetadata annotationMetadata;
     private final Argument<?>[] arguments;
-    private @Nullable Constructor<T> targetConstructor;
+    private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
     /**
      * Default constructor.
@@ -72,11 +72,6 @@ public abstract class AbstractBeanConstructor<T> implements BeanConstructor<T> {
 
     @Override
     public @Nullable Constructor<T> getTargetConstructor() {
-        Constructor<T> constructor = targetConstructor;
-        if (constructor == null) {
-            constructor = BeanConstructor.super.getTargetConstructor();
-            targetConstructor = constructor;
-        }
-        return constructor;
+        return targetConstructor.get(() -> TargetConstructorCache.resolve(this));
     }
 }

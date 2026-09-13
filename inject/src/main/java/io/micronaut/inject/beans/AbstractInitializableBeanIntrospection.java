@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.Introspected;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.beans.BeanIntrospection;
 import io.micronaut.core.beans.BeanMethod;
 import io.micronaut.core.beans.BeanProperty;
@@ -200,6 +201,20 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         } else {
             throw new IntrospectionException("No accessible constructor or builder exists for type: " + getBeanType().getName());
         }
+    }
+
+    /**
+     * Whether the bean is instantiated through a static creator method rather than a constructor of the bean
+     * type. Generated introspections override this to return {@code true} when a static {@code @Creator} method
+     * or an enum {@code valueOf} instantiates the bean, in which case
+     * {@link io.micronaut.core.beans.BeanConstructor#getTargetConstructor()} is {@code null}.
+     *
+     * @return True if a static method instantiates the bean
+     * @since 5.2.2
+     */
+    @UsedByGeneratedCode
+    protected boolean isStaticCreator() {
+        return false;
     }
 
     /**
@@ -880,7 +895,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     public BeanConstructor<B> getConstructor() {
         if (beanConstructor == null) {
             beanConstructor = new BeanConstructor<>() {
-                private @Nullable Constructor<B> targetConstructor;
+                private final TargetConstructorCache<B> targetConstructor = new TargetConstructorCache<>();
 
                 @Override
                 public Class<B> getDeclaringBeanType() {
@@ -889,12 +904,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
                 @Override
                 public @Nullable Constructor<B> getTargetConstructor() {
-                    Constructor<B> constructor = targetConstructor;
-                    if (constructor == null) {
-                        constructor = BeanConstructor.super.getTargetConstructor();
-                        targetConstructor = constructor;
-                    }
-                    return constructor;
+                    return targetConstructor.get(() -> isStaticCreator() ? null : TargetConstructorCache.resolve(this));
                 }
 
                 @Override
@@ -2031,7 +2041,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final class BeanConstructorImpl implements BeanConstructor<B> {
 
         private final BeanConstructorRef ref;
-        private @Nullable Constructor<B> targetConstructor;
+        private final TargetConstructorCache<B> targetConstructor = new TargetConstructorCache<>();
 
         private BeanConstructorImpl(BeanConstructorRef ref) {
             this.ref = ref;
@@ -2044,12 +2054,7 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         @Override
         public @Nullable Constructor<B> getTargetConstructor() {
-            Constructor<B> constructor = targetConstructor;
-            if (constructor == null) {
-                constructor = BeanConstructor.super.getTargetConstructor();
-                targetConstructor = constructor;
-            }
-            return constructor;
+            return targetConstructor.get(() -> ref.constructor ? TargetConstructorCache.resolve(this) : null);
         }
 
         @Override
@@ -2316,13 +2321,32 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         final Argument<?>[] arguments;
 
         final int instantiateIndex;
+        /**
+         * Whether the reference describes a constructor of the bean type, rather than a static creator method.
+         */
+        final boolean constructor;
 
         public BeanConstructorRef(@Nullable AnnotationMetadata annotationMetadata,
                                   Argument<?> @Nullable [] arguments,
                                   int instantiateIndex) {
+            this(annotationMetadata, arguments, instantiateIndex, true);
+        }
+
+        /**
+         * @param annotationMetadata The annotation metadata
+         * @param arguments          The arguments
+         * @param instantiateIndex   The dispatch index
+         * @param constructor        Whether a constructor of the bean type, rather than a static creator method
+         * @since 5.2.2
+         */
+        public BeanConstructorRef(@Nullable AnnotationMetadata annotationMetadata,
+                                  Argument<?> @Nullable [] arguments,
+                                  int instantiateIndex,
+                                  boolean constructor) {
             this.annotationMetadata = annotationMetadata == null ? AnnotationMetadata.EMPTY_METADATA : EvaluatedAnnotationMetadata.wrapIfNecessary(annotationMetadata);
             this.arguments = arguments == null ? Argument.ZERO_ARGUMENTS : arguments;
             this.instantiateIndex = instantiateIndex;
+            this.constructor = constructor;
         }
     }
 

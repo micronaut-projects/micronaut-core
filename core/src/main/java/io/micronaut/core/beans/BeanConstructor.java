@@ -17,7 +17,6 @@ package io.micronaut.core.beans;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.naming.Described;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
@@ -62,19 +61,14 @@ public interface BeanConstructor<T> extends AnnotationMetadataProvider, Describe
      *
      * <p>The result is {@code null} when the bean is not created through a constructor of the declaring
      * bean type: a bean produced by a factory method or field, or an introspection instantiating through a
-     * static creator method whose parameter types no constructor shares.</p>
+     * static creator method, even one whose parameter types a declared constructor shares.</p>
      *
      * @return The constructor, or {@code null} if the declaring bean type declares no such constructor
      * @since 5.2.2
      */
     @Nullable
     default Constructor<T> getTargetConstructor() {
-        Argument<?>[] arguments = getArguments();
-        Class<?>[] parameterTypes = new Class<?>[arguments.length];
-        for (int i = 0; i < arguments.length; i++) {
-            parameterTypes[i] = arguments[i].getType();
-        }
-        return ReflectionUtils.findConstructor(getDeclaringBeanType(), parameterTypes).orElse(null);
+        return TargetConstructorCache.resolve(this);
     }
 
     /**

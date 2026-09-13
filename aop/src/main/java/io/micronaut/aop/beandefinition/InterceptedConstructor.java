@@ -20,7 +20,9 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
+import io.micronaut.core.beans.TargetConstructorCache;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ConstructorInjectionPoint;
 import io.micronaut.inject.FieldInjectionPoint;
 import io.micronaut.inject.MethodInjectionPoint;
@@ -43,8 +45,7 @@ final class InterceptedConstructor<T> implements BeanConstructor<T> {
     private final BeanResolutionContext beanResolutionContext;
     private final BeanContext beanContext;
     private final AnnotationMetadata annotationMetadata;
-    private @Nullable Constructor<T> targetConstructor;
-    private boolean targetConstructorResolved;
+    private final TargetConstructorCache<T> targetConstructor = new TargetConstructorCache<>();
 
     /**
      * @param interceptedBeanDefinition The intercepted bean definition
@@ -83,18 +84,20 @@ final class InterceptedConstructor<T> implements BeanConstructor<T> {
         return interceptedBeanDefinition.getConstructor().getArguments();
     }
 
+    /**
+     * Whether the bean is produced by a factory method or field, so is not created through a constructor of its
+     * own type, even one that happens to declare the factory's parameter types.
+     *
+     * @param beanDefinition The bean definition
+     * @return True if a factory produces the bean
+     */
+    static boolean isFactoryProduced(BeanDefinition<?> beanDefinition) {
+        ConstructorInjectionPoint<?> injectionPoint = beanDefinition.getConstructor();
+        return injectionPoint instanceof MethodInjectionPoint || injectionPoint instanceof FieldInjectionPoint;
+    }
+
     @Override
     public @Nullable Constructor<T> getTargetConstructor() {
-        if (!targetConstructorResolved) {
-            ConstructorInjectionPoint<T> injectionPoint = interceptedBeanDefinition.getConstructor();
-            if (injectionPoint instanceof MethodInjectionPoint || injectionPoint instanceof FieldInjectionPoint) {
-                // A bean produced by a factory is not created through a constructor of its own type
-                targetConstructor = null;
-            } else {
-                targetConstructor = BeanConstructor.super.getTargetConstructor();
-            }
-            targetConstructorResolved = true;
-        }
-        return targetConstructor;
+        return targetConstructor.get(() -> InterceptedConstructor.isFactoryProduced(interceptedBeanDefinition) ? null : TargetConstructorCache.resolve(this));
     }
 }
