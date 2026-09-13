@@ -26,6 +26,7 @@ import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonToken;
 import tools.jackson.core.ObjectReadContext;
 import tools.jackson.core.TokenStreamFactory;
@@ -151,7 +152,7 @@ public class JacksonCoreProcessor extends SingleThreadedBufferingProcessor<byte[
                     requestMoreInput();
                 }
             }
-        } catch (IOException e) {
+        } catch (IOException | JacksonException e) {
             onError(e);
         }
     }
