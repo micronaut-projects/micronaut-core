@@ -305,8 +305,25 @@ public class GroovyVisitorContext implements VisitorContext {
         return outputVisitor.visitGeneratedFile(path, originatingElements);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The Groovy compiler has no annotation-processing rounds, so the file is not written to a generated
+     * sources directory: it is queued into the running compilation once it is written and closed, and its classes
+     * are compiled, visited by the type element visitors and written to the same output as every other class of
+     * the compilation. The content must be Groovy source. A generated class may reference any class of the
+     * compilation, but the sources the compilation started with are resolved before the visitors run, so they
+     * cannot reference a generated class. Nothing is left in the compilation to process a source written once
+     * class generation has started, so an empty optional is returned from then on.</p>
+     */
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
+        if (compilationUnit != null) {
+            Optional<GeneratedFile> generatedFile = GroovyGeneratedSourceFiles.of(compilationUnit).visitGeneratedSourceFile(packageName, fileNameWithoutExtension);
+            if (generatedFile.isPresent()) {
+                return generatedFile;
+            }
+        }
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
     }
 
