@@ -32,6 +32,7 @@ import com.google.devtools.ksp.symbol.KSPropertySetter
 import com.google.devtools.ksp.symbol.KSType
 import com.google.devtools.ksp.symbol.KSTypeAlias
 import com.google.devtools.ksp.symbol.KSTypeReference
+import com.google.devtools.ksp.symbol.KSValueArgument
 import com.google.devtools.ksp.symbol.KSValueParameter
 import com.google.devtools.ksp.symbol.KSVisitor
 import com.google.devtools.ksp.symbol.Location
@@ -56,6 +57,9 @@ internal class KotlinAnnotationMetadataBuilder(
     var resolver: Resolver,
     private val visitorContext: KotlinVisitorContext
 ) : AbstractAnnotationMetadataBuilder<KSAnnotated, KSAnnotation>() {
+
+    private var defaultArgumentsCacheResolver: Resolver? = null
+    private val defaultArgumentsCache = mutableMapOf<String, List<KSValueArgument>>()
 
     override fun getTypeForAnnotation(annotationMirror: KSAnnotation): KSAnnotated {
         return KotlinAnnotationType(annotationMirror, visitorContext.getTypeForAnnotation(annotationMirror))
@@ -390,20 +394,57 @@ internal class KotlinAnnotationMetadataBuilder(
         annotationType: KSAnnotated,
         includeEmptyValues: Boolean
     ): MutableMap<out KSDeclaration, *> {
-        return if (annotationType is KotlinAnnotationType) {
-            val map = mutableMapOf<KSDeclaration, Any>()
-            annotationType.type.getAllProperties().forEach { prop ->
-                val argument = annotationType.mirror.defaultArguments.find { it.name == prop.simpleName }
-                if (argument?.value != null && argument.isDefault()) {
-                    val value = argument.value!!
-                    if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
-                        map[prop] = value
-                    }
+        val declaration: KSClassDeclaration
+        val defaultArguments: List<KSValueArgument>
+        when {
+            annotationType is KotlinAnnotationType -> {
+                // an actual usage of the annotation: KSP resolves the defaults for us
+                declaration = annotationType.type
+                defaultArguments = annotationType.mirror.defaultArguments
+            }
+            annotationType is KSClassDeclaration && annotationType.classKind == ClassKind.ANNOTATION_CLASS -> {
+                // the annotation class itself, as returned by getAnnotationMirror(String). KSP exposes member
+                // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
+                declaration = annotationType
+                defaultArguments = findDefaultArguments(annotationType)
+            }
+            else -> return mutableMapOf<KSDeclaration, Any>()
+        }
+        val map = mutableMapOf<KSDeclaration, Any>()
+        declaration.getAllProperties().forEach { prop ->
+            val argument = defaultArguments.find { it.name == prop.simpleName }
+            if (argument?.value != null && argument.isDefault()) {
+                val value = argument.value!!
+                if (value !is String || includeEmptyValues || !StringUtils.isEmpty(value)) {
+                    map[prop] = value
                 }
             }
-            map
-        } else {
-            mutableMapOf<KSDeclaration, Any>()
+        }
+        return map
+    }
+
+    /**
+     * Resolves the default arguments of the given annotation type from an arbitrary usage of it in the current round.
+     *
+     * KSP models member defaults on [KSAnnotation.defaultArguments] rather than on the annotation class declaration,
+     * so the defaults of an annotation that is never used cannot be resolved and an empty list is returned. The
+     * result is cached for the lifetime of the current [Resolver], since scanning for usages is not cheap.
+     */
+    private fun findDefaultArguments(annotationType: KSClassDeclaration): List<KSValueArgument> {
+        if (defaultArgumentsCacheResolver !== resolver) {
+            defaultArgumentsCacheResolver = resolver
+            defaultArgumentsCache.clear()
+        }
+        // Annotation names are binary names (Outer$Inner) while KSP names declarations by source name (Outer.Inner):
+        // look usages up by the source name and match them by declaration, so a nested annotation resolves too.
+        val sourceName = annotationType.qualifiedName?.asString() ?: return emptyList()
+        val binaryName = visitorContext.getBinaryName(annotationType)
+        return defaultArgumentsCache.getOrPut(binaryName) {
+            resolver.getSymbolsWithAnnotation(sourceName)
+                .flatMap { it.annotations }
+                .firstOrNull { visitorContext.getBinaryName(visitorContext.getTypeForAnnotation(it)) == binaryName }
+                ?.defaultArguments
+                ?: emptyList()
         }
     }
 
@@ -512,7 +553,14 @@ internal class KotlinAnnotationMetadataBuilder(
             .or { ClassUtils.forName(className, visitorContext::class.java.classLoader) }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
-        return Optional.ofNullable(visitorContext.classDeclarationByName(annotationName))
+        // annotation names are binary names (Outer$Inner), while KSP looks a declaration up by source name (Outer.Inner)
+        val declaration = visitorContext.classDeclarationByName(annotationName)
+            ?: if (annotationName.contains('$')) {
+                visitorContext.classDeclarationByName(annotationName.replace('$', '.'))
+            } else {
+                null
+            }
+        return Optional.ofNullable(declaration)
     }
 
     override fun getAnnotationMember(annotationElement: KSAnnotated, member: CharSequence): KSAnnotated? {
