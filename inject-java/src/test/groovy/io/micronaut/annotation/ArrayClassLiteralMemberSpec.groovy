@@ -13,7 +13,8 @@ package test;
 import java.lang.annotation.*;
 import java.util.List;
 
-@Types(type = String[].class, primitiveType = int[].class, nested = int[][].class, types = {String[].class, int[].class, List[][].class, String.class, long.class})
+@Types(type = String[].class, primitiveType = int[].class, nested = int[][].class, types = {String[].class, int[].class, List[][].class, String.class, long.class},
+    primitiveArrays = {boolean[].class, byte[].class, short[].class, int[].class, long[].class, char[].class, float[].class, double[].class})
 class Test {
 }
 
@@ -23,6 +24,7 @@ class Test {
     Class<?> primitiveType();
     Class<?> nested();
     Class<?>[] types();
+    Class<?>[] primitiveArrays();
 }
 ''')
         def annotation = element.getAnnotation('test.Types')
@@ -32,6 +34,9 @@ class Test {
         annotation.getValues().get('primitiveType') == new AnnotationClassValue<>('[I')
         annotation.getValues().get('nested') == new AnnotationClassValue<>('[[I')
         (annotation.getValues().get('types') as AnnotationClassValue[])*.name == ['[Ljava.lang.String;', '[I', '[[Ljava.util.List;', 'java.lang.String', 'long']
+
+        and: "every primitive array is named by its descriptor"
+        (annotation.getValues().get('primitiveArrays') as AnnotationClassValue[])*.name == ['[Z', '[B', '[S', '[I', '[J', '[C', '[F', '[D']
 
         and: "the names are the ones Class.getName() gives"
         Class.forName(annotation.getValues().get('type').name) == String[]
