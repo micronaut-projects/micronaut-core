@@ -17,3 +17,5 @@ io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$Inherited
 io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsVisitor
 io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSpec$IgnorePropsRecordingVisitor
 io.micronaut.kotlin.processing.annotations.SourceAnnotationsSpec$SourceVisitor
+io.micronaut.kotlin.processing.ast.visitor.AnnotatedPrimitiveElementSpec$PrimitiveVisitor
+io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$DeclarationVisitor

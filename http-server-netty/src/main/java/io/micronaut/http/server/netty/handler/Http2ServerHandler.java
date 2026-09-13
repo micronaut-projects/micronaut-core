@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -49,7 +50,6 @@ import io.netty.handler.timeout.IdleStateEvent;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.channels.ClosedChannelException;
-import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
@@ -61,7 +61,7 @@ import java.util.Objects;
  */
 @Internal
 public final class Http2ServerHandler extends MultiplexedServerHandler implements Http2FrameListener {
-    private static final Map<Http2Error, Exception> HTTP2_ERRORS = new EnumMap<>(Http2Error.class);
+    private static final Map<Http2Error, Exception> HTTP2_ERRORS;
 
     @Nullable
     private Http2ConnectionHandler connectionHandler;
@@ -70,7 +70,9 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
     private boolean upgradedFromHttp1 = false;
 
     static {
-        for (Http2Error value : Http2Error.values()) {
+        Http2Error[] errors = Http2Error.values();
+        HTTP2_ERRORS = CollectionUtils.newEnumMap(errors);
+        for (Http2Error value : errors) {
             Exception e;
             if (value == Http2Error.CANCEL) {
                 e = StacklessStreamClosedChannelException.INSTANCE;

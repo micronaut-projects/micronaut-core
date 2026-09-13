@@ -343,7 +343,14 @@ public abstract class AbstractJavaElement extends AbstractAnnotationElement impl
             return componentElement.toArray();
         }
         if (type instanceof PrimitiveType pt) {
-            return PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            PrimitiveElement primitiveElement = PrimitiveElement.valueOf(pt.getKind().name(), doc);
+            if (!pt.getAnnotationMirrors().isEmpty()) {
+                // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
+                return primitiveElement.withTypeAnnotationMetadata(
+                    elementAnnotationMetadataFactory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeMirror(pt), pt)
+                );
+            }
+            return primitiveElement;
         }
         if (type instanceof WildcardType wt) {
             return resolveWildcard(owner, declaredTypeArguments, visitedTypes, representedTypeParameter, wt, doc);

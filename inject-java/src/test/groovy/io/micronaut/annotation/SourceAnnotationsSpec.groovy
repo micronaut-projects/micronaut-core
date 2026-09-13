@@ -31,6 +31,10 @@ class MyBean<@TypeAnn("class-var") T> {
 
     public @TypeAnn("component") String @TypeAnn("outer") [] @TypeAnn("inner") [] arrayField;
 
+    public @TypeAnn("primitive") int primitiveField;
+
+    public int plainPrimitiveField;
+
     @MyRepeatable("m")
     public <@TypeAnn("method-var") M> M method(@MyRepeatable("p") String param) {
         return null;
@@ -186,6 +190,20 @@ class MyBean<@TypeAnn("class-var") T> {
 
         and: "an array made from the component holds no mirror for the new dimension"
         arrayType.fromArray().fromArray().toArray().getTypeAnnotationMetadata().getSourceAnnotations().isEmpty()
+    }
+
+    void "test a type annotation on a primitive is in the source view of the use, the shared constant has none"() {
+        given:
+        def element = buildClassElement(SOURCE)
+        def primitive = element.getFields().find { it.name == 'primitiveField' }.getType()
+        def plain = element.getFields().find { it.name == 'plainPrimitiveField' }.getType()
+
+        expect:
+        primitive.isPrimitive()
+        values(primitive.getSourceAnnotations()) == ['primitive']
+        values(primitive.getTypeAnnotationMetadata().getSourceAnnotations()) == ['primitive']
+        plain.getSourceAnnotations().isEmpty()
+        plain.getTypeAnnotationMetadata().getSourceAnnotations().isEmpty()
     }
 
     void "test what a visitor adds does not appear and the meta-annotations of an annotation interface do"() {
