@@ -35,21 +35,29 @@ import java.util.function.Supplier;
 @Internal
 public final class TargetConstructorCache<T> {
 
-    private @Nullable Constructor<T> constructor;
-    private boolean resolved;
+    private static final Object UNRESOLVED = new Object();
 
     /**
-     * Returns the held constructor, resolving it on the first call.
+     * The resolved constructor, {@code null} once resolved to none, or {@link #UNRESOLVED}. One volatile field
+     * rather than a value and a flag, so that a concurrent first call never sees the flag without the value.
+     */
+    private volatile @Nullable Object constructor = UNRESOLVED;
+
+    /**
+     * Returns the held constructor, resolving it on the first call. Concurrent first calls may each resolve,
+     * and hold equal constructors.
      *
-     * @param resolver The resolution, run once
+     * @param resolver The resolution
      * @return The constructor, or {@code null} if the resolution produced none
      */
+    @SuppressWarnings("unchecked")
     public @Nullable Constructor<T> get(Supplier<@Nullable Constructor<T>> resolver) {
-        if (!resolved) {
-            constructor = resolver.get();
-            resolved = true;
+        Object resolved = constructor;
+        if (resolved == UNRESOLVED) {
+            resolved = resolver.get();
+            constructor = resolved;
         }
-        return constructor;
+        return (Constructor<T>) resolved;
     }
 
     /**

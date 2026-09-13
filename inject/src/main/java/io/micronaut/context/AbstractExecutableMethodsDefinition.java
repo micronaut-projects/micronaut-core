@@ -430,7 +430,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final Argument<?>[] arguments;
         private final boolean argumentsAnnotationsWithExpressions;
         @Nullable
-        private Method targetMethod;
+        private volatile Method targetMethod;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,

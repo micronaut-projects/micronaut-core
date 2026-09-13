@@ -235,6 +235,91 @@ class CapturingInterceptor implements ConstructorInterceptor<Object> {
         context.close()
     }
 
+    void 'test the target constructor of a factory produced around advised bean is null'() {
+        given:
+        ApplicationContext context = buildContext('''
+package targetctor.factoryproxy;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.*;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.lang.reflect.Constructor;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@AroundConstruct
+@interface Tracked {
+}
+
+@Singleton
+class Alpha {
+}
+
+class MyBean {
+    final Alpha alpha;
+
+    MyBean() {
+        this(null);
+    }
+
+    MyBean(Alpha alpha) {
+        this.alpha = alpha;
+    }
+
+    String work() {
+        return "done";
+    }
+}
+
+@Factory
+class MyBeanFactory {
+    @Bean
+    @Singleton
+    @Tracked
+    MyBean myBean(Alpha alpha) {
+        return new MyBean(alpha);
+    }
+}
+
+@Singleton
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND_CONSTRUCT)
+class CapturingInterceptor implements ConstructorInterceptor<Object> {
+    static List<Class<?>> declaringBeanTypes = new ArrayList<>();
+    static List<Constructor<?>> targets = new ArrayList<>();
+    static List<Integer> argumentCounts = new ArrayList<>();
+
+    @Override
+    public Object intercept(ConstructorInvocationContext<Object> context) {
+        declaringBeanTypes.add(context.getConstructor().getDeclaringBeanType());
+        targets.add(context.getConstructor().getTargetConstructor());
+        argumentCounts.add(context.getConstructor().getArguments().length);
+        return context.proceed();
+    }
+}
+''')
+        Class<?> beanType = context.classLoader.loadClass('targetctor.factoryproxy.MyBean')
+        Class<?> interceptorType = context.classLoader.loadClass('targetctor.factoryproxy.CapturingInterceptor')
+
+        when:
+        def bean = context.getBean(beanType)
+
+        then:
+        bean instanceof Intercepted
+        bean.work() == 'done'
+
+        and: 'every interception describes the bean type, and none of them names a constructor, since the factory made the instance'
+        !interceptorType.declaringBeanTypes.isEmpty()
+        interceptorType.declaringBeanTypes.every { it == beanType }
+        interceptorType.targets.every { it == null }
+        beanType.getDeclaredConstructor() != null
+
+        cleanup:
+        context.close()
+    }
+
     void 'test the target constructor of an introspection is its declared constructor'() {
         given:
         BeanIntrospection<?> introspection = buildBeanIntrospection('targetctor.introspection.MyBean', '''
