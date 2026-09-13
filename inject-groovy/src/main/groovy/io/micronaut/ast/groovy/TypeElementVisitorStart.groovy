@@ -32,6 +32,7 @@ import io.micronaut.core.version.VersionUtils
 import io.micronaut.inject.visitor.PackageElementVisitor
 import io.micronaut.inject.visitor.TypeElementVisitor
 import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.CompileUnit
 import org.codehaus.groovy.ast.ModuleNode
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilePhase
@@ -55,6 +56,16 @@ class TypeElementVisitorStart implements ASTTransformation, CompilationUnitAware
     @Override
     void visit(ASTNode[] nodes, SourceUnit source) {
         Map<String, LoadedVisitor> loadedVisitors = TypeElementVisitorTransform.loadedVisitors.get()
+        CompileUnit ast = compilationUnit?.getAST()
+        if (loadedVisitors != null && ast != null && ast.getNodeMetaData(TypeElementVisitorStart) == null) {
+            // left on this thread by a compilation that failed before TypeElementVisitorEnd could clear it
+            TypeElementVisitorTransform.loadedVisitors.remove()
+            TypeElementVisitorTransform.beanDefinitionBuilders.remove()
+            loadedVisitors = null
+        }
+        if (ast != null) {
+            ast.putNodeMetaData(TypeElementVisitorStart, Boolean.TRUE)
+        }
         if (loadedVisitors == null) {
             loadedVisitors = [:]
 

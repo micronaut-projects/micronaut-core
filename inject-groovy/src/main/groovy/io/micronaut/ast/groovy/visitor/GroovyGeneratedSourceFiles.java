@@ -56,7 +56,8 @@ import java.util.Set;
  * <p>The rewind only skips the sources whose phase is marked complete, and the compiler marks a phase complete
  * after it has checked the queue. A source queued from the middle of a phase would therefore make the whole
  * phase run a second time for every source already in it, transforms included. So the generated sources are
- * not queued where they are written. Instead a phase operation is registered for the following phase; the
+ * not queued where they are written. Instead a phase operation is registered for a later phase, instruction
+ * selection at the earliest, after the operations that visit the types and write the bean definitions; the
  * compiler appends it after every other operation of that phase, and when it runs it marks the phase complete
  * for the sources in the unit exactly as the compiler would, and only then queues the generated sources. The
  * rewind then processes the generated sources alone up to that phase, after which all sources continue
@@ -119,7 +120,9 @@ final class GroovyGeneratedSourceFiles {
         if (!pending.contains(file)) {
             pending.add(file);
         }
-        int queuePhase = phase + 1;
+        // the type element visitors and the bean definitions run at the end of CANONICALIZATION (deferred phase
+        // operations); the generated sources are queued after them, so they do not skip the sources they mark complete
+        int queuePhase = Math.max(phase + 1, Phases.INSTRUCTION_SELECTION);
         if (queuePhases.add(queuePhase)) {
             compilationUnit.addNewPhaseOperation(this::queuePending, queuePhase);
         }
