@@ -607,10 +607,5 @@ public abstract sealed class MappingAnnotationMetadataDelegate implements Annota
         public <T extends Annotation> AnnotationValue<T> mapAnnotationValue(AnnotationValue<T> av) {
             return owner.mapAnnotationValue(av);
         }
-
-        @Override
-        public boolean hasEvaluatedExpressions() {
-            return layer.hasEvaluatedExpressions();
-        }
     }
 }

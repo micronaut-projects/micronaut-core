@@ -19,6 +19,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Test annotation that can be declared on both a class and a method and whose single member has a default,
@@ -32,4 +33,18 @@ public @interface Zone {
     int priority() default 0;
 
     long timeout() default 0L;
+
+    double ratio() default 0;
+
+    boolean enabled() default false;
+
+    String[] tags() default {};
+
+    TimeUnit unit() default TimeUnit.SECONDS;
+
+    TimeUnit[] units() default {};
+
+    Class<?> type() default Object.class;
+
+    Class<?>[] types() default {};
 }

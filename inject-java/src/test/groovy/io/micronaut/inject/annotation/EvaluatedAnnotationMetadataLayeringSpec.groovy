@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.inject.ExecutableMethod
 
 import java.lang.annotation.Annotation
+import java.util.concurrent.TimeUnit
 
 /**
  * An annotation that a method declares has to be read from the method, even when an unrelated annotation on the
@@ -47,7 +48,9 @@ class Zoned {
     void defaulted() {
     }
 
-    @Zone(value = "method", priority = 3, timeout = 4L)
+    @Zone(value = "method", priority = 3, timeout = 4L, ratio = 0.5, enabled = true, tags = {"a", "b"},
+          unit = java.util.concurrent.TimeUnit.MINUTES, units = {java.util.concurrent.TimeUnit.HOURS},
+          type = String.class, types = {Integer.class})
     @ExpressionCarrier(VALUE)
     @Executable
     void declared() {
@@ -107,6 +110,22 @@ class Zoned {
         metadata.longValue(zone, 'timeout').asLong == 4L
         metadata.intValue(zone, 'priority') == unwrapped.intValue(zone, 'priority')
         metadata.longValue(zone, 'timeout') == unwrapped.longValue(zone, 'timeout')
+
+        and: "the other member reads resolve the method's values, as the unwrapped hierarchy does"
+        metadata.doubleValue(zone, 'ratio').asDouble == 0.5d
+        metadata.doubleValue(zone.name, 'ratio') == unwrapped.doubleValue(zone.name, 'ratio')
+        metadata.booleanValue(zone, 'enabled').get()
+        metadata.booleanValue(zone, 'enabled') == unwrapped.booleanValue(zone, 'enabled')
+        metadata.isTrue(zone, 'enabled')
+        metadata.stringValues(zone, 'tags') as List == ['a', 'b']
+        metadata.stringValues(zone, 'tags') as List == unwrapped.stringValues(zone, 'tags') as List
+        metadata.enumValue(zone, 'unit', TimeUnit).get() == TimeUnit.MINUTES
+        metadata.enumValue(zone, 'unit', TimeUnit) == unwrapped.enumValue(zone, 'unit', TimeUnit)
+        metadata.enumValues(zone, 'units', TimeUnit) as List == [TimeUnit.HOURS]
+        metadata.classValue(zone, 'type').get() == String
+        metadata.classValue(zone, 'type') == unwrapped.classValue(zone, 'type')
+        metadata.classValues(zone, 'types') as List == [Integer]
+        metadata.synthesize(zone, zone.name).value() == 'method'
 
         cleanup:
         ctx.close()
