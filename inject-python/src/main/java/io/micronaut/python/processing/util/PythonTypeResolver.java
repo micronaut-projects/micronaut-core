@@ -172,6 +172,10 @@ public final class PythonTypeResolver {
             return baseType;
         }
         var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
+        if (baseType instanceof PrimitiveElement primitiveElement) {
+            // A type annotation on a primitive, such as Annotated[int, ...]: an annotated copy of the shared constant
+            return primitiveElement.withTypeAnnotationMetadata(metadata);
+        }
         return new TypeAnnotatedClassElement(baseType, metadata);
     }
 

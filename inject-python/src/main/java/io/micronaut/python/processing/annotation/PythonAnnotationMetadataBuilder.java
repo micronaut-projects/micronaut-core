@@ -684,7 +684,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     @Override
-    protected String getRepeatableContainerNameForType(ElementDef annotationType) {
+    public String getRepeatableContainerNameForType(ElementDef annotationType) {
         if (visitorContext != null) {
             PythonProcessingEnvironment env = visitorContext.getProcessingEnvironment();
             DecoratorDef decoratorDef = findDecoratorDef(env.environment().decorators(), annotationType.name());
@@ -891,7 +891,7 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(ElementDef annotation) {
+    public RetentionPolicy getRetentionPolicy(ElementDef annotation) {
         JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
         if (javaVisitorContext != null) {
             return javaVisitorContext.getAnnotationMetadataBuilder().getRetentionPolicy(annotation.name());

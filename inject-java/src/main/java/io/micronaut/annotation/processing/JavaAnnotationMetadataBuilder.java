@@ -141,7 +141,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
 
     @Nullable
     @Override
-    protected String getRepeatableContainerNameForType(Element annotationType) {
+    public String getRepeatableContainerNameForType(Element annotationType) {
         List<? extends AnnotationMirror> mirrors = annotationType.getAnnotationMirrors();
         for (AnnotationMirror mirror : mirrors) {
             String name = mirror.getAnnotationType().toString();
@@ -178,7 +178,7 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     }
 
     @Override
-    protected RetentionPolicy getRetentionPolicy(Element annotation) {
+    public RetentionPolicy getRetentionPolicy(Element annotation) {
         final List<? extends AnnotationMirror> annotationMirrors = annotation.getAnnotationMirrors();
         for (AnnotationMirror annotationMirror : annotationMirrors) {
             final String annotationTypeName = getAnnotationTypeName(annotationMirror);
@@ -201,6 +201,18 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
     @Override
     protected Element getTypeForAnnotation(AnnotationMirror annotationMirror) {
         return annotationMirror.getAnnotationType().asElement();
+    }
+
+    /**
+     * Lookup or build the metadata of the type annotations written on the given type mirror, such as those on
+     * a primitive type use, keyed by the mirror.
+     *
+     * @param typeMirror The type mirror
+     * @return The metadata
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForTypeMirror(TypeMirror typeMirror) {
+        return lookupOrBuild(typeMirror, new AnnotationsElement(typeMirror));
     }
 
     @Override

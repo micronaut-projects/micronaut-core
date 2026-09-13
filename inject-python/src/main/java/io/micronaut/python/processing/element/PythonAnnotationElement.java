@@ -18,9 +18,19 @@ package io.micronaut.python.processing.element;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.AnnotationElement;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.python.processing.model.ClassDef;
+import io.micronaut.python.processing.annotation.PythonAnnotationMetadataBuilder;
 import io.micronaut.python.processing.model.DecoratorDef;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.util.Collections;
+import java.util.EnumSet;
+import java.util.Optional;
+import java.util.Set;
 
 /**
  * Class element implementation for Python annotations, which are declared as decorators.
@@ -58,5 +68,93 @@ public final class PythonAnnotationElement extends PythonClassElement implements
             }
         }
         return false;
+    }
+
+    @Override
+    public Set<ElementType> getTargets() {
+        // A Python declaration may carry java.lang.annotation.Target like it carries @Inherited
+        for (DecoratorDef decorator : getNativeType().decorators()) {
+            if (Target.class.getName().equals(decorator.annotationName())) {
+                EnumSet<ElementType> targets = EnumSet.noneOf(ElementType.class);
+                for (Object value : decorator.members().values()) {
+                    addTargets(value, targets);
+                }
+                return Collections.unmodifiableSet(targets);
+            }
+        }
+        // A Java annotation used from Python answers with its own declaration
+        AnnotationElement javaAnnotation = javaAnnotation();
+        if (javaAnnotation != null) {
+            return javaAnnotation.getTargets();
+        }
+        return DEFAULT_TARGETS;
+    }
+
+    private static void addTargets(Object value, EnumSet<ElementType> targets) {
+        if (value instanceof Iterable<?> values) {
+            for (Object item : values) {
+                addTargets(item, targets);
+            }
+        } else if (value instanceof Object[] values) {
+            for (Object item : values) {
+                addTargets(item, targets);
+            }
+        } else if (value instanceof ElementType elementType) {
+            targets.add(elementType);
+        } else if (value != null) {
+            String name = value.toString();
+            name = name.substring(name.lastIndexOf('.') + 1);
+            for (ElementType elementType : ElementType.values()) {
+                if (elementType.name().equals(name)) {
+                    targets.add(elementType);
+                    break;
+                }
+            }
+        }
+    }
+
+    @Override
+    public Optional<String> getRepeatableContainer() {
+        // The repeated name of the Python declaration, or the @Repeatable of the Java annotation
+        PythonAnnotationMetadataBuilder builder = environment.annotationMetadataBuilder();
+        DecoratorDef declaration = builder.decoratorDef(getName());
+        if (declaration != null && declaration.repeatedName() != null) {
+            return Optional.of(builder.binaryClassName(declaration.repeatedName()));
+        }
+        return Optional.ofNullable(builder.getRepeatableContainerNameForType(getNativeType()));
+    }
+
+    @Override
+    public RetentionPolicy getRetentionPolicy() {
+        for (DecoratorDef decorator : getNativeType().decorators()) {
+            if (Retention.class.getName().equals(decorator.annotationName())) {
+                for (Object value : decorator.members().values()) {
+                    if (value instanceof RetentionPolicy retentionPolicy) {
+                        return retentionPolicy;
+                    }
+                    if (value != null) {
+                        String name = value.toString();
+                        name = name.substring(name.lastIndexOf('.') + 1);
+                        for (RetentionPolicy retentionPolicy : RetentionPolicy.values()) {
+                            if (retentionPolicy.name().equals(name)) {
+                                return retentionPolicy;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return environment.annotationMetadataBuilder().getRetentionPolicy(getNativeType());
+    }
+
+    @Nullable
+    private AnnotationElement javaAnnotation() {
+        if (environment.javaVisitorContext() == null) {
+            return null;
+        }
+        return environment.javaVisitorContext().getClassElement(getName())
+            .filter(AnnotationElement.class::isInstance)
+            .map(AnnotationElement.class::cast)
+            .orElse(null);
     }
 }

@@ -123,6 +123,21 @@ public abstract class AbstractElementAnnotationMetadataFactory<K, A> implements 
     }
 
     @Override
+    public ElementAnnotationMetadata buildTypeAnnotations(AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata cacheEntry, Object description) {
+        return new AbstractElementAnnotationMetadata() {
+            @Override
+            protected AbstractAnnotationMetadataBuilder.CachedAnnotationMetadata lookup() {
+                return cacheEntry;
+            }
+
+            @Override
+            public String toString() {
+                return description.toString();
+            }
+        };
+    }
+
+    @Override
     public ElementAnnotationMetadata buildGenericTypeAnnotations(GenericElement element) {
         if (element instanceof GenericPlaceholderElement placeholderElement) {
             return buildTypeAnnotationsForGenericPlaceholder(placeholderElement);
