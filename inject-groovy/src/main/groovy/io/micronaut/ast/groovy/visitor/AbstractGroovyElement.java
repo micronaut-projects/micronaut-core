@@ -30,7 +30,6 @@ import io.micronaut.inject.ast.ElementModifier;
 import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.WildcardElement;
 import io.micronaut.inject.ast.annotation.AbstractAnnotationElement;
-import io.micronaut.inject.ast.annotation.AbstractElementAnnotationMetadataFactory;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -221,9 +220,8 @@ public abstract class AbstractGroovyElement extends AbstractAnnotationElement {
             PrimitiveElement primitiveElement = PrimitiveElement.valueOf(classNode.getName());
             if (CollectionUtils.isNotEmpty(classNode.getTypeAnnotations())) {
                 // A type annotation on a primitive, such as @A int: an annotated copy of the shared constant
-                var factory = (AbstractElementAnnotationMetadataFactory<?, ?>) elementAnnotationMetadataFactory;
                 return primitiveElement.withTypeAnnotationMetadata(
-                    factory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode)
+                    elementAnnotationMetadataFactory.buildTypeAnnotations(visitorContext.getAnnotationMetadataBuilder().lookupOrBuildForTypeAnnotations(classNode), classNode)
                 );
             }
             return primitiveElement;

@@ -212,9 +212,9 @@ public final class PropertyElementAnnotationMetadata implements ElementAnnotatio
     }
 
     /**
-     * Reads the type annotations of a member's type through the property and writes to them, unless the type is
-     * a primitive: its type annotations are the annotations written on a use of the primitive, readable, but no
-     * element to annotate.
+     * Reads the type annotations of a member's type through the property and writes the property's mutations to
+     * them, except for a primitive: what was written on a use of a primitive is read through the property, but a
+     * mutation of the property is not propagated into it.
      */
     private static void addTypeAnnotations(ClassElement type,
                                            List<MutableAnnotationMetadataDelegate<?>> writeElements,

@@ -165,6 +165,14 @@ public final class PrimitiveElement implements ArrayableClassElement {
         return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, typeAnnotationMetadata, doc);
     }
 
+    /**
+     * A copy of this element with the given metadata preset. As for every element, the preset replaces what was
+     * built from the source: on an annotated copy the type annotations of the use are replaced too, and the
+     * result, like the shared constants, cannot be annotated at compilation time.
+     *
+     * @param annotationMetadata The metadata
+     * @return The copy
+     */
     @Override
     public PrimitiveElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
         return new PrimitiveElement(typeName, boxedTypeName, arrayDimensions, annotationMetadata, null, doc);
