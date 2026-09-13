@@ -44,6 +44,7 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.ClassNodeResolver;
@@ -319,12 +320,30 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
         if (compilationUnit != null) {
-            Optional<GeneratedFile> generatedFile = GroovyGeneratedSourceFiles.of(compilationUnit).visitGeneratedSourceFile(packageName, fileNameWithoutExtension);
+            Optional<GeneratedFile> generatedFile = GroovyGeneratedSourceFiles.of(compilationUnit)
+                .visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingSource(originatingElements));
             if (generatedFile.isPresent()) {
                 return generatedFile;
             }
         }
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
+    }
+
+    /**
+     * The source unit of the first originating element that has one, else the source unit being visited.
+     */
+    @Nullable
+    private SourceUnit originatingSource(Element... originatingElements) {
+        for (Element element : originatingElements) {
+            if (element != null && element.getNativeType() instanceof GroovyNativeElement nativeElement) {
+                AnnotatedNode node = nativeElement.annotatedNode();
+                ClassNode owner = node instanceof ClassNode classNode ? classNode : node.getDeclaringClass();
+                if (owner != null && owner.getModule() != null && owner.getModule().getContext() != null) {
+                    return owner.getModule().getContext();
+                }
+            }
+        }
+        return sourceUnit;
     }
 
     @Override

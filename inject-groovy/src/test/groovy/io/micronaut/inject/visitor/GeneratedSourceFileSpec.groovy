@@ -19,7 +19,12 @@ import io.micronaut.ast.transform.test.AbstractBeanDefinitionSpec
 import io.micronaut.inject.BeanDefinition
 import io.micronaut.inject.writer.BeanDefinitionWriter
 import jakarta.inject.Singleton
+import org.codehaus.groovy.ast.ClassNode
+import org.codehaus.groovy.classgen.GeneratorContext
+import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.control.customizers.CompilationCustomizer
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit
 import spock.lang.TempDir
@@ -138,6 +143,15 @@ class Foo {
         def configuration = new CompilerConfiguration()
         configuration.targetDirectory = targetDir.toFile()
         configuration.jointCompilationOptions = [stubDir: Files.createDirectories(tempDir.resolve('stubs')).toFile()]
+
+        and: 'the customizer Gradle incremental compilation registers, which maps every class to the file of its source unit'
+        Map<String, String> classSources = [:]
+        configuration.addCompilationCustomizers(new CompilationCustomizer(CompilePhase.CLASS_GENERATION) {
+            @Override
+            void call(SourceUnit su, GeneratorContext context, ClassNode classNode) {
+                classSources[classNode.name] = new File(su.source.URI.path).canonicalPath
+            }
+        })
         def unit = new JavaAwareCompilationUnit(configuration, new GroovyClassLoader(getClass().classLoader, configuration))
         unit.addSources([source.toFile()] as File[])
 
@@ -149,6 +163,10 @@ class Foo {
         Files.exists(targetDir.resolve('test/FooGenerated.class'))
         Files.exists(targetDir.resolve('test/$FooGenerated' + BeanDefinitionWriter.CLASS_SUFFIX + '.class'))
         GeneratedSourceVisitor.visited == ['test.Foo']
+
+        and: 'the generated class and its bean definition are attributed to the originating source file'
+        classSources['test.Foo'] == source.toFile().canonicalPath
+        classSources['test.FooGenerated'] == source.toFile().canonicalPath
 
         and: 'the generated class loads with its annotations'
         def classLoader = new URLClassLoader([targetDir.toUri().toURL()] as URL[], getClass().classLoader)

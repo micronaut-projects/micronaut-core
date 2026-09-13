@@ -18,9 +18,12 @@ package io.micronaut.ast.groovy.visitor;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.writer.GeneratedFile;
+import org.jspecify.annotations.Nullable;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.control.io.ReaderSource;
+import org.codehaus.groovy.control.io.StringReaderSource;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -60,6 +63,10 @@ import java.util.Set;
  * together. Micronaut's transforms, and every other global transform, see the generated class exactly once,
  * as they would a class the compilation started with, and its classes reach the same output as the others.</p>
  *
+ * <p>The generated source reports the URI of the source it originates from: tooling that attributes the classes
+ * of the compilation to source files (Gradle's incremental Groovy compilation does, at class generation) then
+ * keeps the generated classes with the originating file, as javac does through the originating elements.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -92,14 +99,15 @@ final class GroovyGeneratedSourceFiles {
      *
      * @param packageName              The package of the source file
      * @param fileNameWithoutExtension The name of the source file, without extension
+     * @param originatingSource        The source the file is generated from, if known
      * @return The file, or empty once the compilation is generating classes and nothing would process the source
      */
-    Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension) {
+    Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, @Nullable SourceUnit originatingSource) {
         if (compilationUnit.getPhase() >= Phases.CLASS_GENERATION) {
             return Optional.empty();
         }
         String path = (packageName.isEmpty() ? "" : packageName.replace('.', '/') + "/") + fileNameWithoutExtension + EXTENSION;
-        return Optional.of(files.computeIfAbsent(path, GroovyGeneratedSourceFile::new));
+        return Optional.of(files.computeIfAbsent(path, key -> new GroovyGeneratedSourceFile(key, originatingSource)));
     }
 
     private void written(GroovyGeneratedSourceFile file) throws IOException {
@@ -136,7 +144,14 @@ final class GroovyGeneratedSourceFiles {
             }
         }
         for (GroovyGeneratedSourceFile file : pending) {
-            compilationUnit.addSource(file.getName(), file.text);
+            ReaderSource readerSource = new StringReaderSource(file.text, compilationUnit.getConfiguration()) {
+                @Override
+                public URI getURI() {
+                    ReaderSource originating = file.originatingSource == null ? null : file.originatingSource.getSource();
+                    return originating == null ? super.getURI() : originating.getURI();
+                }
+            };
+            compilationUnit.addSource(new SourceUnit(file.getName(), readerSource, compilationUnit.getConfiguration(), compilationUnit.getClassLoader(), compilationUnit.getErrorCollector()));
             file.queued = true;
         }
         pending.clear();
@@ -148,11 +163,14 @@ final class GroovyGeneratedSourceFiles {
     private final class GroovyGeneratedSourceFile implements GeneratedFile {
 
         private final String path;
+        @Nullable
+        private final SourceUnit originatingSource;
         private String text = "";
         private boolean queued;
 
-        private GroovyGeneratedSourceFile(String path) {
+        private GroovyGeneratedSourceFile(String path, @Nullable SourceUnit originatingSource) {
             this.path = path;
+            this.originatingSource = originatingSource;
         }
 
         @Override
