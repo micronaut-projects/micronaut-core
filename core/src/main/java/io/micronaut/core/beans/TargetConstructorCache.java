@@ -41,6 +41,7 @@ public final class TargetConstructorCache<T> {
      * The resolved constructor, {@code null} once resolved to none, or {@link #UNRESOLVED}. One volatile field
      * rather than a value and a flag, so that a concurrent first call never sees the flag without the value.
      */
+    @SuppressWarnings("java:S3077") // a Constructor is immutable: publishing the reference publishes it
     private volatile @Nullable Object constructor = UNRESOLVED;
 
     /**

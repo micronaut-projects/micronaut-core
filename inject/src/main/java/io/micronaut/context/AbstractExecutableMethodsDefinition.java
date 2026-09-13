@@ -430,6 +430,7 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         private final Argument<?>[] arguments;
         private final boolean argumentsAnnotationsWithExpressions;
         @Nullable
+        @SuppressWarnings("java:S3077") // a Method is immutable: publishing the reference publishes it
         private volatile Method targetMethod;
 
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
