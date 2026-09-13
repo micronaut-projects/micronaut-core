@@ -41,9 +41,11 @@ singleton:
 * *Singleton* – one instance for the whole application context, shared by every intercepted bean and every kind it is
 bound to. It must not hold state that belongs to one intercepted bean, because it will see many. State that belongs to
 one _type_ can be cached against the `ExecutableMethod` or declaring type from the api:aop.InvocationContext[].
-* *Non-singleton* – declare ann:context.annotation.Prototype[], or another non-singleton scope, and the framework
-creates *one instance per intercepted bean*. That instance is then reused for every kind bound to that bean, so state
-set up while the bean is constructed is still there when the bean is destroyed.
+* *Non-singleton* – declare ann:context.annotation.Prototype[], or leave the scope out, and the interceptor is of the
+*dependent scope* of the bean it intercepts: *one instance per intercepted bean*, created with the bean as one of its
+dependents, found there by every interception point of the bean like a singleton whose scope is that one bean, and
+destroyed with it. State set up while the bean is constructed is still there when the bean is destroyed. An
+interceptor of a custom scope belongs to that scope instead.
 
 .A per-target interceptor
 [source,java]
@@ -81,7 +83,8 @@ hierarchy is intercepted once, and `proceed()` invokes all of them. See <<lifecy
 For one intercepted bean, in order:
 
 . The interceptors bound to that bean are resolved while the bean is being created; the non-singleton ones are
-created with it, as dependents of its registration, and every later interception point takes them from there.
+created in the bean's dependent scope, as dependents of its registration, and every later interception point finds
+them there.
 . `AROUND_CONSTRUCT` interception runs, then the bean's constructor.
 . `POST_CONSTRUCT` interception runs once, then the bean's `@PostConstruct` methods, superclass methods first.
 . `AROUND` or `INTRODUCTION` interception runs on each method call, for as long as the bean lives.
@@ -140,8 +143,9 @@ life, or on each call for a proxy whose target changes, such as a scoped proxy t
 per thread. Two targets never share an instance, and each instance is destroyed with its target. The proxy itself is
 injected with the singleton interceptors only.
 
-An interceptor bound for `AROUND` alone is not resolved while the target is created; the proxy creates it for the
-target on the first call and hands it to the target's registration, so it is destroyed with the target as well.
+An interceptor bound for `AROUND` alone is not resolved while the target is created; the proxy resolves it in the
+target's dependent scope the first time it selects for that target, which creates it there, so it is destroyed with
+the target as well.
 
 NOTE: An object handed to a hot-swappable proxy through `swap` that the context did not create, or a prototype
 created for another proxy, has no registration the proxy can find. Such a target is intercepted with instances the

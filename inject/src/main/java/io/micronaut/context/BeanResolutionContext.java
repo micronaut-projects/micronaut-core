@@ -119,24 +119,19 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * Obtains the bean registrations for the given type and qualifier, reusing a registration among the given ones
-     * for a non-singleton candidate of the same definition instead of creating a new bean.
+     * The dependent scope of the bean this context resolves for, as a context.
      *
-     * <p>This is how the interception points of one bean share one instance of a non-singleton interceptor: the
-     * instances created with the bean are the dependents of its creation, and later of its registration, and an
-     * interception point resolves its interceptors by binding while reusing them.</p>
+     * <p>Its lookups are the bean context's, answered within the scope: a singleton or a bean of a custom scope comes
+     * from its scope, any other bean is the dependent of that definition the bean already has, among
+     * {@link #getDependentBeans()}, or is created as a new dependent of the bean. The interceptors bound to a bean are
+     * resolved through it, which is what gives every interception point of the bean the same instance of a
+     * non-singleton interceptor.</p>
      *
-     * @param beanType  The bean type
-     * @param qualifier The qualifier
-     * @param reusable  Registrations to reuse, typically the dependents of the bean being resolved for
-     * @param <T>       The bean type
-     * @return The registrations
+     * @return The dependent context
      * @since 5.3.0
      */
-    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType,
-                                                                     @Nullable Qualifier<T> qualifier,
-                                                                     Collection<? extends BeanRegistration<?>> reusable) {
-        return getBeanRegistrations(beanType, qualifier);
+    default DependentBeanContext getDependentContext() {
+        return new DefaultDependentBeanContext(getContext(), this);
     }
 
     /**

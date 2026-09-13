@@ -387,24 +387,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return registrations;
     }
 
-    @Override
-    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType,
-                                                                    @Nullable Qualifier<T> qualifier,
-                                                                    Collection<? extends BeanRegistration<?>> reusable) {
-        if (reusable.isEmpty()) {
-            return getBeanRegistrations(beanType, qualifier);
-        }
-        Collection<BeanRegistration<T>> registrations = context.getBeanRegistrations(this, beanType, qualifier, reusable);
-        if (tracer != null) {
-            traceBeanCollection(
-                beanType,
-                qualifier,
-                registrations.stream().map(BeanRegistration::getBean).collect(Collectors.toList())
-            );
-        }
-        return registrations;
-    }
-
     /**
      * Copy the state from a previous resolution context.
      *

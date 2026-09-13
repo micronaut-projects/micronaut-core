@@ -42,6 +42,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     private List<BeanRegistration<?>> dependents;
     @Nullable
     private volatile Map<Object, Object> dependentState;
+    private volatile boolean inDependentScope;
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
@@ -83,8 +84,29 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         return dependents == null ? List.of() : List.copyOf(dependents);
     }
 
+    /**
+     * Marks this bean as a member of the dependent scope of the bean it was created for: resolved through that
+     * bean's {@link DependentBeanContext}, and so the one instance of its definition that bean has there. A
+     * dependency injected into the bean is a dependent too, but not a member: an interceptor injected into a bean
+     * is not the instance that intercepts it.
+     */
+    void markInDependentScope() {
+        inDependentScope = true;
+    }
+
+    /**
+     * @return Whether this bean is a member of the dependent scope of the bean it was created for
+     */
+    boolean isInDependentScope() {
+        return inDependentScope;
+    }
+
     @Override
-    public synchronized void addDependentBean(BeanRegistration<?> registration) {
+    public BeanResolutionContext newResolutionContext() {
+        return new ExistingBeanResolutionContext(beanContext, this);
+    }
+
+    synchronized void addDependentBean(BeanRegistration<?> registration) {
         if (dependents == null) {
             dependents = new ArrayList<>(2);
         } else if (!(dependents instanceof ArrayList)) {
