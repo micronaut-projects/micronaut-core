@@ -202,6 +202,18 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         return annotationMirror.getAnnotationType().asElement();
     }
 
+    /**
+     * Lookup or build the metadata of the type annotations written on the given type mirror, such as those on
+     * a primitive type use, keyed by the mirror.
+     *
+     * @param typeMirror The type mirror
+     * @return The metadata
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForTypeMirror(TypeMirror typeMirror) {
+        return lookupOrBuild(typeMirror, new AnnotationsElement(typeMirror));
+    }
+
     @Override
     protected List<? extends AnnotationMirror> getAnnotationsForType(Element element) {
         var expanded = new ArrayList<AnnotationMirror>();

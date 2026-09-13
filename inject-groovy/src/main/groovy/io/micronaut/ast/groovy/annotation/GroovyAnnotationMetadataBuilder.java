@@ -304,6 +304,24 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         throw new IllegalArgumentException("Cannot establish name for node type: " + element.getClass().getName());
     }
 
+    /**
+     * Lookup or build the metadata of the type annotations written on the given class node, such as those on a
+     * primitive type use, keyed by the node.
+     *
+     * @param classNode The class node
+     * @return The metadata
+     * @since 5.3.0
+     */
+    public CachedAnnotationMetadata lookupOrBuildForTypeAnnotations(ClassNode classNode) {
+        var annotatedNode = new AnnotatedNode();
+        List<AnnotationNode> typeAnnotations = classNode.getTypeAnnotations();
+        if (CollectionUtils.isNotEmpty(typeAnnotations)) {
+            annotatedNode.addAnnotations(typeAnnotations);
+        }
+        // ClassNode equality is by name; the annotations belong to this use of the type
+        return lookupOrBuild(new TypeUseKey(classNode), annotatedNode);
+    }
+
     @Override
     protected List<? extends AnnotationNode> getAnnotationsForType(AnnotatedNode element) {
         List<AnnotationNode> annotations = element.getAnnotations();
@@ -652,4 +670,24 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         return ((MethodNode) member).getName();
     }
 
+    /**
+     * A cache key for the type annotations of one use of a type, compared by the identity of the node.
+     */
+    private static final class TypeUseKey {
+        private final ClassNode classNode;
+
+        TypeUseKey(ClassNode classNode) {
+            this.classNode = classNode;
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            return o instanceof TypeUseKey that && that.classNode == classNode;
+        }
+
+        @Override
+        public int hashCode() {
+            return System.identityHashCode(classNode);
+        }
+    }
 }
