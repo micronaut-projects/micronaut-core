@@ -21,4 +21,14 @@ public @interface GenerateSource {
      * @return Extra source placed into the body of the generated class
      */
     String body() default "";
+
+    /**
+     * @return Whether to write through the byte stream and read the file back, without originating elements
+     */
+    boolean stream() default false;
+
+    /**
+     * @return "write" to obtain the file when visiting but write it only in finish, "rewrite" to write it again in finish
+     */
+    String late() default "";
 }

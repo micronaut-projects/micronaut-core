@@ -23,9 +23,16 @@ public class ConstructorArityVisitor implements TypeElementVisitor<Object, Objec
     @Override
     public void visitClass(ClassElement element, VisitorContext context) {
         if (element.getPackageName().equals("transformorder")) {
-            SEEN.put(element.getName(), "record=" + element.isRecord()
-                + " primary=" + element.getPrimaryConstructor().map(MethodElement::getParameters).map(p -> p.length).orElse(-1)
-                + " methods=" + element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared()).stream().map(MethodElement::getName).sorted().toList());
+            record(element);
+            // non-static inner classes are not visited on their own
+            element.getEnclosedElements(ElementQuery.ALL_INNER_CLASSES).forEach(this::record);
         }
+    }
+
+    private void record(ClassElement element) {
+        SEEN.put(element.getName(), "record=" + element.isRecord()
+            + " primary=" + element.getPrimaryConstructor().map(MethodElement::getParameters).map(p -> p.length).orElse(-1)
+            + " default=" + element.getDefaultConstructor().map(MethodElement::getParameters).map(p -> p.length).orElse(-1)
+            + " methods=" + element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared()).stream().map(MethodElement::getName).sorted().toList());
     }
 }

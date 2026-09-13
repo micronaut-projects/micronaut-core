@@ -192,6 +192,57 @@ class Foo {
         e.message.contains('unable to resolve class FooGenerated')
     }
 
+    void "a generated file can be written through its stream and read back, without originating elements"() {
+        when:
+        def classLoader = buildClassLoader('''
+package test
+
+@io.micronaut.inject.visitor.GenerateSource(stream = true)
+class Foo {
+}
+''')
+
+        then:
+        classLoader.loadClass('test.FooGenerated').getAnnotation(GeneratedFrom).value() == 'test.Foo'
+        GeneratedSourceVisitor.readBack[0] == 'memory:test/FooGenerated.groovy'
+        GeneratedSourceVisitor.readBack[1].contains('class FooGenerated')
+        GeneratedSourceVisitor.readBack[2] == GeneratedSourceVisitor.readBack[1]
+        GeneratedSourceVisitor.readBack[3] == GeneratedSourceVisitor.readBack[1]
+
+        and: 'no file is offered once class generation has started'
+        GeneratedSourceVisitor.fileOfferedInFinish == false
+    }
+
+    void "a file written only once class generation has started fails instead of being lost"() {
+        when:
+        buildClassLoader('''
+package test
+
+@io.micronaut.inject.visitor.GenerateSource(late = "write")
+class Foo {
+}
+''')
+
+        then:
+        def e = thrown(MultipleCompilationErrorsException)
+        e.message.contains('generated sources must be written before class generation')
+    }
+
+    void "a file already handed to the compiler cannot be written again"() {
+        when:
+        buildClassLoader('''
+package test
+
+@io.micronaut.inject.visitor.GenerateSource(late = "rewrite")
+class Foo {
+}
+''')
+
+        then:
+        def e = thrown(MultipleCompilationErrorsException)
+        e.message.contains('has already been handed to the Groovy compiler')
+    }
+
     void "a generated source that does not compile fails the compilation with its name"() {
         when:
         buildClassLoader('''

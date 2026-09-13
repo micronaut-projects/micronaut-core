@@ -107,25 +107,8 @@ final class GroovyGeneratedSourceFiles {
         if (compilationUnit.getPhase() >= Phases.CLASS_GENERATION) {
             return Optional.empty();
         }
-        String path = (packageName.isEmpty() ? "" : packageName.replace('.', '/') + "/") + fileNameWithoutExtension + EXTENSION;
+        String path = (packageName.isEmpty() ? "" : packageName.replace('.', '/') + '/') + fileNameWithoutExtension + EXTENSION;
         return Optional.of(files.computeIfAbsent(path, key -> new GroovyGeneratedSourceFile(key, originatingSource)));
-    }
-
-    private void written(GroovyGeneratedSourceFile file) throws IOException {
-        int phase = compilationUnit.getPhase();
-        if (phase >= Phases.CLASS_GENERATION) {
-            throw new IOException("Generated source file [" + file.getName() + "] was written during " + compilationUnit.getPhaseDescription()
-                + " of the Groovy compilation, when nothing would compile it: generated sources must be written before class generation");
-        }
-        if (!pending.contains(file)) {
-            pending.add(file);
-        }
-        // the type element visitors and the bean definitions run at the end of CANONICALIZATION (deferred phase
-        // operations); the generated sources are queued after them, so they do not skip the sources they mark complete
-        int queuePhase = Math.max(phase + 1, Phases.INSTRUCTION_SELECTION);
-        if (queuePhases.add(queuePhase)) {
-            compilationUnit.addNewPhaseOperation(this::queuePending, queuePhase);
-        }
     }
 
     private void queuePending(SourceUnit source) {
@@ -198,7 +181,7 @@ final class GroovyGeneratedSourceFiles {
                 @Override
                 public void close() throws IOException {
                     text = toString(StandardCharsets.UTF_8);
-                    written(GroovyGeneratedSourceFile.this);
+                    written();
                 }
             };
         }
@@ -220,9 +203,26 @@ final class GroovyGeneratedSourceFiles {
                 @Override
                 public void close() throws IOException {
                     text = toString();
-                    written(GroovyGeneratedSourceFile.this);
+                    written();
                 }
             };
+        }
+
+        private void written() throws IOException {
+            int phase = compilationUnit.getPhase();
+            if (phase >= Phases.CLASS_GENERATION) {
+                throw new IOException("Generated source file [" + path + "] was written during " + compilationUnit.getPhaseDescription()
+                    + " of the Groovy compilation, when nothing would compile it: generated sources must be written before class generation");
+            }
+            if (!pending.contains(this)) {
+                pending.add(this);
+            }
+            // the type element visitors and the bean definitions run at the end of CANONICALIZATION (deferred phase
+            // operations); the generated sources are queued after them, so they do not skip the sources they mark complete
+            int queuePhase = Math.max(phase + 1, Phases.INSTRUCTION_SELECTION);
+            if (queuePhases.add(queuePhase)) {
+                compilationUnit.addNewPhaseOperation(GroovyGeneratedSourceFiles.this::queuePending, queuePhase);
+            }
         }
 
         private void checkNotQueued() throws IOException {

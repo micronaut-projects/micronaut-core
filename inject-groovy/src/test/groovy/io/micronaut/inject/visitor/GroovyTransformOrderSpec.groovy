@@ -46,14 +46,27 @@ class Canon { Long id; String name }
 
 @Immutable
 class Imm { Long id; String name }
+
+class Declared {
+    Declared(Long id) {}
+}
+
+class Outer {
+    @TupleConstructor
+    class Inner { Long id }
+}
 ''')
 
-        then:
-        ConstructorArityVisitor.SEEN['transformorder.Person'].startsWith('record=true primary=2')
-        ConstructorArityVisitor.SEEN['transformorder.Tuple'].startsWith('record=false primary=2')
-        ConstructorArityVisitor.SEEN['transformorder.Canon'].startsWith('record=false primary=2')
+        then: 'a record has no no-arg constructor, a class whose constructor parameters all have defaults gets one'
+        ConstructorArityVisitor.SEEN['transformorder.Person'].startsWith('record=true primary=2 default=-1')
+        ConstructorArityVisitor.SEEN['transformorder.Tuple'].startsWith('record=false primary=2 default=0')
+        ConstructorArityVisitor.SEEN['transformorder.Canon'].startsWith('record=false primary=2 default=0')
         ConstructorArityVisitor.SEEN['transformorder.Canon'].contains('toString')
-        ConstructorArityVisitor.SEEN['transformorder.Imm'].startsWith('record=false primary=2')
+        ConstructorArityVisitor.SEEN['transformorder.Imm'].startsWith('record=false primary=2 default=0')
+        ConstructorArityVisitor.SEEN['transformorder.Declared'].startsWith('record=false primary=1 default=-1')
+
+        and: 'a non-static inner class cannot be constructed without its enclosing instance'
+        ConstructorArityVisitor.SEEN['transformorder.Outer$Inner'].startsWith('record=false primary=-1 default=-1')
     }
 
     void "a record singleton is created through its canonical constructor"() {
