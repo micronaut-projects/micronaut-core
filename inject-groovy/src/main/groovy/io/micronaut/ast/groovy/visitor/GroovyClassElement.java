@@ -710,8 +710,18 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
     @NonNull
     @Override
     public List<? extends GenericPlaceholderElement> getDeclaredGenericPlaceholders() {
-        //noinspection unchecked
-        return (List<? extends GenericPlaceholderElement>) getBoundGenericTypes();
+        // The variables the class declares, not the arguments of this use of it: for List<String> that is E
+        GenericsType[] genericsTypes = classNode.redirect().getGenericsTypes();
+        if (genericsTypes == null) {
+            return Collections.emptyList();
+        }
+        var placeholders = new ArrayList<GenericPlaceholderElement>(genericsTypes.length);
+        for (GenericsType genericsType : genericsTypes) {
+            if (genericsType.isPlaceholder() && newClassElement(genericsType) instanceof GenericPlaceholderElement placeholder) {
+                placeholders.add(placeholder);
+            }
+        }
+        return placeholders;
     }
 
     private List<PropertyNode> getPropertyNodes() {
