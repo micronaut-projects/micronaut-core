@@ -60,8 +60,18 @@ Now consider this example:
 
 snippet::io.micronaut.docs.aop.advice.method.MyFactory[tags="class", indent=0, title="AOP Advice at the method level of a `@Factory`"]
 
-The above example logs the time it takes to execute the public methods of the `MyBean` bean, but not the bean creation.
+The above example logs the time it takes to execute the advised methods of the `MyBean` bean, but not the bean creation. Which methods those are is described below.
 
 The rationale for this behaviour is that you may at times wish to apply advice to a factory and at other times apply advice to the bean produced by the factory.
 
-Note that there is currently no way to apply advice at the method level to a ann:context.annotation.Factory[] bean, and all advice for factories must be applied at the type level. You can control which methods have advice applied by defining methods as non-public which do not have advice applied.
+Note that there is currently no way to apply advice at the method level to a ann:context.annotation.Factory[] bean, and all advice for factories must be applied at the type level.
+
+=== Which Methods of a Produced Bean are Advised
+
+The proxy of a produced bean is a subclass of the produced type generated into the factory's package, and it invokes the produced instance from there, so the methods it can advise are the ones that package can both override and call. They are the same methods advised on a bean that declares the advice itself, within that bound:
+
+* `public` and package-private methods inherit the advice declared by the producing element. A package-private method is only advised when the produced type is declared in the same package as the factory, because a subclass in another package cannot override it.
+* A method that declares advice itself is advised whatever its visibility, as long as the factory's package can see it, so a `protected` method is advised when it is annotated and its declaring type is in the factory's package.
+* `private` methods are never advised. Making a method private is how you keep it out of the advice of a produced bean.
+* `static` methods are never advised.
+* `final` methods are *not* advised, and this is not reported as an error. A produced type is often a third-party type whose methods you cannot change, so a `final` method is left alone rather than failing the build - unlike a `final` method of a bean that declares the advice itself, which is a compilation error.

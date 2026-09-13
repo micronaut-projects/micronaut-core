@@ -16,6 +16,14 @@ NOTE: If you take this approach you should not invoke other bean methods interna
 
 TIP: To allow the resulting bean to participate in the application context shutdown process, annotate the method with link:{api}/io/micronaut/context/annotation/Bean.html[@Bean] and set the `preDestroy` argument to the name of the method to be called to close the bean.
 
+=== Lifecycle of a Produced Bean
+
+A produced instance is constructed by the factory method or field and not by Micronaut, so it is not a managed instance of the produced type: the lifecycle callbacks the produced type declares are *not* invoked for the produced bean. A `@PostConstruct` or `@PreDestroy` method on the produced type is skipped, and so are the type's injection points.
+
+Initialize the instance in the producing element itself, and name a destroy callback with `@Bean(preDestroy = "...")` on the producing element, as described in <<lifecycle, Bean Lifecycle>>. The processors report the callbacks a produced type declares that will not run, as a warning on the producing element.
+
+NOTE: If the produced type is also a bean in its own right - it declares a scope, or is imported - then the callbacks do run for the beans of *that* definition, which Micronaut constructs. They still do not run for the instance the factory returns.
+
 === Beans from Fields
 
 With Micronaut framework 3.0 or above it is also possible to produce beans from fields by declaring the ann:context.annotation.Bean[] annotation on a field.
