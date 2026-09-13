@@ -55,7 +55,7 @@ The Micronaut APIs use https://jspecify.dev[JSpecify] annotations, and we recomm
 
 The default implementations of api:context.BeanContext[BeanContext], api:context.ApplicationContext[ApplicationContext] and api:context.env.Environment[Environment] are no longer public and non-final.
 
-There are new options added to api:context.ApplicationContextBuilder[ApplicationContextBuilder] which allow to modify the behavior of the bean context without overring it:
+There are new options added to api:context.ApplicationContextBuilder[ApplicationContextBuilder] which allow modifying the behavior of the bean context without overriding it:
 
 [source,java]
 ----
