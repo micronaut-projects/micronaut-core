@@ -107,6 +107,26 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     private static final Set<Introspected.AccessKind> METHOD_ACCESS = Set.of(Introspected.AccessKind.METHOD);
 
     private final Class<T> beanType;
+    /**
+     * Whether the type is a {@link Proxy}. A proxy is described through the interfaces it stands for alone: its
+     * own methods are the generated implementations of those interfaces, they carry no annotation, and taking
+     * them as members would report {@code jdk.proxyN.$ProxyN} as the type declaring a property of an interface
+     * that declares it. So every member it reports is the interface declaration a caller means, with the
+     * annotations of that declaration, and the constructor it takes its {@link java.lang.reflect.InvocationHandler}
+     * through is not one of the interfaces.
+     */
+    private final boolean proxy;
+    /**
+     * The classes whose declared members describe the bean, the most derived first: the type and its super
+     * classes, {@link Object} apart; none for a proxy.
+     */
+    private final List<Class<?>> classHierarchy;
+    /**
+     * The interfaces those classes implement and the ones they extend, each once, the ones of the most derived
+     * class first; for a proxy, the interfaces it was created with and the ones they extend - walking its super
+     * class would add the ones {@link Proxy} implements itself, which the proxy does not stand for.
+     */
+    private final List<Class<?>> interfaces;
     private final AnnotationMetadata annotationMetadata;
     private final Set<Introspected.AccessKind> accessKinds;
     private final Set<Introspected.Visibility> visibility;
@@ -130,6 +150,9 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                                         AnnotationMetadata additionalAnnotationMetadata,
                                         @Nullable Set<Introspected.AccessKind> requestedAccessKinds) {
         this.beanType = beanType;
+        this.proxy = Proxy.isProxyClass(beanType);
+        this.classHierarchy = proxy ? List.of() : classHierarchy(beanType);
+        this.interfaces = allInterfaces(proxy ? List.of(beanType) : classHierarchy);
         // the annotations the caller means the type to carry win where both declare the same one: a
         // specification told to handle a type says what that type is, over what the class says of itself
         this.annotationMetadata = ReflectionAnnotations.merge(additionalAnnotationMetadata, typeMetadataOf(beanType));
@@ -153,7 +176,6 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // a static @Creator factory is the instantiation route the processors select first, before any
         // constructor; a proxy declares neither - the constructor it carries takes its InvocationHandler and
         // builds nothing a caller asked for - so it is not buildable, as the interfaces it stands for are not
-        boolean proxy = Proxy.isProxyClass(beanType);
         this.factory = proxy ? null : selectFactoryMethod(beanType);
         this.constructor = factory == null && !proxy ? selectConstructor(beanType) : null;
         if (factory != null) {
@@ -178,12 +200,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     }
 
     /**
-     * The annotations of the described type: the ones the class declares, or, for a {@link Proxy}, the ones
+     * The annotations of a described type: the ones the class declares, or, for a {@link Proxy}, the ones
      * the interfaces it was created with declare. A proxy class carries no annotation of its own, and
      * describing it as anything but the interfaces it stands for would lose what they say of themselves,
      * including {@link Introspected#accessKind()} and {@link AccessorsStyle}, which decide what a property is.
+     *
+     * <p>Whatever merges the annotations of a type with others before describing it - the
+     * {@link ReflectionBeanIntrospectionFallback}, over the ones an application configured - reads them here,
+     * so that the ones of a proxy take the precedence the ones of a class do.</p>
+     *
+     * @param beanType The type
+     * @return The annotations, {@link AnnotationMetadata#EMPTY_METADATA} when there are none
      */
-    private static AnnotationMetadata typeMetadataOf(Class<?> beanType) {
+    static AnnotationMetadata typeMetadataOf(Class<?> beanType) {
         if (Proxy.isProxyClass(beanType)) {
             return ReflectionAnnotations.metadataOf((AnnotatedElement[]) beanType.getInterfaces());
         }
@@ -414,7 +443,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 return Optional.of(method);
             }
         }
-        if (Proxy.isProxyClass(beanType)) {
+        if (proxy) {
             // the methods a proxy class declares are the generated implementations of its interfaces: they
             // carry none of the annotations of the declarations, and the proxy declares nothing of its own
             return Optional.empty();
@@ -467,7 +496,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         List<Constructor<?>> others = new ArrayList<>();
         // a proxy declares one constructor, taking the InvocationHandler the JDK builds it with: it is not a
         // constructor of the interfaces the proxy stands for, and they declare none
-        if (!Proxy.isProxyClass(beanType)) {
+        if (!proxy) {
             for (Constructor<?> declared : beanType.getDeclaredConstructors()) {
                 if (!declared.isSynthetic() && !declared.equals(constructor)) {
                     others.add(declared);
@@ -695,81 +724,31 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     private List<BeanProperty<T, Object>> discoverProperties() {
         Map<String, PropertyMembers> candidates = new LinkedHashMap<>();
+        // the signatures of the methods seen so far, the most derived declaration of each first: a declaration
+        // hides the ones it overrides, and what @Introspected.Property says holds for the most derived one
+        // alone, as the processor reads it - an override carries no annotation of its own, method annotations
+        // not being inherited, so the declaration of a super class or of an interface makes an accessor of a
+        // type only where the type does not override it
+        Set<String> seen = new HashSet<>();
         // the accessors first, as the processor resolves them: a field is a member of a property they
         // discovered, it makes one of its own only when field access is asked for
-        for (Class<?> type : classHierarchy(beanType)) {
-            for (Method method : type.getDeclaredMethods()) {
-                // an accessor of any visibility is a member of the property: what it declares holds
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
-                    continue;
-                }
-                String name = method.getName();
-                int parameters = method.getParameterCount();
-                // a method annotated @Introspected.Property is an accessor whatever its name, of the property
-                // named after the method when the name carries no accessor prefix, as the processor names it
-                Introspected.Property declared = method.getAnnotation(Introspected.Property.class);
-                if (parameters == 0 && method.getReturnType() != void.class) {
-                    String property = accessorProperty(name, method.getReturnType());
-                    if (property == null && declared != null) {
-                        property = name;
-                    }
-                    if (property != null) {
-                        candidate(candidates, property).addGetter(method, declared);
-                    }
-                } else if (parameters == 1) {
-                    String property = writerProperty(name);
-                    if (property == null && declared != null) {
-                        property = name;
-                    }
-                    if (property != null) {
-                        candidate(candidates, property).addSetter(method, declared);
-                    }
-                }
-            }
+        for (Class<?> type : classHierarchy) {
+            addAccessors(type, seen, candidates);
         }
-        // the accessor of a record component is a getter under the name of the component, which the naming rules
-        // below do not match: an annotation of the component whose target is a method lands there and nowhere else
+        // the accessor of a record component is a getter under the name of the component, which the naming
+        // rules do not match: an annotation of the component whose target is a method lands there and nowhere else
         if (beanType.isRecord()) {
             for (RecordComponent component : beanType.getRecordComponents()) {
                 candidate(candidates, component.getName()).addComponent(component);
             }
         }
-        // the accessors of the interfaces, which declare the type-use annotations of the implementations'
-        // properties, and whose default methods a type inherits as accessors of its own
-        // a proxy has no class of its own whose declarations the pass above reads: the interfaces are its
-        // declarations, so an @Introspected.Property there makes an accessor as it does on the interface itself
-        boolean proxy = Proxy.isProxyClass(beanType);
-        for (Class<?> anInterface : allInterfaces(beanType)) {
-            for (Method method : anInterface.getDeclaredMethods()) {
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || isGroovyObjectMethod(method)) {
-                    continue;
-                }
-                Introspected.Property declared = proxy ? method.getAnnotation(Introspected.Property.class) : null;
-                if (method.getParameterCount() == 0 && method.getReturnType() != void.class) {
-                    String property = accessorProperty(method.getName(), method.getReturnType());
-                    if (property == null && declared != null) {
-                        property = method.getName();
-                    }
-                    if (property != null) {
-                        if (declared != null) {
-                            candidate(candidates, property).addGetter(method, declared);
-                        } else {
-                            candidate(candidates, property).addGetter(method);
-                        }
-                    }
-                } else if (method.getParameterCount() == 1) {
-                    String property = writerProperty(method.getName());
-                    if (property == null && declared != null) {
-                        property = method.getName();
-                    }
-                    if (property != null) {
-                        candidate(candidates, property).addSetter(method, method.getAnnotation(Introspected.Property.class));
-                    }
-                }
-            }
+        // then the accessors of the interfaces, which declare the type-use annotations of the implementations'
+        // properties, and whose default methods a type inherits as accessors of its own; a proxy has no others
+        for (Class<?> anInterface : interfaces) {
+            addAccessors(anInterface, seen, candidates);
         }
         boolean fieldAccess = accessKinds.contains(Introspected.AccessKind.FIELD);
-        for (Class<?> type : classHierarchy(beanType)) {
+        for (Class<?> type : classHierarchy) {
             for (Field field : type.getDeclaredFields()) {
                 if (Modifier.isStatic(field.getModifiers()) || field.isSynthetic()) {
                     continue;
@@ -797,7 +776,46 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     }
 
     private PropertyMembers candidate(Map<String, PropertyMembers> candidates, String name) {
-        return candidates.computeIfAbsent(name, key -> new PropertyMembers(key, beanType));
+        return candidates.computeIfAbsent(name, key -> new PropertyMembers(key, beanType, classHierarchy, interfaces));
+    }
+
+    /**
+     * Adds the accessors a class or an interface declares to the candidate properties they name. An accessor
+     * of any visibility is a member of the property: what it declares holds. A method annotated
+     * {@link Introspected.Property} is an accessor whatever its name, of the property named after the method
+     * when the name carries no accessor prefix, as the processor names it - unless a more derived type
+     * overrides it, as the override is the declaration the processor reads.
+     *
+     * @param type       The class or interface
+     * @param seen       The signatures of the methods of the more derived types, the ones of this type added
+     * @param candidates The candidate properties, by name
+     */
+    private void addAccessors(Class<?> type, Set<String> seen, Map<String, PropertyMembers> candidates) {
+        for (Method method : type.getDeclaredMethods()) {
+            if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
+                continue;
+            }
+            String name = method.getName();
+            int parameters = method.getParameterCount();
+            Introspected.Property declared = seen.add(signature(method)) ? method.getAnnotation(Introspected.Property.class) : null;
+            if (parameters == 0 && method.getReturnType() != void.class) {
+                String property = accessorProperty(name, method.getReturnType());
+                if (property == null && declared != null) {
+                    property = name;
+                }
+                if (property != null) {
+                    candidate(candidates, property).addGetter(method, declared);
+                }
+            } else if (parameters == 1) {
+                String property = writerProperty(name);
+                if (property == null && declared != null) {
+                    property = name;
+                }
+                if (property != null) {
+                    candidate(candidates, property).addSetter(method, declared);
+                }
+            }
+        }
     }
 
     /**
@@ -912,41 +930,25 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
     }
 
     /**
-     * The classes whose declared members describe the bean: the type and its super classes, {@link Object}
-     * apart.
-     *
-     * <p>A {@link Proxy} has none. Its own methods are the generated implementations of the interfaces it
-     * stands for: they carry no annotation, and taking them as members would report {@code jdk.proxyN.$ProxyN}
-     * as the type declaring a property of an interface that declares it. A proxy is described through
-     * {@link #allInterfaces(Class)} alone, so that every member it reports is the interface declaration a
-     * caller means, with the annotations of that declaration.</p>
-     *
-     * @param type The bean type
-     * @return The classes to read the declared members of, in order of precedence
+     * The type and its super classes, {@link Object} apart, the most derived first.
      */
     private static List<Class<?>> classHierarchy(Class<?> type) {
-        if (Proxy.isProxyClass(type)) {
-            return List.of();
-        }
         List<Class<?>> hierarchy = new ArrayList<>();
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             hierarchy.add(current);
         }
-        return hierarchy;
+        return List.copyOf(hierarchy);
     }
 
-    private static List<Class<?>> allInterfaces(Class<?> type) {
+    /**
+     * The interfaces the types implement and the ones those extend, each once, the ones of the first type first.
+     */
+    private static List<Class<?>> allInterfaces(List<Class<?>> types) {
         List<Class<?>> interfaces = new ArrayList<>();
-        if (Proxy.isProxyClass(type)) {
-            // the proxied interfaces and what they extend; the walk below would add the ones
-            // java.lang.reflect.Proxy implements itself, which the proxy does not stand for
+        for (Class<?> type : types) {
             collectInterfaces(type, interfaces);
-            return interfaces;
         }
-        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
-            collectInterfaces(current, interfaces);
-        }
-        return interfaces;
+        return List.copyOf(interfaces);
     }
 
     private static void collectInterfaces(Class<?> type, List<Class<?>> interfaces) {
@@ -1024,30 +1026,35 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     private List<BeanMethod<T, Object>> discoverMethods() {
         Map<String, Method> bySignature = new LinkedHashMap<>();
-        for (Class<?> type : classHierarchy(beanType)) {
-            for (Method method : type.getDeclaredMethods()) {
-                if (!Modifier.isPublic(method.getModifiers()) || Modifier.isStatic(method.getModifiers())
-                    || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
-                    continue;
-                }
-                bySignature.putIfAbsent(signature(method), method);
-            }
+        for (Class<?> type : classHierarchy) {
+            addMethods(type, bySignature);
         }
         // then the interfaces, for a default method the type inherits without overriding it and for the
         // methods a super interface declares: the processor reads the methods of the whole hierarchy
-        for (Class<?> anInterface : allInterfaces(beanType)) {
-            for (Method method : anInterface.getDeclaredMethods()) {
-                if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
-                    continue;
-                }
-                bySignature.putIfAbsent(signature(method), method);
-            }
+        for (Class<?> anInterface : interfaces) {
+            addMethods(anInterface, bySignature);
         }
         List<BeanMethod<T, Object>> discovered = new ArrayList<>(bySignature.size());
         for (Method method : bySignature.values()) {
             discovered.add(new ReflectionMethod<>(this, new ReflectionExecutableMethod<>(beanType, method)));
         }
         return discovered;
+    }
+
+    /**
+     * Adds the public instance methods a class or an interface declares, under the signatures no more derived
+     * declaration took. A private method of an interface is no more a method of the types inheriting it - a
+     * class implementing it, a {@link Proxy} standing for it - than a private method of a class is of its sub
+     * classes.
+     */
+    private static void addMethods(Class<?> type, Map<String, Method> bySignature) {
+        for (Method method : type.getDeclaredMethods()) {
+            if (!Modifier.isPublic(method.getModifiers()) || Modifier.isStatic(method.getModifiers())
+                || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
+                continue;
+            }
+            bySignature.putIfAbsent(signature(method), method);
+        }
     }
 
     /**
@@ -1091,6 +1098,8 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
         private final String name;
         private final Class<?> beanType;
+        private final List<Class<?>> classHierarchy;
+        private final List<Class<?>> interfaces;
         private final List<Field> fields = new ArrayList<>(1);
         private final List<Method> getters = new ArrayList<>(1);
         private final List<Method> setters = new ArrayList<>(1);
@@ -1108,18 +1117,16 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         private @Nullable Member reader;
         private @Nullable Member writer;
 
-        PropertyMembers(String name, Class<?> beanType) {
+        PropertyMembers(String name, Class<?> beanType, List<Class<?>> classHierarchy, List<Class<?>> interfaces) {
             this.name = name;
             this.beanType = beanType;
+            this.classHierarchy = classHierarchy;
+            this.interfaces = interfaces;
         }
 
         void addField(Field field, Introspected.@Nullable Property declaration) {
             fields.add(field);
             declare(field, declaration);
-        }
-
-        void addGetter(Method getter) {
-            getters.add(getter);
         }
 
         void addGetter(Method getter, Introspected.@Nullable Property declaration) {
@@ -1345,13 +1352,12 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
          * has no class of its own in the walk, and its interfaces rank first.
          */
         private int rankOf(Class<?> declaringType) {
-            List<Class<?>> hierarchy = classHierarchy(beanType);
-            int rank = hierarchy.indexOf(declaringType);
+            int rank = classHierarchy.indexOf(declaringType);
             if (rank != -1) {
                 return rank;
             }
-            int index = allInterfaces(beanType).indexOf(declaringType);
-            return index == -1 ? Integer.MAX_VALUE : hierarchy.size() + index;
+            int index = interfaces.indexOf(declaringType);
+            return index == -1 ? Integer.MAX_VALUE : classHierarchy.size() + index;
         }
 
         /**

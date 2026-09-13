@@ -1,6 +1,7 @@
 package io.micronaut.reflection
 
 import io.micronaut.core.annotation.AccessorsStyle
+import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
@@ -15,12 +16,20 @@ import java.lang.reflect.Proxy
  */
 class ProxyIntrospectionSpec extends Specification {
 
+    // a proxy routes toString, hashCode and equals to the handler too, and Spock renders the proxy when a
+    // condition fails: they answer as an object does, so that the failure reported is the real one
     private static final InvocationHandler HANDLER = { Object proxy, java.lang.reflect.Method method, Object[] args ->
-        method.name == "getString" ? "proxied" : 42
+        switch (method.name) {
+            case "toString": return "proxy"
+            case "hashCode": return System.identityHashCode(proxy)
+            case "equals": return proxy.is(args[0])
+            default: return method.returnType == String ? "proxied" : 42
+        }
     }
 
+    // the loader of the interface: a proxy of a package-private interface is defined in the package of it
     private static <T> T proxyOf(Class<T> type) {
-        return (T) Proxy.newProxyInstance(ProxyIntrospectionSpec.classLoader, [type] as Class<?>[], HANDLER)
+        return (T) Proxy.newProxyInstance(type.classLoader, [type] as Class<?>[], HANDLER)
     }
 
     void "an interface is described through the accessors it inherits"() {
@@ -103,6 +112,60 @@ class ProxyIntrospectionSpec extends Specification {
         proxied.getRequiredProperty("value", String).annotationMetadata.stringValue(Tag).get() == "declared"
     }
 
+    void "an accessor a super interface declares @Introspected.Property is one of the types inheriting it"() {
+        given: "an interface inheriting the declared accessor, a class overriding it, and a proxy of the interface"
+        def inherited = ReflectionBeanIntrospection.of(ProxiedSubDeclared)
+        def overriding = ReflectionBeanIntrospection.of(ProxiedDeclaredBean)
+        def proxied = ReflectionBeanIntrospection.of(proxyOf(ProxiedSubDeclared).getClass())
+
+        expect: "the interface declaring nothing of its own reports the property, as the declaring interface does"
+        inherited.beanProperties*.name == ["value"]
+        inherited.getRequiredProperty("value", String).annotationMetadata.stringValue(Tag).get() == "declared"
+
+        and: "and a proxy of it, the same way"
+        proxied.beanProperties*.name == ["value"]
+        proxied.getRequiredProperty("value", String).get(proxyOf(ProxiedSubDeclared)) == "proxied"
+        proxied.getRequiredProperty("value", String).members*.declaringType == [ProxiedDeclared]
+
+        and: "but not a class overriding the accessor: the override hides the declaration and carries no annotation of its own"
+        overriding.beanProperties.empty
+    }
+
+    void "a private method of an interface is not a method of the proxy"() {
+        given:
+        def bean = proxyOf(ProxiedHelper)
+        def proxied = ReflectionBeanIntrospection.of(bean.getClass())
+
+        expect: "the interface reports its public methods alone"
+        ReflectionBeanIntrospection.of(ProxiedHelper).beanMethods*.name.toSet() == ["getName", "describe"].toSet()
+
+        and: "so does the proxy, which the private method is no method of"
+        proxied.beanMethods*.name.toSet() == ["getName", "describe"].toSet()
+        proxied.beanMethods.find { it.name == "describe" }.invoke(bean) == "proxied"
+    }
+
+    void "a proxy of a package-private interface is served by the fallback under the annotations of the interface"() {
+        given: "a configuration describing the package with field access, which the interface itself does not declare"
+        def registration = ReflectionIntrospectionPolicy.configure(["io.micronaut.reflection.*"],
+            ReflectionAnnotations.declaring(Introspected, ["accessKind": [Introspected.AccessKind.FIELD] as Introspected.AccessKind[]]))
+        def proxyClass = proxyOf(ProxiedPackaged).getClass()
+
+        expect: "the proxy class is named after the package of the interface, which the pattern matches"
+        proxyClass.name.startsWith("io.micronaut.reflection.")
+        ReflectionIntrospectionPolicy.isAllowed(proxyClass)
+
+        when:
+        def introspection = new ReflectionBeanIntrospectionFallback().findIntrospection(proxyClass)
+
+        then: "the method access the interface declares wins over the configured field access, as it does for a class"
+        introspection.present
+        introspection.get().beanProperties*.name == ["name"]
+
+        cleanup:
+        registration.close()
+        ReflectionIntrospectionPolicy.reset()
+    }
+
     void "a proxy is not built through the builder its interface names"() {
         when:
         def proxied = ReflectionBeanIntrospection.of(proxyOf(ProxiedBuilt).getClass())
@@ -152,5 +215,23 @@ class ProxyIntrospectionSpec extends Specification {
             generated.getRequiredProperty("string", String).annotationMetadata.stringValue(Tag).get()
         ReflectionBeanIntrospection.of(proxyOf(ProxiedParitySub).getClass()).beanProperties*.name.toSet() ==
             generated.beanProperties*.name.toSet()
+    }
+
+    void "an inherited @Introspected.Property accessor is the property the generated introspection reports"() {
+        given: "the types inheriting the declared accessor, and the one overriding it, described both ways"
+        def generatedSub = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredSub)
+        def generatedBase = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredBase)
+        def generatedBean = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredBean)
+
+        expect: "the generated side reports the property to the types inheriting the accessor, not to the one overriding it"
+        generatedSub.beanProperties*.name == ["value"]
+        generatedBase.beanProperties*.name == ["value"]
+        generatedBean.beanProperties.empty
+
+        and: "the reflective side reports the same, through a proxy of the interface too"
+        ReflectionBeanIntrospection.of(ProxiedParityDeclaredSub).beanProperties*.name == generatedSub.beanProperties*.name
+        ReflectionBeanIntrospection.of(ProxiedParityDeclaredBase).beanProperties*.name == generatedBase.beanProperties*.name
+        ReflectionBeanIntrospection.of(ProxiedParityDeclaredBean).beanProperties*.name == generatedBean.beanProperties*.name
+        ReflectionBeanIntrospection.of(proxyOf(ProxiedParityDeclaredSub).getClass()).beanProperties*.name == generatedSub.beanProperties*.name
     }
 }
