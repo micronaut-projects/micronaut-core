@@ -724,16 +724,10 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
 
     private List<BeanProperty<T, Object>> discoverProperties() {
         Map<String, PropertyMembers> candidates = new LinkedHashMap<>();
-        // the signatures of the methods seen so far, the most derived declaration of each first: a declaration
-        // hides the ones it overrides, and what @Introspected.Property says holds for the most derived one
-        // alone, as the processor reads it - an override carries no annotation of its own, method annotations
-        // not being inherited, so the declaration of a super class or of an interface makes an accessor of a
-        // type only where the type does not override it
-        Set<String> seen = new HashSet<>();
         // the accessors first, as the processor resolves them: a field is a member of a property they
         // discovered, it makes one of its own only when field access is asked for
         for (Class<?> type : classHierarchy) {
-            addAccessors(type, seen, candidates);
+            addAccessors(type, candidates);
         }
         // the accessor of a record component is a getter under the name of the component, which the naming
         // rules do not match: an annotation of the component whose target is a method lands there and nowhere else
@@ -745,7 +739,7 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         // then the accessors of the interfaces, which declare the type-use annotations of the implementations'
         // properties, and whose default methods a type inherits as accessors of its own; a proxy has no others
         for (Class<?> anInterface : interfaces) {
-            addAccessors(anInterface, seen, candidates);
+            addAccessors(anInterface, candidates);
         }
         boolean fieldAccess = accessKinds.contains(Introspected.AccessKind.FIELD);
         for (Class<?> type : classHierarchy) {
@@ -787,17 +781,19 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
      * overrides it, as the override is the declaration the processor reads.
      *
      * @param type       The class or interface
-     * @param seen       The signatures of the methods of the more derived types, the ones of this type added
      * @param candidates The candidate properties, by name
      */
-    private void addAccessors(Class<?> type, Set<String> seen, Map<String, PropertyMembers> candidates) {
+    private void addAccessors(Class<?> type, Map<String, PropertyMembers> candidates) {
         for (Method method : type.getDeclaredMethods()) {
             if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || method.isBridge() || isGroovyObjectMethod(method)) {
                 continue;
             }
             String name = method.getName();
             int parameters = method.getParameterCount();
-            Introspected.Property declared = seen.add(signature(method)) ? method.getAnnotation(Introspected.Property.class) : null;
+            Introspected.Property declared = method.getAnnotation(Introspected.Property.class);
+            if (declared != null && isOverridden(method)) {
+                declared = null;
+            }
             if (parameters == 0 && method.getReturnType() != void.class) {
                 String property = accessorProperty(name, method.getReturnType());
                 if (property == null && declared != null) {
@@ -927,6 +923,56 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
             }
         }
         return null;
+    }
+
+    /**
+     * Whether a more derived type of the hierarchy overrides a declaration, as a member of the bean type: a
+     * class of the hierarchy, for the declaration of a super class it derives from or of any interface - a
+     * method a class declares or inherits implements the interface methods of its signature, whether or not
+     * that class implements the interface itself - or an interface extending the declaring one. What
+     * {@link Introspected.Property} says on a declaration holds for the most derived one alone, as the
+     * processors read it: the annotation is not {@link java.lang.annotation.Inherited}, so an override carries
+     * none of its own, and the declaration it hides is not a member they see.
+     */
+    private boolean isOverridden(Method declaration) {
+        Class<?> declaringType = declaration.getDeclaringClass();
+        for (Class<?> type : classHierarchy) {
+            if (type == declaringType) {
+                // the classes below are the ones it derives from, and no interface overrides a class method
+                return false;
+            }
+            if (overrides(type, declaration)) {
+                return true;
+            }
+        }
+        for (Class<?> anInterface : interfaces) {
+            if (anInterface != declaringType && declaringType.isAssignableFrom(anInterface) && overrides(anInterface, declaration)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a type declares a method overriding a declaration: one of the same name and arity, neither
+     * static nor private nor generated, taking the parameters the declaration takes - or the ones they resolve
+     * to for the bean type where the declaration is generic, as {@code store(T)} of a {@code Repo<T>} is
+     * {@code store(String)} on a {@code Repo<String>}.
+     */
+    private boolean overrides(Class<?> type, Method declaration) {
+        for (Method candidate : type.getDeclaredMethods()) {
+            int modifiers = candidate.getModifiers();
+            if (Modifier.isStatic(modifiers) || Modifier.isPrivate(modifiers) || candidate.isSynthetic() || candidate.isBridge()
+                || candidate.getParameterCount() != declaration.getParameterCount()
+                || !candidate.getName().equals(declaration.getName())) {
+                continue;
+            }
+            if (Arrays.equals(candidate.getParameterTypes(), declaration.getParameterTypes())
+                || MethodHierarchy.overrides(declaration, beanType, candidate.getParameterTypes())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

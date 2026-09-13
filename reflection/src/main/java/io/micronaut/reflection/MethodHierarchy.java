@@ -342,8 +342,13 @@ public record MethodHierarchy(Declaration local,
      * Whether every parameter of a declaration, resolved for the type reading the method, is the parameter the
      * read method declares: an overload of the same arity whose parameters resolve to other types stays a
      * declaration of its own.
+     *
+     * @param candidate      The declaration, of a type the reading type derives from
+     * @param context        The type reading the method
+     * @param parameterTypes The parameters of the read method
+     * @return Whether the read method overrides the declaration
      */
-    private static boolean overrides(Method candidate, Class<?> context, Class<?>[] parameterTypes) {
+    static boolean overrides(Method candidate, Class<?> context, Class<?>[] parameterTypes) {
         Parameter[] parameters = candidate.getParameters();
         for (int i = 0; i < parameters.length; i++) {
             Argument<?> resolved = ReflectionArguments.of(parameters[i], context);

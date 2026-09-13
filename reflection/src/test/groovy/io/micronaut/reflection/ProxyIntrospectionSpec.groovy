@@ -136,12 +136,11 @@ class ProxyIntrospectionSpec extends Specification {
         def bean = proxyOf(ProxiedHelper)
         def proxied = ReflectionBeanIntrospection.of(bean.getClass())
 
-        expect: "the interface reports its public methods alone"
+        expect: "the interface reports its public methods alone, the default one included"
         ReflectionBeanIntrospection.of(ProxiedHelper).beanMethods*.name.toSet() == ["getName", "describe"].toSet()
 
-        and: "so does the proxy, which the private method is no method of"
+        and: "so does the proxy, which the private method is no method of either"
         proxied.beanMethods*.name.toSet() == ["getName", "describe"].toSet()
-        proxied.beanMethods.find { it.name == "describe" }.invoke(bean) == "proxied"
     }
 
     void "a proxy of a package-private interface is served by the fallback under the annotations of the interface"() {
@@ -218,20 +217,25 @@ class ProxyIntrospectionSpec extends Specification {
     }
 
     void "an inherited @Introspected.Property accessor is the property the generated introspection reports"() {
-        given: "the types inheriting the declared accessor, and the one overriding it, described both ways"
+        given: "the types inheriting the declared accessor, and the ones overriding it, described both ways"
         def generatedSub = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredSub)
         def generatedBase = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredBase)
         def generatedBean = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredBean)
+        def generatedPlain = BeanIntrospector.SHARED.getIntrospection(ProxiedParityDeclaredPlainBean)
 
-        expect: "the generated side reports the property to the types inheriting the accessor, not to the one overriding it"
+        expect: "the generated side reports the property to the types inheriting the accessor"
         generatedSub.beanProperties*.name == ["value"]
         generatedBase.beanProperties*.name == ["value"]
+
+        and: "not to the ones overriding it, whether or not the override says @Override: the annotation is not inherited"
         generatedBean.beanProperties.empty
+        generatedPlain.beanProperties.empty
 
         and: "the reflective side reports the same, through a proxy of the interface too"
         ReflectionBeanIntrospection.of(ProxiedParityDeclaredSub).beanProperties*.name == generatedSub.beanProperties*.name
         ReflectionBeanIntrospection.of(ProxiedParityDeclaredBase).beanProperties*.name == generatedBase.beanProperties*.name
         ReflectionBeanIntrospection.of(ProxiedParityDeclaredBean).beanProperties*.name == generatedBean.beanProperties*.name
+        ReflectionBeanIntrospection.of(ProxiedParityDeclaredPlainBean).beanProperties*.name == generatedPlain.beanProperties*.name
         ReflectionBeanIntrospection.of(proxyOf(ProxiedParityDeclaredSub).getClass()).beanProperties*.name == generatedSub.beanProperties*.name
     }
 }

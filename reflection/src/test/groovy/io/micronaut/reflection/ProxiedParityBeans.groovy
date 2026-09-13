@@ -52,12 +52,24 @@ abstract class ProxiedParityDeclaredBase implements ProxiedParityDeclared {
 
 /**
  * A class overriding the declared accessor: the override hides the declaration, and carries no annotation of its
- * own, as method annotations are not inherited.
+ * own, as the annotation is not inherited.
  */
 @Introspected
 class ProxiedParityDeclaredBean implements ProxiedParityDeclared {
 
     @Override
+    String value() {
+        return "implemented"
+    }
+}
+
+/**
+ * A class overriding the declared accessor without saying {@code @Override}, which is what the Groovy processor
+ * merges the overridden declarations of a method on: the annotation is not inherited either way.
+ */
+@Introspected
+class ProxiedParityDeclaredPlainBean implements ProxiedParityDeclared {
+
     String value() {
         return "implemented"
     }
