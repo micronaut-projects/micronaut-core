@@ -4,9 +4,9 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 
 /**
- * An annotation type of members a loader with no parent of its own resolves, so that a copy of it defined by such
- * a loader is a type the shared proxy cannot be built for: that proxy carries {@code AnnotationValueProvider} as
- * well, which a loader that does not see Micronaut cannot resolve.
+ * An annotation type that depends only on JDK types, so a class loader whose parent is the platform loader can
+ * define a copy of it. That copy cannot see {@code AnnotationValueProvider}, so the shared proxy, which implements
+ * that interface as well, cannot be built for it.
  */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface Isolated {
