@@ -1,5 +1,6 @@
 package io.micronaut.reflection
 
+import io.micronaut.core.annotation.AccessorsStyle
 import io.micronaut.core.beans.BeanIntrospector
 import spock.lang.Specification
 
@@ -67,6 +68,49 @@ class ProxyIntrospectionSpec extends Specification {
         !introspection.isBuildable()
         introspection.constructorArguments.length == 0
         introspection.constructors*.arguments*.type == [[]]
+    }
+
+    void "a proxy declares no method of its own"() {
+        given:
+        def introspection = ReflectionBeanIntrospection.of(proxyOf(ProxiedSubContract).getClass())
+
+        expect: "the generated implementations of the proxy class are not the declarations a caller means"
+        introspection.findDeclaredMethod("getString").empty
+        introspection.findDeclaredMethod("hashCode").empty
+    }
+
+    void "the annotations of the interface decide what a property of the proxy is"() {
+        given: "an interface naming its own read prefix"
+        def proxied = ReflectionBeanIntrospection.of(proxyOf(ProxiedStyled).getClass())
+
+        expect: "the interface itself reports the property its prefix names, and not the one it does not"
+        ReflectionBeanIntrospection.of(ProxiedStyled).beanProperties*.name == ["title"]
+
+        and: "so does the proxy, carrying the annotation of the interface"
+        proxied.beanProperties*.name == ["title"]
+        proxied.annotationMetadata.stringValues(AccessorsStyle, "readPrefixes") == ["read"] as String[]
+    }
+
+    void "an accessor the interface declares with @Introspected.Property is an accessor of the proxy"() {
+        given:
+        def proxied = ReflectionBeanIntrospection.of(proxyOf(ProxiedDeclared).getClass())
+
+        expect: "the interface itself reports the property named after the method"
+        ReflectionBeanIntrospection.of(ProxiedDeclared).beanProperties*.name == ["value"]
+
+        and: "so does the proxy, with the annotations of the declaration"
+        proxied.beanProperties*.name == ["value"]
+        proxied.getRequiredProperty("value", String).annotationMetadata.stringValue(Tag).get() == "declared"
+    }
+
+    void "a proxy is not built through the builder its interface names"() {
+        when:
+        def proxied = ReflectionBeanIntrospection.of(proxyOf(ProxiedBuilt).getClass())
+
+        then: "the builder method is a static method of the interface, not of the proxy class"
+        !proxied.isBuildable()
+        !proxied.hasBuilder()
+        proxied.beanProperties*.name == ["name"]
     }
 
     void "a proxy of the interface declaring the accessors is described the same way"() {

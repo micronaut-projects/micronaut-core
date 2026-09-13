@@ -172,14 +172,16 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         this.propertiesByName = Collections.unmodifiableMap(byName);
         this.methods = Collections.unmodifiableList(discoverMethods());
         this.indexedAnnotations = indexedAnnotationsOf(annotationMetadata);
-        this.builderSupport = ReflectionIntrospectionBuilder.Support.of(beanType, annotationMetadata);
+        // nor through the builder an interface names: its builder method is a static method of the interface,
+        // not of the proxy class, and what it builds is not the proxy
+        this.builderSupport = proxy ? null : ReflectionIntrospectionBuilder.Support.of(beanType, annotationMetadata);
     }
 
     /**
      * The annotations of the described type: the ones the class declares, or, for a {@link Proxy}, the ones
      * the interfaces it was created with declare. A proxy class carries no annotation of its own, and
-     * describing it as anything but the interfaces it stands for would lose what they say of themselves -
-     * {@link Introspected#accessKind()} and {@link AccessorsStyle} among it, which decide what a property is.
+     * describing it as anything but the interfaces it stands for would lose what they say of themselves,
+     * including {@link Introspected#accessKind()} and {@link AccessorsStyle}, which decide what a property is.
      */
     private static AnnotationMetadata typeMetadataOf(Class<?> beanType) {
         if (Proxy.isProxyClass(beanType)) {
@@ -411,6 +413,11 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
                 && Arrays.equals(Argument.toClassArray(method.getArguments()), parameterTypes)) {
                 return Optional.of(method);
             }
+        }
+        if (Proxy.isProxyClass(beanType)) {
+            // the methods a proxy class declares are the generated implementations of its interfaces: they
+            // carry none of the annotations of the declarations, and the proxy declares nothing of its own
+            return Optional.empty();
         }
         // the accessors are properties, not bean methods, yet they are declarations of the type all the same
         try {
@@ -729,18 +736,32 @@ public final class ReflectionBeanIntrospection<T> implements ReflectiveIntrospec
         }
         // the accessors of the interfaces, which declare the type-use annotations of the implementations'
         // properties, and whose default methods a type inherits as accessors of its own
+        // a proxy has no class of its own whose declarations the pass above reads: the interfaces are its
+        // declarations, so an @Introspected.Property there makes an accessor as it does on the interface itself
+        boolean proxy = Proxy.isProxyClass(beanType);
         for (Class<?> anInterface : allInterfaces(beanType)) {
             for (Method method : anInterface.getDeclaredMethods()) {
                 if (Modifier.isStatic(method.getModifiers()) || method.isSynthetic() || isGroovyObjectMethod(method)) {
                     continue;
                 }
+                Introspected.Property declared = proxy ? method.getAnnotation(Introspected.Property.class) : null;
                 if (method.getParameterCount() == 0 && method.getReturnType() != void.class) {
                     String property = accessorProperty(method.getName(), method.getReturnType());
+                    if (property == null && declared != null) {
+                        property = method.getName();
+                    }
                     if (property != null) {
-                        candidate(candidates, property).addGetter(method);
+                        if (declared != null) {
+                            candidate(candidates, property).addGetter(method, declared);
+                        } else {
+                            candidate(candidates, property).addGetter(method);
+                        }
                     }
                 } else if (method.getParameterCount() == 1) {
                     String property = writerProperty(method.getName());
+                    if (property == null && declared != null) {
+                        property = method.getName();
+                    }
                     if (property != null) {
                         candidate(candidates, property).addSetter(method, method.getAnnotation(Introspected.Property.class));
                     }
