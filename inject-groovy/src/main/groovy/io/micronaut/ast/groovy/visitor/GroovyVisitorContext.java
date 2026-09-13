@@ -320,11 +320,8 @@ public class GroovyVisitorContext implements VisitorContext {
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
         if (compilationUnit != null) {
-            Optional<GeneratedFile> generatedFile = GroovyGeneratedSourceFiles.of(compilationUnit)
+            return GroovyGeneratedSourceFiles.of(compilationUnit)
                 .visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingSource(originatingElements));
-            if (generatedFile.isPresent()) {
-                return generatedFile;
-            }
         }
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
     }
@@ -335,8 +332,9 @@ public class GroovyVisitorContext implements VisitorContext {
     @Nullable
     private SourceUnit originatingSource(Element... originatingElements) {
         for (Element element : originatingElements) {
-            if (element != null && element.getNativeType() instanceof GroovyNativeElement nativeElement) {
-                AnnotatedNode node = nativeElement.annotatedNode();
+            // not every element has a native type: a primitive or a synthetic method element throws for it
+            if (element instanceof AbstractGroovyElement groovyElement) {
+                AnnotatedNode node = groovyElement.getNativeType().annotatedNode();
                 ClassNode owner = node instanceof ClassNode classNode ? classNode : node.getDeclaringClass();
                 if (owner != null && owner.getModule() != null && owner.getModule().getContext() != null) {
                     return owner.getModule().getContext();

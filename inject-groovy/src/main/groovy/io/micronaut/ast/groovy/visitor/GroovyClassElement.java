@@ -372,6 +372,10 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
      * @return The no-argument constructor Groovy will generate, if a declared constructor implies one
      */
     private Optional<MethodElement> constructorGeneratedFromDefaultedParameters() {
+        if (isInner() && !isStatic()) {
+            // only static inner classes can be constructed
+            return Optional.empty();
+        }
         for (ConstructorNode constructor : classNode.getDeclaredConstructors()) {
             Parameter[] parameters = constructor.getParameters();
             if (parameters.length > 0 && !constructor.isPrivate() && Arrays.stream(parameters).allMatch(Parameter::hasInitialExpression)) {

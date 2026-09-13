@@ -113,7 +113,7 @@ class Broken {
         then:
         thrown(MultipleCompilationErrorsException)
         TypeElementVisitorTransform.loadedVisitors.get() != null
-        def starts = ConstructorArityVisitor.STARTS.size()
+        def starts = ConstructorArityVisitor.starts
 
         when: 'the next compilation on the thread'
         buildClassLoader('''
@@ -123,7 +123,7 @@ class Fine {}
 ''')
 
         then: 'starts fresh visitors and clears them when done'
-        ConstructorArityVisitor.STARTS.size() == starts + 1
+        ConstructorArityVisitor.starts == starts + 1
         ConstructorArityVisitor.SEEN.containsKey('transformorder.Fine')
         TypeElementVisitorTransform.loadedVisitors.get() == null
     }
