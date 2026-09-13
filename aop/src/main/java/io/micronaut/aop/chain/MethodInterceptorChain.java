@@ -38,9 +38,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
@@ -337,17 +335,19 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
 
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
         if (shared != null && !shared.isEmpty()) {
-            // Resolved once while the bean was created and handed to this interception point.
+            // Handed over by a caller that holds them.
             resolved = shared;
         } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
-            // Retained by the generated proxy.
+            // Retained by the generated proxy, which is the bean itself.
             resolved = intercepted.$interceptorRegistrations();
-        } else if (kind == InterceptorKind.PRE_DESTROY) {
-            // Destruction runs with a fresh resolution context, so a bean with lifecycle advice but no proxy has
-            // nothing handed to it. Reuse the interceptor instances the bean still owns.
-            resolved = resolveLifecycleInterceptors(resolutionContext, binding);
         } else {
-            resolved = resolutionContext.getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(binding));
+            // Resolved by binding, reusing the non-singleton instances the bean owns: those created with it are the
+            // dependents of its creation, and at destruction the dependents of its registration.
+            resolved = resolutionContext.getBeanRegistrations(
+                Interceptor.ARGUMENT,
+                Qualifiers.byInterceptorBindingValues(binding),
+                ownedDependents(resolutionContext)
+            );
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor[] resolvedInterceptors = interceptorRegistry
@@ -374,63 +374,18 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     /**
-     * Resolves the interceptor candidates for pre-destroy interception.
-     *
-     * <p>Destruction runs with a fresh resolution context, so a bean with lifecycle advice but no retaining proxy has
-     * nothing handed to it. The interceptor instances it owns are still reachable through the registrations the
-     * container passes to the dispose call, and every interceptor bound to the bean's lifecycle was created while the
-     * bean was, so those registrations are the candidate set. When the bean owns none, candidates are resolved by
-     * binding as before.</p>
+     * The beans the intercepted bean owns, among them any non-singleton interceptor created with it: the dependents
+     * of its creation while it is being created, and the dependents of its registration when it is being destroyed,
+     * which the container hands over since destruction runs with a fresh resolution context.
      *
      * @param resolutionContext The resolution context
-     * @param binding           The binding of the interception point
-     * @return The interceptor registrations to select from
-     * @since 5.2.0
+     * @return The registrations to reuse
      */
     @SuppressWarnings("unchecked")
-    private static Collection<BeanRegistration<Interceptor<?, ?>>> resolveLifecycleInterceptors(
-        BeanResolutionContext resolutionContext,
-        Collection<AnnotationValue<?>> binding) {
-
-        Object attribute = resolutionContext.getAttribute(BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS);
-        if (attribute instanceof List<?> existing) {
-            return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
+    private static Collection<BeanRegistration<?>> ownedDependents(BeanResolutionContext resolutionContext) {
+        if (resolutionContext.getAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS) instanceof List<?> existing) {
+            return (List<BeanRegistration<?>>) existing;
         }
-        List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
-        return existing.isEmpty()
-            ? resolutionContext.getBeanRegistrations(
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(binding)
-            )
-            : existing;
-    }
-
-    /**
-     * Finds interceptor registrations already associated with a legacy disposal path. New bean registrations carry
-     * the exact selected set through {@link BeanResolutionContext#EXISTING_INTERCEPTOR_REGISTRATIONS}; this fallback
-     * remains for generated factory definitions that cannot transfer that set during construction.
-     *
-     * @param resolutionContext The resolution context
-     * @return Existing interceptor registrations
-     */
-    @SuppressWarnings("unchecked")
-    private static List<BeanRegistration<Interceptor<?, ?>>> findExistingInterceptors(BeanResolutionContext resolutionContext) {
-        List<BeanRegistration<?>> dependents = resolutionContext.getDependentBeans();
-        if (dependents.isEmpty() && resolutionContext.getAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS) instanceof List<?> attribute) {
-            dependents = (List<BeanRegistration<?>>) attribute;
-        }
-        if (dependents.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<BeanRegistration<Interceptor<?, ?>>> interceptors = null;
-        for (BeanRegistration<?> dependent : dependents) {
-            if (dependent.getBean() instanceof Interceptor) {
-                if (interceptors == null) {
-                    interceptors = new ArrayList<>(dependents.size());
-                }
-                interceptors.add((BeanRegistration<Interceptor<?, ?>>) dependent);
-            }
-        }
-        return interceptors == null ? Collections.emptyList() : interceptors;
+        return resolutionContext.getDependentBeans();
     }
 }

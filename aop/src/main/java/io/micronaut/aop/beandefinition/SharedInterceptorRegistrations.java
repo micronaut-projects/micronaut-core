@@ -63,7 +63,13 @@ import java.util.List;
  *
  * @author Denis Stepanov
  * @since 5.2.0
+ * @deprecated Since 5.3.0 the interception points of a bean share an instance of a non-singleton interceptor by
+ * resolving their interceptors with {@link BeanResolutionContext#getBeanRegistrations(io.micronaut.core.type.Argument, io.micronaut.context.Qualifier, java.util.Collection)},
+ * reusing the dependents the bean's creation recorded and its registration keeps, so nothing is carried on the
+ * resolution context any more. The methods here still record what they are given, but nothing reads it.
  */
+@Deprecated(since = "5.3.0", forRemoval = true)
+@SuppressWarnings("removal")
 @Internal
 public final class SharedInterceptorRegistrations {
 

@@ -65,6 +65,11 @@ public interface Intercepted extends InterceptedBean {
      *
      * @return The retained interceptor registrations, never {@code null}
      * @since 5.2.0
+     * <p>A proxy that fronts a separate target, generated for {@code @Around(proxyTarget = true)}, is injected with
+     * the singleton interceptors only and reports those. The non-singleton interceptors of such a target are created
+     * with the target and are dependents of its registration, from which the proxy selects the interceptors of each
+     * call; see {@code io.micronaut.aop.chain.ProxyTargetInterceptors}.</p>
+     *
      */
     @Override
     @Internal
