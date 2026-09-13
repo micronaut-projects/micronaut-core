@@ -47,7 +47,7 @@ class Zoned {
     void defaulted() {
     }
 
-    @Zone("method")
+    @Zone(value = "method", priority = 3, timeout = 4L)
     @ExpressionCarrier(VALUE)
     @Executable
     void declared() {
@@ -93,6 +93,7 @@ class Zoned {
         ApplicationContext ctx = buildContext(SOURCE.replace('VALUE', '"#{ 1 + 1 }"'))
         Class<? extends Annotation> zone = Zone
         AnnotationMetadata metadata = executableMethod(ctx, 'declared').getAnnotationMetadata()
+        AnnotationMetadata unwrapped = metadata.getTargetAnnotationMetadata()
 
         expect:
         metadata instanceof EvaluatedAnnotationMetadata
@@ -100,6 +101,12 @@ class Zoned {
         metadata.stringValue(zone).get() == 'method'
         metadata.getValue(zone, String).get() == 'method'
         metadata.getAnnotation(zone).stringValue().get() == 'method'
+
+        and: "the numeric reads resolve the requested member, not the value member"
+        metadata.intValue(zone, 'priority').asInt == 3
+        metadata.longValue(zone, 'timeout').asLong == 4L
+        metadata.intValue(zone, 'priority') == unwrapped.intValue(zone, 'priority')
+        metadata.longValue(zone, 'timeout') == unwrapped.longValue(zone, 'timeout')
 
         cleanup:
         ctx.close()

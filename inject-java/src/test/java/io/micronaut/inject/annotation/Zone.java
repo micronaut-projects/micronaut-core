@@ -28,4 +28,8 @@ import java.lang.annotation.Target;
 @Target({ElementType.TYPE, ElementType.METHOD})
 public @interface Zone {
     String value() default "default";
+
+    int priority() default 0;
+
+    long timeout() default 0L;
 }
