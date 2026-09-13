@@ -50,12 +50,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Attribute that exposes the dependent bean registrations already created for the bean this context is operating
      * on.
      *
-     * <p>During bean creation those registrations are available from {@link #getDependentBeans()}, but a bean is
-     * destroyed with a fresh resolution context that has no dependents of its own. This attribute is retained for
-     * compatibility with generated factory definitions that still use that fallback.</p>
-     *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 the context a bean is destroyed with carries the dependents of that bean itself, so
+     * {@link #getDependentBeans()} answers during destruction as it does during creation. Still set for a reader
+     * compiled against an earlier version.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String EXISTING_DEPENDENT_BEANS = "io.micronaut.context.existingDependentBeans";
 
     /**
@@ -314,8 +314,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
-     * @return The current dependent beans that must be destroyed by an upstream bean.
+     * The dependent beans of the bean this context operates on: the beans created for it so far while it is being
+     * created, and the beans that were created with it when it is being destroyed. A non-singleton interceptor
+     * created for the bean is among them, which is how every interception point of the bean reaches the same
+     * instance.
      *
+     * @return The dependent beans, never {@code null}
      * @since 5.1.0
      */
     default List<BeanRegistration<?>> getDependentBeans() {

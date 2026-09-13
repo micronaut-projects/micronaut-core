@@ -1345,10 +1345,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             return;
         }
         try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition)) {
-            // the beans created with this one, among them its non-singleton interceptors, which the pre-destroy
-            // interception reuses
+            // The dependents of the bean being destroyed are the dependents of this context, as they were of the
+            // context that created it, so the pre-destroy interception finds the non-singleton interceptors created
+            // with the bean where every other interception point does: in getDependentBeans().
+            resolutionContext.pushDependentBeans(new ArrayList<>(dependents));
             resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
             definition.dispose(resolutionContext, this, beanToDestroy);
+            // Whatever the disposal itself created, an interceptor bound to pre-destroy alone for instance, is a
+            // dependent of the bean too and goes with it, rather than being dropped with this context.
+            List<BeanRegistration<?>> afterDisposal = resolutionContext.getAndResetDependentBeans();
+            for (int i = afterDisposal.size() - 1; i >= dependents.size(); i--) {
+                destroyBean(afterDisposal.get(i), true);
+            }
         }
     }
 

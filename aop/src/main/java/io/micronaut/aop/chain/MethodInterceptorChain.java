@@ -39,7 +39,6 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.List;
 import java.util.Objects;
 
 import static io.micronaut.core.util.ArrayUtils.EMPTY_OBJECT_ARRAY;
@@ -341,12 +340,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             // Retained by the generated proxy, which is the bean itself.
             resolved = intercepted.$interceptorRegistrations();
         } else {
-            // Resolved by binding, reusing the non-singleton instances the bean owns: those created with it are the
-            // dependents of its creation, and at destruction the dependents of its registration.
+            // Resolved by binding, reusing the non-singleton instances the bean owns: the dependents of the bean,
+            // which the context carries while the bean is created and again while it is destroyed.
             resolved = resolutionContext.getBeanRegistrations(
                 Interceptor.ARGUMENT,
                 Qualifiers.byInterceptorBindingValues(binding),
-                ownedDependents(resolutionContext)
+                resolutionContext.getDependentBeans()
             );
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
@@ -371,21 +370,5 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         } else {
             return interceptedMethod.invoke(bean);
         }
-    }
-
-    /**
-     * The beans the intercepted bean owns, among them any non-singleton interceptor created with it: the dependents
-     * of its creation while it is being created, and the dependents of its registration when it is being destroyed,
-     * which the container hands over since destruction runs with a fresh resolution context.
-     *
-     * @param resolutionContext The resolution context
-     * @return The registrations to reuse
-     */
-    @SuppressWarnings("unchecked")
-    private static Collection<BeanRegistration<?>> ownedDependents(BeanResolutionContext resolutionContext) {
-        if (resolutionContext.getAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS) instanceof List<?> existing) {
-            return (List<BeanRegistration<?>>) existing;
-        }
-        return resolutionContext.getDependentBeans();
     }
 }
