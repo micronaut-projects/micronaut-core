@@ -178,9 +178,11 @@ public class ChainInterceptor implements MethodInterceptor<Object, Object>, Inte
 }
 ----
 
-The order is asked once for each interception point, when its interceptors are resolved. `getOrder()` still applies
-wherever else the interceptor is ordered, and to proxies compiled by a version of Micronaut that did not consult the
-point.
+The order is asked once for each interception point, when its interceptors are resolved, and places the interceptor
+as a whole within its kind: around advice always runs before introduction advice, whatever order either reports. For
+`POST_CONSTRUCT` and `PRE_DESTROY` the point is the lifecycle event of the bean, so its annotation metadata is the
+bean's. `getOrder()` still applies wherever else the interceptor is ordered, and to proxies compiled before
+Micronaut 4.3.
 
 == Selection
 

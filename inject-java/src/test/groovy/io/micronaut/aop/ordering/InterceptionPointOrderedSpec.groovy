@@ -102,7 +102,7 @@ class PointOrdered extends Base implements InterceptionPointOrdered {
 
     @Override
     public int getOrder(BeanConstructor<?> constructor) {
-        ASKED.add("AROUND_CONSTRUCT");
+        ASKED.add("AROUND_CONSTRUCT:" + constructor.getDeclaringBeanType().getSimpleName() + ":" + constructor.getArguments().length);
         return constructor.getAnnotationMetadata().hasAnnotation(Early.class) ? InterceptPhase.VALIDATE.getPosition() - 1 : getOrder();
     }
 }
@@ -144,7 +144,7 @@ class MyBean {
 
         and: 'the order was asked once for each interception point, with its kind'
         List<String> asked = pointOrdered.ASKED
-        asked.count('AROUND_CONSTRUCT') == 1
+        asked.count('AROUND_CONSTRUCT:MyBean:0') == 1 // the bean's constructor, not the proxy's
         asked.count('POST_CONSTRUCT:init') == 1
         asked.count('AROUND:early') == 1
         asked.count('AROUND:late') == 1

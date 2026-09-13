@@ -29,9 +29,16 @@ import io.micronaut.core.type.Executable;
  * element declares where in the surrounding advice it belongs.</p>
  *
  * <p>The order is consulted once for each interception point, when its interceptors are resolved, and only by
- * the {@link InterceptorRegistry}. Any other consumer of an interceptor's order, and any proxy compiled before
- * the registry consulted it, still uses {@link Ordered#getOrder()}, so implementations should return the position
- * they take most often from it.</p>
+ * the default {@link InterceptorRegistry}: a custom registry orders interceptors as it sees fit. The interceptors
+ * of a point are ordered within their kind, so an {@link Introduction} interceptor still runs after every
+ * {@link Around} interceptor of the point whatever order it reports. Wherever else an interceptor's order is used,
+ * and by proxies compiled before Micronaut 4.3 which resolve their interceptors through the deprecated
+ * {@code InterceptorChain.resolveAroundInterceptors(BeanContext, ExecutableMethod, Interceptor...)}, it is
+ * {@link Ordered#getOrder()} that applies, so implementations should return the position they take most often
+ * from it, and return it consistently as any {@link Ordered} bean does.</p>
+ *
+ * <p>The interceptor is placed as a whole: an interceptor running a chain of its own reports one position for
+ * the chain, it cannot spread the chain's members around other advice of the point.</p>
  *
  * @author Denis Stepanov
  * @since 5.2.0
@@ -42,8 +49,9 @@ public interface InterceptionPointOrdered extends Ordered {
      * The order of this interceptor at a method interception point.
      *
      * <p>For {@link InterceptorKind#POST_CONSTRUCT} and {@link InterceptorKind#PRE_DESTROY} the point is the
-     * lifecycle event of the bean, one chain running every callback of the phase, and its annotation metadata is
-     * the bean's.</p>
+     * lifecycle event of the bean, one chain running every callback of the phase: its annotation metadata is the
+     * bean's, and its name and declaring type are those of one of the callbacks, so an implementation should decide
+     * by the kind and the metadata rather than by the identity of the method.</p>
      *
      * @param method The intercepted method
      * @param kind   The kind of interception: {@link InterceptorKind#AROUND}, {@link InterceptorKind#INTRODUCTION},
@@ -57,7 +65,7 @@ public interface InterceptionPointOrdered extends Ordered {
     /**
      * The order of this interceptor at a constructor interception point.
      *
-     * @param constructor The intercepted constructor
+     * @param constructor The intercepted constructor, the one a {@link ConstructorInvocationContext} presents
      * @return The order, lower values run first
      */
     default int getOrder(BeanConstructor<?> constructor) {
