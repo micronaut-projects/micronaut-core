@@ -1043,7 +1043,7 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
      * The values of an annotation looked up by name: the occurrences of a repeatable annotation, read from its
      * container, or the single value of a non-repeatable one.
      *
-     * @param annotationType    The annotation name
+     * @param annotationType    The annotation type name
      * @param sourceAnnotations The annotations to read, either all of them or only the declared ones
      * @param sourceStereotypes The stereotypes the container of a repeatable annotation may be among
      * @param <T>               The annotation type

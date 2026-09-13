@@ -6585,10 +6585,10 @@ class Parent implements Named {
         withMembers.getProperty("name").get().members.size() == 7
         plain.getProperty("name").get().members.isEmpty()
 
-        and: "the metadata the previous API answers is the same in both, but for the member that asks for the members"
+        and: "the metadata the previous API answers is the same in both"
         withMembers.propertyNames == plain.propertyNames
         withMembers.beanMethods*.name.toSorted() == plain.beanMethods*.name.toSorted()
-        IntrospectionMetadataShape.of(withMembers).replace(', members=true', '') == IntrospectionMetadataShape.of(plain)
+        IntrospectionMetadataShape.of(withMembers) == IntrospectionMetadataShape.of(plain)
     }
 
     private static List<String> describe(List<BeanPropertyMember> members) {
