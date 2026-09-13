@@ -177,7 +177,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
+    public @NonNull RetentionPolicy getRetentionPolicy(@NonNull AnnotatedNode annotation) {
         List<AnnotationNode> annotations = annotation.getAnnotations();
         for (AnnotationNode ann : annotations) {
             if (ann.getClassNode().getName().equals(Retention.class.getName())) {
@@ -249,7 +249,7 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
     }
 
     @Override
-    protected String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
+    public String getRepeatableContainerNameForType(AnnotatedNode annotationType) {
         List<AnnotationNode> annotationNodes = annotationType.getAnnotations(ClassHelper.makeCached(Repeatable.class));
         if (CollectionUtils.isNotEmpty(annotationNodes)) {
             Expression expression = annotationNodes.get(0).getMember("value");
