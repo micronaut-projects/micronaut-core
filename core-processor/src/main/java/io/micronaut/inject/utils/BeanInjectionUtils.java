@@ -353,10 +353,33 @@ public class BeanInjectionUtils {
 
             Map<String, ClassElement> typeArgs = genericType.getTypeArguments();
             if (typeArgs.size() == 2) {
-                ClassElement k = typeArgs.get("K");
-                return k != null && k.isAssignable(CharSequence.class);
+                return isKeyedByBeanName(typeArgs.get("K"), typeArgs.get("V"));
             }
         }
         return false;
+    }
+
+    /**
+     * Beans are collected into a map by their bean name, so the key type has to be resolvable from that
+     * name. A {@link CharSequence} always is.
+     *
+     * <p>An enum is too, but only for an iterable bean type - one that exists once per configuration key
+     * or per parent bean - because those names form the closed set an enum can model. That keeps an
+     * enum-keyed map of any other bean type resolving as the single bean it resolves as today. Whether a
+     * bean of the map type exists is not decided here: a map that is supplied directly still takes
+     * precedence, which is resolved at runtime where that is actually known.</p>
+     *
+     * @param keyType  The map key type
+     * @param beanType The map value type
+     * @return Whether the map can be collected by bean name
+     */
+    private static boolean isKeyedByBeanName(@Nullable ClassElement keyType, @Nullable ClassElement beanType) {
+        if (keyType == null) {
+            return false;
+        }
+        if (keyType.isAssignable(CharSequence.class)) {
+            return true;
+        }
+        return keyType.isEnum() && beanType != null && isIterable(beanType);
     }
 }
