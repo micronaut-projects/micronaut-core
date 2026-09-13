@@ -15,16 +15,13 @@
  */
 package io.micronaut.aop.beandefinition;
 
-import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.InitializingBeanDefinition;
 
-import java.util.Collection;
 import java.util.Objects;
 
 /**
@@ -42,14 +39,14 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
         // One chain runs for the post-construct event of the bean: proceeding it reaches doInitialize, which invokes
         // every @PostConstruct callback of the bean, superclass callbacks first. An interceptor that does not proceed
         // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
-        Collection<BeanRegistration<Interceptor<?, ?>>> shared = SharedInterceptorRegistrations.peek(resolutionContext, this);
+        // The interceptors are resolved by binding, reusing the non-singleton instances created with the bean, which
+        // are the dependents of its creation.
         return Objects.requireNonNull(MethodInterceptorChain.initialize(
             resolutionContext,
             context,
             this,
             new InitializableInterceptedMethod<>(this, resolutionContext, context, bean),
-            bean,
-            shared
+            bean
         ));
     }
 

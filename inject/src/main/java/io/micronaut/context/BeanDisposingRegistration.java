@@ -20,7 +20,11 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 /**
  * The disposing bean registration.
@@ -35,31 +39,27 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     private final java.util.concurrent.atomic.AtomicBoolean closed =
         new java.util.concurrent.atomic.AtomicBoolean();
     @Nullable
-    private final List<BeanRegistration<?>> dependents;
+    private List<BeanRegistration<?>> dependents;
     @Nullable
-    private final List<?> interceptorRegistrations;
+    private volatile Map<Object, Object> dependentState;
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              List<BeanRegistration<?>> dependents,
-                              @Nullable List<?> interceptorRegistrations) {
+                              List<BeanRegistration<?>> dependents) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = dependents;
-        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
-                              BT createdBean,
-                              @Nullable List<?> interceptorRegistrations) {
+                              BT createdBean) {
         super(identifier, beanDefinition, createdBean);
         this.beanContext = beanContext;
         this.dependents = null;
-        this.interceptorRegistrations = interceptorRegistrations;
     }
 
     @Override
@@ -79,15 +79,34 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
     }
 
     @Override
-    public List<BeanRegistration<?>> dependentBeans() {
+    public synchronized List<BeanRegistration<?>> dependentBeans() {
         return dependents == null ? List.of() : List.copyOf(dependents);
     }
 
-    /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
-     */
-    @Nullable
-    List<?> getInterceptorRegistrations() {
-        return interceptorRegistrations;
+    @Override
+    public synchronized void addDependentBean(BeanRegistration<?> registration) {
+        if (dependents == null) {
+            dependents = new ArrayList<>(2);
+        } else if (!(dependents instanceof ArrayList)) {
+            // the list created with the bean is unmodifiable; a late dependent needs one of this registration's own
+            dependents = new ArrayList<>(dependents);
+        }
+        dependents.add(registration);
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <S> S dependentState(Object key, Supplier<S> supplier) {
+        Map<Object, Object> state = dependentState;
+        if (state == null) {
+            synchronized (this) {
+                state = dependentState;
+                if (state == null) {
+                    state = new ConcurrentHashMap<>(2);
+                    dependentState = state;
+                }
+            }
+        }
+        return (S) state.computeIfAbsent(key, ignored -> supplier.get());
     }
 }

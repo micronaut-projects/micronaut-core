@@ -66,7 +66,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing reads it: an interception point resolves its interceptors reusing the
+     * dependents of the bean, see {@link #getBeanRegistrations(Argument, Qualifier, Collection)}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
@@ -76,7 +79,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * is intended for lifecycle interception.</p>
      *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing sets or reads it: pre-destroy interception reuses the dependents handed over
+     * as {@link #EXISTING_DEPENDENT_BEANS}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
     @Override
@@ -100,6 +106,27 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier, reusing a registration among the given ones
+     * for a non-singleton candidate of the same definition instead of creating a new bean.
+     *
+     * <p>This is how the interception points of one bean share one instance of a non-singleton interceptor: the
+     * instances created with the bean are the dependents of its creation, and later of its registration, and an
+     * interception point resolves its interceptors by binding while reusing them.</p>
+     *
+     * @param beanType  The bean type
+     * @param qualifier The qualifier
+     * @param reusable  Registrations to reuse, typically the dependents of the bean being resolved for
+     * @param <T>       The bean type
+     * @return The registrations
+     * @since 5.3.0
+     */
+    default <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType,
+                                                                     @Nullable Qualifier<T> qualifier,
+                                                                     Collection<? extends BeanRegistration<?>> reusable) {
+        return getBeanRegistrations(beanType, qualifier);
+    }
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
@@ -352,6 +379,34 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the registration of the proxy target for a given proxy bean definition.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier)} returns the target alone, this
+     * returns the registration the context holds for it: the singleton scope's for a singleton, the one a custom
+     * scope keeps for a scoped bean, or the one created for a prototype. A generated proxy fronting a target that
+     * is not a singleton resolves the target of each call this way and takes the non-singleton interceptors of the
+     * call from the dependents of that registration, which is where the interceptors created with the target live.</p>
+     *
+     * @param definition The proxy target bean definition
+     * @param beanType   The bean type
+     * @param qualifier  The qualifier
+     * @param <T>        The generic type
+     * @return The registration of the proxy target
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition,
+                                                                  Argument<T> beanType,
+                                                                  @Nullable Qualifier<T> qualifier) {
+        return BeanRegistration.of(
+            getContext(),
+            new DefaultBeanContext.BeanKey<>(beanType, qualifier),
+            definition,
+            getProxyTargetBean(definition, beanType, qualifier)
+        );
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

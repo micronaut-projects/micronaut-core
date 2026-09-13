@@ -87,6 +87,7 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
@@ -1326,23 +1327,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         List<BeanRegistration<?>> dependents = registration instanceof DependentBeanProvider provider
             ? provider.dependentBeans()
             : Collections.emptyList();
-        List<?> interceptorRegistrations = registration instanceof BeanDisposingRegistration<?> disposingRegistration
-            ? disposingRegistration.getInterceptorRegistrations()
-            : null;
-        if (dependents.isEmpty() && (interceptorRegistrations == null || interceptorRegistrations.isEmpty())) {
+        if (dependents.isEmpty()) {
             definition.dispose(this, beanToDestroy);
             return;
         }
         try (DefaultBeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(this, definition)) {
-            if (!dependents.isEmpty()) {
-                resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
-            }
-            if (interceptorRegistrations != null && !interceptorRegistrations.isEmpty()) {
-                resolutionContext.setAttribute(
-                    BeanResolutionContext.EXISTING_INTERCEPTOR_REGISTRATIONS,
-                    interceptorRegistrations
-                );
-            }
+            // the beans created with this one, among them its non-singleton interceptors, which the pre-destroy
+            // interception reuses
+            resolutionContext.setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
             definition.dispose(resolutionContext, this, beanToDestroy);
         }
     }
@@ -1422,12 +1414,19 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     if (destroyed.contains(interceptedTarget)) {
                         return;
                     }
-                    destroyBean(BeanRegistration.of(this,
-                        new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
-                        proxyTargetBeanDefinition,
-                        interceptedTarget,
-                        registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
-                    ));
+                    BeanRegistration<T> heldRegistration = interceptedProxy.interceptedTargetRegistration();
+                    if (heldRegistration != null && heldRegistration.bean == interceptedTarget && heldRegistration instanceof BeanDisposingRegistration) {
+                        // the proxy resolved the target later than its own creation, so the target's registration
+                        // is not among the proxy's dependents; it carries the beans created with the target
+                        destroyBean(heldRegistration);
+                    } else {
+                        destroyBean(BeanRegistration.of(this,
+                            new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
+                            proxyTargetBeanDefinition,
+                            interceptedTarget,
+                            registration instanceof BeanDisposingRegistration ? ((BeanDisposingRegistration<T>) registration).getDependents() : null
+                        ));
+                    }
                     interceptedProxy.clearCachedInterceptedTarget();
                 }
             }
@@ -1644,6 +1643,36 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             registration = resolveNullBeanRegistration(beanType, beanType, registration);
         }
         return registration.bean;
+    }
+
+    /**
+     * Resolves the registration of the proxy target for a given proxy bean definition.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanResolutionContext, BeanDefinition, Argument, Qualifier)} returns the
+     * target alone, this returns the registration the context holds for it, whose dependents are the beans created
+     * with the target, among them its non-singleton interceptors. A custom scope hands back only the bean it holds,
+     * so for a scoped target the registration is the one created here when the scope creates the bean, and
+     * otherwise the one the scope finds for the bean.</p>
+     *
+     * @param resolutionContext The bean resolution context
+     * @param definition        The proxy target bean definition
+     * @param beanType          The bean type
+     * @param qualifier         The bean qualifier
+     * @param <T>               The generic type
+     * @return The registration of the proxy target
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                                 BeanDefinition<T> definition,
+                                                                 Argument<T> beanType,
+                                                                 @Nullable Qualifier<T> qualifier) {
+        BeanRegistration<T> registration = Objects.requireNonNull(resolveBeanRegistration(resolutionContext, definition, beanType, qualifier, true));
+        if (registration.bean == null) {
+            registration = resolveNullBeanRegistration(beanType, beanType, registration);
+        }
+        return registration;
     }
 
     @Override
@@ -3138,6 +3167,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                             BeanDefinition<T> definition,
                                                             Argument<T> beanType,
                                                             @Nullable Qualifier<T> qualifier) {
+        return resolveBeanRegistration(resolutionContext, definition, beanType, qualifier, false);
+    }
+
+    /**
+     * Resolve the {@link BeanRegistration} by a {@link BeanDefinition}.
+     *
+     * @param resolutionContext The resolution context
+     * @param definition        The bean type
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param heldRegistration  Whether a scoped bean must come back in the registration its scope holds, with the
+     *                          dependents created with the bean, rather than in a registration built for the bean
+     * @param <T>               The type
+     * @return The bean registration
+     */
+    private <T> BeanRegistration<T> resolveBeanRegistration(@Nullable BeanResolutionContext resolutionContext,
+                                                            BeanDefinition<T> definition,
+                                                            Argument<T> beanType,
+                                                            @Nullable Qualifier<T> qualifier,
+                                                            boolean heldRegistration) {
         assertContextState();
         final boolean isScopedProxyDefinition = definition.hasStereotype(SCOPED_PROXY_ANN);
 
@@ -3177,7 +3226,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             if (isProxy) {
                 definition = getProxyTargetBeanDefinition(beanType, qualifier);
             }
-            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition);
+            return getOrCreateScopedRegistration(resolutionContext, customScope, qualifier, beanType, definition, heldRegistration);
         }
         // Unknown scope, prototype scope etc
         return createRegistration(resolutionContext, beanType, qualifier, definition, true);
@@ -3276,8 +3325,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                   CustomScope<?> registeredScope,
                                                                   @Nullable Qualifier<T> qualifier,
                                                                   Argument<T> beanType,
-                                                                  BeanDefinition<T> definition) {
+                                                                  BeanDefinition<T> definition,
+                                                                  boolean heldRegistration) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
+        java.util.concurrent.atomic.AtomicReference<BeanRegistration<T>> created = heldRegistration
+            ? new java.util.concurrent.atomic.AtomicReference<>()
+            : null;
         T bean = registeredScope.getOrCreate(
             new BeanCreationContext<T>() {
                 @Override
@@ -3292,10 +3345,26 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
                 @Override
                 public CreatedBean<T> create() throws BeanCreationException {
-                    return createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
+                    BeanRegistration<T> registration = createRegistration(resolutionContext == null ? null : resolutionContext.copy(), beanKey.beanType, qualifier, definition, true);
+                    if (created != null) {
+                        created.set(registration);
+                    }
+                    return registration;
                 }
             }
         );
+        if (created != null) {
+            // the scope hands back only the bean; the registration it stores is the one created above on a miss,
+            // and on a hit the one the scope finds for the bean
+            BeanRegistration<T> registration = created.get();
+            if (registration != null && registration.bean == bean) {
+                return registration;
+            }
+            Optional<BeanRegistration<T>> held = registeredScope.findBeanRegistration(bean);
+            if (held.isPresent()) {
+                return held.get();
+            }
+        }
         return BeanRegistration.of(this, beanKey, definition, bean);
     }
 
@@ -3330,13 +3399,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 } else {
                     throw new BeanInstantiationException("BeanDefinition doesn't support creating a new instance of the bean");
                 }
-                List<?> interceptorRegistrations = null;
-                if (context.getAttribute(BeanResolutionContext.INTERCEPTOR_REGISTRATIONS) instanceof Map<?, ?> registrations) {
-                    Object value = registrations.remove(definition);
-                    if (value instanceof List<?> list) {
-                        interceptorRegistrations = list;
-                    }
-                }
                 bean = postBeanCreated(context, definition, beanType, qualifier, bean);
 
                 BeanRegistration<?> dependentFactoryBean = context.getAndResetDependentFactoryBean();
@@ -3354,8 +3416,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     beanKey,
                     definition,
                     bean,
-                    dependentBeans,
-                    interceptorRegistrations
+                    dependentBeans
                 );
                 context.pushDependentBeans(parentDependentBeans);
                 if (dependent) {
@@ -3631,6 +3692,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                     Argument<T> beanType,
                                                                     @Nullable Qualifier<T> qualifier) {
+        return getBeanRegistrations(resolutionContext, beanType, qualifier, null);
+    }
+
+    /**
+     * Obtains the bean registrations for the given type and qualifier, reusing a registration among the given ones
+     * for a non-singleton candidate of the same definition instead of creating a new bean.
+     *
+     * @param resolutionContext The resolution context
+     * @param beanType          The bean type
+     * @param qualifier         The qualifier
+     * @param reusable          Registrations to reuse, or {@code null}
+     * @param <T>               The generic type
+     * @return A collection of {@link BeanRegistration}
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    @Internal
+    public <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
+                                                                    Argument<T> beanType,
+                                                                    @Nullable Qualifier<T> qualifier,
+                                                                    @Nullable Collection<? extends BeanRegistration<?>> reusable) {
         assertContextState();
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
@@ -3676,11 +3758,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         logResolvedExistingBeanRegistrations(beanType, qualifier, holder.registrations);
                         return holder.registrations;
                     }
-                    holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
+                    holder.registrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, null);
                     return holder.registrations;
                 }
             } else {
-                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier);
+                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, reusable);
             }
         }
         if (LOG.isDebugEnabled() && !beanRegistrations.isEmpty()) {
@@ -3696,16 +3778,46 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return beanRegistrations;
     }
 
+    @SuppressWarnings("unchecked")
     private <T> Collection<BeanRegistration<T>> resolveBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                          Collection<BeanDefinition<T>> beanDefinitions,
                                                                          Argument<T> beanType,
-                                                                         @Nullable Qualifier<T> qualifier) {
+                                                                         @Nullable Qualifier<T> qualifier,
+                                                                         @Nullable Collection<? extends BeanRegistration<?>> reusable) {
         List<BeanRegistration<T>> beansOfTypeList = new ArrayList<>(beanDefinitions.size());
         for (BeanDefinition<T> definition : beanDefinitions) {
-            addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
+            BeanRegistration<?> existing = reusable == null || definition.isSingleton() ? null : findReusable(reusable, definition);
+            if (existing != null) {
+                beansOfTypeList.add((BeanRegistration<T>) existing);
+            } else {
+                addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList);
+            }
         }
         beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
+    }
+
+    /**
+     * Finds among the given registrations one of the given definition, looking through the delegates an iterable
+     * bean is wrapped in.
+     */
+    @Nullable
+    private static BeanRegistration<?> findReusable(Collection<? extends BeanRegistration<?>> registrations, BeanDefinition<?> definition) {
+        BeanDefinition<?> unwrapped = unwrapDelegates(definition);
+        for (BeanRegistration<?> registration : registrations) {
+            if (registration.bean != null && unwrapDelegates(registration.beanDefinition).equals(unwrapped)) {
+                return registration;
+            }
+        }
+        return null;
+    }
+
+    private static BeanDefinition<?> unwrapDelegates(BeanDefinition<?> definition) {
+        BeanDefinition<?> unwrapped = definition;
+        while (unwrapped instanceof DelegatingBeanDefinition<?> delegating) {
+            unwrapped = delegating.getTarget();
+        }
+        return unwrapped;
     }
 
     private <T> void logResolvedExistingBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier, Collection<BeanRegistration<T>> existing) {

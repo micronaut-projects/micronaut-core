@@ -56,8 +56,9 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      *
      * <p>The qualifier is built from the bean's own annotation metadata, so it covers every {@code @InterceptorBinding}
      * the bean declares whatever kind each was declared for. That makes the result a superset of what any one phase
-     * needs; each interception point filters it again by its own binding and kind. Resolving once is what lets a
-     * non-singleton interceptor be shared by every phase of one bean.</p>
+     * needs; each interception point filters it again by its own binding and kind. The non-singleton interceptors
+     * this creates become dependents of the bean, where its post-construct and pre-destroy interception find them
+     * again, so one instance serves every phase of one bean.</p>
      *
      * <p>Override to supply the set another way. Returning {@code null} leaves each interception point to resolve its
      * own, which is the behaviour of a bean that declares no interceptor binding at all.</p>
@@ -88,22 +89,17 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         // Resolve the constructor values first, as before, so that resolving interceptors cannot change the order in
         // which this bean's own dependencies are created.
         Object[] values = resolveInstantiationValues(resolutionContext, context);
-        // One resolution for construction, post-construct and pre-destroy rather than one per interception point, so a
-        // non-singleton interceptor is shared by every phase of this bean.
+        // Resolved once for construction: the non-singleton interceptors this creates are dependents of this bean,
+        // and its post-construct and pre-destroy interception reuse them from there.
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveInterceptors(resolutionContext, constructor);
-        SharedInterceptorRegistrations.push(resolutionContext, this, interceptors);
-        try {
-            return ConstructorInterceptorChain.instantiate(
-                resolutionContext,
-                context,
-                interceptors,
-                this,
-                constructor,
-                values
-            );
-        } finally {
-            SharedInterceptorRegistrations.pop(resolutionContext, this, interceptors);
-        }
+        return ConstructorInterceptorChain.instantiate(
+            resolutionContext,
+            context,
+            interceptors,
+            this,
+            constructor,
+            values
+        );
     }
 
     /**
