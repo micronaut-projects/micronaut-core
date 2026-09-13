@@ -744,28 +744,28 @@ public final class PythonAnnotationMetadataBuilder extends AbstractAnnotationMet
 
     private Optional<ElementDef> resolveAnnotationMirror(String annotationName) {
         JavaVisitorContext javaVisitorContext = visitorContext.getJavaVisitorContext();
-        if (javaVisitorContext == null) {
-            return Optional.empty();
+        if (javaVisitorContext != null) {
+            Optional<AnnotationValue<?>> annotationValue = javaVisitorContext.getAnnotationMetadataBuilder().buildAnnotation(annotationName);
+            if (annotationValue.isPresent()) {
+                AnnotationValue<?> av = annotationValue.get();
+                return Optional.of(new ClassDef(
+                    av.getAnnotationName(),
+                    av.getStereotypes().stream().map(this::toDecoratorDef).toList()
+                ));
+            }
+            Optional<ElementDef> javaType = javaVisitorContext.getClassElement(annotationName)
+                .map(annotationType -> new ClassDef(
+                    annotationType.getName(),
+                    toDecoratorDefs(annotationType.getAnnotationMetadata())
+                ));
+            if (javaType.isPresent()) {
+                return javaType;
+            }
         }
-        Optional<AnnotationValue<?>> annotationValue = javaVisitorContext.getAnnotationMetadataBuilder().buildAnnotation(annotationName);
-        if (annotationValue.isPresent()) {
-            AnnotationValue<?> av = annotationValue.get();
-            return Optional.of(new ClassDef(
-                av.getAnnotationName(),
-                av.getStereotypes().stream().map(this::toDecoratorDef).toList()
-            ));
-        }
-        Optional<ElementDef> javaType = javaVisitorContext.getClassElement(annotationName)
-            .map(annotationType -> new ClassDef(
-                annotationType.getName(),
-                toDecoratorDefs(annotationType.getAnnotationMetadata())
-            ));
-        if (javaType.isPresent()) {
-            return javaType;
-        }
-        // A Python declared annotation has no compiled Java type until its generated stub is compiled, so fall back
-        // to the decorator registry. Without this the annotation type cannot be resolved while the Python class that
-        // declares it is visited, and VisitorContext#getAnnotationDefaultValues answers an empty map for it.
+        // A Python declared annotation has no compiled Java type until its generated stub is compiled, and none at all
+        // when no Java visitor context backs this one, so fall back to the decorator registry. Without this the
+        // annotation type cannot be resolved while the Python class that declares it is visited, and
+        // VisitorContext#getAnnotationDefaultValues answers an empty map for it.
         DecoratorDef decoratorDef = findDecoratorDef(annotationName);
         if (decoratorDef == null) {
             return Optional.empty();

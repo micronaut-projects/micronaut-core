@@ -7,3 +7,4 @@ io.micronaut.inject.visitor.MutatingVisitor
 io.micronaut.expressions.ContextRegistrar
 io.micronaut.inject.visitor.TypeElementQueryVisitor
 io.micronaut.ast.groovy.annotation.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
+io.micronaut.ast.groovy.annotation.ConstantReferenceDefaultsSpec$ConstantDefaultsRecordingVisitor

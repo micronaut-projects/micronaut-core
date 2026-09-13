@@ -406,7 +406,7 @@ internal class KotlinAnnotationMetadataBuilder(
                 // the annotation class itself, as returned by getAnnotationMirror(String). KSP exposes member
                 // defaults only through KSAnnotation, so locate a usage of the annotation in this round.
                 declaration = annotationType
-                defaultArguments = findDefaultArguments(annotationName)
+                defaultArguments = findDefaultArguments(annotationType)
             }
             else -> return mutableMapOf<KSDeclaration, Any>()
         }
@@ -430,15 +430,19 @@ internal class KotlinAnnotationMetadataBuilder(
      * so the defaults of an annotation that is never used cannot be resolved and an empty list is returned. The
      * result is cached for the lifetime of the current [Resolver], since scanning for usages is not cheap.
      */
-    private fun findDefaultArguments(annotationName: String): List<KSValueArgument> {
+    private fun findDefaultArguments(annotationType: KSClassDeclaration): List<KSValueArgument> {
         if (defaultArgumentsCacheResolver !== resolver) {
             defaultArgumentsCacheResolver = resolver
             defaultArgumentsCache.clear()
         }
-        return defaultArgumentsCache.getOrPut(annotationName) {
-            resolver.getSymbolsWithAnnotation(annotationName)
+        // Annotation names are binary names (Outer$Inner) while KSP names declarations by source name (Outer.Inner):
+        // look usages up by the source name and match them by declaration, so a nested annotation resolves too.
+        val sourceName = annotationType.qualifiedName?.asString() ?: return emptyList()
+        val binaryName = visitorContext.getBinaryName(annotationType)
+        return defaultArgumentsCache.getOrPut(binaryName) {
+            resolver.getSymbolsWithAnnotation(sourceName)
                 .flatMap { it.annotations }
-                .firstOrNull { visitorContext.getTypeForAnnotation(it).qualifiedName?.asString() == annotationName }
+                .firstOrNull { visitorContext.getBinaryName(visitorContext.getTypeForAnnotation(it)) == binaryName }
                 ?.defaultArguments
                 ?: emptyList()
         }
@@ -549,7 +553,14 @@ internal class KotlinAnnotationMetadataBuilder(
             .or { ClassUtils.forName(className, visitorContext::class.java.classLoader) }
 
     override fun getAnnotationMirror(annotationName: String): Optional<KSAnnotated> {
-        return Optional.ofNullable(visitorContext.classDeclarationByName(annotationName))
+        // annotation names are binary names (Outer$Inner), while KSP looks a declaration up by source name (Outer.Inner)
+        val declaration = visitorContext.classDeclarationByName(annotationName)
+            ?: if (annotationName.contains('$')) {
+                visitorContext.classDeclarationByName(annotationName.replace('$', '.'))
+            } else {
+                null
+            }
+        return Optional.ofNullable(declaration)
     }
 
     override fun getAnnotationMember(annotationElement: KSAnnotated, member: CharSequence): KSAnnotated? {

@@ -90,6 +90,17 @@ class Colour(Enum):
         self.assertEqual(["a", "b"], defaults["names"])
         self.assertEqual("pkg.Colour", defaults["ref"])
 
+    def test_argument_defaults_drop_unconvertible_expressions(self):
+        defaults = processor.extract_arg_defaults(
+            self.func("def dec(total=1 + 2, names=['a', 1 + 2], text='Call(foo)', mapping={'k': 'v'}): pass")
+        )
+        # an expression the converter cannot read is no default at all, rather than an AST dump
+        self.assertIsNone(defaults["total"])
+        self.assertIsNone(defaults["names"])
+        # a literal string that merely reads like an AST dump is an ordinary default
+        self.assertEqual("Call(foo)", defaults["text"])
+        self.assertEqual({"k": "v"}, defaults["mapping"])
+
 
 class TypeAnnotationTest(unittest.TestCase):
     def test_simple_generic_forward_and_union_types(self):

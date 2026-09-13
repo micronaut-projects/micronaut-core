@@ -73,6 +73,7 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -441,7 +442,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
      * <p>The supported expressions mirror those understood by
      * {@link #readAnnotationValue(AnnotatedNode, AnnotatedNode, String, String, Object)}: constants (including nested
      * annotations), enum constants and constant fields ({@link PropertyExpression}), class literals
-     * ({@link ClassExpression}) and array literals ({@link ListExpression}).</p>
+     * ({@link ClassExpression}), array literals ({@link ListExpression}) and references to a constant in scope
+     * ({@link VariableExpression}).</p>
      *
      * @param method The annotation member
      * @return The default value expression, or {@code null} if the member declares no readable default
@@ -465,7 +467,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
         }
         if (expression instanceof PropertyExpression
             || expression instanceof ClassExpression
-            || expression instanceof ListExpression) {
+            || expression instanceof ListExpression
+            || expression instanceof VariableExpression) {
             return expression;
         }
         return null;
@@ -710,7 +713,8 @@ public class GroovyAnnotationMetadataBuilder extends AbstractAnnotationMetadataB
                     while (i.hasNext()) {
                         Map.Entry<CharSequence, Object> next = i.next();
                         Object v = annotationDefaults.get(next.getKey());
-                        if (v != null && v.equals(next.getValue())) {
+                        // deepEquals: an array default is read into a new array each time, so equals never matches
+                        if (v != null && Objects.deepEquals(v, next.getValue())) {
                             i.remove();
                         }
                     }

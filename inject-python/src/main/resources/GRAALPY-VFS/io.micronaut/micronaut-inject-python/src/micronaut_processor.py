@@ -2239,6 +2239,31 @@ def _resolve_java_constant(visitor, name_parts):
 
     return None
 
+def _is_convertible_default(node, visitor=None):
+    """
+    Whether convert_ast_value turns the given default expression into a real value. For any other
+    shape it falls back to ast.dump, and a dump is indistinguishable, once it reaches the Java side,
+    from a string default that happens to read the same, so such a default is reported as absent
+    instead (see extract_arg_defaults).
+    """
+    if isinstance(node, (ast.Name, ast.Attribute)):
+        return True
+    if isinstance(node, (ast.List, ast.Tuple)):
+        return all(_is_convertible_default(element, visitor) for element in node.elts)
+    if isinstance(node, ast.Dict):
+        return all(
+            key is not None and _is_convertible_default(key, visitor) and _is_convertible_default(value, visitor)
+            for key, value in zip(node.keys, node.values)
+        )
+    if isinstance(node, ast.Call):
+        return convert_ast_call_to_decorator(node, visitor) is not None
+    try:
+        ast.literal_eval(node)
+        return True
+    except _LITERAL_EVAL_ERRORS:
+        return False
+
+
 def extract_arg_defaults(func_node, visitor=None):
     """
     Given an ast.FunctionDef node, return an ordered dictionary
@@ -2246,7 +2271,9 @@ def extract_arg_defaults(func_node, visitor=None):
 
     Defaults are converted the same way member values given at a usage site are, so that an
     enum constant, a class reference, a list or a nested decorator reaches the Java side in the
-    shape the stub generator expects rather than as an AST repr.
+    shape the stub generator expects. A default expression the converter cannot read is reported
+    as None, which is no default at all, rather than as an AST repr: the Java side has no reliable
+    way to tell a dump from a string default with the same text.
     """
     arg_names = [a.arg for a in func_node.args.args]
     defaults = func_node.args.defaults
@@ -2258,7 +2285,7 @@ def extract_arg_defaults(func_node, visitor=None):
     arg_dict = {}
     for arg, default in zip(arg_names, default_values):
         member_name = normalize_python_keyword_alias(arg)
-        if default is None:
+        if default is None or not _is_convertible_default(default, visitor):
             arg_dict[member_name] = None
         else:
             arg_dict[member_name] = convert_ast_value(default, visitor)

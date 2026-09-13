@@ -102,6 +102,13 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
      * annotation (reported as an {@link io.micronaut.core.annotation.AnnotationValue}) and the empty string. Java,
      * Kotlin and Groovy report the same defaults for the equivalent annotation.</p>
      *
+     * <p>Python reports the same defaults for a decorator declared as an annotation, with two differences its model
+     * forces. A decorator member cannot declare another decorator application as its default, so there is no nested
+     * annotation default. And a class reference or list default is only reported as an
+     * {@link io.micronaut.core.annotation.AnnotationClassValue} or an array once the generated Java annotation type
+     * exists; until then, while the Python class that declares the decorator is visited, it is reported as the class
+     * name or a {@link java.util.List}. A default expression the Python processor cannot read declares no default.</p>
+     *
      * <p>This is deliberately more complete than the defaults carried by the written annotation metadata and read
      * back through {@link io.micronaut.core.annotation.AnnotationValue#getDefaultValues()}, which omits empty string
      * defaults to keep the generated metadata small. Use this method when "no default" has to be told apart from
