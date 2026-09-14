@@ -23,9 +23,26 @@ package io.micronaut.http.client.exceptions;
  */
 public final class ReadTimeoutException extends HttpClientException {
 
-    public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException();
+    /**
+     * Shared instance.
+     *
+     * @deprecated This shared instance captures its stack trace at static initialization time
+     * and is reused across concurrent requests. Use {@link #ReadTimeoutException()} instead so
+     * that the stack trace points to the request that actually timed out and so the exception
+     * can carry per-request metadata such as the service id.
+     */
+    @Deprecated(since = "4.9.0")
+    public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException(true);
 
-    private ReadTimeoutException() {
-        super("Read Timeout", null, true);
+    /**
+     * Create a new read timeout exception. The stack trace is captured at the point of creation,
+     * so it points to the client/request path that timed out.
+     */
+    public ReadTimeoutException() {
+        super("Read Timeout");
+    }
+
+    private ReadTimeoutException(boolean shared) {
+        super("Read Timeout", null, shared);
     }
 }
