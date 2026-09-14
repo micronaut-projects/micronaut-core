@@ -69,6 +69,7 @@ import reactor.core.scheduler.Schedulers;
 import reactor.util.context.Context;
 
 import java.security.Principal;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -267,7 +268,15 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
             @Override
             public Set<? extends WebSocketSession> getOpenSessions() {
-                return requiredWebSocketSessionRepository.getOpenSessions();
+                // the group only holds websocket channels, one attribute read each is all it takes
+                Set<WebSocketSession> open = new HashSet<>();
+                for (Channel ch : requiredWebSocketSessionRepository.getChannelGroup()) {
+                    NettyWebSocketSession s = ch.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).get();
+                    if (s != null && s.isOpen()) {
+                        open.add(s);
+                    }
+                }
+                return open;
             }
 
             @Override

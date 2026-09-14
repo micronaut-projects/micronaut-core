@@ -2,7 +2,6 @@ package io.micronaut.http.server.netty.websocket
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
-import io.micronaut.http.netty.websocket.NettyWebSocketSession
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository
 import io.micronaut.runtime.server.EmbeddedServer
 import io.micronaut.websocket.WebSocketClient
@@ -10,10 +9,6 @@ import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.annotation.ClientWebSocket
 import io.micronaut.websocket.annotation.OnMessage
 import io.micronaut.websocket.annotation.ServerWebSocket
-import io.netty.channel.Channel
-import io.netty.channel.embedded.EmbeddedChannel
-import io.netty.channel.group.DefaultChannelGroup
-import io.netty.util.concurrent.GlobalEventExecutor
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
@@ -26,7 +21,7 @@ class OpenSessionsSpec extends Specification {
         given:
         def ctx = ApplicationContext.run(['spec.name': 'OpenSessionsSpec'])
         def server = ctx.getBean(EmbeddedServer).start()
-        def repository = (WebSocketSessionRepository) server
+        def group = ((WebSocketSessionRepository) server).channelGroup
         def client = ctx.createBean(WebSocketClient, server.URI)
         def conditions = new PollingConditions(timeout: 10)
 
@@ -36,8 +31,7 @@ class OpenSessionsSpec extends Specification {
 
         then:
         conditions.eventually {
-            repository.openSessions.size() == 2
-            repository.channelGroup.size() == 2
+            group.size() == 2
         }
 
         when: 'each server session reports its own id and the ids of all open sessions'
@@ -58,8 +52,7 @@ class OpenSessionsSpec extends Specification {
 
         then:
         conditions.eventually {
-            repository.openSessions*.id == [secondId]
-            repository.channelGroup.size() == 1
+            group.size() == 1
         }
 
         when:
@@ -73,104 +66,12 @@ class OpenSessionsSpec extends Specification {
 
         then:
         conditions.eventually {
-            repository.openSessions.isEmpty()
-            repository.channelGroup.isEmpty()
+            group.isEmpty()
         }
 
         cleanup:
         client.close()
         ctx.close()
-    }
-
-    def "sessions are forgotten when the channel closes without removeChannel"() {
-        given:
-        def ctx = ApplicationContext.run(['spec.name': 'OpenSessionsSpec'])
-        def repository = (WebSocketSessionRepository) ctx.getBean(EmbeddedServer)
-        def channel = new EmbeddedChannel()
-        def session = Mock(NettyWebSocketSession)
-        channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(session)
-        // always reports open, so that only the bookkeeping decides whether it is returned
-        session.isOpen() >> true
-
-        when:
-        repository.addChannel(channel)
-
-        then:
-        repository.openSessions == [session] as Set
-
-        when:
-        channel.close().sync()
-
-        then:
-        repository.openSessions.isEmpty()
-        repository.channelGroup.isEmpty()
-
-        cleanup:
-        ctx.close()
-    }
-
-    def "a channel removed from the group directly is not reported"() {
-        given:
-        def ctx = ApplicationContext.run(['spec.name': 'OpenSessionsSpec'])
-        def repository = (WebSocketSessionRepository) ctx.getBean(EmbeddedServer)
-        def channel = new EmbeddedChannel()
-        def session = Mock(NettyWebSocketSession)
-        channel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(session)
-        session.isOpen() >> true
-        repository.addChannel(channel)
-
-        when:
-        repository.channelGroup.remove(channel)
-
-        then:
-        repository.openSessions.isEmpty()
-
-        cleanup:
-        channel.close()
-        ctx.close()
-    }
-
-    def "default implementation derives the sessions from the channel group"() {
-        given:
-        def group = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-        def repository = new WebSocketSessionRepository() {
-            @Override
-            void addChannel(Channel channel) {
-                group.add(channel)
-            }
-
-            @Override
-            void removeChannel(Channel channel) {
-                group.remove(channel)
-            }
-
-            @Override
-            io.netty.channel.group.ChannelGroup getChannelGroup() {
-                return group
-            }
-        }
-        def openChannel = new EmbeddedChannel()
-        def openSession = Mock(NettyWebSocketSession)
-        openSession.isOpen() >> true
-        openChannel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(openSession)
-        def closedChannel = new EmbeddedChannel()
-        def closedSession = Mock(NettyWebSocketSession)
-        closedSession.isOpen() >> false
-        closedChannel.attr(NettyWebSocketSession.WEB_SOCKET_SESSION_KEY).set(closedSession)
-        def noSessionChannel = new EmbeddedChannel()
-
-        when:
-        repository.addChannel(openChannel)
-        repository.addChannel(closedChannel)
-        repository.addChannel(noSessionChannel)
-
-        then:
-        repository.openSessions == [openSession] as Set
-
-        cleanup:
-        openChannel.close()
-        closedChannel.close()
-        noSessionChannel.close()
     }
 
     @Requires(property = 'spec.name', value = 'OpenSessionsSpec')
