@@ -108,6 +108,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         Qualifier.class
     );
 
+    private static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_INTERCEPTOR_REGISTRATIONS = ReflectionUtils.getRequiredInternalMethod(
+        BeanResolutionContext.class,
+        "getProxyTargetBean",
+        BeanDefinition.class,
+        Argument.class,
+        Qualifier.class,
+        List.class
+    );
+
     private static final Method METHOD_GET_PROXY_BEAN_DEFINITION = ReflectionUtils.getRequiredInternalMethod(
         BeanDefinitionRegistry.class,
         "getProxyTargetBeanDefinition",
@@ -751,17 +760,22 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 // always cached. Saying so is what lets the context destroy the target when the proxy is destroyed.
                 proxyBuilder.addMethod(getHasCachedInterceptedTargetMethod(targetField));
 
-                // Non-lazy target
+                // Non-lazy target. The proxy and the target it creates here are one intercepted bean, so the target
+                // is handed the interceptors the proxy was constructed with: it adopts the non-singleton ones for its
+                // own construction, post-construct and pre-destroy, and destroys them with itself. A lazy proxy stands
+                // for a target resolved later, possibly many, so it does not hand them over.
                 bodyBuilders.add((aThis, methodParameters) -> aThis.field(targetField).assign(
                         methodParameters.get(beanResolutionContextArgumentIndex)
                             .invoke(
-                                METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT,
+                                METHOD_GET_PROXY_TARGET_BEAN_WITH_INTERCEPTOR_REGISTRATIONS,
                                 // 1st argument: this.$proxyBeanDefinition
                                 aThis.field(proxyBeanDefinitionField),
                                 // 2nd argument: the type
                                 pushTargetArgument(targetType),
                                 // 3th argument: the qualifier
-                                methodParameters.get(qualifierIndex)
+                                methodParameters.get(qualifierIndex),
+                                // 4th argument: the interceptor registrations
+                                methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
                             ).cast(targetType)
                     )
                 );

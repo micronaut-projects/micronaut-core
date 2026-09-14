@@ -378,9 +378,9 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
      *
      * <p>Destruction runs with a fresh resolution context, so a bean with lifecycle advice but no retaining proxy has
      * nothing handed to it. The interceptor instances it owns are still reachable through the registrations the
-     * container passes to the dispose call, and every interceptor bound to the bean's lifecycle was created while the
-     * bean was, so those registrations are the candidate set. When the bean owns none, candidates are resolved by
-     * binding as before.</p>
+     * container passes to the dispose call. The exact set selected while the bean was created is used when the
+     * registration recorded one. Otherwise candidates are resolved by binding, selecting the instances the bean owns,
+     * such as the ones a proxy target adopted from its proxy, instead of creating new ones.</p>
      *
      * @param resolutionContext The resolution context
      * @param binding           The binding of the interception point
@@ -396,13 +396,15 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         if (attribute instanceof List<?> existing) {
             return (List<BeanRegistration<Interceptor<?, ?>>>) existing;
         }
+        // Resolve by binding, but select an instance the bean owns instead of creating another of the same
+        // interceptor. Using only what the bean owns would drop an interceptor bound to pre-destroy that was never
+        // created with the bean, such as one a proxy target did not adopt from its proxy.
         List<BeanRegistration<Interceptor<?, ?>>> existing = findExistingInterceptors(resolutionContext);
-        return existing.isEmpty()
-            ? resolutionContext.getBeanRegistrations(
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(binding)
-            )
-            : existing;
+        return resolutionContext.getBeanRegistrations(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBindingValues(binding),
+            existing
+        );
     }
 
     /**

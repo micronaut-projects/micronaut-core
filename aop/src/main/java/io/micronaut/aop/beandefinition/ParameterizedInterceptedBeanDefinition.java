@@ -21,14 +21,10 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -81,14 +77,7 @@ public interface ParameterizedInterceptedBeanDefinition<T>
                                                                                             AnnotationMetadataProvider constructor) {
         // The constructor already exposes this bean's metadata combined with the constructor's, so use it rather
         // than building a second hierarchy around it on every bean creation.
-        AnnotationMetadata metadata = constructor.getAnnotationMetadata();
-        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
-            return null;
-        }
-        return new ArrayList(resolutionContext.getBeanRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBinding(metadata)
-        ));
+        return SharedInterceptorRegistrations.resolve(resolutionContext, this, constructor.getAnnotationMetadata());
     }
 
     @Override
