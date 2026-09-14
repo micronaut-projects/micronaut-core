@@ -204,6 +204,8 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         // as a lifecycle method before any around advice is applied to it.
         String preDestroyMethodName = resolvePreDestroyMethodName(producedType, producedAnnotationMetadata);
 
+        warnAboutUninvokedLifecycleCallbacks(producedType, producingElement, preDestroyMethodName);
+
         if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
@@ -242,7 +244,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
             List<MethodElement> methodElements = producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
-                .filter(m -> m.isPublic() && !m.isFinal() && !m.isStatic())
+                .filter(this::isAdvisableProducedMethod)
                 .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
                 .toList();
             methodElements
@@ -250,13 +252,13 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             List<PropertyElement> syntheticBeanProperties = producedType.getSyntheticBeanProperties();
             for (PropertyElement syntheticBeanProperty : syntheticBeanProperties) {
                 syntheticBeanProperty.getReadMethod().ifPresent(m -> {
-                        if (!m.isFinal() && !isPreDestroyCallback(m, preDestroyMethodName)) {
+                        if (isAdvisableProducedMethod(m) && !isPreDestroyCallback(m, preDestroyMethodName)) {
                             visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
                 );
                 syntheticBeanProperty.getWriteMethod().ifPresent(m -> {
-                        if (!m.isFinal()) {
+                        if (isAdvisableProducedMethod(m)) {
                             visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
@@ -300,6 +302,76 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         }
 
         additionalBuilders.add(beanDefinitionBuilder);
+    }
+
+    /**
+     * Warns about the {@code @PostConstruct} and {@code @PreDestroy} methods a produced type declares, which are not
+     * invoked for a bean produced from a {@code @Factory}.
+     *
+     * <p>A produced instance is constructed by the factory method or field and not by Micronaut, so it is not a
+     * managed instance whose lifecycle Micronaut drives; this is also what the Jakarta CDI specification says about
+     * the return value of a producer method. The documented way to give a produced bean a destroy callback is
+     * {@link Bean#preDestroy()} on the producing element, and there is no equivalent for construction because the
+     * factory method can initialise the instance itself. That the callbacks are silently skipped is the surprising
+     * part, so it is reported once per produced bean, pointing at the producing element the user owns.</p>
+     *
+     * @param producedType         The produced type
+     * @param producingElement     The producing method or field
+     * @param preDestroyMethodName The pre-destroy callback named by {@link Bean#preDestroy()}, which is invoked
+     */
+    private void warnAboutUninvokedLifecycleCallbacks(ClassElement producedType,
+                                                      MemberElement producingElement,
+                                                      @Nullable String preDestroyMethodName) {
+        if (producedType.isPrimitive() || producedType.isArray()) {
+            return;
+        }
+        List<String> callbacks;
+        try {
+            callbacks = producedType.getEnclosedElements(ElementQuery.ALL_METHODS
+                    .annotated(metadata -> metadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) || metadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)))
+                .stream()
+                .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
+                .map(m -> m.getDeclaringType().getSimpleName() + "." + m.getName() + "()")
+                .distinct()
+                .toList();
+        } catch (RuntimeException e) {
+            // The warning is best effort: building the methods of a produced type fails when one of them references a
+            // class missing from the classpath, which must not fail or postpone the produced bean itself. The
+            // pre-destroy lookup avoids the same failure by filtering on the method name before building elements.
+            return;
+        }
+        if (callbacks.isEmpty()) {
+            return;
+        }
+        visitorContext.warn("The type produced by this element declares the lifecycle callback(s) " + String.join(", ", callbacks)
+            + ", which are not invoked for a bean produced from a @Factory: the instance is constructed by the factory and is not "
+            + "a managed instance of the produced type. Initialize the instance in the producing element, and name a destroy "
+            + "method with @Bean(preDestroy = \"...\").", producingElement);
+    }
+
+    /**
+     * Whether a method of a produced type carries the around advice of the produced bean.
+     *
+     * <p>This is the rule {@link #visitAopMethod} gives a bean that declares the advice itself - a method inherits
+     * class-level advice when it is public or package-private, and carries advice it declares itself whatever its
+     * visibility - bounded by what the generated code can reach. The proxy of a produced bean is a subclass of the
+     * produced type generated into the factory's package, and its executable methods invoke the target from there, so
+     * a non-public method is only reachable when the factory's package can see it.</p>
+     *
+     * <p>A final method is left unadvised rather than reported as an error, which is what a final method inheriting
+     * class-level advice on a bean that declares it gets: a produced type is often a third-party type whose methods
+     * the user cannot change.</p>
+     *
+     * @param methodElement The method
+     * @return true if the method carries the advice
+     */
+    private boolean isAdvisableProducedMethod(MethodElement methodElement) {
+        if (methodElement.isStatic() || methodElement.isFinal() || !methodElement.isAccessible(classElement, false)) {
+            return false;
+        }
+        return methodElement.isPublic()
+            || methodElement.isPackagePrivate()
+            || InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getMethodAnnotationMetadata());
     }
 
     /**
