@@ -20,6 +20,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * A registration the context created, which destroys its bean through the context when it is closed.
@@ -31,7 +32,6 @@ import java.util.List;
 @Internal
 @SuppressWarnings("removal")
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
-    private final BeanContext beanContext;
     private final java.util.concurrent.atomic.AtomicBoolean closed =
         new java.util.concurrent.atomic.AtomicBoolean();
 
@@ -40,16 +40,14 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
                               List<BeanRegistration<?>> dependents) {
-        super(identifier, beanDefinition, createdBean, dependents);
-        this.beanContext = beanContext;
+        super(beanContext, identifier, beanDefinition, createdBean, dependents);
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean) {
-        super(identifier, beanDefinition, createdBean, null);
-        this.beanContext = beanContext;
+        super(beanContext, identifier, beanDefinition, createdBean, null);
     }
 
     @Override
@@ -59,7 +57,7 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
         // not run them twice
         if (closed.compareAndSet(false, true)) {
-            beanContext.destroyBean(this);
+            Objects.requireNonNull(beanContext).destroyBean(this);
         }
     }
 

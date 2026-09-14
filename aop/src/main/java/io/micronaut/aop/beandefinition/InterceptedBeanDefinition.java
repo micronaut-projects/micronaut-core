@@ -77,8 +77,8 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        // through the bean's dependent context, which creates the non-singleton ones as dependents of the bean
-        return new ArrayList(resolutionContext.getDependentContext().getBeanRegistrations(
+        // the bean's own: the non-singleton ones are created as dependents of the bean
+        return new ArrayList(resolutionContext.getInterceptorRegistrations(
             Interceptor.ARGUMENT,
             Qualifiers.byInterceptorBinding(metadata)
         ));

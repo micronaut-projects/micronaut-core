@@ -15,7 +15,9 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.Reference;
@@ -31,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * by whoever asked for it. Two things still need the way from such a bean back to its registration: destroying the
  * bean through {@code destroyBean(Object)}, which destroys the beans created for it only through the registration
  * that carries them, and a hot-swappable proxy handed a prototype created as the target of another proxy, which
- * intercepts it with its own interceptors only through the registration's dependent scope. This index keeps that
+ * intercepts it with its own interceptors only through the registration. This index keeps that
  * way, weakly on both sides: it retains neither the bean nor the registration, and forgets an entry once the bean
  * is unreachable.</p>
  *
@@ -43,6 +45,20 @@ final class UnscopedRegistrationIndex {
 
     private final ReferenceQueue<Object> collected = new ReferenceQueue<>();
     private final Map<Object, WeakReference<BeanRegistration<?>>> registrations = new ConcurrentHashMap<>();
+
+    /**
+     * Whether a bean of the given definition is created for no scope, and so held by whoever asked for it.
+     *
+     * @param definition The definition
+     * @return {@code true} for a prototype or a bean with no scope
+     */
+    static boolean isUnscoped(BeanDefinition<?> definition) {
+        if (definition.isSingleton()) {
+            return false;
+        }
+        String scope = definition.getScopeName().orElse(null);
+        return scope == null || Prototype.class.getName().equals(scope);
+    }
 
     void put(BeanRegistration<?> registration) {
         Object target = registration.getBean();

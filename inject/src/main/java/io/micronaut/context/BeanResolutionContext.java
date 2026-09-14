@@ -66,8 +66,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
-     * @deprecated Since 5.3.0 nothing reads it: an interception point resolves its interceptors reusing the
-     * dependents of the bean, see {@link #getBeanRegistrations(Argument, Qualifier, Collection)}
+     * @deprecated Since 5.3.0 nothing reads it: an interception point resolves its interceptors as the bean's own,
+     * see {@link #getInterceptorRegistrations(Argument, Qualifier)}
      */
     @Deprecated(since = "5.3.0", forRemoval = true)
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
@@ -108,38 +108,38 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
 
     /**
-     * The dependent scope of the bean this context resolves for, as a context.
+     * Obtains the registrations of the interceptors bound to the bean this context resolves for.
      *
-     * <p>Its lookups are the bean context's, answered within the scope: a singleton or a bean of a custom scope comes
-     * from its scope, any other bean is the dependent of that definition the bean already has, among
-     * {@link #getDependentBeans()}, or is created as a new dependent of the bean. The interceptors bound to a bean are
-     * resolved through it, which is what gives every interception point of the bean the same instance of a
-     * non-singleton interceptor.</p>
+     * <p>The interceptors of a bean are the bean's own. A singleton, or an interceptor of a custom scope, comes from
+     * its scope as always. Any other interceptor is the one the bean already has among {@link #getDependentBeans()},
+     * created for it earlier, and is otherwise created now as a new dependent of the bean, so that it is destroyed
+     * with the bean. That is what gives every interception point of a bean, from its construction to its
+     * destruction, the same instance of a non-singleton interceptor.</p>
      *
-     * <p>A context of the container answers within the scope. The default here is for a context of another kind,
-     * which carries no scope: it resolves as the plain lookups do.</p>
+     * <p>A context of the container answers so. The default here is for a context of another kind, which owns
+     * nothing: it resolves as {@link #getBeanRegistrations(Argument, Qualifier)} does.</p>
      *
-     * @return The dependent context
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return The registrations
      * @since 5.3.0
      */
-    default DependentBeanContext getDependentContext() {
-        BeanResolutionContext resolutionContext = this;
-        return new DependentBeanContext() {
-            @Override
-            public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-                return resolutionContext.getBeanRegistrations(beanType, qualifier);
-            }
+    default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return getBeanRegistrations(interceptorType, binding);
+    }
 
-            @Override
-            public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> definition) {
-                return getContext().getBeanRegistration(definition);
-            }
-
-            @Override
-            public BeanContext getContext() {
-                return resolutionContext.getContext();
-            }
-        };
+    /**
+     * Obtains the registration of one interceptor bound to the bean this context resolves for, the bean's own
+     * instance of it, as {@link #getInterceptorRegistrations(Argument, Qualifier)} would list it.
+     *
+     * @param interceptor The interceptor definition
+     * @param <I>         The interceptor type
+     * @return The registration
+     * @since 5.3.0
+     */
+    default <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
+        return getContext().getBeanRegistration(interceptor);
     }
 
     /**
@@ -319,8 +319,8 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     /**
      * The dependent beans of the bean this context operates on: the beans created for it so far while it is being
      * created, and the beans that were created with it when it is being destroyed. A non-singleton interceptor
-     * created for the bean is among them, which is how every interception point of the bean reaches the same
-     * instance.
+     * created for the bean is among them, which is how {@link #getInterceptorRegistrations(Argument, Qualifier)}
+     * gives every interception point of the bean the same instance.
      *
      * @return The dependent beans, never {@code null}
      * @since 5.1.0

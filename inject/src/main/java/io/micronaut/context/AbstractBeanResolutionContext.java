@@ -75,8 +75,6 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
-    private DependentBeanContext dependentContext;
-    @Nullable
     private final PropertyResolver propertyResolver;
 
     @Nullable
@@ -478,11 +476,13 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public DependentBeanContext getDependentContext() {
-        if (dependentContext == null) {
-            dependentContext = new DefaultDependentBeanContext(context, this);
-        }
-        return dependentContext;
+    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return context.getInterceptorRegistrations(this, interceptorType, binding);
+    }
+
+    @Override
+    public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
+        return context.getInterceptorRegistration(this, interceptor);
     }
 
     @Override
