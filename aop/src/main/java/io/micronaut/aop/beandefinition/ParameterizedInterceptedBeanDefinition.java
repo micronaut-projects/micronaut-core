@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -99,10 +99,10 @@ public interface ParameterizedInterceptedBeanDefinition<T>
         if (declared != null) {
             // An explicitly supplied set is bound for construction only, so it is used here but not shared with the
             // post-construct interception of this bean, which may bind interceptors this set does not contain.
-            return ConstructorInterceptorChain.instantiate(resolutionContext, context, declared, this, constructor, values);
+            return LifecycleInterception.instantiate(resolutionContext, context, declared, this, constructor, values);
         }
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveLifecycleInterceptors(resolutionContext, constructor);
-        return ConstructorInterceptorChain.instantiate(
+        return LifecycleInterception.instantiate(
             resolutionContext,
             context,
             interceptors,

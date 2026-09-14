@@ -16,7 +16,7 @@
 package io.micronaut.aop.beandefinition;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
@@ -93,7 +93,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
         // Resolved once for construction: the non-singleton interceptors this creates are dependents of this bean,
         // and its post-construct and pre-destroy interception reuse them from there.
         List<BeanRegistration<Interceptor<T, T>>> interceptors = resolveInterceptors(resolutionContext, constructor);
-        return ConstructorInterceptorChain.instantiate(
+        return LifecycleInterception.instantiate(
             resolutionContext,
             context,
             interceptors,
