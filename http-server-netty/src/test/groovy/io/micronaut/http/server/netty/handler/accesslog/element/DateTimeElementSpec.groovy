@@ -39,6 +39,15 @@ class DateTimeElementSpec extends Specification {
         element.toString() == '%{dd/MMM/yyyy:HH:mm:ss Z, UTC}t'
     }
 
+    def 'a comma-only pattern is a literal comma'() {
+        given: "split(',') reduces this format to an empty array"
+        def element = new DateTimeElement(",")
+
+        expect:
+        element.value(T) == ','
+        element.toString() == '%{,}t'
+    }
+
     def 'custom pattern with a different zone respects that zone'() {
         given:
         def element = new DateTimeElement("end:yyyy-MM-dd HH:mm:ss, Asia/Tokyo")

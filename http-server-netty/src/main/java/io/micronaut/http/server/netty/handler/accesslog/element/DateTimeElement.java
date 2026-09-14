@@ -88,12 +88,16 @@ final class DateTimeElement implements LogElement {
         }
         this.dateFormat = dateFormat;
         String[] formatSplit = format.split(",");
+        String pattern;
         if (formatSplit.length < 2) {
+            // also covers a comma-only format, which split reduces to an empty array
+            pattern = format;
             formatter = DateTimeFormatter.ofPattern(format, Locale.US);
         } else {
-            formatter = DateTimeFormatter.ofPattern(formatSplit[0], Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
+            pattern = formatSplit[0];
+            formatter = DateTimeFormatter.ofPattern(pattern, Locale.US).withZone(ZoneId.of(formatSplit[1].strip()));
         }
-        cache = hasSubSecondField(formatSplit[0]) ? null : new PerSecondCache(this::formatSecond);
+        cache = hasSubSecondField(pattern) ? null : new PerSecondCache(this::formatSecond);
         events = fromStart ? Event.REQUEST_HEADERS_EVENTS : LAST_RESPONSE_EVENTS;
     }
 
