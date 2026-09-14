@@ -39,6 +39,23 @@ public interface MethodInvocationContext<T, R> extends InvocationContext<T, R>, 
         return getExecutableMethod().isSuspend();
     }
 
+    /**
+     * Whether this invocation was fired by the scheduler as a scheduled task, as opposed to a direct call of the
+     * same method from application code.
+     *
+     * <p>The scheduler marks each firing of a {@code @Scheduled} method through
+     * {@link ScheduledInvocation#invoke(ExecutableMethod, Object, Object...)}. The marker applies to that method
+     * only: a direct call to the method, and any method the scheduled invocation calls in turn, return
+     * {@code false}. Interceptors that apply timer-specific advice, such as Jakarta Interceptors' around-timeout
+     * methods, can use this flag to intercept only the scheduled firings.</p>
+     *
+     * @return {@code true} if the invocation was fired as a scheduled task
+     * @since 5.2.0
+     */
+    default boolean isScheduled() {
+        return false;
+    }
+
     @Override
     default boolean isAbstract() {
         return getExecutableMethod().isAbstract();
