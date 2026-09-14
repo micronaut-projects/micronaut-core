@@ -49,7 +49,6 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.ArgumentExpUtils;
@@ -677,15 +676,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     .returning()));
         }
 
-        constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder -> {
-            builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES));
-            if (isProxyTarget) {
-                // The non-singleton interceptors of a target are created with the target and found among the
-                // dependents of its registration, see ProxyTargetInterceptors; the proxy is injected with the
-                // singletons only, so that it creates no instance of its own that no target is intercepted with.
-                builder.member(InterceptorBindingQualifier.META_SINGLETONS_ONLY, true);
-            }
-        });
+        constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder ->
+            builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES)));
 
         if (parentWriter != null) {
             proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
