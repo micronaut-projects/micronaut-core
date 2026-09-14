@@ -29,7 +29,7 @@ import java.util.function.UnaryOperator;
  * themselves.
  *
  * @author Micronaut
- * @since 5.2.0
+ * @since 5.2.2
  */
 @Internal
 public final class TypeVariableBinder {
