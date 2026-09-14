@@ -497,6 +497,21 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public void markDependentAsFactory(Object factoryBean) {
+        if (dependentBeans == null) {
+            return;
+        }
+        // the factory was looked up last, so search from the end
+        for (int i = dependentBeans.size() - 1; i >= 0; i--) {
+            BeanRegistration<?> dependent = dependentBeans.get(i);
+            if (dependent.getBean() == factoryBean) {
+                dependentFactory = dependentBeans.remove(i);
+                return;
+            }
+        }
+    }
+
+    @Override
     @Nullable
     public BeanRegistration<?> getAndResetDependentFactoryBean() {
         BeanRegistration<?> result = this.dependentFactory;
@@ -638,6 +653,11 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public <T> T getProxyTargetBean(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
         return context.getProxyTargetBean(this, definition, beanType, qualifier);
+    }
+
+    @Override
+    public <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition, Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+        return context.getProxyTargetBeanRegistration(this, definition, beanType, qualifier);
     }
 
     /**

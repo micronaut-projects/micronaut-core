@@ -83,11 +83,9 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         return dependents == null ? List.of() : List.copyOf(dependents);
     }
 
-    /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
-     */
+    @Override
     @Nullable
-    List<?> getInterceptorRegistrations() {
+    public List<?> getInterceptorRegistrations() {
         return interceptorRegistrations;
     }
 }
