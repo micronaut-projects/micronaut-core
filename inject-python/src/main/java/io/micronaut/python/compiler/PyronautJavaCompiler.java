@@ -48,7 +48,10 @@ import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -780,7 +783,21 @@ final class PyronautJavaCompiler {
         }
         // A shared, predictable path under java.io.tmpdir would be writable by the first user only
         // and open to interference on multi-user hosts, so create a private directory per dump.
-        return Files.createTempDirectory("pyronaut-" + ERROR_DUMP_DIRECTORY_NAME + "-").toFile();
+        return Files.createTempDirectory(
+            "pyronaut-" + ERROR_DUMP_DIRECTORY_NAME + "-",
+            ownerOnlyDirectoryAttributes()
+        ).toFile();
+    }
+
+    private static FileAttribute<?>[] ownerOnlyDirectoryAttributes() {
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            return new FileAttribute<?>[] {
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))
+            };
+        }
+        // Non-POSIX file systems (Windows) already place the temporary directory under the
+        // user's own profile.
+        return new FileAttribute<?>[0];
     }
 
     /**

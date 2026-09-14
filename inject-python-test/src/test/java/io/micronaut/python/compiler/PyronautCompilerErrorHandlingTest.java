@@ -23,8 +23,10 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -162,11 +164,12 @@ class PyronautCompilerErrorHandlingTest {
         Files.createDirectories(targetDirectory.toPath());
         File expectedDumpDirectory = buildDirectory.resolve("processor-error-dumps").toFile();
 
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("class Broken(")
             .targetDir(targetDirectory)
-            .build()
-            .compile());
+            .build();
+
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::compile);
 
         assertConciseSyntaxError(exception.getMessage(), "class Broken(", expectedDumpDirectory);
         assertEquals(1, countDumpFiles(expectedDumpDirectory));
@@ -176,10 +179,11 @@ class PyronautCompilerErrorHandlingTest {
 
     @Test
     void buildClassLoaderWritesDumpToPrivateTemporaryDirectoryByDefault() throws IOException {
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonCode("class Broken(")
-            .build()
-            .buildClassLoader());
+            .build();
+
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
 
         String message = exception.getMessage();
         String marker = "Full error details were written to: ";
@@ -189,6 +193,9 @@ class PyronautCompilerErrorHandlingTest {
         try {
             assertTrue(Files.isRegularFile(dumpFile), message);
             assertTrue(dumpFile.getParent().getFileName().toString().startsWith("pyronaut-processor-error-dumps-"), message);
+            if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+                assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dumpFile.getParent())));
+            }
             assertFalse(dumpFile.startsWith(Path.of(System.getProperty("user.home"), ".pyronaut")), message);
         } finally {
             Files.deleteIfExists(dumpFile);
