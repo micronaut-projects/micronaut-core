@@ -73,6 +73,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -417,15 +418,21 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object finalData = data;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
+                            boolean handled = false;
                             try {
                                 if (e == null) {
                                     messageHandled(ctx, finalData);
+                                    handled = true;
                                 } else {
                                     messageProcessingException(ctx, e);
                                 }
                             } finally {
                                 if (finalHandlerOwnedContent != null) {
-                                    finalHandlerOwnedContent.release();
+                                    if (handled) {
+                                        releaseAfterListeners(ctx, finalHandlerOwnedContent);
+                                    } else {
+                                        finalHandlerOwnedContent.release();
+                                    }
                                 }
                             }
                         });
@@ -491,6 +498,24 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     ctx,
                     CloseReason.UNSUPPORTED_DATA
             );
+        }
+    }
+
+    /**
+     * Release the frame content a handled message aliased, but only after the listeners that
+     * {@link #messageHandled} hands the message to have run. Implementations publish the
+     * {@code WebSocketMessageProcessedEvent} from a task on the channel's executor rather than
+     * inline, so the release is queued on that executor behind it.
+     *
+     * @param ctx     The context
+     * @param content The content owned by the handler invocation
+     */
+    private static void releaseAfterListeners(ChannelHandlerContext ctx, ByteBuf content) {
+        try {
+            ctx.executor().execute(content::release);
+        } catch (RejectedExecutionException e) {
+            // the event loop is gone, so are the listeners
+            content.release();
         }
     }
 
