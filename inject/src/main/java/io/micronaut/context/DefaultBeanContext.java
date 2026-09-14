@@ -146,6 +146,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -200,6 +201,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     final Map<BeanIdentifier, BeanRegistration<?>> singlesInCreation = new ConcurrentHashMap<>(5);
 
     protected final SingletonScope singletonScope = new SingletonScope();
+
+    private final RuntimeDependencies runtimeDependencies = new RuntimeDependencies();
 
     private final BeanContextConfiguration beanContextConfiguration;
 
@@ -490,6 +493,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             beanConfigurations.clear();
             disabledConfigurations.clear();
             singletonScope.clear();
+            runtimeDependencies.clear();
             attributes.clear();
             beanInitializedEventListeners = null;
             beanCreationEventListeners = null;
@@ -3851,18 +3855,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         return false;
     }
 
-    /**
-     * Sorts the singleton registrations into the order in which they should be destroyed.
-     *
-     * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point or
-     * from {@link DependsOn}, so that a dependency outlives its dependents. Where the dependencies leave the order
-     * open, beans are destroyed in bean name order so that the sequence is stable between runs. A dependency cycle
-     * cannot satisfy that guarantee for every one of its members, so it is broken by destroying the first bean in
-     * name order that lies on a cycle; beans that merely depend on a cycle are never chosen to break it.</p>
-     *
-     * @param beans The registrations
-     * @return The registrations in destruction order
-     */
+    @Override
+    public void registerDependency(BeanRegistration<?> dependent, BeanRegistration<?> required) {
+        ArgumentUtils.requireNonNull("dependent", dependent);
+        ArgumentUtils.requireNonNull("required", required);
+        runtimeDependencies.add(dependent, required);
+    }
+
     /**
      * Destroys the given singleton registrations, skipping any bean already present in {@code processed}.
      *
@@ -3904,6 +3903,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
+    /**
+     * Sorts the singleton registrations into the order in which they should be destroyed.
+     *
+     * <p>A bean is destroyed before every bean it requires, whether the requirement comes from an injection point,
+     * from {@link DependsOn}, from the interceptors an intercepted bean retained, or from a dependency recorded with
+     * {@link #registerDependency(BeanRegistration, BeanRegistration)} while the application ran, so that a dependency
+     * outlives its dependents. Where the dependencies leave the order open, beans are destroyed in bean name order so
+     * that the sequence is stable between runs. A dependency cycle cannot satisfy that guarantee for every one of its
+     * members, so it is broken by destroying the first bean in name order that lies on a cycle; beans that merely
+     * depend on a cycle are never chosen to break it.</p>
+     *
+     * @param beans The registrations
+     * @return The registrations in destruction order
+     */
     private List<BeanRegistration> topologicalSort(Collection<BeanRegistration> beans) {
         final int size = beans.size();
         // Nodes are indexed in bean name order so that the destruction sequence is deterministic
@@ -3911,35 +3924,39 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         nodes.sort(Comparator.comparing(registration -> registration.getBeanDefinition().getName()));
 
         final Map<Class<?>, List<Integer>> nodesByType = new HashMap<>(size);
+        // a dependency discovered at runtime names a bean instance rather than a type, so the nodes are indexed by both
+        final IdentityHashMap<Object, Integer> nodesByBean = new IdentityHashMap<>(size);
         for (int i = 0; i < size; i++) {
             nodesByType.computeIfAbsent(nodes.get(i).getBeanDefinition().getBeanType(), type -> new ArrayList<>(1)).add(i);
+            final Object bean = nodes.get(i).bean;
+            if (bean != null) {
+                nodesByBean.putIfAbsent(bean, i);
+            }
         }
 
         // qualifiers are not taken into account, so every singleton assignable to a required type is a candidate
         final Map<Class<?>, List<Integer>> candidatesByRequiredType = new HashMap<>();
+        final Function<Class<?>, List<Integer>> candidatesForType = requiredType -> candidatesByRequiredType.computeIfAbsent(requiredType, type -> {
+            final List<Integer> assignable = new ArrayList<>();
+            for (Map.Entry<Class<?>, List<Integer>> entry : nodesByType.entrySet()) {
+                if (type.isAssignableFrom(entry.getKey())) {
+                    assignable.addAll(entry.getValue());
+                }
+            }
+            return assignable;
+        });
         // dependencies[i] holds the nodes that node i requires; each of them must be destroyed after node i
         final List<List<Integer>> dependencies = new ArrayList<>(size);
         final int[] dependents = new int[size];
         for (int i = 0; i < size; i++) {
-            final Collection<Class<?>> required = nodes.get(i).getBeanDefinition().getRequiredComponents();
+            final BeanRegistration<?> node = nodes.get(i);
+            final Collection<Class<?>> required = node.getBeanDefinition().getRequiredComponents();
             final List<Integer> nodeDependencies = new ArrayList<>(required.size());
             for (Class<?> requiredType : required) {
-                final List<Integer> candidates = candidatesByRequiredType.computeIfAbsent(requiredType, type -> {
-                    final List<Integer> assignable = new ArrayList<>();
-                    for (Map.Entry<Class<?>, List<Integer>> entry : nodesByType.entrySet()) {
-                        if (type.isAssignableFrom(entry.getKey())) {
-                            assignable.addAll(entry.getValue());
-                        }
-                    }
-                    return assignable;
-                });
-                for (int j : candidates) {
-                    if (j != i && !nodeDependencies.contains(j)) {
-                        nodeDependencies.add(j);
-                        dependents[j]++;
-                    }
-                }
+                addDependencies(i, candidatesForType.apply(requiredType), nodeDependencies, dependents);
             }
+            addInterceptorDependencies(i, node.bean, nodesByBean, nodeDependencies, dependents);
+            addRuntimeDependencies(i, node.bean, nodesByBean, candidatesForType, nodeDependencies, dependents, null);
             dependencies.add(nodeDependencies);
         }
 
@@ -3970,6 +3987,116 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
         return sorted;
+    }
+
+    /**
+     * Adds an edge from the given node to each of the given candidate nodes, ignoring duplicates and the node itself.
+     *
+     * @param i                The node the dependencies belong to
+     * @param candidates       The nodes it requires
+     * @param nodeDependencies The dependencies collected for the node so far, added to
+     * @param dependents       The number of nodes requiring each node, added to
+     */
+    private static void addDependencies(int i, List<Integer> candidates, List<Integer> nodeDependencies, int[] dependents) {
+        for (int j : candidates) {
+            addDependency(i, j, nodeDependencies, dependents);
+        }
+    }
+
+    /**
+     * Adds an edge from one node to another, unless it is already there or the two are the same node.
+     *
+     * @param i                The node the dependency belongs to
+     * @param j                The node it requires
+     * @param nodeDependencies The dependencies collected for the node so far, added to
+     * @param dependents       The number of nodes requiring each node, added to
+     */
+    private static void addDependency(int i, int j, List<Integer> nodeDependencies, int[] dependents) {
+        if (j != i && !nodeDependencies.contains(j)) {
+            nodeDependencies.add(j);
+            dependents[j]++;
+        }
+    }
+
+    /**
+     * Adds the edges from an intercepted bean to the interceptors it retained when it was constructed, so that an
+     * interceptor outlives every bean it advises and a destruction hook that is itself intercepted still runs against
+     * a live interceptor.
+     *
+     * <p>Only the singleton interceptors reach a node here: a non-singleton interceptor was created for this one bean
+     * and is already destroyed as one of its dependents. An interceptor a bean also injects is a declared dependency
+     * that adds the same edge, so nothing about that bean's order changes.</p>
+     *
+     * @param i                The node of the intercepted bean
+     * @param bean             The bean of the node
+     * @param nodesByBean      The node of each created bean
+     * @param nodeDependencies The dependencies collected for the node so far, added to
+     * @param dependents       The number of nodes requiring each node, added to
+     */
+    private static void addInterceptorDependencies(int i,
+                                                   @Nullable Object bean,
+                                                   IdentityHashMap<Object, Integer> nodesByBean,
+                                                   List<Integer> nodeDependencies,
+                                                   int[] dependents) {
+        if (!(bean instanceof InterceptedBean intercepted)) {
+            return;
+        }
+        for (BeanRegistration<?> registration : intercepted.$interceptorRegistrations()) {
+            final Integer interceptorNode = registration.bean == null ? null : nodesByBean.get(registration.bean);
+            if (interceptorNode != null) {
+                addDependency(i, interceptorNode, nodeDependencies, dependents);
+            }
+        }
+    }
+
+    /**
+     * Adds the edges from a node to the beans it was recorded as requiring by
+     * {@link #registerDependency(BeanRegistration, BeanRegistration)} while the application ran.
+     *
+     * <p>A required bean this pass does not destroy, a prototype resolved for the dependent say, is replaced by what it
+     * requires in turn: the singletons it holds have to outlive the dependent just as much, and they are as invisible
+     * to its definition as the prototype itself. Beans already expanded that way are not expanded again, so a cycle
+     * among them terminates.</p>
+     *
+     * @param i                The node the dependencies belong to
+     * @param bean             The bean whose recorded dependencies are being added
+     * @param nodesByBean      The node of each created bean
+     * @param candidatesForType The nodes assignable to a required type
+     * @param nodeDependencies The dependencies collected for the node so far, added to
+     * @param dependents       The number of nodes requiring each node, added to
+     * @param expanded         The beans already expanded, or {@code null} if none have been
+     */
+    private void addRuntimeDependencies(int i,
+                                        @Nullable Object bean,
+                                        IdentityHashMap<Object, Integer> nodesByBean,
+                                        Function<Class<?>, List<Integer>> candidatesForType,
+                                        List<Integer> nodeDependencies,
+                                        int[] dependents,
+                                        @Nullable Set<Object> expanded) {
+        Set<Object> expandedBeans = expanded;
+        for (RuntimeDependencies.BeanRef ref : runtimeDependencies.requiredBy(bean)) {
+            final Object required = ref.get();
+            if (required == null || required == bean) {
+                continue;
+            }
+            final Integer requiredNode = nodesByBean.get(required);
+            if (requiredNode != null) {
+                addDependency(i, requiredNode, nodeDependencies, dependents);
+                continue;
+            }
+            if (expandedBeans == null) {
+                expandedBeans = Collections.newSetFromMap(new IdentityHashMap<>());
+            }
+            if (!expandedBeans.add(required)) {
+                continue;
+            }
+            if (ref.definition != null) {
+                for (Class<?> requiredType : ref.definition.getRequiredComponents()) {
+                    addDependencies(i, candidatesForType.apply(requiredType), nodeDependencies, dependents);
+                }
+            }
+            addRuntimeDependencies(i, required, nodesByBean, candidatesForType, nodeDependencies, dependents, expandedBeans);
+        }
     }
 
     /**
