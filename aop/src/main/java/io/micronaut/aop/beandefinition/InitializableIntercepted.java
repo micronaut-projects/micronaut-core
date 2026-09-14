@@ -15,7 +15,7 @@
  */
 package io.micronaut.aop.beandefinition;
 
-import io.micronaut.aop.chain.MethodInterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
@@ -41,7 +41,7 @@ public interface InitializableIntercepted<T> extends InitializingBeanDefinition<
         // keeps all of them from running. The callbacks themselves are listed by getPostConstructExecutableMethods().
         // The interceptors are resolved by binding, reusing the non-singleton instances created with the bean, which
         // are the dependents of its creation.
-        return Objects.requireNonNull(MethodInterceptorChain.initialize(
+        return Objects.requireNonNull(LifecycleInterception.initialize(
             resolutionContext,
             context,
             this,
