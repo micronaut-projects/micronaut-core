@@ -70,7 +70,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
      *
      * @param channel The channel
      * @return The shared factory for the channel
-     * @since 5.2.0
+     * @since 5.2.2
      */
     public static NettyByteBodyFactory forChannel(Channel channel) {
         Attribute<NettyByteBodyFactory> attribute = channel.attr(CHANNEL_FACTORY);
