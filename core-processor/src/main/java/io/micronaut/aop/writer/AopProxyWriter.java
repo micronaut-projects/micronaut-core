@@ -20,7 +20,6 @@ import io.micronaut.aop.Intercepted;
 import io.micronaut.aop.InterceptedProxy;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
@@ -72,7 +71,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -82,14 +80,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
 import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
-
 /**
  * A class that generates AOP proxy classes at compile time.
  *
@@ -100,7 +95,7 @@ import static io.micronaut.inject.writer.BeanDefinitionVisitor.PROXY_SUFFIX;
 @Internal
 public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
-    public static final int ADDITIONAL_PARAMETERS_COUNT = 5;
+    public static final int ADDITIONAL_PARAMETERS_COUNT = 3;
 
     private static final Method METHOD_GET_PROXY_TARGET_BEAN_WITH_BEAN_DEFINITION_AND_CONTEXT = ReflectionUtils.getRequiredInternalMethod(
         BeanResolutionContext.class,
@@ -182,9 +177,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_READ_LOCK = "$target_rl";
     private static final String FIELD_WRITE_LOCK = "$target_wl";
 
-    private static final Method RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveIntroductionInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
-
-    private static final Method RESOLVE_AROUND_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "resolveAroundInterceptors", InterceptorRegistry.class, ExecutableMethod.class, List.class);
+    private static final Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(
+        InterceptorChain.class,
+        "resolveInterceptors",
+        BeanResolutionContext.class,
+        ExecutableMethod[].class,
+        boolean.class
+    );
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class, Object[].class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
@@ -192,11 +191,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final Constructor<?> CONSTRUCTOR_METHOD_INTERCEPTOR_CHAIN_NO_PARAMS = ReflectionUtils.findConstructor(MethodInterceptorChain.class, Interceptor[].class, Object.class, ExecutableMethod.class).orElseThrow(() ->
         new IllegalStateException("new MethodInterceptorChain(..) constructor not found. Incompatible version of Micronaut?")
     );
-    private static final String INTERCEPTORS_PARAMETER = "$interceptors";
     private static final String BEAN_RESOLUTION_CONTEXT_PARAMETER = "$beanResolutionContext";
     private static final String BEAN_CONTEXT_PARAMETER = "$beanContext";
     private static final String QUALIFIER_PARAMETER = "$qualifier";
-    private static final String INTERCEPTOR_REGISTRY_PARAMETER = "$interceptorRegistry";
 
     private static final Method METHOD_PROCEED = ReflectionUtils.getRequiredInternalMethod(InterceptorChain.class, "proceed");
 
@@ -214,10 +211,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
     private static final Constructor<?> CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS = ReflectionUtils.findConstructor(
         ProxyTargetInterceptors.class,
-        BeanContext.class,
-        InterceptorRegistry.class,
+        BeanResolutionContext.class,
         ExecutableMethod[].class,
-        List.class,
         boolean.class
     ).orElseThrow(() -> new IllegalStateException("new ProxyTargetInterceptors(..) constructor not found. Incompatible version of Micronaut?"));
 
@@ -353,16 +348,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static MethodElement createProxyConstructor(ClassElement target, ClassElement proxyClass, OptionalValues<Boolean> settings, VisitorContext visitorContext) {
         MethodElement constructor = selectProxyConstructor(target, settings);
 
-        final ClassElement interceptorList = ClassElement.of(List.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
-            "E", ClassElement.of(BeanRegistration.class, AnnotationMetadata.EMPTY_METADATA, Collections.singletonMap(
-                "T", ClassElement.of(Interceptor.class)
-            ))
-        ));
-
-        ParameterElement interceptorsListParameter = ParameterElement.of(interceptorList, INTERCEPTORS_PARAMETER);
-
         ParameterElement[] constructorParameters = constructor.getParameters();
-        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + 5);
+        List<ParameterElement> newConstructorParameters = new ArrayList<>(constructorParameters.length + ADDITIONAL_PARAMETERS_COUNT);
         newConstructorParameters.addAll(List.of(constructorParameters));
 
         ParameterElement qualifierParameter = ParameterElement.of(Qualifier.class, QUALIFIER_PARAMETER);
@@ -371,8 +358,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         newConstructorParameters.add(ParameterElement.of(BeanResolutionContext.class, BEAN_RESOLUTION_CONTEXT_PARAMETER));
         newConstructorParameters.add(ParameterElement.of(BeanContext.class, BEAN_CONTEXT_PARAMETER));
         newConstructorParameters.add(qualifierParameter);
-        newConstructorParameters.add(interceptorsListParameter);
-        newConstructorParameters.add(ParameterElement.of(ClassElement.of(InterceptorRegistry.class), INTERCEPTOR_REGISTRY_PARAMETER));
 
         return MethodElement.of(
             proxyClass,
@@ -676,9 +661,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     .returning()));
         }
 
-        constructor.getParameter(INTERCEPTORS_PARAMETER).annotate(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER, builder ->
-            builder.values(interceptorBinding.toArray(ZERO_ANNOTATION_VALUES)));
-
         if (parentWriter != null) {
             proxyBeanDefinitionWriter.visitBeanDefinitionInterface(ProxyBeanDefinition.class);
             proxyBeanDefinitionWriter.generateProxyReference(parentWriter.getBeanDefinitionName(), parentWriter.getBeanTypeName());
@@ -750,15 +732,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 aThis.field(proxyTargetInterceptorsField).assign(
                     ClassTypeDef.of(ProxyTargetInterceptors.class).instantiate(
                         CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS,
-                        // 1st argument: the bean context
-                        methodParameters.get(beanContextArgumentIndex),
-                        // 2nd argument: the interceptor registry
-                        methodParameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                        // 3rd argument: the methods
+                        // 1st argument: the resolution context the proxy is created in
+                        methodParameters.get(beanResolutionContextArgumentIndex),
+                        // 2nd argument: the methods
                         aThis.field(proxyMethodsField),
-                        // 4th argument: the singleton interceptors the proxy was injected with
-                        methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER)),
-                        // 5th argument: whether the methods are introduced
+                        // 3rd argument: whether the methods are introduced
                         TypeDef.Primitive.BOOLEAN.constant(isIntroduction)
                     )
                 )
@@ -969,7 +947,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         } else {
             executableMethodsInstance = executableMethodsType.instantiate();
         }
-        AtomicInteger index = new AtomicInteger();
         return executableMethodsInstance.newLocal("executableMethods", executableMethodsVar -> StatementDef.multi(
             aThis.field(proxyMethodsField).assign(
                 ClassTypeDef.of(ExecutableMethod.class).array().instantiate(
@@ -981,23 +958,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         )).toList()
                 )
             ),
+            // the bean's own interceptors, resolved through the context creating it and selected per method
             aThis.field(interceptorsField).assign(
-                ClassTypeDef.of(Interceptor.class).array(2).instantiate(
-                    methods.stream().map(methodElement -> {
-                            boolean introduction = isIntroduction && (methodElement.isAbstract() || (methodElement.getDeclaringType().isInterface() && !methodElement.isDefault()));
-
-                            return ClassTypeDef.of(InterceptorChain.class).invokeStatic(
-                                (introduction ? RESOLVE_INTRODUCTION_INTERCEPTORS_METHOD : RESOLVE_AROUND_INTERCEPTORS_METHOD),
-
-                                // First argument. The interceptor registry
-                                parameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                                // Second argument i.e. proxyMethods[0]
-                                aThis.field(proxyMethodsField).arrayElement(index.getAndIncrement()),
-                                // Third argument i.e. interceptors
-                                parameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
-                            );
-                        }
-                    ).toList()
+                ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                    RESOLVE_INTERCEPTORS_METHOD,
+                    // 1st argument: the resolution context
+                    parameters.get(constructor.findParameterIndex(BEAN_RESOLUTION_CONTEXT_PARAMETER)),
+                    // 2nd argument: the methods
+                    aThis.field(proxyMethodsField),
+                    // 3rd argument: whether the proxy introduces methods
+                    TypeDef.Primitive.BOOLEAN.constant(isIntroduction)
                 )
             )
         ));

@@ -15,6 +15,8 @@
  */
 package io.micronaut.aop.chain;
 
+import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
+import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
@@ -35,12 +37,11 @@ import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
-
 /**
  * Selects the interceptors of the methods of a proxy that fronts a separate target, for the target of each call.
  *
  * <p>A proxy generated for {@code @Around(proxyTarget = true)}, and so every scoped proxy and every advised bean a
- * factory produces, is injected with the singleton interceptors bound to its methods only. The non-singleton
+ * factory produces, holds the singleton interceptors bound to its methods only, resolved here. The non-singleton
  * interceptors of a target are the target's own: they were created with the target, as dependents of its
  * registration, when its construction or lifecycle was intercepted, and they are destroyed with it. This class finds
  * them there, by definition, and creates as a further dependent of the target any that the target has not got yet,
@@ -77,25 +78,25 @@ public final class ProxyTargetInterceptors {
     private volatile Interceptor<?, ?> @Nullable [][] unowned;
 
     /**
-     * @param beanContext         The bean context
-     * @param interceptorRegistry The interceptor registry
-     * @param methods             The intercepted methods of the target, in the proxy's order
-     * @param registrations       The registrations the proxy was injected with, singletons only
-     * @param introduction        Whether the methods are introduced rather than intercepted around
+     * @param resolutionContext The resolution context the proxy is created in, through which the registry and the
+     *                          singleton interceptors are resolved
+     * @param methods           The intercepted methods of the target, in the proxy's order
+     * @param introduction      Whether the methods are introduced rather than intercepted around
      */
     @UsedByGeneratedCode
-    public ProxyTargetInterceptors(BeanContext beanContext,
-                                   InterceptorRegistry interceptorRegistry,
+    public ProxyTargetInterceptors(BeanResolutionContext resolutionContext,
                                    ExecutableMethod<?, ?>[] methods,
-                                   List<? extends BeanRegistration<?>> registrations,
                                    boolean introduction) {
-        this.beanContext = beanContext;
-        this.interceptorRegistry = interceptorRegistry;
+        this.beanContext = resolutionContext.getContext();
+        this.interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
         this.methods = methods;
         this.introduction = introduction;
-        this.singletons = new ArrayList<>(registrations);
         // the hierarchy reverses the array it is given, so it gets a copy
         this.binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
+        // the singletons bound to the methods are the proxy's to share; the non-singletons are each target's own
+        this.singletons = methods.length == 0
+            ? List.of()
+            : new ArrayList<>(beanContext.getBeanRegistrations(Interceptor.ARGUMENT, ((InterceptorBindingQualifier<Interceptor<?, ?>>) binding).singletonsOnly()));
         List<BeanDefinition<Interceptor<?, ?>>> found = List.of();
         if (methods.length > 0) {
             for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {

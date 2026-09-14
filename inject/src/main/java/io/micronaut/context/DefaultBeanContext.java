@@ -2409,8 +2409,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
+        BeanDefinition<?> prevDefinition = resolutionContext.getCurrentBeanDefinition();
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
+            resolutionContext.setCurrentBeanDefinition(beanDefinition);
             createDependsOnBeans(resolutionContext, beanDefinition);
             T bean;
             if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
@@ -2443,6 +2445,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
+            resolutionContext.setCurrentBeanDefinition(prevDefinition);
         }
     }
 
