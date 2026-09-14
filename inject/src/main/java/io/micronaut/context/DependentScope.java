@@ -28,7 +28,7 @@ import org.jspecify.annotations.Nullable;
  * <p>Where the {@link SingletonScope} holds one instance of a definition for the whole context, this scope holds one
  * per bean, among the dependents of that bean. It has no storage of its own: a lookup reads the dependents of the
  * resolution context resolving for the bean, and a bean created after a miss joins them as every dependent does,
- * {@linkplain BeanDisposingRegistration#markInDependentScope() marked} as a member of the scope. A dependency
+ * {@linkplain BeanRegistration#markInDependentScope() marked} as a member of the scope. A dependency
  * injected into the bean is a dependent as well but not a member, so an interceptor a bean injects is not the
  * instance that intercepts it. Only a bean with no scope, or a prototype, is of this scope; a singleton belongs to
  * the singleton scope and a bean of a custom scope to that scope.</p>
@@ -71,10 +71,7 @@ final class DependentScope {
         }
         BeanDefinition<?> unwrapped = unwrap(definition);
         for (BeanRegistration<?> dependent : resolutionContext.getDependentBeans()) {
-            if (dependent instanceof BeanDisposingRegistration<?> member
-                && member.isInDependentScope()
-                && member.bean != null
-                && unwrap(member.beanDefinition).equals(unwrapped)) {
+            if (dependent.isInDependentScope() && dependent.bean != null && unwrap(dependent.beanDefinition).equals(unwrapped)) {
                 return (BeanRegistration<T>) dependent;
             }
         }
@@ -89,8 +86,8 @@ final class DependentScope {
      * @return The same registration
      */
     <T> BeanRegistration<T> created(BeanRegistration<T> registration) {
-        if (registration instanceof BeanDisposingRegistration<?> member && isDependent(registration.beanDefinition)) {
-            member.markInDependentScope();
+        if (isDependent(registration.beanDefinition)) {
+            registration.markInDependentScope();
         }
         return registration;
     }
