@@ -166,12 +166,10 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            if (streamer == null) {
-                if (closed) {
-                    // no request will be accepted for this stream anymore
-                    data.release();
-                    return 0;
-                }
+            if (streamer == null && closed) {
+                // no request will be accepted for this stream anymore
+                data.release();
+            } else if (streamer == null) {
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
                 }
