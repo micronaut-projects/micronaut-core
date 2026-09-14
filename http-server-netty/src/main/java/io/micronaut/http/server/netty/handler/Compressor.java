@@ -138,8 +138,8 @@ final class Compressor {
                     end = length;
                 }
                 float q = 1.0f;
-                int equalsPos = header.indexOf('=', start);
-                if (equalsPos != -1 && equalsPos < end) {
+                int equalsPos = indexOf(header, '=', start, end);
+                if (equalsPos != -1) {
                     try {
                         q = Float.parseFloat(header.substring(equalsPos + 1, end));
                     } catch (NumberFormatException e) {
@@ -197,11 +197,29 @@ final class Compressor {
     }
 
     /**
-     * Whether {@code needle} occurs inside {@code s[start, end)}.
+     * Whether {@code needle} occurs inside {@code s[start, end)}. The scan is bounded by
+     * {@code end}, so that a header with many entries stays linear in its length.
      */
     private static boolean contains(String s, int start, int end, String needle) {
-        int i = s.indexOf(needle, start);
-        return i != -1 && i + needle.length() <= end;
+        int n = needle.length();
+        for (int i = start; i + n <= end; i++) {
+            if (s.regionMatches(i, needle, 0, n)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Index of {@code ch} inside {@code s[start, end)}, or {@code -1}.
+     */
+    private static int indexOf(String s, char ch, int start, int end) {
+        for (int i = start; i < end; i++) {
+            if (s.charAt(i) == ch) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     enum Algorithm {

@@ -4,6 +4,7 @@ import io.micronaut.http.server.netty.HttpCompressionStrategy;
 import io.netty.handler.codec.compression.Brotli;
 import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.HttpResponse;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressorTest {
     private static final HttpCompressionStrategy STRATEGY = new HttpCompressionStrategy() {
@@ -108,6 +110,32 @@ class CompressorTest {
         Compressor compressor = new Compressor(STRATEGY);
         Compressor.Algorithm expected = referenceDetermineEncoding(headerValues, Brotli.isAvailable(), Zstd.isAvailable());
         assertEquals(expected, compressor.determineEncoding(headerValues.iterator()), headerValues.toString());
+    }
+
+    @Test
+    void longHeadersAreTokenizedInLinearTime() {
+        Compressor compressor = new Compressor(STRATEGY);
+        // each of these fits the default maxHeaderSize of 8192 and consists of thousands of entries
+        List<String> headers = List.of(
+            ",".repeat(8000),
+            "a,".repeat(4000),
+            "x;q,".repeat(2000),
+            "gzip;q=0.5,".repeat(700) + "gzip"
+        );
+        for (String header : headers) {
+            // warm up, then time: a quadratic tokenizer takes tens of milliseconds per call here
+            for (int i = 0; i < 20; i++) {
+                compressor.determineEncoding(List.of(header).iterator());
+            }
+            long start = System.nanoTime();
+            for (int i = 0; i < 100; i++) {
+                compressor.determineEncoding(List.of(header).iterator());
+            }
+            long perCallMicros = (System.nanoTime() - start) / 100 / 1000;
+            assertTrue(perCallMicros < 2000, "tokenizing " + header.length() + " chars took " + perCallMicros + " us per call");
+            assertEquals(referenceDetermineEncoding(List.of(header), Brotli.isAvailable(), Zstd.isAvailable()),
+                compressor.determineEncoding(List.of(header).iterator()));
+        }
     }
 
     private static Stream<Arguments> determineEncodingMatchesTheSplitBasedTokenizer() {
