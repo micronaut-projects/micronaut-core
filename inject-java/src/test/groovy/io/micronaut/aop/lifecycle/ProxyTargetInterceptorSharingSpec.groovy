@@ -7,7 +7,9 @@ import io.micronaut.context.ApplicationContext
  * A bean proxied with {@code proxyTarget = true}, which includes every bean a {@code @Factory} method produces with
  * around advice, has two definitions: the proxy intercepts the business methods and the target is constructed,
  * initialized and destroyed. A non-singleton interceptor is still one instance per intercepted bean, so both must use
- * the same instance for one target.
+ * the same instance for one target. The cases here watch the state of that instance across the phases, and the
+ * bindings a target declares beyond the proxy's own; per-target instances, lazy and hot-swappable proxies are in
+ * {@link ProxyTargetInterceptorsFromDependentsSpec}.
  */
 class ProxyTargetInterceptorSharingSpec extends AbstractTypeElementSpec {
 
@@ -83,22 +85,10 @@ class ProxiedSingleton {
     @PreDestroy void close() { PairedInterceptor.events.add("TARGET_DESTROYED"); }
 }
 
-@Prototype
-@Paired
-class ProxiedPrototype {
-    @PostConstruct void init() {}
-    public String work() { return "done"; }
-}
-
 class Produced {
     @PostConstruct void init() {}
     public String work() { return "done"; }
     void close() { PairedInterceptor.events.add("TARGET_DESTROYED"); }
-}
-
-class ProducedPrototype {
-    @PostConstruct void init() {}
-    public String work() { return "done"; }
 }
 
 @Factory
@@ -108,13 +98,6 @@ class ProducingFactory {
     @Paired
     Produced produced() {
         return new Produced();
-    }
-
-    @Bean
-    @Prototype
-    @Paired
-    ProducedPrototype producedPrototype() {
-        return new ProducedPrototype();
     }
 }
 '''
@@ -160,43 +143,6 @@ class ProducingFactory {
         description                   | beanName
         'proxyTarget singleton'       | 'ProxiedSingleton'
         'factory produced singleton'  | 'Produced'
-    }
-
-    void 'test each target of a #description gets its own interceptor instance for post construct and its methods'() {
-        given:
-        ApplicationContext context = buildContext(SOURCE)
-        Class<?> interceptorType = context.classLoader.loadClass('proxytarget.sharing.PairedInterceptor')
-        Class<?> beanType = context.classLoader.loadClass('proxytarget.sharing.' + beanName)
-
-        when:
-        def first = context.getBean(beanType)
-        def second = context.getBean(beanType)
-        first.work()
-        second.work()
-        first.work()
-        List<String> events = interceptorType.events.toList()
-        println "$description events: $events"
-        // target identity -> interceptor ids that intercepted it
-        Map<String, Set<String>> perTarget = [:].withDefault { new LinkedHashSet<String>() }
-        events.findAll { it.contains(':POST_CONSTRUCT:') || it.contains(':AROUND:') }.each {
-            def parts = it.split(':')
-            perTarget[parts[3]] << parts[0]
-        }
-
-        then: 'every target is intercepted by exactly one instance, and different targets by different instances'
-        perTarget.size() == 2
-        perTarget.values().every { it.size() == 1 }
-        perTarget.values().collect { it.first() }.unique().size() == 2
-        events.findAll { it.contains(':AROUND:') }.every { it.contains(':initialized:') }
-
-        cleanup:
-        interceptorType.events.clear()
-        context.close()
-
-        where:
-        description                   | beanName
-        'proxyTarget prototype'       | 'ProxiedPrototype'
-        'factory produced prototype'  | 'ProducedPrototype'
     }
 
     void 'test a proxy target with post construct advice and no constructor advice shares the instance'() {
@@ -310,106 +256,6 @@ class OtherBean {
         events.count('TARGET_DESTROYED') == 1
         events.count('1:DESTROYED') == 1
         events.indexOf('TARGET_DESTROYED') < events.indexOf('1:DESTROYED')
-
-        cleanup:
-        interceptorType.events.clear()
-        context.close()
-    }
-
-    void 'test a lazy proxy target and a hotswap proxy still intercept every call'() {
-        given:
-        ApplicationContext context = buildContext('''
-package proxytarget.lazy;
-
-import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
-import jakarta.annotation.PostConstruct;
-import jakarta.inject.Singleton;
-import java.lang.annotation.*;
-import java.util.*;
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-@Around(proxyTarget = true, lazy = true)
-@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
-@interface LazyPaired {
-}
-
-@Retention(RetentionPolicy.RUNTIME)
-@Target({ElementType.TYPE, ElementType.METHOD})
-@Around(proxyTarget = true, hotswap = true)
-@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
-@interface Swappable {
-}
-
-@Prototype
-@InterceptorBinding(value = LazyPaired.class, kind = InterceptorKind.AROUND)
-@InterceptorBinding(value = LazyPaired.class, kind = InterceptorKind.POST_CONSTRUCT)
-class PairedInterceptor implements MethodInterceptor<Object, Object> {
-    static int instances;
-    static final List<String> events = new ArrayList<>();
-
-    private final int id = ++instances;
-
-    @Override
-    public Object intercept(MethodInvocationContext<Object, Object> context) {
-        events.add(context.getTarget().getClass().getSimpleName() + ":" + id + ":" + context.getKind());
-        return context.proceed();
-    }
-}
-
-@Prototype
-@InterceptorBinding(value = Swappable.class, kind = InterceptorKind.AROUND)
-@InterceptorBinding(value = Swappable.class, kind = InterceptorKind.POST_CONSTRUCT)
-class SwappableInterceptor extends PairedInterceptor {
-}
-
-@Singleton
-@LazyPaired
-class LazyBean {
-    @PostConstruct void init() {}
-    public String work() { return "lazy"; }
-}
-
-@Prototype
-@Swappable
-class SwappableBean {
-    @PostConstruct void init() {}
-    public String work() { return "swappable"; }
-}
-''')
-        Class<?> interceptorType = context.classLoader.loadClass('proxytarget.lazy.PairedInterceptor')
-        Class<?> swappableType = context.classLoader.loadClass('proxytarget.lazy.SwappableBean')
-
-        when:
-        def lazy = context.getBean(context.classLoader.loadClass('proxytarget.lazy.LazyBean'))
-        def swappable = context.getBean(swappableType)
-        String lazyResult = lazy.work()
-        String swappableResult = swappable.work()
-        List<String> events = interceptorType.events.toList()
-        println "lazy and hotswap events: $events"
-
-        then:
-        lazyResult == 'lazy'
-        swappableResult == 'swappable'
-        events.count { it.endsWith(':AROUND') } == 2
-        events.count { it.endsWith(':POST_CONSTRUCT') } == 2
-
-        and: 'the hotswap proxy created its target, so they share one instance'
-        events.findAll { it.startsWith('SwappableBean:') }.collect { it.split(':')[1] }.unique().size() == 1
-
-        when: 'another target is swapped in'
-        def replacement = context.getBean(swappableType).interceptedTarget()
-        swappable.swap(replacement)
-
-        String swappedResult = swappable.work()
-        events = interceptorType.events.toList()
-        println "swapped events: $events"
-
-        then: 'the swapped in target is intercepted by its own instance, the one that ran its post construct, not by the instance of the target it replaced'
-        swappedResult == 'swappable'
-        events.findAll { it.startsWith('SwappableBean:') && it.endsWith(':AROUND') }.collect { it.split(':')[1] }.unique().size() == 2
-        events.findAll { it.startsWith('SwappableBean:') }.last().split(':')[1] == events.findAll { it.startsWith('SwappableBean:') && it.endsWith(':POST_CONSTRUCT') }.last().split(':')[1]
 
         cleanup:
         interceptorType.events.clear()

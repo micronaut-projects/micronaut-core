@@ -174,8 +174,8 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     /**
      * Returns state another component keeps against this registration, computing it once.
      *
-     * <p>A generated proxy keeps the interceptors it selected for the methods of this bean here, keyed by the proxy
-     * class, so that every call through any proxy of the same class fronting this bean selects once.</p>
+     * <p>A proxy fronting this bean keeps the interceptors it selected for the methods of this bean here, keyed by
+     * its selector, so that it selects once per target and the selection lives exactly as long as this bean.</p>
      *
      * @param key      The key, compared by identity
      * @param supplier Computes the state when absent

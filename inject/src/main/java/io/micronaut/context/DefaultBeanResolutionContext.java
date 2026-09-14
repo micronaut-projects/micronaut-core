@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @since 1.0
  */
 @Internal
-public class DefaultBeanResolutionContext extends AbstractBeanResolutionContext {
+public sealed class DefaultBeanResolutionContext extends AbstractBeanResolutionContext permits ExistingBeanResolutionContext {
     private final Map<BeanIdentifier, BeanRegistration<?>> beansInCreation = new ConcurrentHashMap<>(5);
 
     /**

@@ -76,7 +76,7 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
                 builder = builder.method(ElementMatchers.is(targetMethod))
                     .intercept(MethodDelegation
                         .withDefaultConfiguration()
-                        .to(new ProxyTargetInterceptor<>(interceptedMethod.executableMethod(), interceptedMethod.interceptors(), proxyTarget)));
+                        .to(new ProxyTargetInterceptor<>(proxyDefinition, interceptedMethod, proxyTarget)));
             } else {
                 builder = builder.method(ElementMatchers.is(targetMethod))
                     .intercept(MethodDelegation
@@ -106,13 +106,13 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
 
     public static class ProxyTargetInterceptor<T> {
 
-        private final ExecutableMethod<T, Object> executableMethod;
-        private final Interceptor<T, Object>[] interceptors;
+        private final RuntimeProxyDefinition<T> proxyDefinition;
+        private final RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod;
         private final T proxyTarget;
 
-        public ProxyTargetInterceptor(ExecutableMethod<T, Object> executableMethod, Interceptor<T, Object>[] interceptors, T proxyTarget) {
-            this.executableMethod = executableMethod;
-            this.interceptors = interceptors;
+        public ProxyTargetInterceptor(RuntimeProxyDefinition<T> proxyDefinition, RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod, T proxyTarget) {
+            this.proxyDefinition = proxyDefinition;
+            this.interceptedMethod = interceptedMethod;
             this.proxyTarget = proxyTarget;
         }
 
@@ -120,7 +120,9 @@ public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
         @Nullable
         public Object intercept(@AllArguments Object[] args
         ) throws Exception {
-            return new MethodInterceptorChain<>(interceptors, proxyTarget, executableMethod, args).proceed();
+            // selected for the target: its own non-singleton interceptors when it is not a singleton
+            Interceptor<T, Object>[] interceptors = proxyDefinition.interceptors(interceptedMethod, proxyTarget);
+            return new MethodInterceptorChain<>(interceptors, proxyTarget, interceptedMethod.executableMethod(), args).proceed();
         }
     }
 

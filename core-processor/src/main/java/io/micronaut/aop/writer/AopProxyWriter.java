@@ -217,7 +217,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         ProxyTargetInterceptors.class,
         BeanContext.class,
         InterceptorRegistry.class,
-        Class.class,
         ExecutableMethod[].class,
         List.class,
         boolean.class
@@ -485,7 +484,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private MethodDef buildMethodIntercept(MethodElement methodElement,
                                            int index,
                                            @Nullable FieldDef targetField,
-                                           FieldDef interceptorsField,
+                                           @Nullable FieldDef interceptorsField,
                                            FieldDef proxyMethodsField,
                                            @Nullable ProxyTargetFields proxyTargetFields) {
         return MethodDef.override(methodElement)
@@ -524,7 +523,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     ));
                 }
                 ExpressionDef targetArgument = isProxyTarget ? aThis.field(Objects.requireNonNull(targetField)) : aThis;
-                return proceed(methodElement, methodParameters, aThis.field(interceptorsField).arrayElement(index), targetArgument, method);
+                return proceed(methodElement, methodParameters, aThis.field(Objects.requireNonNull(interceptorsField)).arrayElement(index), targetArgument, method);
             });
     }
 
@@ -587,16 +586,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
 
         // A proxy that fronts a different target from one call to the next selects the interceptors of each call
-        // for the target of that call, so it keeps no selection of its own in this field.
+        // for the target of that call, so it keeps no selection of its own.
         boolean variableTarget = isProxyTarget && (lazy || hotswap);
-        var interceptorsFieldBuilder = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
-            .addModifiers(Modifier.PRIVATE);
+        FieldDef interceptorsField = null;
         if (!variableTarget) {
-            interceptorsFieldBuilder.addModifiers(Modifier.FINAL);
+            interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
+                .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
+                .build();
+            proxyBuilder.addField(interceptorsField);
         }
-        FieldDef interceptorsField = interceptorsFieldBuilder.build();
-
-        proxyBuilder.addField(interceptorsField);
 
         if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
             // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
@@ -719,7 +717,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private void addConstructor(ClassDef.ClassDefBuilder proxyBuilder,
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
-                                FieldDef interceptorsField,
+                                @Nullable FieldDef interceptorsField,
                                 FieldDef proxyMethodsField,
                                 List<MethodElement> interceptedMethods,
                                 @Nullable ProxyTargetFields proxyTargetFields) {
@@ -764,13 +762,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         methodParameters.get(beanContextArgumentIndex),
                         // 2nd argument: the interceptor registry
                         methodParameters.get(constructor.findParameterIndex(INTERCEPTOR_REGISTRY_PARAMETER)),
-                        // 3rd argument: this proxy class, the key of the selection kept on each target
-                        ExpressionDef.constant(ClassTypeDef.of(proxyType.getName())),
-                        // 4th argument: the methods
+                        // 3rd argument: the methods
                         aThis.field(proxyMethodsField),
-                        // 5th argument: the singleton interceptors the proxy was injected with
+                        // 4th argument: the singleton interceptors the proxy was injected with
                         methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER)),
-                        // 6th argument: whether the methods are introduced
+                        // 5th argument: whether the methods are introduced
                         TypeDef.Primitive.BOOLEAN.constant(isIntroduction)
                     )
                 )
@@ -881,7 +877,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     } else {
                         // the target is fixed, so its interceptors are selected once
                         statements.add(aThis.field(Objects.requireNonNull(targetRegistrationField)).assign(targetRegistration));
-                        statements.add(aThis.field(interceptorsField).assign(
+                        statements.add(aThis.field(Objects.requireNonNull(interceptorsField)).assign(
                             aThis.field(proxyTargetInterceptorsField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, targetRegistration)
                         ));
                     }
@@ -891,7 +887,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
             proxyBuilder.addMethod(interceptedTargetMethod);
         } else {
-            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, interceptorsField, proxyMethodsField, interceptedMethods));
+            bodyBuilders.add((aThis, methodParameters) -> initializeProxyMethodsAndInterceptors(aThis, methodParameters, Objects.requireNonNull(interceptorsField), proxyMethodsField, interceptedMethods));
         }
 
         proxyBuilder.addMethod(MethodDef.constructor()

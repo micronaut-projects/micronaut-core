@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.Prototype;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -50,7 +49,7 @@ final class DependentScope {
         if (definition.isSingleton()) {
             return false;
         }
-        String scope = definition.getAnnotationMetadata().getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
+        String scope = definition.getScopeName().orElse(null);
         return scope == null || Prototype.class.getName().equals(scope);
     }
 

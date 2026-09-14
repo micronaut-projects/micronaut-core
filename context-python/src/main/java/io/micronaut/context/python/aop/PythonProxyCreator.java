@@ -129,6 +129,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 .toList();
             Value originalFunction = PythonInvocation.getRawClassMember(value, methodName);
             ProxyExecutable proxiedFunction = createProxiedFunction(
+                proxyDefinition,
                 true,
                 true,
                 value,
@@ -277,7 +278,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             if (isSyntheticPropertySetter(methodName, interceptedMethods, originalFunction)) {
                 String propertyName = NameUtils.getPropertyNameForSetter(methodName);
                 proxiedFunction = createProxiedPropertySetter(
-                    proxyDefinition::targetBean,
+                    proxyDefinition,
                     propertyName,
                     methodSelector(methodName, interceptedMethods)
                 );
@@ -287,6 +288,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 proxyValue.getMember(SCOPED_PROXY_SETTER_OVERRIDE_METHOD).execute(propertyName, proxiedFunction);
             } else {
                 proxiedFunction = createProxiedFunction(
+                    proxyDefinition,
                     false,
                     true,
                     pythonClass,
@@ -399,6 +401,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private <T> ProxyExecutable createProxiedFunction(
+        RuntimeProxyDefinition<T> proxyDefinition,
         boolean isIntroduction,
         boolean bindOriginalFunction,
         Value owner,
@@ -411,13 +414,6 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         return args -> {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
-            Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
-            if (isIntroduction && executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
-                // Core adapter introduction resolution returns method-level around interceptors plus
-                // the adapter introduction. Python target methods are proxied separately, so keeping
-                // those around interceptors here would apply the same Python method advice twice.
-                interceptors = Arrays.copyOfRange(interceptors, interceptors.length - 1, interceptors.length);
-            }
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
             @SuppressWarnings("unchecked")
             T tb;
@@ -432,6 +428,14 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             }
             if (tb == null) {
                 throw new IllegalStateException("Target bean has not been initialized yet");
+            }
+            // for the target of this call: a proxy fronting a target that is not a singleton selects per target
+            Interceptor<T, ?>[] interceptors = proxyDefinition.interceptors(interceptedMethod, tb);
+            if (isIntroduction && executableMethod.hasStereotype(Adapter.class) && interceptors.length > 1) {
+                // Core adapter introduction resolution returns method-level around interceptors plus
+                // the adapter introduction. Python target methods are proxied separately, so keeping
+                // those around interceptors here would apply the same Python method advice twice.
+                interceptors = Arrays.copyOfRange(interceptors, interceptors.length - 1, interceptors.length);
             }
             Interceptor<T, ?>[] finalInterceptors;
             if (isIntroduction && executableMethod.isAbstract()) {
@@ -460,7 +464,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private <T> ProxyExecutable createProxiedPropertySetter(
-        Supplier<T> targetBeanSupplier,
+        RuntimeProxyDefinition<T> proxyDefinition,
         String propertyName,
         MethodSelector<T> methodSelector
     ) {
@@ -468,11 +472,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
             Object[] javaArgs = fromPolyglotArray(args, executableMethod.getArguments());
-            T targetBean = targetBeanSupplier.get();
+            T targetBean = proxyDefinition.targetBean();
             if (targetBean == null) {
                 throw new IllegalStateException("Target bean has not been initialized yet");
             }
-            Interceptor<T, ?>[] interceptors = interceptedMethod.interceptors();
+            Interceptor<T, ?>[] interceptors = proxyDefinition.interceptors(interceptedMethod, targetBean);
             Interceptor<T, ?>[] finalInterceptors = Arrays.copyOf(interceptors, interceptors.length + 1, Interceptor[].class);
             finalInterceptors[finalInterceptors.length - 1] = invocationContext -> {
                 Value targetValue = asValue(targetBean);

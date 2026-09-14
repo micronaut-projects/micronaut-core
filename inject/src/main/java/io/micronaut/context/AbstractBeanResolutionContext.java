@@ -75,6 +75,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private BeanRegistration<?> dependentFactory;
     @Nullable
+    private DependentBeanContext dependentContext;
+    @Nullable
     private final PropertyResolver propertyResolver;
 
     @Nullable
@@ -473,6 +475,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             }
             dependentFactory = dependentBeans.removeFirst();
         }
+    }
+
+    @Override
+    public DependentBeanContext getDependentContext() {
+        if (dependentContext == null) {
+            dependentContext = new DefaultDependentBeanContext(context, this);
+        }
+        return dependentContext;
     }
 
     @Override
