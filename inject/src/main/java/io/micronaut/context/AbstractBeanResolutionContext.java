@@ -497,6 +497,21 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public void markDependentAsFactory(Object factoryBean) {
+        if (dependentBeans == null) {
+            return;
+        }
+        // the factory was looked up last, so search from the end
+        for (int i = dependentBeans.size() - 1; i >= 0; i--) {
+            BeanRegistration<?> dependent = dependentBeans.get(i);
+            if (dependent.getBean() == factoryBean) {
+                dependentFactory = dependentBeans.remove(i);
+                return;
+            }
+        }
+    }
+
+    @Override
     @Nullable
     public BeanRegistration<?> getAndResetDependentFactoryBean() {
         BeanRegistration<?> result = this.dependentFactory;

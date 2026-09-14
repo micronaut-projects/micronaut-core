@@ -21,7 +21,7 @@ import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DependentBeanProvider;
+import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -34,6 +34,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -72,8 +73,10 @@ public final class ProxyTargetInterceptors {
     private final Qualifier<Interceptor<?, ?>> binding;
     private final List<BeanDefinition<Interceptor<?, ?>>> nonSingletons;
     private final Interceptor<?, ?> @Nullable [][] fixed;
-    private volatile @Nullable BeanRegistration<?> lastTarget;
-    private volatile @Nullable Object unownedTarget;
+    // Weak, so that a proxy fronting a different target per thread or request retains none of them: a target the
+    // proxy holds is held by the proxy, and a target swapped in is held by whoever handed it over.
+    private volatile @Nullable WeakReference<BeanRegistration<?>> lastTarget;
+    private volatile @Nullable WeakReference<Object> unownedTarget;
     private volatile Interceptor<?, ?> @Nullable [][] unowned;
 
     /**
@@ -127,11 +130,11 @@ public final class ProxyTargetInterceptors {
         if (fixed != null) {
             return fixed;
         }
-        if (target == null || target.getBean() == null || !(target instanceof DependentBeanProvider provider)) {
+        if (target == null || target.getBean() == null) {
             return unowned();
         }
-        lastTarget = target;
-        return provider.dependentState(proxyClass, () -> select(ownedBy(provider)));
+        lastTarget = new WeakReference<>(target);
+        return target.dependentState(proxyClass, () -> select(ownedBy(target)));
     }
 
     /**
@@ -161,17 +164,19 @@ public final class ProxyTargetInterceptors {
         if (fixed != null) {
             return fixed[index];
         }
-        BeanRegistration<?> last = lastTarget;
-        if (last != null && last.getBean() == target && last instanceof DependentBeanProvider provider) {
-            return provider.dependentState(proxyClass, () -> select(ownedBy(provider)))[index];
+        WeakReference<BeanRegistration<?>> lastReference = lastTarget;
+        BeanRegistration<?> last = lastReference == null ? null : lastReference.get();
+        if (last != null && last.getBean() == target) {
+            return last.dependentState(proxyClass, () -> select(ownedBy(last)))[index];
         }
-        if (target == null || target == unownedTarget) {
+        WeakReference<Object> unownedReference = unownedTarget;
+        if (target == null || (unownedReference != null && unownedReference.get() == target)) {
             return unowned()[index];
         }
         BeanRegistration<?> registration = beanContext.findBeanRegistration(target).orElse(null);
         if (registration == null) {
             // remembered, so that the calls that follow do not ask the scopes again for the same object
-            unownedTarget = target;
+            unownedTarget = new WeakReference<>(target);
         }
         return resolve(registration)[index];
     }
@@ -180,8 +185,11 @@ public final class ProxyTargetInterceptors {
      * The interceptors of the methods for a target, resolved through the target's dependent context: the singletons,
      * and for each non-singleton the instance the target owns, or one created for it that joins its dependents.
      */
-    private List<BeanRegistration<?>> ownedBy(DependentBeanProvider target) {
-        try (BeanResolutionContext resolutionContext = target.newResolutionContext()) {
+    private List<BeanRegistration<?>> ownedBy(BeanRegistration<?> target) {
+        if (!(beanContext instanceof DefaultBeanContext defaultBeanContext)) {
+            return resolveUnowned();
+        }
+        try (BeanResolutionContext resolutionContext = defaultBeanContext.newResolutionContext(target)) {
             return new ArrayList<>(resolutionContext.getDependentContext().getBeanRegistrations(Interceptor.ARGUMENT, binding));
         }
     }
@@ -196,17 +204,20 @@ public final class ProxyTargetInterceptors {
             synchronized (this) {
                 result = unowned;
                 if (result == null) {
-                    List<BeanRegistration<?>> registrations = new ArrayList<>(singletons.size() + nonSingletons.size());
-                    registrations.addAll(singletons);
-                    for (BeanDefinition<Interceptor<?, ?>> definition : nonSingletons) {
-                        registrations.add(beanContext.getBeanRegistration(definition));
-                    }
-                    result = select(registrations);
+                    result = select(resolveUnowned());
                     unowned = result;
                 }
             }
         }
         return result;
+    }
+
+    /**
+     * Resolves the interceptors of the methods with no dependent scope to reuse from, so every non-singleton one is
+     * a new instance that belongs to nothing.
+     */
+    private List<BeanRegistration<?>> resolveUnowned() {
+        return new ArrayList<>(beanContext.getBeanRegistrations(Interceptor.ARGUMENT, binding));
     }
 
     @SuppressWarnings({"unchecked", "rawtypes"})

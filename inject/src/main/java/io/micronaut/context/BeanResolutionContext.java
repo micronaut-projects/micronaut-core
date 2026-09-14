@@ -334,10 +334,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Marks first dependent as factory.
      * Dependent can be missing which means it's a singleton or scoped bean.
      *
+     * <p>Superseded by {@link #markDependentAsFactory(Object)}, which generated code calls now; kept for bean
+     * definitions compiled by earlier versions.</p>
+     *
      * @since 3.5.0
      */
     @UsedByGeneratedCode
     default void markDependentAsFactory() {
+    }
+
+    /**
+     * Marks the dependent registration of the given factory bean as the factory that produces the bean being
+     * created, so that a factory which is itself a dependent, a prototype for instance, is destroyed once it has
+     * produced the bean. A singleton or scoped factory has no dependent registration, and nothing is marked.
+     *
+     * <p>Unlike {@link #markDependentAsFactory()}, which marks whichever dependent was resolved first, this finds
+     * the registration by the factory instance, so that dependents resolved before the factory was looked up, such
+     * as the interceptors of a bean whose creation is advised, are left alone.</p>
+     *
+     * @param factoryBean The factory bean that was just looked up
+     * @since 5.2.2
+     */
+    @UsedByGeneratedCode
+    default void markDependentAsFactory(Object factoryBean) {
+        markDependentAsFactory();
     }
 
     /**

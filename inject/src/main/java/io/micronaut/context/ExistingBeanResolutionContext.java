@@ -36,13 +36,13 @@ import java.util.List;
 @SuppressWarnings("removal")
 final class ExistingBeanResolutionContext extends DefaultBeanResolutionContext {
 
-    private final BeanDisposingRegistration<?> registration;
+    private final BeanRegistration<?> registration;
     private int handed;
 
-    ExistingBeanResolutionContext(BeanContext context, BeanDisposingRegistration<?> registration) {
+    ExistingBeanResolutionContext(BeanContext context, BeanRegistration<?> registration) {
         super(context, registration.getBeanDefinition());
         this.registration = registration;
-        List<BeanRegistration<?>> dependents = registration.dependentBeans();
+        List<BeanRegistration<?>> dependents = registration.getDependentBeans();
         this.handed = dependents.size();
         pushDependentBeans(new ArrayList<>(dependents));
         // for a reader compiled against an earlier version, which looked for them here

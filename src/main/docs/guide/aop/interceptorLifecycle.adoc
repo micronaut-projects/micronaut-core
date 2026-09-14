@@ -148,9 +148,9 @@ An interceptor bound for `AROUND` alone is not resolved while the target is crea
 target's dependent scope the first time it selects for that target, which creates it there, so it is destroyed with
 the target as well.
 
-NOTE: An object handed to a hot-swappable proxy through `swap` that the context did not create, or a prototype
-created for another proxy, has no registration the proxy can find. Such a target is intercepted with instances the
-proxy creates once and keeps; a singleton or scoped target swapped in is found and intercepted with its own.
+NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted with its own instances when the context
+created it, whether as a singleton, in a scope, or as the target of another proxy. An object the context did not
+create is intercepted with instances the proxy creates once and keeps.
 
 == Ordering
 

@@ -33,6 +33,8 @@ import org.jspecify.annotations.NullMarked;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import io.micronaut.aop.chain.ProxyTargetInterceptors;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The default {@link RuntimeProxyDefinition}.
@@ -76,9 +78,11 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                 .getContext();
             Argument<T> argument = Argument.of(beanType);
             Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
-            executableMethods = beanContext
-                .getProxyTargetBeanDefinition(argument, qualifier)
-                .getExecutableMethods();
+            BeanDefinition<T> targetDefinition = beanContext.getProxyTargetBeanDefinition(argument, qualifier);
+            if (targetDefinition.isSingleton()) {
+                return aroundSingletonTarget(resolutionContext, proxyBeanDefinition, targetDefinition, argument, qualifier, constructorValues);
+            }
+            executableMethods = targetDefinition.getExecutableMethods();
         } else {
             executableMethods = proxyBeanDefinition.getExecutableMethods();
         }
@@ -97,6 +101,53 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             }
         }
         return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, isProxyTarget, constructorValues);
+    }
+
+    /**
+     * Creates the definition of a proxy around a singleton target.
+     *
+     * <p>The proxy and a singleton target are one to one, so the target is resolved now and the interceptors of its
+     * methods are selected in the target's dependent scope: a non-singleton interceptor is the instance created with
+     * the target, which its lifecycle interception uses as well. The proxy holds the singleton interceptors only.
+     * {@link #targetBean()} still resolves the target on each call, so a creator that reaches the target that way
+     * sees what the context holds. A target of any other scope keeps the selection the proxy makes for itself.</p>
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T> DefaultRuntimeProxyDefinition<T> aroundSingletonTarget(BeanResolutionContext resolutionContext,
+                                                                             BeanDefinition<T> proxyBeanDefinition,
+                                                                             BeanDefinition<T> targetDefinition,
+                                                                             Argument<T> argument,
+                                                                             @Nullable Qualifier<T> qualifier,
+                                                                             Object[] constructorValues) {
+        BeanContext beanContext = resolutionContext.getContext();
+        ExecutableMethod<T, ?>[] methods = targetDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
+        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
+        List<BeanRegistration<?>> singletons = new ArrayList<>();
+        if (methods.length > 0) {
+            Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
+            for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
+                if (definition.isSingleton()) {
+                    singletons.add(beanContext.getBeanRegistration(definition));
+                }
+            }
+        }
+        ProxyTargetInterceptors selection = new ProxyTargetInterceptors(
+            beanContext,
+            interceptorRegistry,
+            proxyBeanDefinition.getClass(),
+            methods,
+            singletons,
+            false
+        );
+        BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);
+        Interceptor<?, ?>[][] interceptors = selection.resolve(target);
+        List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
+        for (int i = 0; i < methods.length; i++) {
+            if (interceptors[i].length > 0) {
+                interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], (Interceptor[]) interceptors[i]));
+            }
+        }
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues);
     }
 
     /**
