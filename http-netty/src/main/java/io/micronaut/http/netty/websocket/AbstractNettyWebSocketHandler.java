@@ -383,22 +383,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
-                    boolean releaseContent = true;
-                    try {
-                        data = decodeMessage(ctx, content, bodyArgument, messageHandler);
-                        if (data == content || (data instanceof ByteBuffer<?> byteBuffer && byteBuffer.asNativeBuffer() == content)) {
-                            // the argument is a view of the frame content: ownership passes to the handler invocation
-                            releaseContent = false;
-                            handlerOwnedContent = content;
-                        }
-                    } catch (Throwable e) {
-                        messageProcessingException(ctx, e);
+                    DecodedMessage decoded = decodeContent(ctx, content, bodyArgument, messageHandler);
+                    if (decoded == null) {
+                        // the failure has been reported and the content released
                         return;
-                    } finally {
-                        if (releaseContent) {
-                            content.release();
-                        }
                     }
+                    data = decoded.data();
+                    handlerOwnedContent = decoded.ownedContent();
                 }
 
                 if (data != null) {
@@ -502,6 +493,37 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
+     * Decode the aggregated content, releasing it unless the bound value aliases it. A decoding
+     * failure is reported through {@link #messageProcessingException} and the content released.
+     *
+     * @param ctx            The context
+     * @param content        The aggregated message content
+     * @param bodyArgument   The body argument
+     * @param messageHandler The message handler
+     * @return The decoded message, or {@code null} if decoding failed
+     */
+    @Nullable
+    private DecodedMessage decodeContent(ChannelHandlerContext ctx, ByteBuf content, Argument<?> bodyArgument, MethodExecutionHandle<?, ?> messageHandler) {
+        boolean releaseContent = true;
+        try {
+            Object data = decodeMessage(ctx, content, bodyArgument, messageHandler);
+            if (data == content || (data instanceof ByteBuffer<?> byteBuffer && byteBuffer.asNativeBuffer() == content)) {
+                // the argument is a view of the frame content: ownership passes to the handler invocation
+                releaseContent = false;
+                return new DecodedMessage(data, content);
+            }
+            return new DecodedMessage(data, null);
+        } catch (Exception e) {
+            messageProcessingException(ctx, e);
+            return null;
+        } finally {
+            if (releaseContent) {
+                content.release();
+            }
+        }
+    }
+
+    /**
      * Release the frame content a handled message aliased, but only after the listeners that
      * {@link #messageHandled} hands the message to have run. Implementations publish the
      * {@code WebSocketMessageProcessedEvent} from a task on the channel's executor rather than
@@ -554,12 +576,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
         // the reader takes ownership of the buffer it is given and releases it once the message has been read
         ByteBuffer<ByteBuf> byteBuffer = bufferFactory.wrap(content.retain());
+        boolean read = false;
         try {
-            return reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-        } catch (Throwable e) {
-            // readers only release on success
-            content.release();
-            throw e;
+            Object value = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+            read = true;
+            return value;
+        } finally {
+            if (!read) {
+                // readers only release on success
+                content.release();
+            }
         }
     }
 
@@ -729,5 +755,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (buffer != null) {
             buffer.release();
         }
+    }
+
+    /**
+     * The decoded message and, when the bound value is a view of the frame content, that content,
+     * whose ownership passes to the handler invocation.
+     *
+     * @param data         The decoded message, or {@code null} if nothing can decode it
+     * @param ownedContent The content the handler invocation owns, or {@code null} if it was released
+     */
+    private record DecodedMessage(@Nullable Object data, @Nullable ByteBuf ownedContent) {
     }
 }
