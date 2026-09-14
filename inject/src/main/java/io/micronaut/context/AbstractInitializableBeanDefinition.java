@@ -1682,7 +1682,32 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         MethodReference constructorMethodRef = (MethodReference) Objects.requireNonNull(constructor);
         Argument<?> argument = resolveArgument(context, argumentIndex, constructorMethodRef.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
-            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier);
+            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier, false);
+        }
+    }
+
+    /**
+     * Obtains the registrations of the interceptors bound to this bean for a constructor argument, the one a
+     * generated proxy is given. They are resolved in the dependent scope of the bean being created, so a
+     * non-singleton interceptor is created as a dependent of the bean and is the instance every interception point
+     * of the bean reaches, see {@link BeanResolutionContext#getDependentContext()}.
+     *
+     * @param resolutionContext The resolution context
+     * @param context           The context
+     * @param argumentIndex     The argument index
+     * @param genericType       The generic type
+     * @param qualifier         The qualifier
+     * @return The registrations, as the collection type of the argument
+     * @since 5.3.0
+     */
+    @Internal
+    @UsedByGeneratedCode
+    @Nullable
+    protected final Object getInterceptorRegistrationsForConstructorArgumentObject(BeanResolutionContext resolutionContext, BeanContext context, int argumentIndex, Argument genericType, Qualifier qualifier) {
+        MethodReference constructorMethodRef = (MethodReference) Objects.requireNonNull(constructor);
+        Argument<?> argument = resolveArgument(context, argumentIndex, constructorMethodRef.arguments);
+        try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(this, argument)) {
+            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier, true);
         }
     }
 
@@ -1745,7 +1770,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         Argument<?> argument = resolveArgument(context, argIndex, methodReference.arguments);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath()
                 .pushMethodArgumentResolve(this, methodReference.methodName, argument, methodReference.arguments)) {
-            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier);
+            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier, false);
         }
     }
 
@@ -2139,7 +2164,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         FieldReference fieldRef = Objects.requireNonNull(fieldInjection)[fieldIndex];
         Argument<?> argument = resolveArgument(context, fieldRef.argument);
         try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushFieldResolve(this, argument)) {
-            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier);
+            return resolveBeanRegistrationsAsObject(resolutionContext, argument, resolveArgument(context, genericType), qualifier, false);
         }
     }
 
@@ -2658,20 +2683,23 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                                                                                       Argument<K> returnType,
                                                                                       @Nullable Argument<I> beanType,
                                                                                       @Nullable Qualifier<I> qualifier) {
-        return (K) resolveBeanRegistrationsAsObject(resolutionContext, returnType, beanType, qualifier);
+        return (K) resolveBeanRegistrationsAsObject(resolutionContext, returnType, beanType, qualifier, false);
     }
 
     @Nullable
     private <I> Object resolveBeanRegistrationsAsObject(BeanResolutionContext resolutionContext,
                                                         Argument<?> returnType,
                                                         @Nullable Argument<I> beanType,
-                                                        @Nullable Qualifier<I> qualifier) {
+                                                        @Nullable Qualifier<I> qualifier,
+                                                        boolean inDependentScope) {
         try {
             if (beanType == null) {
                 throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registrations. Argument [" + returnType + "] missing generic type information.");
             }
             qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
-            Collection<BeanRegistration<I>> beanRegistrations = resolutionContext.getBeanRegistrations(beanType, qualifier);
+            Collection<BeanRegistration<I>> beanRegistrations = inDependentScope
+                ? resolutionContext.getDependentContext().getBeanRegistrations(beanType, qualifier)
+                : resolutionContext.getBeanRegistrations(beanType, qualifier);
             return coerceCollectionToCorrectType(returnType.getType(), beanRegistrations, resolutionContext, returnType);
         } catch (NoSuchBeanException e) {
             if (returnType.isNullable()) {

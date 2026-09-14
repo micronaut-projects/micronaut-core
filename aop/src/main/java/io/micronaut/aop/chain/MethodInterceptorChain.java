@@ -319,7 +319,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         );
     }
 
-    @SuppressWarnings({"unchecked", "rawtypes"})
+    @SuppressWarnings({"unchecked", "rawtypes", "removal"})
     @Nullable
     private static <T1> T1 doIntercept(
         BeanResolutionContext resolutionContext,
@@ -337,7 +337,8 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
             // Handed over by a caller that holds them.
             resolved = shared;
         } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
-            // Retained by the generated proxy, which is the bean itself.
+            // A proxy generated before 5.3 retained the registrations it was constructed with; a newer proxy returns
+            // none here, its interceptors being dependents of the bean like everyone else's.
             resolved = intercepted.$interceptorRegistrations();
         } else {
             // Resolved by binding through the bean's dependent context: a non-singleton interceptor is the instance

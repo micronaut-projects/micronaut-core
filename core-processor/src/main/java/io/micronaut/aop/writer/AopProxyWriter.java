@@ -257,11 +257,6 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         InterceptedBeanProxy.class,
         "interceptedTargetRegistration"
     );
-    private static final String FIELD_INTERCEPTOR_REGISTRATIONS = "$interceptorRegistrations";
-
-    // The proxy accessor is named after the field it returns.
-    private static final Method GET_INTERCEPTOR_REGISTRATIONS_METHOD =
-        ReflectionUtils.getRequiredInternalMethod(Intercepted.class, FIELD_INTERCEPTOR_REGISTRATIONS);
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
@@ -603,20 +598,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addField(interceptorsField);
 
-        // Every proxy retains the registrations its constructor was given, so a proxy can always report the
-        // interceptors bound to it. For an around-only proxy that is exactly the around/introduction set it already
-        // receives; only a proxy with intercepted lifecycle widens the constructor qualifier below.
-        FieldDef interceptorRegistrationsField = FieldDef.builder(FIELD_INTERCEPTOR_REGISTRATIONS, List.class)
-            .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
-            .build();
-        proxyBuilder.addField(interceptorRegistrationsField);
-        proxyBuilder.addMethod(MethodDef.override(GET_INTERCEPTOR_REGISTRATIONS_METHOD)
-            .build((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).returning()));
-
         if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {
             // The constructor argument is qualified by the accumulated around/introduction bindings only. Widen it
-            // with the lifecycle bindings so the retained list is a superset of what lifecycle interception needs,
-            // otherwise a lifecycle interceptor bound by a different annotation would be dropped.
+            // with the lifecycle bindings so that the interceptors created with the proxy, as dependents of it, are
+            // a superset of what its lifecycle interception needs, otherwise a lifecycle interceptor bound by a
+            // different annotation would be created again there.
             // This is the compile-time half of the same rule InterceptedBeanDefinition#resolveInterceptors applies at
             // runtime for beans that get no proxy: whatever a bean binds for construction, post-construct and
             // pre-destroy is resolved as one set. Keep the two in step.
@@ -710,7 +696,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         proxyBuilder.addSuperinterface(TypeDef.of(isIntroduction ? Introduced.class : Intercepted.class));
 
-        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, interceptorRegistrationsField, proxyMethodsField, interceptedMethods, proxyTargetFields);
+        addConstructor(proxyBuilder, classTargetType, targetField, interceptorsField, proxyMethodsField, interceptedMethods, proxyTargetFields);
 
         List<OutputObjectDef> classes = new ArrayList<>();
         classes.add(new OutputObjectDef(proxyBuilder.build(), null, originatingElements));
@@ -734,15 +720,11 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                                 ClassTypeDef targetType,
                                 @Nullable FieldDef targetField,
                                 FieldDef interceptorsField,
-                                FieldDef interceptorRegistrationsField,
                                 FieldDef proxyMethodsField,
                                 List<MethodElement> interceptedMethods,
                                 @Nullable ProxyTargetFields proxyTargetFields) {
 
         List<MethodDef.MethodBodyBuilder> bodyBuilders = new ArrayList<>();
-        bodyBuilders.add((aThis, methodParameters) -> aThis.field(interceptorRegistrationsField).assign(
-            methodParameters.get(constructor.findParameterIndex(INTERCEPTORS_PARAMETER))
-        ));
 
         if (isProxyTarget) {
             ProxyTargetFields fields = Objects.requireNonNull(proxyTargetFields);

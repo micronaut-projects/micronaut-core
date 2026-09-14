@@ -51,7 +51,10 @@ public interface InterceptedBean {
      *
      * @return The retained interceptor registrations, never {@code null}
      * @since 5.2.0
+     * @deprecated Since 5.3.0 a proxy retains nothing: the beans created for a bean, its non-singleton interceptors
+     * among them, are the dependents of its registration, see {@link BeanRegistration#getDependentBeans()}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
     @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
     default List<? extends BeanRegistration<?>> $interceptorRegistrations() {

@@ -392,10 +392,10 @@ class Holder {
         context.close()
     }
 
-    // destroyBean(Object) cannot find a registration for a bean created with createBean, so the registrations
-    // owned by that bean are not available to the dispose call and pre destroy still resolves a new interceptor.
-    // This bean has constructor advice but no around proxy, so nothing retains the registrations for it.
-    void 'test a prototype created through createBean reuses the interceptor up to post construct'() {
+    // A bean created with createBean has no scope to hold its registration, but the context remembers it, weakly,
+    // when beans were created for it: destroyBean(Object) finds the registration again, and the pre destroy
+    // interception resolves in the bean's dependent scope, where the interceptor created with it lives.
+    void 'test a prototype created through createBean and destroyed through destroyBean(Object) reuses the interceptor for every phase'() {
         given:
         ApplicationContext context = buildContext('''
 package reuse.createbean;
@@ -448,16 +448,16 @@ class Product {
         def product = context.createBean(context.classLoader.loadClass('reuse.createbean.Product'), 'test')
         context.destroyBean(product)
 
-        then: 'construction and post construct share one instance, pre destroy does not'
-        interceptorType.instances == 2
-        interceptorType.events == ['1:AROUND_CONSTRUCT', '1:POST_CONSTRUCT', '2:PRE_DESTROY']
+        then: 'the context remembers the registration of a bean created with dependents, so pre destroy reaches the same instance'
+        interceptorType.instances == 1
+        interceptorType.events == ['1:AROUND_CONSTRUCT', '1:POST_CONSTRUCT', '1:PRE_DESTROY']
 
         cleanup:
         context.close()
     }
 
-    // A proxied bean is different: the proxy retains the registrations it was constructed with, so destroyBean(Object)
-    // can hand them to the untracked registration it builds and the prototype interceptor dies with its target.
+    // The same for a proxied bean: the prototype interceptor the proxy was built with is a dependent of the bean, and
+    // destroyBean(Object) destroys it with the bean through the registration the context remembered.
     void 'test destroyBean(Object) destroys the prototype interceptor a proxied prototype retained'() {
         given:
         ApplicationContext context = buildContext('''
@@ -891,20 +891,15 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('reuse.identity.MyBean'))
         bean.work()
-        def accessor = io.micronaut.aop.Intercepted.getMethod('$interceptorRegistrations')
-        def registrations = accessor.invoke(bean)
+        def dependents = context.findBeanRegistration(bean).get().getDependentBeans()
 
-        then: 'the proxy exposes the registrations it was constructed with, not a copy'
+        then: 'the prototype interceptor bound to the target is a dependent of it, exactly once; the singleton one is shared and is not'
         bean instanceof io.micronaut.aop.Intercepted
-        accessor.invoke(bean).is(registrations)
-        registrations.every { it instanceof io.micronaut.context.BeanRegistration }
+        dependents.every { it instanceof io.micronaut.context.BeanRegistration }
+        dependents.collect { it.beanDefinition.beanType } == [prototypeType]
 
-        and: 'every interceptor bound to the target is present exactly once'
-        registrations.collect { it.beanDefinition.beanType }.toSet() == [prototypeType, singletonType].toSet()
-        registrations.size() == 2
-
-        and: 'the instances exposed are the very instances that performed the interception'
-        def exposed = registrations.collectEntries { [it.beanDefinition.beanType, it.bean] }
+        and: 'the instances that performed the interception are that dependent and the singleton'
+        def exposed = [(prototypeType): dependents[0].bean, (singletonType): context.getBean(singletonType)]
         seen.BY_KIND['prototype@AROUND'].is(exposed[prototypeType])
         seen.BY_KIND['prototype@POST_CONSTRUCT'].is(exposed[prototypeType])
         seen.BY_KIND['singleton@POST_CONSTRUCT'].is(exposed[singletonType])
@@ -977,16 +972,16 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('reuse.ctorproxy.MyBean'))
         bean.work()
-        def registrations = io.micronaut.aop.Intercepted.getMethod('$interceptorRegistrations').invoke(bean)
+        def dependents = context.findBeanRegistration(bean).get().getDependentBeans()
         context.stop()
 
         then: 'one interceptor is resolved for the bean and used by every phase'
         seen.instances == 1
         seen.BY_KIND.keySet() as List == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'AROUND', 'PRE_DESTROY']
 
-        and: 'constructor interception used the very instance the proxy retains, so nothing was resolved twice'
-        registrations.size() == 1
-        seen.BY_KIND.values().every { it.is(registrations[0].bean) }
+        and: 'constructor interception used the very instance the bean owns as a dependent, so nothing was resolved twice'
+        dependents.size() == 1
+        seen.BY_KIND.values().every { it.is(dependents[0].bean) }
 
         cleanup:
         context.close()
