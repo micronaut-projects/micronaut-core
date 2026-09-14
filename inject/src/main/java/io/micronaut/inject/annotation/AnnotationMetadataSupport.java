@@ -64,8 +64,6 @@ import io.micronaut.core.convert.format.Format;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.convert.format.ReadableBytes;
 import io.micronaut.core.reflect.ClassUtils;
-import io.micronaut.core.reflect.InstantiationUtils;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import jakarta.annotation.Nonnull;
@@ -78,7 +76,6 @@ import jakarta.inject.Scope;
 import jakarta.inject.Singleton;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
@@ -92,6 +89,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 
 import static io.micronaut.core.annotation.AnnotationClassValue.ZERO_ANNOTATION_CLASS_VALUES;
 import static io.micronaut.core.annotation.AnnotationUtil.ZERO_ANNOTATION_VALUES;
@@ -111,7 +109,7 @@ public final class AnnotationMetadataSupport {
     private static final Map<String, String> REPEATABLE_ANNOTATIONS_CONTAINERS = new ConcurrentHashMap<>(20);
     private static final Map<String, String> CORE_REPEATABLE_ANNOTATIONS_CONTAINERS;
 
-    private static final Map<Class<? extends Annotation>, Optional<Constructor<InvocationHandler>>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
+    private static final Map<Class<? extends Annotation>, Function<InvocationHandler, Object>> ANNOTATION_PROXY_CACHE = new ConcurrentHashMap<>(20);
     private static final Map<String, Class<? extends Annotation>> ANNOTATION_TYPES = new ConcurrentHashMap<>(20);
 
     /**
@@ -524,21 +522,28 @@ public final class AnnotationMetadataSupport {
     }
 
     /**
+     * The factory of the proxies of the given annotation type, the loader and the interfaces of the proxy resolved
+     * once per type.
+     *
+     * <p>The instance is created with {@link Proxy#newProxyInstance}, rather than by calling the constructor of the
+     * proxy class, because an annotation type is allowed to be package private: the JDK then defines the proxy
+     * class in the annotation's own package and makes the proxy class package private too, so its constructor is
+     * not accessible from here, while {@link Proxy#newProxyInstance} makes it accessible itself.</p>
+     *
      * @param annotation The annotation
-     * @return The proxy class
+     * @return The proxy factory
      */
-    @SuppressWarnings("unchecked")
-    static Optional<Constructor<InvocationHandler>> getProxyClass(Class<? extends Annotation> annotation) {
+    static Function<InvocationHandler, Object> getProxyFactory(Class<? extends Annotation> annotation) {
         return ANNOTATION_PROXY_CACHE.computeIfAbsent(annotation, aClass -> {
             // Annotations loaded by the bootstrap or platform classloader (e.g. java.lang.Deprecated)
             // cannot see Micronaut's AnnotationValueProvider; in that case fall back to the loader of
             // AnnotationValueProvider, which still resolves the JDK annotation via parent delegation.
-            ClassLoader annotationLoader = annotation.getClassLoader();
+            ClassLoader annotationLoader = aClass.getClassLoader();
             ClassLoader proxyLoader = (annotationLoader == null || annotationLoader == ClassLoader.getPlatformClassLoader())
                 ? AnnotationValueProvider.class.getClassLoader()
                 : annotationLoader;
-            Class proxyClass = Proxy.getProxyClass(proxyLoader, annotation, AnnotationValueProvider.class);
-            return ReflectionUtils.findConstructor(proxyClass, InvocationHandler.class);
+            Class<?>[] interfaces = {aClass, AnnotationValueProvider.class};
+            return handler -> Proxy.newProxyInstance(proxyLoader, interfaces, handler);
         });
     }
 
@@ -551,25 +556,23 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     @Internal
+    @SuppressWarnings("unchecked")
     public static <T extends Annotation> T buildAnnotation(Class<T> annotationClass, @Nullable AnnotationValue<T> annotationValue) {
-        Optional<Constructor<InvocationHandler>> proxyClass = getProxyClass(annotationClass);
-        if (proxyClass.isPresent()) {
-            // the defaults of the annotation type itself, the ones equals completes the members with: a hash
-            // computed from the registry keyed by annotation name could differ from them when another class
-            // loader registered the same name, and two equal annotations would then hash apart
-            Map<CharSequence, Object> values = new HashMap<>(AnnotationDefaults.of(annotationClass));
-            AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
-            if (proxyAnnotationValue != null) {
-                proxyAnnotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));
-            }
-            int hashCode = AnnotationUtil.calculateHashCode(values);
-
-            Optional<?> instantiated = InstantiationUtils.tryInstantiate(proxyClass.get(), new AnnotationProxyHandler<>(hashCode, annotationClass, proxyAnnotationValue));
-            if (instantiated.isPresent()) {
-                return (T) instantiated.get();
-            }
+        // the defaults of the annotation type itself, the ones equals completes the members with: a hash
+        // computed from the registry keyed by annotation name could differ from them when another class
+        // loader registered the same name, and two equal annotations would then hash apart
+        Map<CharSequence, Object> values = new HashMap<>(AnnotationDefaults.of(annotationClass));
+        AnnotationValue<T> proxyAnnotationValue = removeInternalAnnotationValues(annotationValue);
+        if (proxyAnnotationValue != null) {
+            proxyAnnotationValue.getValues().forEach((key, o) -> values.put(key.toString(), o));
         }
-        throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName());
+        int hashCode = AnnotationUtil.calculateHashCode(values);
+        try {
+            return (T) getProxyFactory(annotationClass)
+                .apply(new AnnotationProxyHandler<>(hashCode, annotationClass, proxyAnnotationValue));
+        } catch (Exception e) {
+            throw new AnnotationMetadataException("Failed to build annotation for type: " + annotationClass.getName(), e);
+        }
     }
 
     @Nullable
