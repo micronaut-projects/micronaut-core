@@ -25,19 +25,21 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Finds the registration of a proxy target the context created for no scope, by the identity of the target.
+ * Finds the registration of a bean the context created for no scope, by the identity of the bean.
  *
- * <p>A singleton is found through the singleton scope and a scoped bean through its scope, but a prototype created
- * as the target of a proxy is held by that proxy alone. An object such a proxy hands out can be given to another,
- * hot-swappable proxy, which then needs the registration to intercept the object with its own interceptors. This
- * index keeps the way from the object back to its registration, weakly on both sides: it retains neither, and
- * forgets an entry once the target is unreachable.</p>
+ * <p>A singleton is found through the singleton scope and a scoped bean through its scope, but a prototype is held
+ * by whoever asked for it. Two things still need the way from such a bean back to its registration: destroying the
+ * bean through {@code destroyBean(Object)}, which destroys the beans created for it only through the registration
+ * that carries them, and a hot-swappable proxy handed a prototype created as the target of another proxy, which
+ * intercepts it with its own interceptors only through the registration's dependent scope. This index keeps that
+ * way, weakly on both sides: it retains neither the bean nor the registration, and forgets an entry once the bean
+ * is unreachable.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class ProxyTargetRegistrationIndex {
+final class UnscopedRegistrationIndex {
 
     private final ReferenceQueue<Object> collected = new ReferenceQueue<>();
     private final Map<Object, WeakReference<BeanRegistration<?>>> registrations = new ConcurrentHashMap<>();
