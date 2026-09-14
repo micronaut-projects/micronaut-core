@@ -32,7 +32,6 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
@@ -68,8 +67,8 @@ public final class LifecycleInterception {
      * bean's own, resolved once for construction by every binding the bean declares, whatever kind each was declared
      * for, so that the non-singleton ones are created with the bean and found again by its later interception points.
      *
-     * <p>A proxy fronting a separate target owns no interceptor instance, as a client proxy owns none in CDI: the
-     * non-singleton interceptors are the target's, so such a proxy is constructed with the singletons only.</p>
+     * <p>A proxy fronting a separate target never reaches here: the definition writer intercepts the construction of
+     * the target alone, as CDI never intercepts the construction of a client proxy.</p>
      *
      * @param resolutionContext The resolution context
      * @param definition        The definition of the bean
@@ -86,9 +85,7 @@ public final class LifecycleInterception {
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        // a proxy fronting a separate target owns no interceptor instance: singletons only
-        boolean clientProxy = InterceptedBeanProxy.class.isAssignableFrom(definition.getBeanType());
-        return new ArrayList(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(metadata, clientProxy)));
+        return new ArrayList(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(metadata)));
     }
 
     /**
