@@ -81,6 +81,23 @@ public interface RuntimeProxyDefinition<T> {
     boolean proxyTarget();
 
     /**
+     * The interceptors of one intercepted method for the target of a call.
+     *
+     * <p>A proxy fronting a target that is not a singleton resolves the target of each call, and the non-singleton
+     * interceptors of a target are the target's own, so a creator that invokes the method asks here with the target
+     * it resolved rather than using {@link InterceptedMethod#interceptors()}, which for such a proxy lists none.
+     * For every other proxy the answer is the method's own interceptors.</p>
+     *
+     * @param method The intercepted method
+     * @param target The target of the call
+     * @return The interceptors to run, possibly none
+     * @since 5.3.0
+     */
+    default Interceptor<T, Object>[] interceptors(InterceptedMethod<T> method, T target) {
+        return method.interceptors();
+    }
+
+    /**
      * The intercepted method.
      *
      * @param executableMethod The executable method

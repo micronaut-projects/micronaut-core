@@ -127,11 +127,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * resolved through it, which is what gives every interception point of the bean the same instance of a
      * non-singleton interceptor.</p>
      *
+     * <p>A context of the container answers within the scope. The default here is for a context of another kind,
+     * which carries no scope: it resolves as the plain lookups do.</p>
+     *
      * @return The dependent context
      * @since 5.3.0
      */
     default DependentBeanContext getDependentContext() {
-        return new DefaultDependentBeanContext(getContext(), this);
+        BeanResolutionContext resolutionContext = this;
+        return new DependentBeanContext() {
+            @Override
+            public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
+                return resolutionContext.getBeanRegistrations(beanType, qualifier);
+            }
+
+            @Override
+            public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> definition) {
+                return getContext().getBeanRegistration(definition);
+            }
+
+            @Override
+            public BeanContext getContext() {
+                return resolutionContext.getContext();
+            }
+        };
     }
 
     /**

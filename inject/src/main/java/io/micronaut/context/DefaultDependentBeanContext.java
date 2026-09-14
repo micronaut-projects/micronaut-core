@@ -27,7 +27,7 @@ import java.util.Collection;
  *
  * <p>The dependents of that bean are the ones the resolution context carries: the beans created for it so far while
  * it is being created, or the beans created with it when the context was opened for its registration. Reuse and
- * creation are the {@link DefaultBeanContext}'s; a context of another kind resolves as it always did.</p>
+ * creation are the {@link DefaultBeanContext}'s.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -35,28 +35,22 @@ import java.util.Collection;
 @Internal
 final class DefaultDependentBeanContext implements DependentBeanContext {
 
-    private final BeanContext context;
+    private final DefaultBeanContext context;
     private final BeanResolutionContext resolutionContext;
 
-    DefaultDependentBeanContext(BeanContext context, BeanResolutionContext resolutionContext) {
+    DefaultDependentBeanContext(DefaultBeanContext context, BeanResolutionContext resolutionContext) {
         this.context = context;
         this.resolutionContext = resolutionContext;
     }
 
     @Override
     public <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier) {
-        if (context instanceof DefaultBeanContext defaultBeanContext) {
-            return defaultBeanContext.getDependentBeanRegistrations(resolutionContext, beanType, qualifier);
-        }
-        return resolutionContext.getBeanRegistrations(beanType, qualifier);
+        return context.getDependentBeanRegistrations(resolutionContext, beanType, qualifier);
     }
 
     @Override
     public <T> BeanRegistration<T> getBeanRegistration(BeanDefinition<T> definition) {
-        if (context instanceof DefaultBeanContext defaultBeanContext) {
-            return defaultBeanContext.getDependentBeanRegistration(resolutionContext, definition);
-        }
-        return context.getBeanRegistration(definition);
+        return context.getDependentBeanRegistration(resolutionContext, definition);
     }
 
     @Override

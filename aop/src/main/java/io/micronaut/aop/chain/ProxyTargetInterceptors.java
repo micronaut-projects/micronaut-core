@@ -47,8 +47,8 @@ import java.util.List;
  * registration, when its construction or lifecycle was intercepted, and they are destroyed with it. This class finds
  * them there, by definition, and creates as a further dependent of the target any that the target has not got yet,
  * which is the case for an interceptor bound only for {@code AROUND}. The selection for the methods is then kept
- * against the target's registration, so that every call through any proxy of the same class fronting that target
- * selects once.</p>
+ * on the target's registration, so that it lives exactly as long as the target does and a proxy selects once per
+ * target.</p>
  *
  * <p>When no non-singleton interceptor is bound to any of the methods, which is the common case, the selection is
  * made once with the singletons and every target gets it, and no registration is consulted.</p>
@@ -66,7 +66,6 @@ public final class ProxyTargetInterceptors {
 
     private final BeanContext beanContext;
     private final InterceptorRegistry interceptorRegistry;
-    private final Class<?> proxyClass;
     private final ExecutableMethod<?, ?>[] methods;
     private final boolean introduction;
     private final List<BeanRegistration<?>> singletons;
@@ -82,7 +81,6 @@ public final class ProxyTargetInterceptors {
     /**
      * @param beanContext         The bean context
      * @param interceptorRegistry The interceptor registry
-     * @param proxyClass          The generated proxy class, the key of the selection kept on each target
      * @param methods             The intercepted methods of the target, in the proxy's order
      * @param registrations       The registrations the proxy was injected with, singletons only
      * @param introduction        Whether the methods are introduced rather than intercepted around
@@ -90,13 +88,11 @@ public final class ProxyTargetInterceptors {
     @UsedByGeneratedCode
     public ProxyTargetInterceptors(BeanContext beanContext,
                                    InterceptorRegistry interceptorRegistry,
-                                   Class<?> proxyClass,
                                    ExecutableMethod<?, ?>[] methods,
                                    List<? extends BeanRegistration<?>> registrations,
                                    boolean introduction) {
         this.beanContext = beanContext;
         this.interceptorRegistry = interceptorRegistry;
-        this.proxyClass = proxyClass;
         this.methods = methods;
         this.introduction = introduction;
         this.singletons = new ArrayList<>(registrations);
@@ -120,6 +116,21 @@ public final class ProxyTargetInterceptors {
     }
 
     /**
+     * Whether any interceptor is bound to the method at the index, for any target: a method a runtime proxy must
+     * override. When a non-singleton interceptor is bound to the methods, this answers by the definitions bound to
+     * the method, without selecting for a target; the selection for a target may still leave the method alone.
+     *
+     * @param index The index of the method
+     * @return Whether an interceptor may apply to the method
+     */
+    public boolean intercepted(int index) {
+        if (fixed != null) {
+            return fixed[index].length > 0;
+        }
+        return !beanContext.getBeanDefinitions(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(methods[index].getAnnotationMetadata())).isEmpty();
+    }
+
+    /**
      * The interceptors of every method for the given target.
      *
      * @param target The registration of the target, or {@code null} when the context holds none
@@ -134,7 +145,16 @@ public final class ProxyTargetInterceptors {
             return unowned();
         }
         lastTarget = new WeakReference<>(target);
-        return target.dependentState(proxyClass, () -> select(ownedBy(target)));
+        return selectionFor(target);
+    }
+
+    /**
+     * The selection kept for a target, made on the first call for it. It is kept on the target's registration,
+     * keyed by this selector, so that nothing outlives the target: a map held here, however weak its keys, would
+     * retain the interceptors of a target a scope forgot until its next expunge.
+     */
+    private Interceptor<?, ?>[][] selectionFor(BeanRegistration<?> target) {
+        return target.dependentState(this, () -> select(ownedBy(target)));
     }
 
     /**
@@ -167,7 +187,7 @@ public final class ProxyTargetInterceptors {
         WeakReference<BeanRegistration<?>> lastReference = lastTarget;
         BeanRegistration<?> last = lastReference == null ? null : lastReference.get();
         if (last != null && last.getBean() == target) {
-            return last.dependentState(proxyClass, () -> select(ownedBy(last)))[index];
+            return selectionFor(last)[index];
         }
         WeakReference<Object> unownedReference = unownedTarget;
         if (target == null || (unownedReference != null && unownedReference.get() == target)) {

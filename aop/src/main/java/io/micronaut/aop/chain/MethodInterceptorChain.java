@@ -209,30 +209,27 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean) {
-        return initialize(resolutionContext, beanContext, definition, postConstructMethod, bean, null);
+        return doIntercept(resolutionContext, beanContext, definition, postConstructMethod, bean, InterceptorKind.POST_CONSTRUCT);
     }
 
     /**
      * Variant of {@link #initialize(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object)}
-     * that reuses registrations already resolved for this bean.
+     * that was handed registrations resolved for the bean.
      *
-     * <p>Called for a bean whose interceptors were resolved once while it was constructed, so that a
-     * {@code @Prototype} interceptor which ran the constructor also runs {@code @PostConstruct}. Passing
-     * {@code null} resolves interceptors by binding, which is what the five-argument form does and what generated
-     * code from earlier versions continues to do.</p>
-     *
-     * @param resolutionContext  The resolution context
-     * @param beanContext        The bean context
-     * @param definition         The definition
+     * @param resolutionContext   The resolution context
+     * @param beanContext         The bean context
+     * @param definition          The definition
      * @param postConstructMethod The post construct method
-     * @param bean               The bean
-     * @param interceptors       Registrations resolved for this bean, or {@code null} to resolve them
-     * @param <T1>               The bean type
+     * @param bean                The bean
+     * @param interceptors        Ignored
+     * @param <T1>                The bean type
      * @return the bean instance
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing is handed over: the interceptors of a bean are resolved through its dependent
+     * context, where a non-singleton one is the instance created with the bean. Use the five-argument form.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
-    @UsedByGeneratedCode
     @Nullable
     public static <T1> T1 initialize(
         BeanResolutionContext resolutionContext,
@@ -241,15 +238,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return doIntercept(
-            resolutionContext,
-            beanContext,
-            definition,
-            postConstructMethod,
-            bean,
-            InterceptorKind.POST_CONSTRUCT,
-            interceptors
-        );
+        return initialize(resolutionContext, beanContext, definition, postConstructMethod, bean);
     }
 
     /**
@@ -277,29 +266,27 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean) {
-        return dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean, null);
+        return doIntercept(resolutionContext, beanContext, definition, preDestroyMethod, bean, InterceptorKind.PRE_DESTROY);
     }
 
     /**
      * Variant of {@link #dispose(BeanResolutionContext, BeanContext, BeanDefinition, ExecutableMethod, Object)} that
-     * reuses registrations already resolved for this bean.
-     *
-     * <p>Nothing supplies registrations here today: destruction runs with a fresh resolution context, so a bean
-     * reaches its interceptors either through the field on its proxy or through the registrations the container
-     * passes to the dispose call. The parameter exists so a caller that does hold them can hand them over.</p>
+     * was handed registrations resolved for the bean.
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
      * @param definition        The definition
      * @param preDestroyMethod  The pre destroy method
      * @param bean              The bean
-     * @param interceptors      Registrations resolved for this bean, or {@code null} to resolve them
+     * @param interceptors      Ignored
      * @param <T1>              The bean type
      * @return the bean instance
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing is handed over: the interceptors of a bean are resolved through its dependent
+     * context, where a non-singleton one is the instance created with the bean. Use the five-argument form.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
-    @UsedByGeneratedCode
     @Nullable
     public static <T1> T1 dispose(
         BeanResolutionContext resolutionContext,
@@ -308,15 +295,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return doIntercept(
-            resolutionContext,
-            beanContext,
-            definition,
-            preDestroyMethod,
-            bean,
-            InterceptorKind.PRE_DESTROY,
-            interceptors
-        );
+        return dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes", "removal"})
@@ -327,16 +306,12 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         BeanDefinition<T1> definition,
         ExecutableMethod<T1, T1> interceptedMethod,
         T1 bean,
-        InterceptorKind kind,
-        @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> shared) {
+        InterceptorKind kind) {
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = resolveInterceptorValues(annotationMetadata, kind);
 
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
-        if (shared != null && !shared.isEmpty()) {
-            // Handed over by a caller that holds them.
-            resolved = shared;
-        } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
+        if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
             // A proxy generated before 5.3 retained the registrations it was constructed with; a newer proxy returns
             // none here, its interceptors being dependents of the bean like everyone else's.
             resolved = intercepted.$interceptorRegistrations();

@@ -254,7 +254,6 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgument", true);
 
     private static final Method GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getBeanRegistrationsForConstructorArgumentObject", true);
-    private static final Method GET_INTERCEPTOR_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT = getBeanLookupMethod("getInterceptorRegistrationsForConstructorArgumentObject", true);
 
     private static final Method GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT = getBeanLookupMethod("getBeanRegistrationForConstructorArgument", true);
 
@@ -4084,12 +4083,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             case BeanRegistrationInjectionPoint<ClassElement> v ->
                 injectConstructorParameter(GET_BEAN_REGISTRATION_FOR_CONSTRUCTOR_ARGUMENT, true, v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case BeanRegistrationsInjectionPoint<ClassElement> v ->
-                // the interceptors a generated proxy is given are resolved in the dependent scope of the bean
-                injectConstructorParameter(
-                    v.annotationMetadata().hasAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
-                        ? GET_INTERCEPTOR_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT
-                        : GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT,
-                    v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
+                injectConstructorParameter(GET_BEAN_REGISTRATIONS_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case BeansInjectionPoint<ClassElement> v ->
                 injectConstructorParameter(GET_BEANS_OF_TYPE_FOR_CONSTRUCTOR_ARGUMENT_OBJECT, v.beanType(), v.type(), aThis, methodParameters, index, constructorMethodVarSupplier, v.annotationMetadata());
             case MapOfBeansInjectionPoint<ClassElement> v ->

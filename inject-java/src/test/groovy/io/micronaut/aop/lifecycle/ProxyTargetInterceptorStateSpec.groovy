@@ -10,7 +10,8 @@ import java.util.concurrent.ConcurrentLinkedQueue
 /**
  * How a proxy with {@code proxyTarget = true} shares non-singleton interceptors with its targets: none are created for
  * the proxy itself, targets resolved concurrently keep their own, a replaced registry still sees its instances, runtime
- * proxies behave like generated ones, and nothing retains a target that a scope forgot.
+ * proxies behave like generated ones, for a singleton target and for a scoped one, and nothing retains a target that
+ * a scope forgot.
  */
 class ProxyTargetInterceptorStateSpec extends AbstractTypeElementSpec {
 
@@ -354,6 +355,63 @@ class TargetBean {
         tracking.events == ['1:POST_CONSTRUCT', '1:AROUND', '1:PRE_DESTROY', 'target:DESTROYED', '1:DESTROYED']
 
         cleanup:
+        context.close()
+    }
+
+    void 'a runtime proxy of a scoped target uses the interceptor created with that target'() {
+        given:
+        def context = buildContext("""
+package scopedproxy.runtimescoped;
+$IMPORTS
+import io.micronaut.aop.runtime.RuntimeProxy;
+$SCOPE
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target(ElementType.TYPE)
+@Around
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Tracked {}
+
+@Prototype
+@InterceptorBean(Tracked.class)
+class Tracking implements MethodInterceptor<Object, Object> {
+    static int instances;
+    static final List<String> events = new ArrayList<>();
+    final int id = ++instances;
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        events.add(id + ":" + ctx.getKind());
+        return ctx.proceed();
+    }
+    @PreDestroy void close() { events.add(id + ":DESTROYED"); }
+}
+
+@Conversation
+@Tracked
+@RuntimeProxy(io.micronaut.aop.ByteBuddyRuntimeProxy.class)
+class TargetBean {
+    @PostConstruct void init() {}
+    public String call() { return "called"; }
+    @PreDestroy void close() { Tracking.events.add("target:DESTROYED"); }
+}
+""")
+        context.registerSingleton(new io.micronaut.aop.ByteBuddyRuntimeProxy())
+        def tracking = context.classLoader.loadClass('scopedproxy.runtimescoped.Tracking')
+        def scopeType = context.classLoader.loadClass('scopedproxy.runtimescoped.ConversationScope')
+        def scope = context.getBean(scopeType)
+
+        when: 'the proxy is created, which resolves the target of the conversation, and called'
+        def bean = context.getBean(context.classLoader.loadClass('scopedproxy.runtimescoped.TargetBean'))
+        bean.call()
+        bean.call()
+        scope.end('first')
+
+        then: 'the instance created with the target intercepts its methods, and the proxy creates none of its own'
+        tracking.instances == 1
+        tracking.events == ['1:POST_CONSTRUCT', '1:AROUND', '1:AROUND', '1:PRE_DESTROY', 'target:DESTROYED', '1:DESTROYED']
+
+        cleanup:
+        scopeType.current = 'first'
         context.close()
     }
 

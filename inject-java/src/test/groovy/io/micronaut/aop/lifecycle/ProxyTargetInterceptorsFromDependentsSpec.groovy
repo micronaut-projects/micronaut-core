@@ -666,4 +666,160 @@ class MyBean {
         cleanup:
         context.close()
     }
+
+    // The target of a lazy proxy that does not cache it is resolved on every call, with its registration.
+    void 'test a lazy proxy of a singleton target is intercepted in every phase by the instance resolved for it'() {
+        given:
+        ApplicationContext context = buildContext("""
+package scopedproxy.singletontarget;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around(proxyTarget = true, lazy = true)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Probed {
+}
+
+@Prototype
+@InterceptorBean(Probed.class)
+class ProbeInterceptor implements MethodInterceptor<Object, Object> {
+    static final List<String> events = new ArrayList<>();
+    static final Set<ProbeInterceptor> used = new LinkedHashSet<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        used.add(this);
+        events.add(context.getKind().name());
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() {
+        if (used.contains(this)) {
+            events.add("DESTROYED");
+        }
+    }
+}
+
+@Singleton
+@Probed
+class TargetBean {
+    @PostConstruct
+    void init() {
+    }
+
+    public String call() {
+        return "called";
+    }
+
+    @PreDestroy
+    void close() {
+        ProbeInterceptor.events.add("PRE_DESTROY_CALLBACK");
+    }
+}
+""")
+        Class<?> interceptorType = context.classLoader.loadClass('scopedproxy.singletontarget.ProbeInterceptor')
+        def bean = context.getBean(context.classLoader.loadClass('scopedproxy.singletontarget.TargetBean'))
+
+        when:
+        bean.call()
+        bean.call()
+        context.stop()
+
+        then: 'post construct, the method calls and pre destroy share one instance, destroyed after the target'
+        interceptorType.used.size() == 1
+        interceptorType.events.toList() == [
+                'POST_CONSTRUCT',
+                'AROUND',
+                'AROUND',
+                'PRE_DESTROY',
+                'PRE_DESTROY_CALLBACK',
+                'DESTROYED'
+        ]
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test a singleton pre destroy interceptor still applies to a target with no post construct advice'() {
+        given:
+        ApplicationContext context = buildContext("""
+package scopedproxy.predestroyonly;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PreDestroy;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around(proxyTarget = true)
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@interface Guarded {
+}
+
+@Prototype
+@InterceptorBinding(value = Guarded.class, kind = InterceptorKind.AROUND)
+class AroundInterceptor implements MethodInterceptor<Object, Object> {
+    static final List<String> events = new ArrayList<>();
+
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        events.add("AROUND");
+        return context.proceed();
+    }
+
+    @PreDestroy
+    void destroy() {
+        events.add("AROUND_DESTROYED");
+    }
+}
+
+@Singleton
+@InterceptorBinding(value = Guarded.class, kind = InterceptorKind.PRE_DESTROY)
+class DestroyInterceptor implements MethodInterceptor<Object, Object> {
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        AroundInterceptor.events.add("PRE_DESTROY");
+        return context.proceed();
+    }
+}
+
+@Singleton
+@Guarded
+class GuardedBean {
+    public String call() {
+        return "called";
+    }
+
+    @PreDestroy
+    void close() {
+        AroundInterceptor.events.add("PRE_DESTROY_CALLBACK");
+    }
+}
+""")
+        Class<?> interceptorType = context.classLoader.loadClass('scopedproxy.predestroyonly.AroundInterceptor')
+        def bean = context.getBean(context.classLoader.loadClass('scopedproxy.predestroyonly.GuardedBean'))
+
+        when:
+        bean.call()
+        context.stop()
+
+        then:
+        interceptorType.events.toList() == ['AROUND', 'PRE_DESTROY', 'PRE_DESTROY_CALLBACK', 'AROUND_DESTROYED']
+
+        cleanup:
+        context.close()
+    }
 }

@@ -58,6 +58,7 @@ import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationMetadataResolver;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -150,7 +151,6 @@ import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import io.micronaut.core.annotation.AnnotationUtil;
 
 /**
  * The default context implementations.
@@ -1150,12 +1150,24 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                      Argument<T> beanType,
                                      @Nullable Qualifier<T> qualifier,
                                      @Nullable T bean) {
-        if (bean == null || !dependentScope.isDependent(definition)) {
+        if (bean == null) {
             return;
         }
         List<BeanRegistration<?>> dependents = resolutionContext.getAndResetDependentBeans();
         if (!dependents.isEmpty()) {
-            unscopedRegistrations.put(BeanRegistration.of(this, new BeanKey<>(beanType, qualifier), definition, bean, dependents));
+            rememberUnscoped(BeanRegistration.of(this, new BeanKey<>(beanType, qualifier), definition, bean, dependents));
+        }
+    }
+
+    /**
+     * Keeps the way from a bean created for no scope, which is held by whoever asked for it, back to the registration
+     * the context created for it. See {@link UnscopedRegistrationIndex}.
+     *
+     * @param registration The registration
+     */
+    private void rememberUnscoped(BeanRegistration<?> registration) {
+        if (registration.bean != null && dependentScope.isDependent(registration.beanDefinition)) {
+            unscopedRegistrations.put(registration);
         }
     }
 
@@ -1305,15 +1317,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanToDestroy instanceof LifeCycle<?> cycle && !dependent) {
             destroyLifeCycleBean(cycle, definition);
         }
-        if (registration instanceof BeanDisposingRegistration) {
-            List<BeanRegistration<?>> dependents = registration.getDependentBeans();
-            if (!dependents.isEmpty()) {
-                final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
-                while (i.hasPrevious()) {
-                    destroyBean(i.previous(), true);
-                }
+        List<BeanRegistration<?>> dependents = registration.getDependentBeans();
+        if (!dependents.isEmpty()) {
+            final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
+            while (i.hasPrevious()) {
+                destroyBean(i.previous(), true);
             }
-        } else {
+        }
+        if (!(registration instanceof BeanDisposingRegistration)) {
+            // a registration the context created closes by destroying its bean here; any other closes its own way
             try {
                 registration.close();
             } catch (Exception e) {
@@ -1439,11 +1451,12 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         // is not among the proxy's dependents; it carries the beans created with the target
                         destroyBean(heldRegistration);
                     } else {
+                        // a proxy generated before 5.3 reports no registration for the target it resolved later;
+                        // the target is destroyed alone, the proxy's own dependents having been destroyed above
                         destroyBean(BeanRegistration.of(this,
                             new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
                             proxyTargetBeanDefinition,
-                            interceptedTarget,
-                            registration.getDependentBeans()
+                            interceptedTarget
                         ));
                     }
                     interceptedProxy.clearCachedInterceptedTarget();
@@ -1697,11 +1710,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (registration.bean == null) {
             return resolveNullBeanRegistration(beanType, beanType, registration);
         }
-        if (dependentScope.isDependent(definition)) {
-            // held by the proxy alone: remember the way from the target back to its registration, for a proxy the
-            // target is later handed to
-            unscopedRegistrations.put(registration);
-        }
+        // held by the proxy alone: remembered for a proxy the target is later handed to
+        rememberUnscoped(registration);
         return registration;
     }
 
@@ -3409,9 +3419,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                   BeanDefinition<T> definition,
                                                                   boolean heldRegistration) {
         BeanKey<T> beanKey = new BeanKey<>(definition.asArgument(), qualifier);
-        java.util.concurrent.atomic.AtomicReference<BeanRegistration<T>> created = heldRegistration
-            ? new java.util.concurrent.atomic.AtomicReference<>()
-            : null;
+        AtomicReference<BeanRegistration<T>> created = heldRegistration ? new AtomicReference<>() : null;
         T bean = registeredScope.getOrCreate(
             new BeanCreationContext<T>() {
                 @Override
@@ -3509,9 +3517,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                 if (dependent) {
                     context.addDependentBean(beanRegistration);
                 }
-                if (bean != null && !dependentBeans.isEmpty() && dependentScope.isDependent(definition)) {
+                if (!dependentBeans.isEmpty()) {
                     // held by whoever asked for it: keep the way back to the registration that carries its dependents
-                    unscopedRegistrations.put(beanRegistration);
+                    rememberUnscoped(beanRegistration);
                 }
                 return beanRegistration;
             } finally {
