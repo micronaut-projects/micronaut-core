@@ -22,6 +22,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -458,6 +459,7 @@ final class HttpPipelineBuilder {
                 Http2FrameCodec http2FrameCodec = createHttp2FrameCodec();
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2FrameCodec);
                 specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2FrameCodec);
+                pipeline.addLast(createHttp2ConnectionWindow(http2FrameCodec));
                 pipeline.addLast(makeHttp2Handler());
             } else {
                 Http2ConnectionHandler http2ServerHandler = createHttp2ServerHandler(true);
@@ -482,14 +484,25 @@ final class HttpPipelineBuilder {
             return builder.build();
         }
 
+        /**
+         * The {@link Http2FrameCodec} raises the connection window only from the stream window.
+         * This handler applies an explicitly configured connection window on top of that.
+         */
+        private Http2ConnectionWindow createHttp2ConnectionWindow(Http2FrameCodec http2FrameCodec) {
+            NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
+            return new Http2ConnectionWindow(http2FrameCodec, Http2ConnectionWindow.effectiveWindowSize(http2.http2Settings(), http2.getInitialConnectionWindowSize()));
+        }
+
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
+            NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
                 .compressor(embeddedServices.getHttpCompressionStrategy())
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
-                .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
+                .initialSettings(http2.http2Settings())
+                .initialConnectionWindowSize(http2.getInitialConnectionWindowSize());
             server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->
                 builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class)));
             return builder.build();
@@ -588,7 +601,7 @@ final class HttpPipelineBuilder {
                     if (frameCodec == null || multiplexHandler == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
-                        return new Http2ServerUpgradeCodecImpl(frameCodec, multiplexHandler);
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
                     }
                 } else {
                     return null;
@@ -604,7 +617,7 @@ final class HttpPipelineBuilder {
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(connectionHandler, multiplexHandler);
+                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
                 }
             };
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
