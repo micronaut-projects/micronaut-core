@@ -30,6 +30,7 @@ import reactor.core.publisher.Sinks;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.OptionalLong;
 
 /**
@@ -355,9 +356,11 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         List<ReadBuffer> deferred = addGuarded(rb, true);
         complete0(deferred == null);
         if (deferred != null) {
-            // a snapshot: a subscriber added reentrantly by a callback below is completed by
-            // subscribe0 itself, since the buffer is complete by now
-            List<BufferConsumer> targets = new ArrayList<>(subscribers);
+            // only the subscribers deferred was built for: complete0 above may have run a
+            // buffering subscriber's callback which subscribed another split reentrantly. That
+            // subscriber has already received the buffered bytes and its completion from
+            // subscribe0, since the buffer is complete by now.
+            List<BufferConsumer> targets = new ArrayList<>(Objects.requireNonNull(subscribers).subList(0, deferred.size()));
             for (int i = 0; i < targets.size(); i++) {
                 targets.get(i).addAndComplete(deferred.get(i));
             }
