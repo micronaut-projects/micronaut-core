@@ -170,7 +170,15 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
-            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
+            Map<String, Object> intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
+            Class<T> targetType = context.getArgument().getType();
+            if (mediaType != null
+                    && mediaType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE)
+                    && !targetType.isInstance(intermediate)
+                    && !context.getArgument().isContainerType()
+                    && !ConvertibleValues.class.isAssignableFrom(targetType)) {
+                intermediate.values().removeIf(value -> value instanceof String text && text.isEmpty());
+            }
             Optional<T> converted = conversionService.convert(intermediate, context);
             nhr.setLegacyBody(converted.orElse(null));
             return converted;
