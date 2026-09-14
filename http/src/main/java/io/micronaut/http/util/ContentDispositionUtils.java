@@ -23,7 +23,7 @@ import org.jspecify.annotations.Nullable;
  * Utility class to build RFC 6266 compliant {@code Content-Disposition} header values.
  *
  * @author Shubham Jain
- * @since 5.2.0
+ * @since 5.3.0
  */
 @Internal
 public final class ContentDispositionUtils {
@@ -39,7 +39,7 @@ public final class ContentDispositionUtils {
      * @param type     The disposition type, typically {@code attachment} or {@code inline}
      * @param filename The filename to include, or {@code null}/empty to omit the filename parameters
      * @return The header value
-     * @since 5.2.0
+     * @since 5.3.0
      */
     public static String toHeaderValue(String type, @Nullable String filename) {
         if (StringUtils.isEmpty(filename)) {
