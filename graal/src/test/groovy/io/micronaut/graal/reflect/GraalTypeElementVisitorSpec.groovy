@@ -263,6 +263,41 @@ class Other {}
         config.getAnnotations("fields").first().stringValue("name").get() == 'name'
     }
 
+    void "test write reflect config for a private @Inject constructor"() {
+
+        given:
+        GraalReflectionConfigurer configurer = buildReflectionConfigurer('test.Test', '''
+package test;
+
+import io.micronaut.core.annotation.ReflectiveAccess;
+
+@jakarta.inject.Singleton
+class Test {
+
+    @jakarta.inject.Inject
+    @ReflectiveAccess
+    private Test(Other other) {
+    }
+
+    public Test() {
+    }
+}
+
+@jakarta.inject.Singleton
+class Other {}
+''')
+
+        when:
+        AnnotationValue<ReflectionConfig> config = configurer.getAnnotationMetadata().getAnnotationValuesByType(ReflectionConfig).first()
+
+        then:
+        config
+        config.stringValue("type").get() == 'test.Test'
+        config.getAnnotations("methods").size() == 1
+        config.getAnnotations("methods").first().stringValue("name").get() == '<init>'
+        config.getAnnotations("methods").first().annotationClassValues("parameterTypes")*.name == ['test.Other']
+    }
+
     void "test write reflect config for @Inject on inherited inaccessible fields and methods"() {
 
         given:
