@@ -21,11 +21,16 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.File;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -152,6 +157,83 @@ class PyronautCompilerErrorHandlingTest {
         assertEquals(1, countDumpFiles(dumpDirectory));
     }
 
+    @Test
+    void compileWritesDumpNextToTargetDirectoryByDefault() throws IOException {
+        Path buildDirectory = temporaryDirectory.resolve("build");
+        File targetDirectory = buildDirectory.resolve("classes").toFile();
+        Files.createDirectories(targetDirectory.toPath());
+        File expectedDumpDirectory = buildDirectory.resolve("processor-error-dumps").toFile();
+
+        PyronautCompiler compiler = PyronautCompiler.builder()
+            .pythonCode("class Broken(")
+            .targetDir(targetDirectory)
+            .build();
+
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::compile);
+
+        assertConciseSyntaxError(exception.getMessage(), "class Broken(", expectedDumpDirectory);
+        assertEquals(1, countDumpFiles(expectedDumpDirectory));
+        assertFalse(exception.getMessage().contains(System.getProperty("user.home") + File.separator + ".pyronaut"), exception.getMessage());
+        assertEquals(0, countDumpFiles(targetDirectory.toPath().resolve("processor-error-dumps")));
+    }
+
+    @Test
+    void buildClassLoaderWritesDumpToPrivateTemporaryDirectoryByDefault() throws IOException {
+        PyronautCompiler compiler = PyronautCompiler.builder()
+            .pythonCode("class Broken(")
+            .build();
+
+        RuntimeException exception = assertThrows(RuntimeException.class, compiler::buildClassLoader);
+
+        String message = exception.getMessage();
+        String marker = "Full error details were written to: ";
+        int start = message.indexOf(marker);
+        assertTrue(start >= 0, message);
+        Path dumpFile = Path.of(message.substring(start + marker.length()).strip());
+        try {
+            assertTrue(Files.isRegularFile(dumpFile), message);
+            assertTrue(dumpFile.getParent().getFileName().toString().startsWith("pyronaut-processor-error-dumps-"), message);
+            if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+                assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dumpFile.getParent())));
+            }
+            assertFalse(dumpFile.startsWith(Path.of(System.getProperty("user.home"), ".pyronaut")), message);
+        } finally {
+            Files.deleteIfExists(dumpFile);
+            Files.deleteIfExists(dumpFile.getParent());
+        }
+    }
+
+    @Test
+    void defaultErrorDumpDirectoryIsNextToTargetDirectory() {
+        File relativeTarget = new File("build/classes");
+        assertEquals(
+            new File(relativeTarget.getAbsoluteFile().getParentFile(), "processor-error-dumps"),
+            PyronautJavaCompiler.defaultErrorDumpDirectory(relativeTarget)
+        );
+    }
+
+    @Test
+    void javaCompilerHasNoStaticFieldDerivedFromUserHome() throws IllegalAccessException {
+        // io.micronaut.python.compiler is initialised at build time in native images, so a static
+        // path derived from the build host's environment would be baked into the released binary.
+        String userHome = System.getProperty("user.home");
+        String userDir = System.getProperty("user.dir");
+        assertNotNull(userHome);
+        assertNotNull(userDir);
+        for (Field field : PyronautJavaCompiler.class.getDeclaredFields()) {
+            if (!Modifier.isStatic(field.getModifiers())) {
+                continue;
+            }
+            field.setAccessible(true);
+            Object value = field.get(null);
+            if (value instanceof File || value instanceof Path || value instanceof CharSequence) {
+                String text = value.toString();
+                assertFalse(text.contains(userHome), "static field " + field.getName() + " is derived from user.home: " + text);
+                assertFalse(text.contains(userDir), "static field " + field.getName() + " is derived from user.dir: " + text);
+            }
+        }
+    }
+
     private static void assertConciseSyntaxError(String message, String snippet, File dumpDirectory) {
         assertTrue(message.contains("Pyronaut processing failed"), message);
         assertTrue(message.contains("SyntaxError"), message);
@@ -174,7 +256,14 @@ class PyronautCompilerErrorHandlingTest {
     }
 
     private static long countDumpFiles(File dumpDirectory) throws IOException {
-        try (var paths = Files.list(dumpDirectory.toPath())) {
+        return countDumpFiles(dumpDirectory.toPath());
+    }
+
+    private static long countDumpFiles(Path dumpDirectory) throws IOException {
+        if (!Files.isDirectory(dumpDirectory)) {
+            return 0;
+        }
+        try (var paths = Files.list(dumpDirectory)) {
             return paths.count();
         }
     }

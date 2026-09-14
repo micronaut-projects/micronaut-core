@@ -48,7 +48,10 @@ import java.io.StringWriter;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -82,15 +85,15 @@ final class PyronautJavaCompiler {
     private static final Pattern SOURCE_IN_MESSAGE = Pattern.compile("Python source \\[([^]]+)]");
     private static final Pattern LINE_IN_MESSAGE = Pattern.compile("line (\\d+)");
     private static final DateTimeFormatter DUMP_FILE_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss-SSS");
-    private static final File DEFAULT_ERROR_DUMP_DIRECTORY = new File(
-        System.getProperty("user.home"),
-        ".pyronaut/processor-error-dumps"
-    );
+    private static final String ERROR_DUMP_DIRECTORY_NAME = "processor-error-dumps";
+    // No static field may hold a path derived from user.home, user.dir or java.io.tmpdir: this
+    // package is initialised at build time in native images, so such a value would be baked in
+    // from the image build host.
 
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private Consumer<ClassElement> classElementCallback;
     private boolean verboseErrors;
-    private File errorDumpDirectory = DEFAULT_ERROR_DUMP_DIRECTORY;
+    private File errorDumpDirectory;
     private List<SourceSnapshot> sourceSnapshots = List.of();
     private boolean compilePythonBytecode;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
@@ -121,7 +124,13 @@ final class PyronautJavaCompiler {
     /**
      * Set the directory for full compiler error dump files.
      *
-     * @param errorDumpDirectory The dump directory
+     * <p>When not set, dumps are written to a {@code processor-error-dumps} directory next to the
+     * target directory, so they never end up inside the compiled class output. In-memory
+     * compilation without a target directory writes to a freshly created private temporary
+     * directory. The default is resolved when a dump is written, never at class initialisation
+     * time.</p>
+     *
+     * @param errorDumpDirectory The dump directory, or {@code null} to use the default
      */
     public void setErrorDumpDirectory(File errorDumpDirectory) {
         this.errorDumpDirectory = errorDumpDirectory;
@@ -487,7 +496,7 @@ final class PyronautJavaCompiler {
             if (propagated != null) {
                 throw propagated;
             }
-            throw processingFailure(diagnosticCollector, e);
+            throw processingFailure(diagnosticCollector, e, outputDirectory);
         } finally {
             Thread.currentThread().setContextClassLoader(previous);
             shutdownProcessors(processors);
@@ -496,7 +505,7 @@ final class PyronautJavaCompiler {
             }
         }
         if (!success) {
-            throw processingFailure(diagnosticCollector, null);
+            throw processingFailure(diagnosticCollector, null, outputDirectory);
         }
         return IncrementalCompilationTrace.empty();
     }
@@ -532,10 +541,12 @@ final class PyronautJavaCompiler {
             .addAll(values));
     }
 
-    private RuntimeException processingFailure(DiagnosticCollector<JavaFileObject> diagnosticCollector, RuntimeException exception) {
+    private RuntimeException processingFailure(DiagnosticCollector<JavaFileObject> diagnosticCollector,
+                                               RuntimeException exception,
+                                               java.nio.file.Path outputDirectory) {
         List<Diagnostic<? extends JavaFileObject>> diagnostics = diagnostics(diagnosticCollector);
         String fullDetails = fullDetails(diagnostics, exception);
-        DumpResult dumpResult = writeDump(fullDetails);
+        DumpResult dumpResult = writeDump(fullDetails, outputDirectory);
         String message = verboseErrors
             ? verboseMessage(fullDetails, dumpResult)
             : conciseMessage(diagnostics, exception, dumpResult);
@@ -741,11 +752,12 @@ final class PyronautJavaCompiler {
         return formatted.toString();
     }
 
-    private DumpResult writeDump(String details) {
+    private DumpResult writeDump(String details, java.nio.file.Path outputDirectory) {
         try {
-            Files.createDirectories(errorDumpDirectory.toPath());
+            File dumpDirectory = resolveErrorDumpDirectory(outputDirectory);
+            Files.createDirectories(dumpDirectory.toPath());
             File dumpFile = new File(
-                errorDumpDirectory,
+                dumpDirectory,
                 "pyronaut-compiler-error-" + DUMP_FILE_TIMESTAMP.format(LocalDateTime.now(ZoneId.systemDefault())) + ".log"
             );
             Files.writeString(dumpFile.toPath(), details);
@@ -753,6 +765,54 @@ final class PyronautJavaCompiler {
         } catch (IOException | RuntimeException e) {
             return DumpResult.failed(e);
         }
+    }
+
+    /**
+     * Resolve the dump directory for the current compilation. Resolved lazily so nothing derived
+     * from the running JVM's environment is captured in a static initialiser.
+     *
+     * @param outputDirectory The compiled classes directory, or {@code null} for in-memory compilation
+     * @return The dump directory
+     */
+    private File resolveErrorDumpDirectory(java.nio.file.Path outputDirectory) throws IOException {
+        if (errorDumpDirectory != null) {
+            return errorDumpDirectory;
+        }
+        if (outputDirectory != null) {
+            return defaultErrorDumpDirectory(outputDirectory.toFile());
+        }
+        // A shared, predictable path under java.io.tmpdir would be writable by the first user only
+        // and open to interference on multi-user hosts, so create a private directory per dump.
+        return Files.createTempDirectory(
+            "pyronaut-" + ERROR_DUMP_DIRECTORY_NAME + "-",
+            ownerOnlyDirectoryAttributes()
+        ).toFile();
+    }
+
+    private static FileAttribute<?>[] ownerOnlyDirectoryAttributes() {
+        if (FileSystems.getDefault().supportedFileAttributeViews().contains("posix")) {
+            return new FileAttribute<?>[] {
+                PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwx------"))
+            };
+        }
+        // Non-POSIX file systems (Windows) already place the temporary directory under the
+        // user's own profile.
+        return new FileAttribute<?>[0];
+    }
+
+    /**
+     * The default dump directory for a target directory: a {@code processor-error-dumps} directory
+     * next to it, in the same way the incremental cache sits next to the target directory. Dumps
+     * are kept out of the target directory itself so that a later successful build cannot package
+     * stale diagnostics with the compiled classes.
+     *
+     * @param targetDir The compiled classes directory
+     * @return The dump directory
+     */
+    static File defaultErrorDumpDirectory(File targetDir) {
+        File absoluteTarget = targetDir.getAbsoluteFile();
+        File parent = absoluteTarget.getParentFile();
+        return new File(parent == null ? absoluteTarget : parent, ERROR_DUMP_DIRECTORY_NAME);
     }
 
     private static void appendDumpResult(StringBuilder message, DumpResult dumpResult) {
