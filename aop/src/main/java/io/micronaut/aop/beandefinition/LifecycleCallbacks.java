@@ -61,7 +61,7 @@ final class LifecycleCallbacks {
             callback.invoke(bean, arguments);
         } catch (InvocationException e) {
             if (e.getCause() instanceof InvocationTargetException targetException && targetException.getCause() != null) {
-                ExceptionUtils.sneakyThrow(targetException.getCause());
+                throw ExceptionUtils.<RuntimeException, RuntimeException>sneakyThrow(targetException.getCause());
             }
             throw e;
         }

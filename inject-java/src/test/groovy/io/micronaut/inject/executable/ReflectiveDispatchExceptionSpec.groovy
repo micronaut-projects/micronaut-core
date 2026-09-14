@@ -3,8 +3,11 @@ package io.micronaut.inject.executable
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.exceptions.BeanInstantiationException
+import io.micronaut.core.reflect.exception.InvocationException
 import io.micronaut.inject.BeanDefinition
 import spock.lang.Unroll
+
+import java.lang.reflect.InvocationTargetException
 
 /**
  * A private executable method is dispatched reflectively, a non-private one by generated code. Whichever it is, the
@@ -262,6 +265,38 @@ class Failing {
         visibility        | modifier
         'private'         | 'private'
         'package-private' | ''
+    }
+
+    void 'test a private introspected property accessor still wraps what it threw'() {
+        given:
+        def introspection = buildBeanIntrospection('dispatch.introspection.Holder', '''
+package dispatch.introspection;
+
+import io.micronaut.core.annotation.Introspected;
+
+@Introspected(accessKind = Introspected.AccessKind.METHOD, visibility = Introspected.Visibility.ANY)
+class Holder {
+
+    private String getName() {
+        throw new IllegalStateException("name");
+    }
+
+    private void setName(String name) {
+    }
+}
+''')
+        def constructor = introspection.beanType.getDeclaredConstructor()
+        constructor.accessible = true
+        Object bean = constructor.newInstance()
+
+        when:
+        introspection.getRequiredProperty('name', String).get(bean)
+
+        then:
+        InvocationException e = thrown()
+        e.cause instanceof InvocationTargetException
+        e.cause.cause instanceof IllegalStateException
+        e.cause.cause.message == 'name'
     }
 
     private static Object invoke(BeanDefinition<?> definition, String name, Object bean) {

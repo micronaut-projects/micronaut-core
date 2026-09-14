@@ -248,6 +248,7 @@ public class ReflectionUtils {
      * @since 5.2.1
      */
     @Nullable
+    @Internal
     @UsedByGeneratedCode
     public static <R, T> R invokeMethodPropagating(@Nullable T instance, Method method, @Nullable Object... arguments) {
         try {
