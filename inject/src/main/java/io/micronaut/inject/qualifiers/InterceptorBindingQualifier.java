@@ -60,17 +60,10 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      */
     public static final String META_BINDING_VALUES = "$bindingValues";
     public static final String META_MEMBER_INTERCEPTOR_TYPE = "interceptorType";
-    /**
-     * Member of the qualifier annotation that restricts the candidates to singleton interceptors. A proxy that
-     * fronts a separate target is injected with singletons only: the non-singleton interceptors of a target are the
-     * target's own, created with it and found among the dependents of its registration.
-     *
-     * @since 5.3.0
-     */
-    public static final String META_SINGLETONS_ONLY = "singletonsOnly";
     private static final String META_BIND_MEMBERS = "bindMembers";
     private final Map<String, List<AnnotationValue<?>>> supportedAnnotationNames;
     private final Set<String> supportedInterceptorTypes;
+    // whether only singleton interceptors qualify, see singletonsOnly()
     private final boolean singletonsOnly;
 
     /**
@@ -84,10 +77,8 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
         AnnotationValue<Annotation> av = annotationMetadata.findAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER).orElse(null);
         if (av == null) {
             annotationValues = Collections.emptyList();
-            singletonsOnly = false;
         } else {
             annotationValues = av.getAnnotations(AnnotationMetadata.VALUE_MEMBER);
-            singletonsOnly = av.booleanValue(META_SINGLETONS_ONLY).orElse(false);
         }
         if (annotationValues.isEmpty()) {
             annotationValues = annotationMetadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
@@ -98,6 +89,28 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
             annotationValue.annotationClassValue(META_MEMBER_INTERCEPTOR_TYPE).map(AnnotationClassValue::getName).ifPresent(supportedInterceptorTypes::add);
         }
         this.supportedInterceptorTypes = supportedInterceptorTypes;
+        this.singletonsOnly = false;
+    }
+
+    private InterceptorBindingQualifier(InterceptorBindingQualifier<T> that, boolean singletonsOnly) {
+        this.supportedAnnotationNames = that.supportedAnnotationNames;
+        this.supportedInterceptorTypes = that.supportedInterceptorTypes;
+        this.singletonsOnly = singletonsOnly;
+    }
+
+    /**
+     * This qualifier restricted to singleton interceptors.
+     *
+     * <p>A proxy that fronts a separate target owns no interceptor instance, as a client proxy owns none in CDI:
+     * the non-singleton interceptors of a target are the target's own, created with it and found among the
+     * dependents of its registration. Such a proxy is injected with the singletons only, which it can share.</p>
+     *
+     * @return The qualifier, matching singleton interceptors alone
+     * @since 5.3.0
+     */
+    @Internal
+    public InterceptorBindingQualifier<T> singletonsOnly() {
+        return singletonsOnly ? this : new InterceptorBindingQualifier<>(this, true);
     }
 
     /**

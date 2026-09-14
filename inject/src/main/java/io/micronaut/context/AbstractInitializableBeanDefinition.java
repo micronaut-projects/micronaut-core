@@ -59,6 +59,7 @@ import io.micronaut.inject.ParametrizedInstantiatableBeanDefinition;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.annotation.AbstractEnvironmentAnnotationMetadata;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
+import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.qualifiers.TypeAnnotationQualifier;
@@ -2671,12 +2672,17 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 throw new DependencyInjectionException(resolutionContext, "Cannot resolve bean registrations. Argument [" + returnType + "] missing generic type information.");
             }
             qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
-            // The interceptors bound to a bean, asked for by the interceptor binding qualifier of a generated proxy's
-            // constructor, are the bean's own: a non-singleton interceptor is created as a dependent of the bean and
-            // is the instance every interception point of the bean reaches
-            Collection<BeanRegistration<I>> beanRegistrations = qualifier instanceof InterceptorBindingQualifier<I>
-                ? resolutionContext.getInterceptorRegistrations(beanType, qualifier)
-                : resolutionContext.getBeanRegistrations(beanType, qualifier);
+            Collection<BeanRegistration<I>> beanRegistrations;
+            if (qualifier instanceof InterceptorBindingQualifier<I> binding) {
+                // The interceptors bound to a bean, asked for by the interceptor binding qualifier of a generated
+                // proxy's constructor, are the bean's own: a non-singleton interceptor is created as a dependent of
+                // the bean and is the instance every interception point of the bean reaches. A proxy that fronts a
+                // separate target owns none, as a client proxy owns none in CDI: the non-singleton interceptors are
+                // the target's, so the proxy is given the singletons only.
+                beanRegistrations = resolutionContext.getInterceptorRegistrations(beanType, InterceptedBeanProxy.class.isAssignableFrom(getBeanType()) ? binding.singletonsOnly() : binding);
+            } else {
+                beanRegistrations = resolutionContext.getBeanRegistrations(beanType, qualifier);
+            }
             return coerceCollectionToCorrectType(returnType.getType(), beanRegistrations, resolutionContext, returnType);
         } catch (NoSuchBeanException e) {
             if (returnType.isNullable()) {
