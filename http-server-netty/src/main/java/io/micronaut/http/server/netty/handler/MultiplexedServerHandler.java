@@ -176,7 +176,10 @@ abstract class MultiplexedServerHandler {
                         fullBody = data;
                     } else {
                         bufferedContent.add(data);
-                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), bufferedContent);
+                        List<ByteBuf> pieces = bufferedContent;
+                        // composeBody takes ownership of the pieces even when it fails
+                        bufferedContent = null;
+                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                     }
                     bufferedContent = null;
 

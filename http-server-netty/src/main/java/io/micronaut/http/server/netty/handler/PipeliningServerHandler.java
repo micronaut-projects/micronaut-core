@@ -674,6 +674,9 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
                     for (HttpContent c : buffer) {
                         pieces.add(c.content());
                     }
+                    // composeBody takes ownership of the pieces even when it fails, so the
+                    // messages must not be reachable for a later devolveToStreaming or discard
+                    buffer.clear();
                     fullBody = composeBody(requiredCtx().alloc(), pieces);
                 }
                 buffer.clear();
