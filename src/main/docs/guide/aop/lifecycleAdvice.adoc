@@ -43,6 +43,25 @@ snippet::io.micronaut.docs.aop.lifecycle.ProductInterceptors[tags="method-interc
 <2> `@PostConstruct` interception is handled
 <3> `@PreDestroy` interception is handled
 
+=== What Construct Advice Wraps
+
+Construct advice wraps the constructor call only. The instance that `proceed()` returns has been created, but its
+fields and methods have not been injected yet and its `@PostConstruct` methods have not run. Both happen once every
+api:aop.ConstructorInterceptor[] in the chain has returned, on the instance the chain returned:
+
+. The construct interceptors run up to `proceed()`, outermost first
+. The constructor runs, and any ann:context.annotation.InjectScope[] constructor argument is released
+. The construct interceptors complete after `proceed()`, innermost first
+. Fields and methods are injected
+. `@PostConstruct` interception runs, then the `@PostConstruct` methods
+
+An interceptor that needs the injected and initialized bean should bind to `POST_CONSTRUCT` instead, and an exception
+thrown by a construct interceptor after `proceed()` means the instance is neither injected nor initialized. This is
+the order the Jakarta Interceptors specification defines for `@AroundConstruct`.
+
+NOTE: A bean compiled with a Micronaut version before 5.2.1 keeps the previous behaviour, in which injection and
+`@PostConstruct` ran inside the chain, until it is recompiled.
+
 === Exceptions Thrown by Construct Advice
 
 An exception thrown by a api:aop.ConstructorInterceptor[] reaches whoever asked for the bean as it was thrown,
