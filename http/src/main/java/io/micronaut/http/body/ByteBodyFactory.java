@@ -157,7 +157,7 @@ public class ByteBodyFactory {
      * @return The data written to the stream
      * @param <T> Exception type thrown by the consumer
      * @throws T Exception thrown by the consumer
-     * @since 5.2.1
+     * @since 5.2.2
      */
     public <T extends Throwable> CloseableAvailableByteBody buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
         return adapt(readBufferFactory().buffer(expectedSize, writer));

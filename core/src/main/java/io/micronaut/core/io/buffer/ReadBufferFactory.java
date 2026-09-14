@@ -183,7 +183,7 @@ public class ReadBufferFactory {
      * @param <T>          An exception thrown by the writer
      * @return The written data
      * @throws T If the writer throws an exception
-     * @since 5.2.1
+     * @since 5.2.2
      */
     public <T extends Throwable> ReadBuffer buffer(int expectedSize, ThrowingConsumer<? super OutputStream, T> writer) throws T {
         var s = new NoCopyByteArrayOutputStream(expectedSize);
