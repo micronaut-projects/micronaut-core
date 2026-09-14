@@ -19,8 +19,10 @@ import spock.lang.Specification
 
 /**
  * The access log handler needs the current request in a channel attribute (Micronaut Session
- * reads it from there). Whether a pipeline carries that handler is recorded when the pipeline is
- * built, so this checks that the attribute is set exactly on the pipelines that have the handler.
+ * reads it from there). Whether a pipeline carries that handler is worked out from the pipeline on
+ * the first request and remembered per pipeline, so this checks that the attribute is set exactly
+ * on the pipelines that have the handler, including one where the handler was added after the
+ * pipeline was built.
  */
 class AccessLogPipelineFlagSpec extends Specification {
     private static final AttributeKey<NettyHttpRequest> KEY = AttributeKey.valueOf(NettyHttpRequest.class.getSimpleName())
