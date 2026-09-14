@@ -15,7 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
@@ -38,16 +37,21 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
 /**
- * Selects the interceptors of the methods of a proxy that fronts a separate target, for the target of each call.
+ * The interceptors of the methods of a generated proxy.
  *
- * <p>A proxy generated for {@code @Around(proxyTarget = true)}, and so every scoped proxy and every advised bean a
- * factory produces, holds the singleton interceptors bound to its methods only, resolved here. The non-singleton
- * interceptors of a target are the target's own: they were created with the target, as dependents of its
- * registration, when its construction or lifecycle was intercepted, and they are destroyed with it. This class finds
- * them there, by definition, and creates as a further dependent of the target any that the target has not got yet,
- * which is the case for an interceptor bound only for {@code AROUND}. The selection for the methods is then kept
- * on the target's registration, so that it lives exactly as long as the target does and a proxy selects once per
- * target.</p>
+ * <p>A proxy that is the bean, generated for {@code @Around} or {@code @Introduction}, resolves them once in its
+ * constructor with {@link #resolve(BeanResolutionContext, ExecutableMethod[], boolean)}: the bean's own, through the
+ * context creating it, a non-singleton among them being the instance created with the bean or created now as its
+ * dependent.</p>
+ *
+ * <p>A proxy that fronts a separate target, generated for {@code @Around(proxyTarget = true)} and so every scoped
+ * proxy and every advised bean a factory produces, keeps an instance of this class. It holds the singleton
+ * interceptors bound to its methods only. The non-singleton interceptors of a target are the target's own: they were
+ * created with the target, as dependents of its registration, when its construction or lifecycle was intercepted,
+ * and they are destroyed with it. This class finds them there, by definition, and creates as a further dependent of
+ * the target any that the target has not got yet, which is the case for an interceptor bound only for {@code AROUND}.
+ * The selection for the methods is then kept on the target's registration, so that it lives exactly as long as the
+ * target does and a proxy selects once per target.</p>
  *
  * <p>When no non-singleton interceptor is bound to any of the methods, which is the common case, the selection is
  * made once with the singletons and every target gets it, and no registration is consulted.</p>
@@ -61,7 +65,7 @@ import java.util.List;
  */
 @Internal
 @UsedByGeneratedCode
-public final class ProxyTargetInterceptors {
+public final class ProxyInterceptors {
 
     private final BeanContext beanContext;
     private final InterceptorRegistry interceptorRegistry;
@@ -84,7 +88,7 @@ public final class ProxyTargetInterceptors {
      * @param introduction      Whether the methods are introduced rather than intercepted around
      */
     @UsedByGeneratedCode
-    public ProxyTargetInterceptors(BeanResolutionContext resolutionContext,
+    public ProxyInterceptors(BeanResolutionContext resolutionContext,
                                    ExecutableMethod<?, ?>[] methods,
                                    boolean introduction) {
         this.beanContext = resolutionContext.getContext();
@@ -96,7 +100,7 @@ public final class ProxyTargetInterceptors {
         // the singletons bound to the methods are the proxy's to share; the non-singletons are each target's own
         this.singletons = methods.length == 0
             ? List.of()
-            : new ArrayList<>(beanContext.getBeanRegistrations(Interceptor.ARGUMENT, ((InterceptorBindingQualifier<Interceptor<?, ?>>) binding).singletonsOnly()));
+            : new ArrayList<>(beanContext.getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()), true)));
         List<BeanDefinition<Interceptor<?, ?>>> found = List.of();
         if (methods.length > 0) {
             for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
@@ -112,6 +116,39 @@ public final class ProxyTargetInterceptors {
         }
         this.nonSingletons = found;
         this.fixed = found.isEmpty() ? select(singletons) : null;
+    }
+
+    /**
+     * Resolves the interceptors of the methods of a proxy that is the bean, for its constructor: the bean's own,
+     * through the context creating it, selected for each method through the registry.
+     *
+     * @param resolutionContext The resolution context the bean is created in
+     * @param methods           The intercepted methods, in the proxy's order
+     * @param introduction      Whether the proxy introduces methods; an abstract one is then implemented by its
+     *                          introduction interceptors and every other one is intercepted around
+     * @return The interceptors, by method
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @UsedByGeneratedCode
+    public static Interceptor<?, ?>[][] resolve(BeanResolutionContext resolutionContext,
+                                                ExecutableMethod<?, ?>[] methods,
+                                                boolean introduction) {
+        Interceptor<?, ?>[][] result = new Interceptor[methods.length][];
+        if (methods.length == 0) {
+            return result;
+        }
+        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
+        // the hierarchy reverses the array it is given, so it gets a copy
+        List<BeanRegistration<Interceptor<?, ?>>> registrations = new ArrayList<>(resolutionContext.getInterceptorRegistrations(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()))
+        ));
+        for (int i = 0; i < methods.length; i++) {
+            result[i] = introduction && methods[i].isAbstract()
+                ? InterceptorChain.resolveIntroductionInterceptors(interceptorRegistry, (ExecutableMethod) methods[i], (List) registrations)
+                : InterceptorChain.resolveAroundInterceptors(interceptorRegistry, (ExecutableMethod) methods[i], (List) registrations);
+        }
+        return result;
     }
 
     /**

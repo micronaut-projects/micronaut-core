@@ -23,7 +23,7 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.aop.chain.MethodInterceptorChain;
-import io.micronaut.aop.chain.ProxyTargetInterceptors;
+import io.micronaut.aop.chain.ProxyInterceptors;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanDefinitionRegistry;
@@ -178,8 +178,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_WRITE_LOCK = "$target_wl";
 
     private static final Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
-        "resolveInterceptors",
+        ProxyInterceptors.class,
+        "resolve",
         BeanResolutionContext.class,
         ExecutableMethod[].class,
         boolean.class
@@ -204,33 +204,33 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     );
 
     private static final String FIELD_INTERCEPTORS = "$interceptors";
-    private static final String FIELD_PROXY_TARGET_INTERCEPTORS = "$proxyTargetInterceptors";
+    private static final String FIELD_PROXY_TARGET_INTERCEPTORS = "$proxyInterceptors";
     private static final String FIELD_TARGET_REGISTRATION = "$targetRegistration";
     private static final String LOCAL_TARGET = "target";
     private static final String LOCAL_TARGET_REGISTRATION = "targetRegistration";
 
     private static final Constructor<?> CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS = ReflectionUtils.findConstructor(
-        ProxyTargetInterceptors.class,
+        ProxyInterceptors.class,
         BeanResolutionContext.class,
         ExecutableMethod[].class,
         boolean.class
-    ).orElseThrow(() -> new IllegalStateException("new ProxyTargetInterceptors(..) constructor not found. Incompatible version of Micronaut?"));
+    ).orElseThrow(() -> new IllegalStateException("new ProxyInterceptors(..) constructor not found. Incompatible version of Micronaut?"));
 
     private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE = ReflectionUtils.getRequiredInternalMethod(
-        ProxyTargetInterceptors.class,
+        ProxyInterceptors.class,
         "resolve",
         BeanRegistration.class
     );
 
     private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
-        ProxyTargetInterceptors.class,
+        ProxyInterceptors.class,
         "get",
         int.class,
         BeanRegistration.class
     );
 
     private static final Method METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_TARGET = ReflectionUtils.getRequiredInternalMethod(
-        ProxyTargetInterceptors.class,
+        ProxyInterceptors.class,
         "get",
         int.class,
         Object.class
@@ -730,7 +730,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             bodyBuilders.add((aThis, methodParameters) -> StatementDef.multi(
                 initializeProxyTargetMethods(aThis, proxyBeanDefinitionField, proxyMethodsField, interceptedMethods),
                 aThis.field(proxyTargetInterceptorsField).assign(
-                    ClassTypeDef.of(ProxyTargetInterceptors.class).instantiate(
+                    ClassTypeDef.of(ProxyInterceptors.class).instantiate(
                         CONSTRUCTOR_PROXY_TARGET_INTERCEPTORS,
                         // 1st argument: the resolution context the proxy is created in
                         methodParameters.get(beanResolutionContextArgumentIndex),
@@ -879,7 +879,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef beanQualifier = FieldDef.builder(FIELD_BEAN_QUALIFIER, TypeDef.of(Qualifier.class))
             .addModifiers(Modifier.PRIVATE)
             .build();
-        FieldDef proxyTargetInterceptors = FieldDef.builder(FIELD_PROXY_TARGET_INTERCEPTORS, ProxyTargetInterceptors.class)
+        FieldDef proxyTargetInterceptors = FieldDef.builder(FIELD_PROXY_TARGET_INTERCEPTORS, ProxyInterceptors.class)
             .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
             .build();
         FieldDef beanResolutionContext = lazy
@@ -960,7 +960,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             ),
             // the bean's own interceptors, resolved through the context creating it and selected per method
             aThis.field(interceptorsField).assign(
-                ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                ClassTypeDef.of(ProxyInterceptors.class).invokeStatic(
                     RESOLVE_INTERCEPTORS_METHOD,
                     // 1st argument: the resolution context
                     parameters.get(constructor.findParameterIndex(BEAN_RESOLUTION_CONTEXT_PARAMETER)),

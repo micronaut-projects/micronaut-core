@@ -15,12 +15,6 @@
  */
 package io.micronaut.aop.chain;
 
-import io.micronaut.inject.BeanDefinition;
-import io.micronaut.context.Qualifier;
-import java.util.ArrayList;
-import io.micronaut.inject.qualifiers.Qualifiers;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.aop.Adapter;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.Interceptor;
@@ -50,7 +44,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-
 /**
  * An internal representation of the {@link Interceptor} chain. This class implements {@link InvocationContext} and is
  * consumed by the framework itself and should not be used directly in application code.
@@ -62,15 +55,6 @@ import java.util.Set;
  */
 @Internal
 public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> implements InvocationContext<B, R> {
-
-    /**
-     * The argument a proxy's interceptors are recorded against on the resolution path: the parameter a proxy compiled
-     * before 5.3 received them through.
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static final Argument<List<BeanRegistration<Interceptor<?, ?>>>> INTERCEPTORS_ARGUMENT = (Argument) Argument.listOf(
-        Argument.of(BeanRegistration.class, Interceptor.ARGUMENT)
-    ).withName("$interceptors");
 
     protected final B target;
     protected final ExecutableMethod<B, R> executionHandle;
@@ -270,49 +254,6 @@ public class InterceptorChain<B, R> extends AbstractInterceptorChain<B, R> imple
         }
         Interceptor[] aroundInterceptors = resolveAroundInterceptors(beanContext, method, interceptors);
         return ArrayUtils.concat(aroundInterceptors, introductionInterceptors);
-    }
-
-    /**
-     * Resolves the interceptors of the methods of a bean that is its own proxy, for its constructor: the bean's own,
-     * through the resolution context creating it, selected for each method through the registry.
-     *
-     * @param resolutionContext The resolution context the bean is created in
-     * @param methods           The intercepted methods, in the proxy's order
-     * @param introduction      Whether the proxy introduces methods; an abstract one is then implemented by its
-     *                          introduction interceptors and every other one is intercepted around
-     * @return The interceptors, by method
-     * @since 5.3.0
-     */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    @UsedByGeneratedCode
-    public static Interceptor<?, ?>[][] resolveInterceptors(BeanResolutionContext resolutionContext,
-                                                            ExecutableMethod<?, ?>[] methods,
-                                                            boolean introduction) {
-        Interceptor<?, ?>[][] result = new Interceptor[methods.length][];
-        if (methods.length == 0) {
-            return result;
-        }
-        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        // the hierarchy reverses the array it is given, so it gets a copy
-        Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
-        List<BeanRegistration<Interceptor<?, ?>>> registrations;
-        BeanDefinition<?> proxyDefinition = resolutionContext.getCurrentBeanDefinition();
-        if (proxyDefinition == null) {
-            registrations = new ArrayList<>(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, binding));
-        } else {
-            // recorded on the path as the resolution of a constructor argument of the proxy, which is what an
-            // interceptor that injects its InjectionPoint sees: the bean it intercepts, or for an introduction the
-            // point the proxied bean is injected at
-            try (BeanResolutionContext.Path ignored = resolutionContext.getPath().pushConstructorResolve(proxyDefinition, INTERCEPTORS_ARGUMENT)) {
-                registrations = new ArrayList<>(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, binding));
-            }
-        }
-        for (int i = 0; i < methods.length; i++) {
-            result[i] = introduction && methods[i].isAbstract()
-                ? resolveIntroductionInterceptors(interceptorRegistry, (ExecutableMethod) methods[i], (List) registrations)
-                : resolveAroundInterceptors(interceptorRegistry, (ExecutableMethod) methods[i], (List) registrations);
-        }
-        return result;
     }
 
     private static <T> Interceptor<T, ?>[] resolveInterceptors(BeanContext beanContext,

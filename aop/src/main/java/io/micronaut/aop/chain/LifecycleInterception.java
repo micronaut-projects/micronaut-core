@@ -28,14 +28,11 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanConstructor;
 import io.micronaut.core.util.ArrayUtils;
-import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
-import io.micronaut.inject.qualifiers.InterceptorBindingQualifier;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
@@ -43,7 +40,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-
 /**
  * Runs the interception of a bean's lifecycle events: its construction, its post-construct and its pre-destroy.
  *
@@ -90,11 +86,9 @@ public final class LifecycleInterception {
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
             return null;
         }
-        Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(metadata);
-        if (InterceptedBeanProxy.class.isAssignableFrom(definition.getBeanType())) {
-            binding = ((InterceptorBindingQualifier<Interceptor<?, ?>>) binding).singletonsOnly();
-        }
-        return new ArrayList(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, binding));
+        // a proxy fronting a separate target owns no interceptor instance: singletons only
+        boolean clientProxy = InterceptedBeanProxy.class.isAssignableFrom(definition.getBeanType());
+        return new ArrayList(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(metadata, clientProxy)));
     }
 
     /**
@@ -149,10 +143,8 @@ public final class LifecycleInterception {
             interceptors = constructionInterceptors(resolutionContext, definition, constructor);
         }
         if (interceptors == null) {
-            // no binding at all: resolved by the construction binding alone, as an unbound bean always was
-            final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
-            final Collection<AnnotationValue<?>> annotationValues = AbstractInterceptorChain.resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
-            interceptors = new ArrayList(resolutionContext.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBindingValues(annotationValues)));
+            // no binding at all, so nothing can qualify: the constructor runs unadvised
+            interceptors = List.of();
         }
         final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
         final Interceptor<T, T>[] resolvedInterceptors = interceptorRegistry.resolveConstructorInterceptors(constructor, interceptors);

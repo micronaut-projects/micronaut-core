@@ -49,7 +49,7 @@ final class OwnedInterceptors {
      * @return {@code true} for a prototype or an interceptor with no scope
      */
     static boolean owned(BeanDefinition<?> definition) {
-        return UnscopedRegistrationIndex.isUnscoped(definition);
+        return BeanScopes.isUnscoped(definition);
     }
 
     /**

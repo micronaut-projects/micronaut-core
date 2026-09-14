@@ -15,9 +15,7 @@
  */
 package io.micronaut.context;
 
-import io.micronaut.context.annotation.Prototype;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.Reference;
@@ -25,7 +23,6 @@ import java.lang.ref.ReferenceQueue;
 import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-
 /**
  * Finds the registration of a bean the context created for no scope, by the identity of the bean.
  *
@@ -45,20 +42,6 @@ final class UnscopedRegistrationIndex {
 
     private final ReferenceQueue<Object> collected = new ReferenceQueue<>();
     private final Map<Object, WeakReference<BeanRegistration<?>>> registrations = new ConcurrentHashMap<>();
-
-    /**
-     * Whether a bean of the given definition is created for no scope, and so held by whoever asked for it.
-     *
-     * @param definition The definition
-     * @return {@code true} for a prototype or a bean with no scope
-     */
-    static boolean isUnscoped(BeanDefinition<?> definition) {
-        if (definition.isSingleton()) {
-            return false;
-        }
-        String scope = definition.getScopeName().orElse(null);
-        return scope == null || Prototype.class.getName().equals(scope);
-    }
 
     void put(BeanRegistration<?> registration) {
         Object target = registration.getBean();
