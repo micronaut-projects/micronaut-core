@@ -27,6 +27,7 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.TestScenario;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -36,6 +37,7 @@ import java.util.Map;
  * {@code micronaut.server.max-request-size} applies to every request body, not only to multipart uploads.
  */
 @SuppressWarnings({"java:S5960", "checkstyle:MissingJavadocType", "checkstyle:DesignForExtension"})
+@Tag("max-request-size") // a runner whose server does not yet enforce the limit on every body can exclude this tag
 public class MaxRequestSizeTest {
     public static final String SPEC_NAME = "MaxRequestSizeTest";
     private static final Map<String, Object> CONFIGURATION = Map.of("micronaut.server.max-request-size", "1KB");

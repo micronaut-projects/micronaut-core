@@ -28,6 +28,7 @@ import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.SameSite;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -44,6 +45,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * several headers.
  */
 @SuppressWarnings({"java:S5960", "checkstyle:MissingJavadocType", "checkstyle:DesignForExtension"})
+@Tag("cookie-attributes") // a runner whose server folds or splits Set-Cookie values can exclude this tag
 public class CookieAttributesTest {
     public static final String SPEC_NAME = "CookieAttributesTest";
 

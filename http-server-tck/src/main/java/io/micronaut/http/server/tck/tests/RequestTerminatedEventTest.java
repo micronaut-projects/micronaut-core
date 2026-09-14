@@ -33,9 +33,10 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.LockSupport;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
  * {@link HttpRequestTerminatedEvent} is published once for every request, whether it succeeded, failed in the
@@ -85,14 +86,17 @@ public class RequestTerminatedEventTest {
     }
 
     /**
-     * The event is published after the response has been sent, so the client can return before it fires.
+     * The event is published after the response has been sent, so the client can return before it fires. Once it
+     * has, a grace period passes before the count is checked, so that a second event published a little later,
+     * by an error path and a completion path both reporting the same request, is caught as well.
      */
     private static void awaitTerminated(Counter counter, String path) {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
         while (counter.terminated.get() == 0 && System.nanoTime() < deadline) {
-            Thread.onSpinWait();
+            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(10));
         }
-        assertTrue(counter.terminated.get() == 1, () -> "expected one terminated event for " + path + " but saw " + counter.terminated.get());
+        LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(200));
+        assertEquals(1, counter.terminated.get(), () -> "expected exactly one terminated event for " + path);
     }
 
     @Controller("/terminated")

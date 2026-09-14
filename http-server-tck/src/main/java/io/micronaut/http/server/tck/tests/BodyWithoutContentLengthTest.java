@@ -21,10 +21,12 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Delete;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -44,6 +46,7 @@ import static io.micronaut.http.tck.TestScenario.asserts;
  * parameters into a controller whose parameter is a {@code HttpRequest<Map<String, Object>>}.</p>
  */
 @SuppressWarnings({"java:S5960", "checkstyle:MissingJavadocType", "checkstyle:DesignForExtension"})
+@Tag("body-without-content-length") // a runner whose server still assumes an unknown length means a body can exclude this tag
 public class BodyWithoutContentLengthTest {
     public static final String SPEC_NAME = "BodyWithoutContentLengthTest";
 
@@ -59,13 +62,24 @@ public class BodyWithoutContentLengthTest {
     }
 
     @Test
-    void deleteWithABodyTypeAndNoBodyReachesTheRoute() throws IOException {
+    void getWithAStringBodyTypeAndNoBodyReachesTheRoute() throws IOException {
         asserts(SPEC_NAME,
             HttpRequest.GET("/body-without-content-length/optional-body"),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.OK)
                     .body("empty")
+                    .build()));
+    }
+
+    @Test
+    void deleteWithABodyTypeAndNoBodyReachesTheRoute() throws IOException {
+        asserts(SPEC_NAME,
+            HttpRequest.DELETE("/body-without-content-length/item/42"),
+            (server, request) -> AssertionUtils.assertDoesNotThrow(server, request,
+                HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("deleted 42 body=empty")
                     .build()));
     }
 
@@ -82,6 +96,12 @@ public class BodyWithoutContentLengthTest {
         @Get(value = "/optional-body", produces = MediaType.TEXT_PLAIN)
         String optionalBody(@NonNull HttpRequest<String> request) {
             return request.getBody().orElse("empty");
+        }
+
+        @Delete(value = "/item/{id}", produces = MediaType.TEXT_PLAIN)
+        String delete(@NonNull HttpRequest<Map<String, Object>> request, String id) {
+            Optional<Map<String, Object>> body = request.getBody();
+            return "deleted " + id + " body=" + body.map(Object::toString).orElse("empty");
         }
     }
 }

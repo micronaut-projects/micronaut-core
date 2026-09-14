@@ -39,7 +39,7 @@ public final class CorsUtils {
      * response, so the header's presence alone says nothing about CORS.
      *
      * @param response HTTP Response to run the assertion against
-     * @since 5.2.1
+     * @since 5.2.2
      */
     public static void assertVaryDoesNotNameOrigin(HttpResponse<?> response) {
         assertFalse(response.getHeaders().getAll(HttpHeaders.VARY).stream()
