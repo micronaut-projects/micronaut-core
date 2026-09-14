@@ -2,17 +2,34 @@ package io.micronaut.aop.proxy
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
+import io.micronaut.inject.BeanIdentifier
+import io.micronaut.inject.qualifiers.Qualifiers
 
 /**
- * The non-singleton interceptors a generated proxy is built with are of the dependent scope of the bean: they are the
- * dependents of its registration, whatever advice the bean has, and a singleton interceptor bound to it is shared
- * and is not.
+ * Every generated proxy retains the interceptor registrations its constructor was given, not only a proxy whose
+ * bean has intercepted lifecycle callbacks.
  */
 class InterceptorRegistrationRetentionSpec extends AbstractTypeElementSpec {
 
     private static List<String> interceptorNames(ApplicationContext context, Object bean) {
-        context.findBeanRegistration(bean).get().getDependentBeans()*.bean*.getClass()*.simpleName
+        assert bean instanceof Intercepted
+        interceptorRegistrations(context, bean)*.bean*.getClass()*.simpleName
+    }
+
+    /**
+     * The interceptors bound to the bean, as its registration answers for them: since 5.3 a proxy retains nothing,
+     * and the bean's own interceptors are resolved from its registration instead.
+     */
+    private static List<BeanRegistration> interceptorRegistrations(ApplicationContext context, Object bean) {
+        def registration = context.findBeanRegistration(bean).orElseGet {
+            // a bean of no scope that nothing was created for is held by nobody; a registration built for it answers the same way
+            def definition = context.getBeanDefinition(bean.getClass())
+            BeanRegistration.of(context, BeanIdentifier.of(definition.name), definition, bean)
+        }
+        new ArrayList<>(registration.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(registration.beanDefinition.annotationMetadata)))
     }
 
     void 'test an around only proxy retains the around interceptors bound to it'() {
@@ -21,7 +38,6 @@ class InterceptorRegistrationRetentionSpec extends AbstractTypeElementSpec {
 package retention.around;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 
@@ -31,7 +47,7 @@ import java.lang.annotation.*;
 @interface Aro {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Aro.class, kind = InterceptorKind.AROUND)
 class AroundInterceptor implements Interceptor<Object, Object> {
     @Override
@@ -50,7 +66,7 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('retention.around.MyBean'))
 
-        then: 'the interceptor the proxy was built with is a dependent of the bean'
+        then: 'the proxy reports the interceptor it was built with'
         bean.work() == 'done'
         interceptorNames(context, bean) == ['AroundInterceptor']
 
@@ -64,7 +80,6 @@ class MyBean {
 package retention.introduction;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 
@@ -74,7 +89,7 @@ import java.lang.annotation.*;
 @interface Stub {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Stub.class, kind = InterceptorKind.INTRODUCTION)
 class StubInterceptor implements Interceptor<Object, Object> {
     @Override
@@ -106,7 +121,6 @@ interface MyItfce {
 package retention.lifecycle;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -125,7 +139,7 @@ import java.lang.annotation.*;
 @interface Life {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Aro.class, kind = InterceptorKind.AROUND)
 class AroundInterceptor implements Interceptor<Object, Object> {
     @Override
@@ -134,7 +148,7 @@ class AroundInterceptor implements Interceptor<Object, Object> {
     }
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Life.class, kind = InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(value = Life.class, kind = InterceptorKind.PRE_DESTROY)
 class LifecycleInterceptor implements Interceptor<Object, Object> {
@@ -157,7 +171,7 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('retention.lifecycle.MyBean'))
 
-        then: 'the constructor qualifier is still widened, so the lifecycle interceptor was created with the bean too'
+        then: 'the constructor qualifier is still widened, so the list covers the lifecycle binding too'
         interceptorNames(context, bean).toSorted() == ['AroundInterceptor', 'LifecycleInterceptor']
 
         cleanup:
@@ -170,7 +184,6 @@ class MyBean {
 package retention.both;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -184,7 +197,7 @@ import java.lang.annotation.*;
 @interface Tracked {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.POST_CONSTRUCT)
 @InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
@@ -256,9 +269,9 @@ class MyBean {
         interceptorNames(context, first) == ['AroundInterceptor']
         interceptorNames(context, second) == ['AroundInterceptor']
 
-        and: 'each proxy owns its own interceptor instance'
-        !context.findBeanRegistration(first).get().getDependentBeans()[0].bean
-                .is(context.findBeanRegistration(second).get().getDependentBeans()[0].bean)
+        and: 'each proxy holds its own interceptor instance'
+        !interceptorRegistrations(context, first)[0].bean
+                .is(interceptorRegistrations(context, second)[0].bean)
 
         cleanup:
         context.close()
@@ -344,7 +357,7 @@ class MyBean {
         context.close()
     }
 
-    // MethodInterceptorChain#doIntercept selects intercepted.$interceptorRegistrations() whenever the list is
+    // Since 5.3 the lifecycle interception resolves the bean's own interceptors by binding; before, the retained list was used whenever it was
     // non-empty. Retaining a list on every proxy makes that branch reachable for an around-only proxy, so pin down
     // that such a proxy still has no lifecycle interception at all: the definition only generates the post-construct
     // and pre-destroy entry points when the bean carries lifecycle bindings, which is the same condition that widens
@@ -355,7 +368,6 @@ class MyBean {
 package retention.aroundlifecycle;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import jakarta.inject.Singleton;
@@ -368,7 +380,7 @@ import java.util.*;
 @interface Aro {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Aro.class, kind = InterceptorKind.AROUND)
 class AroundInterceptor implements Interceptor<Object, Object> {
     static final List<String> events = new ArrayList<>();
@@ -395,7 +407,7 @@ class MyBean {
         def bean = context.getBean(beanType)
         bean.work()
 
-        then: 'the around interceptor is a dependent, but post construct was not routed through the chain'
+        then: 'the retained list is non-empty, but post construct was not routed through the chain'
         interceptorNames(context, bean) == ['AroundInterceptor']
         beanType.callbacks == ['init']
         around.events == ['AROUND']
@@ -417,7 +429,6 @@ class MyBean {
 package retention.proxytarget;
 
 import io.micronaut.aop.*;
-import io.micronaut.context.annotation.Prototype;
 import jakarta.inject.Singleton;
 import java.lang.annotation.*;
 
@@ -427,7 +438,7 @@ import java.lang.annotation.*;
 @interface Aro {
 }
 
-@Prototype
+@Singleton
 @InterceptorBinding(value = Aro.class, kind = InterceptorKind.AROUND)
 class AroundInterceptor implements Interceptor<Object, Object> {
     @Override
@@ -446,10 +457,9 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('retention.proxytarget.MyBean'))
 
-        then: 'the proxy holds singletons only; the prototype belongs to the target'
+        then:
         bean.work() == 'done'
-        interceptorNames(context, bean) == []
-        interceptorNames(context, ((io.micronaut.aop.InterceptedProxy) bean).interceptedTarget()) == ['AroundInterceptor']
+        interceptorNames(context, bean) == ['AroundInterceptor']
 
         cleanup:
         context.close()
