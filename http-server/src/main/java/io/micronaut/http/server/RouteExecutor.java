@@ -50,6 +50,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
@@ -77,7 +78,6 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
-import java.time.LocalDateTime;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -793,7 +793,7 @@ public final class RouteExecutor {
 
     private void applyConfiguredHeaders(MutableHttpHeaders headers) {
         if (serverConfiguration.isDateHeader() && !headers.contains(HttpHeaders.DATE)) {
-            headers.date(LocalDateTime.now());
+            headers.add(HttpHeaders.DATE, HttpDateHeader.now());
         }
         if (headers.get(HttpHeaders.SERVER) == null) {
             serverConfiguration.getServerHeader()
