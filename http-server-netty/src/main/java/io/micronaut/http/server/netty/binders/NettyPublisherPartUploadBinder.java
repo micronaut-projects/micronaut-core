@@ -23,9 +23,7 @@ import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpStatus;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
-import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.multipart.CompletedAttribute;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.CompletedPart;
@@ -104,15 +102,9 @@ final class NettyPublisherPartUploadBinder implements TypedRequestArgumentBinder
             // these objects consume little memory, and accept writing to disk anyway, so we
             // subscribe eagerly here to avoid backpressure.
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
-                .flatMap(f -> {
-                    if (f.metadata().fileName() == null) {
-                        f.close();
-                        // the request is malformed for this argument, not the server: same answer as
-                        // FormFactory.completeFileUpload gives for a single @Part CompletedFileUpload
-                        return Flux.error(new HttpStatusException(HttpStatus.BAD_REQUEST, "Field [" + f.metadata().name() + "] was expected to be a file upload, but is missing a file name"));
-                    }
-                    return ReactiveExecutionFlow.toPublisher(formFactory.get().completePart(request, f));
-                })));
+                // completeFileUpload rejects a part without a file name with the same 400 a single
+                // @Part CompletedFileUpload gets, instead of treating the malformed request as a server error
+                .flatMap(f -> ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, f)))));
         } else if (contentTypeClass == CompletedAttribute.class) {
             // Publisher<CompletedAttribute>
             publisher = Flux.from(Publishers.bufferNow(Flux.from(formFactory.get().getOrCreateCompleter(request).subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.ASYNC_NO_BACKPRESSURE, argument)))
