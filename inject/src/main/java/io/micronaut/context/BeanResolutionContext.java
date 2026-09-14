@@ -293,6 +293,29 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     void setCurrentQualifier(@Nullable Qualifier<?> qualifier);
 
     /**
+     * The definition of the bean being instantiated through this context, while its constructor runs. A generated
+     * proxy resolves its interceptors from its constructor, and a resolution that starts there is recorded on the
+     * path against this definition, as a resolution of a constructor argument would be.
+     *
+     * @return The definition being instantiated, or {@code null} outside an instantiation
+     * @since 5.3.0
+     */
+    @Nullable
+    default BeanDefinition<?> getCurrentBeanDefinition() {
+        return null;
+    }
+
+    /**
+     * Sets the definition of the bean being instantiated. Set by the container around an instantiation and restored
+     * afterwards.
+     *
+     * @param beanDefinition The definition, or {@code null} once the instantiation is over
+     * @since 5.3.0
+     */
+    default void setCurrentBeanDefinition(@Nullable BeanDefinition<?> beanDefinition) {
+    }
+
+    /**
      * Adds a dependent bean to the resolution context.
      *
      * @param beanRegistration The bean registration

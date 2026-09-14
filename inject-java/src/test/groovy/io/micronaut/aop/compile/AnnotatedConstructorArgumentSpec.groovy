@@ -68,12 +68,6 @@ class MyBean {
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'
         beanDefinition.constructor.arguments[3].name == '$qualifier'
-        beanDefinition.constructor.arguments[4].name == '$interceptors'
-        beanDefinition.constructor.arguments[4]
-                .annotationMetadata
-                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
-                .getAnnotations(AnnotationMetadata.VALUE_MEMBER, InterceptorBinding)[0]
-                .stringValue().get() == Mutating.name
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')
@@ -124,12 +118,6 @@ class MyBean {
         beanDefinition.constructor.arguments[1].name == '$beanResolutionContext'
         beanDefinition.constructor.arguments[2].name == '$beanContext'
         beanDefinition.constructor.arguments[3].name == '$qualifier'
-        beanDefinition.constructor.arguments[4].name == '$interceptors'
-        beanDefinition.constructor.arguments[4]
-                .annotationMetadata
-                .getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING_QUALIFIER)
-                .getAnnotations(AnnotationMetadata.VALUE_MEMBER, InterceptorBinding)[0]
-                .stringValue().get() == Mutating.name
 
         when:
         def context = ApplicationContext.run('foo.bar':'test')

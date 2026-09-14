@@ -18,8 +18,6 @@ package io.micronaut.inject.writer;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
-import io.micronaut.aop.beandefinition.ProxyInterceptedBeanDefinition;
-import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
@@ -199,7 +197,6 @@ import java.util.stream.IntStream;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
-
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
  *
@@ -1585,28 +1582,19 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean isParametrized = isParametrized();
 
         if (isConstructorIntercepted(elementProducerDefinition.annotationMetadata())) {
+            // A generated proxy appends the three parameters every intercepted definition expects, so the same
+            // interface serves a proxy and a bean intercepted in place
             Method resolveValuesMethod;
             Method defaultInstantiateMethod;
             ClassTypeDef interceptedInterface;
-            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType);
             if (isParametrized) {
                 resolveValuesMethod = RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD;
-                if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ParameterizedProxyBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
-                } else {
-                    interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
-                }
+                interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
+                defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
             } else {
                 resolveValuesMethod = RESOLVE_INSTANTIATION_VALUES_METHOD;
-                if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ProxyInterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
-                } else {
-                    interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
-                }
+                interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
+                defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
             }
             classDefBuilder.addSuperinterface(interceptedInterface);
 

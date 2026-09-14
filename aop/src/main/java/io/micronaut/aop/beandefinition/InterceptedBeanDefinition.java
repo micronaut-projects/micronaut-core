@@ -21,16 +21,11 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
-
 /**
  * Intercepted {@link InstantiatableBeanDefinition}.
  *
@@ -68,20 +63,9 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      * @return The interceptors, or {@code null} when the bean binds none
      * @since 5.2.0
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveInterceptors(BeanResolutionContext resolutionContext,
                                                                                    AnnotationMetadataProvider constructor) {
-        // The constructor already exposes this bean's metadata combined with the constructor's, so use it rather
-        // than building a second hierarchy around it on every bean creation.
-        AnnotationMetadata metadata = constructor.getAnnotationMetadata();
-        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
-            return null;
-        }
-        // the bean's own: the non-singleton ones are created as dependents of the bean
-        return new ArrayList(resolutionContext.getInterceptorRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBinding(metadata)
-        ));
+        return LifecycleInterception.constructionInterceptors(resolutionContext, this, constructor);
     }
 
     @Override

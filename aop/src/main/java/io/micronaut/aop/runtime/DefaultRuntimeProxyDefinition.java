@@ -37,7 +37,6 @@ import java.util.Collection;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
-
 /**
  * The default {@link RuntimeProxyDefinition}.
  *
@@ -137,17 +136,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
         BeanDefinition<T> targetDefinition = beanContext.getProxyTargetBeanDefinition(argument, qualifier);
         ExecutableMethod<T, ?>[] methods = targetDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
-        InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
-        List<BeanRegistration<?>> singletons = new ArrayList<>();
-        if (methods.length > 0) {
-            Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()));
-            for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
-                if (definition.isSingleton()) {
-                    singletons.add(beanContext.getBeanRegistration(definition));
-                }
-            }
-        }
-        ProxyTargetInterceptors selection = new ProxyTargetInterceptors(beanContext, interceptorRegistry, methods, singletons, false);
+        ProxyTargetInterceptors selection = new ProxyTargetInterceptors(resolutionContext, methods, false);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
         if (targetDefinition.isSingleton()) {
             BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);

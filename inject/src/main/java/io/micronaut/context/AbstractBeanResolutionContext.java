@@ -67,6 +67,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Nullable
     private Qualifier<?> qualifier;
     @Nullable
+    private BeanDefinition<?> currentBeanDefinition;
+    @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     @Nullable
     private List<BeanRegistration<?>> dependentBeansToDestroyAfterResolution;
@@ -394,6 +396,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     public void copyStateFrom(AbstractBeanResolutionContext context) {
         path.addAll(context.path);
         qualifier = context.qualifier;
+        currentBeanDefinition = context.currentBeanDefinition;
         if (context.attributes != null) {
             getAttributesOrCreate().putAll(context.attributes);
         }
@@ -598,6 +601,17 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     @Override
     public void setCurrentQualifier(@Nullable Qualifier<?> qualifier) {
         this.qualifier = qualifier;
+    }
+
+    @Nullable
+    @Override
+    public BeanDefinition<?> getCurrentBeanDefinition() {
+        return currentBeanDefinition;
+    }
+
+    @Override
+    public void setCurrentBeanDefinition(@Nullable BeanDefinition<?> beanDefinition) {
+        this.currentBeanDefinition = beanDefinition;
     }
 
     @Override
