@@ -246,7 +246,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
 
     private final CustomScopeRegistry customScopeRegistry;
     private final BeanResolutionCustomizer beanResolutionCustomizer;
-    private final DependentScope dependentScope = new DependentScope();
     private final UnscopedRegistrationIndex unscopedRegistrations = new UnscopedRegistrationIndex();
 
     private @Nullable BeanDefinitionValidator beanValidator;
@@ -765,24 +764,6 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    /**
-     * Opens a resolution context for a bean that already exists, carrying the bean's dependent scope.
-     *
-     * <p>The dependents of the context are the dependents of the bean, as they were of the context that created it,
-     * so a lookup through {@link BeanResolutionContext#getDependentContext()} finds the beans created with the bean,
-     * among them its non-singleton interceptors. A bean created through the context is a new dependent of the bean
-     * and is handed to its registration when the context is closed, so that it is destroyed with the bean. The
-     * context must be closed.</p>
-     *
-     * @param registration The registration of the existing bean
-     * @return The resolution context
-     * @since 5.3.0
-     */
-    @Internal
-    public BeanResolutionContext newResolutionContext(BeanRegistration<?> registration) {
-        return new ExistingBeanResolutionContext(this, registration);
-    }
-
     @Override
     public ClassLoader getClassLoader() {
         return classLoader;
@@ -1166,7 +1147,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param registration The registration
      */
     private void rememberUnscoped(BeanRegistration<?> registration) {
-        if (registration.bean != null && dependentScope.isDependent(registration.beanDefinition)) {
+        if (registration.bean != null && UnscopedRegistrationIndex.isUnscoped(registration.beanDefinition)) {
             unscopedRegistrations.put(registration);
         }
     }
@@ -1363,10 +1344,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             definition.dispose(this, beanToDestroy);
             return;
         }
-        // The context carries the bean's dependent scope, so the pre-destroy interception finds the non-singleton
+        // The context carries the bean's dependents, so the pre-destroy interception finds the non-singleton
         // interceptors created with the bean where every other interception point does. Whatever the disposal
         // creates joins the bean's dependents when the context closes, and is destroyed with the bean.
-        try (BeanResolutionContext resolutionContext = newResolutionContext(registration)) {
+        try (BeanResolutionContext resolutionContext = registration.newResolutionContext()) {
             definition.dispose(resolutionContext, this, beanToDestroy);
         }
     }
@@ -3795,45 +3776,46 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     }
 
     /**
-     * Obtains the bean registrations for the given type and qualifier within the dependent scope of the bean the
-     * resolution context resolves for: a prototype, or a bean with no scope, is the dependent the bean already has
-     * of that definition, or is created as a new dependent of the bean. See {@link DependentBeanContext}.
+     * Obtains the registrations of the interceptors bound to the bean the resolution context resolves for: a
+     * singleton or a custom-scoped interceptor from its scope, any other the instance the bean already owns among its
+     * dependents, or one created for it now as a new dependent. See
+     * {@link BeanResolutionContext#getInterceptorRegistrations(Argument, Qualifier)}.
      *
      * @param resolutionContext The resolution context, whose dependents are the bean's
-     * @param beanType          The bean type
-     * @param qualifier         The qualifier
-     * @param <T>               The generic type
+     * @param interceptorType   The interceptor type
+     * @param binding           The interceptor binding qualifier
+     * @param <I>               The interceptor type
      * @return A collection of {@link BeanRegistration}
      * @since 5.3.0
      */
     @Internal
-    <T> Collection<BeanRegistration<T>> getDependentBeanRegistrations(BeanResolutionContext resolutionContext,
-                                                                      Argument<T> beanType,
-                                                                      @Nullable Qualifier<T> qualifier) {
-        return getBeanRegistrations(resolutionContext, beanType, qualifier, true);
+    <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(BeanResolutionContext resolutionContext,
+                                                                    Argument<I> interceptorType,
+                                                                    @Nullable Qualifier<I> binding) {
+        return getBeanRegistrations(resolutionContext, interceptorType, binding, true);
     }
 
     /**
-     * Obtains the bean registration for the given definition within the dependent scope of the bean the resolution
-     * context resolves for. See {@link DependentBeanContext}.
+     * Obtains the registration of one interceptor bound to the bean the resolution context resolves for, the bean's
+     * own instance of it. See {@link BeanResolutionContext#getInterceptorRegistration(BeanDefinition)}.
      *
      * @param resolutionContext The resolution context, whose dependents are the bean's
-     * @param definition        The definition
-     * @param <T>               The generic type
+     * @param interceptor       The interceptor definition
+     * @param <I>               The interceptor type
      * @return The registration
      * @since 5.3.0
      */
     @Internal
-    <T> BeanRegistration<T> getDependentBeanRegistration(BeanResolutionContext resolutionContext, BeanDefinition<T> definition) {
-        BeanRegistration<T> owned = dependentScope.find(resolutionContext, definition);
-        return owned != null ? owned : dependentScope.created(resolveBeanRegistration(resolutionContext, definition));
+    <I> BeanRegistration<I> getInterceptorRegistration(BeanResolutionContext resolutionContext, BeanDefinition<I> interceptor) {
+        BeanRegistration<I> owned = OwnedInterceptors.find(resolutionContext, interceptor);
+        return owned != null ? owned : OwnedInterceptors.created(resolveBeanRegistration(resolutionContext, interceptor));
     }
 
     @SuppressWarnings("unchecked")
     private <T> Collection<BeanRegistration<T>> getBeanRegistrations(@Nullable BeanResolutionContext resolutionContext,
                                                                      Argument<T> beanType,
                                                                      @Nullable Qualifier<T> qualifier,
-                                                                     boolean inDependentScope) {
+                                                                     boolean forInterceptors) {
         assertContextState();
         boolean hasQualifier = qualifier != null;
         if (LOG.isDebugEnabled()) {
@@ -3883,7 +3865,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     return holder.registrations;
                 }
             } else {
-                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, inDependentScope);
+                beanRegistrations = resolveBeanRegistrations(resolutionContext, beanDefinitions, beanType, qualifier, forInterceptors);
             }
         }
         if (LOG.isDebugEnabled() && !beanRegistrations.isEmpty()) {
@@ -3903,10 +3885,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                          Collection<BeanDefinition<T>> beanDefinitions,
                                                                          Argument<T> beanType,
                                                                          @Nullable Qualifier<T> qualifier,
-                                                                         boolean inDependentScope) {
+                                                                         boolean forInterceptors) {
         List<BeanRegistration<T>> beansOfTypeList = new ArrayList<>(beanDefinitions.size());
         for (BeanDefinition<T> definition : beanDefinitions) {
-            addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList, inDependentScope);
+            addCandidateToList(resolutionContext, definition, beanType, qualifier, beansOfTypeList, forInterceptors);
         }
         beansOfTypeList.sort(OrderUtil.ORDERED_COMPARATOR);
         return beansOfTypeList;
@@ -3986,11 +3968,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                         Argument<T> beanType,
                                         @Nullable Qualifier<T> qualifier,
                                         Collection<BeanRegistration<T>> beansOfTypeList,
-                                        boolean inDependentScope) {
+                                        boolean forInterceptors) {
         BeanRegistration<T> beanRegistration = null;
         try {
-            // within the dependent scope of the bean being resolved for, a candidate the bean already owns is reused
-            beanRegistration = inDependentScope ? dependentScope.find(resolutionContext, candidate) : null;
+            // an interceptor the bean being resolved for already owns is reused
+            beanRegistration = forInterceptors ? OwnedInterceptors.find(resolutionContext, candidate) : null;
             if (beanRegistration == null) {
                 beanRegistration = resolveBeanRegistration(
                     resolutionContext,
@@ -3998,8 +3980,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     candidate.asArgument(),
                     candidate.getDeclaredQualifier()
                 );
-                if (inDependentScope) {
-                    dependentScope.created(beanRegistration);
+                if (forInterceptors) {
+                    OwnedInterceptors.created(beanRegistration);
                 }
             }
             if (LOG.isDebugEnabled()) {

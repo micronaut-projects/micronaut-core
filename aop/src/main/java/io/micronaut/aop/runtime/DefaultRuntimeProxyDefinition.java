@@ -101,9 +101,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
         Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
 
-        // through the bean's dependent context: a non-singleton interceptor is created as a dependent of the proxy,
-        // which is the bean, and is the instance its lifecycle interception uses as well
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getDependentContext().getBeanRegistrations(
+        // the bean's own: a non-singleton interceptor is created as a dependent of the proxy, which is the bean, and
+        // is the instance its lifecycle interception uses as well
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getInterceptorRegistrations(
             (Argument) Argument.of(Interceptor.class),
             binding
         ));
@@ -122,7 +122,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
      *
      * <p>The proxy holds the singleton interceptors bound to the target's methods only. The non-singleton
      * interceptors of a target are the target's own, created with it as dependents of its registration, and the
-     * interceptors of a method are selected in the target's dependent scope. A singleton target is one to one with
+     * interceptors of a method are selected from the target's registration. A singleton target is one to one with
      * the proxy, so it is resolved now and the selection is made once. Any other target is resolved by each call,
      * through {@link #targetBean()}, so the selection is made for the target of the call, through
      * {@link #interceptors(InterceptedMethod, Object)}; the intercepted methods then list the methods an interceptor
@@ -199,7 +199,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         InterceptorRegistry interceptorRegistry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
         Qualifier<Object> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(executableMethods.toArray(new ExecutableMethod[0])));
 
-        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getDependentContext().getBeanRegistrations(
+        List<BeanRegistration<Interceptor<T, ?>>> interceptors = new ArrayList<>(resolutionContext.getInterceptorRegistrations(
             (Argument) Argument.of(Interceptor.class),
             binding
         ));

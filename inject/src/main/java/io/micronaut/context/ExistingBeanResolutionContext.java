@@ -25,9 +25,9 @@ import java.util.List;
  *
  * <p>The context that created the bean carried the beans created for it as its dependents, and handed them to the
  * registration. This context carries them again, so that whatever resolves for the existing bean, its pre-destroy
- * interception or a proxy that fronts it, sees the bean's dependent scope as the creation did. A bean created through
- * this context is a new dependent of the existing bean and is handed to the registration when the context is closed,
- * so that it is destroyed with the bean.</p>
+ * interception or a proxy that fronts it, finds the bean's own interceptors as the creation did. A bean created
+ * through this context is a new dependent of the existing bean and is handed to the registration when the context is
+ * closed, so that it is destroyed with the bean.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

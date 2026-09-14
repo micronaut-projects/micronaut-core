@@ -2672,11 +2672,10 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
             }
             qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
             // The interceptors bound to a bean, asked for by the interceptor binding qualifier of a generated proxy's
-            // constructor, are resolved in the dependent scope of the bean being created: a non-singleton interceptor
-            // is created as a dependent of the bean and is the instance every interception point of the bean reaches,
-            // see BeanResolutionContext#getDependentContext()
+            // constructor, are the bean's own: a non-singleton interceptor is created as a dependent of the bean and
+            // is the instance every interception point of the bean reaches
             Collection<BeanRegistration<I>> beanRegistrations = qualifier instanceof InterceptorBindingQualifier<I>
-                ? resolutionContext.getDependentContext().getBeanRegistrations(beanType, qualifier)
+                ? resolutionContext.getInterceptorRegistrations(beanType, qualifier)
                 : resolutionContext.getBeanRegistrations(beanType, qualifier);
             return coerceCollectionToCorrectType(returnType.getType(), beanRegistrations, resolutionContext, returnType);
         } catch (NoSuchBeanException e) {

@@ -20,8 +20,6 @@ import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
-import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.DefaultBeanContext;
 import io.micronaut.context.Qualifier;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
@@ -202,15 +200,15 @@ public final class ProxyTargetInterceptors {
     }
 
     /**
-     * The interceptors of the methods for a target, resolved through the target's dependent context: the singletons,
-     * and for each non-singleton the instance the target owns, or one created for it that joins its dependents.
+     * The interceptors of the methods for a target, the target's own: the singletons, and for each non-singleton the
+     * instance the target owns, or one created for it that joins its dependents.
      */
     private List<BeanRegistration<?>> ownedBy(BeanRegistration<?> target) {
-        if (!(beanContext instanceof DefaultBeanContext defaultBeanContext)) {
+        try {
+            return new ArrayList<>(target.getInterceptorRegistrations(Interceptor.ARGUMENT, binding));
+        } catch (UnsupportedOperationException e) {
+            // a registration a custom scope built by hand, which the context did not create and owns nothing through
             return resolveUnowned();
-        }
-        try (BeanResolutionContext resolutionContext = defaultBeanContext.newResolutionContext(target)) {
-            return new ArrayList<>(resolutionContext.getDependentContext().getBeanRegistrations(Interceptor.ARGUMENT, binding));
         }
     }
 
