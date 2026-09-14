@@ -1147,7 +1147,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      * @param registration The registration
      */
     private void rememberUnscoped(BeanRegistration<?> registration) {
-        if (registration.bean != null && UnscopedRegistrationIndex.isUnscoped(registration.beanDefinition)) {
+        if (registration.bean != null && BeanScopes.isUnscoped(registration.beanDefinition)) {
             unscopedRegistrations.put(registration);
         }
     }
@@ -2409,10 +2409,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                        @Nullable Map<String, Object> argumentValues) {
         Qualifier<T> declaredQualifier = beanDefinition.getDeclaredQualifier();
         Qualifier<?> prevQualifier = resolutionContext.getCurrentQualifier();
-        BeanDefinition<?> prevDefinition = resolutionContext.getCurrentBeanDefinition();
+        AbstractBeanResolutionContext instantiating = resolutionContext instanceof AbstractBeanResolutionContext abstractContext ? abstractContext : null;
+        BeanDefinition<?> prevDefinition = instantiating == null ? null : instantiating.currentBeanDefinition();
         try {
             resolutionContext.setCurrentQualifier(declaredQualifier != null && !AnyQualifier.INSTANCE.equals(declaredQualifier) ? declaredQualifier : qualifier);
-            resolutionContext.setCurrentBeanDefinition(beanDefinition);
+            if (instantiating != null) {
+                instantiating.currentBeanDefinition(beanDefinition);
+            }
             createDependsOnBeans(resolutionContext, beanDefinition);
             T bean;
             if (beanDefinition instanceof ParametrizedInstantiatableBeanDefinition<T> parametrizedInstantiatableBeanDefinition) {
@@ -2445,7 +2448,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             throw new BeanInstantiationException(beanDefinition, e);
         } finally {
             resolutionContext.setCurrentQualifier(prevQualifier);
-            resolutionContext.setCurrentBeanDefinition(prevDefinition);
+            if (instantiating != null) {
+                instantiating.currentBeanDefinition(prevDefinition);
+            }
         }
     }
 

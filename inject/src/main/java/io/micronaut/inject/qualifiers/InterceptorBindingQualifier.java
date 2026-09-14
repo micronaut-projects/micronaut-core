@@ -108,8 +108,7 @@ public final class InterceptorBindingQualifier<T> extends FilteringQualifier<T> 
      * @return The qualifier, matching singleton interceptors alone
      * @since 5.3.0
      */
-    @Internal
-    public InterceptorBindingQualifier<T> singletonsOnly() {
+    InterceptorBindingQualifier<T> singletonsOnly() {
         return singletonsOnly ? this : new InterceptorBindingQualifier<>(this, true);
     }
 

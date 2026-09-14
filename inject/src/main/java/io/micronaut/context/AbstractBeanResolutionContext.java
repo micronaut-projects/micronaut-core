@@ -56,6 +56,10 @@ import java.util.stream.Stream;
 public abstract class AbstractBeanResolutionContext implements BeanResolutionContext {
 
     private static final String CONSTRUCTOR_METHOD_NAME = "<init>";
+    /**
+     * The argument the interceptors of a bean being instantiated are recorded against on the path.
+     */
+    private static final Argument<?> INTERCEPTORS_ARGUMENT = Argument.listOf(BeanRegistration.class).withName("$interceptors");
     protected final DefaultBeanContext context;
     @Nullable
     protected final BeanDefinition<?> rootDefinition;
@@ -501,12 +505,26 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
-        return context.getInterceptorRegistrations(this, interceptorType, binding);
+        if (currentBeanDefinition == null) {
+            return context.getInterceptorRegistrations(this, interceptorType, binding);
+        }
+        // While a bean is instantiated its interceptors are resolved as its own, and the resolution is recorded on
+        // the path as that of a constructor argument of the bean, the one a proxy compiled before 5.3 received them
+        // through: an interceptor that injects its InjectionPoint sees the bean it intercepts, and for an
+        // introduction the point the proxied bean is injected at
+        try (Path ignored = path.pushConstructorResolve(currentBeanDefinition, INTERCEPTORS_ARGUMENT)) {
+            return context.getInterceptorRegistrations(this, interceptorType, binding);
+        }
     }
 
     @Override
     public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
-        return context.getInterceptorRegistration(this, interceptor);
+        if (currentBeanDefinition == null) {
+            return context.getInterceptorRegistration(this, interceptor);
+        }
+        try (Path ignored = path.pushConstructorResolve(currentBeanDefinition, INTERCEPTORS_ARGUMENT)) {
+            return context.getInterceptorRegistration(this, interceptor);
+        }
     }
 
     @Override
@@ -624,14 +642,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         this.qualifier = qualifier;
     }
 
+    /**
+     * @return The definition of the bean being instantiated through this context, or {@code null} outside an
+     * instantiation
+     */
     @Nullable
-    @Override
-    public BeanDefinition<?> getCurrentBeanDefinition() {
+    BeanDefinition<?> currentBeanDefinition() {
         return currentBeanDefinition;
     }
 
-    @Override
-    public void setCurrentBeanDefinition(@Nullable BeanDefinition<?> beanDefinition) {
+    /**
+     * Records the definition of the bean being instantiated, set by the container around an instantiation next to
+     * the current qualifier and restored afterwards.
+     *
+     * @param beanDefinition The definition, or {@code null} once the instantiation is over
+     */
+    void currentBeanDefinition(@Nullable BeanDefinition<?> beanDefinition) {
         this.currentBeanDefinition = beanDefinition;
     }
 

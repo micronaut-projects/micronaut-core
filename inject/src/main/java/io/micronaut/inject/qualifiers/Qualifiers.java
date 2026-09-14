@@ -392,6 +392,24 @@ public class Qualifiers {
     }
 
     /**
+     * Build a qualifier for the given interceptor binding, restricted to singleton interceptors when asked.
+     *
+     * <p>A proxy that fronts a separate target owns no interceptor instance, as a client proxy owns none in CDI:
+     * the non-singleton interceptors of a target are the target's own, so such a proxy holds the singletons only.</p>
+     *
+     * @param annotationMetadata The annotation metadata carrying the binding
+     * @param singletonsOnly     Whether only singleton interceptors qualify
+     * @param <T>                The bean type
+     * @return The qualifier
+     * @since 5.3.0
+     */
+    @Internal
+    public static <T> Qualifier<T> byInterceptorBinding(AnnotationMetadata annotationMetadata, boolean singletonsOnly) {
+        InterceptorBindingQualifier<T> qualifier = new InterceptorBindingQualifier<>(annotationMetadata);
+        return singletonsOnly ? qualifier.singletonsOnly() : qualifier;
+    }
+
+    /**
      * Reduces bean definitions by the given interceptor binding.
      *
      * @param binding The binding values to use
