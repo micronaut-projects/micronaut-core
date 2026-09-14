@@ -28,6 +28,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
         C.closed = 0
         D.destroyed = 0
         D.created = 0
+        D.destroyedInstances.clear()
     }
 
     def cleanup() {
@@ -37,6 +38,7 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
         C.closed = 0
         D.destroyed = 0
         D.created = 0
+        D.destroyedInstances.clear()
     }
 
     void "test that a lazy target bean with a pre-destroy hook works"() {
@@ -63,7 +65,13 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
             B.noArgsDestroyCalled == 1
             B.injectedDestroyCalled == 1
             D.created == 2 // Create proxy + target
-            D.destroyed == 2
+            // The proxy owns one D and the lazy cached target owns another, and only the proxy's is destroyed:
+            // the target instance is cached on the proxy without its registration, so the beans created for the
+            // target are out of reach when the proxy is destroyed. Until 5.2.1 this read as two destructions,
+            // because the proxy's dependents were destroyed once in the proxy and then handed to the target and
+            // destroyed again - the same D twice, never the target's.
+            D.destroyed == 1
+            D.destroyedInstances.unique(false).size() == 1
 
         cleanup:
             context.close()
@@ -125,7 +133,9 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
             B.noArgsDestroyCalled == 1
             B.injectedDestroyCalled == 1
             D.created == 2
-            D.destroyed == 2  // Destroy proxy + target
+            // One D destroyed, and only one: see the first feature for why it is not two.
+            D.destroyed == 1
+            D.destroyedInstances.unique(false).size() == 1
 
         cleanup:
             context.close()
@@ -187,7 +197,9 @@ class ProxyLazyCachedTargetPrototypeBeanWithPreDestroySpec extends Specification
             B.noArgsDestroyCalled == 1
             B.injectedDestroyCalled == 1
             D.created == 2
-            D.destroyed == 2
+            // One D destroyed, and only one: see the first feature for why it is not two.
+            D.destroyed == 1
+            D.destroyedInstances.unique(false).size() == 1
     }
 
     void "test proxies are prototypes and dependent beans not destroyed when created by `getBean(<ProxyClass>)`"() {

@@ -19,11 +19,20 @@ import io.micronaut.context.annotation.Prototype;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Prototype
 public class D {
 
     static int created;
     static int destroyed;
+
+    /**
+     * Which instances were destroyed, so that a test can tell one instance destroyed twice from two instances
+     * destroyed once.
+     */
+    static final List<D> destroyedInstances = new ArrayList<>();
 
     @PostConstruct
     public void create() {
@@ -33,6 +42,7 @@ public class D {
     @PreDestroy
     public void destroy() {
         destroyed++;
+        destroyedInstances.add(this);
     }
 
 }
