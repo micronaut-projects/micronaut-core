@@ -106,6 +106,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean finished;
         private boolean reset;
+        private boolean closed;
         private Compressor. @Nullable Session compressionSession;
 
         MultiplexedStream(int streamId) {
@@ -166,6 +167,11 @@ abstract class MultiplexedServerHandler {
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
             if (streamer == null) {
+                if (closed) {
+                    // no request will be accepted for this stream anymore
+                    data.release();
+                    return 0;
+                }
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
                 }
@@ -208,7 +214,7 @@ abstract class MultiplexedServerHandler {
          * on buffering data in hopes of reading it all in one go.
          */
         final void devolveToStreaming() {
-            if (requestAccepted || streamer != null || request == null) {
+            if (closed || requestAccepted || streamer != null || request == null) {
                 return;
             }
             streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
@@ -243,6 +249,23 @@ abstract class MultiplexedServerHandler {
                 streamer.error(e);
             }
             disposeWriteSide();
+        }
+
+        /**
+         * Called when the stream is closed, or when no more of it will be read. Request data
+         * that is still buffered for the next read complete is released, and no request is
+         * accepted for the stream afterwards. The released bytes are not reported to
+         * {@link #notifyDataConsumed(int)}: the flow control window of a closed stream is settled
+         * by the transport.
+         */
+        final void discardBufferedContent() {
+            closed = true;
+            if (bufferedContent != null) {
+                for (ByteBuf buf : bufferedContent) {
+                    buf.release();
+                }
+                bufferedContent = null;
+            }
         }
 
         private void disposeWriteSide() {

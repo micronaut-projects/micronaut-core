@@ -33,6 +33,7 @@ import io.netty.handler.codec.http2.DefaultHttp2Connection;
 import io.netty.handler.codec.http2.DelegatingDecompressorFrameListener;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2Connection;
+import io.netty.handler.codec.http2.Http2ConnectionAdapter;
 import io.netty.handler.codec.http2.Http2ConnectionDecoder;
 import io.netty.handler.codec.http2.Http2ConnectionEncoder;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -87,7 +88,21 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
     private void init(Http2ConnectionHandler connectionHandler) {
         this.connectionHandler = connectionHandler;
-        streamKey = connectionHandler.connection().newKey();
+        Http2Connection.PropertyKey key = connectionHandler.connection().newKey();
+        streamKey = key;
+        connectionHandler.connection().addListener(new Http2ConnectionAdapter() {
+            @Override
+            public void onStreamClosed(io.netty.handler.codec.http2.Http2Stream s) {
+                // A stream can close before read complete hands its buffered data to a request:
+                // reset by the peer in the same read, reset by us, or closed with the
+                // connection. Netty's local flow controller returns the unconsumed bytes of a
+                // closed stream to the connection window itself.
+                Http2Stream stream = s.getProperty(key);
+                if (stream != null) {
+                    stream.discardBufferedContent();
+                }
+            }
+        });
     }
 
     private Http2ConnectionHandler requiredConnectionHandler() {
@@ -244,6 +259,8 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
                 Http2ServerHandler.Http2Stream stream = s.getProperty(handler.streamKey);
                 if (stream != null) {
                     stream.onGoAwayRead(StacklessStreamClosedChannelException.INSTANCE);
+                    // nothing is read after the handler is removed, so there is no read complete
+                    stream.discardBufferedContent();
                 }
                 return true;
             });
