@@ -45,6 +45,7 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
 import org.codehaus.groovy.ast.ASTNode;
+import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.control.ClassNodeResolver;
@@ -310,9 +311,42 @@ public class GroovyVisitorContext implements VisitorContext {
         return outputVisitor.visitGeneratedFile(path, originatingElements);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * <p>The Groovy compiler has no annotation-processing rounds, so the file is not written to a generated
+     * sources directory: it is queued into the running compilation once it is written and closed, and its classes
+     * are compiled, visited by the type element visitors and written to the same output as every other class of
+     * the compilation. The content must be Groovy source. A generated class may reference any class of the
+     * compilation, but the sources the compilation started with are resolved before the visitors run, so they
+     * cannot reference a generated class. Nothing is left in the compilation to process a source written once
+     * class generation has started, so an empty optional is returned from then on.</p>
+     */
     @Override
     public Optional<GeneratedFile> visitGeneratedSourceFile(String packageName, String fileNameWithoutExtension, Element... originatingElements) {
+        if (compilationUnit != null) {
+            return GroovyGeneratedSourceFiles.of(compilationUnit)
+                .visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingSource(originatingElements));
+        }
         return outputVisitor.visitGeneratedSourceFile(packageName, fileNameWithoutExtension, originatingElements);
+    }
+
+    /**
+     * The source unit of the first originating element that has one, else the source unit being visited.
+     */
+    @Nullable
+    private SourceUnit originatingSource(Element... originatingElements) {
+        for (Element element : originatingElements) {
+            // not every element has a native type: a primitive or a synthetic method element throws for it
+            if (element instanceof AbstractGroovyElement groovyElement) {
+                AnnotatedNode node = groovyElement.getNativeType().annotatedNode();
+                ClassNode owner = node instanceof ClassNode classNode ? classNode : node.getDeclaringClass();
+                if (owner != null && owner.getModule() != null && owner.getModule().getContext() != null) {
+                    return owner.getModule().getContext();
+                }
+            }
+        }
+        return sourceUnit;
     }
 
     @Override

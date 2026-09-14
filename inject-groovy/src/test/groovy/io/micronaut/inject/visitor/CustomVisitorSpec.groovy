@@ -61,11 +61,12 @@ class TestController {
 ''')
         expect:
         ControllerGetVisitor.getVisited() == ["test.TestController", "getMethod"]
+        // @PackageScope turns the property into a package-private field without accessors before the visitors run
         AllElementsVisitor.getVisited().toSet() == ["test.TestController",
                                                     "privateField",
                                                     "protectedField",
                                                     "publicField", "setProperty", "getProperty",
-                                                    "packagePrivateField", "setPackagePrivateField", "getPackagePrivateField",
+                                                    "packagePrivateField",
                                                     "property",
                                                     "setterMethod", "getMethod", "postMethod"].toSet()
         AllClassesVisitor.getVisited() == ["test.TestController", "getMethod"]

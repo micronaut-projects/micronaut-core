@@ -61,6 +61,7 @@ import org.codehaus.groovy.ast.InnerClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PackageNode;
 import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 
 import java.lang.annotation.Annotation;
@@ -355,7 +356,36 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         if (defaultConstructor.isPresent()) {
             return defaultConstructor;
         }
+        Optional<MethodElement> allParametersDefaulted = constructorGeneratedFromDefaultedParameters();
+        if (allParametersDefaulted.isPresent()) {
+            return allParametersDefaulted;
+        }
         return possibleDefaultEmptyConstructor();
+    }
+
+    /**
+     * Groovy generates the constructors with fewer parameters for a constructor whose parameters have default values
+     * at class generation, dropping the defaulted parameters from right to left. A constructor with every parameter
+     * defaulted, which {@code @TupleConstructor} and so {@code @Canonical} and {@code @Immutable} declare, therefore
+     * yields a no-argument constructor that does not exist yet when the class is visited.
+     *
+     * @return The no-argument constructor Groovy will generate, if a declared constructor implies one
+     */
+    private Optional<MethodElement> constructorGeneratedFromDefaultedParameters() {
+        if (isInner() && !isStatic()) {
+            // only static inner classes can be constructed
+            return Optional.empty();
+        }
+        for (ConstructorNode constructor : classNode.getDeclaredConstructors()) {
+            Parameter[] parameters = constructor.getParameters();
+            if (parameters.length > 0 && !constructor.isPrivate() && Arrays.stream(parameters).allMatch(Parameter::hasInitialExpression)) {
+                ConstructorNode generated = new ConstructorNode(constructor.getModifiers(), new BlockStatement());
+                generated.setDeclaringClass(classNode);
+                generated.setSourcePosition(constructor);
+                return createMethodElement(generated);
+            }
+        }
+        return Optional.empty();
     }
 
     private Optional<MethodElement> possibleDefaultEmptyConstructor() {

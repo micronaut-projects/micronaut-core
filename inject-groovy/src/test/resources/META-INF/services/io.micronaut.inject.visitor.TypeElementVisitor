@@ -6,3 +6,5 @@ io.micronaut.inject.visitor.IntroductionVisitor
 io.micronaut.inject.visitor.MutatingVisitor
 io.micronaut.expressions.ContextRegistrar
 io.micronaut.inject.visitor.TypeElementQueryVisitor
+io.micronaut.inject.visitor.GeneratedSourceVisitor
+io.micronaut.inject.visitor.ConstructorArityVisitor
