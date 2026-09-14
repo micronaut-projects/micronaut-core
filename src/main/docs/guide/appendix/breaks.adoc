@@ -1,6 +1,17 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Construct advice no longer wraps injection and `@PostConstruct`
+
+A api:aop.ConstructorInterceptor[] now wraps only the constructor call. Fields and methods of the bean are injected, and
+its `@PostConstruct` methods run, after every construct interceptor has returned, instead of inside the call to
+`proceed()`. As a result `@PostConstruct` no longer runs before an outer construct interceptor has completed, nor when
+one throws after `proceed()`.
+
+A construct interceptor that used the injected state of the instance returned by `proceed()` should bind to
+`InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
+Beans compiled with an earlier version keep the previous order until they are recompiled.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
