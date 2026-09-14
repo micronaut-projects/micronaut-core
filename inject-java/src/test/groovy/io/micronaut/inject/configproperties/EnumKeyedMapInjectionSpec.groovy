@@ -17,6 +17,8 @@ package io.micronaut.inject.configproperties
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.exceptions.DependencyInjectionException
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class EnumKeyedMapInjectionSpec extends AbstractTypeElementSpec {
 
@@ -365,6 +367,239 @@ class Consumer {
 
         cleanup:
         context.close()
+    }
+
+    void 'test a @Factory-provided map takes precedence for an inner configuration too'() {
+        given: """a factory supplying the map of an inner @EachProperty class of an @EachProperty parent.
+                  Those beans are named after the parent bean as well as their own key - france-north, not
+                  north - so an enum does not model them and the map is left resolving as a single bean."""
+        ApplicationContext context = buildContext('test.RegionConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.value.PropertyCatalog;
+import jakarta.inject.Singleton;
+
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+enum Zone {
+    NORTH, SOUTH
+}
+
+@EachProperty(value = "service.regions", catalog = PropertyCatalog.RAW)
+class RegionConfig {
+
+    private final Map<Zone, ZoneConfig> zones;
+
+    @ConfigurationInject
+    RegionConfig(Map<Zone, ZoneConfig> zones) {
+        this.zones = zones;
+    }
+
+    public Map<Zone, ZoneConfig> getZones() {
+        return zones;
+    }
+
+    @EachProperty(value = "zones", catalog = PropertyCatalog.RAW)
+    static class ZoneConfig {
+
+        private final int size;
+
+        @ConfigurationInject
+        ZoneConfig(int size) {
+            this.size = size;
+        }
+
+        public int getSize() {
+            return size;
+        }
+    }
+}
+
+@Factory
+class MapFactory {
+
+    @Singleton
+    Map<Zone, RegionConfig.ZoneConfig> zones() {
+        Map<Zone, RegionConfig.ZoneConfig> supplied = new LinkedHashMap<>();
+        supplied.put(Zone.NORTH, new RegionConfig.ZoneConfig(99));
+        return supplied;
+    }
+}
+''', true, [
+                'service.regions.france.zones.NORTH.size': 1,
+                'service.regions.france.zones.SOUTH.size': 2
+        ])
+        def north = enumConstant(context, 'test.Zone', 'NORTH')
+
+        when:
+        def region = context.getBean(context.classLoader.loadClass('test.RegionConfig'), Qualifiers.byName('france'))
+
+        then: 'the factory map wins: 99 comes from the factory, and the two collected beans would be 1 and 2'
+        region.zones.size() == 1
+        region.zones[north].size == 99
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test an enum-keyed Map of an inner configuration is left resolving as a single bean'() {
+        given: """the same inner @EachProperty class with no factory supplying the map.
+                  The beans are named france-north and france-south, which no Zone constant matches, so
+                  the map is not collected at all and resolves as it did before enum keys were supported."""
+        ApplicationContext context = buildContext('test.RegionConfig', '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.core.value.PropertyCatalog;
+
+import java.util.Map;
+
+enum Zone {
+    NORTH, SOUTH
+}
+
+@EachProperty(value = "service.regions", catalog = PropertyCatalog.RAW)
+class RegionConfig {
+
+    private final Map<Zone, ZoneConfig> zones;
+
+    @ConfigurationInject
+    RegionConfig(Map<Zone, ZoneConfig> zones) {
+        this.zones = zones;
+    }
+
+    public Map<Zone, ZoneConfig> getZones() {
+        return zones;
+    }
+
+    @EachProperty(value = "zones", catalog = PropertyCatalog.RAW)
+    static class ZoneConfig {
+
+        private final int size;
+
+        @ConfigurationInject
+        ZoneConfig(int size) {
+            this.size = size;
+        }
+
+        public int getSize() {
+            return size;
+        }
+    }
+}
+''', true, [
+                'service.regions.france.zones.NORTH.size': 1,
+                'service.regions.france.zones.SOUTH.size': 2
+        ])
+
+        when:
+        context.getBean(context.classLoader.loadClass('test.RegionConfig'), Qualifiers.byName('france'))
+
+        then: """it fails looking for a bean of the map type, as it does on an unmodified checkout, rather
+                 than collecting beans whose names cannot be converted."""
+        def e = thrown(DependencyInjectionException)
+        !e.message.contains('Cannot convert the name of bean')
+
+        cleanup:
+        context.close()
+    }
+
+    void 'test an enum-keyed Map of a factory-declared @EachBean is not collected'() {
+        given: """@EachBean on the factory method rather than on the class. Iterability is read off the
+                  value type's own annotations, which carry nothing here, so the map is not collected -
+                  while the same beans keyed by String are. A limitation, pinned so it is not a surprise."""
+        String source = '''
+package test;
+
+import io.micronaut.context.annotation.ConfigurationInject;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.core.value.PropertyCatalog;
+import jakarta.inject.Singleton;
+
+import java.util.Map;
+
+@EachProperty(value = "shards", catalog = PropertyCatalog.RAW)
+class ShardConfig {
+
+    private final int size;
+
+    @ConfigurationInject
+    ShardConfig(int size) {
+        this.size = size;
+    }
+
+    public int getSize() {
+        return size;
+    }
+}
+
+class ShardClient {
+
+    private final ShardConfig config;
+
+    ShardClient(ShardConfig config) {
+        this.config = config;
+    }
+
+    public int getSize() {
+        return config.getSize();
+    }
+}
+
+@Factory
+class ShardClientFactory {
+
+    @EachBean(ShardConfig.class)
+    ShardClient client(ShardConfig config) {
+        return new ShardClient(config);
+    }
+}
+
+enum Shard {
+    ALPHA, BETA
+}
+
+@Singleton
+class Registry {
+
+    private final Map<KEY, ShardClient> clients;
+
+    Registry(Map<KEY, ShardClient> clients) {
+        this.clients = clients;
+    }
+
+    public Map<KEY, ShardClient> getClients() {
+        return clients;
+    }
+}
+'''
+        Map<String, Object> properties = ['shards.ALPHA.size': 10, 'shards.BETA.size': 20]
+
+        when: 'the same beans are collected by their name'
+        ApplicationContext byName = buildContext('test.Registry', source.replace('KEY', 'String'), true, properties)
+        def collected = byName.getBean(byName.classLoader.loadClass('test.Registry'))
+
+        then:
+        collected.clients.keySet() == ['ALPHA', 'BETA'] as Set
+
+        when: 'the key is the enum naming them'
+        ApplicationContext byEnum = buildContext('test.Registry', source.replace('KEY', 'Shard'), true, properties)
+        byEnum.getBean(byEnum.classLoader.loadClass('test.Registry'))
+
+        then: 'no bean of the map type exists, as before this change'
+        def e = thrown(Exception)
+        e.message.contains('java.util.Map<test.Shard,test.ShardClient>')
+
+        cleanup:
+        byName.close()
+        byEnum.close()
     }
 
     private static Object enumConstant(ApplicationContext context, String enumType, String constant) {

@@ -369,6 +369,12 @@ public class BeanInjectionUtils {
      * bean of the map type exists is not decided here: a map that is supplied directly still takes
      * precedence, which is resolved at runtime where that is actually known.</p>
      *
+     * <p>Iterability is read off the value type's own annotations, so a bean declared iterable by the
+     * {@link io.micronaut.context.annotation.Factory} method that produces it - the annotation is on the
+     * method, not on the returned class, which may not even be compiled here - is not recognised, and an
+     * enum-keyed map of it keeps resolving as a single bean. A {@link CharSequence}-keyed map of the same
+     * beans collects them, because that path never inspects the value type.</p>
+     *
      * @param keyType  The map key type
      * @param beanType The map value type
      * @return Whether the map can be collected by bean name
@@ -380,6 +386,30 @@ public class BeanInjectionUtils {
         if (keyType.isAssignable(CharSequence.class)) {
             return true;
         }
-        return keyType.isEnum() && beanType != null && isIterable(beanType);
+        return keyType.isEnum() && beanType != null && isIterable(beanType) && !isNamedAfterParentBean(beanType);
+    }
+
+    /**
+     * Whether the beans of a type are named after the bean they belong to rather than by their own
+     * configuration key alone.
+     *
+     * <p>An iterable type nested in another iterable one exists once per parent bean as well as once per
+     * key of its own, and is named for both: the zones of a region are named {@code france-north} and
+     * {@code france-south}, not {@code north} and {@code south}. Those names are not the closed set an
+     * enum models, so a map of them keeps resolving as the single bean it resolves as today rather than
+     * being collected and failing to convert.</p>
+     *
+     * @param beanType The map value type
+     * @return Whether the bean names carry the name of a parent bean
+     */
+    private static boolean isNamedAfterParentBean(ClassElement beanType) {
+        for (ClassElement enclosing = beanType.getEnclosingType().orElse(null);
+             enclosing != null;
+             enclosing = enclosing.getEnclosingType().orElse(null)) {
+            if (isIterable(enclosing)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

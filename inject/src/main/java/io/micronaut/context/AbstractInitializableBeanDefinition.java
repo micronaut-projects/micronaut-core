@@ -2533,6 +2533,22 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         return resolutionContext.streamOfType(beanType, qualifier);
     }
 
+    /**
+     * Resolves a map of the beans of a type, collected by the name each is registered under.
+     *
+     * <p>A key type a {@code String} can be assigned to is the bean name itself. Any other key type is
+     * converted from the name by {@link #keyByType}, and because the processor routes an injection point
+     * here on the shape of its type alone, a map supplied directly takes precedence over collecting the
+     * beans at all.</p>
+     *
+     * @param resolutionContext The resolution context
+     * @param returnType        The injection point type
+     * @param beanType          The type of the beans to collect
+     * @param qualifier         The qualifier of the injection point, or {@code null} to resolve one
+     * @param <V>               The bean type
+     * @return The resolved map
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
     private <V> Object resolveMapOfType(
         BeanResolutionContext resolutionContext,
         Argument<?> returnType,
@@ -2541,12 +2557,24 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         if (beanType == null) {
             throw noGenericsError(resolutionContext, returnType);
         }
-        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
-        Argument<?> keyType = returnType.getTypeVariable("K").orElse(null);
-        if (keyType != null && !keyType.getType().isAssignableFrom(String.class)) {
-            return resolveMapOfTypeByKey(resolutionContext, returnType, keyType, beanType, qualifier);
+        Argument<?> keyType = keyToConvertBeanNameTo(returnType);
+        if (keyType != null) {
+            // Whether a bean of the map type exists is not something the processor can answer, so a map
+            // supplied directly - by a @Factory, for instance - keeps the precedence it has when the key
+            // type is not one beans can be collected under at all. That bean belongs to the injection
+            // point and is qualified by it: the qualifier resolved below selects the beans collected into
+            // the map, which for an inner configuration is a name prefix, and the two are not the same.
+            Optional<?> suppliedMap = resolutionContext.findBean((Argument) returnType, (Qualifier) qualifier);
+            if (suppliedMap.isPresent()) {
+                return suppliedMap.get();
+            }
         }
-        Map<String, V> map = resolutionContext.mapOfType(beanType, qualifier);
+        qualifier = qualifier == null ? resolveQualifier(resolutionContext, beanType, returnType) : qualifier;
+        Map<String, V> beansByName = resolutionContext.mapOfType(beanType, qualifier);
+        Map<?, V> map = beansByName;
+        if (keyType != null) {
+            map = keyByType(resolutionContext, beansByName, keyType);
+        }
         if (returnType.isInstance(map)) {
             return map;
         }
@@ -2554,37 +2582,47 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
-     * Resolves a map of beans whose key is something other than the bean name the beans are collected
-     * under, by converting each name to that key type.
+     * The type the name a bean is collected under has to be converted to, or {@code null} when the name is
+     * the key.
      *
-     * <p>A bean of the map type itself is resolved first, so supplying the map directly, from a
-     * {@link io.micronaut.context.annotation.Factory} for instance, keeps the precedence it has when the
-     * key type is not one the beans can be collected under at all.</p>
+     * <p>A key type a {@code String} can be assigned to - {@code String}, {@code CharSequence},
+     * {@code Object} - is the name itself. Anything else is only reached because the processor decided the
+     * map can be collected by bean name at all, which for a key that is not a {@code CharSequence} it only
+     * does for an enum naming the beans of an iterable type: see
+     * {@code BeanInjectionUtils#isKeyedByBeanName}.</p>
      *
-     * <p>Only the names are converted. The resolved beans are the values as they are, and a name that
-     * does not convert, or that collides with one already converted, fails the injection rather than
-     * dropping a bean from the map.</p>
+     * @param returnType The injection point type
+     * @return The key type to convert bean names to, or {@code null} when the names are the keys
+     */
+    @Nullable
+    private static Argument<?> keyToConvertBeanNameTo(Argument<?> returnType) {
+        Argument<?> keyType = returnType.getTypeVariable("K").orElse(null);
+        if (keyType == null || keyType.getType().isAssignableFrom(String.class)) {
+            return null;
+        }
+        return keyType;
+    }
+
+    /**
+     * Keys the collected beans by the declared key type, converting the name each was collected under.
+     *
+     * <p>Only the names are converted. The beans are the values as they are, rather than passed through the
+     * general {@code Map} to {@code Map} conversion, which drops an entry whose key does not convert and
+     * rebuilds a value that is itself a {@code Map} or a {@code Collection}. A name that does not convert,
+     * or that collides with one already converted, fails the injection rather than leaving a bean out of
+     * the map.</p>
      *
      * @param resolutionContext The resolution context
-     * @param returnType        The injection point type
+     * @param beansByName       The beans, by the name each was collected under
      * @param keyType           The declared key type
-     * @param beanType          The bean type to collect
-     * @param qualifier         The qualifier
      * @param <V>               The bean type
-     * @return The resolved map
+     * @return The beans, by the key converted from the name
      */
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private <V> Object resolveMapOfTypeByKey(BeanResolutionContext resolutionContext,
-                                             Argument<?> returnType,
-                                             Argument<?> keyType,
-                                             Argument<V> beanType,
-                                             @Nullable Qualifier<V> qualifier) {
-        Optional<?> mapBean = resolutionContext.findBean((Argument) returnType, (Qualifier) qualifier);
-        if (mapBean.isPresent()) {
-            return mapBean.get();
-        }
+    @SuppressWarnings("unchecked")
+    private static <V> Map<Object, V> keyByType(BeanResolutionContext resolutionContext,
+                                                Map<String, V> beansByName,
+                                                Argument<?> keyType) {
         ConversionService conversionService = resolutionContext.getContext().getConversionService();
-        Map<String, V> beansByName = resolutionContext.mapOfType(beanType, qualifier);
         Map<Object, V> beansByKey = CollectionUtils.newLinkedHashMap(beansByName.size());
         for (Map.Entry<String, V> entry : beansByName.entrySet()) {
             String name = entry.getKey();
@@ -2597,10 +2635,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                     "More than one bean is named for the key [" + key + "] of the injected map");
             }
         }
-        if (returnType.isInstance(beansByKey)) {
-            return beansByKey;
-        }
-        return conversionService.convertRequired(beansByKey, returnType);
+        return beansByKey;
     }
 
     private <K> Object resolveOptionalBean(BeanResolutionContext resolutionContext, Argument<K> returnType, @Nullable Argument<K> beanType, @Nullable Qualifier<K> qualifier) {

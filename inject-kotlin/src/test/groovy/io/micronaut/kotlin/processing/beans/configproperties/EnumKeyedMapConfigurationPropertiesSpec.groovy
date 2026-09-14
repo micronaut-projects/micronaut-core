@@ -36,7 +36,6 @@ import io.micronaut.core.value.PropertyCatalog
 @ConfigurationProperties("service")
 data class AppConfig(
 
-    @param:MapFormat(keyFormat = StringConvention.RAW)
     val countries: Map<Country, CountryConfig>,
 
     @param:MapFormat(keyFormat = StringConvention.RAW)
