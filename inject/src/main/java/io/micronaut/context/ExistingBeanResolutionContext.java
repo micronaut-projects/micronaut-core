@@ -37,6 +37,7 @@ import java.util.List;
 final class ExistingBeanResolutionContext extends DefaultBeanResolutionContext {
 
     private final BeanRegistration<?> registration;
+    private final List<BeanRegistration<?>> seeded;
     private int handed;
 
     ExistingBeanResolutionContext(BeanContext context, BeanRegistration<?> registration) {
@@ -44,7 +45,10 @@ final class ExistingBeanResolutionContext extends DefaultBeanResolutionContext {
         this.registration = registration;
         List<BeanRegistration<?>> dependents = registration.getDependentBeans();
         this.handed = dependents.size();
-        pushDependentBeans(new ArrayList<>(dependents));
+        this.seeded = new ArrayList<>(dependents);
+        pushDependentBeans(seeded);
+        // whatever resolves through this context resolves for the existing bean, and is recorded so on the path
+        currentBeanDefinition(registration.getBeanDefinition());
         // for a reader compiled against an earlier version, which looked for them here
         setAttribute(BeanResolutionContext.EXISTING_DEPENDENT_BEANS, dependents);
     }
@@ -53,16 +57,19 @@ final class ExistingBeanResolutionContext extends DefaultBeanResolutionContext {
      * Hands the beans created through this context so far to the registration, and leaves the context as it is.
      *
      * <p>The container closes the context it resolves through after every bean it creates in it, so this runs in
-     * the middle of a resolution as well as at its end; handing over early is harmless, and the dependents stay in
-     * place for what still resolves.</p>
+     * the middle of a resolution as well as at its end, and while a nested bean is created the context carries that
+     * bean's dependents, not the existing bean's: only the list seeded for the existing bean is handed over, and
+     * only what was added to it. Handing over early is harmless, and the dependents stay in place for what still
+     * resolves.</p>
      */
     @Override
     public void close() {
-        List<BeanRegistration<?>> dependents = getDependentBeans();
-        for (int i = handed; i < dependents.size(); i++) {
-            registration.addDependentBean(dependents.get(i));
+        if (dependentBeansList() == seeded) {
+            for (int i = handed; i < seeded.size(); i++) {
+                registration.addDependentBean(seeded.get(i));
+            }
+            handed = seeded.size();
         }
-        handed = dependents.size();
         super.close();
     }
 }

@@ -603,7 +603,8 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         FieldDef targetField;
         if (cacheLazyTarget || hotswap) {
-            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE).build();
+            // volatile, so that a call which reads the target outside the lock sees the registration written with it
+            targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE, Modifier.VOLATILE).build();
             proxyBuilder.addField(targetField);
         } else if (!lazy) {
             targetField = FieldDef.builder(FIELD_TARGET, TypeDef.OBJECT).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
@@ -888,7 +889,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef targetRegistration;
         if (cacheLazyTarget) {
             // assigned with the target on the first call, cleared with it
-            targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE).build();
+            targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE, Modifier.VOLATILE).build();
         } else if (!lazy && !hotswap) {
             targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
         } else {

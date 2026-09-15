@@ -565,6 +565,14 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
         return result;
     }
 
+    /**
+     * @return The list of dependents the context carries at the moment, the very instance, or {@code null}
+     */
+    @Nullable
+    List<BeanRegistration<?>> dependentBeansList() {
+        return dependentBeans;
+    }
+
     @Override
     public void pushDependentBeans(@Nullable List<BeanRegistration<?>> dependentBeans) {
         if (this.dependentBeans != null && !this.dependentBeans.isEmpty()) {

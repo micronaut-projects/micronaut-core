@@ -17,13 +17,10 @@ package io.micronaut.aop.chain;
 
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationUtil;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.BeanDefinition;
@@ -32,7 +29,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.annotation.Annotation;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -73,7 +69,6 @@ public final class ProxyInterceptors {
     private final boolean introduction;
     private final List<BeanRegistration<?>> singletons;
     private final Qualifier<Interceptor<?, ?>> binding;
-    private final List<BeanDefinition<Interceptor<?, ?>>> nonSingletons;
     private final Interceptor<?, ?> @Nullable [][] fixed;
     // Weak, so that a proxy fronting a different target per thread or request retains none of them: a target the
     // proxy holds is held by the proxy, and a target swapped in is held by whoever handed it over.
@@ -101,21 +96,18 @@ public final class ProxyInterceptors {
         this.singletons = methods.length == 0
             ? List.of()
             : new ArrayList<>(beanContext.getBeanRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()), true)));
-        List<BeanDefinition<Interceptor<?, ?>>> found = List.of();
+        boolean perTarget = false;
         if (methods.length > 0) {
             for (BeanDefinition<Interceptor<?, ?>> definition : beanContext.getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
-                if (!definition.isSingleton() && bindsMethods(definition)) {
-                    if (found.isEmpty()) {
-                        found = new ArrayList<>(2);
-                    }
-                    if (!found.contains(definition)) {
-                        found.add(definition);
-                    }
+                if (!definition.isSingleton()) {
+                    // a non-singleton bound to the methods is each target's own, so the selection is per target;
+                    // whether it applies to a method is the registry's call, made then
+                    perTarget = true;
+                    break;
                 }
             }
         }
-        this.nonSingletons = found;
-        this.fixed = found.isEmpty() ? select(singletons) : null;
+        this.fixed = perTarget ? null : select(singletons);
     }
 
     /**
@@ -152,6 +144,16 @@ public final class ProxyInterceptors {
     }
 
     /**
+     * The interceptors of every method that do not depend on the target: the whole selection when no non-singleton
+     * is bound to the methods, and the singletons alone otherwise. A creator that cannot ask per target gets these.
+     *
+     * @return The interceptors, by method
+     */
+    public Interceptor<?, ?>[][] shared() {
+        return fixed != null ? fixed : select(singletons);
+    }
+
+    /**
      * Whether any interceptor is bound to the method at the index, for any target: a method a runtime proxy must
      * override. When a non-singleton interceptor is bound to the methods, this answers by the definitions bound to
      * the method, without selecting for a target; the selection for a target may still leave the method alone.
@@ -180,7 +182,10 @@ public final class ProxyInterceptors {
         if (target == null || target.getBean() == null) {
             return unowned();
         }
-        lastTarget = new WeakReference<>(target);
+        WeakReference<BeanRegistration<?>> last = lastTarget;
+        if (last == null || last.get() != target) {
+            lastTarget = new WeakReference<>(target);
+        }
         return selectionFor(target);
     }
 
@@ -285,23 +290,5 @@ public final class ProxyInterceptors {
                 : InterceptorChain.resolveAroundInterceptors(interceptorRegistry, (ExecutableMethod) methods[i], (List) registrations);
         }
         return result;
-    }
-
-    /**
-     * Whether the interceptor is bound for the interception of methods at all. One bound only for a lifecycle kind
-     * is resolved by the lifecycle interception of the target itself, and the proxy has no reason to create it.
-     */
-    private static boolean bindsMethods(BeanDefinition<?> definition) {
-        List<AnnotationValue<Annotation>> bindings = definition.getAnnotationMetadata().getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
-        if (bindings.isEmpty()) {
-            return true;
-        }
-        for (AnnotationValue<Annotation> binding : bindings) {
-            InterceptorKind kind = binding.enumValue("kind", InterceptorKind.class).orElse(InterceptorKind.AROUND);
-            if (kind == InterceptorKind.AROUND || kind == InterceptorKind.INTRODUCTION) {
-                return true;
-            }
-        }
-        return false;
     }
 }

@@ -67,9 +67,8 @@ final class OwnedInterceptors {
         if (resolutionContext == null || !owned(definition)) {
             return null;
         }
-        BeanDefinition<?> unwrapped = unwrap(definition);
         for (BeanRegistration<?> dependent : resolutionContext.getDependentBeans()) {
-            if (dependent.isCreatedAsInterceptor() && dependent.bean != null && unwrap(dependent.beanDefinition).equals(unwrapped)) {
+            if (dependent.isCreatedAsInterceptor() && dependent.bean != null && sameDefinition(dependent.beanDefinition, definition)) {
                 return (BeanRegistration<T>) dependent;
             }
         }
@@ -88,6 +87,22 @@ final class OwnedInterceptors {
             registration.markCreatedAsInterceptor();
         }
         return registration;
+    }
+
+    /**
+     * Whether two definitions are the same interceptor. Two delegates of an iterable definition differ by what they
+     * were created for, which their equality carries, so they are compared as they are; a delegate is compared with
+     * the plain definition it wraps only when the other side is that plain definition, which is what a lookup by the
+     * underlying definition names.
+     */
+    private static boolean sameDefinition(BeanDefinition<?> a, BeanDefinition<?> b) {
+        if (a.equals(b)) {
+            return true;
+        }
+        if (a instanceof DelegatingBeanDefinition<?> && b instanceof DelegatingBeanDefinition<?>) {
+            return false;
+        }
+        return unwrap(a).equals(unwrap(b));
     }
 
     /**

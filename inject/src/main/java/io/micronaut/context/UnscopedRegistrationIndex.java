@@ -24,7 +24,7 @@ import java.lang.ref.WeakReference;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 /**
- * Finds the registration of a bean the context created for no scope, by the identity of the bean.
+ * Finds the registration of a bean the context created but no scope can hand back, by the identity of the bean.
  *
  * <p>A singleton is found through the singleton scope and a scoped bean through its scope, but a prototype is held
  * by whoever asked for it. Two things still need the way from such a bean back to its registration: destroying the
@@ -68,6 +68,17 @@ final class UnscopedRegistrationIndex {
             registrations.remove(key, reference);
         }
         return registration;
+    }
+
+    /**
+     * Forgets a bean that has been destroyed.
+     *
+     * @param target The bean
+     */
+    void remove(Object target) {
+        if (!registrations.isEmpty()) {
+            registrations.remove(new LookupKey(target));
+        }
     }
 
     private void expunge() {
