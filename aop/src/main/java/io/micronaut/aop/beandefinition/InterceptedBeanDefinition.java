@@ -65,7 +65,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      */
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveInterceptors(BeanResolutionContext resolutionContext,
                                                                                    AnnotationMetadataProvider constructor) {
-        return LifecycleInterception.constructionInterceptors(resolutionContext, this, constructor);
+        return LifecycleInterception.constructionInterceptors(resolutionContext, constructor);
     }
 
     @Override

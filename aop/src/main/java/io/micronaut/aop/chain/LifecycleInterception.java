@@ -71,7 +71,6 @@ public final class LifecycleInterception {
      * the target alone, as CDI never intercepts the construction of a client proxy.</p>
      *
      * @param resolutionContext The resolution context
-     * @param definition        The definition of the bean
      * @param constructor       The constructor, whose metadata is the bean's combined with the constructor's
      * @param <T>               The bean type
      * @return The interceptors, or {@code null} when the bean binds none
@@ -79,7 +78,6 @@ public final class LifecycleInterception {
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Nullable
     public static <T> List<BeanRegistration<Interceptor<T, T>>> constructionInterceptors(BeanResolutionContext resolutionContext,
-                                                                                        BeanDefinition<T> definition,
                                                                                         AnnotationMetadataProvider constructor) {
         AnnotationMetadata metadata = constructor.getAnnotationMetadata();
         if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
@@ -95,7 +93,7 @@ public final class LifecycleInterception {
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
      * @param interceptors      The interceptors, as
-     *                          {@link #constructionInterceptors(BeanResolutionContext, BeanDefinition, AnnotationMetadataProvider)}
+     *                          {@link #constructionInterceptors(BeanResolutionContext, AnnotationMetadataProvider)}
      *                          resolves them, or {@code null} to resolve them here
      * @param definition        The definition
      * @param constructor       The bean constructor
@@ -137,7 +135,7 @@ public final class LifecycleInterception {
                              int additionalProxyConstructorParametersCount,
                              @Nullable Object... parameters) {
         if (interceptors == null) {
-            interceptors = constructionInterceptors(resolutionContext, definition, constructor);
+            interceptors = constructionInterceptors(resolutionContext, constructor);
         }
         if (interceptors == null) {
             // no binding at all, so nothing can qualify: the constructor runs unadvised
@@ -187,7 +185,21 @@ public final class LifecycleInterception {
                                    BeanDefinition<T> definition,
                                    ExecutableMethod<T, T> postConstructMethod,
                                    T bean) {
-        return intercept(resolutionContext, beanContext, definition, postConstructMethod, bean, InterceptorKind.POST_CONSTRUCT);
+        return intercept(resolutionContext, beanContext, definition, postConstructMethod, bean, InterceptorKind.POST_CONSTRUCT, null);
+    }
+
+    /**
+     * Runs the {@link InterceptorKind#POST_CONSTRUCT} interception of a bean with registrations a caller resolved,
+     * as a definition compiled by 5.2 hands them; the deprecated entry point on the chain delegates here.
+     */
+    @Nullable
+    static <T> T initialize(BeanResolutionContext resolutionContext,
+                            BeanContext beanContext,
+                            BeanDefinition<T> definition,
+                            ExecutableMethod<T, T> postConstructMethod,
+                            T bean,
+                            @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> handed) {
+        return intercept(resolutionContext, beanContext, definition, postConstructMethod, bean, InterceptorKind.POST_CONSTRUCT, handed);
     }
 
     /**
@@ -207,7 +219,21 @@ public final class LifecycleInterception {
                                 BeanDefinition<T> definition,
                                 ExecutableMethod<T, T> preDestroyMethod,
                                 T bean) {
-        return intercept(resolutionContext, beanContext, definition, preDestroyMethod, bean, InterceptorKind.PRE_DESTROY);
+        return intercept(resolutionContext, beanContext, definition, preDestroyMethod, bean, InterceptorKind.PRE_DESTROY, null);
+    }
+
+    /**
+     * Runs the {@link InterceptorKind#PRE_DESTROY} interception of a bean with registrations a caller resolved; the
+     * deprecated entry point on the chain delegates here.
+     */
+    @Nullable
+    static <T> T dispose(BeanResolutionContext resolutionContext,
+                         BeanContext beanContext,
+                         BeanDefinition<T> definition,
+                         ExecutableMethod<T, T> preDestroyMethod,
+                         T bean,
+                         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> handed) {
+        return intercept(resolutionContext, beanContext, definition, preDestroyMethod, bean, InterceptorKind.PRE_DESTROY, handed);
     }
 
     @SuppressWarnings({"unchecked", "rawtypes", "removal"})
@@ -217,12 +243,16 @@ public final class LifecycleInterception {
                                    BeanDefinition<T> definition,
                                    ExecutableMethod<T, T> interceptedMethod,
                                    T bean,
-                                   InterceptorKind kind) {
+                                   InterceptorKind kind,
+                                   @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> handed) {
         final AnnotationMetadata annotationMetadata = interceptedMethod.getAnnotationMetadata();
         final Collection<AnnotationValue<?>> binding = AbstractInterceptorChain.resolveInterceptorValues(annotationMetadata, kind);
 
         final Collection<BeanRegistration<Interceptor<?, ?>>> resolved;
-        if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
+        if (handed != null && !handed.isEmpty()) {
+            // resolved by a caller compiled against 5.2 and handed over
+            resolved = handed;
+        } else if (bean instanceof Intercepted intercepted && !intercepted.$interceptorRegistrations().isEmpty()) {
             // A proxy generated before 5.3 retained the registrations it was constructed with; a newer proxy returns
             // none here, its interceptors being dependents of the bean like everyone else's.
             resolved = intercepted.$interceptorRegistrations();

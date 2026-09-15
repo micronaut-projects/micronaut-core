@@ -74,17 +74,19 @@ public interface ParameterizedInterceptedBeanDefinition<T>
      */
     default @Nullable List<BeanRegistration<Interceptor<T, T>>> resolveLifecycleInterceptors(BeanResolutionContext resolutionContext,
                                                                                             AnnotationMetadataProvider constructor) {
-        return LifecycleInterception.constructionInterceptors(resolutionContext, this, constructor);
+        return LifecycleInterception.constructionInterceptors(resolutionContext, constructor);
     }
 
     @Override
     default T doInstantiate(BeanResolutionContext resolutionContext, BeanContext context, Map<String, Object> requiredArgumentValues) {
         @Nullable Object[] values = resolveInstantiationValues(resolutionContext, context, requiredArgumentValues);
         InterceptedParametrizedConstructor<T> constructor = new InterceptedParametrizedConstructor<>(this, resolutionContext, context);
+        // a set the deprecated hook supplies is honoured for construction, as it was
+        @SuppressWarnings("removal") List<BeanRegistration<Interceptor<T, T>>> declared = resolveInterceptors(resolutionContext, context, values);
         return LifecycleInterception.instantiate(
             resolutionContext,
             context,
-            resolveLifecycleInterceptors(resolutionContext, constructor),
+            declared != null ? declared : resolveLifecycleInterceptors(resolutionContext, constructor),
             this,
             constructor,
             values

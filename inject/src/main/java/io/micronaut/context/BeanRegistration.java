@@ -195,8 +195,12 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @since 5.3.0
      */
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
-        try (BeanResolutionContext resolutionContext = newResolutionContext()) {
-            return resolutionContext.getInterceptorRegistrations(interceptorType, binding);
+        // serialised, so that two callers resolving for this bean at once do not each create the interceptor the
+        // other is creating
+        synchronized (this) {
+            try (BeanResolutionContext resolutionContext = newResolutionContext()) {
+                return resolutionContext.getInterceptorRegistrations(interceptorType, binding);
+            }
         }
     }
 
@@ -211,8 +215,10 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @since 5.3.0
      */
     public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
-        try (BeanResolutionContext resolutionContext = newResolutionContext()) {
-            return resolutionContext.getInterceptorRegistration(interceptor);
+        synchronized (this) {
+            try (BeanResolutionContext resolutionContext = newResolutionContext()) {
+                return resolutionContext.getInterceptorRegistration(interceptor);
+            }
         }
     }
 
@@ -237,7 +243,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * <p>A proxy fronting this bean keeps the interceptors it selected for the methods of this bean here, keyed by
      * its selector, so that it selects once per target and the selection lives exactly as long as this bean.</p>
      *
-     * @param key      The key, compared by identity
+     * @param key      The key; a selector does not define equality, so it is compared by identity
      * @param supplier Computes the state when absent
      * @param <S>      The state type
      * @return The state

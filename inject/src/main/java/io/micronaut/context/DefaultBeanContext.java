@@ -1267,6 +1267,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         BeanDefinition<T> definition = registration.getBeanDefinition();
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
+            unscopedRegistrations.remove(beanToDestroy);
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }
@@ -1327,7 +1328,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private <T> void disposeBean(DisposableBeanDefinition<T> definition,
                                  BeanRegistration<T> registration,
                                  T beanToDestroy) {
-        if (registration.getDependentBeans().isEmpty()) {
+        if (registration.beanContext == null) {
             definition.dispose(this, beanToDestroy);
             return;
         }
@@ -1419,13 +1420,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                         // is not among the proxy's dependents; it carries the beans created with the target
                         destroyBean(heldRegistration);
                     } else {
-                        // a proxy generated before 5.3 reports no registration for the target it resolved later;
-                        // the target is destroyed alone, the proxy's own dependents having been destroyed above
-                        destroyBean(BeanRegistration.of(this,
+                        // a hot-swappable proxy holds no registration, and a proxy generated before 5.3 reports
+                        // none: the one the context created for the target is found from the target when it still
+                        // can be, and the target is destroyed alone otherwise, the proxy's own dependents having
+                        // been destroyed above
+                        destroyBean(findBeanRegistration(interceptedTarget).orElseGet(() -> BeanRegistration.of(this,
                             new BeanKey<>(proxyTargetBeanDefinition, proxyTargetBeanDefinition.getDeclaredQualifier()),
                             proxyTargetBeanDefinition,
                             interceptedTarget
-                        ));
+                        )));
                     }
                     interceptedProxy.clearCachedInterceptedTarget();
                 }
@@ -3369,14 +3372,20 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         );
         if (created != null) {
             // the scope hands back only the bean; the registration it stores is the one created above on a miss,
-            // and on a hit the one the scope finds for the bean
+            // and on a hit the one the scope finds for the bean, or the one the index remembers for a scope that
+            // cannot find it again
             BeanRegistration<T> registration = created.get();
             if (registration != null && registration.bean == bean) {
+                unscopedRegistrations.put(registration);
                 return registration;
             }
             Optional<BeanRegistration<T>> held = registeredScope.findBeanRegistration(bean);
             if (held.isPresent()) {
                 return held.get();
+            }
+            @SuppressWarnings("unchecked") BeanRegistration<T> remembered = (BeanRegistration<T>) unscopedRegistrations.get(bean);
+            if (remembered != null) {
+                return remembered;
             }
         }
         return BeanRegistration.of(this, beanKey, definition, bean);

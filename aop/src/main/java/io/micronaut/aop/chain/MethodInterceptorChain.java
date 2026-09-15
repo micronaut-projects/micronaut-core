@@ -201,19 +201,19 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     /**
-     * Runs the {@link InterceptorKind#POST_CONSTRUCT} interception of a bean, ignoring the handed registrations.
+     * Runs the {@link InterceptorKind#POST_CONSTRUCT} interception of a bean with the handed registrations.
      *
      * @param resolutionContext   The resolution context
      * @param beanContext         The bean context
      * @param definition          The definition
      * @param postConstructMethod The post construct method
      * @param bean                The bean
-     * @param interceptors        Ignored
+     * @param interceptors        Registrations resolved by the caller, used when not empty
      * @param <T1>                The bean type
      * @return the bean instance
      * @since 5.2.0
-     * @deprecated Since 5.3.0 nothing is handed over, the interceptors of a bean being resolved as the bean's own by
-     * {@link LifecycleInterception}. Kept for a caller compiled against 5.2.
+     * @deprecated Since 5.3.0 nothing in the framework hands registrations over, the interceptors of a bean being
+     * resolved as the bean's own by {@link LifecycleInterception}. Kept, and honoured, for a caller compiled against 5.2.
      */
     @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
@@ -225,7 +225,7 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> postConstructMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return LifecycleInterception.initialize(resolutionContext, beanContext, definition, postConstructMethod, bean);
+        return LifecycleInterception.initialize(resolutionContext, beanContext, definition, postConstructMethod, bean, interceptors);
     }
 
     /**
@@ -256,19 +256,19 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
     }
 
     /**
-     * Runs the {@link InterceptorKind#PRE_DESTROY} interception of a bean, ignoring the handed registrations.
+     * Runs the {@link InterceptorKind#PRE_DESTROY} interception of a bean with the handed registrations.
      *
      * @param resolutionContext The resolution context
      * @param beanContext       The bean context
      * @param definition        The definition
      * @param preDestroyMethod  The pre destroy method
      * @param bean              The bean
-     * @param interceptors      Ignored
+     * @param interceptors      Registrations resolved by the caller, used when not empty
      * @param <T1>              The bean type
      * @return the bean instance
      * @since 5.2.0
-     * @deprecated Since 5.3.0 nothing is handed over, the interceptors of a bean being resolved as the bean's own by
-     * {@link LifecycleInterception}. Kept for a caller compiled against 5.2.
+     * @deprecated Since 5.3.0 nothing in the framework hands registrations over, the interceptors of a bean being
+     * resolved as the bean's own by {@link LifecycleInterception}. Kept, and honoured, for a caller compiled against 5.2.
      */
     @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
@@ -280,6 +280,6 @@ public final class MethodInterceptorChain<T, R> extends InterceptorChain<T, R> i
         ExecutableMethod<T1, T1> preDestroyMethod,
         T1 bean,
         @Nullable Collection<BeanRegistration<Interceptor<?, ?>>> interceptors) {
-        return LifecycleInterception.dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean);
+        return LifecycleInterception.dispose(resolutionContext, beanContext, definition, preDestroyMethod, bean, interceptors);
     }
 }

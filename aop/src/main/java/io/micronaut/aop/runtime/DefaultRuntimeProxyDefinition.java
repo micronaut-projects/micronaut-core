@@ -127,10 +127,14 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             }
             return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues);
         }
+        // each intercepted method lists the interceptors that do not depend on the target, which is all of them when
+        // no non-singleton is bound, so that a creator compiled against 5.2, which reads the method's own, still
+        // applies them; a creator that asks per target gets the target's own on top
+        Interceptor<?, ?>[][] shared = selection.shared();
         Map<ExecutableMethod<?, ?>, Integer> indexes = new IdentityHashMap<>();
         for (int i = 0; i < methods.length; i++) {
-            if (selection.intercepted(i)) {
-                interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], new Interceptor[0]));
+            if (shared[i].length > 0 || selection.intercepted(i)) {
+                interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], (Interceptor[]) shared[i]));
                 indexes.put(methods[i], i);
             }
         }
