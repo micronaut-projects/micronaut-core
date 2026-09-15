@@ -7,12 +7,14 @@ import io.netty.handler.codec.http.HttpResponse;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressorTest {
     private static final HttpCompressionStrategy STRATEGY = new HttpCompressionStrategy() {
@@ -28,7 +30,8 @@ class CompressorTest {
 
         @Override
         public int getMaxZstdEncodeSize() {
-            return 0;
+            // netty rejects a zero size when zstd-jni is on the class path
+            return 1 << 20;
         }
     };
 
@@ -108,6 +111,45 @@ class CompressorTest {
         Compressor compressor = new Compressor(STRATEGY);
         Compressor.Algorithm expected = referenceDetermineEncoding(headerValues, Brotli.isAvailable(), Zstd.isAvailable());
         assertEquals(expected, compressor.determineEncoding(headerValues.iterator()), headerValues.toString());
+    }
+
+    /**
+     * The tokenizer must scale linearly with the header length: a quadratic scan of an 8 KiB
+     * header of thousands of entries cost tens of milliseconds per request. The check compares the
+     * cost of a header against one eight times as long, so it does not depend on machine speed:
+     * linear growth gives a ratio near 8, quadratic growth a ratio near 64.
+     */
+    @ParameterizedTest
+    @ValueSource(strings = {",", "a,", "x;q,", "gzip;q=0.5,"})
+    void longHeadersAreTokenizedInLinearTime(String entry) {
+        Compressor compressor = new Compressor(STRATEGY);
+        int shortRepeats = 1000 / entry.length();
+        // fits the default maxHeaderSize of 8192
+        String shortHeader = entry.repeat(shortRepeats);
+        String longHeader = entry.repeat(shortRepeats * 8);
+        // interleave the two so that JIT and GC affect both alike; take the fastest round for each
+        long shortBest = Long.MAX_VALUE;
+        long longBest = Long.MAX_VALUE;
+        for (int round = 0; round < 10; round++) {
+            shortBest = Math.min(shortBest, timePerCall(compressor, shortHeader));
+            longBest = Math.min(longBest, timePerCall(compressor, longHeader));
+        }
+        double ratio = (double) longBest / Math.max(shortBest, 1);
+        assertTrue(ratio < 24, "tokenizing " + longHeader.length() + " chars took " + ratio + " times as long as " + shortHeader.length() + " chars");
+        assertEquals(referenceDetermineEncoding(List.of(longHeader), Brotli.isAvailable(), Zstd.isAvailable()),
+            compressor.determineEncoding(List.of(longHeader).iterator()));
+    }
+
+    private static long timePerCall(Compressor compressor, String header) {
+        List<String> values = List.of(header);
+        for (int i = 0; i < 20; i++) {
+            compressor.determineEncoding(values.iterator());
+        }
+        long start = System.nanoTime();
+        for (int i = 0; i < 50; i++) {
+            compressor.determineEncoding(values.iterator());
+        }
+        return (System.nanoTime() - start) / 50;
     }
 
     private static Stream<Arguments> determineEncodingMatchesTheSplitBasedTokenizer() {
