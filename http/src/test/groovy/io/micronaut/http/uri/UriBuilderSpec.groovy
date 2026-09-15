@@ -198,6 +198,21 @@ class UriBuilderSpec extends Specification {
         builder.build().toString() == "https://google.com/search?q1=v1&q2=v2"
     }
 
+    @Issue("https://github.com/micronaut-projects/micronaut-core/issues/12578")
+    @Unroll
+    void "test uri builder path encoding for #url"() {
+        expect:
+        UriBuilder.of(url).build().toString() == expected
+
+        where:
+        url                                            | expected
+        'https://abc.com/XXX/YYY;abcd=${ABCD};ab_cd=1' | 'https://abc.com/XXX/YYY;abcd=$%7BABCD%7D;ab_cd=1'
+        'https://abc.com/foo bar'                      | 'https://abc.com/foo%20bar'
+        'https://abc.com/foo%20bar'                    | 'https://abc.com/foo%20bar'
+        'https://abc.com/foo%2Fbar'                    | 'https://abc.com/foo%2Fbar'
+        'https://abc.com/foo;param=value'              | 'https://abc.com/foo;param=value'
+    }
+
     void "test uri builder preserves IPv6 host and port"() {
         given:
         List<String> sources = [
