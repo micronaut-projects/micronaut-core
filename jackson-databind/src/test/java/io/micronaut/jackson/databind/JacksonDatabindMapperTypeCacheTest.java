@@ -10,12 +10,16 @@ import tools.jackson.databind.ObjectWriter;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * The reader and writer for a type are cached across calls. The cache is keyed by type, not by
@@ -60,24 +64,48 @@ class JacksonDatabindMapperTypeCacheTest {
 
     @Test
     void severalTypesAreCachedAtOnce() {
-        Argument<Item> item = Argument.of(Item.class);
-        Argument<Other> other = Argument.of(Other.class);
-        Argument<List<Item>> items = Argument.listOf(Item.class);
-        Argument<Map<String, Other>> others = Argument.mapOf(String.class, Other.class);
-        ObjectWriter itemWriter = mapper.createWriter(item);
-        ObjectWriter otherWriter = mapper.createWriter(other);
-        ObjectWriter itemsWriter = mapper.createWriter(items);
-        ObjectWriter othersWriter = mapper.createWriter(others);
-        ObjectReader itemReader = mapper.createReader(item);
-        ObjectReader otherReader = mapper.createReader(other);
+        // the slot is derived from Class.hashCode(), an identity hash, so which types share a
+        // slot varies between JVM runs: pick four candidates that land in distinct slots
+        List<Argument<?>> candidates = List.of(
+            Argument.of(Item.class),
+            Argument.of(Other.class),
+            Argument.listOf(Item.class),
+            Argument.mapOf(String.class, Other.class),
+            Argument.listOf(Other.class),
+            Argument.mapOf(String.class, Item.class),
+            Argument.setOf(Item.class),
+            Argument.of(String.class),
+            Argument.listOf(String.class),
+            Argument.mapOf(String.class, String.class)
+        );
+        List<Argument<?>> types = new ArrayList<>();
+        Set<Integer> slots = new HashSet<>();
+        for (Argument<?> candidate : candidates) {
+            if (slots.add(JacksonDatabindMapper.slotOf(candidate))) {
+                types.add(candidate);
+            }
+            if (types.size() == 4) {
+                break;
+            }
+        }
+        assumeTrue(types.size() == 4, "fewer than four of the candidate types land in distinct slots");
+        List<ObjectWriter> writers = new ArrayList<>();
+        List<ObjectReader> readers = new ArrayList<>();
+        for (Argument<?> type : types) {
+            writers.add(mapper.createWriter(type));
+            readers.add(mapper.createReader(type));
+        }
         for (int i = 0; i < 3; i++) {
             // alternate between the types: each keeps its own entry
-            assertSame(itemWriter, mapper.createWriter(item));
-            assertSame(otherWriter, mapper.createWriter(other));
-            assertSame(itemsWriter, mapper.createWriter(Argument.listOf(Item.class)));
-            assertSame(othersWriter, mapper.createWriter(Argument.mapOf(String.class, Other.class)));
-            assertSame(itemReader, mapper.createReader(item));
-            assertSame(otherReader, mapper.createReader(Argument.of(Other.class)));
+            for (int t = 0; t < types.size(); t++) {
+                Argument<?> type = types.get(t);
+                // an equal, distinct Argument instance hits the same entry
+                Argument<?> equal = Argument.of(type.getType(), type.getTypeParameters());
+                assertSame(writers.get(t), mapper.createWriter(type));
+                assertSame(writers.get(t), mapper.createWriter(equal));
+                assertSame(readers.get(t), mapper.createReader(type));
+                assertSame(readers.get(t), mapper.createReader(equal));
+            }
         }
     }
 

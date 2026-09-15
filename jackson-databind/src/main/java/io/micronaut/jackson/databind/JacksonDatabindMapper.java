@@ -187,17 +187,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedReader != null) {
             return specializedReader;
         }
-        AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders = Objects.requireNonNull(this.cachedReaders);
+        AtomicReferenceArray<TypeCache<ObjectReader>> readers = Objects.requireNonNull(this.cachedReaders);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
-        TypeCache<ObjectReader> cached = cachedReaders.get(slot);
+        TypeCache<ObjectReader> cached = readers.get(slot);
         if (cached != null && cached.type == type) {
             return cached.cachedValue;
         }
         Class<?> view = viewOf(type);
         if (view != null) {
             slot = slot(typeHash, view);
-            cached = cachedReaders.get(slot);
+            cached = readers.get(slot);
         }
         if (cached != null && cached.matches(type, view)) {
             return cached.cachedValue;
@@ -206,7 +206,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (view != null) {
             reader = reader.withView(view);
         }
-        cachedReaders.set(slot, new TypeCache<>(type, view, reader));
+        readers.set(slot, new TypeCache<>(type, view, reader));
         return reader;
     }
 
@@ -221,17 +221,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedWriter != null) {
             return specializedWriter;
         }
-        AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters = Objects.requireNonNull(this.cachedWriters);
+        AtomicReferenceArray<TypeCache<ObjectWriter>> writers = Objects.requireNonNull(this.cachedWriters);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
-        TypeCache<ObjectWriter> cached = cachedWriters.get(slot);
+        TypeCache<ObjectWriter> cached = writers.get(slot);
         if (cached != null && cached.type == type) {
             return cached.cachedValue;
         }
         Class<?> view = viewOf(type);
         if (view != null) {
             slot = slot(typeHash, view);
-            cached = cachedWriters.get(slot);
+            cached = writers.get(slot);
         }
         if (cached != null && cached.matches(type, view)) {
             return cached.cachedValue;
@@ -240,7 +240,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (view != null) {
             writer = writer.withView(view);
         }
-        cachedWriters.set(slot, new TypeCache<>(type, view, writer));
+        writers.set(slot, new TypeCache<>(type, view, writer));
         return writer;
     }
 
@@ -255,6 +255,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
      * a view use a slot derived from both, so a viewed and an unviewed argument of the same type
      * do not evict each other.
      */
+    /**
+     * The cache slot an argument lands in; package-private for tests, which need to pick types
+     * that do not collide.
+     *
+     * @param type The type
+     * @return The slot
+     */
+    static int slotOf(Argument<?> type) {
+        return slot(type.typeHashCode(), viewOf(type));
+    }
+
     private static int slot(int typeHash, @Nullable Class<?> view) {
         int h = view == null ? typeHash : typeHash ^ (31 * view.hashCode());
         // spread the high bits, since typeHashCode of a simple class argument is 31 * (31 + identityHash)
