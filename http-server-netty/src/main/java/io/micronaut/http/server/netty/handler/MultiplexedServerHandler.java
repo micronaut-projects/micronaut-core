@@ -28,7 +28,6 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -180,12 +179,11 @@ abstract class MultiplexedServerHandler {
                     if (bufferedContent == null) {
                         fullBody = data;
                     } else {
-                        CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
-                        for (ByteBuf c : bufferedContent) {
-                            composite.addComponent(true, c);
-                        }
-                        composite.addComponent(true, data);
-                        fullBody = composite;
+                        bufferedContent.add(data);
+                        List<ByteBuf> pieces = bufferedContent;
+                        // composeBody takes ownership of the pieces even when it fails
+                        bufferedContent = null;
+                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                     }
                     bufferedContent = null;
 
