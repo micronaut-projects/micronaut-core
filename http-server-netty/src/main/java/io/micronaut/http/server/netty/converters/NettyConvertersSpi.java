@@ -74,6 +74,8 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                 }
         );
 
+        // the server itself no longer produces netty HttpData instances, but these two conversions are
+        // reachable from application code through the public ConversionService API, so they stay registered
         conversionService.addConverter(
                 HttpData.class,
                 byte[].class,
