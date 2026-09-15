@@ -785,7 +785,7 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
         proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
         proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
         for (AnnotationValue<Annotation> binding : remainingBindings) {
-            proxyAnnotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDING, binding);
+            proxyAnnotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
         }
     }
 
