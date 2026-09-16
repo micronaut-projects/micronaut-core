@@ -1,0 +1,77 @@
+Python has no interfaces. The Python compiler (`micronaut-inject-python`) compiles a Python class to a Java *interface* instead of a Java class when the class has no state of its own and only declares abstract methods:
+
+* the class has no `__init__`, no attributes and no properties, and
+* every method is abstract: decorated with `@abstractmethod`, declared in a `typing.Protocol`, or written with a `...` placeholder body.
+
+Two shapes of class meet these rules.
+
+== Plain Interfaces
+
+A plain abstract class or `Protocol` without a bean or interceptor stereotype is the Python spelling of a Java interface. Other Python classes implement it by extending it, and Java code sees the generated interface:
+
+[source,python]
+----
+from abc import ABC, abstractmethod
+from jakarta.inject import Singleton
+
+
+class Translator(ABC):
+    @abstractmethod
+    def translate(self, text: str) -> str:
+        ...
+
+
+@Singleton
+class UpperTranslator(Translator):
+    def translate(self, text: str) -> str:
+        return text.upper()
+----
+
+== Introduction Interfaces
+
+A class decorated with an api:aop.Introduction[] stereotype, such as a declarative HTTP client (ann:http.client.annotation.Client[]), a Micronaut Data repository or an AI service, whose instance methods are all abstract is an *introduction interface*. As for a Java interface, Micronaut implements it at compile time with an introduction proxy; the Python class is never instantiated, so there is no Python object behind the bean.
+
+[source,python]
+----
+from abc import ABC, abstractmethod
+from micronaut.http.annotation import Get
+from micronaut.http.client.annotation import Client
+
+
+@Client("/pets")
+class PetClient(ABC):
+    @Get("/{name}")
+    @abstractmethod
+    def pet(self, name: str) -> str:
+        ...
+----
+
+Static functions of an introduction interface become static methods of the generated interface that call the Python function.
+
+A class that carries an introduction stereotype but also has state or behaviour of its own (an `__init__`, injected attributes or a concrete method next to the abstract ones) is compiled to a Java class instead: its abstract methods are implemented by the introduction advice at runtime while the rest of the class remains a Python object.
+
+== Runtime Annotations
+
+Frameworks such as LangChain4j build the implementation of an interface reflectively, with `java.lang.reflect.Proxy`, and read its annotations with `Method.getAnnotation`. The annotations of an interface class, of its methods and of their parameters are therefore copied onto the generated interface when their annotation type has `RUNTIME` retention and may be placed on such a declaration:
+
+[source,python]
+----
+from abc import ABC, abstractmethod
+from typing import Annotated
+
+from dev.langchain4j.service import SystemMessage, UserMessage, V
+from micronaut.langchain4j.annotation import AiService
+
+
+@AiService
+class Friend(ABC):
+    @SystemMessage("You are a good friend of mine. Answer using slang.")
+    @UserMessage("Tell me about {{topic}}")
+    @abstractmethod
+    def chat(self, topic: Annotated[str, V("topic")]) -> str:
+        ...
+----
+
+The generated `Friend` interface carries `@SystemMessage` and `@UserMessage` on `chat` and `@V("topic")` on its parameter.
+
+Micronaut annotations are served to Micronaut through the annotation metadata of the Python class and are not copied, unless their annotation type is annotated with ann:core.annotation.ReflectiveAccess[], which declares that a framework reads the annotation reflectively. Python-defined annotations and the `java.lang` annotations that constrain a declaration, such as `@FunctionalInterface`, are never copied. An annotation whose member values cannot be written to Java source is reported as a compilation warning and left out.

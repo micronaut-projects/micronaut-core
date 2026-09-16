@@ -1828,8 +1828,8 @@ class PhoneRepository(CrudRepository[PhoneEntity, int]):
         when:
         compiler.compile()
         def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
-        def contactDefinition = classLoader.loadClass('python.$ContactRepository$RuntimeProxy$Definition').newInstance()
-        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$RuntimeProxy$Definition').newInstance()
+        def contactDefinition = classLoader.loadClass('python.$ContactRepository$Intercepted$Definition').newInstance()
+        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$Intercepted$Definition').newInstance()
         def contactSave = contactDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
         def phoneSave = phoneDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
 

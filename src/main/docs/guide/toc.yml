@@ -346,6 +346,7 @@ languageSupport:
     pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
+    interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions
     javaCollections: Java Collections and Serialization
     keywords: Python Keywords in Java APIs

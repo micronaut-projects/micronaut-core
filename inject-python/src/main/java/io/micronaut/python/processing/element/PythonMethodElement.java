@@ -453,10 +453,12 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     final boolean requiresResolvedParameterType() {
-        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods need
-        // resolved parameter signatures so proxy override detection does not drop the introduced method.
+        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods of a class need
+        // resolved parameter signatures so proxy override detection does not drop the introduced method. The
+        // proxy of an interface is generated from the erased signatures, as for a Java interface.
         return !declaringType.equals(owningType)
-            && owningType.hasStereotype(InterceptorBinding.class);
+            && owningType.hasStereotype(InterceptorBinding.class)
+            && !owningType.isInterface();
     }
 
     @Override
@@ -701,19 +703,18 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        // As for Java elements, two views of one declared function are the same method: the anonymous
+        // subclass withParameters answers and the copies owned by a subtype must stay equal to the element
+        // they were made from, or MethodElement.overrides takes the method for an override of itself.
+        if (!(o instanceof PythonMethodElement that)) {
             return false;
         }
-        PythonMethodElement that = (PythonMethodElement) o;
-
-        return that.getNativeType().name().equals(getNativeType().name()) &&
-            declaringType.equals(that.declaringType) &&
-            owningType.equals(that.owningType);
+        return getNativeType().equals(that.getNativeType()) && declaringType.equals(that.declaringType);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getNativeType().name(), declaringType, owningType);
+        return Objects.hash(getNativeType().name(), declaringType);
     }
 
     @Override

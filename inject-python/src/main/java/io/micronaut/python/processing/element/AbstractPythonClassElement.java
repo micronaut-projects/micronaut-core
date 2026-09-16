@@ -327,9 +327,18 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         }
 
         List<T> allElements = new ArrayList<>(elements);
+        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
         for (MethodElement inheritedMethod : inheritedMethods) {
             int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
             if (representedMethodIndex == -1) {
+                allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (includeOverriddenMethods
+                && allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
+                && !(representedMethod instanceof PythonMethodElement)
+                && !sameErasedReturnType(representedMethod, inheritedMethod)) {
+                // A covariant override of an inherited interface method (Mono<Page<E>> findAll(Pageable)
+                // overriding Publisher<Page<E>> findAll(Pageable)): a query asking for overridden methods
+                // needs both, as the proxy generated for an interface has to implement both descriptors.
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
             } else if (allElements.get(representedMethodIndex) instanceof PythonMethodElement representedMethod
                 && !inheritedMethod.isStatic()
@@ -580,6 +589,10 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
         }
         return -1;
+    }
+
+    private static boolean sameErasedReturnType(MethodElement methodElement, MethodElement inheritedMethod) {
+        return methodElement.getReturnType().getName().equals(inheritedMethod.getReturnType().getName());
     }
 
     /**

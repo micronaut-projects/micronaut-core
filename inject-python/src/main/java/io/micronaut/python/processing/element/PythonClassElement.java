@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -441,24 +442,66 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return interfaces;
     }
 
+    /**
+     * Whether the class compiles to a Java interface. A class is an interface when it has no state
+     * (no constructor, attributes or properties) and only declares abstract methods, in one of two shapes:
+     * <ul>
+     *     <li>a plain abstract class or {@code Protocol} without a bean or interceptor stereotype, the
+     *     Python spelling of a Java interface;</li>
+     *     <li>an {@link #isIntroductionInterface() introduction interface}: a class decorated with an
+     *     {@link Introduction} stereotype ({@code @Client}, an AI service, ...) whose instance methods are all
+     *     abstract. Micronaut implements such a type with an introduction proxy, and frameworks that build the
+     *     implementation reflectively need the Java interface, not a class wrapping a Python object.</li>
+     * </ul>
+     *
+     * @return True if the class compiles to an interface
+     */
     @Override
     public boolean isInterface() {
-        boolean hasInterfaceBase = hasInterfaceBase();
-        if ((!hasInterfaceBase && BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata()))
-            || hasStereotype(InterceptorBinding.class)
-            || hasStereotype(Introspected.class)
+        if (hasStereotype(Introspected.class)
             || getPrimaryConstructor().isPresent()
             || !getNativeType().attributes().isEmpty()
             || !getNativeType().properties().isEmpty()) {
+            return false;
+        }
+        boolean hasInterfaceBase = hasInterfaceBase();
+        boolean isIntroduction = hasIntroductionStereotype();
+        if (!isIntroduction
+            && ((!hasInterfaceBase && BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata()))
+                || hasStereotype(InterceptorBinding.class))) {
             return false;
         }
         List<MethodElement> declaredMethods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
         if (declaredMethods.isEmpty()) {
             return hasInterfaceBase;
         }
-        return !declaredMethods.isEmpty()
-            && declaredMethods.stream().allMatch(MethodElement::isAbstract)
+        if (isIntroduction) {
+            // static functions become static interface methods bridged to Python; the instance
+            // methods are all implemented by the introduction advice
+            return declaredMethods.stream().allMatch(method -> method.isAbstract() || method.isStatic())
+                && declaredMethods.stream().anyMatch(MethodElement::isAbstract)
+                && declaredMethods.stream().noneMatch(PythonClassElement::isDeclaredBeanMethod);
+        }
+        return declaredMethods.stream().allMatch(MethodElement::isAbstract)
             && declaredMethods.stream().noneMatch(PythonClassElement::isIntroductionFactoryMethod);
+    }
+
+    /**
+     * Whether this class is an interface implemented by an introduction proxy: it is decorated with an
+     * {@link Introduction} stereotype and {@link #isInterface() compiles to a Java interface}.
+     *
+     * @return True if the class is an introduction interface
+     */
+    public boolean isIntroductionInterface() {
+        return hasIntroductionStereotype() && isInterface();
+    }
+
+    private boolean hasIntroductionStereotype() {
+        return hasStereotype(Introduction.class) && !isAssignable(Interceptor.class);
+    }
+
+    private static boolean isDeclaredBeanMethod(MethodElement method) {
+        return method.hasDeclaredAnnotation(Bean.class) || method.hasDeclaredStereotype(Bean.class);
     }
 
     private boolean hasInterfaceBase() {
