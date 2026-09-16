@@ -31,6 +31,9 @@ class Person:
     this.address = address;
   }
 
+  public Person() {
+  }
+
   @Override
   public Value asPolyglotValue() {
     if (this.graalpyInternalValue != null) {

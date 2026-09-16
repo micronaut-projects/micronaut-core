@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
@@ -110,6 +111,14 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         if (element.hasStereotype(Introspected.class)) {
             final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
             if (introspected != null && !processed.contains(element.getName())) {
+                if (element.hasAnnotation(Vetoed.class) && isIntrospected(context, element)) {
+                    // A vetoed class keeps the introspection another processor generated for it earlier in
+                    // this compilation: the Java class generated for a Python class carries the runtime
+                    // annotations of the Python class (@Entity, ...) for reflection-based frameworks while
+                    // its introspection was generated from the Python class itself.
+                    processed.add(element.getName());
+                    return;
+                }
                 processIntrospected(element, context, introspected);
             }
         }
