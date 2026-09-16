@@ -70,6 +70,8 @@ public final class ProxyInterceptors {
     private final List<BeanRegistration<?>> singletons;
     private final Qualifier<Interceptor<?, ?>> binding;
     private final Interceptor<?, ?> @Nullable [][] fixed;
+    // an interceptor of a custom scope is that scope's, so a selection containing one is made again for every call
+    private final boolean scoped;
     // Weak, so that a proxy fronting a different target per thread or request retains none of them: a target the
     // proxy holds is held by the proxy, and a target swapped in is held by whoever handed it over.
     private volatile @Nullable WeakReference<BeanRegistration<?>> lastTarget;
@@ -108,6 +110,7 @@ public final class ProxyInterceptors {
             }
         }
         this.fixed = perTarget ? null : select(singletons);
+        this.scoped = perTarget && resolutionContext.hasScopedInterceptors(Interceptor.ARGUMENT, binding);
     }
 
     /**
@@ -195,6 +198,11 @@ public final class ProxyInterceptors {
      * retain the interceptors of a target a scope forgot until its next expunge.
      */
     private Interceptor<?, ?>[][] selectionFor(BeanRegistration<?> target) {
+        if (scoped) {
+            // one of the interceptors belongs to a scope of its own, which decides when the instance is replaced:
+            // keeping the selection on the target would use an instance after its scope has ended
+            return select(ownedBy(target));
+        }
         return target.dependentState(this, () -> select(ownedBy(target)));
     }
 

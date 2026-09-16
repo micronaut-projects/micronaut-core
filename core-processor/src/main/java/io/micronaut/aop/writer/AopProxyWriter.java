@@ -475,11 +475,21 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             .build((aThis, methodParameters) -> {
                 ExpressionDef method = aThis.field(proxyMethodsField).arrayElement(index);
                 ExpressionDef methodIndex = TypeDef.Primitive.INT.constant(index);
-                if (isProxyTarget && (lazy || hotswap)) {
-                    // The target may differ from one call to the next, and the non-singleton interceptors of a
-                    // target are its own, so the interceptors of the call are selected for the target of the call.
+                if (isProxyTarget) {
+                    // The non-singleton interceptors of a target are its own, and the target may differ from one
+                    // call to the next, so the interceptors of the call are selected for the target of the call.
                     ProxyTargetFields fields = Objects.requireNonNull(proxyTargetFields);
                     ExpressionDef selector = aThis.field(fields.proxyTargetInterceptors());
+                    if (!lazy && !hotswap) {
+                        // the target is fixed, and so is its registration: the selector answers from what it kept
+                        return proceed(
+                            methodElement,
+                            methodParameters,
+                            selector.invoke(METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_REGISTRATION, methodIndex, aThis.field(Objects.requireNonNull(fields.targetRegistration()))),
+                            aThis.field(Objects.requireNonNull(targetField)),
+                            method
+                        );
+                    }
                     if (lazy && !cacheLazyTarget) {
                         // resolved with its registration, whose dependents the interceptors are selected from
                         return resolveProxyTargetRegistration(
@@ -494,14 +504,13 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                             method
                         ));
                     }
+                    // the target of the call decides the interceptors, and the selector finds its registration:
+                    // reading the registration field separately could pair a target with the registration of
+                    // another, since a cached target can be cleared and resolved again between the two reads
                     return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal(LOCAL_TARGET, target -> proceed(
                         methodElement,
                         methodParameters,
-                        cacheLazyTarget
-                            // the registration kept with the cached target
-                            ? selector.invoke(METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_REGISTRATION, methodIndex, aThis.field(Objects.requireNonNull(fields.targetRegistration())))
-                            // the target may have been swapped, so its registration is found from the target
-                            : selector.invoke(METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_TARGET, methodIndex, target),
+                        selector.invoke(METHOD_PROXY_TARGET_INTERCEPTORS_GET_FOR_TARGET, methodIndex, target),
                         target,
                         method
                     ));
@@ -569,9 +578,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
 
         ClassDef.ClassDefBuilder proxyBuilder = ClassDef.builder(proxyType.getName()).synthetic();
 
-        // A proxy that fronts a different target from one call to the next selects the interceptors of each call
-        // for the target of that call, so it keeps no selection of its own.
-        boolean variableTarget = isProxyTarget && (lazy || hotswap);
+        // A proxy that fronts a separate target asks its selector for the interceptors of each call: the target
+        // can differ from one call to the next, and even a fixed target may be intercepted by an interceptor of a
+        // scope of its own, which that scope replaces without telling the proxy. So it keeps no selection itself.
+        boolean variableTarget = isProxyTarget;
         FieldDef interceptorsField = null;
         if (!variableTarget) {
             interceptorsField = FieldDef.builder(FIELD_INTERCEPTORS, Interceptor[][].class)
@@ -846,11 +856,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         // initial target is what lets the calls before any swap find it without a lookup
                         statements.add(aThis.field(proxyTargetInterceptorsField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, targetRegistration));
                     } else {
-                        // the target is fixed, so its interceptors are selected once
+                        // the target is fixed: its registration is kept, and selecting now is what lets the calls
+                        // answer from the selector without resolving anything
                         statements.add(aThis.field(Objects.requireNonNull(targetRegistrationField)).assign(targetRegistration));
-                        statements.add(aThis.field(Objects.requireNonNull(interceptorsField)).assign(
-                            aThis.field(proxyTargetInterceptorsField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, targetRegistration)
-                        ));
+                        statements.add(aThis.field(proxyTargetInterceptorsField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, targetRegistration));
                     }
                     return StatementDef.multi(statements);
                 }));

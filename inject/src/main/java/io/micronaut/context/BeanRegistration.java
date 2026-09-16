@@ -32,7 +32,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -56,6 +56,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     @Nullable
     private volatile Map<Object, Object> dependentState;
     private volatile boolean createdAsInterceptor;
+    private boolean destroying;
 
     /**
      * @param identifier     The bean identifier
@@ -196,7 +197,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         // serialised, so that two callers resolving for this bean at once do not each create the interceptor the
-        // other is creating
+        // other is creating, and so that nothing is created for a bean already being destroyed
         synchronized (this) {
             try (BeanResolutionContext resolutionContext = newResolutionContext()) {
                 return resolutionContext.getInterceptorRegistrations(interceptorType, binding);
@@ -241,9 +242,11 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * Returns state another component keeps against this registration, computing it once.
      *
      * <p>A proxy fronting this bean keeps the interceptors it selected for the methods of this bean here, keyed by
-     * its selector, so that it selects once per target and the selection lives exactly as long as this bean.</p>
+     * its selector, so that it selects once per target and the selection lives no longer than this bean. The key is
+     * held weakly: a selector belongs to one proxy, and a proxy that is gone must not keep its selection on a bean
+     * that outlives it.</p>
      *
-     * @param key      The key; a selector does not define equality, so it is compared by identity
+     * @param key      The key, compared as it defines equality and held weakly
      * @param supplier Computes the state when absent
      * @param <S>      The state type
      * @return The state
@@ -252,17 +255,17 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     @Internal
     @SuppressWarnings("unchecked")
     public <S> S dependentState(Object key, Supplier<S> supplier) {
-        Map<Object, Object> state = dependentState;
-        if (state == null) {
-            synchronized (this) {
-                state = dependentState;
-                if (state == null) {
-                    state = new ConcurrentHashMap<>(2);
-                    dependentState = state;
-                }
+        Map<Object, Object> state;
+        synchronized (this) {
+            state = dependentState;
+            if (state == null) {
+                state = new WeakHashMap<>(2);
+                dependentState = state;
             }
         }
-        return (S) state.computeIfAbsent(key, ignored -> supplier.get());
+        synchronized (state) {
+            return (S) state.computeIfAbsent(key, ignored -> supplier.get());
+        }
     }
 
     /**
@@ -271,6 +274,14 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @param registration The registration of the dependent bean
      */
     synchronized void addDependentBean(BeanRegistration<?> registration) {
+        if (destroying) {
+            // created for a bean whose destruction has begun, so it is not one of the dependents that destruction
+            // will walk: it is destroyed here instead of outliving the bean it was created for
+            if (beanContext != null) {
+                beanContext.destroyBean(registration);
+            }
+            return;
+        }
         if (dependents == null) {
             dependents = new ArrayList<>(2);
         } else if (!(dependents instanceof ArrayList)) {
@@ -286,6 +297,19 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * definition that bean is intercepted with. A dependency injected into the bean is a dependent too, but carries
      * no mark: an interceptor injected into a bean is not the instance that intercepts it.
      */
+    /**
+     * Takes the dependents of this bean for destruction and marks it as being destroyed, so that a bean created for
+     * it after this point is destroyed as it is created rather than attached to a bean that is going away.
+     *
+     * @return The dependent beans to destroy, in creation order
+     */
+    synchronized List<BeanRegistration<?>> beginDestruction() {
+        destroying = true;
+        List<BeanRegistration<?>> destroyed = dependents == null ? List.of() : List.copyOf(dependents);
+        dependents = null;
+        return destroyed;
+    }
+
     void markCreatedAsInterceptor() {
         createdAsInterceptor = true;
     }
