@@ -43,6 +43,14 @@ public final class Payloads {
         return "object:" + payload;
     }
 
+    public static String read(Iterable<? extends CharSequence> lines) {
+        return "lines:" + String.join("|", lines);
+    }
+
+    public static byte[] bytes(String payload) {
+        return payload.getBytes(StandardCharsets.UTF_8);
+    }
+
     public static int size(byte[] payload) {
         return payload.length;
     }

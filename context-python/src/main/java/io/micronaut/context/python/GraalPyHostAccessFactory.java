@@ -116,12 +116,17 @@ final class GraalPyHostAccessFactory {
             GraalPyHostAccessFactory::readBytes);
     }
 
+    /**
+     * A Python sequence (list, tuple): not a host object (a Java byte[] or List keeps the default host
+     * conversion, or {@code Files.write(Path, byte[])} would become ambiguous with the Iterable overload)
+     * and not a bytes-like buffer, which maps to {@code byte[]}.
+     */
     private static boolean isSequence(@Nullable Value value) {
-        return value != null && !value.isNull() && value.hasArrayElements();
+        return value != null && !value.isNull() && !value.isHostObject() && !value.hasBufferElements() && value.hasArrayElements();
     }
 
     private static boolean isSequenceOrIterable(@Nullable Value value) {
-        if (value == null || value.isNull()) {
+        if (value == null || value.isNull() || value.isHostObject() || value.hasBufferElements()) {
             return false;
         }
         // sets, generators and other iterables, but not dictionaries (their keys are iterable) or strings

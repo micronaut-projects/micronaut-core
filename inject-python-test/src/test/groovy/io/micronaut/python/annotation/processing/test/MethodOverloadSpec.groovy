@@ -266,8 +266,16 @@ class Readers:
         return Payloads.size(b"payload")
 
     @Executable
+    def from_list(self) -> str:
+        return Payloads.read(["a", "b"])
+
+    @Executable
     def roundtrip(self, payload: bytes) -> str:
         return Payloads.read(payload)
+
+    @Executable
+    def java_bytes(self) -> str:
+        return Payloads.read(Payloads.bytes("payload"))
 '''
         when:
         def context = buildContext(pythonCode)
@@ -278,7 +286,9 @@ class Readers:
         bean.from_bytearray() == "bytes:payload"
         bean.from_str() == "string:payload"
         bean.size() == 7
+        bean.from_list() == "lines:a|b"
         bean.roundtrip("payload".bytes) == "bytes:payload"
+        bean.java_bytes() == "bytes:payload"
 
         cleanup:
         context?.close()
