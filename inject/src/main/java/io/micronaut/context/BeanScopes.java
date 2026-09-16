@@ -45,4 +45,15 @@ final class BeanScopes {
         String scope = definition.getScopeName().orElse(null);
         return scope == null || Prototype.class.getName().equals(scope);
     }
+
+    /**
+     * Whether a bean of the given definition belongs to a scope of its own, which decides how long it lives and
+     * when it is replaced: neither a singleton nor a bean held by whoever asked for it.
+     *
+     * @param definition The definition
+     * @return {@code true} for a bean of a custom scope
+     */
+    static boolean isCustomScoped(BeanDefinition<?> definition) {
+        return !definition.isSingleton() && !isUnscoped(definition);
+    }
 }

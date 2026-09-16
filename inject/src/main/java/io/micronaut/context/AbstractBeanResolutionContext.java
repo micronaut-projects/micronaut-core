@@ -72,6 +72,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     private Qualifier<?> qualifier;
     @Nullable
     private BeanDefinition<?> currentBeanDefinition;
+    private boolean resolvingInterceptors;
     @Nullable
     private List<BeanRegistration<?>> dependentBeans;
     @Nullable
@@ -474,16 +475,46 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
 
     @Override
     public void markDependentAsFactory() {
-        if (dependentBeans != null) {
-            if (dependentBeans.isEmpty()) {
-                return;
-            }
-            dependentFactory = dependentBeans.removeFirst();
+        if (dependentBeans == null || dependentBeans.isEmpty()) {
+            return;
         }
+        // The bean being created is produced by a method of its declaring type, so the factory is the dependent of
+        // that type; a definition compiled before 5.3 names none, and the interceptors resolved before the factory
+        // was looked up would otherwise make the first dependent the wrong one.
+        Class<?> factoryType = currentBeanDefinition == null ? null : currentBeanDefinition.getDeclaringType().orElse(null);
+        if (factoryType != null) {
+            for (int i = dependentBeans.size() - 1; i >= 0; i--) {
+                BeanRegistration<?> dependent = dependentBeans.get(i);
+                if (dependent.getBean() != null && factoryType.isInstance(dependent.getBean())) {
+                    dependentFactory = dependentBeans.remove(i);
+                    return;
+                }
+            }
+            return;
+        }
+        dependentFactory = dependentBeans.removeFirst();
+    }
+
+    /**
+     * @return Whether what is being created through this context is being created as an interceptor of the bean it
+     * is resolved for
+     */
+    boolean isResolvingInterceptors() {
+        return resolvingInterceptors;
     }
 
     @Override
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        boolean previous = resolvingInterceptors;
+        resolvingInterceptors = true;
+        try {
+            return resolveInterceptorRegistrations(interceptorType, binding);
+        } finally {
+            resolvingInterceptors = previous;
+        }
+    }
+
+    private <I> Collection<BeanRegistration<I>> resolveInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
         if (currentBeanDefinition == null) {
             return context.getInterceptorRegistrations(this, interceptorType, binding);
         }
@@ -497,12 +528,23 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    public <I> boolean hasScopedInterceptors(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return context.hasScopedInterceptors(interceptorType, binding);
+    }
+
+    @Override
     public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
-        if (currentBeanDefinition == null) {
-            return context.getInterceptorRegistration(this, interceptor);
-        }
-        try (Path ignored = path.pushConstructorResolve(currentBeanDefinition, INTERCEPTORS_ARGUMENT)) {
-            return context.getInterceptorRegistration(this, interceptor);
+        boolean previous = resolvingInterceptors;
+        resolvingInterceptors = true;
+        try {
+            if (currentBeanDefinition == null) {
+                return context.getInterceptorRegistration(this, interceptor);
+            }
+            try (Path ignored = path.pushConstructorResolve(currentBeanDefinition, INTERCEPTORS_ARGUMENT)) {
+                return context.getInterceptorRegistration(this, interceptor);
+            }
+        } finally {
+            resolvingInterceptors = previous;
         }
     }
 

@@ -53,6 +53,17 @@ final class OwnedInterceptors {
     }
 
     /**
+     * Whether an interceptor of the given definition belongs to a scope of its own, so that neither the bean it
+     * intercepts nor a proxy fronting it may keep the instance: the scope decides when it is replaced.
+     *
+     * @param definition The definition
+     * @return {@code true} for an interceptor of a custom scope
+     */
+    static boolean scoped(BeanDefinition<?> definition) {
+        return BeanScopes.isCustomScoped(definition);
+    }
+
+    /**
      * Finds the interceptor of the given definition that the bean the context resolves for already owns.
      *
      * @param resolutionContext The resolution context, whose dependents are the bean's

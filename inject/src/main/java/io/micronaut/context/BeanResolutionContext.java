@@ -143,6 +143,23 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
+     * Whether any interceptor matching the binding belongs to a scope of its own, rather than being a singleton or
+     * the intercepted bean's own.
+     *
+     * <p>Such an interceptor is resolved from its scope every time it is needed and a selection that contains it
+     * must not be kept for a bean: the scope, not the bean, decides when the instance is replaced.</p>
+     *
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return Whether one of the bound interceptors is of a custom scope
+     * @since 5.3.0
+     */
+    default <I> boolean hasScopedInterceptors(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return false;
+    }
+
+    /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
      *
      * @see io.micronaut.context.annotation.InjectScope

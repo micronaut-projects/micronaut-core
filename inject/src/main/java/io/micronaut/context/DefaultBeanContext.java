@@ -1286,7 +1286,9 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanToDestroy instanceof LifeCycle<?> cycle && !dependent) {
             destroyLifeCycleBean(cycle, definition);
         }
-        List<BeanRegistration<?>> dependents = registration.getDependentBeans();
+        // taken under the registration's lock, which also marks it as being destroyed: an interceptor created for
+        // this bean after this point is destroyed as it is created instead of outliving it
+        List<BeanRegistration<?>> dependents = registration.beginDestruction();
         if (!dependents.isEmpty()) {
             final ListIterator<BeanRegistration<?>> i = dependents.listIterator(dependents.size());
             while (i.hasPrevious()) {
@@ -3442,6 +3444,13 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                     dependentBeans
                 );
                 context.pushDependentBeans(parentDependentBeans);
+                if (context instanceof AbstractBeanResolutionContext abstractContext
+                    && abstractContext.isResolvingInterceptors()
+                    && OwnedInterceptors.owned(definition)) {
+                    // marked before it is published to the bean it was created for, so that a concurrent lookup
+                    // sees either no instance or one it can recognise as that bean's interceptor
+                    beanRegistration.markCreatedAsInterceptor();
+                }
                 if (dependent) {
                     context.addDependentBean(beanRegistration);
                 }
@@ -3740,6 +3749,27 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                     Argument<I> interceptorType,
                                                                     @Nullable Qualifier<I> binding) {
         return getBeanRegistrations(resolutionContext, interceptorType, binding, true);
+    }
+
+    /**
+     * Whether any interceptor matching the binding belongs to a scope of its own, so that a selection made for a
+     * bean must not be kept: the scope decides when such an interceptor is replaced. See
+     * {@link BeanResolutionContext#hasScopedInterceptors(Argument, Qualifier)}.
+     *
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return Whether one of the bound interceptors is of a custom scope
+     * @since 5.3.0
+     */
+    @Internal
+    <I> boolean hasScopedInterceptors(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        for (BeanDefinition<I> definition : getBeanDefinitions(interceptorType, binding)) {
+            if (OwnedInterceptors.scoped(definition)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
