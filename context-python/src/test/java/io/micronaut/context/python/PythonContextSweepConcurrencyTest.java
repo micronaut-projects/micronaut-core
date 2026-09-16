@@ -29,6 +29,8 @@ import java.util.concurrent.TimeUnit;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -50,6 +52,33 @@ final class PythonContextSweepConcurrencyTest {
     @Test
     void unregisteredContextsStartingConcurrentlyResolveHelpers() throws Exception {
         assertHelpersResolveConcurrently(false);
+    }
+
+    @Test
+    void closedContextsThatCachedNothingAreDropped() {
+        Context unused = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        Context framed = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        Context open = Context.newBuilder(PYTHON).allowAllAccess(true).build();
+        try {
+            PythonContextRegistry.state(unused);
+            PythonContextRuntime.withExecutionFrame(framed, () -> null);
+            PythonContextRegistry.state(open);
+            for (Context context : List.of(unused, framed, open)) {
+                assertNotNull(PythonContextRegistry.existingState(context));
+            }
+            unused.close();
+            framed.close();
+
+            assertEquals(2, PythonContextRegistry.forgetClosedContexts());
+            assertNull(PythonContextRegistry.existingState(unused), "a closed context without cached values kept its state");
+            assertNull(PythonContextRegistry.existingState(framed), "a closed context used only in a frame kept its state");
+            assertNotNull(PythonContextRegistry.existingState(open), "an open context lost its state");
+        } finally {
+            for (Context context : List.of(unused, framed, open)) {
+                PythonContextRegistry.unregisterContext(context);
+                context.close(true);
+            }
+        }
     }
 
     private static void assertHelpersResolveConcurrently(boolean register) throws Exception {

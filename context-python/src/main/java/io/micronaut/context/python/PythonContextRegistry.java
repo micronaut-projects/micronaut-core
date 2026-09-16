@@ -419,26 +419,22 @@ final class PythonContextRegistry {
 
     /**
      * Whether the sweep may probe the context of a state. The probe enters the context on the
-     * sweeping thread, which is not the thread that owns it: entering a context that is still
-     * initializing leaves the owner evaluating into a main module that the bindings do not expose,
-     * and entering a context that is closing fails its close. Registered contexts are released by
-     * {@link #unregisterContext(Context)} and are never probed; neither are states that cache no
-     * value yet, whose context may still be initializing, nor states with executions or a close in
-     * progress.
+     * sweeping thread, which is not the thread that owns it, and entering a context that is closing
+     * fails its close. Registered contexts are released by {@link #unregisterContext(Context)} and
+     * are never probed; neither are states with executions or a close in progress.
      *
      * @param state The state, read under the registry lock
      * @return Whether the context of the state may be probed
      */
     private static boolean isProbeable(ContextState state) {
-        return !state.registered
-            && !state.closing
-            && state.activeExecutions == 0
-            && (state.runtimeModule.get() != null || !state.helpers.isEmpty() || !state.classes.isEmpty());
+        return !state.registered && !state.closing && state.activeExecutions == 0;
     }
 
     private static boolean isClosed(Context context) {
         try {
-            context.getBindings(PythonContextRuntime.PYTHON);
+            // not getBindings: that initializes Python in a context its owner may be initializing,
+            // and the owner's evaluations then miss the main module the bindings expose
+            context.getPolyglotBindings();
             return false;
         } catch (IllegalStateException e) {
             // "The Context is already closed"; a context in use from another thread is not closed
