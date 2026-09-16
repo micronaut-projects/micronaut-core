@@ -30,7 +30,7 @@ snippet::micronaut.docs.asyncio.BackendClient[tags="publisherClient", indent=0, 
 
 snippet::micronaut.docs.asyncio.AsyncDemoController[tags="awaitPublisher", indent=0, title="Awaiting a scalar Publisher"]
 
-For a `Publisher`, Micronaut requests one item, completes the await with the first item, and cancels the subscription. If the publisher completes empty, the awaited value is `None`; if it signals an error, the await fails. Multi-item `Flux` values are not collected into a list implicitly. Use reactive operators such as `collectList()` when all emitted items are required.
+For a `Publisher`, Micronaut requests one item, completes the await with the first item, and cancels the subscription. If the publisher completes empty, the awaited value is `None`; if it signals an error, the await fails. Multi-item `Flux` values are not collected into a list implicitly. Use reactive operators such as `collectList()` when all emitted items are required, or consume the items one at a time with `async for` as described in <<asyncioStreaming>>.
 
 Classless async routes can await the same scalar reactive client result:
 

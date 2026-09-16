@@ -131,7 +131,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
-    private static final String PUBLISHER = "org.reactivestreams.Publisher";
+    static final String PUBLISHER = "org.reactivestreams.Publisher";
     private static final String GET_MEMBER = "getMember";
     private static final String MAP_OF = "mapOf";
     private static final String ENUM_VALUE = "enumValue";
@@ -2827,6 +2827,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     if (effectiveReturnType.isVoid()) {
                         return (StatementDef) invokedValue;
+                    } else if (isAsyncGeneratorPythonMethod(methodElement)) {
+                        return invokedValue.newLocal("pythonAsyncGenerator", pythonAsyncGenerator ->
+                            convertedElementPublisher(allClasses, effectiveReturnType, PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                                "toPublisher",
+                                ClassTypeDef.of(PUBLISHER),
+                                pythonAsyncGenerator
+                            )).returning()
+                        );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
                             PYTHON_ASYNCIO_RUNTIME.invokeStatic(
@@ -3995,6 +4003,45 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
         return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsync();
+    }
+
+    /**
+     * Convert the elements of a publisher backed by a Python async generator the way the elements of
+     * a returned {@code Publisher} are converted: a generated wrapper element type keeps its wrapper,
+     * any other declared element type goes through the runtime conversion.
+     *
+     * @param allClasses The generated classes
+     * @param returnType The declared {@code Publisher<T>} return type
+     * @param publisher The raw publisher expression
+     * @return The converted publisher expression
+     */
+    static ExpressionDef convertedElementPublisher(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef publisher) {
+        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+        ExpressionDef converted;
+        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                "convertPublisher",
+                List.of(ClassTypeDef.of(PUBLISHER), POLYGLOT_VALUE_CONVERTER),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                generatedWrapperConverter(componentType)
+            );
+        } else {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                "convertPublisher",
+                List.of(ClassTypeDef.of(PUBLISHER), TypeDef.CLASS),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                toClassExpression(componentType)
+            );
+        }
+        // an element type with type arguments of its own (Event[Tick]) cannot be cast from the raw
+        // publisher directly
+        return uncheckedCast(converted, returnType);
+    }
+
+    static boolean isAsyncGeneratorPythonMethod(MethodElement methodElement) {
+        return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsyncGenerator();
     }
 
     @Override

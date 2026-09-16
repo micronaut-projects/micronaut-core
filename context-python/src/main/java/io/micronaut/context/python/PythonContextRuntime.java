@@ -41,6 +41,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import org.reactivestreams.Publisher;
 
 /**
  * Runtime coordination point for generated Python bridge classes.
@@ -582,6 +583,45 @@ public final class PythonContextRuntime {
     @UsedByGeneratedCode
     public static CompletionStage<?> invokePooledScriptAsync(String packageName, String scriptName, String methodName, Object... args) {
         return withPooledScriptStage(packageName, scriptName, v -> PythonAsyncioRuntime.toCompletionStage(v.getMember(methodName).execute(
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    /**
+     * Invoke an async generator method on a pooled class instance and expose the generator as a
+     * publisher. On a Netty event loop the generator runs in the loop's own context, which needs no
+     * lease; without a loop the call fails, since nothing could drive the generator after the borrowed
+     * context is returned to the pool.
+     *
+     * @param classReference The Python class reference
+     * @param methodName The method name
+     * @param args Arguments
+     * @return The publisher of the generator's elements
+     * @since 5.2.3
+     */
+    @UsedByGeneratedCode
+    public static Publisher<?> invokePooledPublisher(PythonClassReference classReference, String methodName, Object... args) {
+        return withPooled(classReference, v -> PythonAsyncioRuntime.toPublisher(PythonInvocation.invokePythonMethod(
+            v,
+            methodName,
+            PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
+        )));
+    }
+
+    /**
+     * Invoke an async generator function of a pooled script and expose the generator as a publisher;
+     * see {@link #invokePooledPublisher(PythonClassReference, String, Object...)}.
+     *
+     * @param packageName The package
+     * @param scriptName The script name
+     * @param methodName The function name
+     * @param args Arguments
+     * @return The publisher of the generator's elements
+     * @since 5.2.3
+     */
+    @UsedByGeneratedCode
+    public static Publisher<?> invokePooledScriptPublisher(String packageName, String scriptName, String methodName, Object... args) {
+        return withPooledScript(packageName, scriptName, v -> PythonAsyncioRuntime.toPublisher(v.getMember(methodName).execute(
             PythonCoercion.coerceArgumentsToContext(v.getContext(), args)
         )));
     }

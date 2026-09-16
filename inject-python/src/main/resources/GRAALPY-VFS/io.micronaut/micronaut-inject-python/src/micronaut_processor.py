@@ -120,6 +120,40 @@ def has_return_value(funcdef):
             return True
     return False
 
+def has_yield(funcdef):
+    """
+    Returns True if the function body contains a yield expression of its own, which makes the
+    function a generator: an ``async def`` with a yield is an async generator, bridged as a Publisher.
+    """
+    class YieldVisitor(ast.NodeVisitor):
+        def __init__(self):
+            self.found = False
+
+        def visit_Yield(self, node):
+            self.found = True
+
+        def visit_YieldFrom(self, node):
+            self.found = True
+
+        def visit_FunctionDef(self, node):
+            return
+
+        def visit_AsyncFunctionDef(self, node):
+            return
+
+        def visit_Lambda(self, node):
+            return
+
+        def visit_ClassDef(self, node):
+            return
+
+    visitor = YieldVisitor()
+    for stmt in funcdef.body:
+        visitor.visit(stmt)
+        if visitor.found:
+            return True
+    return False
+
 def is_static_method(func_node):
     """
     Check if a function node represents a static method (has @staticmethod or @classmethod decorator).
@@ -362,7 +396,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         )
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node))
+                        # only an async generator changes the bridge (a Publisher); a plain generator keeps its declared type
+                        is_generator = is_async and has_yield(node)
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node), is_generator)
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 if is_async:

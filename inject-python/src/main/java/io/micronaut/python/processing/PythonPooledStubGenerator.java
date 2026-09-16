@@ -50,8 +50,11 @@ import static io.micronaut.python.processing.PythonStubGenerator.FROM_POLYGLOT_V
 import static io.micronaut.python.processing.PythonStubGenerator.POLYGLOT_VALUE;
 import static io.micronaut.python.processing.PythonStubGenerator.PYTHON_ASYNCIO_RUNTIME;
 import static io.micronaut.python.processing.PythonStubGenerator.addReferencedPythonClassReferenceFields;
+import static io.micronaut.python.processing.PythonStubGenerator.convertedElementPublisher;
 import static io.micronaut.python.processing.PythonStubGenerator.erasedType;
 import static io.micronaut.python.processing.PythonStubGenerator.handleReturnType;
+import static io.micronaut.python.processing.PythonStubGenerator.PUBLISHER;
+import static io.micronaut.python.processing.PythonStubGenerator.isAsyncGeneratorPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.isAsyncPythonMethod;
 import static io.micronaut.python.processing.PythonStubGenerator.pythonClassReference;
 import static io.micronaut.python.processing.PythonStubGenerator.pythonClassAnnotation;
@@ -227,6 +230,10 @@ final class PythonPooledStubGenerator {
             args.add(pythonClassReference(element, element));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
+            if (isAsyncGeneratorPythonMethod(methodElement)) {
+                return convertedElementPublisher(allClasses, methodElement.getGenericReturnType(),
+                    PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledPublisher", ClassTypeDef.of(PUBLISHER), args)).returning();
+            }
             if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
                 // the coroutine is driven while the pooled context is still leased to this call
                 return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledAsync", TypeDef.of(CompletionStage.class), args));
@@ -262,6 +269,10 @@ final class PythonPooledStubGenerator {
             args.add(ExpressionDef.constant(script));
             args.add(ExpressionDef.constant(pythonFunctionName));
             args.addAll(parameterExpressions);
+            if (isAsyncGeneratorPythonMethod(methodElement)) {
+                return convertedElementPublisher(allClasses, methodElement.getGenericReturnType(),
+                    PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScriptPublisher", ClassTypeDef.of(PUBLISHER), args)).returning();
+            }
             if (isAsyncPythonMethod(methodElement) && !methodElement.getReturnType().isVoid()) {
                 return completionStage(methodElement, PYTHON_CONTEXT_RUNTIME.invokeStatic("invokePooledScriptAsync", TypeDef.of(CompletionStage.class), args));
             }
@@ -280,6 +291,15 @@ final class PythonPooledStubGenerator {
                                                   ExpressionDef.InvokeStaticMethod invoked) {
         if (methodElement.getReturnType().isVoid()) {
             return invoked;
+        }
+        if (isAsyncGeneratorPythonMethod(methodElement)) {
+            return invoked.newLocal("pythonAsyncGenerator", pythonAsyncGenerator ->
+                convertedElementPublisher(allClasses, methodElement.getGenericReturnType(), PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                    "toPublisher",
+                    ClassTypeDef.of(PUBLISHER),
+                    pythonAsyncGenerator
+                )).returning()
+            );
         }
         if (isAsyncPythonMethod(methodElement)) {
             return invoked.newLocal("pythonCoroutine", pythonCoroutine ->

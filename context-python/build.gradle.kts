@@ -39,6 +39,7 @@ dependencies {
     compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautHttp)
+    testImplementation(libs.managed.reactor)
     testImplementation("com.graphql-java:java-dataloader:6.0.0")
 }
 
