@@ -85,6 +85,38 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             spec = __micronaut_importlib_util.spec_from_file_location('__main__', module_path)
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
+    /**
+     * Python code that gives every Java object the trailing-underscore aliases of members named after a
+     * Python keyword ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
+     * {@code Specification.and(other)}).
+     * <p>
+     * The compiler rewrites such aliases only on names it can resolve statically (imported Java classes
+     * and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy foreign
+     * objects, so the alias is resolved here instead: a Python class registered with
+     * {@code polyglot.register_interop_type} for {@code java.lang.Object} enters the type of every host
+     * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
+     * failed, retrying with the underscore stripped. The rule is the one the compiler applies
+     * ({@code keyword.iskeyword}), so the same spelling works everywhere.
+     */
+    private static final Source KEYWORD_ALIASES_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_register_keyword_aliases():
+            import keyword
+            import java
+            from polyglot import register_interop_type
+
+            class MicronautJavaObject:
+                __slots__ = ()
+
+                def __getattr__(self, name):
+                    if name.endswith('_') and keyword.iskeyword(name[:-1]):
+                        return getattr(self, name[:-1])
+                    raise AttributeError(f"foreign object has no attribute '{name}'")
+
+            register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
+
+        __micronaut_register_keyword_aliases()
+        del __micronaut_register_keyword_aliases
+        """, "micronaut-keyword-aliases.py").cached(true).buildLiteral();
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
@@ -279,6 +311,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
                 LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
             }
+            // Before any application code runs: Java objects answer to keyword-safe member aliases
+            now = System.currentTimeMillis();
+            context.eval(KEYWORD_ALIASES_SOURCE);
+            LOG.debug("GraalPy keyword aliases registered in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
             evaluateMain(classLoader, INTERNAL_MAIN, context);
