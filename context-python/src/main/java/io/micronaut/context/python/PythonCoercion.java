@@ -175,11 +175,40 @@ public final class PythonCoercion {
                 throw new IllegalArgumentException("Cannot pass a polyglot Value to a different context");
             }
             case List<?> list -> {
+                return coerceCollectionToContext(list, context);
+            }
+            case Map<?, ?> map -> {
+                return coerceCollectionToContext(map, context);
+            }
+            case Set<?> set -> {
+                return coerceCollectionToContext(set, context);
+            }
+            default -> {
+            }
+        }
+        return value;
+    }
+
+    private static Object coerceCollectionToContext(Object collection, Context context) {
+        if (isGuestBackedCollection(collection)) {
+            Value guest = Value.asValue(collection);
+            if (isValueInContext(guest, context)) {
+                // a view of a Python collection of this context: hand the collection itself back
+                return guest;
+            }
+            return copyCollection(collection, context);
+        }
+        return requiresElementCoercion(collection) ? copyCollection(collection, context) : collection;
+    }
+
+    private static Object copyCollection(Object collection, Context context) {
+        return switch (collection) {
+            case List<?> list -> {
                 List<@Nullable Object> result = new ArrayList<>(list.size());
                 for (Object element : list) {
                     result.add(coerceToContext(element, context));
                 }
-                return result;
+                yield result;
             }
             case Map<?, ?> map -> {
                 Map<Object, Object> result = new HashMap<>();
@@ -189,26 +218,90 @@ public final class PythonCoercion {
                         coerceToContext(entry.getValue(), context)
                     );
                 }
-                return result;
+                yield result;
             }
             case Set<?> set -> {
                 Set<@Nullable Object> result = new HashSet<>();
                 for (Object element : set) {
                     result.add(coerceToContext(element, context));
                 }
-                return result;
+                yield result;
             }
-            default -> {
-            }
+            default -> collection;
+        };
+    }
+
+    /**
+     * Whether a Java collection has to be rebuilt before it enters a Python context.
+     *
+     * <p>Collections are passed to Python by reference: GraalPy exposes a host {@link List},
+     * {@link Map} or {@link Set} with its full Java API and in-place mutations made in Python
+     * reach the Java object. Only a plain JDK collection (a {@code java.util} implementation such as
+     * {@link ArrayList} or {@link HashMap}) whose elements themselves need coercion (generated Python
+     * wrappers, polyglot values, {@code java.time} values, nested collections of those) is copied, so
+     * the elements arrive as Python objects. A collection of any other class, for example a cache or
+     * a view that implements {@link Map}, is never inspected or copied: it keeps its identity and API.</p>
+     *
+     * @param collection The list, map or set
+     * @return Whether the collection must be copied with coerced elements
+     */
+    private static boolean requiresElementCoercion(Object collection) {
+        return isPlainCollection(collection) && requiresContextCoercion(collection);
+    }
+
+    private static boolean isPlainCollection(Object collection) {
+        return collection.getClass().getName().startsWith("java.util.");
+    }
+
+    /**
+     * Whether a collection is the Java view of a Python collection, as returned by
+     * {@link Value#as(Class)} for {@link List}, {@link Map} and {@link Set} targets.
+     */
+    private static boolean isGuestBackedCollection(Object collection) {
+        return collection.getClass().getName().startsWith("com.oracle.truffle.polyglot.");
+    }
+
+    private static boolean requiresContextCoercion(@Nullable Object value) {
+        if (value == null || isInteropPrimitive(value)) {
+            return false;
         }
-        return value;
+        return switch (value) {
+            case ValueCoercible _, Value _ -> true;
+            case LocalDate _, LocalTime _, LocalDateTime _, Duration _, ZoneOffset _, UUID _ -> true;
+            case List<?> _, Map<?, ?> _, Set<?> _ when isGuestBackedCollection(value) -> true;
+            case List<?> list when isPlainCollection(list) -> {
+                for (Object element : list) {
+                    if (requiresContextCoercion(element)) {
+                        yield true;
+                    }
+                }
+                yield false;
+            }
+            case Map<?, ?> map when isPlainCollection(map) -> {
+                for (Map.Entry<?, ?> entry : map.entrySet()) {
+                    if (requiresContextCoercion(entry.getKey()) || requiresContextCoercion(entry.getValue())) {
+                        yield true;
+                    }
+                }
+                yield false;
+            }
+            case Set<?> set when isPlainCollection(set) -> {
+                for (Object element : set) {
+                    if (requiresContextCoercion(element)) {
+                        yield true;
+                    }
+                }
+                yield false;
+            }
+            default -> value.getClass().isArray();
+        };
     }
 
     /**
      * Coerce a value using the generated Java bridge's declared parameter type.
-     * Some host objects implement collection interfaces as an implementation
-     * detail and should stay host objects unless the Python method declares the
-     * plain collection contract.
+     * A collection argument is only rebuilt with coerced elements when the Python
+     * method declares the plain collection contract; a parameter declared with a
+     * more specific type (a cache, a view) always stays the host object it is.
      *
      * @param value The value to coerce
      * @param context The target context

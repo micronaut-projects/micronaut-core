@@ -347,6 +347,7 @@ languageSupport:
     pythonThreading: Python Threading
     typeOrdering: Type Ordering and Forward References
     standardTypes: Standard Library Type Conversions
+    javaCollections: Java Collections
     keywords: Python Keywords in Java APIs
     moduleScripts:
       title: Module Scripts
