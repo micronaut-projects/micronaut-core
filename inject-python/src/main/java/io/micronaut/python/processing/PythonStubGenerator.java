@@ -395,7 +395,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Track method names that have been added to avoid duplicates
                     Set<String> addedMethodNames = stubEntry.bridgedMethods();
 
-                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, isDeclaredBean, isIntroductionBean, isAopProxy);
+                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, isDeclaredBean, isIntroductionBean, isAopProxy, beanProperties);
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
                     final FieldDef pythonValueSyncingFinal = pythonValueSyncing;
@@ -487,7 +487,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Bridges the methods of implemented Java interfaces, overridden host methods and abstract introduction methods; returns whether an interceptor binding was found on the way.
      */
     @SuppressWarnings("java:S107") // the flags describe one bean kind; a record for them is a refactoring of its own
-    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy) {
+    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy, List<PropertyElement> beanProperties) {
         Collection<ClassElement> interfaces = classElement.getInterfaces();
         for (ClassElement anInterface : interfaces) {
             TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
@@ -503,7 +503,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
                     MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
                     MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
-                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))) {
+                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))
+                        && !(bridgeMethod == interfaceMethod && isImplementedByPropertyAccessor(interfaceMethod, beanProperties))) {
                         if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
                             isAopProxy = true;
                         }
@@ -3741,6 +3742,36 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return pythonProperty.getAttributeField();
         }
         return beanProperty.getField();
+    }
+
+    /**
+     * Whether a Java interface accessor is implemented by the getter or setter generated for an attribute of the same
+     * name, so a dataclass can implement an interface such as {@code KubernetesObject} through its attributes
+     * ({@code apiVersion} implements {@code getApiVersion()}). The Python class declares no method of that name, and
+     * the attribute type must satisfy the interface signature for the generated accessor to override it.
+     */
+    private static boolean isImplementedByPropertyAccessor(MethodElement interfaceMethod, List<PropertyElement> beanProperties) {
+        String methodName = interfaceMethod.getName();
+        ParameterElement[] parameters = interfaceMethod.getParameters();
+        for (PropertyElement beanProperty : beanProperties) {
+            String propertyName = beanProperty.getName();
+            if (parameters.length == 0 && !interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getReadMethod().map(MethodElement::isSynthetic).orElse(true);
+                boolean sameName = methodName.equals(beanGetterName(propertyName))
+                    || (isBooleanProperty(beanProperty) && methodName.equals(booleanBeanGetterName(propertyName)));
+                if (synthetic && sameName && !beanProperty.isWriteOnly()
+                    && beanProperty.getType().isAssignable(interfaceMethod.getReturnType())) {
+                    return true;
+                }
+            } else if (parameters.length == 1 && interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getWriteMethod().map(MethodElement::isSynthetic).orElse(true);
+                if (synthetic && methodName.equals(beanSetterName(propertyName)) && !beanProperty.isReadOnly()
+                    && parameters[0].getType().getName().equals(beanProperty.getType().getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {

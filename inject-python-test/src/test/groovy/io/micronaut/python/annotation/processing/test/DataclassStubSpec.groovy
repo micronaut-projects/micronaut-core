@@ -15,9 +15,11 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.python.annotation.processing.test.dataclass.VersionedObject
 
 /**
- * The stub of a dataclass takes the fields of its dataclass bases, in the order of the generated {@code __init__}.
+ * The stub of a dataclass takes the fields of its dataclass bases, in the order of the generated {@code __init__},
+ * and its attributes can implement the accessors of a Java interface.
  */
 class DataclassStubSpec extends AbstractPythonTypeElementSpec {
 
@@ -165,6 +167,39 @@ class Cat(Animal):
         cat.name == "Tom"
         cat.asPolyglotValue().getMember("name").asString() == "Tom"
         cat.asPolyglotValue().getMember("lives").asInt() == 3
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a dataclass implements a Java interface through attributes named after its getters"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from micronaut.core.annotation import Introspected
+from micronaut.python.annotation.processing.test.dataclass import VersionedObject
+
+@Introspected
+@dataclass
+class CustomObject(VersionedObject):
+    apiVersion: str
+    kind: str
+    enabled: bool = True
+    labels: list[str] = field(default_factory=list)
+    value: str | None = None
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.CustomObject")
+        VersionedObject object = introspection.instantiate("custom.test.io/v1", "CustomObject", false, ["a", "b"], "value")
+
+        then: "the generated accessors implement the interface"
+        object.apiVersion == "custom.test.io/v1"
+        object.kind == "CustomObject"
+        !object.enabled
+        object.labels == ["a", "b"]
+        object.describe() == "CustomObject/custom.test.io/v1"
 
         cleanup:
         context?.close()
