@@ -12,6 +12,9 @@ enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
 dependencyResolutionManagement {
     repositories {
+        // TEMPORARY: resolves the micronaut-sourcegen 2.2.1-SNAPSHOT built from
+        // micronaut-projects/micronaut-sourcegen#518, which the Java source generator needs.
+        mavenLocal()
         mavenCentral()
     }
 }
