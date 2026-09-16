@@ -711,6 +711,24 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private Object[] fromPolyglotArray(Value[] in, Argument<?>[] arguments) {
+        if (packsVarargs(in, arguments)) {
+            // Python passes the elements of a Java varargs parameter as separate positional
+            // arguments (send_books(book1, book2)); collect the trailing values into the array.
+            int fixed = arguments.length - 1;
+            Object[] out = new Object[arguments.length];
+            for (int i = 0; i < fixed; i++) {
+                out[i] = box(arguments[i], in[i]);
+            }
+            Argument<?> varargs = arguments[fixed];
+            Class<?> componentType = varargs.getType().getComponentType();
+            Argument<?> componentArgument = varargs.getFirstTypeVariable().orElseGet(() -> Argument.of(componentType));
+            Object array = Array.newInstance(componentType, in.length - fixed);
+            for (int i = fixed; i < in.length; i++) {
+                Array.set(array, i - fixed, box(componentArgument, in[i]));
+            }
+            out[fixed] = array;
+            return out;
+        }
         Object[] out = new Object[in.length];
         for (int i = 0; i < in.length; i++) {
             Value arg = in[i];
@@ -718,6 +736,42 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             out[i] = box(argType, arg);
         }
         return out;
+    }
+
+    /**
+     * Whether the Python arguments must be packed into the trailing array parameter of the method:
+     * the arity differs, or it matches but the last value is neither an array nor {@code None}.
+     */
+    private static boolean packsVarargs(Value[] in, Argument<?>[] arguments) {
+        if (!acceptsVarargs(arguments, in.length)) {
+            return false;
+        }
+        if (in.length != arguments.length) {
+            return true;
+        }
+        Value last = in[in.length - 1];
+        return !last.isNull() && !last.hasArrayElements() && !last.hasBufferElements();
+    }
+
+    /**
+     * Whether a method whose last parameter is an array accepts the given number of positional arguments as varargs.
+     */
+    private static boolean acceptsVarargs(Argument<?>[] arguments, int arity) {
+        return arguments.length > 0
+            && arguments[arguments.length - 1].getType().isArray()
+            && arity >= arguments.length - 1;
+    }
+
+    private static <T> RuntimeProxyDefinition.@Nullable InterceptedMethod<T> findVarargsMethod(
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> methods,
+        int arity
+    ) {
+        for (RuntimeProxyDefinition.InterceptedMethod<T> method : methods) {
+            if (acceptsVarargs(method.executableMethod().getArguments(), arity)) {
+                return method;
+            }
+        }
+        return null;
     }
 
     private interface MethodSelector<T> {
@@ -739,6 +793,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 if (method.executableMethod().getArguments().length == args.length) {
                     return method;
                 }
+            }
+            RuntimeProxyDefinition.InterceptedMethod<T> varargsMethod = findVarargsMethod(methods, args.length);
+            if (varargsMethod != null) {
+                return varargsMethod;
             }
             throw new IllegalArgumentException("No overload found for method " + methodName + " with " + args.length + " arguments");
         }
@@ -768,6 +826,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                     if (method.executableMethod().getArguments().length == arity) {
                         return method;
                     }
+                }
+                RuntimeProxyDefinition.InterceptedMethod<T> varargsMethod = findVarargsMethod(methods, arity);
+                if (varargsMethod != null) {
+                    return varargsMethod;
                 }
                 throw new IllegalArgumentException("No overload found for method " + methodName + " with " + arity + " arguments");
             }

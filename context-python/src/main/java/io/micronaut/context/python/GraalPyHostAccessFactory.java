@@ -86,7 +86,79 @@ final class GraalPyHostAccessFactory {
         registerPythonClassMapping(builder, pythonClassResolver);
         registerObjectMapping(builder, pythonClassResolver);
         registerStandardLibraryMappings(builder);
+        registerSequenceMappings(builder);
         return builder.build();
+    }
+
+    /**
+     * Overload resolution for Python sequences.
+     * <p>
+     * Host interop only knows {@code List} for array-like guest values, and it accepts any object with
+     * members as a {@code Map}. A Python {@code list} passed to overloads such as
+     * {@code success(String, Collection)} / {@code success(String, Map)} therefore selected the
+     * {@code Map} overload, and {@code Collection} or {@code Iterable} parameters received an
+     * interface proxy. These mappings take precedence over the default (loose) conversions so a
+     * sequence selects the collection overload, and Python {@code bytes} / {@code bytearray} select
+     * a {@code byte[]} overload instead of an {@code Object} or stream one.
+     */
+    private static void registerSequenceMappings(HostAccess.Builder builder) {
+        builder.targetTypeMapping(Value.class, List.class,
+            GraalPyHostAccessFactory::isSequence,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, Collection.class,
+            GraalPyHostAccessFactory::isSequenceOrIterable,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, Iterable.class,
+            GraalPyHostAccessFactory::isSequenceOrIterable,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, byte[].class,
+            value -> value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements(),
+            GraalPyHostAccessFactory::readBytes);
+    }
+
+    private static boolean isSequence(@Nullable Value value) {
+        return value != null && !value.isNull() && value.hasArrayElements();
+    }
+
+    private static boolean isSequenceOrIterable(@Nullable Value value) {
+        if (value == null || value.isNull()) {
+            return false;
+        }
+        // sets, generators and other iterables, but not dictionaries (their keys are iterable) or strings
+        return value.hasArrayElements()
+            || value.hasIterator() && !value.hasHashEntries() && !value.isString();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> asList(Value value) {
+        if (value.hasArrayElements()) {
+            // Value.as(List.class) would re-enter this mapping; the default Object conversion of an
+            // array-like value is the same live List view, which keeps the identity of the Python
+            // sequence when it is handed back to Python.
+            Object converted = value.as(Object.class);
+            if (converted instanceof List<?> list) {
+                return (List<Object>) list;
+            }
+            long size = value.getArraySize();
+            List<Object> elements = new ArrayList<>(Math.toIntExact(size));
+            for (long i = 0; i < size; i++) {
+                elements.add(value.getArrayElement(i).as(Object.class));
+            }
+            return elements;
+        }
+        List<Object> elements = new ArrayList<>();
+        Value iterator = value.getIterator();
+        while (iterator.hasIteratorNextElement()) {
+            elements.add(iterator.getIteratorNextElement().as(Object.class));
+        }
+        return elements;
+    }
+
+    private static byte[] readBytes(Value value) {
+        int size = Math.toIntExact(value.getBufferSize());
+        byte[] bytes = new byte[size];
+        value.readBuffer(0, bytes, 0, size);
+        return bytes;
     }
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {

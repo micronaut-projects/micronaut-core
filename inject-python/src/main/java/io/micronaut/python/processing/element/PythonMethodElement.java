@@ -648,6 +648,12 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return created.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS);
     }
 
+    @Override
+    public boolean isVarArgs() {
+        List<ArgumentDef> arguments = getNativeType().arguments().arguments();
+        return !arguments.isEmpty() && arguments.getLast().variadic();
+    }
+
     private static boolean isReceiverArgument(ArgumentDef argument) {
         String name = argument.name();
         return "cls".equals(name) || "self".equals(name);

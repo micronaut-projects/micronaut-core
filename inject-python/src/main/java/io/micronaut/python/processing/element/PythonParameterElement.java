@@ -110,13 +110,26 @@ public final class PythonParameterElement extends AbstractPythonElement implemen
     }
 
     private ClassElement resolveType(ArgumentDef argumentDef, Map<String, ClassElement> boundTypes) {
+        ClassElement classElement;
         if (argumentDef.typeAnnotation() != null) {
             // Use the same type resolution logic as fields
-            return environment.visitorContext().getTypeResolver().resolve(argumentDef.typeAnnotation(), boundTypes);
+            classElement = environment.visitorContext().getTypeResolver().resolve(argumentDef.typeAnnotation(), boundTypes);
+        } else {
+            // Fall back to Object when no type annotation
+            classElement = environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
         }
+        if (argumentDef.variadic()) {
+            // `*args: T` collects the remaining positional arguments: Java sees a `T...` varargs array
+            return classElement.toArray();
+        }
+        return classElement;
+    }
 
-        // Fall back to Object when no type annotation
-        return environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+    /**
+     * @return Whether this is the variadic ({@code *args}) parameter of its function
+     */
+    public boolean isVariadic() {
+        return argumentDef.variadic();
     }
 
     @Override

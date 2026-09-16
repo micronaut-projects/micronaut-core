@@ -1859,6 +1859,24 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
             arguments.append(ArgumentDef.of(arg_name, annotation, type_annotation, default_value, has_default, decorators, param_doc))
 
+        vararg = func_node.args.vararg
+        if vararg is not None:
+            # `*args` collects the remaining positional arguments: it is exposed to Java as a
+            # varargs array of the annotated element type (or Object when unannotated).
+            annotation = ""
+            type_annotation = None
+            decorators = []
+            if vararg.annotation is not None:
+                annotation = ast.unparse(vararg.annotation)
+                if self._is_annotated_subscript(vararg.annotation):
+                    type_annotation, decorators = self._parse_annotated_type(vararg.annotation)
+                else:
+                    type_annotation = self._parse_type(vararg.annotation)
+            param_doc = param_docs.get(vararg.arg, None)
+            arguments.append(
+                ArgumentDef.of(vararg.arg, annotation, type_annotation, None, False, decorators, param_doc).withVariadic(True)
+            )
+
         return ArgumentsDef.of(arguments)
 
     def parse_function_return_type(self, func_node):
