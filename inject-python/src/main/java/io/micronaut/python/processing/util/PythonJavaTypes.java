@@ -36,6 +36,11 @@ public final class PythonJavaTypes {
         "java.lang.Throwable", "java.lang.Exception", "java.lang.RuntimeException", "java.lang.Error"
     );
 
+    private static final Set<String> WRAPPER_TYPES = Set.of(
+        "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
+        "java.lang.Float", "java.lang.Boolean", "java.lang.Character"
+    );
+
     private PythonJavaTypes() {
     }
 
@@ -66,5 +71,48 @@ public final class PythonJavaTypes {
      */
     public static boolean isConcreteClass(@Nullable ClassElement classElement) {
         return classElement != null && !classElement.isInterface() && !classElement.isAbstract();
+    }
+
+    /**
+     * Whether two types are the same type once primitives are boxed. A Python {@code int} hint resolves to
+     * the primitive {@code int} while a Java {@code ID} argument resolves to the boxed {@code Integer}; Python
+     * has no overloading, so a method declared with the one overrides a method declared with the other.
+     *
+     * @param left  A type
+     * @param right Another type
+     * @return {@code true} if the types are the same, or a primitive and its wrapper
+     */
+    public static boolean isSameOrBoxedType(ClassElement left, ClassElement right) {
+        return left.getName().equals(right.getName()) || boxedTypeName(left).equals(boxedTypeName(right));
+    }
+
+    /**
+     * Whether the type is a primitive or one of the primitive wrappers.
+     *
+     * @param type The type
+     * @return {@code true} for a primitive or a wrapper such as {@link Integer}
+     */
+    public static boolean isPrimitiveOrBoxedType(ClassElement type) {
+        if (type.isArray()) {
+            return false;
+        }
+        return type.isPrimitive() || WRAPPER_TYPES.contains(type.getName());
+    }
+
+    private static String boxedTypeName(ClassElement type) {
+        if (!type.isPrimitive() || type.isArray()) {
+            return type.getName();
+        }
+        return switch (type.getName()) {
+            case "int" -> Integer.class.getName();
+            case "long" -> Long.class.getName();
+            case "short" -> Short.class.getName();
+            case "byte" -> Byte.class.getName();
+            case "double" -> Double.class.getName();
+            case "float" -> Float.class.getName();
+            case "boolean" -> Boolean.class.getName();
+            case "char" -> Character.class.getName();
+            default -> type.getName();
+        };
     }
 }
