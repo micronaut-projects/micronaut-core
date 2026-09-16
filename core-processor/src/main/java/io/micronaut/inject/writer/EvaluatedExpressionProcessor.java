@@ -127,6 +127,14 @@ public final class EvaluatedExpressionProcessor implements Buildable<List<Output
         return evaluatedExpressions;
     }
 
+    /**
+     * @return The visitor context
+     * @since 5.2
+     */
+    public VisitorContext getVisitorContext() {
+        return visitorContext;
+    }
+
     @Override
     public List<OutputObjectDef> build() {
         Collection<ExpressionWithContext> expressions = getEvaluatedExpressions();

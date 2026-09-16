@@ -811,7 +811,9 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
      *
      * @return The arguments required to construct parametrized bean
      */
-    public final Argument<?>[] getRequiredArguments() {
+    // Matches ParametrizedInstantiatableBeanDefinition#getRequiredArguments, which a generated subclass also implements
+    @SuppressWarnings("unchecked")
+    public final Argument<Object>[] getRequiredArguments() {
         if (requiredParametrizedArguments == null) {
             if (this instanceof ParametrizedInstantiatableBeanDefinition<?> parametrizedInstantiatableBeanDefinition) {
                 requiredParametrizedArguments = ParametrizedInstantiatableBeanDefinition.resolveRequiredArguments(parametrizedInstantiatableBeanDefinition);
@@ -819,7 +821,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
                 requiredParametrizedArguments = Argument.ZERO_ARGUMENTS;
             }
         }
-        return requiredParametrizedArguments;
+        return (Argument<Object>[]) requiredParametrizedArguments;
     }
 
     /**

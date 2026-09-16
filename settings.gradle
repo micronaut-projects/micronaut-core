@@ -73,6 +73,7 @@ include "websocket"
 
 // test suites
 include "test-suite"
+include "test-suite-java-sourcegen"
 include "test-suite-helper"
 include "test-suite-http-client-jdk-ssl"
 include "test-suite-http-client-tck-netty"
