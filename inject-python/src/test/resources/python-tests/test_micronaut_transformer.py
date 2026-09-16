@@ -74,6 +74,54 @@ class TransformerTest(unittest.TestCase):
         self.assertEqual("io.micronaut.async_.support", transformer._to_python_import_module("io.micronaut.async.support"))
         self.assertEqual("jakarta.inject", transformer._to_java_import_module("jakarta.inject"))
 
+    def test_unresolvable_io_imports_are_reported(self):
+        source = (
+            "from io.swagger.v3.oas.annotations import Operation\n"
+            "from io.nosuch.annotations import *\n"
+            "import io.nosuch.other as other\n"
+            "import io.nosuch.alias\n"
+            "from io import StringIO\n"
+            "import io\n"
+        )
+        transformer = MicronautTransformer(no_class_element, no_class_elements)
+        transformer.visit(ast.parse(source))
+        errors = transformer.validation_errors
+        self.assertEqual(4, len(errors), errors)
+        self.assertIn("Cannot resolve Java import [io.swagger.v3.oas.annotations.Operation]", errors[0])
+        self.assertIn("Cannot resolve Java package [io.nosuch.annotations]", errors[1])
+        self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2])
+        self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3])
+
+
+class RuntimeImportRewriteTest(unittest.TestCase):
+    def rewrite(self, source):
+        return unparse(MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source)))
+
+    def test_io_from_imports_are_rewritten_to_generated_packages(self):
+        code = self.rewrite(
+            "from io.micronaut.context.annotation import Executable\n"
+            "from io.swagger.v3.oas.annotations import Operation as Op\n"
+            "from io.swagger.v3.oas.annotations.media import *\n"
+            "from io.kubernetes.client.openapi.models import V1Pod\n"
+            "from io.micronaut.async_.support import Helper\n"
+        )
+        self.assertIn("from micronaut.context.annotation import Executable", code)
+        self.assertIn("from swagger.v3.oas.annotations import Operation as Op", code)
+        self.assertIn("from swagger.v3.oas.annotations.media import *", code)
+        self.assertIn("from kubernetes.client.openapi.models import V1Pod", code)
+        self.assertIn("from micronaut.async_.support import Helper", code)
+        self.assertNotIn("from io.", code)
+
+    def test_io_module_imports_are_rewritten_to_generated_packages(self):
+        code = self.rewrite(
+            "import io.swagger.v3.oas.annotations as oas, io.micronaut.http.annotation as http\n"
+        )
+        self.assertIn("import swagger.v3.oas.annotations as oas, micronaut.http.annotation as http", code)
+
+    def test_python_io_module_imports_are_untouched(self):
+        source = "import io\nfrom io import StringIO\nimport io as pyio\n"
+        self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source))))
+
 
 if __name__ == "__main__":
     unittest.main()
