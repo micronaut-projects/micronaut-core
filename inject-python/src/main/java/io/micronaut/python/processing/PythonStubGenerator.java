@@ -440,7 +440,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             Set<MethodElement> methodSet = new LinkedHashSet<>();
             for (int i = 0; i < methods.size(); i++) {
                 MethodElement method = methods.get(i);
-                if (!methodSet.contains(method)) {
+                // A static interface method (Predicate.not(Predicate<? super T>)) is neither inherited nor
+                // implemented by the Python class: copying it would only reproduce its signature in the stub.
+                if (!methodSet.contains(method) && !method.isStatic()) {
                     MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
                     MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
                     MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
@@ -1316,7 +1318,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> typeArguments = resolvedTypeArguments(anInterface);
         TypeDef interfaceTypeDef = javaClassType(anInterface);
         List<? extends GenericPlaceholderElement> declaredPlaceholders = anInterface.getDeclaredGenericPlaceholders();
-        if (!typeArguments.isEmpty()) {
+        if (!typeArguments.isEmpty() && !rendersRaw(anInterface, typeArguments, declaredPlaceholders)) {
             List<TypeDef> resolvedTypeArguments = new ArrayList<>(typeArguments.size());
             int index = 0;
             for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
@@ -1544,19 +1546,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (anInterface instanceof GenericPlaceholderElement placeholder) {
             ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
-            if (resolvedTypeArgument != null
-                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+            if (resolvedTypeArgument != null && !samePlaceholderType(placeholder, resolvedTypeArgument)) {
                 return sourceSignatureType(resolvedTypeArgument, typeArgument, signatureTypeArguments);
             }
-            if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
+            if (isMethodTypeVariable(placeholder)) {
                 return TypeDef.variable(placeholder.getVariableName());
             }
             Optional<ClassElement> resolved = placeholder.getResolved();
-            if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
+            if (resolved.isPresent() && !samePlaceholderType(placeholder, resolved.get())) {
                 return sourceSignatureType(resolved.get(), typeArgument, signatureTypeArguments);
             }
             if (placeholder.isRawType()) {
-                return sourceSignatureType(firstBound(placeholder), typeArgument, signatureTypeArguments);
+                return boundSignatureType(placeholder, typeArgument, signatureTypeArguments);
             }
             return TypeDef.variable(placeholder.getVariableName());
         }
@@ -1576,7 +1577,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> typeArguments = resolvedTypeArguments(anInterface);
         TypeDef interfaceTypeDef = javaClassType(anInterface);
         List<? extends GenericPlaceholderElement> declaredPlaceholders = anInterface.getDeclaredGenericPlaceholders();
-        if (!typeArguments.isEmpty()) {
+        if (!typeArguments.isEmpty() && !rendersRaw(anInterface, typeArguments, declaredPlaceholders)) {
             List<TypeDef> resolvedTypeArguments = new ArrayList<>(typeArguments.size());
             int index = 0;
             for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
@@ -1599,14 +1600,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return bridgeSignatureType(signatureType.fromArray(), resolvedComponentType, signatureTypeArguments).array(signatureType.getArrayDimensions());
         }
         if (signatureType instanceof WildcardElement wildcardElement) {
+            // The resolved counterpart of a wildcard is usually a wildcard too: its bound, not the
+            // wildcard itself, resolves the signature bound (otherwise `? super T` resolved against
+            // `? super Book` would render as `? super ? super Book`).
+            WildcardElement resolvedWildcard = resolvedType instanceof WildcardElement wildcard ? wildcard : null;
             if (!wildcardElement.getLowerBounds().isEmpty()) {
-                return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedType, signatureTypeArguments));
+                ClassElement resolvedBound = resolvedWildcard == null ? resolvedType : firstOrNull(resolvedWildcard.getLowerBounds());
+                return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedBound, signatureTypeArguments));
             }
             if (!wildcardElement.getUpperBounds().isEmpty()) {
                 ClassElement upperBound = wildcardElement.getUpperBounds().getFirst();
                 if (!Object.class.getName().equals(upperBound.getName())) {
-                    return TypeDef.wildcardSubtypeOf(bridgeSignatureType(upperBound, resolvedType, signatureTypeArguments));
+                    ClassElement resolvedBound = resolvedWildcard == null ? resolvedType : firstOrNull(resolvedWildcard.getUpperBounds());
+                    return TypeDef.wildcardSubtypeOf(bridgeSignatureType(upperBound, resolvedBound, signatureTypeArguments));
                 }
+            }
+            if (resolvedWildcard != null) {
+                return sourceSignatureType(resolvedWildcard, true, signatureTypeArguments);
             }
             if (resolvedType != null && !isObjectType(resolvedType)) {
                 return TypeDef.wildcardSubtypeOf(sourceSignatureType(resolvedType, true, signatureTypeArguments));
@@ -1615,22 +1625,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (signatureType instanceof GenericPlaceholderElement placeholder) {
             ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
-            if (resolvedTypeArgument != null
-                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+            if (resolvedTypeArgument != null && !samePlaceholderType(placeholder, resolvedTypeArgument)) {
                 return sourceSignatureType(resolvedTypeArgument, false, signatureTypeArguments);
             }
-            if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
+            if (isMethodTypeVariable(placeholder)) {
                 return TypeDef.variable(placeholder.getVariableName());
             }
             if (resolvedType != null && !isObjectType(resolvedType)) {
                 return sourceSignatureType(resolvedType, false, signatureTypeArguments);
             }
             Optional<ClassElement> resolved = placeholder.getResolved();
-            if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
+            if (resolved.isPresent() && !samePlaceholderType(placeholder, resolved.get())) {
                 return sourceSignatureType(resolved.get(), false, signatureTypeArguments);
             }
             if (placeholder.isRawType()) {
-                return sourceSignatureType(firstBound(placeholder), false, signatureTypeArguments);
+                return boundBridgeSignatureType(placeholder, null, signatureTypeArguments);
             }
             return TypeDef.variable(placeholder.getVariableName());
         }
@@ -1650,6 +1659,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
             }
             List<? extends GenericPlaceholderElement> declaredPlaceholders = signatureType.getDeclaredGenericPlaceholders();
+            if (rendersRaw(signatureType, typeArguments, declaredPlaceholders)) {
+                return javaClassType(signatureType);
+            }
             Map<String, ClassElement> resolvedTypeArguments = resolvedType == null ? Map.of() : resolvedType.getTypeArguments();
             List<TypeDef> resolvedTypeDefs = new ArrayList<>(typeArguments.size());
             int index = 0;
@@ -1866,7 +1878,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> signatureTypeArguments
     ) {
         if (placeholder != null && isDeclaredPlaceholderArgument(signatureTypeArgument, placeholder)) {
-            return bridgeSignatureType(firstBound(placeholder), resolvedTypeArgument, signatureTypeArguments);
+            return boundBridgeSignatureType(placeholder, resolvedTypeArgument, signatureTypeArguments);
         }
         return bridgeSignatureType(signatureTypeArgument, resolvedTypeArgument, signatureTypeArguments);
     }
@@ -1878,11 +1890,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (placeholder == null || !(typeArgument instanceof GenericPlaceholderElement argumentPlaceholder)) {
             return false;
         }
-        if (!placeholder.getVariableName().equals(argumentPlaceholder.getVariableName())) {
-            return false;
-        }
-        return argumentPlaceholder.equals(placeholder)
-            || argumentPlaceholder.getDeclaringElement().equals(placeholder.getDeclaringElement());
+        return samePlaceholder(argumentPlaceholder, placeholder);
     }
 
     private static TypeDef sourceTypeArgument(ClassElement typeArgument, @Nullable GenericPlaceholderElement placeholder) {
@@ -1894,17 +1902,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable GenericPlaceholderElement placeholder,
         Map<String, ClassElement> resolvedTypeArguments
     ) {
+        if (typeArgument instanceof WildcardElement) {
+            return sourceSignatureType(typeArgument, true, resolvedTypeArguments);
+        }
         if (typeArgument instanceof GenericPlaceholderElement
             && (placeholder == null || !isDeclaredPlaceholderArgument(typeArgument, placeholder))) {
             return sourceSignatureType(typeArgument, true, resolvedTypeArguments);
         }
         if (placeholder != null) {
             if (isDeclaredPlaceholderArgument(typeArgument, placeholder)) {
-                return sourceSignatureType(firstBound(placeholder), true, resolvedTypeArguments);
+                return boundSignatureType(placeholder, true, resolvedTypeArguments);
             }
             if (isObjectType(typeArgument)) {
                 Optional<ClassElement> bound = firstNonObjectBound(placeholder);
-                if (bound.isPresent()) {
+                if (bound.isPresent() && !referencesPlaceholder(bound.get(), placeholder, new HashSet<>())) {
                     return sourceSignatureType(bound.get(), true, resolvedTypeArguments);
                 }
             }
@@ -2201,6 +2212,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (t instanceof GenericPlaceholderElement placeholder) {
             return erasedType(resolvedOrFirstBound(placeholder));
         }
+        if (t instanceof WildcardElement wildcard) {
+            return erasedType(wildcardErasure(wildcard));
+        }
         if (t.isPrimitive() || t.isArray()) {
             return TypeDef.of(t);
         }
@@ -2274,7 +2288,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (GenericPlaceholderElement placeholder : methodElement.getDeclaredTypeVariables()) {
             List<TypeDef> bounds = placeholder.getBounds().stream()
                 .filter(bound -> !Object.class.getName().equals(bound.getName()))
-                .map(bound -> sourceSignatureType(bound, true, resolvedTypeArguments))
+                .map(bound -> typeVariableReferencesAsClassNames(sourceSignatureType(bound, true, resolvedTypeArguments)))
                 .toList();
             ClassElement inferredBound = inferredMethodBounds.get(placeholder.getVariableName());
             if (bounds.isEmpty() && inferredBound != null && !isObjectType(inferredBound)) {
@@ -2283,6 +2297,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             typeVariables.add(TypeDef.variable(placeholder.getVariableName(), bounds));
         }
         return typeVariables;
+    }
+
+    /**
+     * The source generator renders the bounds of a method type variable without the method in
+     * scope, so a bound that references another variable of the same method (a variable
+     * {@code L} bounded by a list of the variable {@code A}) would print as that variable's
+     * bound. A plain class type named like the variable prints as the variable.
+     */
+    private static TypeDef typeVariableReferencesAsClassNames(TypeDef typeDef) {
+        return switch (typeDef) {
+            case TypeDef.TypeVariable typeVariable -> ClassTypeDef.of(typeVariable.name());
+            case ClassTypeDef.Parameterized parameterized -> TypeDef.parameterized(
+                parameterized.rawType(),
+                parameterized.typeArguments().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList()
+            );
+            case TypeDef.Wildcard wildcard -> new TypeDef.Wildcard(
+                wildcard.upperBounds().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList(),
+                wildcard.lowerBounds().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList()
+            );
+            case TypeDef.Array array -> TypeDef.array(typeVariableReferencesAsClassNames(array.componentType()), array.dimensions());
+            default -> typeDef;
+        };
+    }
+
+    private static @Nullable ClassElement firstOrNull(List<? extends ClassElement> elements) {
+        return elements.isEmpty() ? null : elements.getFirst();
     }
 
     private static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
@@ -2376,6 +2416,201 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return ClassElement.of(Object.class);
         }
         return bounds.getFirst();
+    }
+
+    /**
+     * The erasure of a wildcard: its upper bound ({@code ? extends X} erases to {@code X},
+     * {@code ?} and {@code ? super X} to {@code Object}).
+     */
+    private static ClassElement wildcardErasure(WildcardElement wildcard) {
+        List<? extends ClassElement> upperBounds = wildcard.getUpperBounds();
+        if (upperBounds.isEmpty()) {
+            return ClassElement.of(Object.class);
+        }
+        return upperBounds.getFirst();
+    }
+
+    /**
+     * Whether two placeholders are the same type variable. Placeholders cannot be compared with
+     * {@code equals}: a Java placeholder is represented by its bound, so every unbounded type
+     * variable equals every other one.
+     */
+    private static boolean samePlaceholder(GenericPlaceholderElement left, GenericPlaceholderElement right) {
+        if (left == right) {
+            return true;
+        }
+        if (!left.getVariableName().equals(right.getVariableName())) {
+            return false;
+        }
+        Optional<Element> leftDeclaring = left.getDeclaringElement();
+        Optional<Element> rightDeclaring = right.getDeclaringElement();
+        if (leftDeclaring.isEmpty() || rightDeclaring.isEmpty()) {
+            return left.equals(right);
+        }
+        return leftDeclaring.get().equals(rightDeclaring.get());
+    }
+
+    private static boolean isMethodTypeVariable(GenericPlaceholderElement placeholder) {
+        return placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent();
+    }
+
+    /**
+     * Whether a placeholder already carries the type it resolves to in the signature it was read
+     * from, so it must not be re-resolved by name against the type arguments of another declaration.
+     */
+    private static boolean isResolvedPlaceholder(GenericPlaceholderElement placeholder) {
+        return !placeholder.isRawType() && placeholder.getResolved().filter(resolved -> !samePlaceholderType(placeholder, resolved)).isPresent();
+    }
+
+    private static boolean samePlaceholderType(GenericPlaceholderElement placeholder, ClassElement resolved) {
+        return resolved instanceof GenericPlaceholderElement resolvedPlaceholder && samePlaceholder(placeholder, resolvedPlaceholder);
+    }
+
+    /**
+     * Whether a type mentions the given placeholder in its type arguments or, through other
+     * placeholders, in their bounds: expanding such a bound into a signature would never end
+     * ({@code B extends Builder<T, B>}, {@code E extends Enum<E>}).
+     */
+    private static boolean referencesPlaceholder(ClassElement type, GenericPlaceholderElement placeholder, Set<String> visitedPlaceholders) {
+        if (type instanceof GenericPlaceholderElement candidate) {
+            if (samePlaceholder(candidate, placeholder)) {
+                return true;
+            }
+            if (!visitedPlaceholders.add(placeholderKey(candidate))) {
+                return false;
+            }
+            for (ClassElement bound : candidate.getBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (type instanceof WildcardElement wildcard) {
+            for (ClassElement bound : wildcard.getUpperBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            for (ClassElement bound : wildcard.getLowerBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (ClassElement typeArgument : type.getTypeArguments().values()) {
+            if (referencesPlaceholder(typeArgument, placeholder, visitedPlaceholders)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a type mentions the given raw type in its type arguments or, through placeholders,
+     * in their bounds.
+     */
+    private static boolean referencesRawType(ClassElement type, String rawTypeName, Set<String> visitedPlaceholders) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            if (!visitedPlaceholders.add(placeholderKey(placeholder))) {
+                return false;
+            }
+            for (ClassElement bound : placeholder.getBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (type instanceof WildcardElement wildcard) {
+            for (ClassElement bound : wildcard.getUpperBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            for (ClassElement bound : wildcard.getLowerBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (sameRawTypeName(type, rawTypeName)) {
+            return true;
+        }
+        for (ClassElement typeArgument : type.getTypeArguments().values()) {
+            if (referencesRawType(typeArgument, rawTypeName, visitedPlaceholders)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a reference to a generic type has to stay raw: one of its type arguments is a
+     * variable of the type itself (an unparameterized reference), or the {@code Object} the element
+     * model substitutes for a cyclic argument, and that variable's bound refers back to the type
+     * ({@code AgentBuilder<T, B extends AgentBuilder<T, ?>>}). Expanding such a bound never ends,
+     * and neither its erasure nor {@code Object} is within the bound; the raw type is.
+     */
+    private static boolean rendersRaw(
+        ClassElement type,
+        Map<String, ClassElement> typeArguments,
+        List<? extends GenericPlaceholderElement> declaredPlaceholders
+    ) {
+        String rawTypeName = type.getName();
+        int index = 0;
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            GenericPlaceholderElement placeholder = placeholderFor(declaredPlaceholders, entry.getKey(), index++);
+            if (placeholder == null) {
+                continue;
+            }
+            ClassElement typeArgument = entry.getValue();
+            if (!isDeclaredPlaceholderArgument(typeArgument, placeholder) && !isObjectType(typeArgument)) {
+                continue;
+            }
+            ClassElement bound = firstBound(placeholder);
+            if (referencesRawType(bound, rawTypeName, new HashSet<>()) || referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String placeholderKey(GenericPlaceholderElement placeholder) {
+        return placeholder.getDeclaringElement().map(Element::getName).orElse("") + "#" + placeholder.getVariableName();
+    }
+
+    /**
+     * The first bound of a placeholder as a source type. A bound that refers back to the
+     * placeholder is rendered as its erasure.
+     */
+    private static TypeDef boundSignatureType(
+        GenericPlaceholderElement placeholder,
+        boolean typeArgument,
+        Map<String, ClassElement> signatureTypeArguments
+    ) {
+        ClassElement bound = firstBound(placeholder);
+        if (referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+            return javaClassType(bound);
+        }
+        return sourceSignatureType(bound, typeArgument, signatureTypeArguments);
+    }
+
+    /**
+     * The first bound of a placeholder as a bridge signature type, see {@link #boundSignatureType}.
+     */
+    private static TypeDef boundBridgeSignatureType(
+        GenericPlaceholderElement placeholder,
+        @Nullable ClassElement resolvedType,
+        Map<String, ClassElement> signatureTypeArguments
+    ) {
+        ClassElement bound = firstBound(placeholder);
+        if (referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+            return javaClassType(bound);
+        }
+        return bridgeSignatureType(bound, resolvedType, signatureTypeArguments);
     }
 
     private static String pythonSimpleName(ClassElement element) {
@@ -3187,6 +3422,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return resolvedReturnType;
         }
         if (genericReturnType instanceof GenericPlaceholderElement placeholder) {
+            if (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)) {
+                return null;
+            }
             return typeArguments.get(placeholder.getVariableName());
         }
         if (genericReturnType.isVoid() || !Object.class.getName().equals(genericReturnType.getName())) {
@@ -3216,6 +3454,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static @Nullable ClassElement resolveInterfaceType(ClassElement type, Map<String, ClassElement> interfaceTypeArguments) {
         if (type instanceof GenericPlaceholderElement placeholder) {
+            // A method type variable (<R> R findOne(...)) stays a variable, and a placeholder the
+            // element model already resolved against its declaring type (the T of ArgumentBinder<T, S>
+            // bound to Object through AnnotatedArgumentBinder<A, Object, S>) keeps that resolution; the
+            // arguments of the implemented interface only answer for its own, unresolved variables.
+            if (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)) {
+                return null;
+            }
             return interfaceTypeArguments.get(placeholder.getVariableName());
         }
         Map<String, ClassElement> typeArguments = type.getTypeArguments();
@@ -3227,7 +3472,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
             ClassElement typeArgument = entry.getValue();
             ClassElement resolvedTypeArgument = resolveInterfaceType(typeArgument, interfaceTypeArguments);
-            if (resolvedTypeArgument == null && typeArguments.size() == 1 && interfaceTypeArguments.size() == 1 && Object.class.getName().equals(typeArgument.getName())) {
+            if (resolvedTypeArgument == null
+                && typeArguments.size() == 1
+                && interfaceTypeArguments.size() == 1
+                && Object.class.getName().equals(typeArgument.getName())
+                && !(typeArgument instanceof GenericPlaceholderElement placeholder && (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)))) {
                 resolvedTypeArgument = interfaceTypeArguments.values().iterator().next();
             }
             if (resolvedTypeArgument == null) {
