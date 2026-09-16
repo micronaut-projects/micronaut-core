@@ -64,6 +64,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -667,7 +668,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ann.hasStereotype(InterceptorBinding.class) ||
             element.hasStereotype(Around.class) ||
             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-            isDeclaredBeanMethod(ann) ||
+            isFactoryBeanMethod(element, ann) ||
             isConfigurationBuilderType;
         List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(
             ElementQuery.ALL_METHODS
@@ -2321,7 +2322,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                             ann.hasStereotype(Around.class) ||
                             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                            isDeclaredBeanMethod(ann)));
+                            isFactoryBeanMethod(scriptElement, ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
                 boolean isJunit5Test = methodElement.hasDeclaredAnnotation(JUNIT_TEST)
@@ -3381,7 +3382,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         addedMethodNames.add(key);
         addedMethodNames.add(pythonKey);
 
-        if (isDeclaredBeanMethod(methodElement.getAnnotationMetadata())) {
+        if (isFactoryBeanMethod(bridgeOwner, methodElement.getAnnotationMetadata())) {
             if (isAsyncPythonMethod(methodElement)) {
                 throw new ProcessingException(methodElement, "Factory methods declared with @Bean cannot be async.");
             }
@@ -5015,11 +5016,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
     }
 
-    private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
+    /**
+     * Whether a method is a factory method producing a bean. Mirrors the core bean definition creators: a
+     * method carrying a declared {@code @Bean} annotation or stereotype only produces a bean when the class
+     * declaring it is a {@code @Factory}. Elsewhere the {@code @Bean} stereotype is incidental, for example
+     * messaging listener annotations meta-annotated with {@code @MessageListener} that are placed on methods
+     * of ordinary beans, and such methods are bridged as regular executable methods.
+     *
+     * @param owner              The class the method is bridged for
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method is a factory method
+     */
+    private static boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
         // Visitors can add @Bean directly to Python methods after metadata parsing. Those
         // methods still need Java bridge methods so generated bean definitions can call them.
-        return annotationMetadata.hasDeclaredAnnotation(Bean.class)
-            || annotationMetadata.hasDeclaredStereotype(Bean.class);
+        return owner.hasStereotype(Factory.class)
+            && (annotationMetadata.hasDeclaredAnnotation(Bean.class)
+            || annotationMetadata.hasDeclaredStereotype(Bean.class));
     }
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
