@@ -154,7 +154,7 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
             return baseType;
         }
         ElementAnnotationMetadata metadata = getElementAnnotationMetadataFactory().buildMutable(typeAnnotationMetadata);
-        return new TypeAnnotatedClassElement(baseType, metadata);
+        return TypeAnnotatedClassElement.of(baseType, metadata);
     }
 
     private Map<String, ClassElement> getBoundGenericTypes(AttributeDef attributeDef) {

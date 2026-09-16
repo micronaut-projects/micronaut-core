@@ -15,11 +15,13 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.inject.ast.EnumElement
 import io.micronaut.python.annotation.processing.test.dataclass.VersionedObject
 
 /**
  * The stub of a dataclass takes the fields of its dataclass bases, in the order of the generated {@code __init__},
- * its attributes can implement the accessors of a Java interface, and generic attributes keep their type variable.
+ * its attributes can implement the accessors of a Java interface, and generic and optional enum attributes keep
+ * their types.
  */
 class DataclassStubSpec extends AbstractPythonTypeElementSpec {
 
@@ -236,5 +238,37 @@ class Response(Generic[T]):
 
         cleanup:
         context?.close()
+    }
+
+    void "test an optional enum attribute is an enum element"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from enum import Enum
+from micronaut.core.annotation import Introspected
+
+class PetType(Enum):
+    DOG = "DOG"
+    CAT = "CAT"
+
+@Introspected
+@dataclass
+class Pet:
+    type: PetType | None
+    kind: PetType
+'''
+
+        when:
+        def propertyTypes = buildClassElement(pythonCode, "Pet") { classElement ->
+            classElement.beanProperties.collectEntries { [(it.name): it.genericType] }
+        }
+
+        then: "the nullable wrapper of the enum is still an EnumElement, as visitors expect"
+        propertyTypes.type instanceof EnumElement
+        propertyTypes.type.isEnum()
+        propertyTypes.type.values() == ["DOG", "CAT"]
+        propertyTypes.type.isNullable()
+        propertyTypes.kind instanceof EnumElement
+        !propertyTypes.kind.isNullable()
     }
 }
