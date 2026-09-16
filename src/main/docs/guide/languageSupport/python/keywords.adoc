@@ -27,3 +27,26 @@ publisher = Flux.from_(source)
 ----
 
 The `from_` call is rewritten during processing to call the Java `from` method.
+
+== Java packages under `io`
+
+`io` is a module of the Python standard library, so Python itself cannot import from a package named `io.something`. Java packages under `io` such as `io.micronaut`, `io.swagger` or `io.kubernetes` are nevertheless imported with their Java names; the Python compiler support recognises that an `io.*` import can only refer to a Java package and rewrites it for the runtime:
+
+[source,python]
+----
+from micronaut.http.annotation import Controller, Get
+from io.swagger.v3.oas.annotations import Operation
+from io.swagger.v3.oas.annotations.tags import *
+import io.swagger.v3.oas.annotations.responses as responses
+
+@Controller("/pets")
+@Tag(name="pets")
+class PetController:
+    @Get
+    @Operation(summary="List pets")
+    @responses.ApiResponse(responseCode="200")
+    def list_pets(self) -> list[str]:
+        return []
+----
+
+Micronaut's own packages may also be written without the prefix (`from micronaut.http.annotation import Controller`). An `io.*` import that names no class or package on the compile classpath is a compilation error, since the Python `io` module can never satisfy it; `import io.some.package` requires an alias (`as`), because the name `io` cannot refer to the Java package at runtime. Importing the Python module itself (`import io`, `from io import StringIO`) is unaffected.
