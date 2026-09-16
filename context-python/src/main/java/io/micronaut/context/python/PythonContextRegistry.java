@@ -102,7 +102,9 @@ final class PythonContextRegistry {
      * @param context The GraalPy context being tracked
      */
     static void registerContext(Context context) {
-        state(context).enterable.set(context);
+        ContextState state = state(context);
+        state.enterable.set(context);
+        state.registered = true;
     }
 
     /**
@@ -385,9 +387,13 @@ final class PythonContextRegistry {
      */
     static int forgetClosedContexts() {
         // the probe is a context operation: never under the registry lock
-        Map<Context, ContextState> snapshot;
+        Map<Context, ContextState> snapshot = new HashMap<>();
         synchronized (LOCK) {
-            snapshot = new HashMap<>(CONTEXT_STATES);
+            CONTEXT_STATES.forEach((context, state) -> {
+                if (isProbeable(state)) {
+                    snapshot.put(context, state);
+                }
+            });
         }
         List<Context> closed = new ArrayList<>();
         for (Context context : snapshot.keySet()) {
@@ -409,6 +415,25 @@ final class PythonContextRegistry {
             }
         }
         return dropped;
+    }
+
+    /**
+     * Whether the sweep may probe the context of a state. The probe enters the context on the
+     * sweeping thread, which is not the thread that owns it: entering a context that is still
+     * initializing leaves the owner evaluating into a main module that the bindings do not expose,
+     * and entering a context that is closing fails its close. Registered contexts are released by
+     * {@link #unregisterContext(Context)} and are never probed; neither are states that cache no
+     * value yet, whose context may still be initializing, nor states with executions or a close in
+     * progress.
+     *
+     * @param state The state, read under the registry lock
+     * @return Whether the context of the state may be probed
+     */
+    private static boolean isProbeable(ContextState state) {
+        return !state.registered
+            && !state.closing
+            && state.activeExecutions == 0
+            && (state.runtimeModule.get() != null || !state.helpers.isEmpty() || !state.classes.isEmpty());
     }
 
     private static boolean isClosed(Context context) {
@@ -704,6 +729,8 @@ final class PythonContextRegistry {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
         final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
+        /** Whether the runtime created the context and unregisters it when closing it. */
+        volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
@@ -725,6 +752,7 @@ final class PythonContextRegistry {
             helpers.clear();
             classes.clear();
             runtimeModule.set(null);
+            registered = false;
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
             activeExecutions = 0;
