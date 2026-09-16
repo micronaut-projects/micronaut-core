@@ -74,6 +74,7 @@ import javax.lang.model.element.Element;
 @SuppressWarnings("checkstyle:InnerTypeLast")
 @Experimental
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
+    private static final String PUBLISHER_NAME = "org.reactivestreams.Publisher";
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";
 
@@ -202,6 +203,16 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
      */
     public boolean isAsync() {
         return getNativeType().isAsync();
+    }
+
+    /**
+     * Returns whether this method is an async generator ({@code async def} with a {@code yield}),
+     * bridged as a {@code Publisher} of its elements.
+     *
+     * @return Whether this method is an async generator
+     */
+    public boolean isAsyncGenerator() {
+        return getNativeType().isAsync() && getNativeType().isGenerator();
     }
 
     @Override
@@ -626,6 +637,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (!functionDef.isAsync()) {
             return awaitedType;
         }
+        if (functionDef.isGenerator()) {
+            return asyncGeneratorReturnType(awaitedType);
+        }
         ClassElement completionStage = environment.visitorContext()
             .getClassElement(CompletionStage.class.getName())
             .orElseGet(() -> ClassElement.of(CompletionStage.class));
@@ -634,6 +648,28 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             return completionStage.withTypeArguments(Map.of("T", stageValueType));
         } catch (UnsupportedOperationException e) {
             return ClassElement.of(CompletionStage.class, AnnotationMetadata.EMPTY_METADATA, Map.of("T", stageValueType));
+        }
+    }
+
+    /**
+     * The bridge return type of an async generator: {@code Publisher<T>}. An {@code AsyncIterator[T]},
+     * {@code AsyncGenerator[T, S]} or {@code Publisher[T]} annotation already resolves to a publisher
+     * and is kept; any other annotation names the element type, and no annotation means {@code Object}.
+     */
+    private ClassElement asyncGeneratorReturnType(ClassElement annotatedType) {
+        if (PUBLISHER_NAME.equals(annotatedType.getName())) {
+            return annotatedType;
+        }
+        ClassElement publisher = environment.visitorContext()
+            .getClassElement(PUBLISHER_NAME)
+            .orElseGet(() -> ClassElement.of(PUBLISHER_NAME, true, AnnotationMetadata.EMPTY_METADATA));
+        ClassElement elementType = annotatedType.isVoid()
+            ? environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
+            : asyncStageValueType(annotatedType);
+        try {
+            return publisher.withTypeArguments(Map.of("T", elementType));
+        } catch (UnsupportedOperationException e) {
+            return ClassElement.of(PUBLISHER_NAME, true, AnnotationMetadata.EMPTY_METADATA, Map.of("T", elementType));
         }
     }
 

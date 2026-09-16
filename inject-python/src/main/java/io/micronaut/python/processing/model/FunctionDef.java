@@ -44,6 +44,8 @@ import java.util.Objects;
  *                           advice, and a method returning {@code None} in a concrete class.
  * @param declaringClass Declaring class, can be null if there is none
  * @param superArguments The arguments of the {@code super().__init__(...)} call of a constructor, or
+ * @param isGenerator Whether the function body contains a yield of its own; with {@code isAsync} the function is
+ *                    an async generator, bridged as a Publisher of its elements.
  * {@code null} when the function is not a constructor or does not call the super constructor
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
@@ -62,7 +64,8 @@ public record FunctionDef(
     boolean hasReturnValue,
     boolean hasPlaceholderBody,
     ClassDef declaringClass,
-    @Nullable List<SuperArgumentDef> superArguments
+    @Nullable List<SuperArgumentDef> superArguments,
+    boolean isGenerator
 ) implements ElementDef, MemberDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
@@ -82,6 +85,22 @@ public record FunctionDef(
         if (superArguments != null) {
             superArguments = List.copyOf(superArguments);
         }
+    }
+
+    /**
+     * Creates a function that is not a generator.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, ClassDef declaringClass, @Nullable List<SuperArgumentDef> superArguments) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, declaringClass, superArguments, false);
+    }
+
+    /**
+     * Creates a function as the processor parses it: no declaring class and no super constructor call yet.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, boolean hasPlaceholderBody, boolean isGenerator) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, hasPlaceholderBody, null, null, isGenerator);
     }
 
     /**
@@ -204,7 +223,8 @@ public record FunctionDef(
             hasReturnValue,
             hasPlaceholderBody,
             classDef,
-            superArguments
+            superArguments,
+            isGenerator
         );
         return new FunctionDef(
             name,
@@ -220,7 +240,8 @@ public record FunctionDef(
             hasReturnValue,
             hasPlaceholderBody,
             classDef,
-            superArguments
+            superArguments,
+            isGenerator
         );
     }
 
@@ -245,7 +266,8 @@ public record FunctionDef(
             hasReturnValue,
             hasPlaceholderBody,
             declaringClass,
-            superArguments
+            superArguments,
+            isGenerator
         );
     }
 }
