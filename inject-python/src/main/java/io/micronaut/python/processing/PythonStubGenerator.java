@@ -1521,6 +1521,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean typeArgument,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (anInterface.isArray() && (anInterface instanceof GenericPlaceholderElement || anInterface instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            return sourceSignatureType(anInterface.fromArray(), typeArgument, signatureTypeArguments).array(anInterface.getArrayDimensions());
+        }
         if (anInterface instanceof WildcardElement wildcardElement) {
             if (!wildcardElement.getLowerBounds().isEmpty()) {
                 return TypeDef.wildcardSupertypeOf(sourceSignatureType(wildcardElement.getLowerBounds().getFirst(), true, signatureTypeArguments));
@@ -1584,6 +1588,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ClassElement resolvedType,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (signatureType.isArray() && (signatureType instanceof GenericPlaceholderElement || signatureType instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            ClassElement resolvedComponentType = resolvedType != null && resolvedType.isArray() ? resolvedType.fromArray() : resolvedType;
+            return bridgeSignatureType(signatureType.fromArray(), resolvedComponentType, signatureTypeArguments).array(signatureType.getArrayDimensions());
+        }
         if (signatureType instanceof WildcardElement wildcardElement) {
             if (!wildcardElement.getLowerBounds().isEmpty()) {
                 return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedType, signatureTypeArguments));

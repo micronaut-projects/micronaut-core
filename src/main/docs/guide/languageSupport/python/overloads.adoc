@@ -1,0 +1,50 @@
+Python has no method overloading and no varargs syntax of its own, while Java APIs use both. The Python compiler maps between the two as follows.
+
+=== Implementing Overloaded Java Methods
+
+A Python class that implements a Java interface with several overloads of the same name and arity implements them with a single Python method. The generated Java stub declares every overload of the interface, and each of them dispatches to that Python method:
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.views.fields.elements import Option
+from micronaut.views.fields.fetchers import OptionFetcher
+
+@Singleton
+class AuthorFetcher(OptionFetcher[int]):
+
+    def generate(self, type_or_instance) -> list[Option]:  # <1>
+        ...
+----
+
+<1> Implements both `generate(Class<Integer>)` and `generate(Integer)`; the Python method receives either a `Class` object or an `int`.
+
+=== Variadic Parameters
+
+A `*args` parameter is exposed to Java as a varargs array of the annotated element type (`Object[]` when unannotated), so a Python method can implement a Java varargs method or declare one:
+
+[source,python]
+----
+from abc import ABC, abstractmethod
+from micronaut.configuration.kafka.annotation import KafkaClient, Topic
+
+@KafkaClient(batch=True)
+class BookClient(ABC):
+
+    @Topic("books")
+    @abstractmethod
+    def send_books(self, *books: Book) -> None:  # <1>
+        ...
+----
+
+<1> The generated Java method is `send_books(Book[] books)`. Java callers pass an array; Python callers pass the books positionally (`client.send_books(book1, book2)`) or as a single list.
+
+When Java invokes the method, the elements of the array become the positional arguments of the Python method.
+
+=== Selecting Java Overloads from Python
+
+When Python code calls an overloaded Java method, the argument types select the overload:
+
+* a `list` or `tuple` selects a `List`, `Collection` or `Iterable` parameter over a `Map` parameter (`AuthenticationResponse.success("user", ["ROLE_A"])`), and a `set` or other iterable is accepted by `Collection` and `Iterable` parameters;
+* a `dict` selects a `Map` parameter;
+* `bytes` and `bytearray` select a `byte[]` parameter over `Object`, `String` or stream parameters (`object_mapper.readValue(payload, Book)`).
