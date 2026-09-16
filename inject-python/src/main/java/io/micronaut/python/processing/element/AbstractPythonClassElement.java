@@ -660,6 +660,22 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     private void addAttributeBackedProperties(AbstractPythonClassElement declaringType,
                                               ClassElement owningType,
                                               List<PropertyElement> allProperties) {
+        allProperties.addAll(attributeBackedProperties(declaringType, owningType, allProperties));
+    }
+
+    /**
+     * The properties backed by the attributes of a class and of its Python base classes. Inherited attributes lead,
+     * in the order of the fields of a dataclass and of its generated {@code __init__}; an attribute declared again
+     * keeps that position but is represented by the declaration of the subclass.
+     */
+    private List<PropertyElement> attributeBackedProperties(AbstractPythonClassElement declaringType,
+                                                            ClassElement owningType,
+                                                            List<PropertyElement> allProperties) {
+        List<PropertyElement> inheritedProperties = declaringType.getSuperType()
+            .filter(AbstractPythonClassElement.class::isInstance)
+            .map(superType -> attributeBackedProperties((AbstractPythonClassElement) superType, owningType, allProperties))
+            .orElse(List.of());
+        List<PropertyElement> properties = new ArrayList<>(inheritedProperties);
         List<AttributeDef> fields = declaringType.getNativeType().attributes();
         for (AttributeDef field : fields) {
             // Check if this field is already represented as a property
@@ -678,15 +694,24 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                     owningType,
                     environment.metadataFactory()
                 );
-                allProperties.add(propertyElement);
+                int inheritedIndex = indexOfProperty(inheritedProperties, field.name());
+                if (inheritedIndex >= 0) {
+                    properties.set(inheritedIndex, propertyElement);
+                } else {
+                    properties.add(propertyElement);
+                }
             }
         }
+        return properties;
+    }
 
-        declaringType.getSuperType().ifPresent(superType -> {
-            if (superType instanceof AbstractPythonClassElement pythonSuperType) {
-                addAttributeBackedProperties(pythonSuperType, owningType, allProperties);
+    private static int indexOfProperty(List<PropertyElement> properties, String name) {
+        for (int i = 0; i < properties.size(); i++) {
+            if (properties.get(i).getName().equals(name)) {
+                return i;
             }
-        });
+        }
+        return -1;
     }
 
     static List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {

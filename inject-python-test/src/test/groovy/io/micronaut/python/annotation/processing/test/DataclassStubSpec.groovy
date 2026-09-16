@@ -1,0 +1,172 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.annotation.processing.test
+
+
+/**
+ * The stub of a dataclass takes the fields of its dataclass bases, in the order of the generated {@code __init__}.
+ */
+class DataclassStubSpec extends AbstractPythonTypeElementSpec {
+
+    void "test a dataclass inherits the constructor fields of its dataclass base"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Animal:
+    name: str
+
+@Introspected
+@dataclass
+class Cat(Animal):
+    lives: int = 9
+
+@Introspected
+@dataclass
+class Kitten(Cat):
+    pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def animalType = context.classLoader.loadClass("python.Animal")
+        def catIntrospection = getBeanIntrospection(context, "python.Cat")
+        def kittenIntrospection = getBeanIntrospection(context, "python.Kitten")
+
+        then: "the base fields lead the constructor and the properties, as in the Python __init__"
+        catIntrospection.constructorArguments*.name == ["name", "lives"]
+        catIntrospection.propertyNames == ["name", "lives"] as String[]
+        kittenIntrospection.constructorArguments*.name == ["name", "lives"]
+        kittenIntrospection.propertyNames == ["name", "lives"] as String[]
+
+        when:
+        def cat = catIntrospection.instantiate("Tom", 3)
+        def kitten = kittenIntrospection.instantiate("Kit", 1)
+
+        then:
+        animalType.isInstance(cat)
+        cat.name == "Tom"
+        cat.lives == 3
+        cat.getName() == "Tom"
+        kitten.name == "Kit"
+        kitten.lives == 1
+
+        when: "the Python object is created from the Java fields"
+        def pythonCat = cat.asPolyglotValue()
+
+        then:
+        pythonCat.getMember("name").asString() == "Tom"
+        pythonCat.getMember("lives").asInt() == 3
+        pythonCat.getMetaObject().getMetaSimpleName() == "Cat"
+
+        when: "a Python instance is wrapped"
+        def pythonInstance = pythonCat.getMetaObject().execute("Felix", 7)
+        def wrapper = catIntrospection.getBeanType().fromPolyglotValue(pythonInstance)
+
+        then:
+        wrapper.name == "Felix"
+        wrapper.lives == 7
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a field declared again by the subclass keeps the position of the base"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class Base:
+    a: int
+    b: int
+
+@Introspected
+@dataclass
+class Sub(Base):
+    a: int
+    c: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Sub")
+
+        then:
+        introspection.constructorArguments*.name == ["a", "b", "c"]
+        introspection.propertyNames == ["a", "b", "c"] as String[]
+
+        when:
+        def sub = introspection.instantiate(1, 2, 3)
+
+        then:
+        sub.a == 1
+        sub.b == 2
+        sub.c == 3
+        sub.asPolyglotValue().getMember("b").asInt() == 2
+
+        when: "the class element reports the declaration of the subclass"
+        def declaringTypes = buildClassElement(pythonCode, "Sub") { classElement ->
+            classElement.beanProperties.collectEntries { [(it.name): it.declaringType.simpleName] }
+        }
+
+        then:
+        declaringTypes == [a: "Sub", b: "Base", c: "Sub"]
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test an introspected dataclass extending a plain dataclass"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@dataclass
+class Animal:
+    name: str
+
+@Introspected
+@dataclass
+class Cat(Animal):
+    lives: int = 9
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Cat")
+
+        then:
+        introspection.constructorArguments*.name == ["name", "lives"]
+
+        when:
+        def cat = introspection.instantiate("Tom", 3)
+
+        then:
+        cat.name == "Tom"
+        cat.asPolyglotValue().getMember("name").asString() == "Tom"
+        cat.asPolyglotValue().getMember("lives").asInt() == 3
+
+        cleanup:
+        context?.close()
+    }
+}

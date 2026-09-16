@@ -1177,10 +1177,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
             final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
             final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
+            // A dataclass takes the fields of its dataclass base first; an introspected base is constructed from
+            // them. Any other Python base only wraps the Python object, which then has to exist up front.
+            final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
+            final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                     if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties) {
+                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties || requiresPythonInstance) {
                             List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                             if (hasDefaultedConstructorParameters) {
                                 arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
@@ -1209,6 +1213,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         List<StatementDef> assignments = new ArrayList<>();
                         if (extendsHostClass) {
                             assignments.add(aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, parameters, methodParameters)));
+                        } else if (extendsPythonClass) {
+                            List<ExpressionDef> superArguments = new ArrayList<>(superConstructorParameterIndexes.length);
+                            for (int index : superConstructorParameterIndexes) {
+                                superArguments.add(methodParameters.get(index));
+                            }
+                            assignments.add(aThis.superRef().invokeSuperConstructor(superArguments));
                         }
                         for (int i = 0; i < parameters.length; i++) {
                             @NonNull ParameterElement parameter = parameters[i];
@@ -1865,6 +1875,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .findFirst()
             .map(constructor -> new ArrayList<ExpressionDef>(methodParameters.subList(0, constructor.getParameters().length)))
             .orElseGet(() -> new ArrayList<>(methodParameters));
+    }
+
+    /**
+     * The positions, among the constructor parameters, of the arguments of the constructor of an introspected Python
+     * base class, which a dataclass inherits as its leading fields. {@code null} when the base has to be constructed
+     * from the Python object instead: it is not introspected, or its constructor takes a parameter of another name.
+     */
+    private static int @Nullable [] pythonSuperConstructorParameterIndexes(ClassElement superType, ParameterElement[] parameters) {
+        if (!superType.hasStereotype(Introspected.class)) {
+            return null;
+        }
+        ParameterElement[] superParameters = superType.getPrimaryConstructor()
+            .map(MethodElement::getParameters)
+            .orElse(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+        int[] indexes = new int[superParameters.length];
+        for (int i = 0; i < superParameters.length; i++) {
+            indexes[i] = indexOfParameter(parameters, superParameters[i].getName());
+            if (indexes[i] < 0) {
+                return null;
+            }
+        }
+        return indexes;
+    }
+
+    private static int indexOfParameter(ParameterElement[] parameters, String name) {
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean matchesConstructorPrefix(ConstructorElement constructor, ParameterElement[] parameters) {

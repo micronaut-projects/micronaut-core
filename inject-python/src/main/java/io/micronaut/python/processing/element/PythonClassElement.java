@@ -36,6 +36,9 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.python.processing.model.ArgumentDef;
+import io.micronaut.python.processing.model.ArgumentsDef;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
@@ -61,8 +64,10 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 public sealed class PythonClassElement extends AbstractPythonClassElement permits PythonAnnotationElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";
+    private static final String DATACLASS_DECORATOR = "dataclass";
 
     private Map<String, ClassElement> resolvedTypeArguments;
+    private FunctionDef constructor;
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
@@ -235,11 +240,79 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
 
         // Fall back to regular constructor
-        FunctionDef constructor = getNativeType().constructor();
+        if (constructor == null) {
+            constructor = withInheritedDataclassFields(getNativeType().constructor());
+        }
         if (constructor != null) {
             return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether this class is decorated with {@code @dataclass}.
+     *
+     * @return {@code true} for a Python dataclass
+     */
+    public boolean isDataclass() {
+        return hasDataclassDecorator(getNativeType().decorators());
+    }
+
+    /**
+     * Completes the {@code __init__} the processor derived from the fields of a dataclass with the fields of its
+     * dataclass bases. Python collects the fields in reverse MRO order, so the fields of the base come first and a
+     * field the subclass declares again keeps the position of its first declaration. An explicit {@code __init__}
+     * is used as declared, as in Python.
+     *
+     * @param constructor The constructor of the class definition, may be {@code null}
+     * @return The constructor to use, may be {@code null}
+     */
+    private @Nullable FunctionDef withInheritedDataclassFields(@Nullable FunctionDef constructor) {
+        if (!isDataclass() || (constructor != null && !hasDataclassDecorator(constructor.decorators()))) {
+            return constructor;
+        }
+        if (!(getSuperType().orElse(null) instanceof PythonClassElement superType) || !superType.isDataclass()) {
+            return constructor;
+        }
+        List<ArgumentDef> inheritedFields = superType.getPrimaryConstructor()
+            .filter(PythonConstructorElement.class::isInstance)
+            .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
+            .orElse(List.of());
+        if (inheritedFields.isEmpty()) {
+            return constructor;
+        }
+        Map<String, ArgumentDef> fields = new LinkedHashMap<>();
+        for (ArgumentDef inheritedField : inheritedFields) {
+            fields.put(inheritedField.name(), inheritedField);
+        }
+        if (constructor != null) {
+            for (ArgumentDef field : constructor.arguments().arguments()) {
+                fields.put(field.name(), field);
+            }
+        }
+        FunctionDef template = constructor != null ? constructor : new FunctionDef(FunctionDef.CONSTRUCTOR_NAME, dataclassConstructorDecorators());
+        return new FunctionDef(
+            template.name(),
+            ArgumentsDef.of(List.copyOf(fields.values())),
+            template.decorators(),
+            template.returnType(),
+            template.typeComment(),
+            template.typeParams(),
+            template.documentation(),
+            template.isAbstract(),
+            template.isStatic(),
+            template.isAsync(),
+            template.hasReturnValue(),
+            null
+        ).withClassDef(getNativeType());
+    }
+
+    private static List<DecoratorDef> dataclassConstructorDecorators() {
+        return List.of(new DecoratorDef(DATACLASS_DECORATOR, DATACLASS_DECORATOR));
+    }
+
+    private static boolean hasDataclassDecorator(List<DecoratorDef> decorators) {
+        return decorators.stream().anyMatch(decorator -> DATACLASS_DECORATOR.equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
     }
 
     @Override
