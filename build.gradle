@@ -96,6 +96,9 @@ configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
 
+// Python tests need a GraalVM runtime and are slow: they only run in the Python CI workflow,
+// which runs `pythonCheck -Ppython-ci`. The `io.micronaut.build.internal.python` plugin applies
+// the same convention to the projects with Python sources and adds them to `pythonCheck`.
 if (!providers.gradleProperty("python-ci").isPresent()) {
     subprojects { project ->
         if (project.path in pythonProjects) {
@@ -104,4 +107,7 @@ if (!providers.gradleProperty("python-ci").isPresent()) {
             }
         }
     }
+}
+tasks.matching { it.name == "pythonCheck" }.configureEach {
+    dependsOn pythonProjects.collect { "${it}:check" }
 }

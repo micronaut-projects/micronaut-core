@@ -1,8 +1,8 @@
-import io.micronaut.build.internal.python.PythonCompile
+import io.micronaut.build.python.PythonCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    id("io.micronaut.build.internal.python")
+    id("io.micronaut.build.internal.convention-python")
 }
 
 dependencies {
