@@ -694,7 +694,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
                 if (isDynamicBeanProperty(beanProperty)) {
                     beanProperty.getWriteMethod().ifPresent(m -> addNamedSetterDynamic(beanProperty, builder, context, hasAsyncBridgeMethod));
-                    beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder));
+                    beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder, true));
                 } else {
                     addSetterPojo(beanProperty, builder, field);
                     addGetterPojo(beanProperty, builder, field);
@@ -712,7 +712,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     String beanStyle = beanGetterName(beanProperty.getName());
                     String booleanBeanStyle = booleanBeanGetterName(beanProperty.getName());
                     if (!m.getName().equals(beanStyle) && (!isBooleanProperty(beanProperty) || !m.getName().equals(booleanBeanStyle))) {
-                        addNamedGetterDynamic(beanProperty, builder);
+                        // addGetterDynamic already emitted the is-prefixed alias of a boolean property
+                        addNamedGetterDynamic(beanProperty, builder, false);
                     }
                 });
             }
@@ -3378,13 +3379,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private void addNamedGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
+    private void addNamedGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, boolean addBooleanAlias) {
         TypeDef propertyType = propertySourceType(beanProperty);
         String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         addGetterDynamic(beanProperty, builder, propertyType, getterName);
 
         String booleanGetterName = booleanBeanGetterName(beanProperty.getName());
-        if (isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
+        if (addBooleanAlias && isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
             addGetterDynamic(beanProperty, builder, propertyType, booleanGetterName);
         }
     }
