@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -731,6 +732,13 @@ final class PythonContextRegistry {
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
         final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
+        /**
+         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
+         * created per request is forgotten with its wrapper, which holds the key.
+         */
+        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
+        /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
+        final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -745,6 +753,8 @@ final class PythonContextRegistry {
 
         private void clear() {
             asyncMembers.clear();
+            asyncConstructorArguments.clear();
+            coroutineClasses.clear();
             helpers.clear();
             classes.clear();
             runtimeModule.set(null);

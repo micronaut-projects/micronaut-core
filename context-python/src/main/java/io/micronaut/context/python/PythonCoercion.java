@@ -417,14 +417,46 @@ public final class PythonCoercion {
         if (isInteropPrimitive(value)) {
             return value;
         }
-        Context context = target.getContext();
+        return asyncMemberValue(target.getContext(), value);
+    }
+
+    static @Nullable Object asyncMemberValue(Context context, @Nullable Object value) {
+        if (isInteropPrimitive(value)) {
+            return value;
+        }
         if (value instanceof CompletionStage<?> completionStage) {
             return PythonAsyncioRuntime.toAwaitable(context, completionStage);
         }
         if (value instanceof PooledValueCoercible || value instanceof Value) {
             return coerceToContext(value, context);
         }
+        if (value instanceof ValueCoercible valueCoercible) {
+            // a Python bean awaited from an event-loop context must run there
+            Value beanValue = PythonContextRuntime.asyncBeanValue(valueCoercible, context);
+            if (beanValue != null) {
+                return beanValue;
+            }
+        }
         return asyncMemberFactory(context).execute(value, ASYNC_MEMBER_ADAPTER, context);
+    }
+
+    /**
+     * Convert a constructor argument of a startup-context object for the replayed constructor in an event-loop
+     * context: Python beans and host beans as async members, other values as a constructor call converts them.
+     *
+     * @param context The event-loop context
+     * @param value The Java constructor argument
+     * @return The context-local argument
+     */
+    static @Nullable Object asyncConstructorArgument(Context context, @Nullable Object value) {
+        if (isInteropPrimitive(value) || value instanceof PooledValueCoercible || value instanceof Value) {
+            return coerceToContext(value, context);
+        }
+        if (value instanceof ValueCoercible || value instanceof CompletionStage<?>) {
+            return asyncMemberValue(context, value);
+        }
+        Object converted = coerceToContext(value, context);
+        return converted == value ? asyncMemberValue(context, value) : converted;
     }
 
     private static boolean isInteropPrimitive(@Nullable Object value) {
@@ -467,6 +499,18 @@ public final class PythonCoercion {
      * @param target The target Python object.
      */
     public static void copyTransferableMembers(@Nullable Value source, @Nullable Value target) {
+        copyTransferableMembers(source, target, Set.of());
+    }
+
+    /**
+     * Copy simple and host-backed Python instance members into another context, resolving injected Python beans
+     * for the target context.
+     *
+     * @param source The source Python object.
+     * @param target The target Python object.
+     * @param skippedHostObjects Host objects, compared by identity, the target already holds in its own form
+     */
+    static void copyTransferableMembers(@Nullable Value source, @Nullable Value target, Set<Object> skippedHostObjects) {
         if (source == null || target == null || PythonConversion.isNone(source) || PythonConversion.isNone(target) || !source.hasMembers()) {
             return;
         }
@@ -475,8 +519,8 @@ public final class PythonCoercion {
                 continue;
             }
             Value member = source.getMember(key);
-            Object transferable = transferableMember(member);
-            if (transferable != null) {
+            Object transferable = transferableMember(member, target.getContext());
+            if (transferable != null && !skippedHostObjects.contains(transferable)) {
                 putMember(target, key, transferable);
             }
         }
@@ -494,12 +538,15 @@ public final class PythonCoercion {
         return keys;
     }
 
-    private static @Nullable Object transferableMember(@Nullable Value member) {
+    private static @Nullable Object transferableMember(@Nullable Value member, Context targetContext) {
         if (member == null || PythonConversion.isNone(member)) {
             return null;
         }
         if (member.isHostObject()) {
             return member.asHostObject();
+        }
+        if (member.isProxyObject() && member.asProxyObject() instanceof ValueCoercible valueCoercible) {
+            return PythonContextRuntime.asyncBeanValue(valueCoercible, targetContext);
         }
         if (member.isBoolean()) {
             return member.asBoolean();
