@@ -59,7 +59,6 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReferenceArray;
 import java.util.function.Consumer;
 
 /**
@@ -99,11 +98,12 @@ public final class JacksonDatabindMapper implements JsonMapper {
      * {@link #specializedReader} and {@link #specializedWriter}) answers every lookup with those
      * two and never touches the caches, and one such mapper is created per route, so they are
      * {@code null} there.
+     * <p>Plain arrays, accessed without synchronization: an entry is an immutable record, a
+     * reference write is atomic, and a reader that sees a stale or missing entry only recomputes
+     * a value that is equal to the cached one.
      */
-    @Nullable
-    private final AtomicReferenceArray<TypeCache<ObjectReader>> cachedReaders;
-    @Nullable
-    private final AtomicReferenceArray<TypeCache<ObjectWriter>> cachedWriters;
+    private final TypeCache<ObjectReader> @Nullable [] cachedReaders;
+    private final TypeCache<ObjectWriter> @Nullable [] cachedWriters;
 
     @Internal
     public JacksonDatabindMapper(ObjectMapper objectMapper) {
@@ -121,8 +121,8 @@ public final class JacksonDatabindMapper implements JsonMapper {
         this.treeCodec = JsonNodeTreeCodec.getInstance().withConfig(config);
         this.specializedReader = null;
         this.specializedWriter = null;
-        this.cachedReaders = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
-        this.cachedWriters = new AtomicReferenceArray<>(TYPE_CACHE_SIZE);
+        this.cachedReaders = newCache();
+        this.cachedWriters = newCache();
     }
 
     @Internal
@@ -187,17 +187,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedReader != null) {
             return specializedReader;
         }
-        AtomicReferenceArray<TypeCache<ObjectReader>> readers = Objects.requireNonNull(this.cachedReaders);
+        TypeCache<ObjectReader>[] readers = Objects.requireNonNull(this.cachedReaders);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
-        TypeCache<ObjectReader> cached = readers.get(slot);
+        TypeCache<ObjectReader> cached = readers[slot];
         if (cached != null && cached.type == type) {
             return cached.cachedValue;
         }
         Class<?> view = viewOf(type);
         if (view != null) {
             slot = slot(typeHash, view);
-            cached = readers.get(slot);
+            cached = readers[slot];
         }
         if (cached != null && cached.matches(type, view)) {
             return cached.cachedValue;
@@ -206,7 +206,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (view != null) {
             reader = reader.withView(view);
         }
-        readers.set(slot, new TypeCache<>(type, view, reader));
+        readers[slot] = new TypeCache<>(type, view, reader);
         return reader;
     }
 
@@ -221,17 +221,17 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (specializedWriter != null) {
             return specializedWriter;
         }
-        AtomicReferenceArray<TypeCache<ObjectWriter>> writers = Objects.requireNonNull(this.cachedWriters);
+        TypeCache<ObjectWriter>[] writers = Objects.requireNonNull(this.cachedWriters);
         int typeHash = type.typeHashCode();
         int slot = slot(typeHash, null);
-        TypeCache<ObjectWriter> cached = writers.get(slot);
+        TypeCache<ObjectWriter> cached = writers[slot];
         if (cached != null && cached.type == type) {
             return cached.cachedValue;
         }
         Class<?> view = viewOf(type);
         if (view != null) {
             slot = slot(typeHash, view);
-            cached = writers.get(slot);
+            cached = writers[slot];
         }
         if (cached != null && cached.matches(type, view)) {
             return cached.cachedValue;
@@ -240,7 +240,7 @@ public final class JacksonDatabindMapper implements JsonMapper {
         if (view != null) {
             writer = writer.withView(view);
         }
-        writers.set(slot, new TypeCache<>(type, view, writer));
+        writers[slot] = new TypeCache<>(type, view, writer);
         return writer;
     }
 
@@ -264,6 +264,11 @@ public final class JacksonDatabindMapper implements JsonMapper {
      */
     static int slotOf(Argument<?> type) {
         return slot(type.typeHashCode(), viewOf(type));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static <T> TypeCache<T>[] newCache() {
+        return (TypeCache<T>[]) new TypeCache<?>[TYPE_CACHE_SIZE];
     }
 
     private static int slot(int typeHash, @Nullable Class<?> view) {
