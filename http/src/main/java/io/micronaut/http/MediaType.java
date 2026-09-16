@@ -859,9 +859,6 @@ public class MediaType implements CharSequence {
     // when the load fails, assigned once under the double checked lock in getMediaTypeFileExtensions.
     @SuppressWarnings("java:S3077")
     private static volatile @Nullable Map<String, String> mediaTypeFileExtensions;
-    private static final byte TEXT_BASED_UNKNOWN = 0;
-    private static final byte TEXT_BASED_NO = 1;
-    private static final byte TEXT_BASED_YES = 2;
 
     protected final String name;
     protected final String subtype;
@@ -880,10 +877,11 @@ public class MediaType implements CharSequence {
 
     private boolean valid;
     /**
-     * Cached {@link #isTextBased()} answer. The value only depends on final fields, so a racy
-     * write of the same value from two threads is harmless.
+     * Cached {@link #isTextBased()} answer, {@code null} until first asked. The value only
+     * depends on final fields, so a racy write of the same value from two threads is harmless.
      */
-    private byte textBased = TEXT_BASED_UNKNOWN;
+    @Nullable
+    private Boolean textBased;
 
     /**
      * Constructs a new media type for the given string.
@@ -1253,12 +1251,12 @@ public class MediaType implements CharSequence {
      * @return Whether the media type is text based
      */
     public boolean isTextBased() {
-        byte cached = textBased;
-        if (cached == TEXT_BASED_UNKNOWN) {
-            cached = computeTextBased() ? TEXT_BASED_YES : TEXT_BASED_NO;
+        Boolean cached = textBased;
+        if (cached == null) {
+            cached = computeTextBased();
             textBased = cached;
         }
-        return cached == TEXT_BASED_YES;
+        return cached;
     }
 
     private boolean computeTextBased() {
