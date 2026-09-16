@@ -1,0 +1,278 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.python.compiler
+
+import io.micronaut.context.ApplicationContext
+import io.micronaut.context.python.PythonContextRuntime
+import io.micronaut.python.processing.PythonAnnotationProcessor
+import spock.lang.Specification
+
+/**
+ * Failures of the Python compiler that used to be silent or opaque: a Python package coinciding
+ * with an imported Java package, a Java import outside the Micronaut packages, and two
+ * definitions of one generated Java class.
+ */
+class CompilerSilentFailureSpec extends Specification {
+
+    File srcDir
+    File targetDir
+
+    def setup() {
+        srcDir = File.createTempDir("python-silent-failure-src", "")
+        targetDir = File.createTempDir("python-silent-failure-target", "")
+        PythonContextRuntime.resetContext()
+    }
+
+    def cleanup() {
+        PythonContextRuntime.resetContext()
+        srcDir.deleteDir()
+        targetDir.deleteDir()
+    }
+
+    def "a Python package coinciding with an imported Java package shares the generated package initializer"() {
+        given: "a module in the package micronaut.context, which is also imported as a Java package with a sub-package"
+        writeSource("micronaut/context/helper.py", '''
+from jakarta.inject import Singleton
+from micronaut.context import ApplicationContext
+from micronaut.context.annotation import Executable
+
+
+@Singleton
+class Helper:
+    def __init__(self, context: ApplicationContext):
+        self.context = context
+
+    @Executable
+    def value(self) -> str:
+        return "ok" if self.context is not None else "missing"
+''')
+
+        when:
+        compile()
+        def initializer = vfsFile("micronaut/context/__init__.py").text.readLines()
+
+        then: "the Java shims come first so the module can import them from its own package while it initializes"
+        initializer.indexOf("ApplicationContext = java.type('io.micronaut.context.ApplicationContext')") <
+            initializer.indexOf("from .helper import Helper")
+        initializer.indexOf("from . import annotation") < initializer.indexOf("from .helper import Helper")
+        initializer.last().startsWith('__all__ = ["ApplicationContext",')
+        initializer.last().contains('"annotation"')
+        initializer.last().endsWith('"Helper"]')
+        vfsFile("micronaut/context/helper.py").exists()
+        vfsFile("micronaut/context/annotation/Executable.py").exists()
+
+        when: "the application starts"
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+        def helper = context.getBean(classLoader.loadClass("micronaut.context.Helper"))
+
+        then:
+        helper.value() == "ok"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
+    def "a module directly inside an imported Java package path is compiled next to the generated shims"() {
+        given: "a module in the package jakarta.inject, which is imported for its annotations"
+        writeSource("jakarta/inject/registry.py", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+
+@Singleton
+class Registry:
+    @Executable
+    def value(self) -> str:
+        return "registered"
+''')
+
+        when:
+        compile()
+        def initializer = vfsFile("jakarta/inject/__init__.py").text.readLines()
+
+        then:
+        initializer.indexOf("from .Singleton import Singleton") < initializer.indexOf("from .registry import Registry")
+        initializer.last().startsWith('__all__ = [')
+        initializer.last().contains('"Singleton"')
+        initializer.last().endsWith('"Registry"]')
+
+        when:
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+        def registry = context.getBean(classLoader.loadClass("jakarta.inject.Registry"))
+
+        then:
+        registry.value() == "registered"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
+    def "a module named like a generated Java annotation module is reported instead of failing on the reopened output"() {
+        given:
+        writeSource("jakarta/inject/Singleton.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Registry:
+    pass
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Python source [jakarta/inject/Singleton.py] is written twice")
+        !e.message.contains("Output stream or writer has already been opened")
+    }
+
+    def "importing a Java class outside the Micronaut packages compiles the module and its bean"() {
+        given:
+        writeSource("app/logging_service.py", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from org.slf4j import LoggerFactory
+
+LOG = LoggerFactory.getLogger("app.logging_service")
+
+
+@Singleton
+class LoggingService:
+    @Executable
+    def value(self) -> str:
+        LOG.info("value requested")
+        return "logged"
+''')
+
+        when:
+        compile()
+
+        then:
+        new File(targetDir, "app/LoggingService.class").exists()
+        vfsFile("org/slf4j/__init__.py").text.contains("LoggerFactory = java.type('org.slf4j.LoggerFactory')")
+
+        when:
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+        def service = context.getBean(classLoader.loadClass("app.LoggingService"))
+
+        then:
+        service.value() == "logged"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
+    def "two top-level classes of one name in one package are a compile error instead of overwriting each other"() {
+        given:
+        writeSource("app/first.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Service:
+    def value(self) -> str:
+        return "first"
+''')
+        writeSource("app/second.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Service:
+    def value(self) -> str:
+        return "second"
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Duplicate Python type [app.Service]")
+        e.message.contains("first.py")
+        e.message.contains("second.py")
+    }
+
+    def "a module of decorated functions named like a class of another module is a compile error"() {
+        given:
+        writeSource("app/service.py", '''
+from micronaut.context.annotation import Executable
+
+
+@Executable
+def run() -> str:
+    return "run"
+''')
+        writeSource("app/models.py", '''
+class Service:
+    pass
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Duplicate Python type [app.Service]")
+    }
+
+    def "module-level assignments named like a class of another module do not conflict"() {
+        given:
+        writeSource("app/service.py", '''
+NAME = "service"
+''')
+        writeSource("app/models.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Service:
+    def value(self) -> str:
+        return "service"
+''')
+
+        when:
+        compile()
+
+        then:
+        new File(targetDir, "app/Service.class").exists()
+    }
+
+    private void writeSource(String relativePath, String code) {
+        def file = new File(srcDir, relativePath)
+        file.parentFile.mkdirs()
+        file.text = code
+    }
+
+    private void compile() {
+        PyronautCompiler.builder()
+            .pythonSrc(srcDir.absolutePath)
+            .targetDir(targetDir)
+            .build()
+            .compile()
+    }
+
+    private File vfsFile(String relativePath) {
+        new File(targetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}${relativePath}")
+    }
+}

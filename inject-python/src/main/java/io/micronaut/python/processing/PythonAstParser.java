@@ -236,13 +236,22 @@ public final class PythonAstParser {
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
 
+        // Every top-level class and every script generates a Java class of its qualified name, so
+        // two definitions of one name in different sources would silently overwrite each other
+        Map<String, Definition> definitions = new LinkedHashMap<>();
+        String[] currentSource = new String[1];
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
                 String qualifiedName = resolveQualifiedName(classDef.packageName(), classDef);
+                checkUniqueDefinition(definitions, qualifiedName, new Definition(currentSource[0], true));
                 classes.put(qualifiedName, classDef);
             } else if (o instanceof ScriptDef scriptDef) {
                 String qualifiedName = resolveScriptQualifiedName(scriptDef.packageName(), scriptDef);
+                // A script of module-level assignments only yields no beans, so a class of the same
+                // name in another module of the package takes precedence over it without conflict
+                boolean significant = !scriptDef.functions().isEmpty() || !scriptDef.decorators().isEmpty();
+                checkUniqueDefinition(definitions, scriptDef.qualifiedName(), new Definition(currentSource[0], significant));
                 scripts.put(qualifiedName, scriptDef);
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
@@ -251,8 +260,10 @@ public final class PythonAstParser {
         });
 
         for (Source source : sources) {
+            String path = source.getPath();
+            currentSource[0] = path != null ? path : source.getName();
+            boolean processed = false;
             for (String srcDir : srcDirs) {
-                String path = source.getPath();
                 if (path == null) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
@@ -262,6 +273,7 @@ public final class PythonAstParser {
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
                     context.eval(PROCESSOR_SOURCE);
+                    processed = true;
                 } else if (isWithinSourceDir(srcDir, path)) {
                     String packageName = getPackageNameOfSource(srcDir, source);
                     bindings.putMember("src", source.getCharacters());
@@ -270,7 +282,15 @@ public final class PythonAstParser {
                     bindings.putMember("visitor_context", visitorContext);
                     bindings.putMember("src_root", srcDir);
                     context.eval(PROCESSOR_SOURCE);
+                    processed = true;
                 }
+            }
+            if (!processed) {
+                // Never skip a source quietly: its classes would be missing from the compiled application
+                throw new ProcessingException(
+                    null,
+                    "Python source [" + currentSource[0] + "] is not located in any of the Python source directories " + srcDirs + " and cannot be processed"
+                );
             }
         }
         return new PythonEnvironment(
@@ -279,6 +299,22 @@ public final class PythonAstParser {
             decorators,
             context
         );
+    }
+
+    private static void checkUniqueDefinition(Map<String, Definition> definitions, String qualifiedName, Definition definition) {
+        Definition previous = definitions.get(qualifiedName);
+        if (previous == null || (!previous.significant() && definition.significant())) {
+            definitions.put(qualifiedName, definition);
+            return;
+        }
+        if (previous.significant() && definition.significant() && !previous.source().equals(definition.source())) {
+            throw new ProcessingException(
+                null,
+                "Duplicate Python type [" + qualifiedName + "] defined in [" + definition.source() + "] and [" + previous.source() + "]: "
+                    + "a top-level class or a module with decorated functions generates a Java class named after it, so the two definitions "
+                    + "would overwrite each other; rename one of them or move it to another package"
+            );
+        }
     }
 
     private static boolean isWithinSourceDir(String srcDir, String path) {
@@ -535,6 +571,15 @@ public final class PythonAstParser {
     }
 
     private record RuntimeArtifact(Value tree, boolean required) {
+    }
+
+    /**
+     * A source definition of a generated Java type.
+     *
+     * @param source      The defining source
+     * @param significant Whether the definition generates beans or bridged members and so conflicts with another one
+     */
+    private record Definition(String source, boolean significant) {
     }
 
     /**
