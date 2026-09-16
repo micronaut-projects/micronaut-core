@@ -21,3 +21,14 @@ class PeopleService:
 A map-like Java object such as a cache or a view is never copied or iterated when it enters Python. Only a plain JDK collection (an `ArrayList`, a `HashMap`, a `List.of(...)`, ...) that holds values needing conversion, generated Python classes, `java.time` values or nested collections of those, is rebuilt so its elements arrive as Python objects.
 
 Since the collection is shared, in-place mutation works in both directions: a `list[str]` attribute of a Python dataclass that was stored in Java, for example in an HTTP session, and read back as its generated Java class can be mutated with `append` and the Java side sees the change. The same is true of immutability: appending to a `List.of(...)` raises the Java exception. A Java `Set` is a foreign iterable in Python: it can be iterated and its Java methods (`size()`, `contains(...)`, `add(...)`) called, but `len()` and `in` are not available.
+
+=== Serialization
+
+The Java class generated for an `@Introspected` Python class (`@Serdeable` includes it) implements `java.io.Serializable`, so Python objects can be stored wherever Java serialization is used: a distributed cache, a topic or an HTTP session store. The serialized form consists of the introspected property values, written from the generated Java fields; the GraalPy object is transient. After deserialization the Python object is recreated from those values by the Python runtime the first time it is used, in the same way an object is rebuilt for a pooled context.
+
+The contract has the following limits:
+
+* Only introspected property values are serialized. Any other state of the Python object (attributes that are not declared properties, closures, open resources) is lost and `+__init__+` is not called again.
+* Every property value must itself be serializable; nested Python objects are, when their class is introspected.
+* A Python class with a custom property accessor (a `@property` with logic) or without `@Introspected` is not serializable, because its state cannot be rebuilt from its properties.
+* A deserialized object is a new Python instance: it does not share identity with the original.

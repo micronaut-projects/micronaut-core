@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
@@ -354,6 +355,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
                     if (isReconstructibleBean) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+                        if (isSerializableStub(superType, extendsPythonClass, extendsHostClass)) {
+                            // The Java fields carry the introspected properties; the Python object is
+                            // transient and rebuilt from them on the first use after deserialization.
+                            builder.addSuperinterface(ClassTypeDef.of(Serializable.class));
+                        }
                     } else if (!extendsPythonClass) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
                     }
@@ -452,6 +458,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PROTECTED, Modifier.TRANSIENT);
             if (!isIntrospectedBean && !isJunit5Test) {
                 pythonValueBuilder.addModifiers(Modifier.FINAL);
+            }
+            if (isIntrospectedBean) {
+                // not part of the serialized form: a serializable stub rebuilds it from the property fields
+                pythonValueBuilder.addModifiers(Modifier.TRANSIENT);
             }
             pythonValue = pythonValueBuilder.build();
             builder.addField(pythonValue);
@@ -3692,6 +3702,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
         return beanProperty.getReadMethod().filter(method -> !method.isSynthetic()).isPresent()
             || beanProperty.getWriteMethod().filter(method -> !method.isSynthetic()).isPresent();
+    }
+
+    /**
+     * Whether the stub of a reconstructible bean (an {@code @Introspected} class whose state is fully
+     * held by the generated property fields) can implement {@link Serializable}.
+     *
+     * <p>Java serialization writes the property fields only; the GraalPy value and the sync state are
+     * transient, and {@code asPolyglotValue()} recreates the Python object from the fields on the first
+     * use after deserialization. A Python superclass must be reconstructible as well, and a Java
+     * superclass must itself be serializable, otherwise its state could not be written.</p>
+     */
+    private static boolean isSerializableStub(@Nullable ClassElement superType, boolean extendsPythonClass, boolean extendsHostClass) {
+        if (superType == null || (!extendsPythonClass && !extendsHostClass)) {
+            return true;
+        }
+        if (extendsHostClass) {
+            return superType.isAssignable(Serializable.class);
+        }
+        return superType.hasStereotype(Introspected.class)
+            && superType.getBeanProperties().stream().noneMatch(PythonStubGenerator::isDynamicBeanProperty)
+            && isSerializableStub(
+                superType.getSuperType().orElse(null),
+                superType.getSuperType().map(AbstractPythonClassElement.class::isInstance).orElse(false),
+                superType.getSuperType().map(type -> !(type instanceof AbstractPythonClassElement) && !type.isInterface() && !Object.class.getName().equals(type.getName())).orElse(false)
+            );
     }
 
     private static boolean isConfigurationBuilderProperty(PropertyElement property) {
