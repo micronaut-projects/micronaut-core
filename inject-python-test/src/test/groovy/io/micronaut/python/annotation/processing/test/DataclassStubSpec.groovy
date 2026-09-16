@@ -19,7 +19,7 @@ import io.micronaut.python.annotation.processing.test.dataclass.VersionedObject
 
 /**
  * The stub of a dataclass takes the fields of its dataclass bases, in the order of the generated {@code __init__},
- * and its attributes can implement the accessors of a Java interface.
+ * its attributes can implement the accessors of a Java interface, and generic attributes keep their type variable.
  */
 class DataclassStubSpec extends AbstractPythonTypeElementSpec {
 
@@ -200,6 +200,39 @@ class CustomObject(VersionedObject):
         !object.enabled
         object.labels == ["a", "b"]
         object.describe() == "CustomObject/custom.test.io/v1"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a generic dataclass keeps the type variable of its attributes"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass, field
+from typing import Generic, TypeVar
+from micronaut.core.annotation import Introspected
+
+T = TypeVar("T")
+
+@Introspected
+@dataclass
+class Response(Generic[T]):
+    result: T
+    items: list[T] = field(default_factory=list)
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.Response")
+        def response = introspection.instantiate("ok", ["a", "b"])
+
+        then:
+        introspection.beanType.typeParameters*.name == ["T"]
+        introspection.beanType.getField("result").genericType.typeName == "T"
+        introspection.beanType.getField("items").genericType.typeName == "java.util.List<T>"
+        response.result == "ok"
+        response.items == ["a", "b"]
+        response.asPolyglotValue().getMember("result").asString() == "ok"
 
         cleanup:
         context?.close()

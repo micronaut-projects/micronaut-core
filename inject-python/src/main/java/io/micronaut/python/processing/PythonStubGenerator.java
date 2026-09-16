@@ -2368,6 +2368,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static TypeDef constructorParameterType(ParameterElement parameter) {
         ClassElement genericType = parameter.getGenericType();
+        if (genericType instanceof GenericPlaceholderElement) {
+            // the field of a generic dataclass attribute (result: T) has the type variable as its type
+            return sourceSignatureType(genericType);
+        }
         if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
             return parameterizedTypeDef(genericType);
         }
