@@ -96,7 +96,9 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * Create and initialize the GraalPy context.
-     * This bean loads on startup due to the @Context annotation.
+     * This bean loads on startup due to the @Context annotation; generated Python code that runs
+     * before the eager beans are initialized (type converters, beans of {@code processOnStartup}
+     * executable methods) creates it earlier through {@link PythonRuntimeBootstrapConfigurer}.
      *
      * @param engine The engine
      * @param hostAccess The host access

@@ -15,8 +15,11 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 
@@ -41,6 +44,14 @@ import java.util.function.Supplier;
  * <p>
  * Context reuse ({@link #setReuseContext(boolean)}) is a JVM-wide policy: the installed runtime then
  * outlives the application contexts that use it and a reset only reloads the Python modules.
+ * <p>
+ * The primary context is a {@code @Context} bean, but generated code can run before the eager beans
+ * are initialized: type converters are created first, and the beans of {@code processOnStartup}
+ * executable methods (message listeners, scheduled jobs) are instantiated by their processors before
+ * the eager beans. The application context that is starting is therefore recorded by
+ * {@link #bootstrapFrom(BeanContext)} (see {@link PythonRuntimeBootstrapConfigurer}), and
+ * {@link #require()} creates the GraalPy context bean of that application, which installs the
+ * runtime, the first time generated code needs it before the bean exists.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -49,6 +60,8 @@ import java.util.function.Supplier;
 final class PythonApplicationRuntime {
 
     private static final AtomicReference<@Nullable PythonApplicationRuntime> CURRENT = new AtomicReference<>();
+    private static final AtomicReference<@Nullable BeanContext> BOOTSTRAP_CONTEXT = new AtomicReference<>();
+    private static final ThreadLocal<Boolean> BOOTSTRAPPING = ThreadLocal.withInitial(() -> false);
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
 
     private final Context context;
@@ -76,17 +89,70 @@ final class PythonApplicationRuntime {
 
     /**
      * The runtime generated code resolves, which must be installed.
+     * <p>
+     * When no runtime is installed but an application context is starting, the GraalPy context bean
+     * of that application is created, which installs the runtime: generated code that runs before the
+     * {@code @Context} beans are initialized (type converters, beans of {@code processOnStartup}
+     * executable methods) then finds the same primary context the rest of the application uses.
      *
      * @return The installed runtime
-     * @throws IllegalStateException When no runtime is installed
+     * @throws IllegalStateException When no runtime is installed and no application context can provide one
      */
     static PythonApplicationRuntime require() {
         PythonApplicationRuntime runtime = CURRENT.get();
+        if (runtime == null) {
+            runtime = bootstrap();
+        }
         if (runtime == null) {
             throw new IllegalStateException("GraalPy context has not been initialized. " +
                 "Make sure micronaut-context-python is on the classpath.");
         }
         return runtime;
+    }
+
+    /**
+     * Record the application context that is starting, so the runtime can be installed on demand by
+     * creating its GraalPy context bean.
+     *
+     * @param beanContext The bean context
+     */
+    static void bootstrapFrom(BeanContext beanContext) {
+        BOOTSTRAP_CONTEXT.set(beanContext);
+    }
+
+    /**
+     * Stop installing the runtime from a bean context that is shutting down, when it is still the
+     * recorded one.
+     *
+     * @param beanContext The bean context
+     */
+    static void forgetBootstrap(BeanContext beanContext) {
+        BOOTSTRAP_CONTEXT.compareAndSet(beanContext, null);
+    }
+
+    /**
+     * Install the runtime by creating the GraalPy context bean of the recorded application context.
+     *
+     * @return The installed runtime, or {@code null} when no application context is recorded
+     */
+    private static @Nullable PythonApplicationRuntime bootstrap() {
+        BeanContext beanContext = BOOTSTRAP_CONTEXT.get();
+        // generated code reached while the context bean is being built (main.py) cannot build a second one
+        if (beanContext == null || BOOTSTRAPPING.get()) {
+            return null;
+        }
+        BOOTSTRAPPING.set(true);
+        try {
+            // creating the primary context bean installs the runtime (GraalPyContextFactory)
+            beanContext.getBean(Context.class, Qualifiers.byName(PythonContextRuntime.PYTHON));
+        } catch (NoSuchBeanException e) {
+            // a bean context without the GraalPy context bean, such as the bootstrap context
+            throw new IllegalStateException("GraalPy context has not been initialized: the bean context " +
+                "provides no GraalPy context bean. Make sure micronaut-context-python is on the classpath.", e);
+        } finally {
+            BOOTSTRAPPING.remove();
+        }
+        return CURRENT.get();
     }
 
     /**
