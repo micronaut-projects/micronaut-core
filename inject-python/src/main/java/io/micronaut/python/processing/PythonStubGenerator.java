@@ -129,6 +129,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_SHORT = "asShort";
     private static final String AS_DOUBLE = "asDouble";
     private static final String AS_FLOAT = "asFloat";
+    private static final String JAVA_LANG_STRING = "java.lang.String";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -4407,7 +4408,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Character" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String" ->
+                case JAVA_LANG_STRING ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
@@ -4650,7 +4651,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return true;
         }
         return switch (type.getName()) {
-            case "java.lang.String", "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer",
+            case JAVA_LANG_STRING, "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer",
                  "java.lang.Long", "java.lang.Float", "java.lang.Double", "java.lang.Character" -> true;
             default -> isSharedCollectionType(type);
         };
@@ -4844,7 +4845,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String":
+                case JAVA_LANG_STRING:
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
