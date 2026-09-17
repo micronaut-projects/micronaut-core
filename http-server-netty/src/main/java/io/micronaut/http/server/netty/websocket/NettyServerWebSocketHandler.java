@@ -75,7 +75,6 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -399,24 +398,20 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
-        try {
-            ctx.executor().execute(() -> {
-                try {
-                    nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
-                            .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
-                } catch (Exception e) {
-                    if (LOG.isErrorEnabled()) {
-                        LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
-                    }
-                } finally {
-                    // the listeners have seen the message, the frame content it may alias can go
-                    release.run();
+        // if the event loop is shutting down no listeners will run, but the content must not leak
+        executeOrElse(ctx.executor(), () -> {
+            try {
+                nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
+                        .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
+            } catch (Exception e) {
+                if (LOG.isErrorEnabled()) {
+                    LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
                 }
-            });
-        } catch (RejectedExecutionException e) {
-            // the event loop is shutting down: no listeners will run, but the content must not leak
-            release.run();
-        }
+            } finally {
+                // the listeners have seen the message, the frame content it may alias can go
+                release.run();
+            }
+        }, release);
     }
 
     @Override

@@ -7,6 +7,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
 import io.micronaut.http.body.MessageBodyReader
 import io.micronaut.http.codec.CodecException
+import io.micronaut.websocket.CloseReason
 import io.micronaut.websocket.WebSocketSession
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent
 import io.netty.buffer.Unpooled
@@ -237,6 +238,26 @@ class WebSocketFrameOwnershipSpec extends Specification {
         server.stop()
     }
 
+    void "a message nothing can decode closes the session with unsupported data"() {
+        given:
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer, ['spec.name': SPEC_NAME])
+        RawWebSocketClient client = RawWebSocketClient.connect(server, '/ws/frame-ownership/undecodable')
+        PollingConditions conditions = new PollingConditions(timeout: 10)
+
+        when: "no converter, codec or reader exists for the parameter type under its content type"
+        client.channel.writeAndFlush(new TextWebSocketFrame('anything')).sync()
+
+        then:
+        conditions.eventually {
+            client.closeFrames.size() == 1
+        }
+        client.closeFrames[0].code == CloseReason.UNSUPPORTED_DATA.code
+
+        cleanup:
+        client.shutdown()
+        server.stop()
+    }
+
     static class RawWebSocketClient {
         final NioEventLoopGroup group = new NioEventLoopGroup(1)
         final CompletableFuture<Void> handshake = new CompletableFuture<>()
@@ -437,6 +458,18 @@ class WebSocketFrameOwnershipSpec extends Specification {
                 throw new CodecException("rejected: " + text)
             }
             return new Custom(text.substring(3))
+        }
+    }
+
+    static class Undecodable {
+    }
+
+    @Requires(property = 'spec.name', value = 'WebSocketFrameOwnershipSpec')
+    @ServerWebSocket('/ws/frame-ownership/undecodable')
+    @Consumes('application/x-nothing-reads-this')
+    static class UndecodableSocket {
+        @OnMessage
+        void onMessage(Undecodable message) {
         }
     }
 }

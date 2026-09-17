@@ -59,6 +59,7 @@ import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
@@ -73,6 +74,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -513,6 +515,22 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             if (releaseContent) {
                 content.release();
             }
+        }
+    }
+
+    /**
+     * Run {@code task} on the executor, or {@code onRejected} in the calling thread if the executor
+     * refuses it because it is shutting down.
+     *
+     * @param executor   The executor
+     * @param task       The task
+     * @param onRejected What to run instead when the executor rejects the task
+     */
+    protected static void executeOrElse(EventExecutor executor, Runnable task, Runnable onRejected) {
+        try {
+            executor.execute(task);
+        } catch (RejectedExecutionException e) {
+            onRejected.run();
         }
     }
 
