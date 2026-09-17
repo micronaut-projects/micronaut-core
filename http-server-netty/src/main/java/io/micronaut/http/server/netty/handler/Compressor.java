@@ -44,8 +44,11 @@ import io.netty.handler.codec.http.HttpRequest;
 import io.netty.handler.codec.http.HttpResponse;
 import io.netty.handler.codec.http.HttpVersion;
 
+import java.util.Collections;
+import java.util.EnumSet;
 import java.util.Iterator;
 import java.util.Objects;
+import java.util.Set;
 
 final class Compressor {
     private final HttpCompressionStrategy strategy;
@@ -56,6 +59,10 @@ final class Compressor {
     @Nullable
     private final ZstdOptions zstdOptions;
     private final SnappyOptions snappyOptions;
+    /**
+     * The algorithms with options, i.e. those {@link #determineEncoding(Iterator)} may pick.
+     */
+    private final Set<Algorithm> available;
 
     Compressor(HttpCompressionStrategy strategy) {
         assert strategy.isEnabled();
@@ -73,6 +80,14 @@ final class Compressor {
             strategy.getMaxZstdEncodeSize())
             : null;
         this.snappyOptions = StandardCompressionOptions.snappy();
+        EnumSet<Algorithm> available = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
+        if (brotliOptions != null) {
+            available.add(Algorithm.BR);
+        }
+        if (zstdOptions != null) {
+            available.add(Algorithm.ZSTD);
+        }
+        this.available = Collections.unmodifiableSet(available);
     }
 
     @Nullable
@@ -111,16 +126,29 @@ final class Compressor {
     }
 
     /**
+     * Pick the response encoding from the {@code Accept-Encoding} header values among the
+     * algorithms this compressor has options for.
+     *
+     * @param acceptEncodingValues The raw header values
+     * @return The algorithm to use, or {@code null} for no compression
+     */
+    @Nullable
+    Algorithm determineEncoding(Iterator<String> acceptEncodingValues) {
+        return determineEncoding(acceptEncodingValues, available);
+    }
+
+    /**
      * Pick the response encoding from the {@code Accept-Encoding} header values. Each value is
      * a comma-separated list of {@code encoding[;q=weight]} entries; the entries are examined in
      * place, without splitting the header into strings.
      *
      * @param acceptEncodingValues The raw header values
+     * @param available            The algorithms that may be chosen
      * @return The algorithm to use, or {@code null} for no compression
      */
     @SuppressWarnings("FloatingPointEquality")
     @Nullable
-    Algorithm determineEncoding(Iterator<String> acceptEncodingValues) {
+    static Algorithm determineEncoding(Iterator<String> acceptEncodingValues, Set<Algorithm> available) {
         // from HttpContentCompressor, slightly modified
         float starQ = -1.0f;
         float brQ = -1.0f;
@@ -164,32 +192,32 @@ final class Compressor {
             }
         }
         if (brQ > 0.0f || zstdQ > 0.0f || snappyQ > 0.0f || gzipQ > 0.0f || deflateQ > 0.0f) {
-            if (brQ != -1.0f && brQ >= zstdQ && this.brotliOptions != null) {
+            if (brQ != -1.0f && brQ >= zstdQ && available.contains(Algorithm.BR)) {
                 return Algorithm.BR;
-            } else if (zstdQ != -1.0f && zstdQ >= snappyQ && this.zstdOptions != null) {
+            } else if (zstdQ != -1.0f && zstdQ >= snappyQ && available.contains(Algorithm.ZSTD)) {
                 return Algorithm.ZSTD;
-            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && this.snappyOptions != null) {
+            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && available.contains(Algorithm.SNAPPY)) {
                 return Algorithm.SNAPPY;
-            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && this.gzipOptions != null) {
+            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && available.contains(Algorithm.GZIP)) {
                 return Algorithm.GZIP;
-            } else if (deflateQ != -1.0f && this.deflateOptions != null) {
+            } else if (deflateQ != -1.0f && available.contains(Algorithm.DEFLATE)) {
                 return Algorithm.DEFLATE;
             }
         }
         if (starQ > 0.0f) {
-            if (brQ == -1.0f && this.brotliOptions != null) {
+            if (brQ == -1.0f && available.contains(Algorithm.BR)) {
                 return Algorithm.BR;
             }
-            if (zstdQ == -1.0f && this.zstdOptions != null) {
+            if (zstdQ == -1.0f && available.contains(Algorithm.ZSTD)) {
                 return Algorithm.ZSTD;
             }
-            if (snappyQ == -1.0f && this.snappyOptions != null) {
+            if (snappyQ == -1.0f && available.contains(Algorithm.SNAPPY)) {
                 return Algorithm.SNAPPY;
             }
-            if (gzipQ == -1.0f && this.gzipOptions != null) {
+            if (gzipQ == -1.0f && available.contains(Algorithm.GZIP)) {
                 return Algorithm.GZIP;
             }
-            if (deflateQ == -1.0f && this.deflateOptions != null) {
+            if (deflateQ == -1.0f && available.contains(Algorithm.DEFLATE)) {
                 return Algorithm.DEFLATE;
             }
         }

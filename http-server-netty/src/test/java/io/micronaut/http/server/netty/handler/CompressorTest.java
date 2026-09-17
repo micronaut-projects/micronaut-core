@@ -1,19 +1,20 @@
 package io.micronaut.http.server.netty.handler;
 
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
-import io.netty.handler.codec.compression.Brotli;
-import io.netty.handler.codec.compression.Zstd;
 import io.netty.handler.codec.http.HttpResponse;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
-import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressorTest {
@@ -39,7 +40,12 @@ class CompressorTest {
      * Reference implementation: the previous split-based tokenizer. The in-place version must
      * pick the same algorithm for every header.
      */
-    private static Compressor.Algorithm referenceDetermineEncoding(List<String> headerValues, boolean brotli, boolean zstd) {
+    private static Compressor.Algorithm referenceDetermineEncoding(List<String> headerValues, Set<Compressor.Algorithm> available) {
+        boolean brotli = available.contains(Compressor.Algorithm.BR);
+        boolean zstd = available.contains(Compressor.Algorithm.ZSTD);
+        boolean snappy = available.contains(Compressor.Algorithm.SNAPPY);
+        boolean gzip = available.contains(Compressor.Algorithm.GZIP);
+        boolean deflate = available.contains(Compressor.Algorithm.DEFLATE);
         float starQ = -1.0f;
         float brQ = -1.0f;
         float zstdQ = -1.0f;
@@ -47,7 +53,7 @@ class CompressorTest {
         float gzipQ = -1.0f;
         float deflateQ = -1.0f;
         for (String s : headerValues) {
-            for (String encoding : Arrays.asList(s.split(","))) {
+            for (String encoding : s.split(",")) {
                 float q = 1.0f;
                 int equalsPos = encoding.indexOf('=');
                 if (equalsPos != -1) {
@@ -77,11 +83,11 @@ class CompressorTest {
                 return Compressor.Algorithm.BR;
             } else if (zstdQ != -1.0f && zstdQ >= snappyQ && zstd) {
                 return Compressor.Algorithm.ZSTD;
-            } else if (snappyQ != -1.0f && snappyQ >= gzipQ) {
+            } else if (snappyQ != -1.0f && snappyQ >= gzipQ && snappy) {
                 return Compressor.Algorithm.SNAPPY;
-            } else if (gzipQ != -1.0f && gzipQ >= deflateQ) {
+            } else if (gzipQ != -1.0f && gzipQ >= deflateQ && gzip) {
                 return Compressor.Algorithm.GZIP;
-            } else if (deflateQ != -1.0f) {
+            } else if (deflateQ != -1.0f && deflate) {
                 return Compressor.Algorithm.DEFLATE;
             }
         }
@@ -92,25 +98,54 @@ class CompressorTest {
             if (zstdQ == -1.0f && zstd) {
                 return Compressor.Algorithm.ZSTD;
             }
-            if (snappyQ == -1.0f) {
+            if (snappyQ == -1.0f && snappy) {
                 return Compressor.Algorithm.SNAPPY;
             }
-            if (gzipQ == -1.0f) {
+            if (gzipQ == -1.0f && gzip) {
                 return Compressor.Algorithm.GZIP;
             }
-            if (deflateQ == -1.0f) {
+            if (deflateQ == -1.0f && deflate) {
                 return Compressor.Algorithm.DEFLATE;
             }
         }
         return null;
     }
 
+    /**
+     * Every header shape is checked against every subset of the five algorithms, so each of them
+     * is selected and skipped somewhere in the run whatever the test class path offers.
+     */
     @ParameterizedTest
     @MethodSource
     void determineEncodingMatchesTheSplitBasedTokenizer(List<String> headerValues) {
+        Compressor.Algorithm[] all = Compressor.Algorithm.values();
+        for (int mask = 0; mask < 1 << all.length; mask++) {
+            Set<Compressor.Algorithm> available = EnumSet.noneOf(Compressor.Algorithm.class);
+            for (int i = 0; i < all.length; i++) {
+                if ((mask & (1 << i)) != 0) {
+                    available.add(all[i]);
+                }
+            }
+            Compressor.Algorithm expected = referenceDetermineEncoding(headerValues, available);
+            assertEquals(expected, Compressor.determineEncoding(headerValues.iterator(), available), headerValues + " available=" + available);
+        }
+    }
+
+    @Test
+    void everyAlgorithmIsSelectedForItsOwnName() {
+        Set<Compressor.Algorithm> all = EnumSet.allOf(Compressor.Algorithm.class);
+        assertEquals(Compressor.Algorithm.BR, Compressor.determineEncoding(List.of("br").iterator(), all));
+        assertEquals(Compressor.Algorithm.ZSTD, Compressor.determineEncoding(List.of("zstd").iterator(), all));
+        assertEquals(Compressor.Algorithm.SNAPPY, Compressor.determineEncoding(List.of("snappy").iterator(), all));
+        assertEquals(Compressor.Algorithm.GZIP, Compressor.determineEncoding(List.of("gzip").iterator(), all));
+        assertEquals(Compressor.Algorithm.DEFLATE, Compressor.determineEncoding(List.of("deflate").iterator(), all));
+        assertNull(Compressor.determineEncoding(List.of("identity").iterator(), all));
+        // an unavailable algorithm is skipped in favour of the next one the client accepts
+        assertEquals(Compressor.Algorithm.GZIP, Compressor.determineEncoding(List.of("br, zstd, gzip").iterator(), EnumSet.of(Compressor.Algorithm.GZIP, Compressor.Algorithm.DEFLATE)));
+        // the instance method uses what the compressor has options for: gzip, deflate and snappy always, brotli and zstd when available
         Compressor compressor = new Compressor(STRATEGY);
-        Compressor.Algorithm expected = referenceDetermineEncoding(headerValues, Brotli.isAvailable(), Zstd.isAvailable());
-        assertEquals(expected, compressor.determineEncoding(headerValues.iterator()), headerValues.toString());
+        assertEquals(Compressor.Algorithm.GZIP, compressor.determineEncoding(List.of("gzip").iterator()));
+        assertEquals(Compressor.Algorithm.SNAPPY, compressor.determineEncoding(List.of("snappy").iterator()));
     }
 
     /**
@@ -122,7 +157,7 @@ class CompressorTest {
     @ParameterizedTest
     @ValueSource(strings = {",", "a,", "x;q,", "gzip;q=0.5,"})
     void longHeadersAreTokenizedInLinearTime(String entry) {
-        Compressor compressor = new Compressor(STRATEGY);
+        Set<Compressor.Algorithm> all = EnumSet.allOf(Compressor.Algorithm.class);
         int shortRepeats = 1000 / entry.length();
         // fits the default maxHeaderSize of 8192
         String shortHeader = entry.repeat(shortRepeats);
@@ -131,23 +166,23 @@ class CompressorTest {
         long shortBest = Long.MAX_VALUE;
         long longBest = Long.MAX_VALUE;
         for (int round = 0; round < 10; round++) {
-            shortBest = Math.min(shortBest, timePerCall(compressor, shortHeader));
-            longBest = Math.min(longBest, timePerCall(compressor, longHeader));
+            shortBest = Math.min(shortBest, timePerCall(shortHeader, all));
+            longBest = Math.min(longBest, timePerCall(longHeader, all));
         }
         double ratio = (double) longBest / Math.max(shortBest, 1);
         assertTrue(ratio < 24, "tokenizing " + longHeader.length() + " chars took " + ratio + " times as long as " + shortHeader.length() + " chars");
-        assertEquals(referenceDetermineEncoding(List.of(longHeader), Brotli.isAvailable(), Zstd.isAvailable()),
-            compressor.determineEncoding(List.of(longHeader).iterator()));
+        assertEquals(referenceDetermineEncoding(List.of(longHeader), all),
+            Compressor.determineEncoding(List.of(longHeader).iterator(), all));
     }
 
-    private static long timePerCall(Compressor compressor, String header) {
+    private static long timePerCall(String header, Set<Compressor.Algorithm> available) {
         List<String> values = List.of(header);
         for (int i = 0; i < 20; i++) {
-            compressor.determineEncoding(values.iterator());
+            Compressor.determineEncoding(values.iterator(), available);
         }
         long start = System.nanoTime();
         for (int i = 0; i < 50; i++) {
-            compressor.determineEncoding(values.iterator());
+            Compressor.determineEncoding(values.iterator(), available);
         }
         return (System.nanoTime() - start) / 50;
     }
