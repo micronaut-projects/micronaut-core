@@ -22,6 +22,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
+import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
@@ -453,6 +454,10 @@ public final class PythonAstParser {
                 return null;
             }
             var classElement = visitorContext.getClassElement(javaName);
+            if (classElement.isEmpty() && !javaName.equals(name)) {
+                // a class generated from a Python source of a package under micronaut.* carries no io. prefix
+                classElement = visitorContext.getClassElement(name).filter(PythonJavaTypes::isPythonClass);
+            }
             if (classElement.isPresent()) {
                 classElementCache.put(javaName, classElement.get());
                 return classElement.get();
