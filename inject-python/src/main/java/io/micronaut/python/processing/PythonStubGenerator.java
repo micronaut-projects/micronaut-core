@@ -20,6 +20,7 @@ import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -714,6 +715,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .onlyDeclared()
                 .filter(method -> !methodsToBridge.contains(method)
                     && shouldBridgeDeclaredPythonMethod(method, beanProperties)
+                    && isDeclarableJavaMethod(method)
                     && !inheritedSignatures.contains(bridgeMethodNameAndArity(bridgeMethodKey(method)))
                     && !overridesBridgedPythonMethodWithAnotherReturnType(method, superType))
         );
@@ -3871,6 +3873,61 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.getReadMethod().map(MethodElement::getName).filter(methodName::equals).isPresent()
                 || beanProperty.getWriteMethod().map(MethodElement::getName).filter(methodName::equals).isPresent()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether a Python method bridged on its own account can be declared as a Java method of the generated class
+     * under its own name and signature. Python allows names Java does not: a Java keyword ({@code default},
+     * {@code new}) is not a valid method name, and a signature {@link Object} declares can only be overridden when
+     * the method is not final ({@code notify}, {@code wait}, {@code getClass}) and the return hint is compatible
+     * ({@code hashCode} returning a string is not). Such a method is left out of the generated class, as it was
+     * before every public method was bridged, rather than failing the compilation.
+     *
+     * @param methodElement The declared method
+     * @return Whether the method can be declared in Java
+     */
+    private static boolean isDeclarableJavaMethod(MethodElement methodElement) {
+        String methodName = methodElement.getName();
+        if (!javax.lang.model.SourceVersion.isName(methodName)) {
+            return false;
+        }
+        ParameterElement[] parameters = methodElement.getParameters();
+        for (Method objectMethod : Object.class.getDeclaredMethods()) {
+            if (!objectMethod.getName().equals(methodName)
+                || java.lang.reflect.Modifier.isPrivate(objectMethod.getModifiers())
+                || !sameErasedParameterTypes(objectMethod, parameters)) {
+                continue;
+            }
+            if (java.lang.reflect.Modifier.isFinal(objectMethod.getModifiers()) || methodElement.isStatic()) {
+                return false;
+            }
+            Class<?> objectReturnType = objectMethod.getReturnType();
+            TypeDef bridgeReturnType = methodReturnType(methodElement, false);
+            boolean compatibleReturnType = objectReturnType.isPrimitive()
+                ? TypeDef.primitive(objectReturnType).equals(bridgeReturnType)
+                : !bridgeReturnType.isPrimitive();
+            if (!compatibleReturnType) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameErasedParameterTypes(Method method, ParameterElement[] parameters) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        if (parameterTypes.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameterTypes.length; i++) {
+            TypeDef erased = erasedType(parameters[i].getType());
+            boolean same = erased instanceof TypeDef.Primitive primitive
+                ? primitive.clazz() == parameterTypes[i]
+                : erased instanceof ClassTypeDef classTypeDef && classTypeDef.getName().equals(parameterTypes[i].getName());
+            if (!same) {
                 return false;
             }
         }

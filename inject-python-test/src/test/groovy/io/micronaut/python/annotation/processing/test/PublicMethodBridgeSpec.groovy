@@ -20,6 +20,7 @@ import java.lang.reflect.Modifier
 import io.micronaut.python.annotation.processing.test.bridge.ExtensionTest
 import io.micronaut.python.annotation.processing.test.bridge.HttpFunctionLike
 import io.micronaut.test.extensions.junit5.MicronautJunit5Extension
+import jakarta.validation.constraints.Size
 import org.junit.jupiter.api.extension.ExtendWith
 import org.junit.platform.commons.support.AnnotationSupport
 
@@ -214,6 +215,87 @@ class ExtensionTestSpec:
         type.getAnnotation(ExtensionTest).environments() == ["lambda"] as String[]
         AnnotationSupport.findAnnotation(type, ExtendWith).map { it.value() as List }.orElse([]) == [MicronautJunit5Extension]
         type.getMethod("test_context").getAnnotation(org.junit.jupiter.api.Test) != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a public method whose name or signature Java cannot declare is left out instead of failing the compilation"() {
+        given: "legal Python method names that are Java keywords or clash with the final or incompatible methods of Object"
+        def context = buildContext('''
+class Helper:
+    def notify(self) -> str:
+        return "notified"
+
+    def wait(self) -> None:
+        pass
+
+    def getClass(self) -> str:
+        return "helper"
+
+    def hashCode(self) -> str:
+        return "hash"
+
+    def toString(self, prefix: str) -> str:
+        return prefix + "helper"
+
+    def equals(self, other) -> bool:
+        return other is self
+
+    def default(self) -> str:
+        return "default"
+
+    def new(self) -> str:
+        return "new"
+
+    def describe(self) -> str:
+        return "described"
+
+    def clone(self) -> str:
+        return "cloned"
+
+    @staticmethod
+    def wait_for(name: str) -> str:
+        return "waited for " + name
+''')
+        def type = context.classLoader.loadClass("python.Helper")
+        def instance = type.getConstructor().newInstance()
+
+        expect: "the names Java cannot declare are not bridged"
+        type.declaredMethods*.name.intersect(["notify", "wait", "getClass", "hashCode", "default", "new"]).isEmpty()
+
+        and: "the Python object still has them"
+        instance.asPolyglotValue().invokeMember("notify").asString() == "notified"
+        instance.asPolyglotValue().invokeMember("default").asString() == "default"
+
+        and: "overrides and overloads of Object methods that Java accepts are bridged"
+        type.getMethod("describe").invoke(instance) == "described"
+        type.getMethod("clone").invoke(instance) == "cloned"
+        type.getMethod("toString", String).invoke(instance, "a ") == "a helper"
+        type.getMethod("equals", Object).invoke(instance, instance)
+        type.getMethod("wait_for", String).invoke(null, "it") == "waited for it"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a repeatable type annotation of a bridged method is emitted as the repeated annotation"() {
+        given:
+        def context = buildContext('''
+from typing import Annotated
+from jakarta.validation.constraints import Size
+
+class Tagger:
+    def tag(self, names: list[str]) -> Annotated[list[str], Size(min=1, max=3)]:
+        return names
+''')
+        def type = context.classLoader.loadClass("python.Tagger")
+        def method = type.getMethod("tag", List)
+
+        expect: "the repeatable annotation is written on the return type, not its Size.List container"
+        method.annotatedReturnType.getAnnotation(Size).min() == 1
+        method.annotatedReturnType.getAnnotation(Size).max() == 3
+        method.invoke(type.getConstructor().newInstance(), ["ab"]) == ["ab"]
 
         cleanup:
         context?.close()
