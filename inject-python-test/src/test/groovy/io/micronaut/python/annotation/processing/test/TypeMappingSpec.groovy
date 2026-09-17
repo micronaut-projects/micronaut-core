@@ -267,6 +267,12 @@ class Shelter:
     @Executable
     def adopt_all(self) -> list[Animal]:
         return [Cat("Tom", 9), Snake("Kaa", 3)]
+
+    @Executable
+    def adopt_stray(self) -> Animal:
+        # a subclass defined at run time in another module, named like the compiled Cat
+        stray = type("Cat", (Animal,), {"__module__": "zoo.cats", "__init__": lambda self, name: setattr(self, "name", name)})
+        return stray("Stray")
 '''
 
         when:
@@ -302,6 +308,13 @@ class Shelter:
         adopted.class.name == "python.Cat"
         adopted.lives == 9
         all*.class*.name == ["python.Cat", "python.Snake"]
+
+        when: 'a same-named subclass of another module has no generated wrapper'
+        def stray = shelter.adopt_stray()
+
+        then: 'it is wrapped as the declared type, not as the compiled Cat'
+        stray.class.name == "python.Animal"
+        stray.asPolyglotValue().getMember("name").asString() == "Stray"
 
         cleanup:
         context?.close()
@@ -343,6 +356,22 @@ class Absent:
         def e = thrown(RuntimeException)
         e.message.contains("UserAgentProvider")
         e.message.contains("io.micronaut.absent.ua")
+
+        when: 'the missing class is imported from a JDK package, which GraalPy imports as a module'
+        buildBeanDefinition("python", "AbsentJdk", '''
+from jakarta.inject import Singleton
+from java.util import NoSuchThing
+
+
+@Singleton
+class AbsentJdk:
+    def __init__(self, thing: NoSuchThing | None):
+        self.thing = thing
+''')
+
+        then:
+        e = thrown(RuntimeException)
+        e.message.contains("java.util.NoSuchThing")
     }
 
     void "imports of standard library and project Python modules are not Java imports"() {

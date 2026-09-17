@@ -962,7 +962,11 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def _is_python_module(self, module_name: str) -> bool:
         """
         Whether the module is importable in the compiler's Python environment, as the standard library is.
+        The ``java`` namespace is never a Python module: GraalPy's ``java`` import hook finds a spec for any
+        ``java.*`` name, whether or not such a package exists.
         """
+        if module_name.split('.')[0] == 'java':
+            return False
         try:
             return importlib.util.find_spec(module_name) is not None
         except Exception:
@@ -1109,8 +1113,10 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if class_elements:
             transformed_any = False
             for class_element in class_elements:
-                if self._is_nested_type(class_element):
-                    # A package scan also lists nested types; a star import binds top-level names only
+                if self._is_nested_type(class_element) or _JavaTypes.isPythonClass(class_element):
+                    # A package scan also lists nested types; a star import binds top-level names only.
+                    # The bridge of a Python class compiled by another source root or into a library
+                    # stays a Python import, as it does for an explicit import of the class.
                     continue
                 import_name = str(class_element.getSimpleName())
                 # Check if it's an annotation
@@ -1139,7 +1145,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return [
             str(class_element.getSimpleName())
             for class_element in class_elements
-            if not self._is_nested_type(class_element) and not self._is_annotation_class(class_element)
+            if not self._is_nested_type(class_element)
+            and not self._is_annotation_class(class_element)
+            and not _JavaTypes.isPythonClass(class_element)
         ]
 
     def _is_annotation_class(self, class_element) -> bool:
