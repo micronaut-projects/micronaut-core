@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty.converters;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.convert.CharSequenceToEnumConverter;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.TypeConverterRegistrar;
@@ -74,8 +75,18 @@ public final class NettyConvertersSpi implements TypeConverterRegistrar {
                 }
         );
 
-        // the server itself no longer produces netty HttpData instances, but these two conversions are
-        // reachable from application code through the public ConversionService API, so they stay registered
+        registerHttpDataConverters(conversionService);
+    }
+
+    /**
+     * The server itself no longer produces netty {@link HttpData} instances, but these two
+     * conversions are reachable from application code through the public
+     * {@link ConversionService} API, so they stay registered until the next major.
+     *
+     * @param conversionService The conversion service
+     */
+    @NextMajorVersion("Remove the HttpData converters, the server no longer produces HttpData")
+    private static void registerHttpDataConverters(MutableConversionService conversionService) {
         conversionService.addConverter(
                 HttpData.class,
                 byte[].class,
