@@ -18,7 +18,6 @@ package io.micronaut.python.processing;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.annotation.processing.AbstractInjectAnnotationProcessor;
-import io.micronaut.annotation.processing.visitor.JavaNativeElement;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
@@ -81,6 +80,38 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     public static final String APPLICATION_LAUNCHER_PATH = APPLICATION_SRC_PATH + "__main__.py";
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     private static final String PYTHON_LANGUAGE = "python";
+    /**
+     * The Python facade of a Java type, defined in the package initializers that need it: it maps
+     * keyword-safe member names ({@code with_}) to the Java member and lets a Python class list a
+     * Java interface among its bases without GraalPy creating a host adapter.
+     */
+    private static final String JAVA_TYPE_FACADE = """
+        import keyword
+
+        class _MicronautJavaType:
+            def __init__(self, target, interface=False):
+                self._target = target
+                self._interface = interface
+
+            def __getattr__(self, name):
+                if name.endswith('_') and keyword.iskeyword(name[:-1]):
+                    name = name[:-1]
+                return getattr(self._target, name)
+
+            def __call__(self, *args, **kwargs):
+                return self._target(*args, **kwargs)
+
+            def __getitem__(self, item):
+                if self._interface:
+                    return self
+                return self._target[item]
+
+            def __mro_entries__(self, bases):
+                if self._interface:
+                    return ()
+                return (self._target,)
+
+        """;
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
@@ -843,47 +874,40 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return parent + "__pycache__/" + cacheFile;
     }
 
+    /**
+     * Writes the Python modules standing for the imported Java types.
+     *
+     * <p>A Java package is a Python package whose {@code __init__.py} exports every annotation
+     * (each generated as its own module, {@code jakarta/inject/Singleton.py}) and every Java class
+     * ({@code Thread = java.type('java.lang.Thread')}) imported from it. A Java type whose nested types
+     * are imported through it ({@code from a.b.Outer import Inner}) is a package as well: its
+     * {@code __init__.py} binds the type itself under its own simple name, next to the nested types,
+     * and the enclosing package imports the type from it ({@code from .Outer import Outer}), so
+     * {@code from a.b import Outer}, {@code Outer.Inner} and {@code from a.b.Outer import Inner}
+     * all resolve to the same objects.</p>
+     */
     private void writeAllToVFS(
         StringBuilder filesList,
         Map<String, String> decorators,
         Map<String, List<Map<String, String>>> javaClassImports,
         Map<String, SourcePackage> sourcePackages,
         ClassElement originatingElement) {
-        // Collect all packages that need __init__.py files
-        Map<String, List<String>> decoratorsByPackage = new LinkedHashMap<>();
+        // Python package -> decorator simple name -> decorator source
+        Map<String, Map<String, String>> decoratorsByPackage = new LinkedHashMap<>();
         Map<String, Map<String, JavaClassImport>> javaClassesByPackage = new LinkedHashMap<>();
-
+        // Python packages that are the modules of Java types, mapped to the type's binary name
+        Map<String, String> typeModules = new LinkedHashMap<>();
 
         // Process decorators
         if (decorators != null && !decorators.isEmpty()) {
-            for (java.util.Map.Entry<String, String> entry : decorators.entrySet()) {
-                String decoratorName = entry.getKey();
-                String decoratorCode = entry.getValue();
-
-                // Transform io. prefixed package names to avoid conflict with Python's builtin io module
-                String transformedDecoratorName = toPythonImportName(decoratorName);
-
-                // Split into package and simple name
-                int lastDotIndex = transformedDecoratorName.lastIndexOf('.');
-                String packageName;
-
-                ClassElement classElement = javaVisitorContext.getClassElement(decoratorName).orElse(null);
-                if (classElement != null && isNestedClass(classElement) && classElement.getEnclosingType().isPresent()) {
-                    packageName = classElement.getEnclosingType().get().getPackageName();
-                } else {
-                    packageName = lastDotIndex > 0 ? transformedDecoratorName.substring(0, lastDotIndex) : "";
-                }
-
-                String simpleName = simpleTypeName(transformedDecoratorName);
-
-                // Add to package map
-                decoratorsByPackage.computeIfAbsent(packageName, k -> new java.util.ArrayList<>()).add(simpleName);
-
-                // Determine file path
-                String packagePath = packageName.isEmpty() ? simpleName : packageName.replace('.', '/') + "/" + simpleName;
-                String filePath = APPLICATION_SRC_PATH + packagePath + ".py";
-
-                writePythonToVfs(filesList, filePath, decoratorCode, originatingElement);
+            for (Map.Entry<String, String> entry : decorators.entrySet()) {
+                String annotationName = entry.getKey();
+                registerEnclosingTypeModules(annotationName, typeModules);
+                String moduleName = toPythonModuleName(annotationName);
+                int lastDotIndex = moduleName.lastIndexOf('.');
+                String packageName = lastDotIndex > 0 ? moduleName.substring(0, lastDotIndex) : "";
+                String simpleName = moduleName.substring(lastDotIndex + 1);
+                decoratorsByPackage.computeIfAbsent(packageName, k -> new LinkedHashMap<>()).put(simpleName, entry.getValue());
             }
         }
 
@@ -897,6 +921,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 for (Map<String, String> importInfo : imports) {
                     String variable = importInfo.get("variable");
                     String className = importInfo.get("class_name");
+                    registerEnclosingTypeModules(className, typeModules);
+                    if (toPythonModuleName(className).equals(pythonPackageName)) {
+                        // from a.b.Outer import Outer: the module of the type exports the type itself
+                        typeModules.putIfAbsent(pythonPackageName, className);
+                    }
                     JavaClassImport javaClassImport = new JavaClassImport(
                         className,
                         Boolean.parseBoolean(importInfo.get("interface")),
@@ -908,13 +937,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
 
         // Collect all packages that need __init__.py files
-        java.util.Set<String> allPackages = new LinkedHashSet<>();
-
-        // Add packages from decorators
+        Set<String> allPackages = new LinkedHashSet<>();
         collectPackageNames(decoratorsByPackage.keySet(), allPackages);
-
-        // Add packages from Java classes
         collectPackageNames(javaClassesByPackage.keySet(), allPackages);
+        collectPackageNames(typeModules.keySet(), allPackages);
 
         // Add the application source packages. A source package that coincides with an imported Java
         // package (or a parent of one) shares the __init__.py with the generated Java package shim.
@@ -922,89 +948,92 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         Set<String> generatedPackages = new LinkedHashSet<>(allPackages);
         allPackages.addAll(sourcePackages.keySet());
 
-        // Write __init__.py files for all packages
+        // The bindings of a type module that its enclosing package hands down to it
+        Map<String, String> typeModuleDecorators = new LinkedHashMap<>();
+        Map<String, JavaClassImport> typeModuleClasses = new LinkedHashMap<>();
+
+        // Annotations of the default package have no package initializer
+        Map<String, String> rootDecorators = decoratorsByPackage.getOrDefault("", Map.of());
+        for (Map.Entry<String, String> entry : rootDecorators.entrySet()) {
+            if (typeModules.containsKey(entry.getKey())) {
+                typeModuleDecorators.put(entry.getKey(), entry.getValue());
+            } else {
+                writePythonToVfs(filesList, APPLICATION_SRC_PATH + entry.getKey() + ".py", entry.getValue(), originatingElement);
+            }
+        }
+
+        // Write __init__.py files for all packages, enclosing packages first
         for (String packageName : allPackages) {
-            List<String> decoratorsInPackage = decoratorsByPackage.get(packageName);
-            Map<String, JavaClassImport> javaClassesInPackage = javaClassesByPackage.get(packageName);
+            Map<String, String> decoratorsInPackage = decoratorsByPackage.getOrDefault(packageName, Map.of());
+            Map<String, JavaClassImport> javaClassesInPackage = javaClassesByPackage.getOrDefault(packageName, Map.of());
             SourcePackage sourcePackage = sourcePackages.get(packageName);
-
             String packagePath = packageName.replace('.', '/');
-            String initFilePath = APPLICATION_SRC_PATH + packagePath + "/__init__.py";
+            String ownTypeName = typeModules.get(packageName);
+            String ownSimpleName = ownTypeName == null ? null : packageName.substring(packageName.lastIndexOf('.') + 1);
+            String ownDecoratorCode = ownTypeName == null ? null : typeModuleDecorators.get(packageName);
+            JavaClassImport ownClassImport = ownTypeName == null || ownDecoratorCode != null ? null
+                : typeModuleClasses.getOrDefault(packageName, classBinding(javaClassesInPackage, ownSimpleName, ownTypeName));
 
+            List<JavaClassImport> classBindings = new ArrayList<>(javaClassesInPackage.values());
+            if (ownClassImport != null) {
+                classBindings.add(ownClassImport);
+            }
             StringBuilder initContent = new StringBuilder();
-
-            // Add Java import if we have Java classes
-            if (javaClassesInPackage != null && !javaClassesInPackage.isEmpty()) {
+            if (!classBindings.isEmpty()) {
                 initContent.append("import java\n\n");
-                if (javaClassesInPackage.values().stream().anyMatch(JavaClassImport::requiresFacade)) {
-                    initContent.append("""
-                        import keyword
-
-                        class _MicronautJavaType:
-                            def __init__(self, target, interface=False):
-                                self._target = target
-                                self._interface = interface
-
-                            def __getattr__(self, name):
-                                if name.endswith('_') and keyword.iskeyword(name[:-1]):
-                                    name = name[:-1]
-                                return getattr(self._target, name)
-
-                            def __call__(self, *args, **kwargs):
-                                return self._target(*args, **kwargs)
-
-                            def __getitem__(self, item):
-                                if self._interface:
-                                    return self
-                                return self._target[item]
-
-                            def __mro_entries__(self, bases):
-                                if self._interface:
-                                    return ()
-                                return (self._target,)
-
-                        """);
+                if (classBindings.stream().anyMatch(JavaClassImport::requiresFacade)) {
+                    initContent.append(JAVA_TYPE_FACADE);
                 }
             }
 
-            List<String> allNames = new java.util.ArrayList<>();
+            List<String> allNames = new ArrayList<>();
+
+            // The type this module stands for
+            if (ownDecoratorCode != null) {
+                initContent.append(ownDecoratorCode).append('\n');
+                allNames.add(ownSimpleName);
+            } else if (ownClassImport != null && !javaClassesInPackage.containsKey(ownSimpleName)) {
+                appendClassBinding(initContent, ownSimpleName, ownClassImport);
+                allNames.add(ownSimpleName);
+            }
 
             // Add decorator imports
-            if (decoratorsInPackage != null) {
-                for (String decoratorName : decoratorsInPackage) {
-                    initContent.append("from .").append(decoratorName).append(" import ").append(decoratorName).append("\n");
-                    allNames.add(decoratorName);
+            for (Map.Entry<String, String> decorator : decoratorsInPackage.entrySet()) {
+                String decoratorName = decorator.getKey();
+                String decoratorModule = childModule(packageName, decoratorName);
+                if (typeModules.containsKey(decoratorModule)) {
+                    typeModuleDecorators.put(decoratorModule, decorator.getValue());
+                } else {
+                    writePythonToVfs(filesList, APPLICATION_SRC_PATH + packagePath + "/" + decoratorName + ".py", decorator.getValue(), originatingElement);
                 }
+                initContent.append("from .").append(decoratorName).append(" import ").append(decoratorName).append("\n");
+                allNames.add(decoratorName);
             }
 
             // Add Java class assignments
-            if (javaClassesInPackage != null) {
-                for (java.util.Map.Entry<String, JavaClassImport> mapping : javaClassesInPackage.entrySet()) {
-                    String typeName = mapping.getKey();
-                    JavaClassImport javaClassImport = mapping.getValue();
-                    if (javaClassImport.requiresFacade()) {
-                        initContent.append(typeName)
-                            .append(" = _MicronautJavaType(java.type('")
-                            .append(javaClassImport.className())
-                            .append("'), ")
-                            .append(javaClassImport.interfaceType() ? "True" : "False")
-                            .append(")\n");
-                    } else {
-                        initContent.append(typeName)
-                            .append(" = java.type('")
-                            .append(javaClassImport.className())
-                            .append("')\n");
-                    }
-                    allNames.add(typeName);
+            for (Map.Entry<String, JavaClassImport> mapping : javaClassesInPackage.entrySet()) {
+                String typeName = mapping.getKey();
+                JavaClassImport javaClassImport = mapping.getValue();
+                String typeModule = childModule(packageName, typeName);
+                if (typeModules.containsKey(typeModule) && toPythonModuleName(javaClassImport.className()).equals(typeModule)) {
+                    typeModuleClasses.put(typeModule, javaClassImport);
+                    initContent.append("from .").append(typeName).append(" import ").append(typeName).append("\n");
+                } else {
+                    appendClassBinding(initContent, typeName, javaClassImport);
                 }
+                allNames.add(typeName);
             }
 
             // Add imports for generated subpackages
             for (String subPackage : generatedPackages) {
                 if (subPackage.startsWith(packageName + ".") && !subPackage.equals(packageName)) {
                     String relativeSubPackage = subPackage.substring(packageName.length() + 1);
-                    if (!relativeSubPackage.contains(".")) { // Direct child package
-                        initContent.append("from . import ").append(relativeSubPackage).append("\n");
+                    if (!relativeSubPackage.contains(".") && !allNames.contains(relativeSubPackage)) { // Direct child package
+                        if (typeModules.containsKey(subPackage)) {
+                            initContent.append("from .").append(relativeSubPackage).append(" import ").append(relativeSubPackage).append("\n");
+                        } else {
+                            initContent.append("from . import ").append(relativeSubPackage).append("\n");
+                        }
                         allNames.add(relativeSubPackage);
                     }
                 }
@@ -1028,7 +1057,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 initContent.append("\n__all__ = ").append(toListOfString(allNames)).append("\n");
             }
 
-            writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
+            writePythonToVfs(filesList, APPLICATION_SRC_PATH + packagePath + "/__init__.py", initContent.toString(), originatingElement);
         }
 
         // Write fileslist.txt
@@ -1060,15 +1089,67 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return classNames.stream().filter(name -> !shadowed.contains(name)).toList();
     }
 
-    private static @NotNull String toListOfString(List<String> allNames) {
-        return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
+    /**
+     * The binding of a type module for its own type when the enclosing package does not hand one
+     * down: the binding the type module itself imports ({@code from a.b.Outer import Outer}), or one
+     * synthesized from the type.
+     */
+    private @Nullable JavaClassImport classBinding(Map<String, JavaClassImport> javaClassesInPackage, String simpleName, String className) {
+        JavaClassImport imported = javaClassesInPackage.get(simpleName);
+        if (imported != null && imported.className().equals(className)) {
+            return imported;
+        }
+        boolean interfaceType = javaVisitorContext.getClassElement(className)
+            .map(ClassElement::isInterface)
+            .orElse(false);
+        return new JavaClassImport(className, interfaceType, false);
     }
 
-    private static String simpleTypeName(String typeName) {
-        int lastDotIndex = typeName.lastIndexOf('.');
-        int lastDollarIndex = typeName.lastIndexOf('$');
-        int lastSeparator = Math.max(lastDotIndex, lastDollarIndex);
-        return lastSeparator > -1 ? typeName.substring(lastSeparator + 1) : typeName;
+    private static void appendClassBinding(StringBuilder initContent, String typeName, JavaClassImport javaClassImport) {
+        if (javaClassImport.requiresFacade()) {
+            initContent.append(typeName)
+                .append(" = _MicronautJavaType(java.type('")
+                .append(javaClassImport.className())
+                .append("'), ")
+                .append(javaClassImport.interfaceType() ? "True" : "False")
+                .append(")\n");
+        } else {
+            initContent.append(typeName)
+                .append(" = java.type('")
+                .append(javaClassImport.className())
+                .append("')\n");
+        }
+    }
+
+    private static String childModule(String packageName, String simpleName) {
+        return packageName.isEmpty() ? simpleName : packageName + "." + simpleName;
+    }
+
+    /**
+     * Records the modules of the types enclosing a nested type: every type on the way to
+     * {@code a.b.Outer$Mid$Inner} ({@code a.b.Outer} and {@code a.b.Outer$Mid}) is a package
+     * so the nested type can be imported from it.
+     */
+    private static void registerEnclosingTypeModules(String binaryName, Map<String, String> typeModules) {
+        int separator = binaryName.indexOf('$');
+        while (separator > 0) {
+            String enclosingName = binaryName.substring(0, separator);
+            typeModules.putIfAbsent(toPythonModuleName(enclosingName), enclosingName);
+            separator = binaryName.indexOf('$', separator + 1);
+        }
+    }
+
+    /**
+     * The Python module of a Java type: its binary name with nested types as sub-modules
+     * ({@code a.b.Outer$Inner} is {@code a.b.Outer.Inner}), keyword-safe and without the
+     * {@code io.} prefix.
+     */
+    private static String toPythonModuleName(String binaryName) {
+        return toPythonImportName(binaryName.replace('$', '.'));
+    }
+
+    private static @NotNull String toListOfString(List<String> allNames) {
+        return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
     }
 
     private static String toPythonImportName(String qualifiedName) {
@@ -1092,20 +1173,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             }
         }
-    }
-
-    private static boolean isNestedClass(ClassElement classElement) {
-        try {
-            if (classElement.getNativeType() instanceof JavaNativeElement jne &&
-                jne.element() instanceof TypeElement typeElement) {
-
-                javax.lang.model.element.NestingKind nestingKind = typeElement.getNestingKind();
-                return nestingKind == javax.lang.model.element.NestingKind.MEMBER;
-            }
-        } catch (Exception e) {
-            // Ignore and return false
-        }
-        return false;
     }
 
     /**
