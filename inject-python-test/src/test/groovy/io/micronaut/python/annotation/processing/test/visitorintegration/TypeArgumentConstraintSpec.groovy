@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.annotation.processing.test.visitorintegration
 
+import io.micronaut.core.annotation.AnnotationUtil
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import jakarta.validation.ConstraintViolationException
 
@@ -92,6 +93,61 @@ class BookInfoService:
 
         then:
         count == 2
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a constraint on a nullable type argument is kept next to the nullability"() {
+        given: "the constraint of Annotated[str | None, NotBlank] sits on the union node"
+        def context = buildContext('''
+from typing import Annotated
+
+from jakarta.inject import Singleton
+from jakarta.validation.constraints import NotBlank
+from micronaut.validation import Validated
+
+
+@Validated
+@Singleton
+class EditorService:
+    def set_editors(self, editors: list[Annotated[str | None, NotBlank]]) -> int:
+        return len(editors)
+
+    def set_reviewers(self, reviewers: list[str | None]) -> int:
+        return len([reviewer for reviewer in reviewers if reviewer is not None])
+''', true)
+        def definition = getBeanDefinition(context, "python.EditorService")
+        def service = getBean(context, "python.EditorService")
+
+        when:
+        def editorsElement = definition.getRequiredMethod("set_editors", List).arguments[0].typeParameters[0].annotationMetadata
+        def reviewersElement = definition.getRequiredMethod("set_reviewers", List).arguments[0].typeParameters[0].annotationMetadata
+
+        then: "the type argument is nullable and constrained"
+        editorsElement.hasAnnotation(AnnotationUtil.NULLABLE)
+        editorsElement.hasStereotype("jakarta.validation.Constraint")
+        editorsElement.hasAnnotation(ANN_VALIDATED_ELEMENT)
+
+        and: "a nullable type argument without a constraint is only nullable"
+        reviewersElement.hasAnnotation(AnnotationUtil.NULLABLE)
+        !reviewersElement.hasStereotype("jakarta.validation.Constraint")
+        !reviewersElement.hasAnnotation(ANN_VALIDATED_ELEMENT)
+
+        when:
+        service.set_editors(["Me", ""])
+
+        then:
+        def e = thrown(ConstraintViolationException)
+        e.message == "set_editors.editors[1]<list element>: must not be blank"
+
+        when:
+        int count = service.set_editors(["Me", "You"])
+        int reviewers = service.set_reviewers(["Me", null])
+
+        then:
+        count == 2
+        reviewers == 1
 
         cleanup:
         context?.close()

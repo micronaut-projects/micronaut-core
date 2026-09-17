@@ -3795,7 +3795,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 StubEntry stubEntry = this.classBuilders.get(genericReturnType.getName());
                 if (stubEntry == null) {
                     // The produced type is visited in registry order and may follow the factory: generate its stub
-                    // now so the callback bridge lands on it (a visited class is not visited twice)
+                    // now so the callback bridge lands on it (a visited class is not visited twice). The lookup is
+                    // deliberately not filtered by the affected sources of an incremental build: the stub of the
+                    // produced type carries the bridge the factory refers to, so it is regenerated whenever the
+                    // factory is, even when only the factory's source changed
                     visitClass(allClasses.getOrDefault(genericReturnType.getName(), genericReturnType), visitorContext);
                     stubEntry = this.classBuilders.get(genericReturnType.getName());
                 }

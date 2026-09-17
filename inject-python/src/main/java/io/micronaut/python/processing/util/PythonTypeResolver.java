@@ -102,7 +102,7 @@ public final class PythonTypeResolver {
         List<TypeRef> typeArguments = typeRef.typeArguments();
         List<DecoratorDef> typeUseDecorators = typeRef.typeUseDecorators();
         if (typeRef.isUnion()) {
-            return withTypeUseDecorators(resolveUnionType(typeRef, visitorContext, boundGenerics), typeRef, typeUseDecorators, visitorContext);
+            return resolveUnionType(typeRef, visitorContext, boundGenerics);
         }
         if (isAnnotatedType(name) && !typeArguments.isEmpty()) {
             ClassElement baseType = resolvePythonTypeToJava(typeArguments.getFirst(), visitorContext, boundGenerics);
@@ -333,18 +333,22 @@ public final class PythonTypeResolver {
 
     /**
      * A union with exactly one member besides {@code None} is that member, boxed and marked nullable;
-     * any other union has no Java counterpart and resolves to {@code Object}.
+     * any other union has no Java counterpart and resolves to {@code Object}. The metadata cached for the
+     * union node carries the nullability and the type-use decorators of the node together
+     * ({@code Annotated[str | None, NotBlank]} places the constraint on the union): a node has one cached
+     * metadata, so building it from the nullability alone would drop the decorators.
      */
     private static ClassElement resolveUnionType(TypeRef union, PythonVisitorContext visitorContext, Map<String, ClassElement> boundGenerics) {
         List<TypeRef> members = union.nonNoneMembers();
         if (members.size() != 1 || !union.isNullableUnion()) {
-            return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+            ClassElement objectType = visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+            return withTypeUseDecorators(objectType, union, union.typeUseDecorators(), visitorContext);
         }
         ClassElement resolvedType = resolvePythonTypeToJava(members.getFirst(), visitorContext, boundGenerics);
         ClassElement boxedType = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
         ElementAnnotationMetadata metadata = visitorContext.getElementAnnotationMetadataFactory().buildTypeUseAnnotations(
             union,
-            new AttributeDef(TYPE_USE_ELEMENT_NAME, union.toString(), union, null, List.of(), null, false, null)
+            new AttributeDef(TYPE_USE_ELEMENT_NAME, union.toString(), union, null, union.typeUseDecorators(), null, false, null)
         );
         if (metadata.isEmpty()) {
             return boxedType;
