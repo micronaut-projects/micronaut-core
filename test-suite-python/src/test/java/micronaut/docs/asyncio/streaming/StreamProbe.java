@@ -56,12 +56,12 @@ public final class StreamProbe {
         FINISHED.computeIfAbsent(name, ignored -> new AtomicInteger()).incrementAndGet();
     }
 
-    public static int started(String name, int ignored) {
+    public static int startedCount(String name) {
         AtomicInteger count = STARTED.get(name);
         return count == null ? 0 : count.get();
     }
 
-    public static int finished(String name, int ignored) {
+    public static int finishedCount(String name) {
         AtomicInteger count = FINISHED.get(name);
         return count == null ? 0 : count.get();
     }
@@ -132,6 +132,7 @@ public final class StreamProbe {
 
             @Override
             public void onNext(Object item) {
+                // only the terminal signal matters here
             }
 
             @Override
@@ -164,7 +165,7 @@ public final class StreamProbe {
      */
     public static boolean awaitFinished(String name, int expected, int seconds) throws InterruptedException {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(seconds);
-        while (finished(name, 0) < expected) {
+        while (finishedCount(name) < expected) {
             if (System.nanoTime() > deadline) {
                 return false;
             }

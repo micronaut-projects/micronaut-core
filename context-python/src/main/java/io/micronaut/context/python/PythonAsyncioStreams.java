@@ -67,7 +67,7 @@ public final class PythonAsyncioStreams {
      */
     public static PublisherIterator iterator(Value publisher, @Nullable PythonEventLoop eventLoop, Value callbacks) {
         Objects.requireNonNull(callbacks, "callbacks");
-        Object source = publisher != null && publisher.isHostObject() ? publisher.asHostObject() : publisher;
+        Object source = publisher.isHostObject() ? publisher.asHostObject() : publisher;
         if (!Publishers.isConvertibleToPublisher(source)) {
             throw new IllegalArgumentException("as_async_iterable expects a Java Publisher, got [" + describe(publisher) + "]");
         }
@@ -88,12 +88,9 @@ public final class PythonAsyncioStreams {
         return new GeneratorPublisher(start, eventLoop);
     }
 
-    private static String describe(Object value) {
-        if (value instanceof Value polyglot) {
-            Value metaObject = polyglot.getMetaObject();
-            return metaObject == null ? polyglot.toString() : metaObject.getMetaQualifiedName();
-        }
-        return value == null ? "None" : value.getClass().getName();
+    private static String describe(Value value) {
+        Value metaObject = value.getMetaObject();
+        return metaObject == null ? value.toString() : metaObject.getMetaQualifiedName();
     }
 
     /**

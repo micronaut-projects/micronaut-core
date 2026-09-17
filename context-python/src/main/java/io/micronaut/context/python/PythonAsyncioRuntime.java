@@ -142,7 +142,7 @@ public final class PythonAsyncioRuntime {
      */
     @SuppressWarnings("rawtypes")
     @UsedByGeneratedCode
-    public static Publisher toPublisher(Value value) {
+    public static Publisher toPublisher(@Nullable Value value) {
         RuntimeState runtimeState = state();
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async generator bridge methods.");

@@ -52,7 +52,6 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
  */
 @Internal
 public final class PythonTypeResolver {
-    private static final String PUBLISHER_NAME = "org.reactivestreams.Publisher";
 
     private final PythonVisitorContext visitorContext;
 
@@ -198,15 +197,6 @@ public final class PythonTypeResolver {
         if (Optional.class.getName().equals(rawName) && !typeArguments.isEmpty()) {
             return parameterizedType(rawType, Optional.class, Map.of("T", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics)));
         }
-        if (PUBLISHER_NAME.equals(rawName) && !typeArguments.isEmpty()) {
-            // AsyncGenerator[Yield, Send]: the first argument is the element type
-            Map<String, ClassElement> elementType = Map.of("T", resolveTypeArgument(typeArguments.get(0), visitorContext, boundGenerics));
-            try {
-                return rawType.withTypeArguments(elementType);
-            } catch (UnsupportedOperationException e) {
-                return ClassElement.of(PUBLISHER_NAME, true, rawType.getAnnotationMetadata(), elementType);
-            }
-        }
         return null;
     }
 
@@ -294,11 +284,6 @@ public final class PythonTypeResolver {
                 visitorContext.getClassElement(Set.class).orElse(ClassElement.of(Set.class));
             case "typing.Optional" ->
                 visitorContext.getClassElement(Optional.class).orElse(ClassElement.of(Optional.class));
-            case "AsyncIterator", "typing.AsyncIterator", "collections.abc.AsyncIterator",
-                 "AsyncIterable", "typing.AsyncIterable", "collections.abc.AsyncIterable",
-                 "AsyncGenerator", "typing.AsyncGenerator", "collections.abc.AsyncGenerator" ->
-                // an async iterator crosses into Java as a Reactive Streams publisher of its elements
-                visitorContext.getClassElement(PUBLISHER_NAME).orElseGet(() -> ClassElement.of(PUBLISHER_NAME, true, AnnotationMetadata.EMPTY_METADATA));
             default -> {
                 String finalTypeAnnotation = typeAnnotation;
                 // Fall back to visitor context lookup

@@ -164,6 +164,24 @@ PythonContextRuntime.invokePooledScriptPublisher(
 ''')
     }
 
+    void "a coroutine returning an async iterator is not bridged as a publisher"() {
+        expect:
+        // the AsyncIterator mapping is confined to async generators: nothing converts a returned iterator
+        assertGeneratedSourceContains('''
+from typing import AsyncIterator
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class StreamingService:
+    @Executable
+    async def numbers(self) -> AsyncIterator[str]:
+        return other_source()
+''', '''
+public CompletionStage<Object> numbers() {
+''')
+    }
+
     void "async constructors are rejected"() {
         expect:
         assertCompilationFailsContaining('''

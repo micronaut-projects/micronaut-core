@@ -479,6 +479,19 @@ final class PythonContextRegistry {
         return CURRENT_EXECUTION.isBound() && !CURRENT_EXECUTION.get().contexts.isEmpty();
     }
 
+    /**
+     * The number of active executions of one context.
+     *
+     * @param context The context
+     * @return The count, or 0 for an unknown context
+     */
+    static int activeExecutions(Context context) {
+        synchronized (LOCK) {
+            ContextState state = CONTEXT_STATES.get(context);
+            return state == null ? 0 : state.activeExecutions;
+        }
+    }
+
     static int activeExecutions() {
         return ACTIVE_EXECUTIONS.get();
     }

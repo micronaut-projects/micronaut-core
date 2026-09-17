@@ -132,6 +132,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
     static final String PUBLISHER = "org.reactivestreams.Publisher";
+    private static final String CONVERT_PUBLISHER = "convertPublisher";
     private static final String GET_MEMBER = "getMember";
     private static final String MAP_OF = "mapOf";
     private static final String ENUM_VALUE = "enumValue";
@@ -3619,14 +3620,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
                         if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
                             yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic(
-                                "convertPublisher",
+                                CONVERT_PUBLISHER,
                                 List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
                                 ClassTypeDef.of(PUBLISHER),
                                 invokedValue,
                                 generatedWrapperConverter(componentType)
                             ), returnType);
                         }
-                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
+                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic(CONVERT_PUBLISHER, ClassTypeDef.of(PUBLISHER),
                                 invokedValue, toClassExpression(componentType)), returnType);
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
@@ -4020,7 +4021,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ExpressionDef converted;
         if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
             converted = PYTHON_HTTP_CONVERSION.invokeStatic(
-                "convertPublisher",
+                CONVERT_PUBLISHER,
                 List.of(ClassTypeDef.of(PUBLISHER), POLYGLOT_VALUE_CONVERTER),
                 ClassTypeDef.of(PUBLISHER),
                 publisher,
@@ -4028,7 +4029,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             );
         } else {
             converted = PYTHON_HTTP_CONVERSION.invokeStatic(
-                "convertPublisher",
+                CONVERT_PUBLISHER,
                 List.of(ClassTypeDef.of(PUBLISHER), TypeDef.CLASS),
                 ClassTypeDef.of(PUBLISHER),
                 publisher,
