@@ -30,7 +30,6 @@ import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.compression.DeflateOptions;
 import io.netty.handler.codec.compression.GzipOptions;
 import io.netty.handler.codec.compression.SnappyFrameEncoder;
-import io.netty.handler.codec.compression.SnappyOptions;
 import io.netty.handler.codec.compression.StandardCompressionOptions;
 import io.netty.handler.codec.compression.ZlibCodecFactory;
 import io.netty.handler.codec.compression.ZlibWrapper;
@@ -58,7 +57,6 @@ final class Compressor {
     private final DeflateOptions deflateOptions;
     @Nullable
     private final ZstdOptions zstdOptions;
-    private final SnappyOptions snappyOptions;
     /**
      * The algorithms with options, i.e. those {@link #determineEncoding(Iterator)} may pick.
      */
@@ -79,15 +77,15 @@ final class Compressor {
             StandardCompressionOptions.zstd().blockSize(),
             strategy.getMaxZstdEncodeSize())
             : null;
-        this.snappyOptions = StandardCompressionOptions.snappy();
-        EnumSet<Algorithm> available = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
+        // snappy, gzip and deflate need no options and are always available
+        EnumSet<Algorithm> algorithms = EnumSet.of(Algorithm.SNAPPY, Algorithm.GZIP, Algorithm.DEFLATE);
         if (brotliOptions != null) {
-            available.add(Algorithm.BR);
+            algorithms.add(Algorithm.BR);
         }
         if (zstdOptions != null) {
-            available.add(Algorithm.ZSTD);
+            algorithms.add(Algorithm.ZSTD);
         }
-        this.available = Collections.unmodifiableSet(available);
+        this.available = Collections.unmodifiableSet(algorithms);
     }
 
     @Nullable
