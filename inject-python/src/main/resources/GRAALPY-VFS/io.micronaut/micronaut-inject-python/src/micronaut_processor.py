@@ -1,4 +1,5 @@
 import ast
+import inspect
 import keyword
 import os
 import java
@@ -978,7 +979,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     self.last_attribute.value(),
                     self.last_attribute.hasDefaultValue(),
                     self.last_attribute.decorators(),
-                    docstring.strip(),
+                    inspect.cleandoc(docstring),
                     self.last_attribute.isStatic(),
                     None,
                     self.last_attribute.defaultFactoryName()
@@ -2054,13 +2055,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         Extract the docstring from a class or function node.
         In Python AST, docstrings are the first statement if it's a string literal.
+        The docstring is rendered the way ``inspect.getdoc`` renders it: without the
+        indentation of the source and the blank lines around the text, so that the
+        documentation of a class reads like that of an attribute.
         """
         if hasattr(node, 'body') and node.body:
             first_stmt = node.body[0]
             if isinstance(first_stmt, ast.Expr) and isinstance(first_stmt.value, ast.Constant):
                 # Python 3.8+ uses ast.Constant for string literals
                 if isinstance(first_stmt.value.value, str):
-                    return first_stmt.value.value
+                    return inspect.cleandoc(first_stmt.value.value)
         return None
 
     def parse_function_arguments(self, func_node):

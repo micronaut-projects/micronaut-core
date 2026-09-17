@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -96,11 +97,36 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                        boolean initializeClassMetadata) {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
-        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
         if (initializeClassMetadata) {
-            markPropertyInjectionBeanCandidate();
-            moveIntroductionInterfacesToImplementedInterfaces();
+            initializeClassMetadata();
         }
+    }
+
+    /**
+     * Creates the element of a Python class for the class registry of the processing environment without
+     * deriving its class level metadata yet: {@link #initializeClassMetadata()} runs annotation mappers, which
+     * may look other Python classes up through the visitor context, so it is applied once every class of the
+     * environment is registered.
+     *
+     * @param classDef    The class definition
+     * @param environment The processing environment
+     * @return The element
+     */
+    @Internal
+    public static PythonClassElement registered(ClassDef classDef, PythonProcessingEnvironment environment) {
+        return new PythonClassElement(classDef, environment, 0, null, false);
+    }
+
+    /**
+     * Derives the class level metadata that depends on the annotations of the class definition: the introspection
+     * excludes, the bean stereotype of a class with property injection points and the interfaces introduced by an
+     * introduction advice. Building that metadata runs the annotation mappers of the class annotations.
+     */
+    @Internal
+    public void initializeClassMetadata() {
+        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
+        markPropertyInjectionBeanCandidate();
+        moveIntroductionInterfacesToImplementedInterfaces();
     }
 
     @Override
