@@ -49,13 +49,13 @@ class NamedGreeter(GreetingBase):
         javaCode.contains('public class NamedGreeter extends GreetingBase implements ValueCoercible, ValueCoercible.JavaBaseMembers')
 
         and: 'the Value constructor marks the object as under construction, calls the resolved (String, int) constructor with the recorded arguments and binds'
-        javaCode.contains('this(value, PythonJavaBases.constructing(value));')
+        javaCode.contains('this(value, PythonJavaBases.constructing(value, NamedGreeter.class));')
         javaCode.contains('super(PythonConversion.isNone(PythonJavaBases.argument(value, 0, "(java.lang.String, int)")) ? null : PythonJavaBases.argument(value, 0, "(java.lang.String, int)").asString(), PythonJavaBases.argument(value, 1, "(java.lang.String, int)").asInt());')
         javaCode.contains('construction.finished();')
         javaCode.contains('PythonJavaBases.bind(value, this)')
 
         and: 'a bridge called by the super constructor reaches the object under construction'
-        javaCode.contains('PythonJavaBases.underConstruction()')
+        javaCode.contains('PythonJavaBases.underConstruction(NamedGreeter.class)')
 
         and: 'the constructor of the Python parameters creates the Python object and delegates to it'
         javaCode.contains('public NamedGreeter(String name, int count) {\n    this(PythonContextRuntime.newInstance(NamedGreeter.__PYTHON_CLASS_REFERENCE, (Object) name, (Object) count));')

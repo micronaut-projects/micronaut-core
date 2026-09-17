@@ -973,7 +973,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         VariableDef.MethodParameter value = methodParameters.get(0);
                         return new ExpressionDef.InvokeInstanceMethod(aThis, constructingConstructor, List.of(
                             value,
-                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value)
+                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value, javaClassType(model.element()).getStaticField("class", TypeDef.CLASS))
                         ));
                     })
             );
@@ -1574,28 +1574,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * The statement of {@code asPolyglotValue()} of a stub extending a Java class that answers a bridge
+     * method the Java super constructor calls: the instance does not hold its Python object yet, which
+     * the runtime knows as the object under construction on the thread for the stub class.
+     *
+     * @param model The class model
+     * @param aThis The stub instance
+     * @return The conditional return statement, empty for a stub without a Java base
+     */
+    private static StatementDef returnObjectUnderConstruction(ClassStubModel model, VariableDef.This aThis) {
+        if (!model.extendsJavaBase() || model.isJunit5Test()) {
+            return StatementDef.multi();
+        }
+        ExpressionDef stubClass = javaClassType(model.element()).getStaticField("class", TypeDef.CLASS);
+        return aThis.field(pythonValueField(model)).isNull().doIf(
+            PYTHON_JAVA_BASES.invokeStatic("underConstruction", POLYGLOT_VALUE, stubClass).newLocal("constructing", constructing ->
+                constructing.isNonNull().doIf(constructing.returning())
+            )
+        );
+    }
+
+    /**
      * A statement returning the Python object of the intercepted target when the stub instance is an AOP
      * proxy (the scoped proxy of a factory bean, for example): the proxy has no Python object of its own.
      *
      * @param aThis The stub instance
      * @return The conditional return statement
      */
-    /**
-     * The statement of {@code asPolyglotValue()} of a stub extending a Java class that answers a bridge
-     * method the Java super constructor calls: the instance does not hold its Python object yet, which
-     * the runtime knows as the object under construction on the thread.
-     */
-    private static StatementDef returnObjectUnderConstruction(ClassStubModel model, VariableDef.This aThis) {
-        if (!model.extendsJavaBase() || model.isJunit5Test()) {
-            return StatementDef.multi();
-        }
-        return aThis.field(pythonValueField(model)).isNull().doIf(
-            PYTHON_JAVA_BASES.invokeStatic("underConstruction", POLYGLOT_VALUE).newLocal("constructing", constructing ->
-                constructing.isNonNull().doIf(constructing.returning())
-            )
-        );
-    }
-
     private static StatementDef returnInterceptedTargetValue(VariableDef.This aThis) {
         return aThis.instanceOf(INTERCEPTED_PROXY).doIf(
             PYTHON_COERCION.invokeStatic(INTERCEPTED_TARGET_VALUE, POLYGLOT_VALUE, aThis.cast(INTERCEPTED_PROXY)).returning()
