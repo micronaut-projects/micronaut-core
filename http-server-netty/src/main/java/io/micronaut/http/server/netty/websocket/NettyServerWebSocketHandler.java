@@ -358,7 +358,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         return invokeExecutable0(boundExecutable, messageHandler, false);
     }
 
-    private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler, boolean suspend) {
+    private ExecutionFlow<?> invokeExecutable0(BoundExecutable<?, ?> boundExecutable, MethodExecutionHandle<?, ?> messageHandler, boolean suspend) {
         Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
         ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
         return ExecutionFlow.async(executor, () -> {
