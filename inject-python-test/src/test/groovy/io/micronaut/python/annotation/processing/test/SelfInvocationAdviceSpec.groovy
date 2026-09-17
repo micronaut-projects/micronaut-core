@@ -18,6 +18,7 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.python.aop.InterceptionLog
 import org.intellij.lang.annotations.Language
 
+import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CompletionStage
 import java.util.concurrent.TimeUnit
 
@@ -191,6 +192,140 @@ class AsyncGreetingCaller:
 
         then:
         result == "Hi"
+        InterceptionLog.methods() == ["greet"]
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a self-invocation runs the interceptor chain on the object that made the call"() {
+        given: "a prototype bean: every call through the proxy resolves a new target"
+        @Language("python") def pythonCode = INTERCEPTOR + '''
+from micronaut.context.annotation import Prototype
+
+@Prototype
+class CountingService:
+    def __init__(self):
+        self.count = 0
+
+    @Executable
+    def hello(self) -> str:
+        self.count = 1
+        return self.greet(str(id(self)))
+
+    @TestAround
+    def greet(self, caller: str) -> str:
+        return ("same" if caller == str(id(self)) else "different") + ":" + str(self.count)
+'''
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.CountingService")
+
+        when:
+        def first = service.hello()
+        def second = service.hello()
+
+        then: "greet was intercepted and ran on the object hello set the state on, for every target"
+        first == "same:1"
+        second == "same:1"
+        InterceptionLog.methods() == ["greet", "greet"]
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a method taking variadic arguments keeps direct self-invocations"() {
+        given:
+        @Language("python") def pythonCode = INTERCEPTOR + '''
+@Singleton
+class VariadicService:
+    @Executable
+    def format_all(self, name: str) -> str:
+        return self.fmt(name, sep="-")
+
+    @TestAround
+    def fmt(self, *values, **options) -> str:
+        return "|".join(values) + "|" + str(list(options))
+'''
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.VariadicService")
+
+        when: "the nested call has no positional layout for the generated Java method"
+        def result = service.format_all("a")
+
+        then: "it is a direct Python call with the keyword arguments intact"
+        result == "a|['sep']"
+        InterceptionLog.methods().isEmpty()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "an interceptor completing the stage of a coroutine method asynchronously does not stall the caller"() {
+        given: "an interceptor that completes the stage 300ms later on another thread"
+        @Language("python") def pythonCode = '''
+from micronaut.python.aop import TestAround
+from micronaut.aop import InterceptorBean, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+InterceptionLog = java.type("io.micronaut.python.aop.InterceptionLog")
+CompletableFuture = java.type("java.util.concurrent.CompletableFuture")
+TimeUnit = java.type("java.util.concurrent.TimeUnit")
+Function = java.type("java.util.function.Function")
+
+@InterceptorBean(TestAround)
+class DelayingInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        InterceptionLog.record(context.getMethodName())
+        stage = context.proceed().toCompletableFuture()
+        return stage.thenApplyAsync(Function.identity(), CompletableFuture.delayedExecutor(300, TimeUnit.MILLISECONDS))
+
+@Singleton
+class DelayedGreetingService:
+    @Executable
+    async def hello(self, name: str) -> str:
+        return await self.greet("Hello " + name)
+
+    @TestAround
+    async def greet(self, greeting: str) -> str:
+        return greeting
+
+@Singleton
+class DelayedGreetingCaller:
+    def __init__(self, service: DelayedGreetingService):
+        self.service = service
+
+    @Executable
+    async def call(self, name: str) -> str:
+        return await self.service.hello(name)
+'''
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.DelayedGreetingService")
+        def caller = getBean(context, "python.DelayedGreetingCaller")
+
+        when: "a Java caller on a thread without an event loop invokes the intercepted coroutine method"
+        CompletionStage<String> stage = CompletableFuture.supplyAsync { service.greet("Hi") }.get(5, TimeUnit.SECONDS)
+
+        then: "the stage of the interceptor is handed back and completes later"
+        stage.toCompletableFuture().get(10, TimeUnit.SECONDS) == "Hi"
+        InterceptionLog.methods() == ["greet"]
+
+        when: "the outer coroutine method awaits the intercepted one through self"
+        InterceptionLog.reset()
+        CompletionStage<String> helloStage = CompletableFuture.supplyAsync { service.hello("Fred") }.get(5, TimeUnit.SECONDS)
+
+        then:
+        helloStage.toCompletableFuture().get(10, TimeUnit.SECONDS) == "Hello Fred"
+        InterceptionLog.methods() == ["greet"]
+
+        when: "a Python caller awaits the outer coroutine method"
+        InterceptionLog.reset()
+        CompletionStage<String> callerStage = CompletableFuture.supplyAsync { caller.call("Bob") }.get(5, TimeUnit.SECONDS)
+
+        then:
+        callerStage.toCompletableFuture().get(10, TimeUnit.SECONDS) == "Hello Bob"
         InterceptionLog.methods() == ["greet"]
 
         cleanup:

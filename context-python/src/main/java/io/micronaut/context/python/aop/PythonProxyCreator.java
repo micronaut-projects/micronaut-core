@@ -256,9 +256,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private <T> T createProxyTargetProxyInFrame(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value pythonClass = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
-        SelfInvocationBinder<T> targetSupplier = new SelfInvocationBinder<>(proxyDefinition);
+        SelfInvocationBinder<T> targetSupplier = new SelfInvocationBinder<>(proxyDefinition, pythonClass);
         Value proxyValue = createScopedProxyValue(pythonClass, () -> asValue(targetSupplier.get()));
-        targetSupplier.proxyCreated(proxyValue);
         if (hasAroundConstructAdvice(proxyDefinition)) {
             // Python proxy-target AOP normally instantiates the target lazily through the scoped proxy.
             // Around-construct advice is observable at bean creation time in Micronaut, so force target
@@ -293,17 +292,22 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
                 // property name so Java and Python-style assignment both see property advice.
                 proxyValue.getMember(SCOPED_PROXY_SETTER_OVERRIDE_METHOD).execute(propertyName, proxiedFunction);
             } else {
-                proxiedFunction = createProxiedFunction(
+                MethodSelector<T> methodSelector = methodSelector(methodName, interceptedMethods);
+                boolean coroutineFunction = isCoroutineFunction(pythonClass, originalFunction);
+                proxiedFunction = proxiedFunction(
                     false,
                     true,
                     pythonClass,
                     targetSupplier,
                     null,
                     null,
-                    methodSelector(methodName, interceptedMethods),
-                    originalFunction
+                    methodSelector,
+                    originalFunction,
+                    coroutineFunction
                 );
-                targetSupplier.interceptedMethodAdded(methodName);
+                if (originalFunction != null) {
+                    targetSupplier.interceptedMethodAdded(methodName, methodSelector, originalFunction, coroutineFunction);
+                }
             }
             proxyValue.getMember(SCOPED_PROXY_OVERRIDE_METHOD).execute(methodName, proxiedFunction);
         }
@@ -418,8 +422,35 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         MethodSelector<T> methodSelector,
         @Nullable Value originalFunction
     ) {
-        boolean coroutineFunction = originalFunction != null
+        return proxiedFunction(
+            isIntroduction,
+            bindOriginalFunction,
+            owner,
+            targetBeanSupplier,
+            targetBean,
+            targetBeanRef,
+            methodSelector,
+            originalFunction,
+            isCoroutineFunction(owner, originalFunction)
+        );
+    }
+
+    private static boolean isCoroutineFunction(Value owner, @Nullable Value originalFunction) {
+        return originalFunction != null
             && PythonContextRuntime.helper(owner.getContext(), IS_COROUTINE_FUNCTION).execute(originalFunction).asBoolean();
+    }
+
+    private <T> ProxyExecutable proxiedFunction(
+        boolean isIntroduction,
+        boolean bindOriginalFunction,
+        Value owner,
+        @Nullable Supplier<T> targetBeanSupplier,
+        @Nullable T targetBean,
+        @Nullable AtomicReference<Object> targetBeanRef,
+        MethodSelector<T> methodSelector,
+        @Nullable Value originalFunction,
+        boolean coroutineFunction
+    ) {
         return args -> {
             RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod = methodSelector.find(args);
             ExecutableMethod<T, ?> executableMethod = interceptedMethod.executableMethod();
@@ -469,7 +500,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             Object result = new MethodInterceptorChain(finalInterceptors, tb, executableMethod, javaArgs).proceed();
             if (coroutineFunction && result instanceof CompletionStage<?> stage) {
                 // the caller may run in another context than the one the proxy was created in (an
-                // event-loop context receives copies of the overrides): the coroutine belongs to the caller
+                // event-loop context receives copies of the overrides): the awaitable belongs to the caller
                 return awaitable(Context.getCurrent(), stage);
             }
             return unbox(owner.getContext(), result);
@@ -478,13 +509,15 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     /**
      * The interceptor chain of an {@code async def} method exchanges a {@link CompletionStage}, as it
-     * does for a Java bean; a Python caller of the proxy, {@code self} included, awaits the method, so
-     * the stage is handed back as a coroutine. The generated Java bridge converts that coroutine into a
-     * stage again for a Java caller.
+     * does for a Java bean. A Python caller of the proxy, {@code self} included, awaits the method, so
+     * the stage is handed back as an awaitable that turns it into an asyncio future on the loop that
+     * awaits it. The awaitable carries the stage, which the generated Java bridge hands back to a Java
+     * caller as it is ({@link PythonAsyncioRuntime#toCompletionStage(Value)}): no loop drives the stage
+     * on the calling thread, and a stage completing on another thread cannot stall the caller.
      */
     private static Value awaitable(Context context, CompletionStage<?> stage) {
         return PythonContextRuntime.helper(context, AWAIT_STAGE)
-            .execute((ProxyExecutable) ignored -> PythonAsyncioRuntime.toAwaitable(context, stage));
+            .execute(stage, (ProxyExecutable) ignored -> PythonAsyncioRuntime.toAwaitable(context, stage));
     }
 
     private <T> ProxyExecutable createProxiedPropertySetter(
@@ -808,46 +841,71 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     /**
      * Resolves the target bean of a proxy-target proxy and, the first time a target is seen, makes its
-     * intercepted methods dispatch through the proxy when the bean calls them on {@code self}: a Java bean
-     * is its own proxy, so {@code this.method()} from inside the bean runs the interceptor chain, and a
-     * Python bean behind the scoped proxy gets the same semantics from instance attributes installed on
-     * the target. The override that runs the chain binds the class function to the target, so the
-     * attributes are never re-entered. The last bound target is remembered so the resolution of a
-     * singleton costs one identity check; a scope that hands out a new target binds it again.
+     * intercepted methods dispatch through the interceptor chain when the bean calls them on {@code self}:
+     * a Java bean is its own proxy, so {@code this.method()} from inside the bean runs the interceptor
+     * chain, and a Python bean behind the scoped proxy gets the same semantics from instance attributes
+     * installed on the target. Each attribute calls an override created for that target, so the chain
+     * runs on the object that made the call (a prototype or thread-local scope hands out several
+     * targets), and the override binds the class function to the target, so the attributes are never
+     * re-entered. The last bound target is remembered so the resolution of a singleton costs one
+     * identity check; a scope that hands out a new target binds it again.
      *
      * @param <T> The bean type
      */
     private final class SelfInvocationBinder<T> implements Supplier<T> {
         private final RuntimeProxyDefinition<T> proxyDefinition;
-        private final List<String> interceptedMethodNames = new ArrayList<>();
-        @Nullable
-        private Value proxyValue;
+        private final Value pythonClass;
+        private final List<InterceptedFunction<T>> interceptedFunctions = new ArrayList<>();
         private volatile WeakReference<Object> boundTarget = new WeakReference<>(null);
 
-        SelfInvocationBinder(RuntimeProxyDefinition<T> proxyDefinition) {
+        SelfInvocationBinder(RuntimeProxyDefinition<T> proxyDefinition, Value pythonClass) {
             this.proxyDefinition = proxyDefinition;
+            this.pythonClass = pythonClass;
         }
 
-        void proxyCreated(Value proxyValue) {
-            this.proxyValue = proxyValue;
-        }
-
-        void interceptedMethodAdded(String methodName) {
-            interceptedMethodNames.add(methodName);
+        void interceptedMethodAdded(String methodName, MethodSelector<T> methodSelector, Value originalFunction, boolean coroutineFunction) {
+            interceptedFunctions.add(new InterceptedFunction<>(methodName, methodSelector, originalFunction, coroutineFunction));
         }
 
         @Override
         public T get() {
             T target = proxyDefinition.targetBean();
-            Value proxy = proxyValue;
-            if (proxy != null && !interceptedMethodNames.isEmpty() && boundTarget.get() != target) {
-                Value targetValue = asValue(target);
-                PythonContextRuntime.helper(targetValue.getContext(), BIND_SELF_INVOCATIONS)
-                    .execute(targetValue, proxy, interceptedMethodNames.toArray(String[]::new));
+            if (!interceptedFunctions.isEmpty() && boundTarget.get() != target) {
+                bind(target);
                 boundTarget = new WeakReference<>(target);
             }
             return target;
         }
+
+        private void bind(T target) {
+            String[] names = new String[interceptedFunctions.size()];
+            Object[] overrides = new Object[names.length];
+            for (int i = 0; i < names.length; i++) {
+                InterceptedFunction<T> function = interceptedFunctions.get(i);
+                names[i] = function.methodName();
+                overrides[i] = proxiedFunction(
+                    false,
+                    true,
+                    pythonClass,
+                    null,
+                    target,
+                    null,
+                    function.methodSelector(),
+                    function.originalFunction(),
+                    function.coroutineFunction()
+                );
+            }
+            Value targetValue = asValue(target);
+            PythonContextRuntime.helper(targetValue.getContext(), BIND_SELF_INVOCATIONS).execute(targetValue, names, overrides);
+        }
+    }
+
+    private record InterceptedFunction<T>(
+        String methodName,
+        MethodSelector<T> methodSelector,
+        Value originalFunction,
+        boolean coroutineFunction
+    ) {
     }
 
     private static final class SimpleMethodSelector<T> implements MethodSelector<T> {
