@@ -353,6 +353,7 @@ languageSupport:
     keywords: Python Keywords in Java APIs
     nestedTypes: Nested Java Types
     pythonExceptions: Python Exceptions Extending Java Exceptions
+    functionalInterfaces: Python Callables as Functional Interfaces
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
