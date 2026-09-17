@@ -1113,10 +1113,12 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if class_elements:
             transformed_any = False
             for class_element in class_elements:
-                if self._is_nested_type(class_element) or _JavaTypes.isPythonClass(class_element):
+                if self._is_nested_type(class_element):
                     # A package scan also lists nested types; a star import binds top-level names only.
-                    # The bridge of a Python class compiled by another source root or into a library
-                    # stays a Python import, as it does for an explicit import of the class.
+                    # The generated bridge of a Python class compiled by another source root or into a
+                    # library is bound like any other class: unlike an explicit import, nothing resolves a
+                    # star-imported Python class on the processor side, so its bridge is what makes the
+                    # name usable in a signature, and the bridge delegates to the Python object.
                     continue
                 import_name = str(class_element.getSimpleName())
                 # Check if it's an annotation
@@ -1145,9 +1147,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return [
             str(class_element.getSimpleName())
             for class_element in class_elements
-            if not self._is_nested_type(class_element)
-            and not self._is_annotation_class(class_element)
-            and not _JavaTypes.isPythonClass(class_element)
+            if not self._is_nested_type(class_element) and not self._is_annotation_class(class_element)
         ]
 
     def _is_annotation_class(self, class_element) -> bool:
