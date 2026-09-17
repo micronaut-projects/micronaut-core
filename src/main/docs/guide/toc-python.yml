@@ -295,6 +295,7 @@ languageSupport:
     keywords: Python Keywords in Java APIs
     overloads: Java Overloads and Variadic Parameters
     pythonExceptions: Python Exceptions Extending Java Exceptions
+    extendingJavaClasses: Extending Java Classes
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

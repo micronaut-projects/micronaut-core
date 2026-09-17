@@ -313,6 +313,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.function_depth = 0
         self.uses_builtin_exception = False
         self.uses_java_interface_defaults = False
+        self.uses_java_base = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -476,10 +477,12 @@ class MicronautTransformer(ast.NodeTransformer):
 
         # Add generated code at the beginning
         if (self.transformed_code or self.has_java_import
-                or self.uses_builtin_exception or self.uses_java_interface_defaults):
+                or self.uses_builtin_exception or self.uses_java_interface_defaults or self.uses_java_base):
             # Create AST nodes for the generated code
             generated_nodes = []
             generated_nodes.extend(self._java_interface_defaults_nodes())
+            if self.uses_java_base:
+                generated_nodes.extend(self._java_base_helper_nodes())
 
             # Add import java statement if we have java.type() calls
             if self.has_java_import:
@@ -601,6 +604,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             runtime_bases = []
             java_interface_names = []
             replaced_throwable = False
+            replaced_java_base = False
             has_python_exception_base = any(
                 isinstance(base, ast.Name)
                 and base.id == 'Exception'
@@ -627,22 +631,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     continue
                 java_class_name = self._java_class_name(base)
                 if java_class_name:
-                    node.body.insert(0, ast.Raise(
-                        exc=ast.Call(
-                            func=ast.Name(id='RuntimeError', ctx=ast.Load()),
-                            args=[ast.Constant(
-                                f"Native Python mode does not support Python class [{node.name}] "
-                                f"extending Java class [{java_class_name}]; "
-                                "use composition or a Java interface instead."
-                            )],
-                            keywords=[]
-                        ),
-                        cause=None
-                    ))
+                    # The generated Java class extends the Java class; the Python class gets a
+                    # Python base standing in for it (see PythonJavaBases in the runtime).
+                    runtime_bases.append(ast.copy_location(self._java_base_call(java_class_name), base))
+                    self.uses_java_base = True
+                    replaced_java_base = True
                     continue
                 runtime_bases.append(base)
             node.bases = runtime_bases
-            if len(node.bases) != original_base_count:
+            if len(node.bases) != original_base_count or replaced_java_base:
                 node.keywords = [
                     keyword
                     for keyword in node.keywords
@@ -1042,6 +1039,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         base_name = self._base_name(base)
         if base_name in self.java_interface_names:
             return self.java_class_elements[base_name].getName()
+        class_element = self._tracked_java_class_element(base)
+        if class_element is not None and class_element.isInterface():
+            return class_element.getName()
         return None
 
     def _is_java_throwable_base(self, base: ast.AST) -> bool:
@@ -1055,19 +1055,53 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         class_name = self._java_type_name(base)
         class_element = self.callback_get_class_element(class_name) if class_name else None
         if class_element is None:
-            base_name = self._base_name(base)
-            if not base_name:
-                return False
-            class_element = self.java_class_elements.get(base_name)
+            class_element = self._tracked_java_class_element(base)
         return _JavaTypes.isThrowable(class_element)
 
     def _java_class_name(self, base: ast.AST) -> Optional[str]:
+        """The binary name of a Java class base (not an interface, not a throwable), or None."""
         class_name = self._java_type_name(base)
         class_element = self.callback_get_class_element(class_name) if class_name else None
         if class_element is None:
-            base_name = self._base_name(base)
-            class_element = self.java_class_elements.get(base_name) if base_name else None
-        return class_element.getName() if _JavaTypes.isConcreteClass(class_element) else None
+            class_element = self._tracked_java_class_element(base)
+        return class_element.getName() if _JavaTypes.isExtensibleClass(class_element) else None
+
+    def _tracked_java_class_element(self, base: ast.AST):
+        """The class element of a base naming an imported Java class, or a class nested in one
+        (``Outer.Inner`` for the Java ``Outer$Inner``)."""
+        base_name = self._base_name(base)
+        if not base_name:
+            return None
+        class_element = self.java_class_elements.get(base_name)
+        if class_element is not None or '.' not in base_name:
+            return class_element
+        root, _, nested = base_name.partition('.')
+        outer = self.java_class_elements.get(root)
+        if outer is None:
+            return None
+        # the element lookup takes the canonical name; the binary name is tried for a nested class
+        # that is not resolvable through it
+        return (
+            self.callback_get_class_element(outer.getName() + '.' + nested)
+            or self.callback_get_class_element(outer.getName() + '$' + nested.replace('.', '$'))
+        )
+
+    JAVA_BASE_HELPER = '__micronaut_java_base'
+
+    def _java_base_call(self, java_class_name: str) -> ast.Call:
+        return ast.Call(
+            func=ast.Name(id=self.JAVA_BASE_HELPER, ctx=ast.Load()),
+            args=[ast.Constant(java_class_name)],
+            keywords=[]
+        )
+
+    def _java_base_helper_nodes(self) -> List[ast.AST]:
+        """The module-level function resolving the Python base standing in for a Java class."""
+        return ast.parse(f'''
+def {self.JAVA_BASE_HELPER}(name):
+    import java
+    return java.type('io.micronaut.context.python.PythonJavaBases').baseClass(java.type(name))
+''').body
 
     def _java_type_name(self, node: ast.AST) -> Optional[str]:
         if not isinstance(node, ast.Call):
@@ -1633,10 +1667,13 @@ class MicronautRuntimeTransformer(MicronautTransformer):
                 ast.Import(names=[ast.alias(name='builtins', asname=None)])
             )
 
-        if not (self.transformed_code or self.uses_builtin_exception or self.uses_java_interface_defaults):
+        if not (self.transformed_code or self.uses_builtin_exception
+                or self.uses_java_interface_defaults or self.uses_java_base):
             return node
 
         generated_nodes = list(self._java_interface_defaults_nodes())
+        if self.uses_java_base:
+            generated_nodes.extend(self._java_base_helper_nodes())
         if self.transformed_code:
             generated_nodes.extend(ast.parse('''
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):

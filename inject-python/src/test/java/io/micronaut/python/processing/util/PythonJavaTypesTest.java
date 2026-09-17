@@ -47,11 +47,12 @@ final class PythonJavaTypesTest {
     }
 
     @Test
-    void concreteClassesExcludeInterfacesAndAbstractTypes() {
-        assertTrue(PythonJavaTypes.isConcreteClass(ClassElement.of(String.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(ClassElement.of(Runnable.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(ClassElement.of(Number.class)));
-        assertFalse(PythonJavaTypes.isConcreteClass(null));
+    void extensibleClassesExcludeInterfacesAndThrowables() {
+        assertTrue(PythonJavaTypes.isExtensibleClass(ClassElement.of(String.class)));
+        assertTrue(PythonJavaTypes.isExtensibleClass(ClassElement.of(Number.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(ClassElement.of(Runnable.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(ClassElement.of(RuntimeException.class)));
+        assertFalse(PythonJavaTypes.isExtensibleClass(null));
     }
 
     @Test
