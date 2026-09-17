@@ -36,6 +36,21 @@ import org.jspecify.annotations.Nullable;
 public record PythonReactiveContext(@Nullable Object reactorContext, PropagatedContext propagatedContext) {
 
     /**
+     * The context of a coroutine started inside a task: this one, with the Reactor context of the
+     * enclosing task when this one has none (an eager start carries the propagated context of the
+     * caller only, and a nested coroutine must subscribe within the enclosing transaction).
+     *
+     * @param enclosing The reactive context of the task the coroutine is started from
+     * @return The context of the new task
+     */
+    public PythonReactiveContext inheriting(PythonReactiveContext enclosing) {
+        if (reactorContext != null || enclosing.reactorContext() == null) {
+            return this;
+        }
+        return new PythonReactiveContext(enclosing.reactorContext(), propagatedContext);
+    }
+
+    /**
      * Run a callback of the task in the propagated context; called by the asyncio module for every
      * {@code call_soon}/{@code call_later} callback of a task that carries this context.
      *

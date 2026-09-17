@@ -1085,14 +1085,20 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     ``reactive_context`` is the reactive context of the subscriber (or the
     propagated context of the caller) that started the coroutine; the task
     copies it, the awaits of the coroutine subscribe within it and its steps run
-    in its propagated context.
+    in its propagated context. Started from within a task, a coroutine without
+    a Reactor context of its own inherits the one of that task (a nested
+    coroutine started eagerly by a Java method awaited in a transaction).
     """
 
     if not inspect.isawaitable(awaitable):
         java_future.complete(awaitable)
         return java_future
     if reactive_context is None:
+        # the task copies the current context, the enclosing task's if any
         return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    enclosing = _micronaut_reactive_context.get()
+    if enclosing is not None:
+        reactive_context = reactive_context.inheriting(enclosing)
     token = _micronaut_reactive_context.set(reactive_context)
     try:
         return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
