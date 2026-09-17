@@ -229,12 +229,30 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         if self.visitor_context is None or not module_name:
             return None
-        parent_name = module_name.rsplit(".", 1)[0] if "." in module_name else "python"
-        for candidate in (f"{module_name}.{imported_name}", f"{parent_name}.{imported_name}"):
+        candidates = [f"{module_name}.{imported_name}"]
+        if "." in module_name:
+            candidates.append(f"{module_name.rsplit('.', 1)[0]}.{imported_name}")
+        elif not self._is_compiled_python_package(module_name):
+            # the classes of a top-level module (from greeting_service import GreetingService) are
+            # compiled into the synthetic "python" package; a package of that name is a package
+            candidates.append(f"python.{imported_name}")
+        for candidate in candidates:
             class_element = self.visitor_context.getClassElement(candidate).orElse(None)
             if class_element is not None and _JavaTypes.isPythonClass(class_element):
                 return candidate
         return None
+
+    def _is_compiled_python_package(self, name):
+        """
+        Whether a top-level name is a Python package: a directory of the source root being
+        compiled, or a package of compiled Python classes on the compile class path.
+        """
+        if self.source_root and os.path.isdir(os.path.join(self.source_root, name)):
+            return True
+        return any(
+            _JavaTypes.isPythonClass(class_element)
+            for class_element in self.visitor_context.getClassElements(name, "*")
+        )
 
     def _resolve_relative_import(self, level, module_name, imported_name):
         """

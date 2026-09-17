@@ -2077,14 +2077,15 @@ class NotNullExample:
     }
 
     /**
-     * The members a compilation contributes to a package: the package initialiser merges the
-     * modules written next to it.
+     * The members contributed to a package by the given number of contributions (the application
+     * modules of the package and the Java shims imported from it are contributed separately), written
+     * to members modules next to the package initialiser that merges them.
      */
-    private static String packageMembers(File packageDirectory) {
-        packageDirectory.listFiles()
+    private static String packageMembers(File packageDirectory, int contributions = 1) {
+        def modules = packageDirectory.listFiles()
             .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
             .sort { it.name }
-            .collect { it.text }
-            .join('\n')
+        assert modules.size() == contributions : "${contributions} members module(s) expected in ${packageDirectory}: ${modules*.name}"
+        modules*.text.join('\n')
     }
 }

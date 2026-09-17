@@ -138,6 +138,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         def __micronaut_merge_members():
             import importlib
             import pkgutil
+            import sys
 
             contributions = [
                 module_info.name
@@ -164,8 +165,22 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             def resolve(name):
                 # a module of this package importing a member from the package while the package
-                # initialises: merge the remaining modules until one defines the member
-                if not name.startswith('__'):
+                # initialises: a contribution still being imported may have bound the member already,
+                # or names the module defining it (its member map is bound before its imports run,
+                # so a sibling is served whichever module the contribution imports first); otherwise
+                # the remaining modules are merged until one defines the member. A subpackage
+                # (from . import annotation) is left to the import system, which imports it itself.
+                if not name.startswith('__') and not any(info.name == name and info.ispkg for info in pkgutil.iter_modules(__path__)):
+                    for contribution_name in contributions:
+                        if contribution_name in merged:
+                            partial = sys.modules.get(__name__ + '.' + contribution_name)
+                            if partial is None:
+                                continue
+                            if name in vars(partial):
+                                return getattr(partial, name)
+                            module_name = getattr(partial, '__micronaut_member_modules__', {}).get(name)
+                            if module_name is not None:
+                                return getattr(importlib.import_module(__name__ + '.' + module_name), name)
                     for contribution_name in contributions:
                         if contribution_name not in merged:
                             merge(contribution_name)
@@ -471,14 +486,22 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 .filter(entry -> entry.getKey().parent.equals(parent))
                                 .toList();
                             List<String> members = new ArrayList<>();
+                            // the module defining each member, bound before the imports so the package initialiser
+                            // can serve a sibling to a module importing it from the package while this module imports
+                            StringBuilder memberModules = new StringBuilder("__micronaut_member_modules__ = {");
                             for (Map.Entry<PathEntry, List<String>> entry : entries) {
                                 List<String> types = entry.getValue();
-                                String filename = entry.getKey().filename;
+                                String moduleName = NameUtils.filename(entry.getKey().filename);
                                 for (String type : types) {
-                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(" import ").append(type).append('\n');
+                                    if (!members.isEmpty()) {
+                                        memberModules.append(", ");
+                                    }
+                                    memberModules.append('"').append(type).append("\": \"").append(moduleName).append('"');
                                     members.add(type);
                                 }
                             }
+                            membersContent.insert(0, memberModules.append("}\n").toString());
                             writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, membersContent, members, initialisedPackages, originatingElement);
                         }
                     }

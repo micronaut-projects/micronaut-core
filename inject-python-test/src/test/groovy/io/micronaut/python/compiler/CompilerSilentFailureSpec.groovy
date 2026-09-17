@@ -62,7 +62,7 @@ class Helper:
 
         when:
         compile()
-        def members = packageMembers(vfsFile("micronaut/context"))
+        def members = packageMembers(vfsFile("micronaut/context"), 2)
 
         then: "the Java shims and the application module are contributed to the same package, whose initializer merges them (a module importing a Java type from its own package while it initializes is served by the merger)"
         members.contains("java.type('io.micronaut.context.ApplicationContext')")
@@ -101,7 +101,7 @@ class Registry:
 
         when:
         compile()
-        def members = packageMembers(vfsFile("jakarta/inject"))
+        def members = packageMembers(vfsFile("jakarta/inject"), 2)
 
         then:
         members.contains("from .Singleton import Singleton")
@@ -428,13 +428,15 @@ class Service:
     }
 
     /**
-     * The members contributed to a package: the package initializer merges the modules written next to it.
+     * The members contributed to a package by the given number of contributions (the application modules of the
+     * package and the Java shims imported from it are contributed separately), written to members modules next to
+     * the initializer that merges them.
      */
-    private static String packageMembers(File packageDirectory) {
-        packageDirectory.listFiles()
+    private static String packageMembers(File packageDirectory, int contributions = 1) {
+        def modules = packageDirectory.listFiles()
             .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
             .sort { it.name }
-            .collect { it.text }
-            .join('\n')
+        assert modules.size() == contributions : "${contributions} members module(s) expected in ${packageDirectory}: ${modules*.name}"
+        modules*.text.join('\n')
     }
 }

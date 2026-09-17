@@ -20,6 +20,8 @@ import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.python.processing.PythonAnnotationProcessor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import java.io.File;
 import java.net.URL;
@@ -150,6 +152,51 @@ class PythonSourceRootsTest {
                 org.graalvm.polyglot.Context pythonContext = context.getBean(org.graalvm.polyglot.Context.class);
                 // both classes are members of the package whichever root's initialiser the class path serves first
                 assertTrue(pythonContext.eval("python", "from example import GreetingService, GreetingConsumer; True").asBoolean());
+            }
+        }
+    }
+
+    /**
+     * A module importing a sibling from its own package ({@code from example import GreetingService}) while the
+     * package initialises, with both modules in one root: the members module binding them is still being imported
+     * when the sibling import runs, whichever of the two modules it imports first.
+     */
+    @ParameterizedTest
+    @CsvSource({"a_service, b_consumer", "z_service, a_consumer"})
+    void aModuleImportsASiblingFromItsOwnPackageInASingleRoot(String serviceModule, String consumerModule) throws Exception {
+        Path sources = Files.createDirectories(temporaryDirectory.resolve("src/main/python/example"));
+        Files.writeString(sources.resolve(serviceModule + ".py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class GreetingService:
+                def greet(self, name: str) -> str:
+                    return f"Hello {name}"
+            """);
+        Files.writeString(sources.resolve(consumerModule + ".py"), """
+            from jakarta.inject import Singleton
+            from example import GreetingService
+
+            @Singleton
+            class GreetingConsumer:
+                def __init__(self, service: GreetingService):
+                    self.service = service
+
+                def greet(self, name: str) -> str:
+                    return self.service.greet(name)
+            """);
+        File output = Files.createDirectories(temporaryDirectory.resolve("classes/main")).toFile();
+        PyronautCompiler.builder()
+            .pythonSrc(sources.getParent().toString())
+            .targetDir(output)
+            .build()
+            .compile();
+
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{output.toURI().toURL()})) {
+            Class<?> consumer = classLoader.loadClass("example.GreetingConsumer");
+            try (ApplicationContext context = ApplicationContext.builder().classLoader(classLoader).build().start()) {
+                Object bean = context.getBean(consumer);
+                assertEquals("Hello Python", ((ValueCoercible) bean).asPolyglotValue().invokeMember("greet", "Python").asString());
             }
         }
     }

@@ -1543,25 +1543,27 @@ final class PyronautCompilerIncrementalTest {
         compilePython(directory.resolve("python"), java, output, cache);
 
         assertTrue(Files.isRegularFile(initializer));
+        // the members module of the previous compilation, named after its content, is replaced
         String content = packageMembers(initializer.getParent());
         assertTrue(content.contains("from .alpha import Added"));
         assertTrue(content.contains("from .beta import Beta"));
     }
 
     /**
-     * The members a compilation contributes to a package, written to modules next to the
-     * package initialiser that merges them.
+     * The members a compilation contributes to a package, written to a module named after
+     * its content next to the package initialiser that merges them: exactly one such module
+     * is expected, a change of the members replacing the previous one.
      */
     private static String packageMembers(Path packageDirectory) throws IOException {
-        StringBuilder members = new StringBuilder();
+        List<Path> modules;
         try (var files = Files.list(packageDirectory)) {
-            for (Path file : files.sorted().toList()) {
-                if (file.getFileName().toString().startsWith("__micronaut_members_")) {
-                    members.append(Files.readString(file));
-                }
-            }
+            modules = files
+                .filter(file -> file.getFileName().toString().startsWith("__micronaut_members_"))
+                .sorted()
+                .toList();
         }
-        return members.toString();
+        assertEquals(1, modules.size(), "members modules of " + packageDirectory + ": " + modules);
+        return Files.readString(modules.getFirst());
     }
 
     @Test
