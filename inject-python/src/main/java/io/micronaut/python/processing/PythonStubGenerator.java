@@ -132,6 +132,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_FLOAT = "asFloat";
     private static final String JAVA_LANG_STRING = "java.lang.String";
     private static final String SERIAL_VERSION_UID = "serialVersionUID";
+    private static final String AS_OBJECT_METHOD = "asObject";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -4661,7 +4662,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 classLiteral(targetType)
             );
         }
-        return PYTHON_CONVERSION.invokeStatic("asObject", TypeDef.OBJECT, converted).cast(castType);
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, converted).cast(castType);
     }
 
     private static boolean isReactiveType(ClassElement type) {
@@ -4695,7 +4696,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (castType == null) {
             return expression;
         }
-        return PYTHON_CONVERSION.invokeStatic("asObject", castType, expression);
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, castType, expression);
     }
 
     private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
@@ -4905,7 +4906,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef uncheckedCast(ExpressionDef expression, ClassElement targetType) {
-        return PYTHON_CONVERSION.invokeStatic("asObject", TypeDef.OBJECT, expression).cast(sourceSignatureType(targetType));
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, expression).cast(sourceSignatureType(targetType));
     }
 
     private static ExpressionDef convertRuntimeValue(ClassElement targetType, ExpressionDef value) {
