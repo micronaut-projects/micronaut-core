@@ -304,8 +304,9 @@ _micronaut_self_invocation_layouts = {}
 def _micronaut_self_invocation_layout(function):
     """The parameters after ``self``, or ``None`` when the layout cannot be mapped onto the Java method.
 
-    A method taking ``*args`` or ``**kwargs`` has no positional layout; its self-invocations stay
-    direct rather than dropping or misplacing arguments.
+    A method taking ``*args`` or ``**kwargs`` has no positional layout, and the generated Java method
+    has no parameter for a keyword-only one; the self-invocations of such methods stay direct rather
+    than dropping or misplacing arguments.
     """
     try:
         return _micronaut_self_invocation_layouts[function]
@@ -317,7 +318,7 @@ def _micronaut_self_invocation_layout(function):
     try:
         parameters = tuple(inspect.signature(function).parameters.values())[1:]
         for parameter in parameters:
-            if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+            if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
                 parameters = None
                 break
     except (TypeError, ValueError):
