@@ -342,7 +342,48 @@ public final class AnnotationMetadataSupport {
      * @return The annotation
      */
     static Optional<Class<? extends Annotation>> getAnnotationType(String name) {
-        return getAnnotationType(name, AnnotationMetadataSupport.class.getClassLoader());
+        // a caller naming no loader is answered for the thread context loader, the loader of the deployment it
+        // runs in, never for the loader of this class: that one sees the application's copy of a type where a
+        // child-first deployment loader defines another
+        final ClassLoader contextLoader = Thread.currentThread().getContextClassLoader();
+        final Class<? extends Annotation> type = ANNOTATION_TYPES.get(name);
+        if (type != null) {
+            // the registered type is kept for a context that defines it or sits above the loader defining it,
+            // a thread of the container a deployment runs in; only a context loader apart from it - another
+            // deployment, which may define a copy of its own - resolves the name again
+            if (contextLoader == null || isSelfOrAncestor(contextLoader, type.getClassLoader())) {
+                return Optional.of(type);
+            }
+            return getAnnotationType(name, contextLoader);
+        }
+        final ClassLoader ownLoader = AnnotationMetadataSupport.class.getClassLoader();
+        if (contextLoader != null && contextLoader != ownLoader) {
+            final Optional<Class<? extends Annotation>> fromContext = getAnnotationType(name, contextLoader);
+            if (fromContext.isPresent()) {
+                return fromContext;
+            }
+        }
+        return getAnnotationType(name, ownLoader);
+    }
+
+    /**
+     * Whether a loader is the given one or one of the parents it delegates to.
+     *
+     * @param candidate The loader that may be the given one or one of its parents
+     * @param loader    The loader whose parents are walked, {@code null} for the bootstrap loader
+     * @return True if it is
+     */
+    private static boolean isSelfOrAncestor(ClassLoader candidate, @Nullable ClassLoader loader) {
+        if (loader == null) {
+            // the bootstrap loader defines a type no other loader can shadow
+            return true;
+        }
+        for (ClassLoader current = loader; current != null; current = current.getParent()) {
+            if (current == candidate) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

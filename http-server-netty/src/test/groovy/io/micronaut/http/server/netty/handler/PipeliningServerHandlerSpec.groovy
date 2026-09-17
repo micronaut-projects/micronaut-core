@@ -639,7 +639,11 @@ class PipeliningServerHandlerSpec extends Specification {
                 failure = cause
             }
         })
-        handler.setBodySizeLimits(new BodySizeLimits(64, 64))
+        // Netty 4.2.18 requests at least 512 writable bytes when growing the decompression
+        // buffer, including after inflating a chunk. Allow enough headroom so this test
+        // reaches the cumulative 64-byte body limit instead of the decoder allocation limit.
+        // See https://github.com/netty/netty/pull/17370
+        handler.setBodySizeLimits(new BodySizeLimits(64, 1024))
         def ch = new EmbeddedChannel(handler)
         def compChannel = new EmbeddedChannel(compressor)
         def requestMessage = new DefaultHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.POST, "/")
