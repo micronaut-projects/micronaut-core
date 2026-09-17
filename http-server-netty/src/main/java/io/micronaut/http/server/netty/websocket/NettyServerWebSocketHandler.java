@@ -26,7 +26,6 @@ import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.KotlinUtils;
 import io.micronaut.http.HttpAttributes;
@@ -76,6 +75,7 @@ import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -345,38 +345,39 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected ExecutionFlow<?> invokeExecutable(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        if (coroutineHelper != null) {
-            Executable<?, ?> target = boundExecutable.getTarget();
-            if (target instanceof ExecutableMethod<?, ?> executableMethod) {
-                if (executableMethod.isSuspend()) {
-                    try {
-                        coroutineHelper.setupCoroutineContext(originatingRequest, Context.empty(), PropagatedContext.getOrEmpty());
-
-                        Object immediateReturnValue = invokeExecutable0(boundExecutable, messageHandler);
-
-                        if (KotlinUtils.isKotlinCoroutineSuspended(immediateReturnValue)) {
-                            Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest);
-                            if (supplier == null) {
-                                return ExecutionFlow.empty();
-                            }
-                            return CompletableFutureExecutionFlow.just(supplier.get());
-                        } else {
-                            return ExecutionFlow.empty();
-                        }
-                    } catch (Exception e) {
-                        return ExecutionFlow.error(e);
-                    }
-                }
+        CoroutineHelper helper = coroutineHelper;
+        if (helper != null
+            && boundExecutable.getTarget() instanceof ExecutableMethod<?, ?> executableMethod
+            && executableMethod.isSuspend()) {
+            try {
+                helper.setupCoroutineContext(originatingRequest, Context.empty(), PropagatedContext.getOrEmpty());
+            } catch (Exception e) {
+                return ExecutionFlow.error(e);
             }
+            return invokeExecutable0(boundExecutable, messageHandler, true);
         }
-        return invokeExecutable0(boundExecutable, messageHandler);
+        return invokeExecutable0(boundExecutable, messageHandler, false);
     }
 
-    private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
+    private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler, boolean suspend) {
         Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
         ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
         return ExecutionFlow.async(executor, () -> {
             Object result = invokeWithContext(boundExecutable, messageHandler).get();
+            if (suspend) {
+                // the flow completes when the coroutine does, so that the frame content the
+                // handler may alias stays alive across its suspensions and its failure reaches
+                // @OnError
+                if (KotlinUtils.isKotlinCoroutineSuspended(result)) {
+                    Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest);
+                    if (supplier == null) {
+                        return ExecutionFlow.empty();
+                    }
+                    CompletionStage<Object> completion = supplier.get().thenApply(v -> v);
+                    return CompletableFutureExecutionFlow.just(completion);
+                }
+                return ExecutionFlow.just(result);
+            }
             if (returnType.isReactive() || Publishers.isConvertibleToPublisher(result)) {
                 return ReactiveExecutionFlow.fromPublisher(Publishers.convertToPublisher(conversionService, result))
                     .putInContext(ServerRequestContext.KEY, originatingRequest);
@@ -398,19 +399,24 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
     @Override
     protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
-        ctx.executor().execute(() -> {
-            try {
-                nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
-                        .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
-            } catch (Exception e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
+        try {
+            ctx.executor().execute(() -> {
+                try {
+                    nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
+                            .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
+                } catch (Exception e) {
+                    if (LOG.isErrorEnabled()) {
+                        LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
+                    }
+                } finally {
+                    // the listeners have seen the message, the frame content it may alias can go
+                    release.run();
                 }
-            } finally {
-                // the listeners have seen the message, the frame content it may alias can go
-                release.run();
-            }
-        });
+            });
+        } catch (RejectedExecutionException e) {
+            // the event loop is shutting down: no listeners will run, but the content must not leak
+            release.run();
+        }
     }
 
     @Override
