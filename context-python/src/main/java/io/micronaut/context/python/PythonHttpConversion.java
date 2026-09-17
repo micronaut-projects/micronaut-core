@@ -165,6 +165,29 @@ public final class PythonHttpConversion {
     }
 
     /**
+     * Convert the value a Python method returned to the reactive type its signature declares: a
+     * host {@link Publisher} or {@link CompletionStage} of another type (a Reactor {@code Mono}
+     * returned by a method implementing a {@code CompletableFuture} declaration without a return
+     * annotation) is adapted as by {@link #convertReactive(Object, Class)}; any other value is
+     * converted as by {@link PythonConversion#convertValue(Value, Class)}.
+     *
+     * @param value The polyglot value the Python method returned
+     * @param targetType The declared reactive return type
+     * @param <P> The reactive type
+     * @return The converted value, or {@code null} for {@code None}
+     * @throws IllegalArgumentException When a reactive value cannot be adapted to the declared type
+     */
+    public static <P> @Nullable P convertReactiveValue(Value value, Class<P> targetType) {
+        if (value.isHostObject()) {
+            Object hostObject = value.asHostObject();
+            if (hostObject instanceof Publisher<?> || hostObject instanceof CompletionStage<?>) {
+                return convertReactive(hostObject, targetType);
+            }
+        }
+        return PythonConversion.convertValue(value, targetType);
+    }
+
+    /**
      * Adapt a reactive value (a {@link Publisher} or a {@link CompletionStage}) to the reactive type a
      * method declares. A value that already is of the declared type is returned as is; a publisher is
      * otherwise wrapped as {@code Mono.from}/{@code Flux.from} when Reactor is present, completed into

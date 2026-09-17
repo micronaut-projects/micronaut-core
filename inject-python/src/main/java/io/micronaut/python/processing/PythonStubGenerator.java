@@ -4594,6 +4594,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(PUBLISHER)) {
                         yield convertPublisher(allClasses, returnType, invokedValue, returnType, sourceSignatureType(returnType));
+                    } else if (returnType.isAssignable(CompletionStage.class)) {
+                        // A publisher returned where a completion stage is declared (an unannotated
+                        // method implementing a CompletableFuture signature returning a Mono) is adapted
+                        yield PYTHON_HTTP_CONVERSION.invokeStatic("convertReactiveValue", TypeDef.OBJECT,
+                                invokedValue, classLiteral(returnType))
+                            .cast(sourceSignatureType(returnType));
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {

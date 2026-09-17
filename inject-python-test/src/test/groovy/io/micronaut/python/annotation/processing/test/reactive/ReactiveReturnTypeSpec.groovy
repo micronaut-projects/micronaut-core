@@ -89,6 +89,84 @@ class PublisherFinder(ReactiveFinder):
         context?.close()
     }
 
+    void "unannotated python implementation of reactive interface methods uses the Java declaration"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.reactive import ReactiveFinder
+from reactor.core.publisher import Flux, Mono
+
+@Singleton
+class UnannotatedFinder(ReactiveFinder):
+    def find(self, id):
+        return Flux.just(id)
+
+    def findAll(self):
+        return Mono.just("a")
+
+    def findFuture(self, id):
+        return Mono.just(id)
+
+    def findStage(self, id):
+        return Flux.just(id)
+''', true)
+
+        when:
+        ReactiveFinder finder = context.getBean(ReactiveFinder)
+
+        then:
+        finder.find("x") instanceof Mono
+        finder.find("x").block() == "x"
+        finder.findAll() instanceof Flux
+        finder.findAll().collectList().block() == ["a"]
+        finder.findFuture("f") instanceof CompletableFuture
+        finder.findFuture("f").get() == "f"
+        finder.findStage("s") instanceof CompletionStage
+        finder.findStage("s").toCompletableFuture().get() == "s"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "unannotated python implementation of future interface methods returning futures"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.reactive import ReactiveFinder
+from reactor.core.publisher import Flux, Mono
+
+@Singleton
+class UnannotatedFutureFinder(ReactiveFinder):
+    def find(self, id):
+        return Mono.just(id)
+
+    def findAll(self):
+        return Flux.just("a", "b")
+
+    def findFuture(self, id):
+        return Mono.just(id).toFuture()
+
+    def findStage(self, id):
+        return Mono.just(id).toFuture()
+''', true)
+
+        when:
+        ReactiveFinder finder = context.getBean(ReactiveFinder)
+
+        then:
+        finder.find("x") instanceof Mono
+        finder.find("x").block() == "x"
+        finder.findAll() instanceof Flux
+        finder.findAll().collectList().block() == ["a", "b"]
+        finder.findFuture("f") instanceof CompletableFuture
+        finder.findFuture("f").get() == "f"
+        finder.findStage("s") instanceof CompletionStage
+        finder.findStage("s").toCompletableFuture().get() == "s"
+
+        cleanup:
+        context?.close()
+    }
+
     void "python implementation of Mono interface methods with async coroutines"() {
         given:
         def context = buildContext('''
