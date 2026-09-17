@@ -178,4 +178,92 @@ class ConsumerFactory:
         def e = thrown(RuntimeException)
         e.message.contains("Factory methods declared with @Bean must specify a return type")
     }
+
+    void "test a @Bean method inherited from a non-@Factory base is bridged for the @Factory subclass"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+class Bar:
+
+    def __init__(self):
+        self.name = "inherited"
+
+class BaseFactory:
+
+    @Bean
+    def bar(self) -> Bar:
+        return Bar()
+
+@Factory
+class BarFactory(BaseFactory):
+    pass
+''')
+
+        when:
+        def bar = getBean(context, "python.Bar")
+        def baseStub = context.classLoader.loadClass("python.BaseFactory")
+        def factoryStub = context.classLoader.loadClass("python.BarFactory")
+
+        then:
+        bar.asPolyglotValue().getMember("name").asString() == "inherited"
+        baseStub.getDeclaredMethod("bar").returnType.name == "python.Bar"
+        factoryStub.getMethod("bar").declaringClass == baseStub
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test @Bean functions of a module-level Factory() script are factory methods"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+Factory()
+
+class Bar:
+
+    def __init__(self, name: str):
+        self.name = name
+
+@Bean
+def bar() -> Bar:
+    return Bar("module")
+
+def not_a_bean() -> Bar:
+    return Bar("plain")
+''')
+
+        when:
+        def bar = getBean(context, "python.Bar")
+        def script = context.classLoader.loadClass("python.Script")
+
+        then:
+        bar.asPolyglotValue().getMember("name").asString() == "module"
+        script.getDeclaredMethod("bar").returnType.name == "python.Bar"
+        !script.declaredMethods*.name.contains("not_a_bean")
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a @Bean function without a return type on a module-level Factory() script is rejected"() {
+        when:
+        buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+Factory()
+
+class Bar:
+    pass
+
+@Bean
+def bar():
+    return Bar()
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Factory methods declared with @Bean must specify a return type")
+    }
 }

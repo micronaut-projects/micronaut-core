@@ -668,7 +668,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ann.hasStereotype(InterceptorBinding.class) ||
             element.hasStereotype(Around.class) ||
             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-            isFactoryBeanMethod(element, ann) ||
+            isDeclaredBeanMethod(ann) ||
             isConfigurationBuilderType;
         List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(
             ElementQuery.ALL_METHODS
@@ -2322,7 +2322,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             ann.hasAnnotation(AnnotationUtil.POST_CONSTRUCT) ||
                             ann.hasStereotype(Around.class) ||
                             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
-                            isFactoryBeanMethod(scriptElement, ann)));
+                            isDeclaredBeanMethod(ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
                 boolean isJunit5Test = methodElement.hasDeclaredAnnotation(JUNIT_TEST)
@@ -5017,22 +5017,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether a method carries a declared {@code @Bean} annotation or stereotype. Every such method is bridged:
+     * a {@code @Factory} needs the bridge for its bean methods, including those it inherits from a base class
+     * that is not itself a {@code @Factory}, as the bean definition of an inherited bean method calls the
+     * bridge of the declaring stub. Visitors can also add {@code @Bean} directly to Python methods after
+     * metadata parsing, and those methods need bridges so that the generated bean definitions can call them.
+     * A plain bridge is harmless elsewhere.
+     *
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method declares a {@code @Bean} annotation or stereotype
+     */
+    private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredAnnotation(Bean.class)
+            || annotationMetadata.hasDeclaredStereotype(Bean.class);
+    }
+
+    /**
      * Whether a method is a factory method producing a bean. Mirrors the core bean definition creators: a
      * method carrying a declared {@code @Bean} annotation or stereotype only produces a bean when the class
-     * declaring it is a {@code @Factory}. Elsewhere the {@code @Bean} stereotype is incidental, for example
-     * messaging listener annotations meta-annotated with {@code @MessageListener} that are placed on methods
-     * of ordinary beans, and such methods are bridged as regular executable methods.
+     * it is bridged for is a {@code @Factory}. Elsewhere the {@code @Bean} stereotype is incidental, for
+     * example messaging listener annotations meta-annotated with {@code @MessageListener} that are placed on
+     * methods of ordinary beans, and such methods are bridged as regular executable methods without the
+     * factory method validation.
      *
      * @param owner              The class the method is bridged for
      * @param annotationMetadata The annotation metadata of the method
      * @return True if the method is a factory method
      */
     private static boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
-        // Visitors can add @Bean directly to Python methods after metadata parsing. Those
-        // methods still need Java bridge methods so generated bean definitions can call them.
-        return owner.hasStereotype(Factory.class)
-            && (annotationMetadata.hasDeclaredAnnotation(Bean.class)
-            || annotationMetadata.hasDeclaredStereotype(Bean.class));
+        return owner.hasStereotype(Factory.class) && isDeclaredBeanMethod(annotationMetadata);
     }
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
