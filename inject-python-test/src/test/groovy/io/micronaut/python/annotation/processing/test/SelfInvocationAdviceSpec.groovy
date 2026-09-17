@@ -260,6 +260,39 @@ class VariadicService:
         context?.close()
     }
 
+    void "a method taking keyword-only arguments keeps direct self-invocations"() {
+        given:
+        @Language("python") def pythonCode = INTERCEPTOR + '''
+@Singleton
+class KeywordOnlyService:
+    @Executable
+    def outer(self, name: str) -> str:
+        return self.fmt(name, suffix="!")
+
+    @Executable
+    def outer_default(self, name: str) -> str:
+        return self.fmt(name)
+
+    @TestAround
+    def fmt(self, value: str, *, suffix: str = ".") -> str:
+        return value + suffix
+'''
+        def context = buildContext(pythonCode)
+        def service = getBean(context, "python.KeywordOnlyService")
+
+        when: "the generated Java method has no parameter for the keyword-only one"
+        def explicit = service.outer("a")
+        def defaulted = service.outer_default("b")
+
+        then: "the nested calls are direct Python calls, with and without the keyword argument"
+        explicit == "a!"
+        defaulted == "b."
+        InterceptionLog.methods().isEmpty()
+
+        cleanup:
+        context?.close()
+    }
+
     void "an interceptor completing the stage of a coroutine method asynchronously does not stall the caller"() {
         given: "an interceptor that completes the stage 300ms later on another thread"
         @Language("python") def pythonCode = '''

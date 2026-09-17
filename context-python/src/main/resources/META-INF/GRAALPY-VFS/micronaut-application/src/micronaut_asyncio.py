@@ -1207,11 +1207,28 @@ def __micronaut_complete_completion_stage_awaitable(future, value, throwable):
     """
 
     loop = future.get_loop()
-    thread_id = getattr(loop, "_thread_id", None)
+    thread_id = _micronaut_loop_thread_id(loop)
     if thread_id is not None and thread_id != threading.get_ident() and not loop.is_closed():
-        loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
-    else:
-        _micronaut_complete_future(future, value, throwable)
+        try:
+            loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
+            return
+        except RuntimeError:
+            # the loop closed between the check and the hand-off (shutdown): complete the future
+            # directly rather than leave it pending
+            pass
+    _micronaut_complete_future(future, value, throwable)
+
+
+def _micronaut_loop_thread_id(loop):
+    """The id of the thread running a standard asyncio loop, or ``None`` when no hand-off is needed.
+
+    ``BaseEventLoop`` records its thread while ``run_forever`` runs (there is no public accessor);
+    the Micronaut loop has no thread of its own and its ``call_soon`` queues every callback on the
+    Netty event loop already, so a future of it is completed directly.
+    """
+    if isinstance(loop, _MicronautAsyncioEventLoop):
+        return None
+    return getattr(loop, "_thread_id", None)
 
 
 def _micronaut_complete_future(future, value, throwable):
