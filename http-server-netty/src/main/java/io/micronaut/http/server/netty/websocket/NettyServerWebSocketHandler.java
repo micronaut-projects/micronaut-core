@@ -397,7 +397,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected void messageHandled(ChannelHandlerContext ctx, Object message) {
+    protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
         ctx.executor().execute(() -> {
             try {
                 nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
@@ -406,6 +406,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 if (LOG.isErrorEnabled()) {
                     LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
                 }
+            } finally {
+                // the listeners have seen the message, the frame content it may alias can go
+                release.run();
             }
         });
     }

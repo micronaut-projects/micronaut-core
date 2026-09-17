@@ -73,7 +73,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -408,22 +407,16 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         );
 
                         Object finalData = data;
+                        Runnable release = finalHandlerOwnedContent == null ? () -> { } : finalHandlerOwnedContent::release;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
-                            boolean handled = false;
-                            try {
-                                if (e == null) {
-                                    messageHandled(ctx, finalData);
-                                    handled = true;
-                                } else {
+                            if (e == null) {
+                                // the message may still be handed to listeners, messageHandled releases once that is done
+                                messageHandled(ctx, finalData, release);
+                            } else {
+                                try {
                                     messageProcessingException(ctx, e);
-                                }
-                            } finally {
-                                if (finalHandlerOwnedContent != null) {
-                                    if (handled) {
-                                        releaseAfterListeners(ctx, finalHandlerOwnedContent);
-                                    } else {
-                                        finalHandlerOwnedContent.release();
-                                    }
+                                } finally {
+                                    release.run();
                                 }
                             }
                         });
@@ -524,24 +517,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Release the frame content a handled message aliased, but only after the listeners that
-     * {@link #messageHandled} hands the message to have run. Implementations publish the
-     * {@code WebSocketMessageProcessedEvent} from a task on the channel's executor rather than
-     * inline, so the release is queued on that executor behind it.
-     *
-     * @param ctx     The context
-     * @param content The content owned by the handler invocation
-     */
-    private static void releaseAfterListeners(ChannelHandlerContext ctx, ByteBuf content) {
-        try {
-            ctx.executor().execute(content::release);
-        } catch (RejectedExecutionException e) {
-            // the event loop is gone, so are the listeners
-            content.release();
-        }
-    }
-
-    /**
      * Decodes the aggregated content of a message into the type of the body argument. The caller keeps ownership
      * of {@code content}; the returned value may alias it (see {@link #handleWebSocketFrame}).
      *
@@ -604,6 +579,24 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
      */
     protected void messageHandled(ChannelHandlerContext ctx, Object message) {
         // no-op
+    }
+
+    /**
+     * Method called once a message has been handled by the handler. When the message is a view of
+     * the frame content, {@code release} frees that content; an implementation that hands the
+     * message on (e.g. to event listeners on another thread) must run it once the message is no
+     * longer needed. The default runs it after {@link #messageHandled(ChannelHandlerContext, Object)}.
+     *
+     * @param ctx     The channel handler context
+     * @param message The message that was handled
+     * @param release Releases the frame content the message aliases; must run exactly once
+     */
+    protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
+        try {
+            messageHandled(ctx, message);
+        } finally {
+            release.run();
+        }
     }
 
     /**
