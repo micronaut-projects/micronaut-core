@@ -2578,8 +2578,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
+    /**
+     * Identifies a placeholder by its declaring element and variable name. A method is identified by
+     * its owner and parameter types, not only its simple name, so the {@code T} of {@code <T> foo(a)}
+     * and the {@code T} of {@code <T> foo(a, b)} are distinct keys.
+     */
     private static String placeholderKey(GenericPlaceholderElement placeholder) {
-        return placeholder.getDeclaringElement().map(Element::getName).orElse("") + "#" + placeholder.getVariableName();
+        String declaringElement = placeholder.getDeclaringElement().map(element -> {
+            if (element instanceof MethodElement methodElement) {
+                return methodElement.getOwningType().getName() + "." + bridgeMethodKey(methodElement);
+            }
+            return element.getName();
+        }).orElse("");
+        return declaringElement + "#" + placeholder.getVariableName();
     }
 
     /**
