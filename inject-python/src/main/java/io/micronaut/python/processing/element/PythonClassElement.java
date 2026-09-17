@@ -215,7 +215,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     public Optional<MethodElement> getDefaultConstructor() {
         Optional<MethodElement> primaryConstructor = getPrimaryConstructor();
         if (primaryConstructor.isEmpty()) {
-            if (!hasDeclaredAnnotation("dataclass")) {
+            if (!hasDeclaredAnnotation(DATACLASS_DECORATOR)) {
                 // python class with no explicit constructor return default
                 return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
             }
