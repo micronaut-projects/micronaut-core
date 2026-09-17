@@ -16,6 +16,8 @@
 package io.micronaut.inject.processing;
 
 import io.micronaut.aop.Adapter;
+import io.micronaut.aop.Around;
+import io.micronaut.aop.Introduction;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
@@ -51,9 +53,11 @@ import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.annotation.Annotation;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,6 +81,15 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
     private static final String MSG_TARGET_METHOD_PREFIX = "] to target method [";
 
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+
+    /**
+     * The stereotypes that mark an annotation as interceptor advice.
+     */
+    private static final List<String> ADVICE_STEREOTYPES = List.of(
+        Around.class.getName(),
+        Introduction.class.getName(),
+        AnnotationUtil.ANN_INTERCEPTOR_BINDING
+    );
 
     protected final boolean isAopProxy;
     protected final List<Buildable<List<R>>> additionalBuilders = new ArrayList<>();
@@ -714,6 +727,8 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
             new AnnotationMetadataHierarchy(classElement, interfaceToAdapt)
         );
 
+        removeInheritedInterceptorAdvice(proxyAnnotationMetadata, interfaceToAdapt);
+
         // TODO: The best would be to add a requires for the adapted bean instead of copying all the annotations
         ElementProxyBuilder<R> aopProxyWriter = beanDefinitionBuilderFactory.introductionProxy(
             adapterProxyClassName,
@@ -723,6 +738,55 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
         additionalBuilders.add(aopProxyWriter);
 
         aopProxyWriter.implementInterface(interfaceToAdapt);
+    }
+
+    /**
+     * Removes the interceptor advice that the generated adapter inherited from the class declaring the adapted
+     * method.
+     *
+     * <p>The adapter is a separate bean that does nothing but delegate to a method of the declaring bean, which
+     * is itself a bean and keeps its own advice. Class level advice therefore describes the declaring bean, not
+     * the adapter, and copying it over applies the same advice twice to what is logically one target: once when
+     * the adapter's SAM method is called and once again when the adapter delegates. Modules that keep per-target
+     * state, such as a lifecycle interceptor instance per object, see two targets where there is one.</p>
+     *
+     * <p>Advice declared on the adapted method itself is unaffected: it was never copied here, it stays on the
+     * declaring bean, and it still runs when the adapter delegates. Advice declared on the adapted interface is
+     * kept, since it describes the adapter.</p>
+     *
+     * @param proxyAnnotationMetadata The metadata of the generated adapter
+     * @param interfaceToAdapt        The adapted interface
+     */
+    private static void removeInheritedInterceptorAdvice(MutableAnnotationMetadata proxyAnnotationMetadata,
+                                                         ClassElement interfaceToAdapt) {
+        Set<String> adviceFromDeclaringClass = new LinkedHashSet<>();
+        for (String stereotype : ADVICE_STEREOTYPES) {
+            adviceFromDeclaringClass.addAll(proxyAnnotationMetadata.getAnnotationNamesByStereotype(stereotype));
+        }
+        // Anything the adapted interface declares itself describes the adapter and is kept
+        adviceFromDeclaringClass.removeAll(interfaceToAdapt.getAnnotationMetadata().getAnnotationNames());
+        if (adviceFromDeclaringClass.isEmpty()) {
+            return;
+        }
+        for (String annotationName : adviceFromDeclaringClass) {
+            proxyAnnotationMetadata.removeAnnotation(annotationName);
+            proxyAnnotationMetadata.removeStereotype(annotationName);
+        }
+        // The bindings are resolved from the repeatable container rather than from the advice annotations, so
+        // the entries of the removed advice have to go too
+        List<AnnotationValue<Annotation>> remainingBindings = proxyAnnotationMetadata
+            .getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING)
+            .stream()
+            .filter(av -> av.stringValue().filter(adviceFromDeclaringClass::contains).isEmpty())
+            .map(av -> (AnnotationValue<Annotation>) av)
+            .toList();
+        proxyAnnotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        proxyAnnotationMetadata.removeAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS);
+        proxyAnnotationMetadata.removeStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDING);
+        for (AnnotationValue<Annotation> binding : remainingBindings) {
+            proxyAnnotationMetadata.addDeclaredRepeatable(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS, binding);
+        }
     }
 
     private static String getClassName(ClassElement element) {
