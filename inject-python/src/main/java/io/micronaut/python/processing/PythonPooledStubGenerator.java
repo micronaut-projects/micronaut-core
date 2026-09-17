@@ -74,7 +74,7 @@ final class PythonPooledStubGenerator {
 
         ClassElement superType = element.getSuperType().orElse(null);
         if (superType instanceof AbstractPythonClassElement) {
-            builder.superclass(ClassTypeDef.of(superType.getName()));
+            builder.superclass(ClassTypeDef.of(PythonStubGenerator.javaTypeName(superType)));
         }
 
         List<PropertyElement> beanProperties = element.getBeanProperties();

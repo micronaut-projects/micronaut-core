@@ -355,8 +355,8 @@ languageSupport:
     nestedTypes: Nested Java Types
     pythonExceptions: Python Exceptions Extending Java Exceptions
     functionalInterfaces: Python Callables as Functional Interfaces
-
     javaInterfaces: Implementing Java Interfaces
+    generatedClasses: Generated Java Classes
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

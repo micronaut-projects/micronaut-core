@@ -175,6 +175,29 @@ public final class PythonContextRuntime {
     }
 
     /**
+     * Whether a Python object owned by a generated stub belongs to the primary context of the installed
+     * application runtime.
+     * <p>
+     * A stub that owns its Python object (one created through a constructor of the stub rather than
+     * wrapping an existing object) creates it on first use and again when the object it holds belongs to
+     * a context that is no longer the primary context: a stub held in a JVM-wide singleton, such as a
+     * service loaded once per JVM, then follows the application currently running instead of failing
+     * with a cancelled execution of a closed context.
+     *
+     * @param value The Python object the stub holds, or {@code null} when none was created yet
+     * @return {@code true} when the object belongs to the primary context of the installed runtime
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static boolean isCurrentInstance(@Nullable Value value) {
+        if (value == null) {
+            return false;
+        }
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime != null && runtime.owns(value.getContext());
+    }
+
+    /**
      * Check whether the supplied context is the primary context of the installed runtime, the one a
      * generated wrapper creates its Python object in.
      * <p>
@@ -1334,12 +1357,17 @@ public final class PythonContextRuntime {
     }
 
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
-        Value module = importModule(ctx, packageName);
-        Value member = module.getMember(importName);
+        // The module named after the class is tried first. Importing a module of a package whose
+        // __init__ is being executed by another thread does not wait for that thread, importing the
+        // package does: a class instantiated on another thread while its package is being imported (a
+        // service the parallel service loader creates for a call made at import time) would otherwise
+        // wait for the import lock the importing thread holds while it waits for the instantiation.
+        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
-        member = importPackageSubmoduleMember(ctx, packageName, importName);
+        Value module = importModule(ctx, packageName);
+        member = module.getMember(importName);
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }

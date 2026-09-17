@@ -761,6 +761,8 @@ final class PythonContextRegistry {
         final AtomicReference<@Nullable Value> runtimeModule = new AtomicReference<>();
         /** Python classes resolved in this context, keyed by their qualified name. */
         final Map<String, Value> classes = new ConcurrentHashMap<>();
+        /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
+        final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -774,6 +776,7 @@ final class PythonContextRegistry {
             coroutineClasses.clear();
             helpers.clear();
             classes.clear();
+            scopedProxies.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

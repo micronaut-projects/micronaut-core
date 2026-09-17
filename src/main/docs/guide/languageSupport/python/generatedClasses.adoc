@@ -1,0 +1,40 @@
+Every Python class compiles to a generated Java class of the same name that Java code, the bean context and the test extensions use in place of the Python object. A few properties of these generated classes matter when Python classes are used from Java or from tests.
+
+== Nested Classes
+
+A class nested in a Python class compiles to a member type of the generated class of its enclosing class, with the binary name Java gives member types (`Outer$Inner`). Java code refers to it as `Outer.Inner`, and frameworks that inspect the nesting of a class see it: a JUnit 5 `@Nested` test class of a `@MicronautTest` class is generated as an inner class of the test class, so JUnit runs it with the application context of the enclosing test and injects its attributes.
+
+[source,python]
+----
+@MicronautTest
+class OrderServiceTest:
+
+    order_service: Annotated[OrderService, Inject]
+
+    @Test
+    def test_places_an_order(self):
+        assert self.order_service.place("book") == "placed book"
+
+    @Nested
+    class Placing:
+
+        order_service: Annotated[OrderService, Inject]
+
+        @Test
+        def test_places_an_order_from_the_nested_test(self):
+            assert self.order_service.place("pen") == "placed pen"
+----
+
+Nested enums, interfaces (abstract base classes and protocols) and `@ContextPooled` classes are generated as top-level types named `Outer$Inner`.
+
+== The Python Object of a Generated Class
+
+An instance of a generated class created through its no-argument constructor, for example a service listed in `META-INF/services` that the framework instantiates, creates its Python object in the Python context of the application running at that time. The instance is not bound to that context: when the application is stopped and another one started in the same JVM, the next use creates the object again in the new context, so a service held in a static holder keeps working across applications and test classes. Instances created with constructor arguments, and instances wrapping an existing Python object, keep the object they were created with.
+
+A class is resolved through the module named after it before its package is imported, so a class instantiated on another thread while its package is being imported (a service the parallel service loader creates for a call made at import time) does not wait for the import of the package.
+
+== Scoped Proxies
+
+A factory method producing a Python class with a proxied scope, such as `@Refreshable` or the `@MockBean` of Micronaut Test, is served through a generated proxy, as for a Java class. The proxy has no Python object of its own: Java callers reach the bean the scope currently holds through the intercepted methods, and Python code receiving the proxy gets a Python scoped proxy of the same class that forwards every attribute read, write and method call to that bean, so a refreshed bean or a mock replaced between tests is seen by Python callers as well. A factory method returning a Python abstract base class produces a proxy implementing the generated interface.
+
+Python code calling a method of such a proxy calls the Python object of the target directly; around advice declared on the factory method applies to calls made from Java.

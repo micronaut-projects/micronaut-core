@@ -229,7 +229,8 @@ def __micronaut_create_scoped_proxy(cls, target_supplier):
     """A subclass of cls that forwards every attribute to the bean the supplier returns.
 
     Method and setter overrides registered by the Java proxy creator run the interceptor chain
-    before the target is reached.
+    before the target is reached. The proxy of an abstract class (a scoped proxy standing in for an
+    implementation of it) is instantiable: every attribute is served by the target.
     """
     class _MicronautScopedProxy(cls):
         def __init__(self, supplier):
@@ -267,6 +268,10 @@ def __micronaut_create_scoped_proxy(cls, target_supplier):
             overrides = object.__getattribute__(self, "_micronaut_overrides")
             if name in overrides:
                 return overrides[name]
+            if name.startswith("org.graalvm.python.embedding."):
+                # GraalPy probes every argument of a host call for its keyword/positional argument
+                # markers: not an attribute of the target, which a lazy target must not be resolved for
+                raise AttributeError(name)
             target = object.__getattribute__(self, "_micronaut_target")()
             return getattr(target, name)
 
@@ -286,4 +291,6 @@ def __micronaut_create_scoped_proxy(cls, target_supplier):
             target = object.__getattribute__(self, "_micronaut_target")()
             return repr(target)
 
+    if getattr(_MicronautScopedProxy, "__abstractmethods__", None):
+        _MicronautScopedProxy.__abstractmethods__ = frozenset()
     return _MicronautScopedProxy(target_supplier)
