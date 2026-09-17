@@ -41,4 +41,8 @@ public final class ResponseFactory {
     public static String describe(Map<String, Object> values) {
         return "map:" + values.size();
     }
+
+    public static String first(Iterable<Object> values) {
+        return "first:" + values.iterator().next();
+    }
 }

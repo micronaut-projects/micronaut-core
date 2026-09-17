@@ -45,6 +45,6 @@ When Java invokes the method, the elements of the array become the positional ar
 
 When Python code calls an overloaded Java method, the argument types select the overload:
 
-* a `list` or `tuple` selects a `List`, `Collection` or `Iterable` parameter over a `Map` parameter (`AuthenticationResponse.success("user", ["ROLE_A"])`), and a `set` or other iterable is accepted by `Collection` and `Iterable` parameters;
+* a `list` or `tuple` selects a `List`, `Collection` or `Iterable` parameter over a `Map` parameter (`AuthenticationResponse.success("user", ["ROLE_A"])`); a `set`, `frozenset` or dictionary view is accepted by `Collection` and `Iterable` parameters as a copy (Java-side changes to that collection do not reach the Python object), while generators and other iterators are only accepted by `Iterable` parameters, which read them lazily;
 * a `dict` selects a `Map` parameter;
 * `bytes` and `bytearray` select a `byte[]` parameter over `Object`, `String` or stream parameters (`object_mapper.readValue(payload, Book)`).

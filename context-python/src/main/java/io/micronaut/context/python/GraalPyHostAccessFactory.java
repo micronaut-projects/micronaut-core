@@ -52,6 +52,12 @@ final class GraalPyHostAccessFactory {
 
     /** The name of the Python datetime module, which its own datetime type shares. */
     private static final String DATETIME = "datetime";
+    private static final String BUILTINS = "builtins";
+    /**
+     * The finite built-in Python containers (besides sequences) accepted by {@code Collection} and
+     * {@code Iterable} parameters.
+     */
+    private static final List<String> FINITE_CONTAINER_TYPES = List.of("set", "frozenset", "dict_keys", "dict_values", "dict_items");
 
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
@@ -100,16 +106,19 @@ final class GraalPyHostAccessFactory {
      * interface proxy. These mappings take precedence over the default (loose) conversions so a
      * sequence selects the collection overload, and Python {@code bytes} / {@code bytearray} select
      * a {@code byte[]} overload instead of an {@code Object} or stream one.
+     * <p>
+     * A sequence is passed as the live host view of the Python object; a set, frozenset or dictionary
+     * view is copied into a Java list, so Java-side mutations of that list do not reach Python.
      */
     private static void registerSequenceMappings(HostAccess.Builder builder) {
         builder.targetTypeMapping(Value.class, List.class,
             GraalPyHostAccessFactory::isSequence,
             GraalPyHostAccessFactory::asList);
         builder.targetTypeMapping(Value.class, Collection.class,
-            GraalPyHostAccessFactory::isSequenceOrIterable,
+            GraalPyHostAccessFactory::isSequenceOrContainer,
             GraalPyHostAccessFactory::asList);
         builder.targetTypeMapping(Value.class, Iterable.class,
-            GraalPyHostAccessFactory::isSequenceOrIterable,
+            GraalPyHostAccessFactory::isSequenceOrContainer,
             GraalPyHostAccessFactory::asList);
         builder.targetTypeMapping(Value.class, byte[].class,
             value -> value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements(),
@@ -125,13 +134,26 @@ final class GraalPyHostAccessFactory {
         return value != null && !value.isNull() && !value.isHostObject() && !value.hasBufferElements() && value.hasArrayElements();
     }
 
-    private static boolean isSequenceOrIterable(@Nullable Value value) {
-        if (value == null || value.isNull() || value.isHostObject() || value.hasBufferElements()) {
+    /**
+     * A Python sequence or a finite built-in container ({@code set}, {@code frozenset} and the dictionary
+     * views): these are copied into a Java list for a {@code Collection} or {@code Iterable} parameter.
+     * Other iterables (generators, {@code itertools} iterators) are not matched, because copying would
+     * consume a lazy iterable eagerly or never finish for an infinite one; an {@code Iterable} parameter
+     * keeps the default lazy host view for them.
+     */
+    private static boolean isSequenceOrContainer(@Nullable Value value) {
+        if (isSequence(value)) {
+            return true;
+        }
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasIterator() || value.hasHashEntries()) {
             return false;
         }
-        // sets, generators and other iterables, but not dictionaries (their keys are iterable) or strings
-        return value.hasArrayElements()
-            || value.hasIterator() && !value.hasHashEntries() && !value.isString();
+        for (String containerType : FINITE_CONTAINER_TYPES) {
+            if (PythonCoercion.isPythonType(value, BUILTINS, containerType)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @SuppressWarnings("unchecked")

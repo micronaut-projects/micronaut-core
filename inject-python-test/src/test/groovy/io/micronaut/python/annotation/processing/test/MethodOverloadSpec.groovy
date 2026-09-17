@@ -16,8 +16,11 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.inject.BeanDefinition
+import io.micronaut.python.annotation.processing.test.overloads.GenericHandler
 import io.micronaut.python.annotation.processing.test.overloads.MessageSender
 import io.micronaut.python.annotation.processing.test.overloads.OptionSource
+import io.micronaut.python.annotation.processing.test.overloads.StringHandler
+import spock.lang.Timeout
 
 import java.lang.reflect.Array
 
@@ -58,6 +61,33 @@ class IntegerOptions(OptionSource[int]):
         bean.generate(Integer) == ["type:Integer"]
         bean.generate(42) == ["instance:42"]
         definition.findMethod("generate", Class).get().invoke(bean, Integer) == ["type:Integer"]
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a generic and a plain interface resolving to the same Java method are bridged once"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.overloads import GenericHandler, StringHandler
+
+@Singleton
+class BothHandler(GenericHandler[str], StringHandler):
+
+    def handle(self, value: str) -> str:
+        return "handled:" + value
+'''
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.BothHandler")
+
+        then: 'the stub declares handle(String) once (plus the javac erasure bridge) and it satisfies both interfaces'
+        bean instanceof GenericHandler
+        bean instanceof StringHandler
+        bean.class.declaredMethods.findAll { it.name == "handle" && !it.bridge }*.parameterTypes == [[String] as Class[]]
+        (bean as StringHandler).handle("a") == "handled:a"
+        (bean as GenericHandler<String>).handle("b") == "handled:b"
 
         cleanup:
         context?.close()
@@ -194,9 +224,11 @@ class UntypedSender(MessageSender):
         context?.close()
     }
 
+    @Timeout(120)
     void "a Python list selects a Java Collection overload over a Map overload"() {
         given:
         def pythonCode = '''
+import itertools
 from jakarta.inject import Singleton
 from micronaut.context.annotation import Executable
 from io.micronaut.python.annotation.processing.test.overloads import ResponseFactory
@@ -223,6 +255,22 @@ class Responses:
     @Executable
     def dict_over_list(self) -> str:
         return ResponseFactory.describe({"a": 1})
+
+    @Executable
+    def from_set(self) -> str:
+        return ResponseFactory.success("bob", {"ROLE_A"})
+
+    @Executable
+    def from_dict_keys(self) -> str:
+        return ResponseFactory.success("bob", {"ROLE_A": 1}.keys())
+
+    @Executable
+    def from_generator(self) -> str:
+        return ResponseFactory.first(i * 2 for i in range(3))
+
+    @Executable
+    def from_infinite_iterator(self) -> str:
+        return ResponseFactory.first(itertools.count(7))
 '''
         when:
         def context = buildContext(pythonCode)
@@ -234,6 +282,14 @@ class Responses:
         bean.from_dict() == "map:bob:1"
         bean.list_over_map() == "list:3"
         bean.dict_over_list() == "map:1"
+
+        and: 'finite built-in containers are accepted by a Collection parameter'
+        bean.from_set() == "collection:bob:ROLE_A"
+        bean.from_dict_keys() == "collection:bob:ROLE_A"
+
+        and: 'other iterables keep the lazy host view of an Iterable parameter'
+        bean.from_generator() == "first:0"
+        bean.from_infinite_iterator() == "first:7"
 
         cleanup:
         context?.close()
