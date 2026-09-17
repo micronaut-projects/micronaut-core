@@ -36,6 +36,7 @@ import io.micronaut.http.netty.channel.ChannelPipelineListener;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupConfiguration;
 import io.micronaut.http.netty.channel.DefaultEventLoopGroupRegistry;
 import io.micronaut.http.netty.channel.EventLoopGroupConfiguration;
+import io.micronaut.http.netty.channel.DomainSocketAddresses;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.micronaut.http.netty.channel.converters.ChannelOptionFactory;
 import io.micronaut.http.netty.websocket.WebSocketSessionRepository;
@@ -69,15 +70,12 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import io.netty.channel.EventLoopGroup;
-import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.DatagramChannel;
 import io.netty.channel.socket.ServerSocketChannel;
-import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
 import io.netty.util.concurrent.Future;
@@ -94,7 +92,6 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.UnixDomainSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -613,13 +610,8 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                                 }
                             });
                             if (cfg.isBind()) {
-                                if (((IoEventLoopGroup) listenerBootstrap.config().group()).isIoType(NioIoHandler.class)) {
-                                    // jdk UnixDomainSocketAddress
-                                    future = listenerBootstrap.bind(UnixDomainSocketAddress.of(cfg.getPath()));
-                                } else {
-                                    // netty DomainSocketAddress (epoll/kqueue)
-                                    future = listenerBootstrap.bind(DomainSocketHolder.makeDomainSocketAddress(Objects.requireNonNull(cfg.getPath())));
-                                }
+                                future = listenerBootstrap.bind(DomainSocketAddresses.of(
+                                    Objects.requireNonNull(cfg.getPath()), listenerBootstrap.config().group()));
                             } else {
                                 future = listenerBootstrap.register();
                             }
@@ -1095,16 +1087,6 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             activeConnections.add(cp);
             ch.closeFuture().addListener((ChannelFutureListener) future -> activeConnections.remove(cp));
             cp.initHttp3Channel();
-        }
-    }
-
-    private static final class DomainSocketHolder {
-        private static SocketAddress makeDomainSocketAddress(String path) {
-            try {
-                return new DomainSocketAddress(path);
-            } catch (NoClassDefFoundError e) {
-                throw new UnsupportedOperationException("Netty domain socket support not on classpath", e);
-            }
         }
     }
 }
