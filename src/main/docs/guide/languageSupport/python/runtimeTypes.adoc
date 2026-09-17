@@ -1,0 +1,46 @@
+Python code calls Java APIs directly through GraalPy host interop. This section describes how Python classes, the objects of those classes and `java.time` values cross that boundary at run time.
+
+=== Python Classes as Java Class Arguments
+
+The Python compiler generates a Java class for every Python class it compiles: a class for a bean or a dataclass, an interface for a `Protocol`, an abstract base class or an introduction type such as a client or a repository. Wherever a Java API expects a `java.lang.Class`, pass the Python class itself; the runtime substitutes the generated class:
+
+[source,python]
+----
+from micronaut.context import ApplicationContext
+from micronaut.core.type import Argument
+from micronaut.websocket import WebSocketClient
+
+from .Book import Book
+from .BookRepository import BookRepository
+from .ChatClientWebSocket import ChatClientWebSocket
+
+def lookups(context: ApplicationContext, client, ws_client: WebSocketClient):
+    repository = context.getBean(BookRepository)
+    repositories = context.getBeansOfType(BookRepository)
+    books = client.retrieve(request, Argument.listOf(Book))
+    chat = ws_client.connect(ChatClientWebSocket, "/chat/stuff/fred")
+----
+
+This applies to every `Class` parameter, including the type arguments of `Argument.of`, `Argument.listOf` and `Argument.mapOf`, `Class...` varargs and the `Class` overloads of methods that also accept an `Argument` (the `Class` overload is selected). A `java.type("...")` alias of the generated class is not needed.
+
+=== Generated Wrappers Returned by Java Calls
+
+A Java API that returns an instance of a compiled Python class returns the generated Java wrapper of the Python object: an `HttpClient.retrieve(request, Book)` call, `ObjectMapper.readValue(json, Book)` or `ApplicationContext.getBean(BookService)`. In Python such a wrapper behaves as the Python object it wraps:
+
+* `==`, `!=` and `hash()` compare the Python object (a dataclass compares by value), so a deserialized `Book` compares equal to a `Book` constructed in Python and can be looked up in a set or a dictionary.
+* `isinstance(book, Book)` is `True` and `book.__class__` is the Python class; `type(book)` is the interop view of the wrapper.
+* `repr()` and `str()` are those of the Python object.
+* Attributes and methods are those of the Python object, together with the public Java members of the wrapper.
+
+`book.asPolyglotValue()` returns the wrapped Python object itself.
+
+=== `java.time` Values
+
+Two paths bring a `java.time` value into Python:
+
+* A value the generated code passes to Python, such as an argument of a Python bean method or an attribute of a dataclass, is converted to the Python standard type of the <<standardTypes, standard type conversions>>: a `LocalDateTime` arrives as `datetime.datetime`.
+* A value returned by a Java method that Python calls directly stays the Java object. GraalPy presents it as an instance of the matching `datetime` type (`isinstance(value, datetime)` holds, `value.year`, `value.isoformat()` and `value + timedelta(days=1)` work) and its Java methods remain available (`value.plusDays(1)`, `value.toInstant(ZoneOffset.UTC)`). Passing the value back to a Java parameter of its type passes the same object; a Python `datetime` passed to a `java.time` parameter is converted as in the standard type conversions.
+
+=== Numeric Overloads
+
+A Python number selects the numeric overload it fits without loss, and the most specific of those: `Vector.of(0.1, 0.2, 0.3)` selects `of(double...)`, `Vector.of(0.5, 0.25)` selects `of(float...)` because both values are exactly representable as `float`, and `Vector.of(1, 2, 3)` selects `of(byte...)`. Write the values as floats (`1.0`, `2.0`) to select a floating-point overload.
