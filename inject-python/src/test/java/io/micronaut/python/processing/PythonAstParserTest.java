@@ -281,6 +281,63 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testTryBlockImportOfJavaClassKeepsTransformedCodeParseable() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.security.Principal".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            try:
+                from java.security import Principal
+            except ImportError:
+                Principal = None
+
+            class Demo(Principal):
+                def getName(self) -> str:
+                    return "demo"
+            """);
+
+        // the import became a generated binding: the emptied try body still parses
+        assertTrue(result.code().contains("Principal = java.type('java.security.Principal')"));
+        assertTrue(result.code().contains("try:\n    pass\n"));
+        assertTrue(result.javaClassImports().containsKey("java.security"));
+        assertEquals("java.security.Principal", result.javaClassImports().get("java.security").get(0).get("class_name"));
+        // the runtime code strips the interface base
+        assertTrue(result.runtimeCode().contains("Principal = java.type('java.security.Principal')"));
+        assertTrue(result.runtimeCode().contains("class Demo:"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+    }
+
+    @Test
     void testRuntimeTransformStripsConcreteJavaThrowableBases() {
         PythonAstParser parser = new PythonAstParser();
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(

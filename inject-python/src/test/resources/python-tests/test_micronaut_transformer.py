@@ -9,7 +9,7 @@ from unittest import mock
 
 import java
 
-from micronaut_transformer import MicronautTransformer, MicronautRuntimeTransformer, ast_equal, unparse
+from micronaut_transformer import MicronautTransformer, MicronautRuntimeTransformer, ast_equal, ensure_non_empty_bodies, unparse
 
 _ClassElement = java.type("io.micronaut.inject.ast.ClassElement")
 
@@ -86,6 +86,32 @@ class AstEqualTest(unittest.TestCase):
                 ast.dump(tree, include_attributes=False) == ast.dump(other, include_attributes=False),
                 ast_equal(tree, other),
             )
+
+
+class EnsureNonEmptyBodiesTest(unittest.TestCase):
+    def test_emptied_blocks_receive_pass(self):
+        tree = ast.parse("try:\n    x = 1\nexcept ImportError:\n    y = 2\nelse:\n    z = 3\n")
+        tree.body[0].body.clear()
+        tree.body[0].handlers[0].body.clear()
+        ensure_non_empty_bodies(tree)
+        self.assertEqual("try:\n    pass\nexcept ImportError:\n    pass\nelse:\n    z = 3", unparse(tree))
+        compile(tree, "<test>", "exec")
+
+    def test_empty_module_and_populated_blocks_are_unchanged(self):
+        source = "if True:\n    x = 1\n"
+        tree = ast.parse(source)
+        ensure_non_empty_bodies(tree)
+        self.assertTrue(ast_equal(ast.parse(source), tree))
+        empty = ast.parse("")
+        ensure_non_empty_bodies(empty)
+        self.assertEqual([], empty.body)
+
+    def test_runtime_transformer_keeps_try_block_of_removed_build_call(self):
+        source = "from pyronaut.build import Dependency\ntry:\n    Dependency('org:artifact:1.0')\nexcept Exception:\n    pass\n"
+        transformed = MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source))
+        ast.fix_missing_locations(transformed)
+        self.assertIn("try:\n    pass\n", unparse(transformed))
+        compile(transformed, "<test>", "exec")
 
 
 class RuntimeTransformerTest(unittest.TestCase):

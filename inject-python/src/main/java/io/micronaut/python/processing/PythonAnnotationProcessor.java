@@ -98,35 +98,53 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static final String RELATIVE_IMPORT_PREFIX = "from .";
     private static final String IMPORT_SEPARATOR = " import ";
     /**
-     * The Python facade of a Java type, defined in the package initializers that need it: it maps
-     * keyword-safe member names ({@code with_}) to the Java member and lets a Python class list a
-     * Java interface among its bases without GraalPy creating a host adapter.
+     * The prelude of a generated package module that binds imported Java classes. Each name is bound
+     * to the host class itself, so it behaves like the Java class in every position: as a base
+     * class, in isinstance checks and as a {@code Class} argument of a host method. A class that is
+     * absent from the runtime class path is bound to a facade that resolves it on first use, so
+     * importing the package does not fail for a compile-time-only dependency.
      */
-    private static final String JAVA_TYPE_FACADE = """
+    private static final String JAVA_TYPE_SHIM_PRELUDE = """
+        import java
         import keyword
 
+
         class _MicronautJavaType:
+            \"""A Java class absent from the runtime class path, resolved on first use.\"""
+
             def __init__(self, target, interface=False):
                 self._target = target
                 self._interface = interface
 
+            def _resolved(self):
+                if isinstance(self._target, str):
+                    self._target = java.type(self._target)
+                return self._target
+
             def __getattr__(self, name):
                 if name.endswith('_') and keyword.iskeyword(name[:-1]):
                     name = name[:-1]
-                return getattr(self._target, name)
+                return getattr(self._resolved(), name)
 
             def __call__(self, *args, **kwargs):
-                return self._target(*args, **kwargs)
+                return self._resolved()(*args, **kwargs)
 
             def __getitem__(self, item):
                 if self._interface:
                     return self
-                return self._target[item]
+                return self._resolved()[item]
 
             def __mro_entries__(self, bases):
                 if self._interface:
                     return ()
-                return (self._target,)
+                return (self._resolved(),)
+
+
+        def _micronaut_java_type(name, interface=False):
+            try:
+                return java.type(name)
+            except Exception:
+                return _MicronautJavaType(name, interface)
 
         """;
     private static final String PACKAGE_INIT_SOURCE = """
@@ -162,9 +180,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             # they are merged when its import completes
             for name in namespace.get('__all__', ()):
                 value = namespace[name]
-                # the first module defining a name wins, unless a later one wraps the Java type in a
-                # keyword-safe facade
-                if name in __all__ and type(value).__name__ != '_MicronautJavaType':
+                # the first module defining a name wins, unless it bound a Java class absent from the
+                # class path to a facade and a later one has the class itself
+                if name in __all__ and type(globals()[name]).__name__ != '_MicronautJavaType':
                     continue
                 globals()[name] = value
                 if name not in __all__:
@@ -1059,8 +1077,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     }
                     JavaClassImport javaClassImport = new JavaClassImport(
                         className,
-                        Boolean.parseBoolean(importInfo.get("interface")),
-                        Boolean.parseBoolean(importInfo.get("keyword_safe"))
+                        Boolean.parseBoolean(importInfo.get("interface"))
                     );
                     classMappings.merge(variable, javaClassImport, JavaClassImport::merge);
                 }
@@ -1110,10 +1127,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             StringBuilder initContent = new StringBuilder();
             if (!classBindings.isEmpty()) {
-                initContent.append("import java\n\n");
-                if (classBindings.stream().anyMatch(JavaClassImport::requiresFacade)) {
-                    initContent.append(JAVA_TYPE_FACADE);
-                }
+                initContent.append(JAVA_TYPE_SHIM_PRELUDE);
             }
 
             List<String> allNames = new ArrayList<>();
@@ -1214,23 +1228,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         boolean interfaceType = javaVisitorContext.getClassElement(className)
             .map(ClassElement::isInterface)
             .orElse(false);
-        return new JavaClassImport(className, interfaceType, false);
+        return new JavaClassImport(className, interfaceType);
     }
 
     private static void appendClassBinding(StringBuilder initContent, String typeName, JavaClassImport javaClassImport) {
-        if (javaClassImport.requiresFacade()) {
-            initContent.append(typeName)
-                .append(" = _MicronautJavaType(java.type('")
-                .append(javaClassImport.className())
-                .append("'), ")
-                .append(javaClassImport.interfaceType() ? "True" : "False")
-                .append(")\n");
-        } else {
-            initContent.append(typeName)
-                .append(" = java.type('")
-                .append(javaClassImport.className())
-                .append("')\n");
-        }
+        initContent.append(typeName)
+            .append(" = _micronaut_java_type('")
+            .append(javaClassImport.className())
+            .append(javaClassImport.interfaceType() ? "', True)\n" : "')\n");
     }
 
     private static String childModule(String packageName, String simpleName) {
@@ -1302,16 +1307,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private record PythonApplicationValues(String code, String[] src) {
     }
 
-    private record JavaClassImport(String className, boolean interfaceType, boolean keywordSafe) {
-        private boolean requiresFacade() {
-            return interfaceType || keywordSafe;
-        }
-
+    private record JavaClassImport(String className, boolean interfaceType) {
         private JavaClassImport merge(JavaClassImport other) {
             return new JavaClassImport(
                 other.className,
-                interfaceType || other.interfaceType,
-                keywordSafe || other.keywordSafe
+                interfaceType || other.interfaceType
             );
         }
     }

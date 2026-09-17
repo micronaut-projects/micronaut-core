@@ -29,6 +29,19 @@ def normalize_python_keyword_alias(name: str) -> str:
         return name[:-1]
     return name
 
+
+def ensure_non_empty_bodies(tree: ast.AST) -> None:
+    """
+    Insert ``pass`` into every block a transformer emptied, such as a ``try:`` whose only statement
+    was an import that became a generated binding, so the tree still unparses and compiles.
+    """
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Module):
+            continue
+        body = getattr(node, 'body', None)
+        if isinstance(body, list) and not body:
+            node.body = [ast.copy_location(ast.Pass(), node)]
+
 from ast import unparse
 
 # ``io`` is Python's built-in module, so a Python import of ``io.<anything>`` can only ever name a Java
@@ -284,7 +297,6 @@ class MicronautTransformer(ast.NodeTransformer):
         self.java_interface_names = set()
         self.java_class_elements = {}
         self.java_keyword_method_aliases = {}
-        self.java_keyword_safe_imports = set()
         self.validation_errors = []
         self.has_java_import = False
         self.exported_types = []
@@ -429,6 +441,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.scan_annotation_functions(node)
         # First visit all nodes to collect imports
         self.generic_visit(node)
+        ensure_non_empty_bodies(node)
 
         if self.strip_java_interface_bases:
             self._ensure_future_annotations(node)
@@ -467,6 +480,11 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     Decorator to mark functions as Micronaut annotations.
     """
     def decorator(target):
+        target.java_class_name = name
+        try:
+            target.java_class = getattr(__import__('java').type(name), 'class')
+        except Exception:
+            target.java_class = None
         return target
     return decorator
 '''
@@ -713,10 +731,6 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if java_method_name is None:
             return node
 
-        owner_name = self._base_name(node.value)
-        if owner_name is not None:
-            self.java_keyword_safe_imports.add(owner_name)
-
         return ast.copy_location(
             ast.Call(
                 func=ast.Name(id='getattr', ctx=ast.Load()),
@@ -832,12 +846,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return class_element.getName() in self.generated_decorator_code
         self._track_java_class(variable_name, class_element)
         # Collect Java class import for VFS generation
-        self._collect_java_class_import(
-            transformed_module_name,
-            import_name,
-            variable_name,
-            class_element
-        )
+        self._collect_java_class_import(transformed_module_name, import_name, class_element)
         # Generate java.type() assignment for regular Java types
         java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
         self.java_type_assignments.append(java_type_assignment)
@@ -1167,9 +1176,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return f'''
 {imports_section}def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     """
-    Decorator to mark functions as Micronaut annotations.
+    Decorator to mark functions as Micronaut annotations. The decorator function stands for the
+    annotation type: ``java_class`` is the annotation's Java class when it is on the class path.
     """
     def decorator(func):
+        func.java_class_name = name
+        try:
+            func.java_class = getattr(__import__('java').type(name), 'class')
+        except Exception:
+            func.java_class = None
         return func
     return decorator
 
@@ -1317,7 +1332,7 @@ except Exception:
             return parent_name + '$' + nested_name[len(prefix):]
         return nested_name
 
-    def _collect_java_class_import(self, package_name: str, import_name: str, variable_name: str, class_element):
+    def _collect_java_class_import(self, package_name: str, import_name: str, class_element):
         """
         Collect Java class import for VFS generation.
         """
@@ -1327,19 +1342,14 @@ except Exception:
         is_interface = class_element.isInterface()
         self.java_class_imports[package_name].append({
             'variable': import_name,
-            'usage_variable': variable_name,
             'class_name': class_element.getName(),
             'interface': str(is_interface).lower()
         })
 
     def get_java_class_imports(self):
         """
-        Get Java imports and mark the types that need Python keyword method aliases.
+        Get the Java class imports by package, for the generated package modules.
         """
-        for imports in self.java_class_imports.values():
-            for import_info in imports:
-                variable_name = import_info['usage_variable']
-                import_info['keyword_safe'] = str(variable_name in self.java_keyword_safe_imports).lower()
         return self.java_class_imports
 
     def get_missing_runtime_decorator_code(self, tree: ast.Module):
@@ -1498,6 +1508,7 @@ class MicronautRuntimeTransformer(MicronautTransformer):
                 bound_after.update(self._statement_bound_names(statement))
         self.locally_bound_names.update(bound_after)
         self.generic_visit(node)
+        ensure_non_empty_bodies(node)
 
         if self._has_java_annotations(node):
             self._ensure_future_annotations(node)
@@ -1521,6 +1532,11 @@ class MicronautRuntimeTransformer(MicronautTransformer):
             generated_nodes.extend(ast.parse('''
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def decorator(target):
+        target.java_class_name = name
+        try:
+            target.java_class = getattr(__import__('java').type(name), 'class')
+        except Exception:
+            target.java_class = None
         return target
     return decorator
 ''').body)

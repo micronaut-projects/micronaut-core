@@ -67,3 +67,12 @@ class PetController:
 Micronaut's own packages may also be written without the prefix (`from micronaut.http.annotation import Controller`). An `io.*` import that names no class or package on the compile classpath is a compilation error, since the Python `io` module can never satisfy it; `import io.some.package` requires an alias (`as`), because the name `io` cannot refer to the Java package at runtime. Importing the Python module itself (`import io`, `from io import StringIO`) is unaffected, and so are relative imports of an application sub-package that happens to be called `io` (`from .io.util import helper`).
 
 NOTE: The generated runtime package for a Java `io.<name>` package is the top-level Python package `<name>` (`micronaut`, `swagger`, `kubernetes`, ...). It occupies the same name as a Python library called `<name>` would (for example the `grpc`, `opentelemetry` or `kubernetes` distributions from PyPI): an application that imports both the Java package `io.grpc` and the Python package `grpc` sees one of the two shadowed, depending on the order of `sys.path`. Use either the Java package or the Python library of a given name within one application.
+
+The same convention applies to Java packages with a segment that is a Python keyword, such as `software.amazon.awssdk.http.async`: import from the package with the trailing underscore, and the generated module maps the segment back to the Java package:
+
+[source,python]
+----
+from software.amazon.awssdk.http.async_ import SdkAsyncHttpClient
+----
+
+An imported Java class is the Java class itself at run time, so it can be used wherever the Java class is expected: as a base class, in `isinstance` checks and as a `Class` argument of a Java method such as `context.getBeansOfType(SdkAsyncHttpClient)`. An imported annotation is a decorator; its `java_class` attribute is the annotation type, and the decorator itself converts to the annotation type when passed to a Java method, for example `Qualifiers.byStereotype(Primary)`.
