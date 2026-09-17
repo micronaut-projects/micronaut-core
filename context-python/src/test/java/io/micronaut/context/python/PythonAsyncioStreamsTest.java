@@ -171,6 +171,7 @@ final class PythonAsyncioStreamsTest {
 
             @Override
             public void cancel() {
+                // nothing to release: the items were emitted synchronously
             }
         });
         context.getBindings(PYTHON).putMember("source", publisher);
@@ -366,7 +367,8 @@ final class PythonAsyncioStreamsTest {
         for (int i = 0; i < 1000; i++) {
             assertEquals(i, ((Number) items.get(i)).intValue());
         }
-        assertEquals(0, activeExecutions(), "the stream released its execution");
+        // the driver releases the execution after signalling completion, so it may still be unwinding
+        awaitReleased();
     }
 
     @Test
@@ -711,7 +713,7 @@ final class PythonAsyncioStreamsTest {
         List<?> items = Flux.from(doubled).collectList().block(java.time.Duration.ofSeconds(10));
         assertNotNull(items);
         assertEquals(List.of(2, 4, 6, 8, 10), items.stream().map(item -> ((Number) item).intValue()).toList());
-        assertEquals(0, activeExecutions());
+        awaitReleased();
     }
 
     // ---- helpers ----
@@ -751,12 +753,11 @@ final class PythonAsyncioStreamsTest {
         throw new AssertionError("Event [" + event + "] did not happen: " + context.getBindings(PYTHON).getMember("events"));
     }
 
-    private static int activeExecutions() {
-        // tests run one at a time in this JVM: the aggregate counter is this test's context alone
-        return PythonContextRegistry.activeExecutions();
+    private int activeExecutions() {
+        return PythonContextRegistry.activeExecutions(context);
     }
 
-    private static void awaitReleased() throws Exception {
+    private void awaitReleased() throws Exception {
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
         while (activeExecutions() > 0 && System.nanoTime() < deadline) {
             Thread.sleep(10);

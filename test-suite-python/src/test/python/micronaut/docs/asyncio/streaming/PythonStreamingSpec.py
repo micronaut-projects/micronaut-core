@@ -80,8 +80,8 @@ class PythonStreamingSpec:
         for _ in range(20):
             StreamProbe.readAndDisconnect(self.server.getPort(), "/async-streams/endless", 100)
 
-        assert StreamProbe.awaitFinished("endless", 20, 20), f"started={StreamProbe.started('endless', 0)} finished={StreamProbe.finished('endless', 0)}"
-        assert StreamProbe.started("endless", 0) == 20
+        assert StreamProbe.awaitFinished("endless", 20, 20), f"started={StreamProbe.startedCount('endless')} finished={StreamProbe.finishedCount('endless')}"
+        assert StreamProbe.startedCount("endless") == 20
 
     @Test
     def asyncControllerConsumesAStreamingClientAndStopsEarly(self):
