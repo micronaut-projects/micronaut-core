@@ -227,6 +227,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
     private static final String JUNIT_EXTEND_WITH = "org.junit.jupiter.api.extension.ExtendWith";
     private static final String JUNIT_EXTENSIONS = "org.junit.jupiter.api.extension.Extensions";
+    private static final String JUNIT_TEST_TEMPLATE = "org.junit.jupiter.api.TestTemplate";
+    private static final String JUNIT_TEST_FACTORY = "org.junit.jupiter.api.TestFactory";
     private static final String ANN_MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
@@ -449,7 +451,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
 
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
-                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
+                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(PythonStubGenerator::isJunit5TestMethod)).isPresent();
                     boolean isConfigurationBuilderType = isConfigurationBuilderType(element);
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
@@ -880,7 +882,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         for (MethodElement methodElement : methodsToBridge) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
         }
         // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
         // factory case handled in addBridgeMethod. The generated bean definition invokes the callback directly on the
@@ -896,7 +898,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .filter(method -> !method.hasParameters())))
             .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
         for (MethodElement methodElement : publicMethods) {
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -2670,7 +2672,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             isDeclaredBeanMethod(ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
-                boolean isJunit5Test = methodElement.hasDeclaredAnnotation(JUNIT_TEST)
+                boolean isJunit5Test = isJunit5TestMethod(methodElement)
                     || (isJunit5TestModule && isScriptTestMethod(methodElement));
                 addBridgeMethod(BridgeMethodSpec.of(methodElement, scriptElement).junit5Test(isJunit5Test).script(true), builder, context, addedMethodNames);
             }
@@ -3305,6 +3307,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether a method is a JUnit 5 test: a {@code @Test}, a test template such as {@code @ParameterizedTest} or
+     * {@code @RepeatedTest} (both meta-annotated with {@code @TestTemplate}) or a {@code @TestFactory}.
+     *
+     * @param annotationMetadata The method annotation metadata
+     * @return Whether JUnit runs the method as a test
+     */
+    static boolean isJunit5TestMethod(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredAnnotation(JUNIT_TEST)
+            || annotationMetadata.hasDeclaredStereotype(JUNIT_TEST_TEMPLATE)
+            || annotationMetadata.hasDeclaredStereotype(JUNIT_TEST_FACTORY);
+    }
+
+    /**
      * Copies the runtime annotations of a Python-defined property accessor ({@code @property} getter or
      * setter) onto the generated accessor, which is where a framework that reads properties reflectively
      * (JPA property access) looks for them. Synthetic accessors carry the field's annotations, which
@@ -3778,6 +3793,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String preDestroy = methodElement.stringValue(Bean.class, MEMBER_PRE_DESTROY).orElse(null);
             if (preDestroy != null && genericReturnType instanceof AbstractPythonClassElement) {
                 StubEntry stubEntry = this.classBuilders.get(genericReturnType.getName());
+                if (stubEntry == null) {
+                    // The produced type is visited in registry order and may follow the factory: generate its stub
+                    // now so the callback bridge lands on it (a visited class is not visited twice)
+                    visitClass(allClasses.getOrDefault(genericReturnType.getName(), genericReturnType), visitorContext);
+                    stubEntry = this.classBuilders.get(genericReturnType.getName());
+                }
                 if (stubEntry != null) {
                     MethodElement preDestroyMethod = stubEntry.originatingElement
                         .findMethod(preDestroy).orElse(null);
@@ -3810,7 +3831,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         methodTypeVariables.forEach(methodBuilder::addTypeVariable);
 
         copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, visitorContext);
-        if (isJunit5Test && !methodElement.hasDeclaredAnnotation(JUNIT_TEST)) {
+        if (isJunit5Test && !isJunit5TestMethod(methodElement)) {
             methodBuilder.addAnnotation(JUNIT_TEST);
         }
         parameterDefs.forEach(methodBuilder::addParameter);

@@ -25,3 +25,4 @@ io.micronaut.python.annotation.processing.test.PythonAnnotationElementSpec$Inher
 io.micronaut.python.annotation.processing.test.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
 io.micronaut.python.annotation.processing.test.ProduceBeansSpec$ProducerModuleVisitor
 io.micronaut.python.annotation.processing.test.bridge.PublicMethodCallerVisitor
+io.micronaut.python.annotation.processing.test.visitorintegration.OptionsRecordingVisitor
