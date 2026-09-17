@@ -30,6 +30,7 @@ package python;
 
 import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.PythonConversion;
+import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.Vetoed;
 import java.lang.String;
 import org.graalvm.polyglot.Value;
@@ -38,6 +39,12 @@ import pythontest.introduction.reflective.ReflectiveService;
 import pythontest.introduction.reflective.Var;
 
 @Vetoed
+@PythonClass(
+    packageName = "python",
+    rootName = "Assistant",
+    displayName = "Assistant",
+    cacheKey = "class-instance:python.Assistant"
+)
 @ReflectiveService("assistant")
 public interface Assistant {
   @Prompt(
