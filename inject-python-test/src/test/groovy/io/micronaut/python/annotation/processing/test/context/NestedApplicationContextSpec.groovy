@@ -68,6 +68,26 @@ class LateGreeter:
         return Greeting("Late hello " + name)
 
 
+@Singleton
+class Counter:
+    """A bean of the enclosing application whose state must survive a nested run."""
+
+    inits = 0
+
+    def __init__(self):
+        Counter.inits += 1
+        self.count = 0
+
+    @Executable
+    def increment(self) -> int:
+        self.count += 1
+        return self.count
+
+    @Executable
+    def init_count(self) -> int:
+        return Counter.inits
+
+
 @Controller("/nested")
 class GreetingController:
     def __init__(self, greeter: Greeter):
@@ -214,6 +234,29 @@ class NestedRunner:
 
         then:
         !PythonContextRuntime.initialized
+
+        cleanup:
+        nested?.close()
+        context?.close()
+    }
+
+    void "the beans of the enclosing application keep their Python objects while a nested application runs"() {
+        given:
+        ApplicationContext context = buildContext(PYTHON, true)
+        def counter = getBean(context, 'python.Counter')
+        List<Integer> observed = []
+
+        when:
+        observed << counter.increment()
+        ApplicationContext nested = startNested(context)
+        observed << counter.increment()
+        observed << counter.init_count()
+        nested.close()
+        observed << counter.increment()
+        observed << counter.init_count()
+
+        then: "the object was created once and counts across the nested run"
+        observed == [1, 2, 1, 3, 1]
 
         cleanup:
         nested?.close()

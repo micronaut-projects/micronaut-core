@@ -143,6 +143,26 @@ final class PythonContextRegistry {
      *
      * @param context The context to forget
      */
+    /**
+     * Drop the Python scoped proxies created in a context for the beans of an application that shuts
+     * down while the context lives on (a reused context): the proxies, and the bean context they
+     * resolve their targets through, are then no longer reachable from the context state. A proxy of
+     * an application still running gets a new Python scoped proxy on its next use.
+     *
+     * @param context The context the application used
+     */
+    static void forgetScopedProxies(Context context) {
+        ContextState state;
+        synchronized (LOCK) {
+            state = CONTEXT_STATES.get(context);
+        }
+        if (state != null) {
+            synchronized (state.scopedProxies) {
+                state.scopedProxies.clear();
+            }
+        }
+    }
+
     static void forgetContext(Context context) {
         synchronized (LOCK) {
             ContextState state = CONTEXT_STATES.remove(context);

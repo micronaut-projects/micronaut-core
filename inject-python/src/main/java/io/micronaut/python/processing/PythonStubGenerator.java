@@ -164,7 +164,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     public static final ClassTypeDef INTERCEPTED_PROXY = ClassTypeDef.of("io.micronaut.aop.InterceptedProxy");
     private static final String INTERCEPTED_TARGET_VALUE = "interceptedTargetValue";
-    private static final String IS_CURRENT_INSTANCE = "isCurrentInstance";
+    private static final String IS_LIVE_INSTANCE = "isLiveInstance";
     private static final String PYTHON_CLASS_REFERENCE_PARAMETER = "pythonClassReference";
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
@@ -566,8 +566,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             FieldDef.FieldDefBuilder pythonValueBuilder = FieldDef.builder("graalpyInternalValue")
                 .ofType(POLYGLOT_VALUE)
                 .addModifiers(Modifier.PROTECTED, Modifier.TRANSIENT);
-            if (!isIntrospectedBean && !isJunit5Test && extendsHostClass) {
-                pythonValueBuilder.addModifiers(Modifier.FINAL);
+            if (!isIntrospectedBean && !isJunit5Test) {
+                // an owned object is replaced when its application shut down, under the stub's monitor,
+                // and read without it by every other thread
+                pythonValueBuilder.addModifiers(extendsHostClass ? Modifier.FINAL : Modifier.VOLATILE);
             }
             pythonValue = pythonValueBuilder.build();
             builder.addField(pythonValue);
@@ -1315,17 +1317,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             aThis.field(pythonValueFinal).returning()
                         );
                     }
-                    // an owned object is created again when the context it was created in is no longer
-                    // the primary context of the application (another application started in the JVM)
+                    // an owned object is created again when the application it was created in has shut
+                    // down (its runtime is no longer installed); the field is volatile and the check is
+                    // repeated under the stub's monitor, so concurrent callers share one new object
+                    ExpressionDef.InvokeStaticMethod newInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)));
                     return StatementDef.multi(
                         returnInterceptedTargetValue(aThis),
                         aThis.field(pythonValueFinal).newLocal("value", value -> StatementDef.multi(
                             aThis.field(ownedClassReference).isNonNull()
-                                .and(PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_CURRENT_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse())
-                                .doIf(StatementDef.multi(
-                                    value.assign(PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)))),
-                                    aThis.field(pythonValueFinal).assign(value)
-                                )),
+                                .and(PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse())
+                                .doIf(new StatementDef.Synchronized(aThis, StatementDef.multi(
+                                    value.assign(aThis.field(pythonValueFinal)),
+                                    PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse()
+                                        .doIf(StatementDef.multi(
+                                            value.assign(newInstance),
+                                            aThis.field(pythonValueFinal).assign(value)
+                                        ))
+                                ))),
                             value.returning()
                         ))
                     );

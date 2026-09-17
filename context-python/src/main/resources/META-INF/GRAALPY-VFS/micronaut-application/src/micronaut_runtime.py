@@ -52,6 +52,17 @@ __micronaut_inspect_isclass = inspect.isclass
 __micronaut_import_module = importlib.import_module
 
 
+def __micronaut_loaded_module(name):
+    """The imported and initialized module, or None: not imported, or another thread is executing it."""
+    module = sys.modules.get(name)
+    if module is None:
+        return None
+    spec = getattr(module, "__spec__", None)
+    if spec is not None and getattr(spec, "_initializing", False):
+        return None
+    return module
+
+
 def __micronaut_put_member(target, name, value):
     setattr(target, name, value)
 
