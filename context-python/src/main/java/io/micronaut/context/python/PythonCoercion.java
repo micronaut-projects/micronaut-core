@@ -642,7 +642,9 @@ public final class PythonCoercion {
      * The Python proxy is created once per proxy instance and context. The target is not resolved here:
      * a lazy proxy resolves it on the first use from Python, and a target that turns out to be a Java
      * object (a Java implementation of a Python abstract base class) is forwarded to as the host object
-     * it is.
+     * it is. The Python proxy carries the AOP proxy as its host object reference, so when Python hands
+     * it back to Java (a method returning the injected bean) Java receives the AOP proxy again, with its
+     * scope and interceptors, rather than the bean the scope holds at that moment.
      *
      * @param proxy The proxy, a generated stub instance or an implementation of a generated interface
      * @return The Python scoped proxy of the intercepted target
@@ -666,7 +668,7 @@ public final class PythonCoercion {
                 ? PythonContextRuntime.findClass(classReference, context)
                 : interceptedTargetObject(proxy).getMetaObject();
             Value scopedProxy = PythonContextRuntime.helper(context, SCOPED_PROXY_FACTORY)
-                .execute(pythonClass, (ProxyExecutable) arguments -> interceptedTargetObject(proxy));
+                .execute(pythonClass, (ProxyExecutable) arguments -> interceptedTargetObject(proxy), new ValueCoercible.HostObjectReference(proxy));
             synchronized (state.scopedProxies) {
                 Value existing = state.scopedProxies.putIfAbsent(proxy, scopedProxy);
                 return existing == null ? scopedProxy : existing;

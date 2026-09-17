@@ -59,6 +59,10 @@ class MathController:
     def calls(self) -> list[int]:
         return list(self.math_service.calls)
 
+    @Executable
+    def service(self) -> MathService:
+        return self.math_service
+
 @Factory
 class MathServiceFactory:
     @Bean
@@ -81,6 +85,14 @@ class MathServiceFactory:
         def controller = getBean(context, "python.MathController")
 
         then:
+        ScopedProxyInitCounter.count() == 0
+
+        when: "the Python consumer hands the proxy back to Java"
+        def returned = controller.service()
+
+        then: "Java receives the scoped proxy it injected, not the bean, and the target is still not resolved"
+        returned instanceof InterceptedProxy
+        returned.is(controller.service())
         ScopedProxyInitCounter.count() == 0
 
         when: "the proxy resolves its target through the scope"
@@ -107,6 +119,10 @@ class MathServiceFactory:
         proxyValue.getMember("result").asInt() == 42
         proxyValue.getMember("calls").arraySize == 1
         ((ValueCoercible) target).asPolyglotValue().getMember("result").asInt() == 42
+        ScopedProxyInitCounter.count() == 1
+
+        and: "the proxy Python hands back to Java resolves to the same bean"
+        ((InterceptedProxy) controller.service()).interceptedTarget().is(target)
         ScopedProxyInitCounter.count() == 1
 
         when: "attributes are assigned through the Python object of the proxy"
@@ -240,6 +256,10 @@ class MathController:
     def is_service(self) -> bool:
         return isinstance(self.math_service, MathService)
 
+    @Executable
+    def service(self) -> MathService:
+        return self.math_service
+
 @Factory
 class MathServiceFactory:
     @Bean
@@ -255,6 +275,14 @@ class MathServiceFactory:
         then: "injecting the proxy does not resolve the Java target"
         ScopedProxyInitCounter.count() == 0
 
+        when: "the Python consumer hands the proxy back to Java"
+        def returned = controller.service()
+
+        then: "Java receives the scoped proxy it injected, with its scope and interceptors, not the Java target, and the target is still not resolved"
+        returned instanceof InterceptedProxy
+        returned.is(controller.service())
+        ScopedProxyInitCounter.count() == 0
+
         when: "the Python consumer calls the Java implementation through the proxy"
         def result = controller.compute(5)
 
@@ -262,6 +290,10 @@ class MathServiceFactory:
         result == 7
         controller.calls() == [5]
         controller.is_service()
+        ScopedProxyInitCounter.count() == 1
+
+        and: "the proxy handed back resolves to the Java target"
+        ((InterceptedProxy) controller.service()).interceptedTarget().toString() == "JavaMathService(7)"
         ScopedProxyInitCounter.count() == 1
 
         cleanup:
