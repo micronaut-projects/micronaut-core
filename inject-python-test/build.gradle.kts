@@ -51,6 +51,8 @@ dependencies {
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautJacksonDatabind)
+    // stores generated Python classes reflectively, like a Java persistence library would
+    testImplementation(libs.eclipsestore.storage.embedded)
 }
 
 tasks {

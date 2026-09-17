@@ -189,9 +189,24 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Uninstall the application runtime. This method is called during application shutdown
-     * to ensure proper cleanup and prevent memory leaks; with context reuse enabled it only
-     * reloads the Python modules of the primary context.
+     * Whether a context is the primary context of the installed runtime, the one a generated
+     * wrapper creates its Python object in.
+     *
+     * @param context The context, or a view of one
+     * @return {@code true} when the context is the primary context
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static boolean isPrimaryContext(Context context) {
+        return isCurrentContext(context);
+    }
+
+    /**
+     * Uninstall every installed application runtime, so no application is running as far as
+     * generated code is concerned; with context reuse enabled it only reloads the Python modules
+     * of the primary context. An application shutting down uninstalls its own runtime through
+     * {@link GraalPyContextFactory}; this method serves tests and tooling that reset the JVM-wide
+     * state between applications.
      */
     public static void resetContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
@@ -202,8 +217,9 @@ public final class PythonContextRuntime {
             runtime.context().eval(RELOAD_MODULES_SOURCE);
             return;
         }
-        PythonApplicationRuntime.uninstall(runtime);
-        PythonContextRegistry.forgetContext(runtime.context());
+        for (PythonApplicationRuntime uninstalled : PythonApplicationRuntime.uninstallAll()) {
+            PythonContextRegistry.forgetContext(uninstalled.context());
+        }
     }
 
     /**

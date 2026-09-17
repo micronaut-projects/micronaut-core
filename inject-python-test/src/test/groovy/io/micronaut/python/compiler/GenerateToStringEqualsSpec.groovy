@@ -43,16 +43,21 @@ class Person:
         this.graalpyInternalValueSyncing = true;
         PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
         PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-        PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
+        if (this.graalpyInternalJavaOwned) {
+          PythonCoercion.putMemberByReference(this.graalpyInternalValue, "address", (Object) this.address);
+        } else {
+          PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
+        }
         this.graalpyInternalValueSyncing = false;
         return this.graalpyInternalValue;
       }
     } else {
       this.graalpyInternalValue = PythonContextRuntime.newUninitializedInstance(Person.__PYTHON_CLASS_REFERENCE);
+      this.graalpyInternalJavaOwned = true;
       this.graalpyInternalValueSyncing = true;
       PythonCoercion.putMember(this.graalpyInternalValue, "name", (Object) this.name);
       PythonCoercion.putMember(this.graalpyInternalValue, "age", (Object) this.age);
-      PythonCoercion.putMember(this.graalpyInternalValue, "address", PythonCoercion.coerceValue(this.address));
+      PythonCoercion.putMemberByReference(this.graalpyInternalValue, "address", (Object) this.address);
       this.graalpyInternalValueSyncing = false;
       return this.graalpyInternalValue;
     }
@@ -67,19 +72,28 @@ class Person:
   public Value reconstructPolyglotValue(Context arg1) {
     if (PythonCoercion.isValueInContext(this.graalpyInternalValue, arg1)) {
       PythonCoercion.rememberPooledValue(this, arg1, this.graalpyInternalValue);
-      PythonCoercion.putMembers(this.graalpyInternalValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
-      return this.graalpyInternalValue;
+      return this.asPolyglotValue();
     } else {
-      Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
-      PythonCoercion.rememberPooledValue(this, arg1, targetValue);
-      PythonCoercion.putMembers(targetValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
-      return targetValue;
+      if (this.graalpyInternalValue == null && PythonContextRuntime.isPrimaryContext(arg1)) {
+        Value targetValue = this.asPolyglotValue();
+        PythonCoercion.rememberPooledValue(this, arg1, targetValue);
+        return targetValue;
+      } else {
+        Value targetValue = PythonContextRuntime.newUninitializedInstance(arg1, Person.__PYTHON_CLASS_REFERENCE);
+        PythonCoercion.rememberPooledValue(this, arg1, targetValue);
+        PythonCoercion.putMembers(targetValue, new String[]{"name","age","address"}, new Object[]{PythonCoercion.coerceToContext(this.name, arg1, java.lang.String.class),PythonCoercion.coerceToContext(this.age, arg1, int.class),PythonCoercion.coerceToContext(this.address, arg1, python.Address.class)});
+        return targetValue;
+      }
     }
   }
 
   public static Person fromPolyglotValue(Value arg1) {
     if (PythonConversion.isNone(arg1)) {
       return null;
+    }
+    Object hostObject = ValueCoercibles.hostObject(arg1, Person.class);
+    if (hostObject != null) {
+      return (Person) hostObject;
     }
     return new python.Person(arg1);
   }
