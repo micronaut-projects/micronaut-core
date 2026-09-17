@@ -97,6 +97,20 @@ class EnsureNonEmptyBodiesTest(unittest.TestCase):
         self.assertEqual("try:\n    pass\nexcept ImportError:\n    pass\nelse:\n    z = 3", unparse(tree))
         compile(tree, "<test>", "exec")
 
+    def test_emptied_final_body_receives_pass(self):
+        tree = ast.parse("try:\n    x = 1\nfinally:\n    y = 2\n")
+        tree.body[0].finalbody.clear()
+        ensure_non_empty_bodies(tree)
+        self.assertEqual("try:\n    x = 1\nfinally:\n    pass", unparse(tree))
+        compile(tree, "<test>", "exec")
+
+    def test_emptied_if_body_receives_pass(self):
+        tree = ast.parse("if TYPE_CHECKING:\n    x = 1\nelse:\n    y = 2\n")
+        tree.body[0].body.clear()
+        ensure_non_empty_bodies(tree)
+        self.assertEqual("if TYPE_CHECKING:\n    pass\nelse:\n    y = 2", unparse(tree))
+        compile(tree, "<test>", "exec")
+
     def test_empty_module_and_populated_blocks_are_unchanged(self):
         source = "if True:\n    x = 1\n"
         tree = ast.parse(source)

@@ -75,4 +75,4 @@ The same convention applies to Java packages with a segment that is a Python key
 from software.amazon.awssdk.http.async_ import SdkAsyncHttpClient
 ----
 
-An imported Java class is the Java class itself at run time, so it can be used wherever the Java class is expected: as a base class, in `isinstance` checks and as a `Class` argument of a Java method such as `context.getBeansOfType(SdkAsyncHttpClient)`. An imported annotation is a decorator; its `java_class` attribute is the annotation type, and the decorator itself converts to the annotation type when passed to a Java method, for example `Qualifiers.byStereotype(Primary)`.
+An imported Java class is the Java class itself at run time, so it can be used wherever the Java class is expected: as an interface base (a Python class cannot extend a concrete Java class), in `isinstance` checks and as a `Class` argument of a Java method such as `context.getBeansOfType(SdkAsyncHttpClient)`. An imported annotation is a decorator; its `java_class` attribute is the annotation type, and the decorator itself converts to the annotation type when passed to a Java method, for example `Qualifiers.byStereotype(Primary)`.

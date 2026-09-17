@@ -99,7 +99,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private static final String IMPORT_SEPARATOR = " import ";
     /**
      * The prelude of a generated package module that binds imported Java classes. Each name is bound
-     * to the host class itself, so it behaves like the Java class in every position: as a base
+     * to the host class itself, so it behaves like the Java class in every position: as an interface base
      * class, in isinstance checks and as a {@code Class} argument of a host method. A class that is
      * absent from the runtime class path is bound to a facade that resolves it on first use, so
      * importing the package does not fail for a compile-time-only dependency.
