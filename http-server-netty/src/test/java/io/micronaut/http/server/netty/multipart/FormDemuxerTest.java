@@ -4,7 +4,9 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
@@ -24,9 +26,11 @@ import reactor.core.publisher.Flux;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -317,7 +321,8 @@ public class FormDemuxerTest {
             .forUrlEncodedData(), channel, new BodySizeLimits(Long.MAX_VALUE, 6), BodySizeLimits.UNLIMITED, streamingBody.rootBody())
             .fields().subscribe(fields.noBackpressure());
 
-        // note: 'ba' actually takes up 4 bytes in the buffer counter, since it's buffered twice: once in BaseSharedBuffer, once in AsFlux
+        // note: the 'ba' that arrives before the field's subscriber does is charged once by BaseSharedBuffer and, from the
+        // hand-off on, once more by AsFlux until it is delivered; the hand-off itself releases the first charge
 
         write(streamingBody.sharedBuffer(), "foo=ba");
 
@@ -355,7 +360,8 @@ public class FormDemuxerTest {
             .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 6), streamingBody.rootBody())
             .fields().subscribe(fields.noBackpressure());
 
-        // note: 'ba' actually takes up 4 bytes in the buffer counter, since it's buffered twice: once in BaseSharedBuffer, once in AsFlux
+        // note: the 'ba' that arrives before the field's subscriber does is charged once by BaseSharedBuffer and, from the
+        // hand-off on, once more by AsFlux until it is delivered; the hand-off itself releases the first charge
 
         write(streamingBody.sharedBuffer(), "foo=ba");
         RawFormField field1 = fields.queue.remove();
@@ -370,6 +376,46 @@ public class FormDemuxerTest {
         assertInstanceOf(BufferLengthExceededException.class, data2.error);
 
         bb1.close();
+    }
+
+    /**
+     * A field whose content spans two writes is devolved to streaming and then buffered whole by its
+     * subscriber. The bytes it keeps have to stay charged against the form-wide limit after the
+     * field completes, otherwise a client that sends the form slowly can buffer roughly the limit
+     * per field instead of the limit per form.
+     */
+    @Test
+    public void formBufferLimitCountsCompletedFieldsSplitAcrossWrites() {
+        MockUpstream upstream = new MockUpstream();
+        ByteBodyFactory.StreamingBody streamingBody = byteBodyFactory.createStreamingBody(BodySizeLimits.UNLIMITED, upstream);
+        QueueSubscriber<RawFormField> fields = new QueueSubscriber<>();
+        new FormDemuxer(PostBodyDecoder.builder()
+            .enableQuirks(DecoderQuirk.REFUSE_NON_HEX_PERCENT_DECODE)
+            .forUrlEncodedData(), channel, BodySizeLimits.UNLIMITED, new BodySizeLimits(Long.MAX_VALUE, 12), streamingBody.rootBody())
+            .fields().subscribe(fields.noBackpressure());
+
+        // foo=666666 (6 bytes of content) split across two writes, so the field is devolved to streaming
+        write(streamingBody.sharedBuffer(), "foo=666");
+        RawFormField field1 = fields.queue.remove();
+        AtomicReference<CloseableAvailableByteBody> buffered1 = new AtomicReference<>();
+        InternalByteBody.bufferFlow(field1.byteBody()).onComplete((b, e) -> buffered1.set(b));
+        write(streamingBody.sharedBuffer(), "666&hello=");
+        assertNotNull(buffered1.get(), "field 1 should be buffered once complete");
+        assertEquals(6, buffered1.get().length());
+
+        // hello=7777777 (7 bytes) would bring the form to 13 bytes, over the limit of 12, while field 1 is still held
+        RawFormField field2 = fields.queue.remove();
+        AtomicReference<Throwable> error2 = new AtomicReference<>();
+        InternalByteBody.bufferFlow(field2.byteBody()).onComplete((b, e) -> {
+            error2.set(e);
+            if (b != null) {
+                b.close();
+            }
+        });
+        write(streamingBody.sharedBuffer(), "7777777");
+        assertInstanceOf(BufferLengthExceededException.class, error2.get());
+
+        buffered1.get().close();
     }
 
     private static final class MockUpstream implements BufferConsumer.Upstream {
