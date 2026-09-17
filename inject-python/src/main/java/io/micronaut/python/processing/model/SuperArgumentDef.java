@@ -34,6 +34,8 @@ import java.util.Objects;
  * @param parameterName The name of the constructor parameter the argument refers to, otherwise {@code null}
  * @param type The static Python type of the argument when it is known ({@code str}, {@code int},
  * {@code float}, {@code bool}, {@code None} or the called class), otherwise {@code null}
+ * @param conflictingCall The source of another {@code super().__init__(...)} call of the same constructor
+ * that passes different arguments, otherwise {@code null}
  * @author Micronaut Team
  * @since 5.2.0
  */
@@ -42,11 +44,16 @@ public record SuperArgumentDef(
     String source,
     @Nullable String keyword,
     @Nullable String parameterName,
-    @Nullable TypeRef type
+    @Nullable TypeRef type,
+    @Nullable String conflictingCall
 ) {
 
     public SuperArgumentDef {
         Objects.requireNonNull(source, "Argument source cannot be null");
+    }
+
+    public SuperArgumentDef(String source, @Nullable String keyword, @Nullable String parameterName, @Nullable TypeRef type) {
+        this(source, keyword, parameterName, type, null);
     }
 
     /**
@@ -90,6 +97,26 @@ public record SuperArgumentDef(
      */
     public static SuperArgumentDef keyword(String source, String keyword) {
         return new SuperArgumentDef(source, keyword, null, null);
+    }
+
+    /**
+     * The record of a constructor calling {@code super().__init__(...)} in more than one way: the
+     * arguments of the first call, with the source of a differing call. A Python class extending a
+     * Java class has one Java super constructor, so the calls have to agree.
+     *
+     * @param source The source of the first call
+     * @param conflictingCall The source of a call that differs
+     * @return The argument
+     */
+    public static SuperArgumentDef conflicting(String source, String conflictingCall) {
+        return new SuperArgumentDef(source, null, null, null, conflictingCall);
+    }
+
+    /**
+     * @return Whether another {@code super().__init__(...)} call of the constructor passes different arguments
+     */
+    public boolean isConflicting() {
+        return conflictingCall != null;
     }
 
     /**

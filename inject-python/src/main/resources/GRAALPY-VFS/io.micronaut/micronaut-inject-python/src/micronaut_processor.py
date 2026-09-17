@@ -1030,22 +1030,20 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         The arguments of the super().__init__(...) call of a constructor, with what the
         processor can tell about them statically, or None when the constructor does not
-        call the super constructor with a fixed argument list: no call, several calls
-        with different arguments (the Java constructor cannot be picked statically) or
-        a call that passes the constructor's own *args/**kwargs through. A Python class
-        extending a Java class needs them to pick the Java super constructor.
+        call the super constructor. A Python class extending a Java class needs them to
+        pick the Java super constructor; a constructor calling super().__init__ in more
+        than one way (on different branches) is recorded as conflicting, and a call that
+        passes the constructor's own *args/**kwargs through records them as spread
+        arguments: an error for a class extending a Java class, the fallback to the
+        message constructor for a subclass of a Java exception.
         """
         calls = self._super_init_calls(func_node.body)
         if not calls:
             return None
-        sources = {ast.unparse(call) for call in calls}
-        if len(sources) > 1:
-            return None
         call = calls[0]
-        if any(isinstance(argument, ast.Starred) for argument in call.args) or any(
-            keyword_argument.arg is None for keyword_argument in call.keywords
-        ):
-            return None
+        for other in calls[1:]:
+            if ast.unparse(other) != ast.unparse(call):
+                return [SuperArgumentDef.conflicting(ast.unparse(call), ast.unparse(other))]
         parameter_names = {arg.name() for arg in arguments.arguments()}
         super_arguments = [
             self._super_argument(argument, parameter_names)
@@ -1053,7 +1051,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         ]
         for keyword_argument in call.keywords:
             source = ast.unparse(keyword_argument)
-            super_arguments.append(SuperArgumentDef.keyword(source, keyword_argument.arg))
+            super_arguments.append(SuperArgumentDef.keyword(source, keyword_argument.arg or "**"))
         return super_arguments
 
     def _super_init_calls(self, statements):
@@ -1083,6 +1081,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
     def _super_argument(self, node, parameter_names):
         source = ast.unparse(node)
+        if isinstance(node, ast.Starred):
+            return SuperArgumentDef.keyword(source, "*")
         if isinstance(node, ast.Name) and node.id in parameter_names:
             return SuperArgumentDef.parameter(source, node.id)
         type_name = self._static_python_type_name(node)

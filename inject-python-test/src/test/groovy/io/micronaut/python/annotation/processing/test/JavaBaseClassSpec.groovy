@@ -18,7 +18,10 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.python.ValueCoercible
 import io.micronaut.python.annotation.processing.test.javabases.AbstractCounter
+import io.micronaut.python.annotation.processing.test.javabases.CtorHookBase
+import io.micronaut.python.annotation.processing.test.javabases.GenericHolder
 import io.micronaut.python.annotation.processing.test.javabases.GreetingBase
+import io.micronaut.python.annotation.processing.test.javabases.LongBase
 import io.micronaut.python.annotation.processing.test.javabases.Services
 import io.micronaut.python.compiler.PyronautCompiler
 import org.graalvm.polyglot.Context
@@ -223,6 +226,136 @@ class Sibling(GreetingBase):
         e.message.contains('Python class [AlsoRefused] cannot extend the final Java class')
         !e.message.contains('Sibling')
         !e.message.contains('Native Python mode')
+    }
+
+    void "a Python class nested in another class and a class local to a function extend Java classes"() {
+        given: "the base helper is not mangled inside a class body; a function-local class keeps the host adapter"
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.javabases import GenericHolder, Services
+
+
+class Holder:
+    class Inner(Services.ServiceBase):
+        def __init__(self):
+            super().__init__("inner")
+
+        def handle(self, request: str) -> str:
+            return "inner:" + request
+
+
+@Singleton
+class User:
+    @Executable
+    def nested(self) -> str:
+        return Holder.Inner().describe()
+
+    @Executable
+    def local(self) -> str:
+        class LocalHolder(GenericHolder):
+            def transform(self, value):
+                return "local:" + value
+
+        holder = LocalHolder()
+        return holder.apply("x") + "/" + holder.value()
+''', true)
+
+        when:
+        def user = ctx.getBean(ctx.classLoader.loadClass('python.User'))
+
+        then: 'the nested class has a generated Java class extending the base'
+        user.nested() == 'inner:inner:ping'
+        ctx.classLoader.loadClass('python.Holder$Inner').superclass == Services.ServiceBase
+
+        and: 'the function-local class works through the host adapter'
+        user.local() == 'local:x/local:x'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Java super constructor calling an overridden method reaches the Python object under construction"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import CtorHookBase
+
+
+@Singleton
+class Hooked(CtorHookBase):
+    def __init__(self):
+        super().__init__()
+        self.after = "python"
+
+    def initialValue(self) -> str:
+        return "from-python"
+''', true)
+
+        when:
+        CtorHookBase hooked = ctx.getBean(CtorHookBase)
+
+        then: 'the hook ran on the Python override while the Java instance was constructed'
+        hooked.init() == 'from-python'
+        hooked.initialValue() == 'from-python'
+        ((ValueCoercible) hooked).asPolyglotValue().getMember('after').asString() == 'python'
+
+        when: 'an instance is created in Python'
+        Context polyglot = ctx.getBean(Context)
+        def created = polyglot.eval('python', 'Hooked()')
+
+        then:
+        created.as(CtorHookBase).init() == 'from-python'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "Python number literals reach boxed constructor parameters by widening"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import LongBase
+
+
+class Ided(LongBase):
+    def __init__(self):
+        super().__init__(5, 2)
+''', true)
+
+        when:
+        LongBase ided = ctx.classLoader.loadClass('python.Ided').getConstructor().newInstance()
+
+        then: 'int matched Long and Double as it widens to long and double'
+        ided.id == 5L
+        ided.ratio == 2.0d
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class extends a generic Java class with a bound type argument"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.python.annotation.processing.test.javabases import GenericHolder
+
+
+@Singleton
+class StrHolder(GenericHolder[str]):
+    def transform(self, value: str) -> str:
+        return value.upper()
+''', true)
+
+        when:
+        GenericHolder<String> holder = ctx.getBean(GenericHolder)
+
+        then: 'the override is what the Java base calls and the type argument is bound'
+        holder.apply('abc') == 'ABC'
+        holder.value() == 'ABC'
+        holder.transform('x') == 'X'
+
+        cleanup:
+        ctx?.close()
     }
 
     void "methods inherited from a non-public generic base class are visible on Java objects"() {

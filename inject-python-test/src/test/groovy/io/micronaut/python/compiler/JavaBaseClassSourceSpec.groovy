@@ -48,9 +48,14 @@ class NamedGreeter(GreetingBase):
         then: 'the generated class extends the Java base and exposes its members to the Python object'
         javaCode.contains('public class NamedGreeter extends GreetingBase implements ValueCoercible, ValueCoercible.JavaBaseMembers')
 
-        and: 'the Value constructor calls the resolved (String, int) constructor with the recorded arguments and binds'
+        and: 'the Value constructor marks the object as under construction, calls the resolved (String, int) constructor with the recorded arguments and binds'
+        javaCode.contains('this(value, PythonJavaBases.constructing(value));')
         javaCode.contains('super(PythonConversion.isNone(PythonJavaBases.argument(value, 0, "(java.lang.String, int)")) ? null : PythonJavaBases.argument(value, 0, "(java.lang.String, int)").asString(), PythonJavaBases.argument(value, 1, "(java.lang.String, int)").asInt());')
+        javaCode.contains('construction.finished();')
         javaCode.contains('PythonJavaBases.bind(value, this)')
+
+        and: 'a bridge called by the super constructor reaches the object under construction'
+        javaCode.contains('PythonJavaBases.underConstruction()')
 
         and: 'the constructor of the Python parameters creates the Python object and delegates to it'
         javaCode.contains('public NamedGreeter(String name, int count) {\n    this(PythonContextRuntime.newInstance(NamedGreeter.__PYTHON_CLASS_REFERENCE, (Object) name, (Object) count));')
@@ -111,6 +116,59 @@ class NoSuperCall(GreetingBase):
         then:
         def e = thrown(RuntimeException)
         e.message.contains('Python class [NoSuperCall] extends the Java class [io.micronaut.python.annotation.processing.test.javabases.GreetingBase], which has no no-argument constructor')
+    }
+
+    def "super constructor calls that disagree are a compile error, calls in nested scopes are not the constructor's"() {
+        when: 'two branches call the super constructor differently'
+        PyronautCompiler.builder()
+            .pythonCode('''
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+class Cond(GreetingBase):
+    def __init__(self, flag: bool):
+        if flag:
+            super().__init__("yes", 1)
+        else:
+            super().__init__("no")
+''')
+            .build()
+            .buildClassLoader()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains('The __init__ method of Python class [Cond] calls super().__init__() in more than one way [super().__init__(\'yes\', 1)] and [super().__init__(\'no\')]')
+
+        when: 'the same call on both branches, and a nested function calling another super constructor'
+        def tempDir = File.createTempDir("python-java-base", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode('''
+from micronaut.python.annotation.processing.test.javabases import GreetingBase
+
+
+class Agreeing(GreetingBase):
+    def __init__(self, flag: bool):
+        if flag:
+            super().__init__("yes", 1)
+        else:
+            super().__init__("yes", 1)
+
+        class Helper:
+            def __init__(self):
+                super().__init__()
+
+        self.helper = Helper()
+''')
+            .targetDir(tempDir)
+            .build()
+        compiler.compile()
+        def javaCode = new File(tempDir, "python/Agreeing.java").text
+
+        then: 'the (String, int) constructor of the base is called'
+        javaCode.contains('"(java.lang.String, int)"')
+
+        cleanup:
+        tempDir?.deleteDir()
     }
 
     def "keyword arguments of the super constructor call are rejected"() {

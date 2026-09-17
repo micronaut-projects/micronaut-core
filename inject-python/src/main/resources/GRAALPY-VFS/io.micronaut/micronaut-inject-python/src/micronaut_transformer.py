@@ -629,10 +629,12 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                         replaced_throwable = True
                         self.uses_builtin_exception = True
                     continue
-                java_class_name = self._java_class_name(base)
+                java_class_name = self._java_class_name(base) if self.function_depth == 0 else None
                 if java_class_name:
                     # The generated Java class extends the Java class; the Python class gets a
-                    # Python base standing in for it (see PythonJavaBases in the runtime).
+                    # Python base standing in for it (see PythonJavaBases in the runtime). A class
+                    # defined inside a function has no generated Java class: it keeps the Java class
+                    # as its base and GraalPy's host adapter implements the subclass.
                     runtime_bases.append(ast.copy_location(self._java_base_call(java_class_name), base))
                     self.uses_java_base = True
                     replaced_java_base = True
@@ -1086,7 +1088,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             or self.callback_get_class_element(outer.getName() + '$' + nested.replace('.', '$'))
         )
 
-    JAVA_BASE_HELPER = '__micronaut_java_base'
+    # a single leading underscore: a name starting with two underscores is mangled inside a class body,
+    # which would turn the base call of a nested class into _Outer__micronaut_java_base
+    JAVA_BASE_HELPER = '_micronaut_java_base'
 
     def _java_base_call(self, java_class_name: str) -> ast.Call:
         return ast.Call(
