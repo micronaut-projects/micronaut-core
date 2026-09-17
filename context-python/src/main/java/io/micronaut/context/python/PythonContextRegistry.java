@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -751,7 +752,7 @@ final class PythonContextRegistry {
          * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
          * wrapper holds the key.
          */
-        final WeakHashMap<Value, AsyncInstance> asyncInstances = new WeakHashMap<>();
+        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /** Helper functions and cached pooled values, keyed by name or expression. */

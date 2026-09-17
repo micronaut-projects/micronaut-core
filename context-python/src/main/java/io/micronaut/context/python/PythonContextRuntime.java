@@ -312,21 +312,19 @@ public final class PythonContextRuntime {
         PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
         if (!inProgress.add(source)) {
             // a bean reached again through its own dependencies: its instance, unless it is still being created
-            PythonContextRegistry.AsyncInstance existing = asyncInstance(state, source);
+            PythonContextRegistry.AsyncInstance existing = state.asyncInstances.get(source);
             return existing == null ? null : existing.target();
         }
         try {
             // one event-loop instance per startup instance: prototypes and factory-produced instances of a class
             // keep their own arguments and state
-            PythonContextRegistry.AsyncInstance instance = asyncInstance(state, source);
+            PythonContextRegistry.AsyncInstance instance = state.asyncInstances.get(source);
             if (instance == null) {
                 Value target = newEventLoopInstance(findClass(classReference, context), rememberedConstructorArguments(source));
                 instance = new PythonContextRegistry.AsyncInstance(target, Set.copyOf(PythonCoercion.transferableMemberNames(target)));
-                synchronized (state) {
-                    PythonContextRegistry.AsyncInstance prior = state.asyncInstances.putIfAbsent(source, instance);
-                    if (prior != null) {
-                        instance = prior;
-                    }
+                PythonContextRegistry.AsyncInstance prior = state.asyncInstances.putIfAbsent(source, instance);
+                if (prior != null) {
+                    instance = prior;
                 }
             }
             Value target = instance.target();
@@ -337,12 +335,6 @@ public final class PythonContextRuntime {
             return target;
         } finally {
             inProgress.remove(source);
-        }
-    }
-
-    private static PythonContextRegistry.@Nullable AsyncInstance asyncInstance(PythonContextRegistry.ContextState state, Value source) {
-        synchronized (state) {
-            return state.asyncInstances.get(source);
         }
     }
 
