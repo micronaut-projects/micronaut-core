@@ -70,6 +70,19 @@ def decorator_name(decorator: ast.AST) -> Optional[str]:
     return None
 
 
+def dotted_name(expression: ast.AST) -> Optional[str]:
+    """
+    The dotted name an expression spells, ``i`` for ``i`` and ``jakarta.inject`` for ``jakarta.inject``, or
+    ``None`` when it is not a name.
+    """
+    if isinstance(expression, ast.Name):
+        return expression.id
+    if isinstance(expression, ast.Attribute):
+        qualifier = dotted_name(expression.value)
+        return None if qualifier is None else f'{qualifier}.{expression.attr}'
+    return None
+
+
 def returns_nested_function(function: ast.FunctionDef) -> bool:
     """
     Whether the function has the decorator factory shape: it returns a function defined in its body.
@@ -85,6 +98,18 @@ def returns_nested_function(function: ast.FunctionDef) -> bool:
         and node.value.id in nested_function_names
         for node in ast.walk(function)
     )
+
+
+def takes_target_directly(function: ast.FunctionDef) -> bool:
+    """
+    Whether the function is a plain wrapping decorator, applied bare by construction: it has exactly one required
+    positional parameter, the decorated target (``def Traced(func): ...``). Such a function is not a factory,
+    whatever it returns, so a bare ``@Traced`` must not become ``@Traced()``.
+    """
+    arguments = function.args
+    positional = list(arguments.posonlyargs) + list(arguments.args)
+    required = len(positional) - len(arguments.defaults)
+    return required == 1
 
 
 def source_file_for_import(source_root: str, package_name: str, level: int, module_name: Optional[str]) -> Optional[str]:
@@ -119,19 +144,24 @@ class AnnotationFunctionScanner:
     Finds the names a module binds to custom annotation functions: top-level functions of the decorator
     factory shape (``def Ann(...): def decorator(target): ...; return decorator``) that are decorated with
     ``micronaut_annotation``, with a Java annotation applicable to annotation types, or with another custom
-    annotation function, as the processor recognises them. Imported modules of the same source root are
-    scanned in turn, so a bare ``@Ann`` can be told from a factory call ``@Ann(...)`` wherever ``Ann`` is used.
+    annotation function, as the processor recognises them. A function taking the decorated target as its
+    single required positional parameter (``def Traced(func): ...``) is a plain wrapping decorator, applied
+    bare by construction, and is not one of them. Imported modules of the same source root are scanned in
+    turn, so a bare ``@Ann`` can be told from a factory call ``@Ann(...)`` wherever ``Ann`` is used.
+
+    The scan results of imported modules are cached for the duration of one scan (one module transform),
+    not across compilations: a module's answer depends on the modules it imports and on the class path.
     """
 
-    _cache: Dict[str, Set[str]] = {}
-    _loading: Set[str] = set()
-
-    def __init__(self, callback_get_class_element, package_name: str = '', source_root: str = ''):
+    def __init__(self, callback_get_class_element, package_name: str = '', source_root: str = '',
+                 cache: Optional[Dict[str, Set[str]]] = None, loading: Optional[Set[str]] = None):
         self.callback_get_class_element = callback_get_class_element
         self.package_name = package_name or ''
         self.source_root = source_root or ''
         self.annotation_functions: Set[str] = set()
         self.annotation_type_targets: Set[str] = set()
+        self._cache: Dict[str, Set[str]] = {} if cache is None else cache
+        self._loading: Set[str] = set() if loading is None else loading
 
     def scan(self, module: ast.Module) -> Set[str]:
         for statement in module.body:
@@ -142,7 +172,7 @@ class AnnotationFunctionScanner:
         return self.annotation_functions
 
     def declares_annotation(self, function: ast.FunctionDef) -> bool:
-        if not returns_nested_function(function):
+        if takes_target_directly(function) or not returns_nested_function(function):
             return False
         for decorator in function.decorator_list:
             name = decorator_name(decorator)
@@ -171,15 +201,12 @@ class AnnotationFunctionScanner:
                 self.annotation_functions.add(bound_name)
 
     def _module_annotation_functions(self, module_file: str) -> Set[str]:
-        try:
-            stat = os.stat(module_file)
-            key = f'{module_file}:{stat.st_mtime_ns}:{stat.st_size}'
-        except OSError:
-            return set()
+        key = os.path.abspath(module_file)
         cached = self._cache.get(key)
         if cached is not None:
             return cached
         if key in self._loading:
+            # a circular import: the module is being scanned higher up the stack
             return set()
         self._loading.add(key)
         try:
@@ -188,7 +215,9 @@ class AnnotationFunctionScanner:
             scanner = AnnotationFunctionScanner(
                 self.callback_get_class_element,
                 package_name_of_source_file(self.source_root, module_file),
-                self.source_root
+                self.source_root,
+                self._cache,
+                self._loading
             )
             names = scanner.scan(module)
         except (OSError, SyntaxError, ValueError):
@@ -684,11 +713,17 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         """
         if isinstance(decorator, ast.Call):
             return decorator
-        decorator_name = self._get_decorator_name(decorator)
-        if decorator_name in self.generated_decorators or decorator_name in self.annotation_functions:
+        if self._is_annotation_decorator(decorator):
             call = ast.Call(func=decorator, args=[], keywords=[])
             return ast.copy_location(call, decorator)
         return decorator
+
+    def _is_annotation_decorator(self, decorator) -> bool:
+        """
+        Whether a bare decorator names a generated annotation decorator or a custom annotation function.
+        """
+        decorator_name = self._get_decorator_name(decorator)
+        return decorator_name in self.generated_decorators or decorator_name in self.annotation_functions
 
     def _normalize_annotation_keyword_arguments(self, call: ast.Call):
         """
@@ -1359,6 +1394,9 @@ class MicronautRuntimeTransformer(MicronautTransformer):
                         )
         self.java_runtime_names = set()
         self.imported_java_interface_names = set()
+        # The annotation names of the Java packages imported as modules, by the name the package is bound to
+        # (``import jakarta.inject as i`` -> ``i``): applied qualified, as @i.Singleton, never bare
+        self.package_decorators: Dict[str, Set[str]] = {}
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         self.scan_annotation_functions(node)
@@ -1413,12 +1451,13 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         for alias in node.names:
             variable_name = alias.asname if alias.asname else alias.name
             if alias.name == '*':
-                self._track_package_decorators(java_module)
+                # the annotations of the package are bound to their own names
+                self.generated_decorators.update(self._package_annotation_names(java_module))
                 continue
             class_element = self._resolve_imported_java_type(java_module, alias.name)
             if class_element is None:
                 # from jakarta import inject: the decorators of the package are applied as inject.Singleton
-                self._track_package_decorators(f'{java_module}.{alias.name}')
+                self._track_package_decorators(variable_name, f'{java_module}.{alias.name}')
             elif self._is_annotation_class(class_element):
                 self.generated_decorators.add(variable_name)
             else:
@@ -1443,7 +1482,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         runtime package, which lives without the ``io.`` prefix.
         """
         for alias in node.names:
-            self._track_package_decorators(self._to_java_import_module(alias.name))
+            # import jakarta.inject as i -> @i.Singleton; import jakarta.inject -> @jakarta.inject.Singleton
+            self._track_package_decorators(alias.asname or alias.name, self._to_java_import_module(alias.name))
         if not any(is_java_io_package(alias.name) for alias in node.names):
             return node
         names = [
@@ -1453,13 +1493,28 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         ]
         return ast.copy_location(ast.Import(names=names), node)
 
-    def _track_package_decorators(self, java_module: str):
+    def _track_package_decorators(self, bound_name: str, java_module: str):
         """
-        Record the annotation types of an imported package, applied as attributes of the package or its alias.
+        Record the annotation types of an imported package under the name the package is bound to: they are
+        applied as attributes of that name, so an unrelated local decorator of the same simple name is not one.
         """
-        for class_element in self.callback_get_class_elements(java_module) or []:
-            if self._is_annotation_class(class_element):
-                self.generated_decorators.add(str(class_element.getSimpleName()))
+        names = self._package_annotation_names(java_module)
+        if names:
+            self.package_decorators.setdefault(bound_name, set()).update(names)
+
+    def _package_annotation_names(self, java_module: str) -> Set[str]:
+        return {
+            str(class_element.getSimpleName())
+            for class_element in self.callback_get_class_elements(java_module) or []
+            if self._is_annotation_class(class_element)
+        }
+
+    def _is_annotation_decorator(self, decorator) -> bool:
+        if isinstance(decorator, ast.Attribute):
+            qualifier = dotted_name(decorator.value)
+            if qualifier in self.package_decorators:
+                return decorator.attr in self.package_decorators[qualifier]
+        return super()._is_annotation_decorator(decorator)
 
     def _normalize_decorator(self, decorator):
         # The runtime source keeps its keyword arguments as written: generated decorators accept them all.

@@ -38,7 +38,22 @@ class V8Engine:
     pass
 ----
 
-A function that takes the decorated target directly, `def Timed(target): return target`, is a marker annotation that is only applied bare.
+A function whose single required positional parameter is the decorated target is a plain Python decorator and is only applied bare, whether it returns the target (`def Timed(target): return target`) or a wrapper around it:
+
+[source,python]
+----
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def Traced(func):
+    def wrapper(*args, **kwargs):
+        return "traced:" + func(*args, **kwargs)
+    return wrapper
+
+@Traced   # Traced(hello), never Traced()(hello)
+def hello(self) -> str:
+    return "ok"
+----
 
 == Placeholder Bodies
 

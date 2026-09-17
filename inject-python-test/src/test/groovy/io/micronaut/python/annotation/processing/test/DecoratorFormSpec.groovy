@@ -125,6 +125,39 @@ class ExplicitMarked:
         context?.close()
     }
 
+    void "test a wrapping decorator taking the target is applied bare"() {
+        given: "the most common Python decorator shape, decorated with an annotation applicable to annotations"
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def Traced(func):
+    def wrapper(*args, **kwargs):
+        return "traced:" + func(*args, **kwargs)
+    return wrapper
+
+@Singleton
+class TracedService:
+    @Executable
+    @Traced
+    def hello(self) -> str:
+        return "ok"
+''')
+
+        when:
+        def definition = getBeanDefinition(context, "python.TracedService")
+        Value bean = getBean(context, "python.TracedService").asPolyglotValue()
+
+        then: "the decorator receives the function, it is not called as a factory"
+        definition.findMethod("hello").get().hasAnnotation("python.Traced")
+        bean.invokeMember("hello").asString() == "traced:ok"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test an imported custom annotation function is applied bare and with parentheses"() {
         given:
         def tempDir = File.createTempDir("python-decorator-form", "")

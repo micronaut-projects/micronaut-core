@@ -210,6 +210,88 @@ class DecoratorFormTest(unittest.TestCase):
         self.assertIn("@Around()", code)
         self.assertIn("@Timed\nclass Service", code)
 
+    def test_wrapping_decorator_returning_a_nested_function_is_not_an_annotation_factory(self):
+        # the most common Python decorator shape: it takes the target and returns a wrapper
+        source = (
+            "from micronaut.core.bind.annotation import Bindable\n"
+            "@Bindable\n"
+            "def Traced(func):\n"
+            "    def wrapper(*args, **kwargs):\n"
+            "        return 'traced:' + func(*args, **kwargs)\n"
+            "    return wrapper\n"
+            "class Service:\n"
+            "    @Traced\n"
+            "    def hello(self):\n"
+            "        return 'ok'\n"
+        )
+        code = runtime_source(source)
+        self.assertIn("@Bindable()", code)
+        self.assertIn("    @Traced\n    def hello", code)
+
+    def test_package_import_decorators_are_matched_by_their_qualifier(self):
+        source = (
+            "import micronaut.context.annotation as annotation\n"
+            "def Executable(target):\n"
+            "    return target\n"
+            "@Executable\n"
+            "class Local:\n"
+            "    pass\n"
+            "@annotation.Executable\n"
+            "class Qualified:\n"
+            "    pass\n"
+            "@other.Executable\n"
+            "class Other:\n"
+            "    pass\n"
+        )
+        code = runtime_source(source)
+        self.assertIn("@Executable\nclass Local", code)
+        self.assertIn("@annotation.Executable()\nclass Qualified", code)
+        self.assertIn("@other.Executable\nclass Other", code)
+
+    def test_unaliased_package_import_decorators_are_matched_by_the_package_name(self):
+        code = runtime_source(
+            "import micronaut.context.annotation\n"
+            "@micronaut.context.annotation.Executable\n"
+            "class Service:\n"
+            "    pass\n"
+        )
+        self.assertIn("@micronaut.context.annotation.Executable()", code)
+
+    def test_imported_module_scan_is_not_cached_across_scans(self):
+        with tempfile.TemporaryDirectory() as source_root:
+            package = os.path.join(source_root, "filters")
+            os.makedirs(package)
+            annotations = os.path.join(package, "Annotations.py")
+            factory = (
+                "from micronaut.core.bind.annotation import Bindable\n"
+                "@Bindable\n"
+                "def Marker(value=''):\n"
+                "    def decorator(target):\n"
+                "        return target\n"
+                "    return decorator\n"
+            )
+            plain = "def Marker(value=''):\n    return value\n"
+            plain += "#" * (len(factory) - len(plain) - 1) + "\n"
+            # a whole second: the file system may keep timestamps no finer than that
+            written = 1_700_000_000 * 1_000_000_000
+            with open(annotations, "w", encoding="utf-8") as module:
+                module.write(plain)
+            os.utime(annotations, ns=(written, written))
+            source = (
+                "from .Annotations import Marker\n"
+                "@Marker\n"
+                "class View:\n"
+                "    pass\n"
+            )
+            self.assertIn("@Marker\nclass View", runtime_source(source, "filters", source_root))
+            # the imported module changes to an annotation function of the same size and mtime (as an
+            # incremental build within one compiler context may see it): a fresh scan reads it again
+            with open(annotations, "w", encoding="utf-8") as module:
+                module.write(factory)
+            os.utime(annotations, ns=(written, written))
+            self.assertEqual(len(plain), os.stat(annotations).st_size)
+            self.assertIn("@Marker()\nclass View", runtime_source(source, "filters", source_root))
+
     def test_imported_custom_annotation_function_is_called_when_bare(self):
         with tempfile.TemporaryDirectory() as source_root:
             package = os.path.join(source_root, "filters")
