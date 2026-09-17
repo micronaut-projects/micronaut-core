@@ -368,12 +368,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 // handler may alias stays alive across its suspensions and its failure reaches
                 // @OnError
                 if (KotlinUtils.isKotlinCoroutineSuspended(result)) {
-                    Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest);
-                    if (supplier == null) {
-                        return ExecutionFlow.empty();
-                    }
-                    CompletionStage<Object> completion = supplier.get().thenApply(v -> v);
-                    return CompletableFutureExecutionFlow.just(completion);
+                    // the continuation is bound with the suspend method, so the supplier is present
+                    Supplier<CompletableFuture<?>> supplier = Objects.requireNonNull(ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(originatingRequest));
+                    return CompletableFutureExecutionFlow.just(supplier.get().thenApply(v -> (Object) v));
                 }
                 return ExecutionFlow.just(result);
             }

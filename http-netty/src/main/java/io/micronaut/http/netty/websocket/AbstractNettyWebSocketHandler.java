@@ -401,6 +401,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                     );
 
                     ByteBuf finalHandlerOwnedContent = handlerOwnedContent;
+                    Runnable release = finalHandlerOwnedContent == null ? () -> { } : finalHandlerOwnedContent::release;
                     try {
                         BoundExecutable boundExecutable = executableBinder.bind(
                                 messageHandler.getExecutableMethod(),
@@ -409,7 +410,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         );
 
                         Object finalData = data;
-                        Runnable release = finalHandlerOwnedContent == null ? () -> { } : finalHandlerOwnedContent::release;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
                             if (e == null) {
                                 // the message may still be handed to listeners, messageHandled releases once that is done
@@ -423,9 +423,7 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             }
                         });
                     } catch (Throwable e) {
-                        if (finalHandlerOwnedContent != null) {
-                            finalHandlerOwnedContent.release();
-                        }
+                        release.run();
                         messageProcessingException(ctx, e);
                     }
 
