@@ -324,8 +324,7 @@ public final class PythonAsyncioRuntime {
         try {
             context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
         } catch (PolyglotException e) {
-            String message = e.getMessage();
-            if (message == null || !message.contains("ModuleNotFoundError")) {
+            if (!PythonContextRuntime.isModuleNotFound(e)) {
                 throw e;
             }
             loadAsyncioModuleSource(context);

@@ -1496,16 +1496,30 @@ public final class PythonContextRuntime {
         try {
             module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         } catch (PolyglotException e) {
+            if (!isModuleNotFound(e)) {
+                throw e;
+            }
             // The virtual file system of this context does not carry the module (a bare context created
             // outside the application, or an application whose file system lists another module set):
             // serve it from the classpath resource and import it again. The import system serialises
-            // the concurrent first imports of a module, so every thread sees it complete; a failure that
-            // is not a missing module recurs on the second import and propagates.
+            // the concurrent first imports of a module, so every thread sees it complete.
             installRuntimeModuleFinder(context, RUNTIME_MODULE_NAME, RUNTIME_MODULE_RESOURCE, RUNTIME_MODULE_FALLBACK_SOURCE);
             module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         }
         Value existing = state.runtimeModule.compareAndExchange(null, module);
         return existing == null ? module : existing;
+    }
+
+    /**
+     * Whether a failed import reports a missing module ({@code ModuleNotFoundError}), the case the
+     * classpath fallback of a runtime module serves; any other failure is a real one.
+     *
+     * @param e The exception of the failed import
+     * @return True if the module was not found
+     */
+    static boolean isModuleNotFound(PolyglotException e) {
+        String message = e.getMessage();
+        return message != null && message.contains("ModuleNotFoundError");
     }
 
     /**
