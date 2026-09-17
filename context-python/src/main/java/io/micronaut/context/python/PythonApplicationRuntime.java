@@ -23,6 +23,7 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.ref.WeakReference;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -51,7 +52,10 @@ import java.util.function.Supplier;
  * the eager beans. The application context that is starting is therefore recorded by
  * {@link #bootstrapFrom(BeanContext)} (see {@link PythonRuntimeBootstrapConfigurer}), and
  * {@link #require()} creates the GraalPy context bean of that application, which installs the
- * runtime, the first time generated code needs it before the bean exists.
+ * runtime, the first time generated code needs it before the bean exists. Like the installed
+ * runtime, that record is JVM-wide and the last writer wins: when two application contexts start in
+ * parallel, an early Python bean of one may build the GraalPy context of the other, exactly as it
+ * would have resolved the other's installed runtime.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -60,7 +64,9 @@ import java.util.function.Supplier;
 final class PythonApplicationRuntime {
 
     private static final AtomicReference<@Nullable PythonApplicationRuntime> CURRENT = new AtomicReference<>();
-    private static final AtomicReference<@Nullable BeanContext> BOOTSTRAP_CONTEXT = new AtomicReference<>();
+    // weakly held: a context whose start failed publishes no ShutdownEvent and stays recorded until the
+    // next context replaces it, which must not keep the failed context alive
+    private static final AtomicReference<@Nullable WeakReference<BeanContext>> BOOTSTRAP_CONTEXT = new AtomicReference<>();
     private static final ThreadLocal<Boolean> BOOTSTRAPPING = ThreadLocal.withInitial(() -> false);
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
 
@@ -117,7 +123,7 @@ final class PythonApplicationRuntime {
      * @param beanContext The bean context
      */
     static void bootstrapFrom(BeanContext beanContext) {
-        BOOTSTRAP_CONTEXT.set(beanContext);
+        BOOTSTRAP_CONTEXT.set(new WeakReference<>(beanContext));
     }
 
     /**
@@ -127,7 +133,10 @@ final class PythonApplicationRuntime {
      * @param beanContext The bean context
      */
     static void forgetBootstrap(BeanContext beanContext) {
-        BOOTSTRAP_CONTEXT.compareAndSet(beanContext, null);
+        WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
+        if (recorded != null && recorded.get() == beanContext) {
+            BOOTSTRAP_CONTEXT.compareAndSet(recorded, null);
+        }
     }
 
     /**
@@ -136,7 +145,8 @@ final class PythonApplicationRuntime {
      * @return The installed runtime, or {@code null} when no application context is recorded
      */
     private static @Nullable PythonApplicationRuntime bootstrap() {
-        BeanContext beanContext = BOOTSTRAP_CONTEXT.get();
+        WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
+        BeanContext beanContext = recorded == null ? null : recorded.get();
         // generated code reached while the context bean is being built (main.py) cannot build a second one
         if (beanContext == null || BOOTSTRAPPING.get()) {
             return null;

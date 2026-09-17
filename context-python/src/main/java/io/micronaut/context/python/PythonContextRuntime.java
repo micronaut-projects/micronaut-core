@@ -197,10 +197,12 @@ public final class PythonContextRuntime {
 
     /**
      * Whether generated calls must use the primary context: no pool is registered or the context is reused.
+     * The runtime is installed on demand first, so a pooled entry point reached before the runtime exists
+     * routes to the pool once the application has configured one.
      */
     private static boolean usePrimaryContext() {
-        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
-        return runtime == null || runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.require();
+        return runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
     }
 
     /**

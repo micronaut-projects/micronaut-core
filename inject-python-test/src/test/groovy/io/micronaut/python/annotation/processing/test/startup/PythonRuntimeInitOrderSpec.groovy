@@ -124,8 +124,44 @@ class StartupListener:
         !PythonContextRuntime.isInitialized()
     }
 
+    void "test the bootstrap context of the application is never used to initialize the runtime"() {
+        given: "an application with a bootstrap context and a Python bean created before the eager beans"
+        bootstrapEnvironment = true
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.core.convert import ConversionContext, TypeConverter
+from java.util import Optional
+from io.micronaut.python.annotation.processing.test.startup import Temperature
+
+@Singleton
+class TemperatureConverter(TypeConverter[str, Temperature]):
+    def convert(self, source: str, target_type: type[Temperature], context: ConversionContext) -> Optional:
+        return Optional.of(Temperature(float(source)))
+''', true)
+
+        expect: "the early bean initialized the runtime from the application context, not the bootstrap context"
+        PythonContextRuntime.isInitialized()
+        context.getConversionService().convert("21.5", Temperature).get().celsius() == 21.5d
+
+        when: "a refresh recreates the bootstrap context while the application is running"
+        context.environment.refresh()
+        context.close()
+        PythonContextRuntime.getContext()
+
+        then: "the stopped application context cleared the record, which the fresh bootstrap context did not replace"
+        def e = thrown(IllegalStateException)
+        e.message == "GraalPy context has not been initialized. Make sure micronaut-context-python is on the classpath."
+        !PythonContextRuntime.isInitialized()
+
+        cleanup:
+        bootstrapEnvironment = false
+    }
+
+    private boolean bootstrapEnvironment
+
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+        contextBuilder.bootstrapEnvironment(bootstrapEnvironment)
         // the processor is a Java bean; the bean context it processes is the one being started
         contextBuilder.beanDefinitions(
             RuntimeBeanDefinition.builder(StartupMethodProcessor, { RuntimeBeanDefinition.CreationContext creation ->

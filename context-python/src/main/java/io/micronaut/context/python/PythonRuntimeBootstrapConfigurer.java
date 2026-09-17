@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ApplicationContextConfigurer;
+import io.micronaut.context.BootstrapContextAccess;
 import io.micronaut.context.annotation.ContextConfigurer;
 import io.micronaut.core.annotation.Internal;
 
@@ -30,6 +31,11 @@ import io.micronaut.core.annotation.Internal;
  * recorded here, {@link PythonContextRuntime} creates the GraalPy context bean of this application
  * instead of failing because the bean does not exist yet. The record is cleared when the application
  * context shuts down (see {@link PythonRuntimeBootstrapShutdownListener}).
+ * <p>
+ * The bootstrap context of an application (see {@link BootstrapContextAccess}) runs the configurer
+ * too but is never recorded: it only holds {@code BootstrapContextCompatible} beans, so it cannot
+ * provide the GraalPy context bean, and it publishes no {@code ShutdownEvent} that would clear the
+ * record again, which matters when a refresh recreates it while the application is running.
  *
  * @author Micronaut Team
  * @since 5.3.0
@@ -40,6 +46,9 @@ public final class PythonRuntimeBootstrapConfigurer implements ApplicationContex
 
     @Override
     public void configure(ApplicationContext applicationContext) {
+        if (applicationContext.containsBean(BootstrapContextAccess.class)) {
+            return;
+        }
         PythonApplicationRuntime.bootstrapFrom(applicationContext);
     }
 }
