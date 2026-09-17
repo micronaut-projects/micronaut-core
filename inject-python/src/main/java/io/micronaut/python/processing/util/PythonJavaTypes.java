@@ -82,14 +82,16 @@ public final class PythonJavaTypes {
     }
 
     /**
-     * Whether the type can be extended at run time as a concrete Java class: not an interface and
-     * not abstract.
+     * Whether a Python class extending the type gets a generated Java class extending it and a
+     * Python base standing in for it at run time: a class (abstract or concrete) that is not a
+     * {@link Throwable}. Interfaces are stripped from the runtime bases and throwables become
+     * Python exceptions.
      *
      * @param classElement The type
-     * @return Whether it is a concrete class
+     * @return Whether it is a Java class a Python class extends through the generated class
      */
-    public static boolean isConcreteClass(@Nullable ClassElement classElement) {
-        return classElement != null && !classElement.isInterface() && !classElement.isAbstract();
+    public static boolean isExtensibleClass(@Nullable ClassElement classElement) {
+        return classElement != null && !classElement.isInterface() && !isThrowable(classElement);
     }
 
     /**

@@ -470,8 +470,11 @@ public class PythonAstParserTest {
             """);
 
         assertTrue(result.code().contains("class Worker(Thread)"));
-        assertTrue(result.runtimeCode().contains("Native Python mode does not support Python class [Worker]"));
-        assertTrue(result.runtimeCode().contains("Java class [java.lang.Thread]"));
+        // the runtime class extends the Python base standing in for the Java class
+        assertTrue(result.runtimeCode().contains("class Worker(__micronaut_java_base('java.lang.Thread'))"));
+        assertTrue(result.runtimeCode().contains("def __micronaut_java_base(name):"));
+        assertTrue(result.runtimeCode().contains("PythonJavaBases').baseClass(java.type(name))"));
+        assertFalse(result.runtimeCode().contains("does not support Python class"));
         assertTrue(parser.requiresRuntimeBytecode(result));
 
         PythonAstParser.TransformResult interfaceResult = parser.transform(visitorContext, """
@@ -481,7 +484,7 @@ public class PythonAstParserTest {
                 pass
             """);
 
-        assertFalse(interfaceResult.runtimeCode().contains("does not support Python class"));
+        assertFalse(interfaceResult.runtimeCode().contains("__micronaut_java_base"));
         assertTrue(interfaceResult.runtimeCode().contains("class Worker:"));
         assertTrue(interfaceResult.runtimeCode().contains("def _micronaut_java_interface_defaults(*interface_names):"));
         assertTrue(interfaceResult.runtimeCode().contains("@_micronaut_java_interface_defaults('java.lang.Runnable')\nclass Worker:"));

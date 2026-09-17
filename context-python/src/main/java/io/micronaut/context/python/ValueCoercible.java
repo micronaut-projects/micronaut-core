@@ -47,6 +47,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      */
     List<String> THROWABLE_MEMBERS = List.of("getMessage", "getLocalizedMessage", "getCause", "getStackTrace");
 
+    /** The prefix of the attributes the runtime stores on a Python object, hidden from member enumeration. */
+    String RUNTIME_MEMBER_PREFIX = "__micronaut_";
+
     /**
      * Returns the wrapped Python value.
      * <p>
@@ -132,7 +135,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         Value value = asPolyglotValue();
         Set<String> keys = new LinkedHashSet<>();
         if (value.hasMembers()) {
-            keys.addAll(value.getMemberKeys());
+            for (String key : value.getMemberKeys()) {
+                if (!key.startsWith(RUNTIME_MEMBER_PREFIX)) {
+                    keys.add(key);
+                }
+            }
         }
         if (this instanceof Throwable) {
             keys.addAll(THROWABLE_MEMBERS);
@@ -224,6 +231,27 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         default boolean micronautValueCoerciblePutMember(String key, Value value) {
             return false;
         }
+    }
+
+    /**
+     * The Java base class members of a generated class that extends a Java class.
+     * <p>
+     * The Python object of such a class has the Java base stripped from its bases: the generated
+     * Java class is the only instance of the base. A Python call of an inherited method
+     * ({@code self.baseMethod(...)}, {@code super().baseMethod(...)}) reaches the base implementation
+     * through this contract, which the generated class implements with a non-virtual call for every
+     * accessible instance method of the base.
+     */
+    interface JavaBaseMembers {
+        /**
+         * Invokes a method of the Java base class on this instance, bypassing a Python override.
+         *
+         * @param name The Java method name
+         * @param arguments The Python arguments
+         * @return The result, or {@code null} for a void method
+         */
+        @Transient
+        @Nullable Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments);
     }
 
     private @Nullable Object generatedGetter(String key) {

@@ -360,6 +360,7 @@ languageSupport:
     javaInterfaces: Implementing Java Interfaces
     generatedClasses: Generated Java Classes
     aopProxies: AOP Proxies
+    extendingJavaClasses: Extending Java Classes
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

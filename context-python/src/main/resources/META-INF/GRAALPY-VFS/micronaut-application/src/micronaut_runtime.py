@@ -153,7 +153,7 @@ def __micronaut_is_plain_bean_instance(obj, qualname):
 
 def __micronaut_transferable_member_names(obj):
     try:
-        return list(vars(obj).keys())
+        return [name for name in vars(obj).keys() if not name.startswith("__micronaut_")]
     except TypeError:
         return []
 
@@ -230,6 +230,56 @@ def __micronaut_install_java_interface_defaults(cls, default_methods):
         method.__name__ = name
         method.__qualname__ = cls.__qualname__ + "." + name
         setattr(cls, name, method)
+
+
+__micronaut_java_base_classes = {}
+
+
+def __micronaut_java_base_class(java_class_name, method_names):
+    """The Python base class standing in for a Java class a Python class extends.
+
+    The generated Java class extends the Java class and is its only instance; this base records
+    the arguments of super().__init__(...) for the Java super constructor and forwards every
+    inherited Java method to that instance (PythonJavaBases.invoke, which creates the instance for
+    an object constructed in Python code). One class per Java class and context.
+    """
+    cls = __micronaut_java_base_classes.get(java_class_name)
+    if cls is not None:
+        return cls
+    import java
+    import keyword
+    invoker = java.type("io.micronaut.context.python.PythonJavaBases")
+
+    def __init__(self, *args, **kwargs):
+        if kwargs:
+            raise TypeError(
+                f"super().__init__() of a Python class extending the Java class {java_class_name} "
+                "takes positional arguments only"
+            )
+        object.__setattr__(self, "__micronaut_super_args__", args)
+
+    def base_method(name):
+        def method(self, *args):
+            return invoker.invoke(self, name, args)
+        method.__name__ = name
+        method.__qualname__ = java_class_name + "." + name
+        return method
+
+    package, _, simple_name = java_class_name.rpartition(".")
+    namespace = {
+        "__module__": package or "java",
+        "__qualname__": simple_name.replace("$", "."),
+        "__micronaut_java_base__": java_class_name,
+        "__init__": __init__,
+    }
+    for name in method_names:
+        method = base_method(name)
+        namespace[name] = method
+        if keyword.iskeyword(name):
+            namespace[name + "_"] = method
+    cls = type(simple_name.rpartition("$")[2], (object,), namespace)
+    __micronaut_java_base_classes[java_class_name] = cls
+    return cls
 
 
 def __micronaut_create_raw_instance(cls):
