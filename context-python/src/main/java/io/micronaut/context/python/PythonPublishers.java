@@ -71,7 +71,8 @@ public final class PythonPublishers {
     /**
      * A publisher that starts a deferred computation (a Python coroutine) when it is first
      * subscribed, in the reactive context of that subscriber, and shares the result with every
-     * subscriber; cancelling a subscription cancels the future.
+     * subscriber: a cancelled subscription does not cancel the shared future, so a later subscriber
+     * (a {@code timeout().retry()}) still receives the result.
      *
      * @param starter Starts the computation in the given context
      * @return The publisher
@@ -81,7 +82,8 @@ public final class PythonPublishers {
             return Reactor.deferred(starter);
         }
         Supplier<CompletableFuture<Object>> started = SupplierUtil.memoized(() -> starter.apply(new PythonReactiveContext(null, PropagatedContext.getOrEmpty())));
-        return Publishers.fromCompletableFuture(started);
+        // each subscriber cancels a copy, never the shared future
+        return Publishers.fromCompletableFuture(() -> started.get().copy());
     }
 
     /**
@@ -129,7 +131,8 @@ public final class PythonPublishers {
 
         static Publisher<Object> deferred(Function<PythonReactiveContext, CompletableFuture<Object>> starter) {
             Started started = new Started();
-            return Mono.deferContextual(contextView -> Mono.fromFuture(started.get(contextView, starter)));
+            // suppressCancel: the future is shared with every subscriber, one cancelling must not fail the others
+            return Mono.deferContextual(contextView -> Mono.fromFuture(started.get(contextView, starter), true));
         }
 
         @SuppressWarnings("unchecked")

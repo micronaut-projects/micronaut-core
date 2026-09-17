@@ -34,6 +34,7 @@ import org.reactivestreams.Subscription;
 import reactor.core.publisher.Mono;
 
 import java.lang.ref.WeakReference;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1518,6 +1519,105 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void aTaskResumedByAnotherTaskKeepsThePropagatedContextOfItsOwnCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutines = context.eval(PYTHON, """
+                import asyncio
+                event = asyncio.Event()
+
+                async def waiter(client):
+                    await event.wait()
+                    return "B=" + client.propagatedElement()
+
+                async def setter(client):
+                    event.set()
+                    await asyncio.sleep(0)
+                    return "A=" + client.propagatedElement()
+
+                (waiter, setter)
+                """);
+            ContextualClient client = new ContextualClient();
+
+            // B starts under "B" and waits for the event; A starts under "A" and sets it: B is resumed
+            // by a callback A scheduled, and must still run in its own context
+            CompletionStage<?> waiter = startUnder("B", coroutines.getArrayElement(0).execute(client));
+            CompletionStage<?> setter = startUnder("A", coroutines.getArrayElement(1).execute(client));
+            eventLoop.runUntilComplete(setter);
+            eventLoop.runUntilComplete(waiter);
+
+            assertEquals("A=A", setter.toCompletableFuture().get(1, TimeUnit.SECONDS));
+            assertEquals("B=B", waiter.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void aCoroutineResumedByAnotherThreadKeepsThePropagatedContextOfItsCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    before = target.client.propagatedElement()
+                    delayed = await target.client.delayed()
+                    after = target.client.propagatedElement()
+                    return before + "/" + delayed + "/" + after
+                values
+                """).execute(target);
+
+            // the awaited publisher completes on a Reactor scheduler thread, which has no context
+            CompletionStage<?> stage = startUnder("E2", coroutine);
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E2/d/E2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void aFailingCallbackOfATaskWithAContextIsReportedAndDoesNotStopTheTask() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def run(client):
+                    loop = asyncio.get_running_loop()
+                    def failing():
+                        raise ValueError("boom")
+                    loop.call_soon(failing)
+                    await asyncio.sleep(0)
+                    return client.propagatedElement()
+                run
+                """).execute(new ContextualClient());
+
+            // the callback runs through the context restoring hop; its failure goes to the loop's exception handler
+            CompletionStage<?> stage = startUnder("E3", coroutine);
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E3", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    private static CompletionStage<?> startUnder(String element, Value coroutine) {
+        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement(element)).propagate()) {
+            return PythonAsyncioRuntime.toCompletionStage(coroutine);
+        }
+    }
+
+    @Test
     void cancellingPublisherAwaitCancelsSubscription() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         NeverPublisher publisher = new NeverPublisher();
@@ -1659,6 +1759,10 @@ final class PythonAsyncioRuntimeTest {
 
         public Mono<String> propagatedElementMono() {
             return Mono.fromSupplier(this::propagatedElement);
+        }
+
+        public Mono<String> delayed() {
+            return Mono.delay(Duration.ofMillis(20)).thenReturn("d");
         }
     }
 

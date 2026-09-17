@@ -20,7 +20,6 @@ import io.micronaut.context.python.PythonAsyncioRuntime;
 import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.PythonEventLoop;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.netty.channel.NettyChannelType;
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
@@ -142,17 +141,18 @@ public final class NettyPythonEventLoop implements PythonEventLoop {
     /**
      * A {@code call_soon}/{@code call_later} callback may outlive the coroutine that scheduled it;
      * it runs inside an execution frame of its context so shutdown waits for it, and it is skipped
-     * once the context has been unregistered for closing. It runs in the {@link PropagatedContext}
-     * of the caller, so a coroutine step resumed by the loop sees the context of the step that
-     * scheduled it.
+     * once the context has been unregistered for closing. The propagated context of the callback
+     * is the one of the asyncio task owning it, restored by the task's {@code contextvars} when the
+     * callback runs (see {@link PythonEventLoop#executeCallback}), not the context of the thread
+     * scheduling it.
      */
     private static Runnable guestCallback(Value callback) {
         Context context = callback.getContext();
-        return PropagatedContext.wrapCurrent(() -> {
+        return () -> {
             if (!PythonContextRuntime.tryWithExecutionFrame(context, callback::executeVoid)) {
                 LOG.debug("Skipping an asyncio callback scheduled on a Python context that is closing");
             }
-        });
+        };
     }
 
     @Override

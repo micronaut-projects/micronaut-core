@@ -91,6 +91,12 @@ public final class PythonAsyncioRuntime {
      * are subscribed with the Reactor context (a reactive transaction status, for instance) and
      * the propagated context of the subscriber. A {@link CompletionStage} is eager; a bridged
      * {@code async def} declared to return a publisher uses this deferred form instead.
+     * <p>
+     * Consequences of the deferred form: the coroutine never runs when nobody subscribes (Python
+     * then warns that the coroutine was never awaited), the event loop is the one of the
+     * subscribing thread, so a {@code subscribeOn} decides which loop runs the coroutine, and the
+     * result of the first subscription is shared with later subscribers, a cancelled subscription
+     * leaving the coroutine running for them.
      *
      * @param value The Python coroutine or awaitable value.
      * @return A publisher of the coroutine's result, empty when the coroutine returns {@code None}.
@@ -110,7 +116,7 @@ public final class PythonAsyncioRuntime {
      *
      * @param value The Python result value.
      * @param reactiveContext The reactive context the publishers awaited by the coroutine are
-     *                        subscribed in, or {@code null} for none
+     *                        subscribed in, or {@code null} for the propagated context of the caller
      * @return A stage that completes when the Python awaitable completes.
      */
     @SuppressWarnings("FutureReturnValueIgnored")
@@ -129,7 +135,8 @@ public final class PythonAsyncioRuntime {
         PythonContextRegistry.enterExecution(context);
         future.whenComplete((ignored, ignoredThrowable) -> PythonContextRegistry.exitExecution(context));
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);
-        Runnable scheduler = () -> schedule(context, value, future, eventLoop, reactiveContext);
+        PythonReactiveContext taskContext = reactiveContext != null ? reactiveContext : callerContext();
+        Runnable scheduler = () -> schedule(context, value, future, eventLoop, taskContext);
         if (eventLoop != null) {
             if (eventLoop.inEventLoop()) {
                 scheduler.run();
@@ -165,7 +172,9 @@ public final class PythonAsyncioRuntime {
         scheduler(context);
         future = awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
         stage.whenComplete((result, throwable) -> {
-            Runnable completion = PropagatedContext.wrapCurrent(() -> completeAwaitable(context, future, result, throwable));
+            // no context is captured from the completing thread (a Reactor scheduler, a client loop): the
+            // task the completion wakes up restores its own propagated context from its contextvars
+            Runnable completion = () -> completeAwaitable(context, future, result, throwable);
             if (eventLoop != null) {
                 try {
                     eventLoop.execute(completion);
@@ -292,6 +301,16 @@ public final class PythonAsyncioRuntime {
      */
     static @Nullable PythonEventLoop currentEventLoopForContext() {
         return currentEventLoop(state());
+    }
+
+    /**
+     * The context of an eager coroutine: the propagated context of the caller, kept by the task so
+     * its steps run in it whichever thread resumes them, or none when the caller has no context.
+     */
+    private static @Nullable PythonReactiveContext callerContext() {
+        return PropagatedContext.find()
+            .map(propagatedContext -> new PythonReactiveContext(null, propagatedContext))
+            .orElse(null);
     }
 
     private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop, @Nullable PythonReactiveContext reactiveContext) {

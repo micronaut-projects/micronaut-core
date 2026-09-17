@@ -238,7 +238,8 @@ class _MicronautAsyncioHandle:
     def __init__(self, callback, args, context=None):
         self._callback = callback
         self._args = args
-        # as asyncio: a callback runs in the context of the code that scheduled it
+        # as asyncio: a callback runs in the context of the code that scheduled it (a task passes its
+        # own context, so the steps of a coroutine share one)
         self._context = contextvars.copy_context() if context is None else context
         self._cancelled = False
 
@@ -251,7 +252,21 @@ class _MicronautAsyncioHandle:
     def _run(self):
         if self._cancelled:
             return
-        self._context.run(self._callback, *self._args)
+        self._context.run(self._run_in_context)
+
+    def _run_in_context(self):
+        # the Java PropagatedContext of the task that owns this callback lives in its contextvars: it
+        # is restored around the callback on the loop thread, so a coroutine step resumed by the
+        # loop sees the context of its own task and not the context of whoever scheduled the step (a
+        # task setting a shared Event, a Java thread completing an awaited stage)
+        reactive_context = _micronaut_reactive_context.get()
+        if reactive_context is None:
+            self._callback(*self._args)
+        else:
+            reactive_context.run(self._invoke)
+
+    def _invoke(self):
+        self._callback(*self._args)
 
 class _MicronautAsyncioTimerHandle(_MicronautAsyncioHandle):
     """Timer variant that can cancel the backing Java scheduled future.
@@ -1039,8 +1054,10 @@ def _new_fallback_loop():
 
 
 # The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
-# subscriber) a Java bridge hands the coroutine it schedules. asyncio copies the variable into the task,
-# so every ``await`` of the coroutine, and of the tasks it spawns, subscribes within that context.
+# subscriber, or the propagated context of the caller of an eager coroutine) a Java bridge hands the
+# coroutine it schedules. asyncio copies the variable into the task, so every ``await`` of the coroutine,
+# and of the tasks it spawns, subscribes within that context, and every callback of the task restores
+# its propagated context (``_MicronautAsyncioHandle._run_in_context``).
 _micronaut_reactive_context = contextvars.ContextVar("micronaut_reactive_context", default=None)
 
 
@@ -1065,9 +1082,10 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     future. Exceptions are routed through Java's ``ExceptionCompleter`` so the
     bridge keeps existing exception wrapping semantics.
 
-    ``reactive_context`` is the reactive context of the subscriber that started
-    the coroutine; the task copies it and the awaits of the coroutine subscribe
-    within it.
+    ``reactive_context`` is the reactive context of the subscriber (or the
+    propagated context of the caller) that started the coroutine; the task
+    copies it, the awaits of the coroutine subscribe within it and its steps run
+    in its propagated context.
     """
 
     if not inspect.isawaitable(awaitable):

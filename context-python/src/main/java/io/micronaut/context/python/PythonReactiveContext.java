@@ -20,17 +20,30 @@ import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The reactive context a subscriber hands to a Python coroutine: the Reactor context of the
- * subscription (a reactive transaction status lives there) and the propagated context it carries.
- * The coroutine's event loop keeps it in a {@code contextvars} variable, so every publisher the
- * coroutine awaits is subscribed within it.
+ * The reactive context a subscriber (or the caller of an eager coroutine) hands to a Python
+ * coroutine: the Reactor context of the subscription (a reactive transaction status lives there)
+ * and the propagated context it carries. The asyncio task keeps it in a {@code contextvars}
+ * variable, so every publisher the coroutine awaits is subscribed within it and every callback of
+ * the task runs in its propagated context, whichever thread or task scheduled the callback.
  *
  * @param reactorContext The Reactor {@code reactor.util.context.Context} of the subscriber, or
- *                       {@code null} when Reactor is not on the class path; typed as an object so
- *                       the record loads without Reactor
- * @param propagatedContext The propagated context of the subscriber
+ *                       {@code null} when Reactor is not on the class path or the coroutine was
+ *                       started eagerly; typed as an object so the record loads without Reactor
+ * @param propagatedContext The propagated context of the subscriber or caller
  * @since 5.2.0
  */
 @Internal
 public record PythonReactiveContext(@Nullable Object reactorContext, PropagatedContext propagatedContext) {
+
+    /**
+     * Run a callback of the task in the propagated context; called by the asyncio module for every
+     * {@code call_soon}/{@code call_later} callback of a task that carries this context.
+     *
+     * @param callback The callback
+     */
+    public void run(Runnable callback) {
+        try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
+            callback.run();
+        }
+    }
 }
