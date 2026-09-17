@@ -175,26 +175,24 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Whether a Python object owned by a generated stub belongs to the primary context of the installed
-     * application runtime.
+     * Whether a Python object owned by a generated stub belongs to the primary context of a running
+     * application.
      * <p>
      * A stub that owns its Python object (one created through a constructor of the stub rather than
-     * wrapping an existing object) creates it on first use and again when the object it holds belongs to
-     * a context that is no longer the primary context: a stub held in a JVM-wide singleton, such as a
-     * service loaded once per JVM, then follows the application currently running instead of failing
-     * with a cancelled execution of a closed context.
+     * wrapping an existing object) creates it on first use and again when the application the object
+     * was created in has shut down, that is when its runtime is no longer installed: a stub held in a
+     * JVM-wide singleton, such as a service loaded once per JVM, then follows the application currently
+     * running instead of failing with a cancelled execution of a closed context. An object of an
+     * enclosing application stays live while a nested {@code ApplicationContext.run(...)} is the current
+     * one, so the beans of the enclosing application keep their state across the nested run.
      *
      * @param value The Python object the stub holds, or {@code null} when none was created yet
-     * @return {@code true} when the object belongs to the primary context of the installed runtime
+     * @return {@code true} when the object belongs to the primary context of an installed runtime
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static boolean isCurrentInstance(@Nullable Value value) {
-        if (value == null) {
-            return false;
-        }
-        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
-        return runtime != null && runtime.owns(value.getContext());
+    public static boolean isLiveInstance(@Nullable Value value) {
+        return value != null && PythonApplicationRuntime.isInstalled(value.getContext());
     }
 
     /**
@@ -1357,19 +1355,30 @@ public final class PythonContextRuntime {
     }
 
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
-        // The module named after the class is tried first. Importing a module of a package whose
-        // __init__ is being executed by another thread does not wait for that thread, importing the
-        // package does: a class instantiated on another thread while its package is being imported (a
-        // service the parallel service loader creates for a call made at import time) would otherwise
-        // wait for the import lock the importing thread holds while it waits for the instantiation.
-        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
+        // A package that is imported already serves the class without importing anything, so a
+        // submodule that happens to carry the class name is not executed for a class the package
+        // defines. Otherwise the module named after the class is tried before the package is imported:
+        // importing a module of a package whose __init__ is being executed by another thread does not
+        // wait for that thread, importing the package does, so a class instantiated on another thread
+        // while its package is being imported (a service the parallel service loader creates for a
+        // call made at import time) would otherwise wait for the import lock the importing thread
+        // holds while it waits for the instantiation. Only a missing submodule is tolerated on the way:
+        // an error raised while executing one propagates.
+        Value module = loadedModule(ctx, packageName);
+        Value member = module != null ? module.getMember(importName) : null;
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
-        Value module = importModule(ctx, packageName);
-        member = module.getMember(importName);
+        member = importPackageSubmoduleMember(ctx, packageName, importName);
         if (member != null && isPythonClass(ctx, member)) {
             return member;
+        }
+        if (module == null) {
+            module = importModule(ctx, packageName);
+            member = module.getMember(importName);
+            if (member != null && isPythonClass(ctx, member)) {
+                return member;
+            }
         }
         member = findClassInPackageModules(ctx, packageName, importName);
         if (member != null && isPythonClass(ctx, member)) {
@@ -1379,25 +1388,60 @@ public final class PythonContextRuntime {
     }
 
     private static @Nullable Value importPackageSubmoduleMember(Context ctx, String packageName, String importName) {
-        try {
-            Value submodule = importModule(ctx, packageName + "." + importName);
-            Value member = submodule.getMember(importName);
-            if (member != null) {
-                return member;
-            }
-        } catch (Exception ignored) {
-            // Fall back to the Python source module name below.
+        Value member = importSubmoduleMember(ctx, packageName + "." + importName, importName);
+        if (member != null) {
+            return member;
         }
         String pythonModuleName = NameUtils.underscoreSeparate(importName, true);
         if (!pythonModuleName.equals(importName)) {
-            try {
-                Value submodule = importModule(ctx, packageName + "." + pythonModuleName);
-                return submodule.getMember(importName);
-            } catch (Exception ignored) {
-                // Fall back to package module scanning below.
-            }
+            return importSubmoduleMember(ctx, packageName + "." + pythonModuleName, importName);
         }
         return null;
+    }
+
+    /**
+     * A member of a module that may not exist: {@code null} when the module (or its package) is not
+     * found; any other error of the import propagates.
+     */
+    private static @Nullable Value importSubmoduleMember(Context ctx, String moduleName, String memberName) {
+        try {
+            return importModule(ctx, moduleName).getMember(memberName);
+        } catch (PolyglotException e) {
+            if (isModuleNotFound(e, moduleName)) {
+                return null;
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Whether an import failed because the module itself, or a package on its path, does not exist:
+     * a {@code ModuleNotFoundError} naming that module, not one raised by the code of the module.
+     */
+    private static boolean isModuleNotFound(PolyglotException e, String moduleName) {
+        Value error = e.isGuestException() ? e.getGuestObject() : null;
+        if (error == null) {
+            return false;
+        }
+        Value meta = error.getMetaObject();
+        if (meta == null || !"ModuleNotFoundError".equals(meta.getMetaSimpleName())) {
+            return false;
+        }
+        Value name = error.hasMember("name") ? error.getMember("name") : null;
+        if (name == null || !name.isString()) {
+            return false;
+        }
+        String missing = name.asString();
+        return moduleName.equals(missing) || moduleName.startsWith(missing + ".");
+    }
+
+    /**
+     * A module that is imported and initialized: {@code null} when it was never imported, or while
+     * another thread is still executing it.
+     */
+    private static @Nullable Value loadedModule(Context ctx, String moduleName) {
+        Value module = helper(ctx, "__micronaut_loaded_module").execute(moduleName);
+        return PythonConversion.isNone(module) ? null : module;
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {

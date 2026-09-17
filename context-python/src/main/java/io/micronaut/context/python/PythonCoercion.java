@@ -35,6 +35,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -72,6 +73,14 @@ public final class PythonCoercion {
     private static final String TO_PYTHON_STANDARD_TYPE = "__micronaut_to_python_standard_type";
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
+
+    /** The Python class reference a generated type in the hierarchy of a class carries, if any; cached per class. */
+    private static final ClassValue<Optional<PythonContextRuntime.PythonClassReference>> PYTHON_CLASS_REFERENCES = new ClassValue<>() {
+        @Override
+        protected Optional<PythonContextRuntime.PythonClassReference> computeValue(Class<?> type) {
+            return Optional.ofNullable(findPythonClassReference(type));
+        }
+    };
 
     private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
 
@@ -665,13 +674,18 @@ public final class PythonCoercion {
 
     /**
      * Whether a value is an AOP proxy of a generated Python type without a Python object of its own: a
-     * proxy implementing a generated interface, which Python code must receive as a Python scoped proxy.
+     * proxy implementing a generated interface whose target is a Python object, which Python code must
+     * receive as a Python scoped proxy. A proxy of a Java implementation of the interface is handed to
+     * Python as the host object it is, its interface methods work as on any Java object.
      *
      * @param value The value
-     * @return {@code true} for a proxy of a generated Python interface
+     * @return {@code true} for a proxy of a generated Python interface standing in for a Python object
      */
     static boolean isPythonInterfaceProxy(@Nullable Object value) {
-        return value instanceof InterceptedProxy<?> && !(value instanceof ValueCoercible) && pythonClassReference(value.getClass()) != null;
+        return value instanceof InterceptedProxy<?> proxy
+            && !(value instanceof ValueCoercible)
+            && pythonClassReference(value.getClass()) != null
+            && proxy.interceptedTarget() instanceof ValueCoercible;
     }
 
     private static Value interceptedTargetObject(InterceptedProxy<?> proxy) {
@@ -687,6 +701,10 @@ public final class PythonCoercion {
      * interfaces they implement carry the {@link PythonClass} annotation of the generated stub or interface.
      */
     private static PythonContextRuntime.@Nullable PythonClassReference pythonClassReference(Class<?> type) {
+        return PYTHON_CLASS_REFERENCES.get(type).orElse(null);
+    }
+
+    private static PythonContextRuntime.@Nullable PythonClassReference findPythonClassReference(Class<?> type) {
         for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
             PythonClass annotation = current.getAnnotation(PythonClass.class);
             if (annotation != null) {

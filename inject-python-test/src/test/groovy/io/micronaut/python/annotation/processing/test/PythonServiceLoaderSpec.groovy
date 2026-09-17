@@ -126,13 +126,16 @@ class Catalog:
             try {
                 return future.get(seconds, TimeUnit.SECONDS)
             } catch (TimeoutException e) {
-                def dump = ManagementFactory.threadMXBean.dumpAllThreads(true, true)
-                    .collect { it.toString() + it.stackTrace.collect { "\n    at " + it }.join("") }
-                    .join("\n")
-                throw new AssertionError("Timed out after ${seconds}s; threads:\n${dump}" as Object)
+                throw new AssertionError("Timed out after ${seconds}s; threads:\n${threadDump()}" as Object)
             }
         } finally {
             executor.shutdownNow()
         }
+    }
+
+    private static String threadDump() {
+        ManagementFactory.threadMXBean.dumpAllThreads(true, true)
+            .collect { it.toString() + it.stackTrace.collect { "\n    at " + it }.join("") }
+            .join("\n")
     }
 }
