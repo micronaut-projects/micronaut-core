@@ -108,7 +108,17 @@ class Holder:
         polyglot.eval("python", "ImportedConnectionFactory").as(Class) == ImportedConnectionFactory
 
         and: "a class absent from the class path is bound to a facade that fails on first use"
-        polyglot.eval("python", "from micronaut.python.annotation.processing.test.javatypes import _micronaut_java_type; type(_micronaut_java_type('missing.Type')).__name__").asString() == "_MicronautJavaType"
+        // the binding helper lives in the members module a compilation contributes to the package
+        polyglot.eval("python", """
+import importlib, pkgutil
+import micronaut.python.annotation.processing.test.javatypes as javatypes_package
+_micronaut_java_type = next(
+    module._micronaut_java_type
+    for module in (importlib.import_module(javatypes_package.__name__ + '.' + info.name) for info in pkgutil.iter_modules(javatypes_package.__path__))
+    if hasattr(module, '_micronaut_java_type')
+)
+""") != null
+        polyglot.eval("python", "type(_micronaut_java_type('missing.Type')).__name__").asString() == "_MicronautJavaType"
         polyglot.eval("python", "_micronaut_java_type('missing.Type')._target").asString() == "missing.Type"
 
         cleanup:

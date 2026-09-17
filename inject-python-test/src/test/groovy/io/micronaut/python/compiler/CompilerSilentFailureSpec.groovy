@@ -65,7 +65,7 @@ class Helper:
         def members = packageMembers(vfsFile("micronaut/context"), 2)
 
         then: "the Java shims and the application module are contributed to the same package, whose initializer merges them (a module importing a Java type from its own package while it initializes is served by the merger)"
-        members.contains("java.type('io.micronaut.context.ApplicationContext')")
+        members.contains("ApplicationContext = _micronaut_java_type('io.micronaut.context.ApplicationContext', True)")
         members.contains("from . import annotation")
         members.contains("from .helper import Helper")
         vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_merge_members")
@@ -164,7 +164,7 @@ class LoggingService:
 
         then:
         new File(targetDir, "app/LoggingService.class").exists()
-        packageMembers(vfsFile("org/slf4j")).contains("LoggerFactory = java.type('org.slf4j.LoggerFactory')")
+        packageMembers(vfsFile("org/slf4j")).contains("LoggerFactory = _micronaut_java_type('org.slf4j.LoggerFactory')")
 
         when:
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
