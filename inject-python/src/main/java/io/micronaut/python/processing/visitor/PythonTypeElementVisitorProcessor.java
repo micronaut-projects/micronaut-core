@@ -20,10 +20,12 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Mixin;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Generated;
@@ -43,11 +45,13 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
@@ -77,6 +81,9 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public final class PythonTypeElementVisitorProcessor {
+    private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
+    private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
+
     private final ClassLoader classLoader;
     private final TypeElementVisitor.VisitorKind visitorKind;
 
@@ -357,7 +364,11 @@ public final class PythonTypeElementVisitorProcessor {
     }
 
     private void annotatePythonAopProxy(ClassElement element) {
-        if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
+        if (!(element instanceof AbstractPythonClassElement)) {
+            return;
+        }
+        adviseConstrainedMethods(element);
+        if (!isAopProxy(element)) {
             return;
         }
         if (element.isInterface()) {
@@ -372,6 +383,41 @@ public final class PythonTypeElementVisitorProcessor {
             builder.value("io.micronaut.context.python.aop.PythonProxyCreator")
                 .member("proxyTarget", true)
         );
+    }
+
+    /**
+     * Applies the validation advice a Java bean receives while its definition is written: every method
+     * that declares {@link RequiresValidation} (a constrained parameter or return value) is annotated
+     * with {@code Validated}, which is around advice. A Python bean decides whether it is proxied at
+     * runtime, and which methods its generated stub bridges, before the definition is written, so the
+     * advice has to be applied here for the bean to be proxied the way a Java bean is. Configuration
+     * beans are validated after construction and get no advice; the synthetic accessors of a
+     * constrained attribute keep the advice the bean definition gives them.
+     *
+     * @param element The Python class
+     */
+    private void adviseConstrainedMethods(ClassElement element) {
+        if (element.hasStereotype(ANN_CONFIGURATION_READER) || !isBeanCandidate(element)) {
+            return;
+        }
+        List<MethodElement> constrainedMethods = element.getEnclosedElements(
+            ElementQuery.ALL_METHODS
+                .onlyInstance()
+                .onlyAccessible()
+                .filter(PythonMethodElement.class::isInstance)
+                .annotated(annotationMetadata -> annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)
+                    && !annotationMetadata.hasDeclaredAnnotation(ANN_VALIDATED))
+        );
+        for (MethodElement constrainedMethod : constrainedMethods) {
+            constrainedMethod.annotate(ANN_VALIDATED);
+        }
+    }
+
+    private static boolean isBeanCandidate(ClassElement element) {
+        return BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(element)
+            || element.hasStereotype(Executable.class)
+            || element.hasStereotype(AnnotationUtil.QUALIFIER)
+            || element.hasStereotype(InterceptorBinding.class);
     }
 
     private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext, List<AbstractBeanDefinitionBuilder> beanElementBuilders) {
