@@ -45,7 +45,7 @@ public PythonConstructorBackedHandler(HandlerDependency dependency, HandlerDepen
 ''')
         assertGeneratedSourceContains(pythonCode, '''
 public PythonConstructorBackedHandler(Value value) {
-    this(value, PythonJavaBases.constructing(value));
+    this(value, PythonJavaBases.constructing(value, PythonConstructorBackedHandler.class));
 ''')
         assertGeneratedSourceContains(pythonCode, '''
 private PythonConstructorBackedHandler(Value value, PythonJavaBases.Construction construction) {

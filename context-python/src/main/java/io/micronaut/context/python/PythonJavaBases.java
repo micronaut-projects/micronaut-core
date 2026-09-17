@@ -21,11 +21,13 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.ref.WeakReference;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -65,6 +67,7 @@ public final class PythonJavaBases {
             return names.toArray(new String[0]);
         }
     };
+    // the constructions in progress on the thread, innermost first; removed once the last one finished
     private static final ThreadLocal<Deque<Construction>> CONSTRUCTIONS = ThreadLocal.withInitial(ArrayDeque::new);
 
     private PythonJavaBases() {
@@ -108,28 +111,46 @@ public final class PythonJavaBases {
      * Marks the Python object whose Java instance is being constructed on the current thread. The
      * generated {@code (Value)} constructor evaluates this before it runs the Java super constructor,
      * which may call a method the Python class overrides: until the instance holds its Python object,
-     * the bridge of that method reaches it through {@link #underConstruction()}.
+     * the bridge of that method reaches it through {@link #underConstruction(Class)}.
      *
      * @param pythonObject The Python object
+     * @param javaClass The generated Java class being constructed
      * @return The construction, finished by the constructor once the super constructor returned
      */
     @UsedByGeneratedCode
-    public static Construction constructing(Value pythonObject) {
-        Construction construction = new Construction(pythonObject);
+    public static Construction constructing(Value pythonObject, Class<?> javaClass) {
+        Construction construction = new Construction(pythonObject, javaClass);
         CONSTRUCTIONS.get().push(construction);
         return construction;
     }
 
     /**
-     * The Python object whose Java instance is being constructed on the current thread, for a bridge
-     * method called by the Java super constructor; {@code null} outside a construction.
+     * The Python object whose Java instance of the given class is being constructed on the current
+     * thread, for a bridge method called by the Java super constructor; {@code null} outside such a
+     * construction. Constructions nest when a super constructor creates the Java instance of another
+     * Python object, so the asking class selects the innermost construction of its own class.
      *
+     * @param javaClass The generated Java class of the asking instance
      * @return The Python object, or {@code null}
      */
     @UsedByGeneratedCode
-    public static @Nullable Value underConstruction() {
-        Construction construction = CONSTRUCTIONS.get().peek();
-        return construction == null ? null : construction.pythonObject;
+    public static @Nullable Value underConstruction(Class<?> javaClass) {
+        Deque<Construction> constructions = CONSTRUCTIONS.get();
+        Iterator<Construction> iterator = constructions.iterator();
+        while (iterator.hasNext()) {
+            Construction construction = iterator.next();
+            Value pythonObject = construction.pythonObject.get();
+            if (pythonObject == null) {
+                // abandoned by a super constructor that threw, and collected since
+                iterator.remove();
+            } else if (construction.javaClass == javaClass) {
+                return pythonObject;
+            }
+        }
+        if (constructions.isEmpty()) {
+            CONSTRUCTIONS.remove();
+        }
+        return null;
     }
 
     /**
@@ -266,17 +287,22 @@ public final class PythonJavaBases {
      * The construction of the Java instance of a Python object, see {@link #constructing(Value)}.
      */
     public static final class Construction {
-        private final Value pythonObject;
+        // weak: the constructors hold the object while it is being constructed, and a construction a
+        // throwing super constructor left behind must not keep the object, and its context, reachable
+        // from the thread
+        private final WeakReference<Value> pythonObject;
+        private final Class<?> javaClass;
 
-        private Construction(Value pythonObject) {
-            this.pythonObject = pythonObject;
+        private Construction(Value pythonObject, Class<?> javaClass) {
+            this.pythonObject = new WeakReference<>(pythonObject);
+            this.javaClass = javaClass;
         }
 
         /**
          * Called by the generated constructor once the Java super constructor returned. A super
          * constructor that threw leaves its construction behind until a later one on the thread
-         * finishes, which is harmless: only a bridge called before the instance holds its Python
-         * object reads it.
+         * finishes or a lookup finds it collected, which is harmless: only a bridge called before
+         * the instance holds its Python object reads it, and by class.
          */
         @UsedByGeneratedCode
         public void finished() {
@@ -286,6 +312,9 @@ public final class PythonJavaBases {
                 // pops the constructions left behind by super constructors that threw, down to this one
                 popped = constructions.poll();
             } while (popped != null && popped != this);
+            if (constructions.isEmpty()) {
+                CONSTRUCTIONS.remove();
+            }
         }
     }
 }
