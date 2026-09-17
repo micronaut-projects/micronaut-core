@@ -138,7 +138,7 @@ final class Compressor {
                     end = length;
                 }
                 float q = 1.0f;
-                int equalsPos = indexOf(header, '=', start, end);
+                int equalsPos = header.indexOf('=', start, end);
                 if (equalsPos != -1) {
                     try {
                         q = Float.parseFloat(header.substring(equalsPos + 1, end));
@@ -147,17 +147,17 @@ final class Compressor {
                         q = 0.0f;
                     }
                 }
-                if (contains(header, start, end, "*")) {
+                if (header.indexOf("*", start, end) != -1) {
                     starQ = q;
-                } else if (contains(header, start, end, "br") && q > brQ) {
+                } else if (header.indexOf("br", start, end) != -1 && q > brQ) {
                     brQ = q;
-                } else if (contains(header, start, end, "zstd") && q > zstdQ) {
+                } else if (header.indexOf("zstd", start, end) != -1 && q > zstdQ) {
                     zstdQ = q;
-                } else if (contains(header, start, end, "snappy") && q > snappyQ) {
+                } else if (header.indexOf("snappy", start, end) != -1 && q > snappyQ) {
                     snappyQ = q;
-                } else if (contains(header, start, end, "gzip") && q > gzipQ) {
+                } else if (header.indexOf("gzip", start, end) != -1 && q > gzipQ) {
                     gzipQ = q;
-                } else if (contains(header, start, end, "deflate") && q > deflateQ) {
+                } else if (header.indexOf("deflate", start, end) != -1 && q > deflateQ) {
                     deflateQ = q;
                 }
                 start = end + 1;
@@ -194,32 +194,6 @@ final class Compressor {
             }
         }
         return null;
-    }
-
-    /**
-     * Whether {@code needle} occurs inside {@code s[start, end)}. The scan is bounded by
-     * {@code end}, so that a header with many entries stays linear in its length.
-     */
-    private static boolean contains(String s, int start, int end, String needle) {
-        int n = needle.length();
-        for (int i = start; i + n <= end; i++) {
-            if (s.regionMatches(i, needle, 0, n)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * Index of {@code ch} inside {@code s[start, end)}, or {@code -1}.
-     */
-    private static int indexOf(String s, char ch, int start, int end) {
-        for (int i = start; i < end; i++) {
-            if (s.charAt(i) == ch) {
-                return i;
-            }
-        }
-        return -1;
     }
 
     enum Algorithm {
