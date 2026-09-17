@@ -57,6 +57,11 @@ final class ThrowableSuperConstructor {
     private static final ClassTypeDef PYTHON_EXCEPTIONS = ClassTypeDef.of("io.micronaut.context.python.PythonExceptions");
     private static final String STRING = String.class.getName();
     private static final String OBJECT = Object.class.getName();
+    private static final String SHORT = "short";
+    private static final String INT = "int";
+    private static final String LONG = "long";
+    private static final String FLOAT = "float";
+    private static final String DOUBLE = "double";
     private static final int REJECTED = -1;
     private static final int ACCEPTED = 0;
     private static final int ASSIGNABLE = 1;
@@ -156,7 +161,7 @@ final class ThrowableSuperConstructor {
             return List.of();
         }
         if (messageFallback) {
-            return List.of(PYTHON_EXCEPTIONS.invokeStatic("message", ClassTypeDef.STRING, exception));
+            return List.of(PYTHON_EXCEPTIONS.invokeStatic("message", TypeDef.STRING, exception));
         }
         ParameterElement[] parameters = constructor.getParameters();
         List<ExpressionDef> arguments = new ArrayList<>(parameters.length);
@@ -164,7 +169,7 @@ final class ThrowableSuperConstructor {
             ClassElement parameterType = parameters[i].getGenericType();
             ExpressionDef index = ExpressionDef.constant(i);
             if (STRING.equals(parameterType.getName())) {
-                arguments.add(PYTHON_EXCEPTIONS.invokeStatic("argumentAsString", ClassTypeDef.STRING, exception, index));
+                arguments.add(PYTHON_EXCEPTIONS.invokeStatic("argumentAsString", TypeDef.STRING, exception, index));
             } else {
                 ExpressionDef argument = PYTHON_EXCEPTIONS.invokeStatic("argument", TypeDef.of(org.graalvm.polyglot.Value.class), exception, index);
                 arguments.add(converter.apply(parameterType, argument));
@@ -261,23 +266,23 @@ final class ThrowableSuperConstructor {
 
     private static boolean widens(String from, String to) {
         return switch (from) {
-            case "byte" -> List.of("short", "int", "long", "float", "double").contains(to);
-            case "short", "char" -> List.of("int", "long", "float", "double").contains(to);
-            case "int" -> List.of("long", "float", "double").contains(to);
-            case "long" -> List.of("float", "double").contains(to);
-            case "float" -> "double".equals(to);
+            case "byte" -> List.of(SHORT, INT, LONG, FLOAT, DOUBLE).contains(to);
+            case SHORT, "char" -> List.of(INT, LONG, FLOAT, DOUBLE).contains(to);
+            case INT -> List.of(LONG, FLOAT, DOUBLE).contains(to);
+            case LONG -> List.of(FLOAT, DOUBLE).contains(to);
+            case FLOAT -> DOUBLE.equals(to);
             default -> false;
         };
     }
 
     private static @Nullable String boxedName(String primitive) {
         return switch (primitive) {
-            case "int" -> Integer.class.getName();
-            case "long" -> Long.class.getName();
-            case "double" -> Double.class.getName();
-            case "float" -> Float.class.getName();
+            case INT -> Integer.class.getName();
+            case LONG -> Long.class.getName();
+            case DOUBLE -> Double.class.getName();
+            case FLOAT -> Float.class.getName();
             case "boolean" -> Boolean.class.getName();
-            case "short" -> Short.class.getName();
+            case SHORT -> Short.class.getName();
             case "byte" -> Byte.class.getName();
             case "char" -> Character.class.getName();
             default -> null;
@@ -285,7 +290,7 @@ final class ThrowableSuperConstructor {
     }
 
     private static @Nullable String unboxedName(String boxed) {
-        for (String primitive : List.of("int", "long", "double", "float", "boolean", "short", "byte", "char")) {
+        for (String primitive : List.of(INT, LONG, DOUBLE, FLOAT, "boolean", SHORT, "byte", "char")) {
             if (boxed.equals(boxedName(primitive))) {
                 return primitive;
             }
