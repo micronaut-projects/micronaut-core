@@ -1641,15 +1641,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return TypeDef.variable(placeholder.getVariableName());
         }
+        if (anInterface.isArray()) {
+            return TypeDef.of(anInterface);
+        }
         if (anInterface.isPrimitive()) {
             TypeDef primitiveType = TypeDef.of(anInterface);
             if (typeArgument && TypeDef.Primitive.VOID.equals(primitiveType)) {
                 return ClassTypeDef.of(Void.class);
             }
             return typeArgument ? TypeDescriptors.toBoxedIfNecessary(primitiveType) : primitiveType;
-        }
-        if (anInterface.isArray()) {
-            return TypeDef.of(anInterface);
         }
         if (anInterface.isRawType()) {
             return javaClassType(anInterface);
@@ -3393,6 +3393,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
+        ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
+            ? null
+            : resolvedSignatureMethod.getGenericReturnType();
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
@@ -3501,18 +3504,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         return (StatementDef) invokedValue;
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
-                            PYTHON_ASYNCIO_RUNTIME.invokeStatic(
-                                "toCompletionStage",
-                                TypeDef.of(CompletionStage.class),
-                                pythonCoroutine
-                            ).cast(TypeDef.of(CompletionStage.class)).cast(methodSourceReturnType).returning()
+                            coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
                         );
                     } else {
                         boolean bridgeSignature = signatureMethod != methodElement
                             || !bridgeSignatureTypeArguments.isEmpty()
                             || returnTypeOverride != null
                             || returnsMethodTypeVariable;
-                        return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null);
+                        return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null, declaredReturnType);
                     }
                 }
             })));
@@ -3594,6 +3593,27 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return variableElement;
         }
         return null;
+    }
+
+    /**
+     * The value a bridged {@code async def} returns: the coroutine as a {@link CompletionStage}, adapted
+     * to the reactive type the Java signature declares when that is not a completion stage.
+     */
+    private static ExpressionDef coroutineResult(
+        ExpressionDef pythonCoroutine,
+        TypeDef methodSourceReturnType,
+        @Nullable ClassElement declaredReturnType
+    ) {
+        ExpressionDef completionStage = PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+            "toCompletionStage",
+            TypeDef.of(CompletionStage.class),
+            pythonCoroutine
+        ).cast(TypeDef.of(CompletionStage.class));
+        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !declaredReturnType.isAssignable(CompletionStage.class)) {
+            return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT, completionStage, classLiteral(declaredReturnType))
+                .cast(methodSourceReturnType);
+        }
+        return completionStage.cast(methodSourceReturnType);
     }
 
     private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {
@@ -4468,6 +4488,42 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static ExpressionDef handleReturnType(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
+        return handleReturnType(allClasses, returnType, invokedValue, null);
+    }
+
+    /**
+     * Converts the value a Python method returned to the method's Java return type.
+     *
+     * @param allClasses         The generated classes by name
+     * @param returnType         The return type the Python method declares
+     * @param invokedValue       The polyglot value the Python method returned
+     * @param declaredReturnType The return type of the Java method the Python method implements, if
+     *                           it differs from the Python declaration; a reactive Java declaration
+     *                           ({@code Mono}, {@code Flux}, {@code CompletionStage}) adapts the Python
+     *                           result to it
+     * @return The conversion expression
+     */
+    static ExpressionDef handleReturnType(
+        Map<String, ClassElement> allClasses,
+        ClassElement returnType,
+        ExpressionDef invokedValue,
+        @Nullable ClassElement declaredReturnType
+    ) {
+        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !sameErasure(declaredReturnType, returnType)) {
+            if (Object.class.getName().equals(returnType.getName())) {
+                // The Python method has no usable return annotation: the Java declaration decides
+                return handleReturnType(allClasses, declaredReturnType, invokedValue, null);
+            }
+            // The bridge casts the result to the Java signature, so the erasure of the declaration suffices here
+            if (returnType.isAssignable(PUBLISHER)) {
+                return convertPublisher(allClasses, returnType, invokedValue, declaredReturnType, erasedType(declaredReturnType));
+            }
+            if (returnType.isAssignable(CompletionStage.class)) {
+                return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT,
+                        convertRuntimeValue(returnType, invokedValue), classLiteral(declaredReturnType))
+                    .cast(erasedType(declaredReturnType));
+            }
+        }
         // Choose appropriate conversion method based on return type
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
@@ -4536,18 +4592,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         yield uncheckedCast(PYTHON_CONVERSION.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(PUBLISHER)) {
-                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
-                            yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic(
-                                "convertPublisher",
-                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
-                                ClassTypeDef.of(PUBLISHER),
-                                invokedValue,
-                                generatedWrapperConverter(componentType)
-                            ), returnType);
-                        }
-                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
-                                invokedValue, toClassExpression(componentType)), returnType);
+                        yield convertPublisher(allClasses, returnType, invokedValue, returnType, sourceSignatureType(returnType));
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
@@ -4571,21 +4616,78 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    /**
+     * Converts a Python-returned publisher: its items to the item type of {@code publisherType} and
+     * the publisher itself to the erasure of {@code targetType} when that is a more specific reactive
+     * type than {@code Publisher} (a Reactor {@code Mono}/{@code Flux}, a {@code CompletionStage}).
+     *
+     * @param allClasses    The generated classes by name
+     * @param publisherType The publisher type the Python method declares
+     * @param invokedValue  The polyglot value the Python method returned
+     * @param targetType    The reactive type to adapt the publisher to
+     * @param castType      The type the expression is cast to
+     * @return The conversion expression
+     */
+    private static ExpressionDef convertPublisher(
+        Map<String, ClassElement> allClasses,
+        ClassElement publisherType,
+        ExpressionDef invokedValue,
+        ClassElement targetType,
+        TypeDef castType
+    ) {
+        ClassElement componentType = publisherType.getFirstTypeArgument().orElse(null);
+        ExpressionDef itemConversion = componentType != null && isGeneratedWrapperType(allClasses, componentType)
+            ? generatedWrapperConverter(componentType)
+            : toClassExpression(componentType);
+        TypeDef itemConversionType = componentType != null && isGeneratedWrapperType(allClasses, componentType)
+            ? POLYGLOT_VALUE_CONVERTER
+            : TypeDef.CLASS;
+        ExpressionDef converted;
+        if (PUBLISHER.equals(targetType.getName())) {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                "convertPublisher",
+                List.of(POLYGLOT_VALUE, itemConversionType),
+                ClassTypeDef.of(PUBLISHER),
+                invokedValue,
+                itemConversion
+            );
+        } else {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                "convertPublisher",
+                List.of(POLYGLOT_VALUE, itemConversionType, TypeDef.CLASS),
+                TypeDef.OBJECT,
+                invokedValue,
+                itemConversion,
+                classLiteral(targetType)
+            );
+        }
+        return PYTHON_CONVERSION.invokeStatic("asObject", TypeDef.OBJECT, converted).cast(castType);
+    }
+
+    private static boolean isReactiveType(ClassElement type) {
+        return type.isAssignable(PUBLISHER) || type.isAssignable(CompletionStage.class);
+    }
+
+    private static boolean sameErasure(ClassElement first, ClassElement second) {
+        return first.getName().equals(second.getName());
+    }
+
     static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
-        return returnConvertedValue(allClasses, returnType, invokedValue, null);
+        return returnConvertedValue(allClasses, returnType, invokedValue, null, null);
     }
 
     private static StatementDef returnConvertedValue(
         Map<String, ClassElement> allClasses,
         ClassElement returnType,
         ExpressionDef invokedValue,
-        @Nullable TypeDef castType
+        @Nullable TypeDef castType,
+        @Nullable ClassElement declaredReturnType
     ) {
         if (returnType.isVoid() || TypeDef.VOID.equals(castType) || TypeDef.Primitive.VOID.equals(castType)) {
             return (StatementDef) invokedValue;
         }
         return invokedValue.newLocal("pythonResult", result ->
-            castReturnValue(handleReturnType(allClasses, returnType, result), castType).returning()
+            castReturnValue(handleReturnType(allClasses, returnType, result, declaredReturnType), castType).returning()
         );
     }
 

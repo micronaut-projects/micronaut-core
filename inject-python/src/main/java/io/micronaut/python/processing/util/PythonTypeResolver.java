@@ -218,7 +218,7 @@ public final class PythonTypeResolver {
         Map<String, ClassElement> boundGenerics
     ) {
         ClassElement resolvedType = resolvePythonTypeToJava(typeParameterDef, visitorContext, boundGenerics);
-        if (resolvedType.isPrimitive()) {
+        if (resolvedType.isPrimitive() && !resolvedType.isArray()) {
             ClassElement boxedClassElement = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
             AnnotationMetadata annotationMetadata = resolvedType.getTypeAnnotationMetadata();
             if (annotationMetadata.isEmpty()) {
@@ -337,9 +337,10 @@ public final class PythonTypeResolver {
     /**
      * Utility method to box primitive types for use in generics.
      * Java generics require boxed types, so this converts primitives to their boxed equivalents.
+     * A primitive array ({@code bytes} is {@code byte[]}) is a reference type already and is kept.
      */
     private static ClassElement boxPrimitiveTypeIfNeeded(ClassElement elementType, PythonVisitorContext visitorContext) {
-        if (elementType.isPrimitive()) {
+        if (elementType.isPrimitive() && !elementType.isArray()) {
             String primitiveName = elementType.getName();
             return switch (primitiveName) {
                 case "int" ->
