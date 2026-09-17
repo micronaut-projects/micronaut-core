@@ -54,6 +54,14 @@ def __micronaut_put_member(target, name, value):
     setattr(target, name, value)
 
 
+def __micronaut_python_list(items):
+    return list(items)
+
+
+def __micronaut_python_dict(keys, values):
+    return dict(zip(keys, values))
+
+
 def __micronaut_to_python_standard_type(kind, value, nanos=0):
     if kind == "date":
         return datetime.date.fromisoformat(value)

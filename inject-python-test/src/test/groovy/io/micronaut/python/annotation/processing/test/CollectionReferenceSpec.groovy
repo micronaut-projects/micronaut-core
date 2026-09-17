@@ -22,8 +22,9 @@ import io.micronaut.python.annotation.processing.test.collections.ObjectStore
 import org.graalvm.polyglot.Context
 
 /**
- * Java collections cross into Python by reference: a {@code Map} with an API of its own keeps it,
- * and in-place mutations made in Python reach the Java object.
+ * A Java collection class of its own (a cache, a registry) crosses into Python by reference and keeps its API,
+ * a plain JDK collection is copied, and the list and dict attributes of a Python object stay Python collections
+ * that the generated Java class views.
  */
 class CollectionReferenceSpec extends AbstractPythonTypeElementSpec {
 
@@ -70,7 +71,7 @@ class RegistryService:
         ctx?.close()
     }
 
-    void "a plain Java collection is passed to Python by reference"() {
+    void "a plain Java collection is copied for Python, so Python neither mutates it nor fails on an unmodifiable one"() {
         given:
         String py = '''
 from jakarta.inject import Singleton
@@ -96,10 +97,13 @@ class ListService:
         when:
         int size = service.extend(values, counts)
 
-        then:
+        then: "the Python method worked on copies"
         size == 2
-        values == ['first', 'added']
-        counts == [added: 2]
+        values == ['first']
+        counts.isEmpty()
+
+        and: "an unmodifiable collection can be appended to in Python"
+        service.extend(List.of('a'), Map.of()) == 2
 
         cleanup:
         ctx?.close()
@@ -193,6 +197,92 @@ class CartService:
         cartClass.isInstance(cart)
         cart.items == ['apple', 'pear']
         ((ValueCoercible) cart).asPolyglotValue().getMember('items').getArraySize() == 2
+
+        when: "Java adds to the list"
+        cart.items.add('plum')
+
+        then: "Python sees it, and the attribute is still a Python list"
+        service.add_item('fig') == 4
+        ((ValueCoercible) cart).asPolyglotValue().getMember('items').getMetaObject().getMetaSimpleName() == 'list'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "the attributes of a wrapped Python object keep their Python types"() {
+        given:
+        String py = '''
+import copy
+import dataclasses
+import json
+from dataclasses import dataclass, field
+
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+@dataclass
+class Cart:
+    items: list[str] = field(default_factory=list)
+    counts: dict[str, int] = field(default_factory=dict)
+    matrix: list[list[int]] = field(default_factory=list)
+
+    def describe(self) -> str:
+        clone = copy.deepcopy(self)
+        clone.items.append("cloned")
+        return type(self.items).__name__ + ":" + type(self.counts).__name__ + ":" + json.dumps(dataclasses.asdict(self)) + ":" + str(len(clone.items))
+
+
+@Introspected
+@dataclass(frozen=True)
+class FrozenCart:
+    items: list[str] = field(default_factory=list)
+
+    def describe(self) -> str:
+        return type(self.items).__name__ + ":" + json.dumps(dataclasses.asdict(self))
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true)
+        Context polyglot = ctx.getBean(Context)
+        Class<?> cartClass = ctx.classLoader.loadClass('python.Cart')
+        Class<?> frozenCartClass = ctx.classLoader.loadClass('python.FrozenCart')
+        def pythonCart = polyglot.eval('python', "Cart(['a'], {'a': 1}, [[1, 2], [3]])")
+
+        when: "the Python object is wrapped, used from Java and crosses back into Python"
+        def cart = pythonCart.as(cartClass)
+        cart.items.add('b')
+        cart.counts.put('b', 2)
+        cart.matrix.get(1).add(4)
+        cart.matrix.add([5])
+        String description = cart.describe()
+
+        then: "the attributes are still Python lists and dicts holding the Java-side changes"
+        description == 'list:dict:{"items": ["a", "b"], "counts": {"a": 1, "b": 2}, "matrix": [[1, 2], [3, 4], [5]]}:3'
+        pythonCart.getMember('items').getArraySize() == 2
+        cart.items == ['a', 'b']
+        cart.counts == [a: 1, b: 2]
+        cart.matrix == [[1, 2], [3, 4], [5]]
+
+        when: "Java assigns a collection"
+        cart.items = new ArrayList<>(['x', 'y'])
+        cart.counts = Map.of('x', 1)
+
+        then: "the next crossing copies it into a Python collection, which the Java property views from then on"
+        cart.describe() == 'list:dict:{"items": ["x", "y"], "counts": {"x": 1}, "matrix": [[1, 2], [3, 4], [5]]}:3'
+        pythonCart.getMember('items').getMetaObject().getMetaSimpleName() == 'list'
+        cart.items.add('z')
+        pythonCart.getMember('items').getArraySize() == 3
+
+        when: "a frozen dataclass is wrapped"
+        def pythonFrozen = polyglot.eval('python', "FrozenCart(['a'])")
+        def frozen = pythonFrozen.as(frozenCartClass)
+        frozen.items.add('b')
+
+        then: "its list stays the Python list of the instance"
+        frozen.describe() == 'list:{"items": ["a", "b"]}'
+        pythonFrozen.getMember('items').getArraySize() == 2
+        ((ValueCoercible) frozen).asPolyglotValue().getMember('items').getArraySize() == 2
 
         cleanup:
         ctx?.close()

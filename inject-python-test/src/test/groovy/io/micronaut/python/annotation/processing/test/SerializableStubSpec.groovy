@@ -100,6 +100,124 @@ class Person:
         ctx?.close()
     }
 
+    void "list and dict attributes are written as plain collections and come back as Python collections"() {
+        given:
+        String py = '''
+from dataclasses import dataclass, field
+
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+@dataclass
+class Matrix:
+    rows: list[list[int]] = field(default_factory=list)
+    labels: dict[str, list[str]] = field(default_factory=dict)
+
+    def describe(self) -> str:
+        return type(self.rows).__name__ + ":" + type(self.rows[0]).__name__ + ":" + str(self.rows) + ":" + str(self.labels)
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true)
+        Context polyglot = ctx.getBean(Context)
+        Class<?> matrixClass = ctx.classLoader.loadClass('python.Matrix')
+        def matrix = polyglot.eval("python", "Matrix([[1, 2], [3]], {'a': ['x']})").as(matrixClass)
+
+        when:
+        def copy = roundTrip(['matrix': matrix], ctx.classLoader).get('matrix')
+
+        then: "the restored fields hold plain Java collections"
+        copy.rows == [[1, 2], [3]]
+        copy.rows.getClass() == ArrayList
+        copy.rows[0].getClass() == ArrayList
+        copy.labels == [a: ['x']]
+
+        when: "the Python object is rebuilt"
+        String description = copy.describe()
+
+        then: "the attributes are Python collections again, viewed by the Java fields"
+        description == 'list:list:[[1, 2], [3]]:{\'a\': [\'x\']}'
+        copy.rows[0].add(9)
+        copy.describe() == 'list:list:[[1, 2, 9], [3]]:{\'a\': [\'x\']}'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a Python class is serializable when its bases are"() {
+        given:
+        String py = '''
+from dataclasses import dataclass
+from java.io import Serializable
+
+from micronaut.core.annotation import Introspected
+
+
+@Introspected
+@dataclass
+class Base:
+    name: str
+
+
+@Introspected
+@dataclass
+class Derived(Base):
+    size: int
+
+
+@Introspected
+class Computed:
+    def __init__(self, name: str):
+        self._name = name
+
+    @property
+    def name(self) -> str:
+        return self._name.upper()
+
+
+@Introspected
+class DerivedFromComputed(Computed):
+    def __init__(self, name: str, size: int):
+        super().__init__(name)
+        self.size = size
+
+
+@Introspected
+@dataclass
+class Declared(Serializable):
+    name: str
+
+
+'''
+        ApplicationContext ctx = buildContext(py, true)
+
+        expect: "a dataclass extending an introspected dataclass"
+        Serializable.isAssignableFrom(ctx.classLoader.loadClass('python.Derived'))
+
+        and: "not when a Python base has a custom property accessor, whose state cannot be rebuilt"
+        !Serializable.isAssignableFrom(ctx.classLoader.loadClass('python.Computed'))
+        !Serializable.isAssignableFrom(ctx.classLoader.loadClass('python.DerivedFromComputed'))
+
+        and: "a class listing Serializable among its bases declares it once"
+        ctx.classLoader.loadClass('python.Declared').interfaces.count { it == Serializable } == 1
+
+        when:
+        def derivedIntrospection = getBeanIntrospection(ctx, 'python.Derived')
+        def derived = derivedIntrospection.instantiate(derivedIntrospection.constructorArguments.collect { it.type == String ? 'd' : 3 } as Object[])
+        derived.name = 'd'
+        def copy = roundTrip(['derived': derived], ctx.classLoader).get('derived')
+
+        then:
+        copy.name == 'd'
+        copy.size == 3
+        ((ValueCoercible) copy).asPolyglotValue().getMember('name').asString() == 'd'
+        ((ValueCoercible) copy).asPolyglotValue().getMember('size').asInt() == 3
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "the generated class of a Python class without introspected properties is not serializable"() {
         given:
         String py = '''
