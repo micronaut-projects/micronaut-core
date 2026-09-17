@@ -109,7 +109,10 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
                 def __getattr__(self, name):
                     if name.endswith('_') and keyword.iskeyword(name[:-1]):
-                        return getattr(self, name[:-1])
+                        try:
+                            return getattr(self, name[:-1])
+                        except AttributeError:
+                            pass  # report the spelling the caller used, not the stripped one
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)

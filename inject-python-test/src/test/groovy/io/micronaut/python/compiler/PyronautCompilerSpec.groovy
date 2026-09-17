@@ -892,6 +892,9 @@ class KeywordAliasService:
 
     def missing(self, message):
         return message.missing_()
+
+    def missing_keyword(self, message):
+        return message.while_()
 '''
         def tempDir = File.createTempDir("python-test-keyword-alias", "")
         def compiler = PyronautCompiler.builder()
@@ -928,6 +931,13 @@ class KeywordAliasService:
         then:
         def error = thrown(PolyglotException)
         error.message.contains("foreign object has no attribute 'missing_'")
+
+        when: "a keyword alias whose stripped member does not exist either"
+        pythonContext.eval("python", "KeywordAliasService().missing_keyword(KeywordMessage.builder().build())")
+
+        then: "the error names the alias the caller used"
+        def keywordError = thrown(PolyglotException)
+        keywordError.message.contains("foreign object has no attribute 'while_'")
 
         cleanup:
         context?.close()

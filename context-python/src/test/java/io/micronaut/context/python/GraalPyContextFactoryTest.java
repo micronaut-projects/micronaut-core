@@ -143,6 +143,8 @@ final class GraalPyContextFactoryTest {
             assertEquals("really from", context.eval(PYTHON, "getattr(factory.literal(), 'from')").asString());
             PolyglotException missing = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.builder().missing_()"));
             assertTrue(missing.getMessage().contains("foreign object has no attribute 'missing_'"), missing.getMessage());
+            PolyglotException missingKeyword = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.spec('a').while_()"));
+            assertTrue(missingKeyword.getMessage().contains("foreign object has no attribute 'while_'"), "the alias the caller used is reported: " + missingKeyword.getMessage());
 
             // pooled contexts are bootstrapped the same way
             String pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> {
