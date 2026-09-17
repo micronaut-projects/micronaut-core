@@ -1431,12 +1431,19 @@ class MicronautRuntimeTransformer(MicronautTransformer):
         self.package_decorators: Dict[str, Set[str]] = {}
         # The names the module defines or assigns itself: they shadow the names a star import binds
         self.locally_bound_names: Set[str] = set()
+        # The names bound by the statements following each star import (by the id of the import statement): as
+        # in Python, a star import rebinds the names defined before it and is shadowed by those defined after it
+        self.names_bound_after_star_import: Dict[int, Set[str]] = {}
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         self.scan_annotation_functions(node)
-        for statement in node.body:
-            if not isinstance(statement, (ast.Import, ast.ImportFrom)):
-                self.locally_bound_names.update(self._statement_bound_names(statement))
+        bound_after: Set[str] = set()
+        for statement in reversed(node.body):
+            if isinstance(statement, ast.ImportFrom) and any(alias.name == '*' for alias in statement.names):
+                self.names_bound_after_star_import[id(statement)] = set(bound_after)
+            elif not isinstance(statement, (ast.Import, ast.ImportFrom)):
+                bound_after.update(self._statement_bound_names(statement))
+        self.locally_bound_names.update(bound_after)
         self.generic_visit(node)
 
         if self._has_java_annotations(node):
@@ -1489,7 +1496,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             variable_name = alias.asname if alias.asname else alias.name
             if alias.name == '*':
                 # the annotations of the package are bound to their own names, unless the module binds a name itself
-                self.generated_decorators.update(self._package_annotation_names(java_module) - self.locally_bound_names)
+                # after the import (a star import nested in a block counts every name the module binds)
+                shadowed = self.names_bound_after_star_import.get(id(node), self.locally_bound_names)
+                self.generated_decorators.update(self._package_annotation_names(java_module) - shadowed)
                 continue
             class_element = self._resolve_imported_java_type(java_module, alias.name)
             if class_element is None:

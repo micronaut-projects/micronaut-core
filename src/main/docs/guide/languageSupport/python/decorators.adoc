@@ -55,6 +55,8 @@ def hello(self) -> str:
     return "ok"
 ----
 
+A custom annotation function whose members are only `*args` (`def Tags(*values: str)`) is likewise a function with only `*args`: written `@Tags("a", "b")` or `@Tags()` it is the annotation with those values, but applied bare it receives the decorated target as its only value, like any Python decorator, and the compiler does not rewrite it. Give such an annotation a regular member with a default instead when it is meant to be applied bare.
+
 A generated decorator applied bare through a name the compiler cannot see as the annotation (`Bean = Singleton` in another module, `getattr`) receives the class or function as its single argument; unless the annotation's `value` member holds a class, it raises a `TypeError` naming the annotation rather than replacing the target with the decorator.
 
 == Placeholder Bodies

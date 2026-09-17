@@ -16,6 +16,7 @@
 package io.micronaut.python.annotation.processing.test
 
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.annotation.Primary
 import io.micronaut.context.python.PythonContextRuntime
 import io.micronaut.python.annotation.processing.test.decorators.MethodOrder
 import io.micronaut.python.annotation.processing.test.decorators.Orderers
@@ -224,6 +225,35 @@ class Aliased:
         then: "the local Primary received the class; the alias is the Singleton factory, not applied to the class"
         shadowed.getMember("primary").asBoolean()
         shadowed.invokeMember("aliased_is_a_class").asBoolean()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a star import rebinds a decorator the module defined before it"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+
+def Primary(target):
+    target.primary = True
+    return target
+
+from micronaut.context.annotation import *
+
+@Singleton
+@Primary
+class RebindPrimary:
+    pass
+''', true)
+
+        when:
+        def definition = getBeanDefinition(context, "python.RebindPrimary")
+        Value bean = getBean(context, "python.RebindPrimary").asPolyglotValue()
+
+        then: "as in Python, the star import replaced the local function by the annotation"
+        definition.hasDeclaredAnnotation(Primary)
+        !bean.hasMember("primary")
 
         cleanup:
         context?.close()
