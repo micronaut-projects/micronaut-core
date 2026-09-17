@@ -1,0 +1,17 @@
+Benchmark                                                                      Mode  Cnt   Score    Error   Units
+GeneratedAnnotationMapBenchmark.generatedMetadataLegacyApi                     avgt   15   9.216 ±  0.332   ns/op
+GeneratedAnnotationMapBenchmark.generatedMetadataLegacyApi:gc.alloc.rate       avgt   15   0.013 ±  0.001  MB/sec
+GeneratedAnnotationMapBenchmark.generatedMetadataLegacyApi:gc.alloc.rate.norm  avgt   15  ≈ 10⁻⁴             B/op
+GeneratedAnnotationMapBenchmark.generatedMetadataLegacyApi:gc.count            avgt   15     ≈ 0           counts
+GeneratedAnnotationMapBenchmark.generatedMetadataTypedApi                      avgt   15   3.020 ±  0.049   ns/op
+GeneratedAnnotationMapBenchmark.generatedMetadataTypedApi:gc.alloc.rate        avgt   15   0.013 ±  0.001  MB/sec
+GeneratedAnnotationMapBenchmark.generatedMetadataTypedApi:gc.alloc.rate.norm   avgt   15  ≈ 10⁻⁴             B/op
+GeneratedAnnotationMapBenchmark.generatedMetadataTypedApi:gc.count             avgt   15     ≈ 0           counts
+GeneratedAnnotationMapBenchmark.ordinaryMetadata                               avgt   15   8.600 ±  0.027   ns/op
+GeneratedAnnotationMapBenchmark.ordinaryMetadata:gc.alloc.rate                 avgt   15   0.013 ±  0.001  MB/sec
+GeneratedAnnotationMapBenchmark.ordinaryMetadata:gc.alloc.rate.norm            avgt   15  ≈ 10⁻⁴             B/op
+GeneratedAnnotationMapBenchmark.ordinaryMetadata:gc.count                      avgt   15     ≈ 0           counts
+GeneratedAnnotationMapBenchmark.ordinaryMetadataAdapter                        avgt   15   7.737 ±  0.043   ns/op
+GeneratedAnnotationMapBenchmark.ordinaryMetadataAdapter:gc.alloc.rate          avgt   15   0.013 ±  0.001  MB/sec
+GeneratedAnnotationMapBenchmark.ordinaryMetadataAdapter:gc.alloc.rate.norm     avgt   15  ≈ 10⁻⁴             B/op
+GeneratedAnnotationMapBenchmark.ordinaryMetadataAdapter:gc.count               avgt   15     ≈ 0           counts

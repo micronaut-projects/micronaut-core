@@ -30,6 +30,7 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.writer.GenUtils;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.InterfaceDef;
 import io.micronaut.sourcegen.model.FieldDef;
 import io.micronaut.sourcegen.model.MethodDef;
 import io.micronaut.sourcegen.model.StatementDef;
@@ -437,13 +438,13 @@ public final class AnnotationMetadataGenUtils {
                 CONSTRUCTOR_ANNOTATION_METADATA,
 
                 // 1st argument: the declared annotations
-                pushCreateAnnotationData(annotationMetadata.declaredAnnotations, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.declaredAnnotations, annotationMetadata, loadClassValueExpressionFn),
                 // 2nd argument: the declared stereotypes
-                pushCreateAnnotationData(annotationMetadata.declaredStereotypes, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.declaredStereotypes, annotationMetadata, loadClassValueExpressionFn),
                 // 3rd argument: all stereotypes
-                pushCreateAnnotationData(annotationMetadata.allStereotypes, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.allStereotypes, annotationMetadata, loadClassValueExpressionFn),
                 // 4th argument: all annotations
-                pushCreateAnnotationData(annotationMetadata.allAnnotations, annotationMetadata.getSourceRetentionAnnotations(), loadClassValueExpressionFn),
+                pushCreateAnnotationData(annotationMetadata.allAnnotations, annotationMetadata, loadClassValueExpressionFn),
                 // 5th argument: annotations by stereotype,
                 GenUtils.stringMapOf(annotationsByStereotype, false, Collections.emptyList(), GenUtils::listOfString),
                 // 6th argument: has property expressions,
@@ -454,8 +455,9 @@ public final class AnnotationMetadataGenUtils {
     }
 
     private static ExpressionDef pushCreateAnnotationData(Map<String, Map<CharSequence, Object>> annotationData,
-                                                          Set<String> sourceRetentionAnnotations,
+                                                          MutableAnnotationMetadata metadata,
                                                           Function<String, ExpressionDef> loadClassValueExpressionFn) {
+        Set<String> sourceRetentionAnnotations = metadata.getSourceRetentionAnnotations();
         if (annotationData != null) {
             annotationData = new LinkedHashMap<>(annotationData);
             for (String sourceRetentionAnnotation : sourceRetentionAnnotations) {
@@ -463,9 +465,21 @@ public final class AnnotationMetadataGenUtils {
             }
         }
 
-        return GenUtils.stringMapOf(annotationData, false, Collections.emptyMap(),
-            attributes -> GenUtils.stringMapOf(writableValues(attributes), true, null,
-                value -> asValueExpression(value, loadClassValueExpressionFn)));
+        Map<String, ExpressionDef> maps = new LinkedHashMap<>();
+        if (annotationData != null) {
+            annotationData.forEach((name, attributes) -> {
+                ExpressionDef values = GenUtils.stringMapOf(writableValues(attributes == null ? Collections.emptyMap() : attributes), true, null,
+                    value -> asValueExpression(value, loadClassValueExpressionFn));
+                // Dynamic values must remain on the environment/evaluation-aware metadata path.
+                if (metadata.annotationMapTypes != null && metadata.annotationMapTypes.contains(name)
+                    && !metadata.hasPropertyExpressions() && !metadata.hasEvaluatedExpressions()) {
+                    values = InterfaceDef.builder(name + "$AnnotationMap").build().asTypeDef()
+                        .invokeStatic("create", TypeDef.of(Map.class), values);
+                }
+                maps.put(name, values);
+            });
+        }
+        return GenUtils.stringMapOf(maps, false, null, Function.identity());
     }
 
     private static ExpressionDef asValueExpression(Object value,

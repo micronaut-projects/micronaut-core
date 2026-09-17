@@ -17,6 +17,7 @@ package io.micronaut.annotation.processing.test;
 
 import com.sun.source.util.JavacTask;
 import io.micronaut.annotation.processing.AggregatingTypeElementVisitorProcessor;
+import io.micronaut.annotation.processing.AnnotationMapProcessor;
 import io.micronaut.annotation.processing.BeanDefinitionInjectProcessor;
 import io.micronaut.annotation.processing.MixinVisitorProcessor;
 import io.micronaut.annotation.processing.PackageElementVisitorProcessor;
@@ -345,6 +346,7 @@ public class JavaParser implements Closeable {
      */
     protected @NonNull List<Processor> getAnnotationProcessors() {
         List<Processor> processors = new ArrayList<>();
+        processors.add(new AnnotationMapProcessor());
         processors.add(new MixinVisitorProcessor());
         processors.add(new PackageElementVisitorProcessor());
         processors.add(getTypeElementVisitorProcessor());

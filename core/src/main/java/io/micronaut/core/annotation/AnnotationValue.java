@@ -1215,7 +1215,7 @@ public class AnnotationValue<A extends Annotation> implements AnnotationValueRes
             attributes.remove(AnnotationUtil.STEREOTYPES_MEMBER);
             return Collections.unmodifiableMap(attributes);
         }
-        return Collections.unmodifiableMap(values);
+        return AnnotationMap.readOnly(values);
     }
 
     /**

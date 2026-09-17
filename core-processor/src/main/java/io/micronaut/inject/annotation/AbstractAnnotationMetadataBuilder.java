@@ -1650,6 +1650,16 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
         return getTransformedAliasForValues(annotationMember);
     }
 
+    /**
+     * Whether this compilation path can emit a typed member map for the annotation.
+     *
+     * @param annotationName The annotation name
+     * @return Whether the annotation opted into supported generation
+     */
+    protected boolean isGeneratedAnnotationMap(String annotationName) {
+        return false;
+    }
+
     private void addAnnotation(MutableAnnotationMetadata mutableAnnotationMetadata,
                                List<String> parentAnnotations,
                                boolean isDeclared,
@@ -1658,6 +1668,9 @@ public abstract class AbstractAnnotationMetadataBuilder<T, A> {
                                Map<String, String> repeatableToContainer) {
 
         String annotationName = annotationValue.getAnnotationName();
+        if (isGeneratedAnnotationMap(annotationName)) {
+            mutableAnnotationMetadata.addAnnotationMapType(annotationName);
+        }
         Map<CharSequence, Object> annotationDefaults = annotationValue.getDefaultValues();
         if (annotationDefaults != null) {
             mutableAnnotationMetadata.addDefaultAnnotationValues(annotationName, annotationDefaults, annotationValue.getRetentionPolicy());

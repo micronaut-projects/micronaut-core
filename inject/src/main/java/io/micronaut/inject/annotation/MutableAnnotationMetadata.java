@@ -60,6 +60,22 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
     private Map<String, Map<CharSequence, Object>> sourceAnnotationDefaultValues;
     @Nullable
     Map<String, String> annotationRepeatableContainer;
+    @Nullable
+    Set<String> annotationMapTypes;
+
+    // Compile-time state only: keep it with the metadata, never in a process-wide registry.
+    void addAnnotationMapType(String annotationName) {
+        if (annotationMapTypes == null) {
+            annotationMapTypes = new HashSet<>();
+        }
+        annotationMapTypes.add(annotationName);
+    }
+
+    private void contributeAnnotationMapTypes(MutableAnnotationMetadata source) {
+        if (source.annotationMapTypes != null) {
+            source.annotationMapTypes.forEach(this::addAnnotationMapType);
+        }
+    }
 
     /**
      * Default constructor.
@@ -147,6 +163,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
         if (sourceAnnotationDefaultValues != null) {
             cloned.sourceAnnotationDefaultValues = cloneMapOfMapValue(sourceAnnotationDefaultValues);
         }
+        cloned.contributeAnnotationMapTypes(this);
         cloned.hasPropertyExpressions = hasPropertyExpressions;
         cloned.hasEvaluatedExpressions = hasEvaluatedExpressions;
         return cloned;
@@ -758,6 +775,9 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
      */
     @Internal
     public void addAnnotationMetadata(DefaultAnnotationMetadata annotationMetadata) {
+        if (annotationMetadata instanceof MutableAnnotationMetadata mutable) {
+            contributeAnnotationMapTypes(mutable);
+        }
         hasPropertyExpressions |= annotationMetadata.hasPropertyExpressions();
         hasEvaluatedExpressions |= annotationMetadata.hasEvaluatedExpressions();
         if (annotationMetadata.declaredAnnotations != null && !annotationMetadata.declaredAnnotations.isEmpty()) {
@@ -870,6 +890,7 @@ public class MutableAnnotationMetadata extends DefaultAnnotationMetadata {
             return;
         }
         if (target instanceof MutableAnnotationMetadata damTarget && source instanceof MutableAnnotationMetadata damSource) {
+            damTarget.contributeAnnotationMapTypes(damSource);
             final Map<String, Map<CharSequence, Object>> existingDefaults = damTarget.annotationDefaultValues;
             final Map<String, Map<CharSequence, Object>> additionalDefaults = damSource.annotationDefaultValues;
             if (existingDefaults != null) {

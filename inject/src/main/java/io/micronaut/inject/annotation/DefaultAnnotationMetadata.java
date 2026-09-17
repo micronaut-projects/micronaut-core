@@ -18,6 +18,7 @@ package io.micronaut.inject.annotation;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMap;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -1383,12 +1384,12 @@ public class DefaultAnnotationMetadata extends AbstractAnnotationMetadata implem
         }
         Map<CharSequence, Object> values = allAnnotations.get(annotation);
         if (values != null) {
-            return Collections.unmodifiableMap(values);
+            return AnnotationMap.readOnly(values);
         }
         if (allStereotypes != null) {
             values = allStereotypes.get(annotation);
             if (values != null) {
-                return Collections.unmodifiableMap(values);
+                return AnnotationMap.readOnly(values);
             }
         }
         return Collections.emptyMap();

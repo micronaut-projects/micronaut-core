@@ -18,6 +18,7 @@ package io.micronaut.annotation.processing;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.GenerateAnnotationMap;
 import io.micronaut.core.annotation.AnnotationUtil;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
@@ -338,6 +339,13 @@ public class JavaAnnotationMetadataBuilder extends AbstractAnnotationMetadataBui
         }
 
         return getOriginatingTypeElement(element.getEnclosingElement());
+    }
+
+    @Override
+    protected boolean isGeneratedAnnotationMap(String annotationName) {
+        return getAnnotationMirror(annotationName)
+            .flatMap(type -> getAnnotationValues(type, type, GenerateAnnotationMap.class))
+            .isPresent();
     }
 
     @Override
