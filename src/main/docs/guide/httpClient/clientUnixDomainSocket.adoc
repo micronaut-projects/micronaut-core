@@ -1,0 +1,32 @@
+The netty client can connect to a server listening on a UNIX domain socket instead of a TCP port. This is useful for
+talking to a local daemon that exposes an HTTP control protocol over a socket file, such as the Docker daemon.
+
+Use the `unix` scheme and put the percent-encoded socket path in the authority of the URI. The rest of the URI is the
+request path, as usual:
+
+[source,java]
+----
+URI socket = URI.create("unix://%2Fvar%2Frun%2Fdocker.sock");
+try (HttpClient client = HttpClient.create(socket.toURL())) {
+    String version = client.toBlocking().retrieve("/v1.41/version");
+}
+----
+
+The socket path is `/var/run/docker.sock` here, with each `/` written as `%2F` so that it stays inside the authority.
+An abstract socket can be addressed by starting the path with `%00`.
+
+Connections are pooled per socket path, in the same way TCP connections are pooled per host and port, so a client
+pointed at a socket reuses its connection across requests. A UNIX domain socket client and a TCP client can be used
+side by side in the same application.
+
+The transport is selected automatically from the configured event loop. The JDK NIO transport supports UNIX domain
+sockets on Java 16 and above, so no native transport is required, though epoll and kqueue are used when configured.
+
+=== Limitations
+
+* A proxy is never applied to a UNIX domain socket connection, since there is no host to route.
+* TLS does not apply, so `httpVersion: 2.0` negotiates over cleartext rather than ALPN.
+* WebSockets over a UNIX domain socket are not supported and fail with an api:http.client.exceptions.HttpClientException[].
+* The `Host` header is sent as `localhost`, matching what curl and the Docker CLI send. The socket path is not put on
+the wire.
+* Only the netty client supports this. The Java HTTP client implementation cannot connect to a UNIX domain socket.

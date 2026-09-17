@@ -40,6 +40,7 @@ import io.netty.channel.Channel;
 import io.netty.channel.ChannelFactory;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.channel.socket.nio.NioDomainSocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.resolver.AddressResolverGroup;
 
@@ -93,6 +94,7 @@ final class NettyHttpClientBuilder {
     EventLoopGroup eventLoopGroup = null;
     ChannelFactory<? extends Channel> socketChannelFactory = NioSocketChannel::new;
     ChannelFactory<? extends Channel> udpChannelFactory = NioDatagramChannel::new;
+    ChannelFactory<? extends Channel> domainSocketChannelFactory = NioDomainSocketChannel::new;
     NettyClientCustomizer clientCustomizer = CompositeNettyClientCustomizer.EMPTY;
     @Nullable
     String informationalServiceId = null;
@@ -236,6 +238,12 @@ final class NettyHttpClientBuilder {
     NettyHttpClientBuilder udpChannelFactory(ChannelFactory<? extends Channel> udpChannelFactory) {
         ArgumentUtils.requireNonNull("udpChannelFactory", udpChannelFactory);
         this.udpChannelFactory = udpChannelFactory;
+        return this;
+    }
+
+    NettyHttpClientBuilder domainSocketChannelFactory(ChannelFactory<? extends Channel> domainSocketChannelFactory) {
+        ArgumentUtils.requireNonNull("domainSocketChannelFactory", domainSocketChannelFactory);
+        this.domainSocketChannelFactory = domainSocketChannelFactory;
         return this;
     }
 
