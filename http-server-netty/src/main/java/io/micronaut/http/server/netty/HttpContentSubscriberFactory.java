@@ -20,7 +20,6 @@ package io.micronaut.http.server.netty;
  * subscriber.
  *
  * @author Graeme Rocher
- * @see DefaultHttpContentProcessor
  * @since 1.0
  * @deprecated Unused now
  */
