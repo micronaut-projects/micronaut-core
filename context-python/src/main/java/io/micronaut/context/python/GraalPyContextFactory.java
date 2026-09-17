@@ -122,6 +122,45 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         __micronaut_register_keyword_aliases()
         del __micronaut_register_keyword_aliases
         """, "micronaut-keyword-aliases.py").cached(true).buildLiteral();
+    /**
+     * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
+     * Java call returns to Python is a foreign object; GraalPy treats an instance of a registered
+     * interop type as an instance of the registered Python class, so the view makes the wrapper
+     * report the class of, compare equal to, hash like and print as the Python object it wraps,
+     * while its attributes and methods remain those of the wrapper (which delegates to the object).
+     */
+    private static final Source JAVA_WRAPPER_VIEW_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_register_java_wrapper_view(wrapper_class):
+            import polyglot
+
+            def unwrap(value):
+                return value.asPolyglotValue() if isinstance(value, JavaWrapperView) else value
+
+            class JavaWrapperView:
+                @property
+                def __class__(self):
+                    return type(self.asPolyglotValue())
+
+                def __eq__(self, other):
+                    return self.asPolyglotValue() == unwrap(other)
+
+                def __ne__(self, other):
+                    return self.asPolyglotValue() != unwrap(other)
+
+                def __hash__(self):
+                    return hash(self.asPolyglotValue())
+
+                def __repr__(self):
+                    return repr(self.asPolyglotValue())
+
+                def __str__(self):
+                    return str(self.asPolyglotValue())
+
+            try:
+                polyglot.register_interop_type(wrapper_class, JavaWrapperView)
+            except KeyError:
+                pass  # already registered in this context
+        """, "micronaut-java-wrapper-view.py").cached(true).buildLiteral();
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
@@ -250,7 +289,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @SuppressWarnings({"rawtypes", "unchecked"})
     static HostAccess bootstrapHostAccess(ClassLoader classLoader) {
         List<TargetTypeMapping<?>> mappings = (List) SoftServiceLoader.load(TargetTypeMapping.class, classLoader).collectAll();
-        return new GraalPyHostAccessFactory().hostAccess(mappings);
+        return new GraalPyHostAccessFactory().hostAccess(mappings, classLoader);
     }
 
     static Context buildContext(HostAccess hostAccess, Engine engine, ClassLoader classLoader) throws IOException {
@@ -310,6 +349,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         LOG.debug("GraalPy Context Built in {}ms", System.currentTimeMillis() - now);
         boolean bootstrapped = false;
         try {
+            PythonContextRuntime.helper(context, "__micronaut_register_java_wrapper_view", JAVA_WRAPPER_VIEW_SOURCE)
+                .executeVoid(ValueCoercible.class);
             // The per-context builtin is only needed by context-reuse tests. Avoid
             // evaluating another Python snippet during normal application startup.
             if (Boolean.getBoolean(CONTEXT_ID_PROPERTY)) {
