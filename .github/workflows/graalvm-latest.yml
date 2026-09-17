@@ -15,6 +15,8 @@ on:
       - master
       - main
       - '[0-9]+.[0-9]+.x'
+      # stacked Python fix PRs target each other's branches
+      - 'python/**'
     types: [opened, synchronize, reopened, ready_for_review]
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to branches get a group of their own and are never cancelled.
