@@ -471,8 +471,8 @@ public class PythonAstParserTest {
 
         assertTrue(result.code().contains("class Worker(Thread)"));
         // the runtime class extends the Python base standing in for the Java class
-        assertTrue(result.runtimeCode().contains("class Worker(__micronaut_java_base('java.lang.Thread'))"));
-        assertTrue(result.runtimeCode().contains("def __micronaut_java_base(name):"));
+        assertTrue(result.runtimeCode().contains("class Worker(_micronaut_java_base('java.lang.Thread'))"));
+        assertTrue(result.runtimeCode().contains("def _micronaut_java_base(name):"));
         assertTrue(result.runtimeCode().contains("PythonJavaBases').baseClass(java.type(name))"));
         assertFalse(result.runtimeCode().contains("does not support Python class"));
         assertTrue(parser.requiresRuntimeBytecode(result));

@@ -23,12 +23,12 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The runtime side of a Python class that extends a Java class.
@@ -56,7 +56,16 @@ public final class PythonJavaBases {
 
     private static final String BASE_CLASS_HELPER = "__micronaut_java_base_class";
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
-    private static final Map<Class<?>, String[]> METHOD_NAMES = new ConcurrentHashMap<>();
+    // a ClassValue rather than a map keyed by class: the entry goes away with the class loader
+    private static final ClassValue<String[]> METHOD_NAMES = new ClassValue<>() {
+        @Override
+        protected String[] computeValue(Class<?> type) {
+            Set<String> names = new LinkedHashSet<>();
+            collectMethodNames(type, names, new LinkedHashSet<>());
+            return names.toArray(new String[0]);
+        }
+    };
+    private static final ThreadLocal<Deque<Construction>> CONSTRUCTIONS = ThreadLocal.withInitial(ArrayDeque::new);
 
     private PythonJavaBases() {
     }
@@ -93,6 +102,34 @@ public final class PythonJavaBases {
         }
         Object result = javaInstance.micronautInvokeJavaBaseMethod(name, values);
         return PythonCoercion.coerceToContext(result, self.getContext());
+    }
+
+    /**
+     * Marks the Python object whose Java instance is being constructed on the current thread. The
+     * generated {@code (Value)} constructor evaluates this before it runs the Java super constructor,
+     * which may call a method the Python class overrides: until the instance holds its Python object,
+     * the bridge of that method reaches it through {@link #underConstruction()}.
+     *
+     * @param pythonObject The Python object
+     * @return The construction, finished by the constructor once the super constructor returned
+     */
+    @UsedByGeneratedCode
+    public static Construction constructing(Value pythonObject) {
+        Construction construction = new Construction(pythonObject);
+        CONSTRUCTIONS.get().push(construction);
+        return construction;
+    }
+
+    /**
+     * The Python object whose Java instance is being constructed on the current thread, for a bridge
+     * method called by the Java super constructor; {@code null} outside a construction.
+     *
+     * @return The Python object, or {@code null}
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Value underConstruction() {
+        Construction construction = CONSTRUCTIONS.get().peek();
+        return construction == null ? null : construction.pythonObject;
     }
 
     /**
@@ -201,11 +238,7 @@ public final class PythonJavaBases {
      * @return The method names
      */
     static String[] methodNames(Class<?> javaClass) {
-        return METHOD_NAMES.computeIfAbsent(javaClass, type -> {
-            Set<String> names = new LinkedHashSet<>();
-            collectMethodNames(type, names, new LinkedHashSet<>());
-            return names.toArray(new String[0]);
-        });
+        return METHOD_NAMES.get(javaClass);
     }
 
     private static void collectMethodNames(@Nullable Class<?> type, Set<String> names, Set<Class<?>> visited) {
@@ -214,7 +247,9 @@ public final class PythonJavaBases {
         }
         for (Method method : type.getDeclaredMethods()) {
             int modifiers = method.getModifiers();
-            if (Modifier.isStatic(modifiers) || Modifier.isAbstract(modifiers) || method.isSynthetic() || method.isBridge()) {
+            if (Modifier.isStatic(modifiers) || Modifier.isAbstract(modifiers) || method.isSynthetic() || method.isBridge()
+                || method.getTypeParameters().length > 0) {
+                // a generic method (toArray(T[])) is not reachable through the generated dispatcher either
                 continue;
             }
             if (Modifier.isPublic(modifiers) || Modifier.isProtected(modifiers)) {
@@ -224,6 +259,33 @@ public final class PythonJavaBases {
         collectMethodNames(type.getSuperclass(), names, visited);
         for (Class<?> anInterface : type.getInterfaces()) {
             collectMethodNames(anInterface, names, visited);
+        }
+    }
+
+    /**
+     * The construction of the Java instance of a Python object, see {@link #constructing(Value)}.
+     */
+    public static final class Construction {
+        private final Value pythonObject;
+
+        private Construction(Value pythonObject) {
+            this.pythonObject = pythonObject;
+        }
+
+        /**
+         * Called by the generated constructor once the Java super constructor returned. A super
+         * constructor that threw leaves its construction behind until a later one on the thread
+         * finishes, which is harmless: only a bridge called before the instance holds its Python
+         * object reads it.
+         */
+        @UsedByGeneratedCode
+        public void finished() {
+            Deque<Construction> constructions = CONSTRUCTIONS.get();
+            Construction popped;
+            do {
+                // pops the constructions left behind by super constructors that threw, down to this one
+                popped = constructions.poll();
+            } while (popped != null && popped != this);
         }
     }
 }

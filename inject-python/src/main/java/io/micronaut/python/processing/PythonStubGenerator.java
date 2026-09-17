@@ -159,6 +159,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
+    private static final ClassTypeDef JAVA_BASE_CONSTRUCTION = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases.Construction");
     private static final ClassTypeDef JAVA_BASE_MEMBERS = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.JavaBaseMembers");
     private static final String INVOKE_JAVA_BASE_METHOD = "micronautInvokeJavaBaseMethod";
     public static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
@@ -815,7 +816,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyInstance()
                     .filter(MethodElement::isAbstract));
             for (MethodElement method : abstractHostMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames);
+                addBridgeMethod(hostBridgeMethodSpec(method, element, superType), builder, context, addedMethodNames);
             }
             List<MethodElement> hostMethods = superType.getEnclosedElements(
                 ElementQuery.ALL_METHODS
@@ -829,7 +830,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyDeclared());
             for (MethodElement hostMethod : hostMethods) {
                 if (declaredMethods.stream().anyMatch(declaredMethod -> overridesHostMethod(declaredMethod, hostMethod))) {
-                    addBridgeMethod(BridgeMethodSpec.of(hostMethod, element), builder, context, addedMethodNames);
+                    addBridgeMethod(hostBridgeMethodSpec(hostMethod, element, superType), builder, context, addedMethodNames);
                 }
             }
         }
@@ -849,6 +850,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         return isAopProxy;
+    }
+
+    /**
+     * The bridge of a method of the Java base class: a method of a generic base is declared with the type
+     * arguments the Python class binds ({@code GenericHolder[str]} declares {@code transform(String)} returning
+     * {@code String}), as a method of a generic interface is, so the bridge overrides the base method.
+     */
+    private static BridgeMethodSpec hostBridgeMethodSpec(MethodElement hostMethod, ClassElement element, ClassElement superType) {
+        Map<String, ClassElement> typeArguments = resolvedInterfaceMethodTypeArguments(superType, hostMethod);
+        boolean bound = typeArguments.values().stream()
+            .anyMatch(typeArgument -> !(typeArgument instanceof GenericPlaceholderElement) && !isObjectType(typeArgument));
+        if (!bound) {
+            // a raw or unbound base (MyMap(HashMap)) keeps the plain bridge of its erased signature
+            return BridgeMethodSpec.of(hostMethod, element);
+        }
+        return BridgeMethodSpec.of(hostMethod, element).signature(hostMethod, hostMethod, typeArguments);
     }
 
     /**
@@ -927,23 +944,40 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // the Python constructor parameters delegate here. The Python object is then bound to
             // this instance, the only Java instance of the base, so the inherited Java methods it
             // calls run on it.
+            // The Java super constructor may call a method the Python class overrides, before this
+            // instance holds its Python object: the public constructor marks the object as under
+            // construction (PythonJavaBases.constructing, evaluated before the super constructor runs)
+            // and asPolyglotValue() falls back to it until the field is assigned.
             JavaSuperConstructor superConstructor = model.javaSuperConstructor();
+            MethodDef constructingConstructor = MethodDef.constructor()
+                .addModifiers(Modifier.PRIVATE)
+                .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                .addParameter(ParameterDef.of("construction", JAVA_BASE_CONSTRUCTION))
+                .build((aThis, methodParameters) -> {
+                    VariableDef.MethodParameter value = methodParameters.get(0);
+                    List<StatementDef> statements = new ArrayList<>();
+                    statements.add(aThis.superRef().invokeSuperConstructor(superConstructor.arguments(value, this::convertValueForType)));
+                    statements.add((StatementDef) methodParameters.get(1).invoke("finished", TypeDef.VOID));
+                    statements.add(aThis.field(pythonValueField(model)).assign(value));
+                    if (isIntrospectedBean) {
+                        statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields, isFrozenPythonDataclass(model.element())));
+                    }
+                    statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
+                    return StatementDef.multi(statements);
+                });
             builder.addMethod(
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
                     .build((aThis, methodParameters) -> {
                         VariableDef.MethodParameter value = methodParameters.get(0);
-                        List<StatementDef> statements = new ArrayList<>();
-                        statements.add(aThis.superRef().invokeSuperConstructor(superConstructor.arguments(value, this::convertValueForType)));
-                        statements.add(aThis.field(pythonValueField(model)).assign(value));
-                        if (isIntrospectedBean) {
-                            statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields, isFrozenPythonDataclass(model.element())));
-                        }
-                        statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
-                        return StatementDef.multi(statements);
+                        return new ExpressionDef.InvokeInstanceMethod(aThis, constructingConstructor, List.of(
+                            value,
+                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value)
+                        ));
                     })
             );
+            builder.addMethod(constructingConstructor);
         }
         if (!isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class)) {
             // A Python exception raised from GraalPy is remapped by the runtime to the generated
@@ -1143,6 +1177,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> StatementDef.multi(
                     returnInterceptedTargetValue(aThis),
+                    returnObjectUnderConstruction(model, aThis),
                     introspectedPolyglotValueBody(model, aThis)
                 ))));
             if (isReconstructibleBean) {
@@ -1482,6 +1517,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (ownedClassReference == null) {
                         return StatementDef.multi(
                             returnInterceptedTargetValue(aThis),
+                            returnObjectUnderConstruction(model, aThis),
                             aThis.field(pythonValueFinal).returning()
                         );
                     }
@@ -1491,6 +1527,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ExpressionDef.InvokeStaticMethod newInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)));
                     return StatementDef.multi(
                         returnInterceptedTargetValue(aThis),
+                        returnObjectUnderConstruction(model, aThis),
                         aThis.field(pythonValueFinal).newLocal("value", value -> StatementDef.multi(
                             aThis.field(ownedClassReference).isNonNull()
                                 .and(PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse())
@@ -1543,6 +1580,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param aThis The stub instance
      * @return The conditional return statement
      */
+    /**
+     * The statement of {@code asPolyglotValue()} of a stub extending a Java class that answers a bridge
+     * method the Java super constructor calls: the instance does not hold its Python object yet, which
+     * the runtime knows as the object under construction on the thread.
+     */
+    private static StatementDef returnObjectUnderConstruction(ClassStubModel model, VariableDef.This aThis) {
+        if (!model.extendsJavaBase() || model.isJunit5Test()) {
+            return StatementDef.multi();
+        }
+        return aThis.field(pythonValueField(model)).isNull().doIf(
+            PYTHON_JAVA_BASES.invokeStatic("underConstruction", POLYGLOT_VALUE).newLocal("constructing", constructing ->
+                constructing.isNonNull().doIf(constructing.returning())
+            )
+        );
+    }
+
     private static StatementDef returnInterceptedTargetValue(VariableDef.This aThis) {
         return aThis.instanceOf(INTERCEPTED_PROXY).doIf(
             PYTHON_COERCION.invokeStatic(INTERCEPTED_TARGET_VALUE, POLYGLOT_VALUE, aThis.cast(INTERCEPTED_PROXY)).returning()

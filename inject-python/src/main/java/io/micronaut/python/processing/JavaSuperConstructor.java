@@ -129,6 +129,12 @@ final class JavaSuperConstructor {
         }
         String call = "super().__init__(" + superArguments.stream().map(SuperArgumentDef::source).collect(Collectors.joining(", ")) + ")";
         for (SuperArgumentDef argument : superArguments) {
+            if (argument.isConflicting()) {
+                visitorContext.fail("The __init__ method of " + PYTHON_CLASS + element.getSimpleName() + "] calls super().__init__() in more than one way ["
+                    + argument.source() + "] and [" + argument.conflictingCall() + "]; a Python class extending the Java class [" + superType.getName()
+                    + "] has one Java super constructor, so every call must pass the same arguments", element);
+                return null;
+            }
             if (argument.isKeyword()) {
                 visitorContext.fail("The super constructor call [" + call + OF_PYTHON_CLASS + element.getSimpleName()
                     + "] passes [" + argument.source() + "]; a Python class extending the Java class [" + superType.getName()
@@ -288,6 +294,11 @@ final class JavaSuperConstructor {
             }
             if (boxed.equals(parameter.getName())) {
                 return EXACT;
+            }
+            String unboxedParameter = unboxedName(parameter.getName());
+            if (unboxedParameter != null) {
+                // a Python int against a Long parameter: GraalPy converts it as it widens the primitive
+                return widens(argument.getName(), unboxedParameter) ? ASSIGNABLE : REJECTED;
             }
             ClassElement boxedElement = visitorContext.getClassElement(boxed).orElse(null);
             return boxedElement != null && boxedElement.isAssignable(parameter) ? ASSIGNABLE : REJECTED;

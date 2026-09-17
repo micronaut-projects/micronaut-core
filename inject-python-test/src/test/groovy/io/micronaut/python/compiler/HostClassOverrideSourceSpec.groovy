@@ -45,7 +45,12 @@ public PythonConstructorBackedHandler(HandlerDependency dependency, HandlerDepen
 ''')
         assertGeneratedSourceContains(pythonCode, '''
 public PythonConstructorBackedHandler(Value value) {
+    this(value, PythonJavaBases.constructing(value));
+''')
+        assertGeneratedSourceContains(pythonCode, '''
+private PythonConstructorBackedHandler(Value value, PythonJavaBases.Construction construction) {
     super((HandlerDependency) PythonConversion.convertValue(PythonJavaBases.argument(value, 0, "(io.micronaut.python.annotation.processing.test.HandlerDependency)"), io.micronaut.python.annotation.processing.test.HandlerDependency.class));
+    construction.finished();
     this.graalpyInternalValue = value;
     PythonJavaBases.bind(value, this);
 ''')

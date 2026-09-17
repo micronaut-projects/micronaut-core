@@ -50,7 +50,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Internal
 public final class PythonHostMembers {
 
-    private static final Map<Class<?>, Map<String, List<MethodHandle>>> INHERITED_METHODS = new ConcurrentHashMap<>();
+    // a ClassValue rather than a map keyed by class: the entry goes away with the class loader
+    private static final ClassValue<Map<String, List<MethodHandle>>> INHERITED_METHODS = new ClassValue<>() {
+        @Override
+        protected Map<String, List<MethodHandle>> computeValue(Class<?> type) {
+            return inheritedMethods(type);
+        }
+    };
 
     private PythonHostMembers() {
     }
@@ -65,7 +71,7 @@ public final class PythonHostMembers {
      */
     @UsedByGeneratedCode
     public static @Nullable Object inheritedMember(Object receiver, String name) {
-        Map<String, List<MethodHandle>> methods = INHERITED_METHODS.computeIfAbsent(receiver.getClass(), PythonHostMembers::inheritedMethods);
+        Map<String, List<MethodHandle>> methods = INHERITED_METHODS.get(receiver.getClass());
         List<MethodHandle> handles = methods.get(name);
         if (handles == null) {
             return null;
