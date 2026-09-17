@@ -345,6 +345,7 @@ languageSupport:
     title: Micronaut for Python
     pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
+    decorators: Annotations as Decorators
     typeOrdering: Type Ordering and Forward References
     interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions

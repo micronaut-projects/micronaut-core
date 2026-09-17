@@ -440,7 +440,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             template.isStatic(),
             template.isAsync(),
             template.hasReturnValue(),
-            null
+            template.hasPlaceholderBody(),
+            null,
+            template.superArguments()
         ).withClassDef(getNativeType());
     }
 
