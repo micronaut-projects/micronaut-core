@@ -239,10 +239,11 @@ class Command:
             .targetDir(tempDir)
             .build()
             .compile()
-        def packageInit = new File(srcPath, "micronaut/python/annotation/processing/test/nested/__init__.py").text
-        def hostInit = new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost/__init__.py").text
-        def builderInit = new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost/Builder/__init__.py").text
-        def markerInit = new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker/__init__.py").text
+        // the package initializers merge the members modules written next to them
+        def packageInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested"))
+        def hostInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost"))
+        def builderInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterHost/Builder"))
+        def markerInit = packageMembers(new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker"))
         def taggedModule = new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker/Tagged.py").text
 
         then: "the package imports each type from the type's own module"
@@ -321,5 +322,13 @@ class Broken:
         def e = thrown(RuntimeException)
         e.message.contains('Missing')
         e.message.contains('io.micronaut.python.annotation.processing.test.nested.OuterHost')
+    }
+
+    private static String packageMembers(File packageDirectory) {
+        packageDirectory.listFiles()
+            .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
+            .sort { it.name }
+            .collect { it.text }
+            .join('\n')
     }
 }

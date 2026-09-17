@@ -44,7 +44,6 @@ public final class PythonJavaTypes {
         "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
         "java.lang.Float", "java.lang.Boolean", "java.lang.Character"
     );
-    private static final String PYTHON_CLASS_ANNOTATION = "io.micronaut.context.python.annotation.PythonClass";
 
     private PythonJavaTypes() {
     }
