@@ -632,7 +632,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ExpressionDef.constant(superType.getName()), name, arguments).doThrow());
                 return StatementDef.multi(statements);
             }));
-        addedMethodNames.add(INVOKE_JAVA_BASE_METHOD);
+        addedMethodNames.add(INVOKE_JAVA_BASE_METHOD + "(" + String.class.getName() + ";" + List.class.getName() + ";)");
     }
 
     private static boolean isParameterizedReference(ClassElement type) {
@@ -4391,13 +4391,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static String bridgeMethodNameAndArity(String bridgeMethodKey) {
+        int parameterStart = bridgeMethodKey.indexOf('(');
+        if (parameterStart < 0) {
+            // a key recorded by name only
+            return bridgeMethodKey + "/0";
+        }
         int parameters = 0;
-        for (int i = bridgeMethodKey.indexOf('('); i < bridgeMethodKey.length(); i++) {
+        for (int i = parameterStart; i < bridgeMethodKey.length(); i++) {
             if (bridgeMethodKey.charAt(i) == ';') {
                 parameters++;
             }
         }
-        return bridgeMethodKey.substring(0, bridgeMethodKey.indexOf('(')) + '/' + parameters;
+        return bridgeMethodKey.substring(0, parameterStart) + '/' + parameters;
     }
 
     /**
