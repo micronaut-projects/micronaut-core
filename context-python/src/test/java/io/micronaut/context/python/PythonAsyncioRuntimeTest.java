@@ -348,6 +348,7 @@ final class PythonAsyncioRuntimeTest {
                         return self.name
                 """;
             primary.eval(PYTHON, service);
+            primary.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'startup'");
             Context eventLoopContext = pool.getEventLoopContext(eventLoop);
             eventLoopContext.eval(PYTHON, service);
             eventLoopContext.eval(PYTHON, "import builtins\nbuiltins.__service_marker__ = 'event-loop'");
@@ -363,6 +364,17 @@ final class PythonAsyncioRuntimeTest {
             assertEquals("event-loop", target.getMember("context_marker").asString(), "__init__ did not run in the event-loop context");
             assertEquals(2, target.getMember("names").getArraySize());
             assertEquals("dependency", target.getMember("dependency").invokeMember("toString").asString());
+            Value again = PythonContextRuntime.asyncInstance(fallback, reference);
+            assertEquals("event-loop", again.getMember("context_marker").asString(),
+                "the startup value replaced a member the event-loop __init__ set");
+
+            Value other = PythonContextRuntime.newInstance(primary, reference, dependency, "y", List.of("c"));
+            Value otherTarget = PythonContextRuntime.asyncInstance(other, reference);
+
+            assertEquals("y", otherTarget.getMember("name").asString());
+            assertEquals(1, otherTarget.getMember("names").getArraySize());
+            assertEquals("x", PythonContextRuntime.asyncInstance(fallback, reference).getMember("name").asString(),
+                "two startup instances of a class shared one event-loop instance");
         } finally {
             PythonAsyncioRuntime.setEventLoopProviders(List.of());
         }

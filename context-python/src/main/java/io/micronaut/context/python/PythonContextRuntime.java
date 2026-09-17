@@ -308,19 +308,41 @@ public final class PythonContextRuntime {
                                            PythonClassReference classReference,
                                            Value source,
                                            Set<Value> inProgress) {
+        Context context = pool.getEventLoopContext(eventLoop);
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
         if (!inProgress.add(source)) {
             // a bean reached again through its own dependencies: its instance, unless it is still being created
-            Context context = pool.findEventLoopContext(eventLoop);
-            return context == null ? null : pool.findCachedClass(context, classReference);
+            PythonContextRegistry.AsyncInstance existing = asyncInstance(state, source);
+            return existing == null ? null : existing.target();
         }
         try {
-            Object[] constructorArguments = rememberedConstructorArguments(source);
-            Value target = pool.getEventLoopClass(eventLoop, classReference, cls -> newEventLoopInstance(cls, constructorArguments));
-            copyTransferableMembers(source, target, constructorArguments);
+            // one event-loop instance per startup instance: prototypes and factory-produced instances of a class
+            // keep their own arguments and state
+            PythonContextRegistry.AsyncInstance instance = asyncInstance(state, source);
+            if (instance == null) {
+                Value target = newEventLoopInstance(findClass(classReference, context), rememberedConstructorArguments(source));
+                instance = new PythonContextRegistry.AsyncInstance(target, Set.copyOf(PythonCoercion.transferableMemberNames(target)));
+                synchronized (state) {
+                    PythonContextRegistry.AsyncInstance prior = state.asyncInstances.putIfAbsent(source, instance);
+                    if (prior != null) {
+                        instance = prior;
+                    }
+                }
+            }
+            Value target = instance.target();
+            // members the event-loop __init__ set are its own: a value derived there from context-local state
+            // must not be replaced by the startup instance's
+            PythonCoercion.copyTransferableMembers(source, target, instance.constructorMembers());
             copyRememberedAsyncMembers(source, target);
             return target;
         } finally {
             inProgress.remove(source);
+        }
+    }
+
+    private static PythonContextRegistry.@Nullable AsyncInstance asyncInstance(PythonContextRegistry.ContextState state, Value source) {
+        synchronized (state) {
+            return state.asyncInstances.get(source);
         }
     }
 
@@ -333,7 +355,7 @@ public final class PythonContextRuntime {
             return cls;
         }
         if (constructorArguments == null) {
-            return cls.newInstance();
+            return withContextClassLoader(cls::newInstance);
         }
         Context context = cls.getContext();
         Object[] arguments = new Object[constructorArguments.length];
@@ -341,20 +363,6 @@ public final class PythonContextRuntime {
             arguments[i] = PythonCoercion.asyncConstructorArgument(context, constructorArguments[i]);
         }
         return withContextClassLoader(() -> cls.newInstance(arguments));
-    }
-
-    /*
-     * Host objects passed to __init__ were already resolved for the event-loop context by the constructor replay:
-     * copying the startup instance's raw member would undo that.
-     */
-    private static void copyTransferableMembers(Value source, Value target, Object @Nullable [] constructorArguments) {
-        if (constructorArguments == null) {
-            PythonCoercion.copyTransferableMembers(source, target);
-        } else {
-            Set<Object> skipped = Collections.newSetFromMap(new IdentityHashMap<>());
-            Collections.addAll(skipped, constructorArguments);
-            PythonCoercion.copyTransferableMembers(source, target, skipped);
-        }
     }
 
     private static boolean isPlainBeanInstance(Value source, PythonClassReference classReference) {

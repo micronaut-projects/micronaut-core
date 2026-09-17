@@ -407,33 +407,6 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
     }
 
     /**
-     * Resolve a class instance in the dedicated context associated with an asyncio event loop,
-     * creating it with the given factory when the context has none yet.
-     *
-     * @param eventLoop The Python event loop that owns the context
-     * @param classReference The Python class reference
-     * @param factory Creates the instance from the context-local class
-     * @return The event-loop-local class value
-     */
-    Value getEventLoopClass(PythonEventLoop eventLoop,
-                            PythonContextRuntime.PythonClassReference classReference,
-                            Function<Value, Value> factory) {
-        return getOrCreateClass(getOrCreateEventLoopContext(eventLoop), classReference, factory);
-    }
-
-    /**
-     * The event-loop-local class value, if the context already created one.
-     *
-     * @param context The event-loop context
-     * @param classReference The Python class reference
-     * @return The cached value, or null
-     */
-    @Nullable Value findCachedClass(Context context, PythonContextRuntime.PythonClassReference classReference) {
-        Map<String, Value> m = cache.get(context);
-        return m == null ? null : m.get(classReference.cacheKey());
-    }
-
-    /**
      * Resolve a script/module in the dedicated context associated with an asyncio event loop.
      *
      * @param eventLoop The Python event loop that owns the context
@@ -703,12 +676,6 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
      * A duplicate load settles with putIfAbsent instead.
      */
     private Value getOrCreateClass(Context c, PythonContextRuntime.PythonClassReference classReference) {
-        return getOrCreateClass(c, classReference, cls -> cls.canInstantiate() ? cls.newInstance() : cls);
-    }
-
-    private Value getOrCreateClass(Context c,
-                                   PythonContextRuntime.PythonClassReference classReference,
-                                   Function<Value, Value> factory) {
         Map<String, Value> m = cache.computeIfAbsent(c, _ -> new ConcurrentHashMap<>());
         String key = classReference.cacheKey();
         Value existing = m.get(key);
@@ -716,7 +683,7 @@ final class PythonPool implements PythonContextExecutor, BeanDestroyedEventListe
             return existing;
         }
         Value cls = loadClass(c, classReference);
-        Value created = factory.apply(cls);
+        Value created = cls.canInstantiate() ? cls.newInstance() : cls;
         Value prior = m.putIfAbsent(key, created);
         return prior != null ? prior : created;
     }

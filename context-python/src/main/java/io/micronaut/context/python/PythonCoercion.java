@@ -508,25 +508,25 @@ public final class PythonCoercion {
      *
      * @param source The source Python object.
      * @param target The target Python object.
-     * @param skippedHostObjects Host objects, compared by identity, the target already holds in its own form
+     * @param skippedMembers Members the target owns and that are not copied
      */
-    static void copyTransferableMembers(@Nullable Value source, @Nullable Value target, Set<Object> skippedHostObjects) {
+    static void copyTransferableMembers(@Nullable Value source, @Nullable Value target, Set<String> skippedMembers) {
         if (source == null || target == null || PythonConversion.isNone(source) || PythonConversion.isNone(target) || !source.hasMembers()) {
             return;
         }
         for (String key : transferableMemberNames(source)) {
-            if (key.startsWith("__")) {
+            if (key.startsWith("__") || skippedMembers.contains(key)) {
                 continue;
             }
             Value member = source.getMember(key);
             Object transferable = transferableMember(member, target.getContext());
-            if (transferable != null && !skippedHostObjects.contains(transferable)) {
+            if (transferable != null) {
                 putMember(target, key, transferable);
             }
         }
     }
 
-    private static List<String> transferableMemberNames(Value source) {
+    static List<String> transferableMemberNames(Value source) {
         Value names = PythonContextRuntime.helper(source.getContext(), TRANSFERABLE_MEMBER_NAMES);
         Value result = names.execute(source);
         List<String> keys = new ArrayList<>();
