@@ -351,6 +351,7 @@ languageSupport:
     javaCollections: Java Collections and Serialization
     keywords: Python Keywords in Java APIs
     nestedTypes: Nested Java Types
+    pythonExceptions: Python Exceptions Extending Java Exceptions
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

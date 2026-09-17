@@ -25,6 +25,7 @@ DefaultFactoryDef = java.type("io.micronaut.python.processing.model.DefaultFacto
 ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
+SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 
 # What ast.literal_eval raises for a node that is not a literal; anything else is a bug worth seeing.
@@ -369,6 +370,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                                 if is_async:
                                     raise ValueError("Async constructors are not supported")
                                 self._handle_constructor_instance_attributes(node, arguments)
+                                super_arguments = self._constructor_super_arguments(node, arguments)
+                                if super_arguments is not None:
+                                    func_def = func_def.withSuperArguments(super_arguments)
                                 # Set as constructor
                                 self.current_class = self.current_class.withConstructor(func_def)
                             else:
@@ -902,6 +906,75 @@ class MicronautAstVisitor(ast.NodeVisitor):
             attr_def = JavaAttributeDef(attr_name, parameter.annotation(), parameter.typeAnnotation(), None, False, [], parameter.documentation(), False, None)
             self.current_class_attributes.append(attr_def)
             existing_attributes.add(attr_name)
+
+    def _constructor_super_arguments(self, func_node, arguments):
+        """
+        The arguments of the super().__init__(...) call of a constructor, with what the
+        processor can tell about them statically, or None when the constructor does not
+        call the super constructor. A Python class extending a Java class needs them to
+        pick the Java super constructor.
+        """
+        for stmt in ast.walk(func_node):
+            if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+                continue
+            call = stmt.value
+            func = call.func
+            if not (
+                isinstance(func, ast.Attribute)
+                and func.attr == "__init__"
+                and isinstance(func.value, ast.Call)
+                and isinstance(func.value.func, ast.Name)
+                and func.value.func.id == "super"
+            ):
+                continue
+            parameter_names = {arg.name() for arg in arguments.arguments()}
+            super_arguments = [
+                self._super_argument(argument, parameter_names)
+                for argument in call.args
+            ]
+            for keyword_argument in call.keywords:
+                source = ast.unparse(keyword_argument)
+                super_arguments.append(SuperArgumentDef.keyword(source, keyword_argument.arg or "**"))
+            return super_arguments
+        return None
+
+    def _super_argument(self, node, parameter_names):
+        source = ast.unparse(node)
+        if isinstance(node, ast.Starred):
+            return SuperArgumentDef.keyword(source, "*")
+        if isinstance(node, ast.Name) and node.id in parameter_names:
+            return SuperArgumentDef.parameter(source, node.id)
+        type_name = self._static_python_type_name(node)
+        if type_name is not None:
+            return SuperArgumentDef.typed(source, TypeRef(type_name))
+        if isinstance(node, ast.Call) and isinstance(node.func, (ast.Name, ast.Attribute)):
+            # a constructor call: the argument is an instance of the called class when the
+            # name resolves to a class; a function call resolves to nothing on the Java side
+            return SuperArgumentDef.typed(source, self._parse_type(node.func))
+        return SuperArgumentDef.unknown(source)
+
+    def _static_python_type_name(self, node):
+        value = None
+        resolved = False
+        if isinstance(node, ast.JoinedStr):
+            return "str"
+        if isinstance(node, ast.Constant):
+            value, resolved = node.value, True
+        elif isinstance(node, ast.Name) and node.id in self.local_constant_values:
+            value, resolved = self.local_constant_values[node.id], True
+        if not resolved:
+            return None
+        if value is None:
+            return "None"
+        if isinstance(value, bool):
+            return "bool"
+        if isinstance(value, int):
+            return "int"
+        if isinstance(value, float):
+            return "float"
+        if isinstance(value, str):
+            return "str"
+        return None
 
     def _is_constructor_readable_attribute_parameter(self, parameter):
         for decorator in parameter.decorators():

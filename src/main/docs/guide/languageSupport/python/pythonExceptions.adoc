@@ -1,0 +1,48 @@
+A Python class can extend a Java exception class, for example `RuntimeException` or a library base such as an `AbstractThrowableProblem`. The Python compiler generates a Java class for it that extends the Java base, so Micronaut exception handlers and `@Error` methods declared for the Python type, or for its Java base, match the exception when it is raised from Python code:
+
+[source,python]
+----
+from java.lang import RuntimeException
+
+
+class NotEligibleException(RuntimeException):
+
+    def __init__(self, message: str):
+        super().__init__(message)
+----
+
+At runtime the Python class is a plain Python exception; the arguments of its `super().__init__(...)` call are kept in `args`, as for any Python exception. When the exception crosses into Java, the generated Java class forwards those arguments to the matching Java super constructor. A message passed to the super constructor is therefore the Java `getMessage()`, and a Java exception given as the cause (`raise NotEligibleException("...") from e`) is the Java `getCause()`. A subclass without an `__init__` method passes `str(exception)` to the message constructor of the Java base, or calls its no-argument constructor when there is no message constructor.
+
+The Java constructor is picked at compile time from the number of arguments of the `super().__init__(...)` call and their types as far as the compiler can tell them: literals and f-strings, constructor parameters through their annotations, module constants and constructor calls of Java classes. An argument of unknown type accepts any parameter, with a preference for a `String` parameter. Compilation fails when no constructor of the Java base accepts the call, when more than one does, or when the call uses keyword arguments:
+
+[source,python]
+----
+from java.net import URI
+from micronaut.http import HttpStatus
+from micronaut.problem import HttpStatusType
+from org.zalando.problem import AbstractThrowableProblem
+
+TYPE = URI.create("https://example.org/not-found")
+
+
+class TaskNotFoundProblem(AbstractThrowableProblem):
+
+    def __init__(self, task_id: int):
+        super().__init__(TYPE, "Not found", HttpStatusType(HttpStatus.NOT_FOUND), f"Task '{task_id}' not found")
+----
+
+The call above resolves to the `(URI, String, StatusType, String)` constructor of the base: the second and last arguments are strings, the third is an `HttpStatusType`, and `TYPE` (a call of a static method) accepts any parameter.
+
+Once an exception has crossed into Java it is the generated Java class. Python code that calls back into Java, for example through an intercepted method, therefore catches the Java class rather than the Python class:
+
+[source,python]
+----
+import java
+
+NotEligibleException = java.type("example.NotEligibleException")
+
+try:
+    service.register(customer)
+except NotEligibleException as rejected:
+    print(rejected.getMessage())
+----

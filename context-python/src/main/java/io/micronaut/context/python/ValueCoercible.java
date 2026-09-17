@@ -70,7 +70,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * {@link #HOST_OBJECT_MEMBER} exposes a private host reference used to recover the generated
      * Java wrapper, and {@link #AS_POLYGLOT_VALUE_MEMBER} exposes a zero-argument callable that
      * returns the wrapped {@link Value}. JavaBean-style generated accessor aliases are resolved
-     * after direct Python members.
+     * after direct Python members, and a wrapper that is a {@link Throwable} exposes the
+     * accessors of the Java exception ({@code getMessage()}, {@code getCause()}, ...), so a
+     * Python exception handler reads the Java view of a Python exception that crossed Java.
      *
      * @param key The requested member name.
      * @return The member value, a generated accessor callable, or {@code null} when the Python
@@ -100,6 +102,10 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         Object getter = generatedGetter(key);
         if (getter != null) {
             return getter;
+        }
+        Object throwableMember = throwableMember(key);
+        if (throwableMember != null) {
+            return throwableMember;
         }
         return generatedSetter(key);
     }
@@ -138,6 +144,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
         return HOST_OBJECT_MEMBER.equals(key) ||
             AS_POLYGLOT_VALUE_MEMBER.equals(key) ||
             asPolyglotValue().hasMember(key) ||
+            throwableMember(key) != null ||
             (this instanceof GeneratedPropertyMembers generatedMembers &&
                 (generatedMembers.micronautValueCoercibleGetterPropertyName(key) != null ||
                     generatedMembers.micronautValueCoercibleSetterPropertyName(key) != null));
@@ -225,6 +232,23 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                 return null;
             }
             return member;
+        };
+    }
+
+    /**
+     * The accessors of a generated exception wrapper, for Python code that handles the exception
+     * after it crossed Java and reads it the Java way.
+     */
+    private @Nullable Object throwableMember(String key) {
+        if (!(this instanceof Throwable throwable)) {
+            return null;
+        }
+        return switch (key) {
+            case "getMessage" -> (ProxyExecutable) arguments -> throwable.getMessage();
+            case "getLocalizedMessage" -> (ProxyExecutable) arguments -> throwable.getLocalizedMessage();
+            case "getCause" -> (ProxyExecutable) arguments -> throwable.getCause();
+            case "getStackTrace" -> (ProxyExecutable) arguments -> throwable.getStackTrace();
+            default -> null;
         };
     }
 
