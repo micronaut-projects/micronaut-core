@@ -32,6 +32,8 @@ snippet::micronaut.docs.asyncio.AsyncDemoController[tags="awaitPublisher", inden
 
 For a `Publisher`, Micronaut requests one item, completes the await with the first item, and cancels the subscription. If the publisher completes empty, the awaited value is `None`; if it signals an error, the await fails. Multi-item `Flux` values are not collected into a list implicitly. Use reactive operators such as `collectList()` when all emitted items are required.
 
+An `async def` that implements a Java method declared to return a `Publisher`, `Mono` or `Flux` is adapted to that type, and the coroutine only starts when the publisher is subscribed: the publishers it awaits are subscribed in the Reactor context of that subscriber (a reactive transaction started by a `@Transactional` caller, for instance) and its steps run in the `PropagatedContext` of the caller. A method declared as a `CompletionStage` starts its coroutine eagerly, when the method is called.
+
 Classless async routes can await the same scalar reactive client result:
 
 snippet::micronaut.docs.asyncio.async_routes[tags="classlessPublisher", indent=0, title="Classless async route awaiting a Publisher"]

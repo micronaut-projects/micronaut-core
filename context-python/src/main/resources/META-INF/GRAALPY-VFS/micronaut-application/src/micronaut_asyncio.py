@@ -1038,7 +1038,19 @@ def _new_fallback_loop():
         return _MicronautFallbackLoop()
 
 
-def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None):
+# The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
+# subscriber) a Java bridge hands the coroutine it schedules. asyncio copies the variable into the task,
+# so every ``await`` of the coroutine, and of the tasks it spawns, subscribes within that context.
+_micronaut_reactive_context = contextvars.ContextVar("micronaut_reactive_context", default=None)
+
+
+def __micronaut_current_reactive_context():
+    """The reactive context of the running coroutine, or ``None`` outside a Java-scheduled coroutine."""
+
+    return _micronaut_reactive_context.get()
+
+
+def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None, reactive_context=None):
     """Drive a Python awaitable and complete the Java bridge future.
 
     This is the main Java entry point used by ``PythonAsyncioRuntime``. It
@@ -1052,11 +1064,25 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     Python task cancellation, and Python task cancellation cancels the Java
     future. Exceptions are routed through Java's ``ExceptionCompleter`` so the
     bridge keeps existing exception wrapping semantics.
+
+    ``reactive_context`` is the reactive context of the subscriber that started
+    the coroutine; the task copies it and the awaits of the coroutine subscribe
+    within it.
     """
 
     if not inspect.isawaitable(awaitable):
         java_future.complete(awaitable)
         return java_future
+    if reactive_context is None:
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    token = _micronaut_reactive_context.set(reactive_context)
+    try:
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    finally:
+        _micronaut_reactive_context.reset(token)
+
+
+def _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter):
     if java_loop is not None:
         loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
         with _CurrentLoopForCall(loop):

@@ -19,11 +19,13 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -77,9 +79,42 @@ public final class PythonAsyncioRuntime {
      * @param value The Python result value.
      * @return A stage that completes when the Python awaitable completes.
      */
-    @SuppressWarnings({"rawtypes", "FutureReturnValueIgnored"})
+    @SuppressWarnings("rawtypes")
     @UsedByGeneratedCode
     public static CompletionStage toCompletionStage(Value value) {
+        return toCompletionStage(value, null);
+    }
+
+    /**
+     * Convert a Python coroutine into a publisher that starts the coroutine when it is first
+     * subscribed, in the reactive context of that subscriber: the publishers the coroutine awaits
+     * are subscribed with the Reactor context (a reactive transaction status, for instance) and
+     * the propagated context of the subscriber. A {@link CompletionStage} is eager; a bridged
+     * {@code async def} declared to return a publisher uses this deferred form instead.
+     *
+     * @param value The Python coroutine or awaitable value.
+     * @return A publisher of the coroutine's result, empty when the coroutine returns {@code None}.
+     */
+    @UsedByGeneratedCode
+    public static Publisher<Object> toPublisher(Value value) {
+        return PythonPublishers.deferred(reactiveContext -> {
+            try (PropagatedContext.Scope ignored = reactiveContext.propagatedContext().propagate()) {
+                return toCompletionStage(value, reactiveContext).toCompletableFuture();
+            }
+        });
+    }
+
+    /**
+     * Convert a Python coroutine or awaitable value into a Java {@link CompletionStage}, running
+     * the coroutine within a reactive context.
+     *
+     * @param value The Python result value.
+     * @param reactiveContext The reactive context the publishers awaited by the coroutine are
+     *                        subscribed in, or {@code null} for none
+     * @return A stage that completes when the Python awaitable completes.
+     */
+    @SuppressWarnings("FutureReturnValueIgnored")
+    static CompletionStage<Object> toCompletionStage(Value value, @Nullable PythonReactiveContext reactiveContext) {
         RuntimeState runtimeState = state();
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
@@ -94,13 +129,13 @@ public final class PythonAsyncioRuntime {
         PythonContextRegistry.enterExecution(context);
         future.whenComplete((ignored, ignoredThrowable) -> PythonContextRegistry.exitExecution(context));
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);
-        Runnable scheduler = () -> schedule(context, value, future, eventLoop);
+        Runnable scheduler = () -> schedule(context, value, future, eventLoop, reactiveContext);
         if (eventLoop != null) {
             if (eventLoop.inEventLoop()) {
                 scheduler.run();
             } else {
                 try {
-                    eventLoop.execute(scheduler);
+                    eventLoop.execute(PropagatedContext.wrapCurrent(scheduler));
                 } catch (Throwable e) {
                     future.completeExceptionally(e);
                 }
@@ -130,7 +165,7 @@ public final class PythonAsyncioRuntime {
         scheduler(context);
         future = awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
         stage.whenComplete((result, throwable) -> {
-            Runnable completion = () -> completeAwaitable(context, future, result, throwable);
+            Runnable completion = PropagatedContext.wrapCurrent(() -> completeAwaitable(context, future, result, throwable));
             if (eventLoop != null) {
                 try {
                     eventLoop.execute(completion);
@@ -259,9 +294,9 @@ public final class PythonAsyncioRuntime {
         return currentEventLoop(state());
     }
 
-    private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop) {
+    private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop, @Nullable PythonReactiveContext reactiveContext) {
         try {
-            scheduler(context).executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
+            scheduler(context).executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, reactiveContext);
         } catch (Throwable e) {
             future.completeExceptionally(e);
         }

@@ -808,8 +808,20 @@ public final class PythonCoercion {
      * @return The future completed by the publisher
      */
     static PythonAsyncioRuntime.PythonCompletableFuture scalarFuture(Publisher<?> publisher) {
+        return scalarFuture(publisher, null);
+    }
+
+    /**
+     * Complete a future with the first item of a publisher subscribed within a reactive context.
+     *
+     * @param publisher The publisher
+     * @param reactiveContext The reactive context of the subscription, or {@code null} for none
+     * @return The future completed by the publisher
+     * @see #scalarFuture(Publisher)
+     */
+    static PythonAsyncioRuntime.PythonCompletableFuture scalarFuture(Publisher<?> publisher, @Nullable PythonReactiveContext reactiveContext) {
         PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
-        publisher.subscribe(new ScalarPublisherSubscriber(future));
+        PythonPublishers.subscribe(publisher, new ScalarPublisherSubscriber(future), reactiveContext);
         return future;
     }
 
@@ -930,10 +942,25 @@ public final class PythonCoercion {
          * @return The adapted Python awaitable, or null when the value is not async.
          */
         public @Nullable Value adaptAwaitable(Context context, @Nullable Object value) {
+            return adaptAwaitable(context, value, null);
+        }
+
+        /**
+         * Adapt a host async value returned from a Java member to a Python awaitable; a publisher is
+         * subscribed within the reactive context of the awaiting coroutine, so the Reactor context
+         * of the subscriber that started the coroutine (a reactive transaction status, for instance)
+         * reaches it.
+         *
+         * @param context The target Python context.
+         * @param value The host value.
+         * @param reactiveContext The reactive context of the coroutine, or {@code null} for none.
+         * @return The adapted Python awaitable, or null when the value is not async.
+         */
+        public @Nullable Value adaptAwaitable(Context context, @Nullable Object value, @Nullable PythonReactiveContext reactiveContext) {
             if (value instanceof CompletionStage<?> completionStage) {
                 return PythonAsyncioRuntime.toAwaitable(context, completionStage);
             }
-            CompletionStage<?> publisherStage = publisherStage(value);
+            CompletionStage<?> publisherStage = publisherStage(value, reactiveContext);
             if (publisherStage != null) {
                 return PythonAsyncioRuntime.toAwaitable(context, publisherStage);
             }
@@ -943,7 +970,7 @@ public final class PythonCoercion {
                     if (hostObject instanceof CompletionStage<?> completionStage) {
                         return PythonAsyncioRuntime.toAwaitable(context, completionStage);
                     }
-                    CompletionStage<?> hostPublisherStage = publisherStage(hostObject);
+                    CompletionStage<?> hostPublisherStage = publisherStage(hostObject, reactiveContext);
                     if (hostPublisherStage != null) {
                         return PythonAsyncioRuntime.toAwaitable(context, hostPublisherStage);
                     }
@@ -957,7 +984,7 @@ public final class PythonCoercion {
             return null;
         }
 
-        private static @Nullable CompletionStage<?> publisherStage(@Nullable Object value) {
+        private static @Nullable CompletionStage<?> publisherStage(@Nullable Object value, @Nullable PythonReactiveContext reactiveContext) {
             if (!Publishers.isConvertibleToPublisher(value)) {
                 return null;
             }
@@ -967,7 +994,7 @@ public final class PythonCoercion {
             } catch (RuntimeException e) {
                 return null;
             }
-            return scalarFuture(publisher);
+            return scalarFuture(publisher, reactiveContext);
         }
     }
 }

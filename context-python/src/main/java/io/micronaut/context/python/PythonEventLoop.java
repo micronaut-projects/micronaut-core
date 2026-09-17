@@ -17,6 +17,7 @@ package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.graalvm.polyglot.Value;
 
 import java.util.concurrent.ScheduledFuture;
@@ -57,12 +58,15 @@ public interface PythonEventLoop {
      * Queue a Python callback for execution on the loop.
      * <p>
      * A loop that owns a GraalPy context runs the callback inside an execution frame of the
-     * callback's context, so shutdown waits for callbacks scheduled with {@code call_soon}.
+     * callback's context, so shutdown waits for callbacks scheduled with {@code call_soon}. The
+     * callback runs in the {@link PropagatedContext} of the caller, the way an instrumented
+     * executor does, so a coroutine step resumed by the loop sees the context of the step that
+     * scheduled it.
      *
      * @param callback The Python callable.
      */
     default void executeCallback(Value callback) {
-        execute(callback::executeVoid);
+        execute(PropagatedContext.wrapCurrent((Runnable) callback::executeVoid));
     }
 
     /**
@@ -74,7 +78,7 @@ public interface PythonEventLoop {
      * @return The scheduled future.
      */
     default ScheduledFuture<?> scheduleCallback(Value callback, long delay, TimeUnit unit) {
-        return schedule(callback::executeVoid, delay, unit);
+        return schedule(PropagatedContext.wrapCurrent((Runnable) callback::executeVoid), delay, unit);
     }
 
     /**

@@ -17,7 +17,10 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownManager;
 import org.graalvm.polyglot.Context;
@@ -28,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Mono;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
@@ -1409,6 +1413,111 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void toPublisherStartsTheCoroutineOnSubscriptionInTheReactorContextOfTheSubscriber() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            AtomicBoolean started = new AtomicBoolean();
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target, started):
+                    started.set(True)
+                    first = await target.client.transaction()
+                    second = await target.client.transaction()
+                    return first + "/" + second
+                values
+                """).execute(target, started);
+
+            Publisher<Object> publisher = PythonAsyncioRuntime.toPublisher(coroutine);
+
+            assertFalse(started.get());
+            assertEquals("T1/T1", Mono.from(publisher).contextWrite(reactor.util.context.Context.of("tx", "T1")).block());
+            assertTrue(started.get());
+        }
+    }
+
+    @Test
+    void toPublisherSharesTheResultOfTheFirstSubscription() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            AtomicInteger runs = new AtomicInteger();
+            Value coroutine = context.eval(PYTHON, """
+                async def once(runs):
+                    return runs.incrementAndGet()
+                once
+                """).execute(runs);
+
+            Mono<Object> publisher = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine));
+
+            assertEquals(1, publisher.block());
+            assertEquals(1, publisher.block());
+            assertEquals(1, runs.get());
+        }
+    }
+
+    @Test
+    void toPublisherRunsTheCoroutineInThePropagatedContextOfTheSubscriber() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    direct = target.client.propagatedElement()
+                    awaited = await target.client.propagatedElementMono()
+                    return direct + "/" + awaited
+                values
+                """).execute(target);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new TestElement("E1"));
+
+            String result = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine))
+                .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext))
+                .map(String.class::cast)
+                .block();
+
+            assertEquals("E1/E1", result);
+            assertTrue(PropagatedContext.getOrEmpty().find(TestElement.class).isEmpty());
+        }
+    }
+
+    @Test
+    void eventLoopCallbacksRunInThePropagatedContextOfTheCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    first = target.client.propagatedElement()
+                    await target.client.transaction()
+                    second = target.client.propagatedElement()
+                    return first + "/" + second
+                values
+                """).execute(target);
+
+            CompletionStage stage;
+            try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement("E2")).propagate()) {
+                stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
+            }
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E2/E2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
     void cancellingPublisherAwaitCancelsSubscription() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         NeverPublisher publisher = new NeverPublisher();
@@ -1524,6 +1633,32 @@ final class PythonAsyncioRuntimeTest {
     public static final class AsyncClient {
         public CompletionStage<String> message() {
             return CompletableFuture.completedFuture("backend");
+        }
+    }
+
+    /**
+     * A propagated context element the tests carry through the Reactor context and the thread.
+     *
+     * @param name The element name
+     */
+    public record TestElement(String name) implements PropagatedContextElement {
+    }
+
+    /**
+     * Members whose results read the Reactor context of their subscriber or the propagated context of the caller.
+     */
+    public static final class ContextualClient {
+
+        public Mono<String> transaction() {
+            return Mono.deferContextual(ctx -> Mono.just(ctx.getOrDefault("tx", "none")));
+        }
+
+        public String propagatedElement() {
+            return PropagatedContext.getOrEmpty().find(TestElement.class).map(TestElement::name).orElse("none");
+        }
+
+        public Mono<String> propagatedElementMono() {
+            return Mono.fromSupplier(this::propagatedElement);
         }
     }
 

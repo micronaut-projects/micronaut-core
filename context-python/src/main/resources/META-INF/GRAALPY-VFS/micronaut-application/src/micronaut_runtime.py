@@ -10,6 +10,7 @@ import datetime
 import importlib
 import inspect
 import pkgutil
+import sys
 import uuid
 
 
@@ -80,6 +81,15 @@ def __micronaut_to_python_standard_type(kind, value, nanos=0):
     raise ValueError("Unsupported Micronaut Python standard type: " + kind)
 
 
+def _micronaut_reactive_context():
+    # the reactive context of the running coroutine lives in the asyncio bridge module; a coroutine
+    # that awaits Java values was scheduled through that module, so it is loaded whenever one exists
+    asyncio_bridge = sys.modules.get("micronaut_asyncio")
+    if asyncio_bridge is None:
+        return None
+    return asyncio_bridge.__micronaut_current_reactive_context()
+
+
 def __micronaut_async_member_value(target, adapter, context):
     def adapt(value):
         try:
@@ -87,7 +97,7 @@ def __micronaut_async_member_value(target, adapter, context):
                 return value
         except Exception:
             pass
-        adapted = adapter.adaptAwaitable(context, value)
+        adapted = adapter.adaptAwaitable(context, value, _micronaut_reactive_context())
         if adapted is not None:
             return adapted
         return value
