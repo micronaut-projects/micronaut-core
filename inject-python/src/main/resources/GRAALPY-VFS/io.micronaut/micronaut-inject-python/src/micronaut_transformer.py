@@ -598,12 +598,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         simple name, the type itself; naming anything else there is an error, because no Python module can
         provide it at run time.
         """
-        class_element = self.callback_get_class_element(f"{module_name}.{import_name}")
-        if class_element is None:
-            # Java style: Singleton -> singleton
-            alt_name = self._to_python_case(import_name)
-            if alt_name != import_name:
-                class_element = self.callback_get_class_element(f"{module_name}.{alt_name}")
+        class_element = self._lookup_imported_class_element(module_name, import_name)
         if class_element is not None:
             return class_element
         outer_element = self._java_type_module(module_name)
@@ -616,6 +611,18 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             f"has no nested type named [{import_name}]"
         )
         return None
+
+    def _lookup_imported_class_element(self, java_module: str, import_name: str):
+        """
+        The ClassElement named by ``from <java_module> import <import_name>``, accepting the Python
+        snake_case spelling of the Java name (``singleton`` for ``Singleton``) as well.
+        """
+        class_element = self.callback_get_class_element(f"{java_module}.{import_name}")
+        if class_element is None:
+            alt_name = self._to_python_case(import_name)
+            if alt_name != import_name:
+                class_element = self.callback_get_class_element(f"{java_module}.{alt_name}")
+        return class_element
 
     def _java_type_module(self, module_name: str):
         """
