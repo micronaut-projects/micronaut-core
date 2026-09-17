@@ -609,7 +609,8 @@ class UnresolvedJavaImportTest(unittest.TestCase):
             return [object()] if package == "jakarta.inject" else []
 
         def qualifier_type(name):
-            return object() if name == "jakarta.inject.Qualifier" else None
+            # a real element: the import resolution asks the Java side whether the type is a Python class
+            return java_class_element("io.micronaut.context.annotation.Executable") if name == "jakarta.inject.Qualifier" else None
 
         self.assertEqual([], self._errors("from jakarta import inject\n", inject_package))
         self.assertEqual([], self._errors("from jakarta.inject.Qualifier import Qualifier\n", class_element=qualifier_type))
