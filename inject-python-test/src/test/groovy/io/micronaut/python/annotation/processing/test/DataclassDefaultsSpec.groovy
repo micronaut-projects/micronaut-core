@@ -122,7 +122,7 @@ class Data:
         context?.close()
     }
 
-    void "test a dataclass with a required field has no no-arg constructor"() {
+    void "test a dataclass with a required field is introspected through its constructor"() {
         given:
         def pythonCode = '''
 from dataclasses import dataclass
@@ -139,9 +139,11 @@ class Person:
         def context = buildContext(pythonCode)
         def personClass = context.classLoader.loadClass("python.Person")
 
-        then:
-        personClass.constructors.every { it.parameterCount != 0 }
-        getBeanIntrospection(context, "python.Person").instantiate("John", 30).age == 30
+        then: "the introspection constructs the class through its arguments; the public no-arg constructor of the generated class only serves frameworks that populate its fields reflectively (JPA)"
+        def introspection = getBeanIntrospection(context, "python.Person")
+        introspection.constructorArguments*.name == ["name", "age"]
+        introspection.instantiate("John", 30).age == 30
+        personClass.constructors.find { it.parameterCount == 0 } != null
 
         cleanup:
         context?.close()
