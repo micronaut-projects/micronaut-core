@@ -214,10 +214,15 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Optional<MethodElement> getDefaultConstructor() {
-        Optional<MethodElement> primaryConstructor = getPrimaryConstructor();
-        if (primaryConstructor.isEmpty() && !hasDeclaredAnnotation(DATACLASS_DECORATOR)) {
-            // python class with no explicit constructor return default
-            return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
+        if (findCreatorFunction().isEmpty()) {
+            Optional<MethodElement> defaultConstructor = findConstructor();
+            if (defaultConstructor.isEmpty() && !hasDeclaredAnnotation(DATACLASS_DECORATOR)) {
+                // python class with no explicit constructor return default
+                return Optional.of(implicitConstructor());
+            } else if (defaultConstructor.isPresent() && defaultConstructor.get().getParameters().length == 0) {
+                // a no-arg __init__, declared or inherited
+                return defaultConstructor;
+            }
         }
         return super.getDefaultConstructor();
     }
@@ -225,8 +230,24 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
         // First check for @Creator methods (static factory methods)
-        List<FunctionDef> functions = getNativeType().functions();
-        for (FunctionDef function : functions) {
+        Optional<MethodElement> creator = findCreatorFunction();
+        if (creator.isPresent()) {
+            return creator;
+        }
+
+        // Fall back to regular constructor
+        Optional<MethodElement> constructor = findConstructor();
+        if (constructor.isPresent()) {
+            return constructor;
+        }
+        // A class that neither declares nor inherits __init__ is constructed without arguments. Report that
+        // implicit constructor like the Java model reports the implicit default constructor of a Java class, so
+        // that visitors resolving the primary constructor (associated beans, module imports) can use it.
+        return Optional.of(implicitConstructor());
+    }
+
+    private Optional<MethodElement> findCreatorFunction() {
+        for (FunctionDef function : getNativeType().functions()) {
             if (function.isStatic()) {
                 // Check if this static method has @Creator annotation
                 for (DecoratorDef decorator : function.decorators()) {
@@ -237,13 +258,30 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                 }
             }
         }
+        return Optional.empty();
+    }
 
-        // Fall back to regular constructor
-        if (constructor == null) {
-            constructor = withInheritedDataclassFields(getNativeType().constructor());
-        }
+    /**
+     * Finds the {@code __init__} of this class: the declared one (including the constructor derived from the
+     * fields of a dataclass), otherwise the one inherited from the nearest Python base class that declares one,
+     * which Python calls when the subclass is instantiated.
+     *
+     * @return The constructor, if the class declares or inherits one
+     */
+    private Optional<MethodElement> findConstructor() {
+        FunctionDef constructor = declaredConstructor();
         if (constructor != null) {
             return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
+        }
+        Set<String> visited = new LinkedHashSet<>();
+        visited.add(getName());
+        ClassElement superType = getSuperType().orElse(null);
+        while (superType instanceof PythonClassElement pythonSuperType && visited.add(pythonSuperType.getName())) {
+            FunctionDef inheritedConstructor = pythonSuperType.declaredConstructor();
+            if (inheritedConstructor != null) {
+                return Optional.of(new PythonConstructorElement(inheritedConstructor, environment, pythonSuperType, this, environment.metadataFactory()));
+            }
+            superType = pythonSuperType.getSuperType().orElse(null);
         }
         return Optional.empty();
     }
@@ -383,6 +421,25 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return decorators.stream().anyMatch(decorator -> DATACLASS_DECORATOR.equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
     }
 
+    private boolean hasDeclaredConstructorOrCreator() {
+        return declaredConstructor() != null || findCreatorFunction().isPresent();
+    }
+
+    /**
+     * The {@code __init__} this class declares, completed with the fields of its dataclass bases for a dataclass;
+     * {@code null} when the class declares none.
+     */
+    private @Nullable FunctionDef declaredConstructor() {
+        if (constructor == null) {
+            constructor = withInheritedDataclassFields(getNativeType().constructor());
+        }
+        return constructor;
+    }
+
+    private PythonConstructorElement implicitConstructor() {
+        return new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory());
+    }
+
     @Override
     public boolean isAssignable(String type) {
         if (Object.class.getName().equals(type) || getName().equals(type)) {
@@ -460,7 +517,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     @Override
     public boolean isInterface() {
         if (hasStereotype(Introspected.class)
-            || getPrimaryConstructor().isPresent()
+            || hasDeclaredConstructorOrCreator()
             || !getNativeType().attributes().isEmpty()
             || !getNativeType().properties().isEmpty()) {
             return false;

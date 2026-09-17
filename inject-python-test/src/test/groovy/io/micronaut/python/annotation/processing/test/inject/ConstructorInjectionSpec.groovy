@@ -714,4 +714,41 @@ class PaymentService:
         cleanup:
         context?.close()
     }
+
+    void "test constructor injection through an inherited __init__"() {
+        given: "a bean without __init__ whose base class declares the injected constructor"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class Dependency:
+    def name(self) -> str:
+        return "dependency"
+
+class BaseService:
+    def __init__(self, dependency: Dependency):
+        self.dependency = dependency
+
+@Singleton
+class ChildService(BaseService):
+
+    @Executable
+    def describe(self) -> str:
+        return "child with " + self.dependency.name()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ChildService")
+        def bean = getBean(context, "python.ChildService")
+
+        then: "the inherited __init__ is the injection point of the subclass"
+        definition.constructor.arguments*.name == ["dependency"]
+        definition.constructor.arguments[0].type.name == "python.Dependency"
+        bean.describe() == "child with dependency"
+
+        cleanup:
+        context?.close()
+    }
 }

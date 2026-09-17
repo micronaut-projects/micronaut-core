@@ -52,7 +52,9 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
@@ -180,6 +182,13 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
+        List<AbstractBeanDefinitionBuilder> associatedBeanBuilders = List.of();
+        if (writeAssociatedBeans) {
+            // The stubs are written when the stub generator finishes, so the producer methods of the
+            // associated beans registered so far are bridged into them first
+            associatedBeanBuilders = takeAssociatedBeanBuilders(pythonVisitorContext);
+            bridgeProducerMethods(associatedBeanBuilders, pythonVisitorContext);
+        }
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             try {
                 loadedVisitor.getVisitor().finish(pythonVisitorContext);
@@ -188,7 +197,42 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
         if (writeAssociatedBeans) {
-            writeAssociatedBeanDefinitions(pythonVisitorContext);
+            List<AbstractBeanDefinitionBuilder> allBuilders = new ArrayList<>(associatedBeanBuilders);
+            allBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            writeAssociatedBeanDefinitions(pythonVisitorContext, allBuilders);
+        }
+    }
+
+    private static List<AbstractBeanDefinitionBuilder> takeAssociatedBeanBuilders(PythonVisitorContext pythonVisitorContext) {
+        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return List.of();
+        }
+        return javaVisitorContext.getBeanElementBuilders();
+    }
+
+    /**
+     * A child bean produced with {@code BeanElementBuilder.produceBeans(...)} invokes its producer method on the
+     * bean type, which for a Python class is the generated Java stub. The stub only bridges the Python methods
+     * Micronaut needs to see, so the producer methods of the associated beans are bridged explicitly.
+     */
+    private void bridgeProducerMethods(List<AbstractBeanDefinitionBuilder> beanElementBuilders, PythonVisitorContext pythonVisitorContext) {
+        PythonStubGenerator stubGenerator = null;
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor() instanceof PythonStubGenerator pythonStubGenerator) {
+                stubGenerator = pythonStubGenerator;
+                break;
+            }
+        }
+        if (stubGenerator == null) {
+            return;
+        }
+        for (AbstractBeanDefinitionBuilder beanElementBuilder : beanElementBuilders) {
+            for (AbstractBeanDefinitionBuilder childBean : beanElementBuilder.getChildBeans()) {
+                if (childBean.getProducingElement() instanceof PythonMethodElement producerMethod) {
+                    stubGenerator.bridgeProducerMethod(producerMethod, pythonVisitorContext);
+                }
+            }
         }
     }
 
@@ -319,12 +363,7 @@ public final class PythonTypeElementVisitorProcessor {
         );
     }
 
-    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
-        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
-        if (javaVisitorContext == null) {
-            return;
-        }
-        List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext, List<AbstractBeanDefinitionBuilder> beanElementBuilders) {
         if (beanElementBuilders.isEmpty()) {
             return;
         }

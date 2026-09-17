@@ -5053,6 +5053,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsync();
     }
 
+    /**
+     * Bridges a producer method of an associated bean into the stub of the Python class that declares it. The
+     * child bean definition written for the method invokes it on the generated Java class, and a Python method
+     * is only bridged into the stub when Micronaut needs to see it.
+     *
+     * @param producerMethod The producer method registered with {@code BeanElementBuilder.produceBeans(...)}
+     * @param visitorContext The visitor context
+     */
+    public void bridgeProducerMethod(PythonMethodElement producerMethod, VisitorContext visitorContext) {
+        StubEntry stubEntry = classBuilders.get(producerMethod.getDeclaringType().getName());
+        if (stubEntry != null) {
+            addBridgeMethod(BridgeMethodSpec.of(producerMethod, stubEntry.originatingElement), stubEntry.builder, visitorContext, stubEntry.bridgedMethods);
+        }
+    }
+
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
