@@ -80,9 +80,12 @@ public final class PythonJavaTypes {
      *
      * @param left  A type
      * @param right Another type
-     * @return {@code true} if the types are the same, or a primitive and its wrapper
+     * @return {@code true} if the types are the same, or a primitive and its wrapper, with the same array dimensions
      */
     public static boolean isSameOrBoxedType(ClassElement left, ClassElement right) {
+        if (left.getArrayDimensions() != right.getArrayDimensions()) {
+            return false;
+        }
         return left.getName().equals(right.getName()) || boxedTypeName(left).equals(boxedTypeName(right));
     }
 

@@ -446,7 +446,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
                 MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
                 MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
-                if (method.isDefault() && bridgeMethod == interfaceMethod) {
+                if (method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod)) {
                     // A default method the Python class does not override keeps its Java implementation.
                     continue;
                 }
@@ -3111,6 +3111,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return property.hasAnnotation(ANN_CONFIGURATION_BUILDER)
             || property.getReadMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false)
             || property.getWriteMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false);
+    }
+
+    /**
+     * Whether the Python class declares a method with the name and arity of the interface method, whatever
+     * its type hints: an unannotated {@code def greet(self, who)} overrides {@code greet(String)} too. The
+     * interface signature is bridged for it and the Python method is looked up by name at run time.
+     */
+    private static boolean declaresOverride(ClassElement element, MethodElement interfaceMethod) {
+        int arity = interfaceMethod.getParameters().length;
+        return element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named(interfaceMethod.getName()))
+            .stream()
+            .anyMatch(declared -> declared.getParameters().length == arity
+                || declared instanceof PythonMethodElement pythonMethod && pythonMethod.isVarArgs() && pythonMethod.getParameters().length <= arity);
     }
 
     private static MethodElement resolveDeclaredBridgeMethod(ClassElement element, MethodElement interfaceMethod) {

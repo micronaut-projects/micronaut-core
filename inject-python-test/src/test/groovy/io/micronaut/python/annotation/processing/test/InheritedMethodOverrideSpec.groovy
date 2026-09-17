@@ -73,6 +73,52 @@ class PythonGreeter(DefaultMethodGreeter):
         context?.close()
     }
 
+    void "test an unannotated python override of a default interface method is bridged by name and arity"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+import java
+
+DefaultMethodGreeter = java.type("io.micronaut.python.annotation.processing.test.inherited.DefaultMethodGreeter")
+
+
+@Singleton
+class LooseGreeter(DefaultMethodGreeter):
+
+    def name(self):
+        return "python"
+
+    def greet(self, who):
+        return "python:" + who
+
+    def onEvent(self, *events):
+        pass
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def bean = getBean(context, "python.LooseGreeter")
+        Class<?> stub = bean.getClass()
+
+        then: "the overrides without type hints are declared on the stub with the Java signature"
+        stub.getDeclaredMethod("greet", String).returnType == String
+        stub.getDeclaredMethod("onEvent", String).returnType == void
+        stub.declaredMethods.every { Method m -> m.name != "getOrder" }
+
+        and: "a Java caller reaches the Python body through the interface"
+        InheritedMethodCaller.greet(bean, "world") == "python:world"
+        InheritedMethodCaller.order(bean) == 0
+
+        when:
+        InheritedMethodCaller.onEvent(bean, "started")
+
+        then:
+        noExceptionThrown()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test default interface methods that are not overridden in python are not bridged"() {
         given:
         def pythonCode = '''
