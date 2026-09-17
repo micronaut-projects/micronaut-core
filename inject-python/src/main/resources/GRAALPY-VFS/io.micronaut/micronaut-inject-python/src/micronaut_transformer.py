@@ -234,7 +234,9 @@ class AnnotationFunctionScanner:
         self._cache[key] = names
         return names
 
-JAVA_INTERFACE_DEFAULTS_DECORATOR = '__micronaut_java_interface_defaults'
+# A single leading underscore: a double-underscore name is mangled when it is referenced inside a class
+# body, and the decorator is applied to classes defined inside a class or a method as well
+JAVA_INTERFACE_DEFAULTS_DECORATOR = '_micronaut_java_interface_defaults'
 
 # The runtime class of a Python type does not extend the Java interfaces it implements, so the default
 # methods of those interfaces are added by the runtime (io.micronaut.context.python.PythonInterfaceDefaults)

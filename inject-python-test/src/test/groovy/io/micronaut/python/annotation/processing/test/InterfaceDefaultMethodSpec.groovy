@@ -288,4 +288,68 @@ class Consumer:
         cleanup:
         context?.close()
     }
+
+    void "test default methods are available on local classes defined inside a method and inside a function"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.defaults import Describable, DescribableCaller
+
+
+def make_local():
+    class FunctionLocal(Describable):
+
+        def name(self) -> str:
+            return "fnlocal"
+
+    return FunctionLocal()
+
+
+@Singleton
+class Probe:
+
+    @Executable
+    def describe_method_local(self) -> str:
+        class Local(Describable):
+
+            def name(self) -> str:
+                return "local"
+
+        return Local().describeWith("m", 1) + "/" + DescribableCaller.describe(Local())
+
+    @Executable
+    def describe_function_local(self) -> str:
+        return make_local().describe() + "/" + DescribableCaller.describe(make_local())
+
+    @Executable
+    def function_local_order(self) -> int:
+        return make_local().getOrder()
+
+    @Executable
+    def function_local_all(self) -> list[str]:
+        return list(make_local().describeAll(["-a"]))
+
+    @Executable
+    def function_local_self(self) -> bool:
+        local = make_local()
+        return local.self() is local
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def probe = getBean(context, "python.Probe")
+
+        then: "a class defined inside a method of a bean (a class body) has the default methods"
+        probe.describe_method_local() == "mlocal/d:local"
+
+        and: "so does a class defined inside a module-level function, which has no generated stub"
+        probe.describe_function_local() == "d:fnlocal/d:fnlocal"
+        probe.function_local_order() == 0
+        probe.function_local_all() == ["fnlocal-a"]
+        probe.function_local_self()
+
+        cleanup:
+        context?.close()
+    }
 }
