@@ -352,4 +352,98 @@ class Probe:
         cleanup:
         context?.close()
     }
+
+    void "test a default method calling another default method reaches the python override of a local class"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test.defaults import Chained, ChainedCaller, Tagged
+
+
+def make_chained():
+    class FnChained(Chained, Tagged):
+
+        def name(self) -> str:
+            return "fc"
+
+        def inner(self) -> str:
+            return "py-inner"
+
+        def tag(self) -> str:
+            return "t"
+
+    return FnChained()
+
+
+def make_plain():
+    class FnPlain(Chained):
+
+        def name(self) -> str:
+            return "fp"
+
+    return FnPlain()
+
+
+class ModuleChained(Chained, Tagged):
+
+    def name(self) -> str:
+        return "mc"
+
+    def inner(self) -> str:
+        return "py-inner"
+
+    def tag(self) -> str:
+        return "t"
+
+
+@Singleton
+class Probe:
+
+    @Executable
+    def function_local_outer(self) -> str:
+        return make_chained().outer() + "/" + ChainedCaller.outer(make_chained())
+
+    @Executable
+    def function_local_inner(self) -> str:
+        return make_chained().inner() + "/" + make_plain().inner()
+
+    @Executable
+    def function_local_plain_outer(self) -> str:
+        return make_plain().outer() + "/" + ChainedCaller.outer(make_plain())
+
+    @Executable
+    def function_local_tagged(self) -> str:
+        return make_chained().tagged() + "/" + ChainedCaller.tagged(make_chained())
+
+    @Executable
+    def module_outer(self) -> str:
+        return ModuleChained().outer() + "/" + ChainedCaller.outer(ModuleChained())
+
+    @Executable
+    def module_tagged(self) -> str:
+        return ModuleChained().tagged() + "/" + ChainedCaller.tagged(ModuleChained())
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def probe = getBean(context, "python.Probe")
+
+        then: "the default method run for a class without a stub reaches the Python override of the default it calls"
+        probe.function_local_outer() == "o:py-inner/o:py-inner"
+        probe.function_local_inner() == "py-inner/j-inner:fp"
+
+        and: "a default the class does not override comes back through its installed method"
+        probe.function_local_plain_outer() == "o:j-inner:fp/o:j-inner:fp"
+
+        and: "a default casting this to another interface of the class reaches the Python method"
+        probe.function_local_tagged() == "t:fc/t:fc"
+
+        and: "a module-level class behaves the same through its stub"
+        probe.module_outer() == "o:py-inner/o:py-inner"
+        probe.module_tagged() == "t:mc/t:mc"
+
+        cleanup:
+        context?.close()
+    }
 }

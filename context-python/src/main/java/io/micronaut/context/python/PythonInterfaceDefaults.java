@@ -50,7 +50,9 @@ import java.util.Map;
  * A class without a generated stub (one defined inside a function) has no such view: the polyglot proxy
  * GraalPy creates for the interface dispatches every member to the Python object first, which would reach
  * the installed method again, so the default method is run through a proxy of this class that invokes the
- * default implementation itself and delegates the abstract methods to the polyglot proxy.
+ * default implementation of that one method itself and delegates every other call to the polyglot proxy:
+ * an abstract method or a default method the Python class overrides reaches the Python code, a default
+ * method the class does not override comes back through its installed method.
  * <p>
  * A default method overridden in Python is not installed: the Python definition is what both the Python
  * object and, through the stub bridge, the Java view run.
@@ -77,9 +79,11 @@ public final class PythonInterfaceDefaults {
     @UsedByGeneratedCode
     public static Value install(Value pythonClass, Value interfaceNames) {
         Map<String, List<Method>> methodsByName = new LinkedHashMap<>();
-        long size = interfaceNames.getArraySize();
-        for (long i = 0; i < size; i++) {
+        int size = (int) interfaceNames.getArraySize();
+        Class<?>[] interfaceTypes = new Class<?>[size];
+        for (int i = 0; i < size; i++) {
             Class<?> interfaceType = loadInterface(interfaceNames.getArrayElement(i).asString());
+            interfaceTypes[i] = interfaceType;
             for (Method method : interfaceType.getMethods()) {
                 if (method.isDefault()) {
                     List<Method> overloads = methodsByName.computeIfAbsent(method.getName(), name -> new ArrayList<>(1));
@@ -93,7 +97,7 @@ public final class PythonInterfaceDefaults {
             return pythonClass;
         }
         DefaultMethod[] defaultMethods = methodsByName.entrySet().stream()
-            .map(entry -> new DefaultMethod(entry.getKey(), orderBySpecificity(entry.getValue())))
+            .map(entry -> new DefaultMethod(entry.getKey(), orderBySpecificity(entry.getValue()), interfaceTypes))
             .toArray(DefaultMethod[]::new);
         Context context = pythonClass.getContext();
         PythonContextRuntime.helper(context, INSTALL_HELPER).executeVoid(pythonClass, defaultMethods);
@@ -156,10 +160,12 @@ public final class PythonInterfaceDefaults {
 
         private final String name;
         private final Method[] overloads;
+        private final Class<?>[] interfaceTypes;
 
-        DefaultMethod(String name, Method[] overloads) {
+        DefaultMethod(String name, Method[] overloads, Class<?>[] interfaceTypes) {
             this.name = name;
             this.overloads = overloads;
+            this.interfaceTypes = interfaceTypes;
         }
 
         /**
@@ -210,8 +216,9 @@ public final class PythonInterfaceDefaults {
             }
             if (Proxy.isProxyClass(target.getClass())) {
                 // no generated stub: the polyglot proxy would dispatch the default method to the installed
-                // Python method again, so run the default implementation here and leave the rest to the proxy
-                target = Proxy.newProxyInstance(interfaceType.getClassLoader(), new Class<?>[] {interfaceType}, new DefaultInvoker(target));
+                // Python method again, so run this default implementation here and leave every other call,
+                // an overridden or another default method included, to the proxy
+                target = Proxy.newProxyInstance(proxyClassLoader(), interfaceTypes, new DefaultInvoker(self, method, target));
             }
             Object result;
             try {
@@ -235,6 +242,21 @@ public final class PythonInterfaceDefaults {
             return PythonCoercion.coerceToContext(result, self.getContext());
         }
 
+        /**
+         * A class loader that sees all the interfaces of the class: the first application loader among theirs
+         * (an application loader sees the JDK interfaces as well), or the bootstrap loader when every interface
+         * is a JDK one.
+         */
+        private ClassLoader proxyClassLoader() {
+            for (Class<?> interfaceType : interfaceTypes) {
+                ClassLoader classLoader = interfaceType.getClassLoader();
+                if (classLoader != null) {
+                    return classLoader;
+                }
+            }
+            return interfaceTypes[0].getClassLoader();
+        }
+
         private static Object[] convertArguments(Method method, Value[] values) {
             Class<?>[] parameterTypes = method.getParameterTypes();
             Object[] converted = new Object[values.length];
@@ -246,25 +268,37 @@ public final class PythonInterfaceDefaults {
     }
 
     /**
-     * The Java view of a Python instance without a generated stub: the default methods run their Java
-     * implementation, every other method (the abstract ones the implementation calls, and those of
-     * {@link Object}) is delegated to the polyglot proxy of the Python object.
+     * The Java view of a Python instance without a generated stub, for one default method call: that method
+     * runs its Java implementation, every other method is delegated to the polyglot proxy of the Python object,
+     * so an abstract method, a default method the Python class overrides and one it does not (which comes
+     * back through its installed method) all reach the Python object. A method of an interface the polyglot
+     * proxy does not implement (a default casting {@code this} to another interface of the class) is invoked
+     * on a polyglot proxy of that interface.
      */
     private static final class DefaultInvoker implements InvocationHandler {
 
+        private final Value self;
+        private final Method defaultMethod;
         private final Object polyglotProxy;
 
-        DefaultInvoker(Object polyglotProxy) {
+        DefaultInvoker(Value self, Method defaultMethod, Object polyglotProxy) {
+            this.self = self;
+            this.defaultMethod = defaultMethod;
             this.polyglotProxy = polyglotProxy;
         }
 
         @Override
         public @Nullable Object invoke(Object proxy, Method method, Object @Nullable [] args) throws Throwable {
-            if (method.isDefault()) {
+            if (method.getName().equals(defaultMethod.getName()) && Arrays.equals(method.getParameterTypes(), defaultMethod.getParameterTypes())) {
                 return InvocationHandler.invokeDefault(proxy, method, args);
             }
+            Class<?> declaringType = method.getDeclaringClass();
+            Object target = declaringType.isInstance(polyglotProxy) ? polyglotProxy : PythonConversion.convertValue(self, declaringType);
+            if (target == null) {
+                throw new IllegalStateException("Python instance cannot be converted to " + declaringType.getName());
+            }
             try {
-                return method.invoke(polyglotProxy, args);
+                return method.invoke(target, args);
             } catch (InvocationTargetException e) {
                 throw e.getCause();
             }
