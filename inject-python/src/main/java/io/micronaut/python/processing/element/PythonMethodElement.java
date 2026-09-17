@@ -91,6 +91,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
     private Collection<MethodElement> resolvedOverriddenMethods;
+    private Boolean resolvedParameterTypeRequired;
     private ParameterElement[] resolvedParameters;
 
     /**
@@ -455,10 +456,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     final boolean requiresResolvedParameterType() {
         // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods of a class need
         // resolved parameter signatures so proxy override detection does not drop the introduced method. The
-        // proxy of an interface is generated from the erased signatures, as for a Java interface.
-        return !declaringType.equals(owningType)
-            && owningType.hasStereotype(InterceptorBinding.class)
-            && !owningType.isInterface();
+        // proxy of an interface is generated from the erased signatures, as for a Java interface. The answer
+        // is cached: every parameter of such a method asks, and isInterface() of a Python owning type
+        // enumerates its declared methods each time.
+        if (resolvedParameterTypeRequired == null) {
+            resolvedParameterTypeRequired = !declaringType.equals(owningType)
+                && owningType.hasStereotype(InterceptorBinding.class)
+                && !owningType.isInterface();
+        }
+        return resolvedParameterTypeRequired;
     }
 
     @Override

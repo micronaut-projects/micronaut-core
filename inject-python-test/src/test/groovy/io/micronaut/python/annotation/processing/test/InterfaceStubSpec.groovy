@@ -215,6 +215,67 @@ class UpperTranslator(Translator):
         context?.close()
     }
 
+    void "test introduction with a concrete Python base keeps compiling to a class extending the base"() {
+        given:
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from micronaut.aop import InterceptorBean, Introduction, MethodInvocationContext
+from micronaut.context.annotation import Executable
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubIntroduction(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        if context.getMethodName() == "is_abstract":
+            return "introduced"
+        return context.proceed()
+
+class Base:
+    def __init__(self):
+        self.calls = 0
+
+    @Executable
+    def helper(self) -> str:
+        self.calls += 1
+        return "helped " + str(self.calls)
+
+@Stub
+@Singleton
+class AbstractBean(Base, ABC):
+    @abstractmethod
+    def is_abstract(self) -> str:
+        ...
+''')
+
+        when:
+        Class<?> baseType = context.classLoader.loadClass("python.Base")
+        Class<?> beanType = context.classLoader.loadClass("python.AbstractBean")
+        def bean = context.getBean(beanType)
+
+        then: "the Java type is a class extending the base, not an interface"
+        !beanType.isInterface()
+        beanType.superclass == baseType
+        baseType.isInstance(bean)
+        context.getBean(baseType).is(bean)
+
+        and: "the abstract method is introduced while the inherited behaviour and state stay with the Python object"
+        bean.is_abstract() == "introduced"
+        bean.helper() == "helped 1"
+        bean.helper() == "helped 2"
+        bean.asPolyglotValue().getMember("calls").asInt() == 2
+
+        cleanup:
+        context?.close()
+    }
+
     @Override
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
         contextBuilder.beanDefinitions(
