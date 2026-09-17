@@ -490,7 +490,10 @@ class TransformerTest(unittest.TestCase):
         )
 
     def test_io_annotation_clashing_with_a_generated_decorator_is_reported_with_an_alias_hint(self):
-        transformer = MicronautTransformer(FakeClassElement, no_class_elements)
+        # the annotation function scanner hands the resolved element to the compiler, so a real annotation
+        # type stands in for the swagger annotation, which is not on the class path of these tests
+        header = java_class_element("io.micronaut.context.annotation.Primary")
+        transformer = MicronautTransformer(lambda name: header, no_class_elements)
         # as left behind by ``from micronaut.http.annotation import *``
         transformer.generated_decorators.add("Header")
         with mock.patch.object(MicronautTransformer, "_is_annotation_class", return_value=True):
