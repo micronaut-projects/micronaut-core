@@ -576,9 +576,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (!isIntrospectedBean && !isJunit5Test && !extendsHostClass) {
                 // The Python class of an object the stub owns: an instance created through the
                 // no-argument constructor of the stub, not one wrapping an existing Python object. The
-                // object is created again when the context it belongs to is no longer the primary context
-                // of the application: a JVM-wide singleton (a service loaded once per JVM) keeps working
-                // across the applications of a JVM.
+                // object is created again once the application it was created in has shut down (its
+                // runtime is no longer installed): a JVM-wide singleton (a service loaded once per JVM)
+                // keeps working across the applications of a JVM.
                 ownedClassReference = FieldDef.builder("graalpyInternalClassReference")
                     .ofType(PYTHON_CLASS_REFERENCE)
                     .addModifiers(Modifier.PROTECTED, Modifier.FINAL)

@@ -135,15 +135,6 @@ final class PythonContextRegistry {
     }
 
     /**
-     * Drop the state of a context without running its listeners.
-     * <p>
-     * Used when the primary context of an application is reset: its executions leave the aggregate
-     * count, while pooled and event-loop contexts stay tracked until they are closed and unregistered,
-     * so shutdown gates waiting for their executions keep waiting.
-     *
-     * @param context The context to forget
-     */
-    /**
      * Drop the Python scoped proxies created in a context for the beans of an application that shuts
      * down while the context lives on (a reused context): the proxies, and the bean context they
      * resolve their targets through, are then no longer reachable from the context state. A proxy of
@@ -163,6 +154,15 @@ final class PythonContextRegistry {
         }
     }
 
+    /**
+     * Drop the state of a context without running its listeners.
+     * <p>
+     * Used when the primary context of an application is reset: its executions leave the aggregate
+     * count, while pooled and event-loop contexts stay tracked until they are closed and unregistered,
+     * so shutdown gates waiting for their executions keep waiting.
+     *
+     * @param context The context to forget
+     */
     static void forgetContext(Context context) {
         synchronized (LOCK) {
             ContextState state = CONTEXT_STATES.remove(context);

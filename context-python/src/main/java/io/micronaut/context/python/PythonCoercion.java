@@ -639,11 +639,13 @@ public final class PythonCoercion {
      * receiving the proxy gets a Python scoped proxy of the same class instead: every attribute read, write
      * and method call is forwarded to the Python object of the bean the proxy resolves through its scope at
      * that moment, so a refreshed or replaced bean is seen by Python callers the way Java callers see it.
-     * The Python proxy is created once per proxy instance and context.
+     * The Python proxy is created once per proxy instance and context. The target is not resolved here:
+     * a lazy proxy resolves it on the first use from Python, and a target that turns out to be a Java
+     * object (a Java implementation of a Python abstract base class) is forwarded to as the host object
+     * it is.
      *
      * @param proxy The proxy, a generated stub instance or an implementation of a generated interface
      * @return The Python scoped proxy of the intercepted target
-     * @throws IllegalStateException When the target is not a Python object
      * @since 5.2.0
      */
     @UsedByGeneratedCode
@@ -674,26 +676,28 @@ public final class PythonCoercion {
 
     /**
      * Whether a value is an AOP proxy of a generated Python type without a Python object of its own: a
-     * proxy implementing a generated interface whose target is a Python object, which Python code must
-     * receive as a Python scoped proxy. A proxy of a Java implementation of the interface is handed to
-     * Python as the host object it is, its interface methods work as on any Java object.
+     * proxy implementing a generated interface, which Python code receives as a Python scoped proxy.
+     * Decided from the proxy type alone, so a lazy proxy is not resolved by the conversion.
      *
      * @param value The value
-     * @return {@code true} for a proxy of a generated Python interface standing in for a Python object
+     * @return {@code true} for a proxy of a generated Python interface
      */
     static boolean isPythonInterfaceProxy(@Nullable Object value) {
-        return value instanceof InterceptedProxy<?> proxy
-            && !(value instanceof ValueCoercible)
-            && pythonClassReference(value.getClass()) != null
-            && proxy.interceptedTarget() instanceof ValueCoercible;
+        return value instanceof InterceptedProxy<?> && !(value instanceof ValueCoercible) && pythonClassReference(value.getClass()) != null;
     }
 
+    /**
+     * The object the Python scoped proxy forwards to, resolved through the scope on every use: the Python
+     * object of a Python target, or the host object of a Java one (a Java implementation of a Python
+     * abstract base class behind a scoped proxy), whose interface methods Python calls as on any Java
+     * object.
+     */
     private static Value interceptedTargetObject(InterceptedProxy<?> proxy) {
         Object target = proxy.interceptedTarget();
         if (target instanceof ValueCoercible valueCoercible) {
             return valueCoercible.asPolyglotValue();
         }
-        throw new IllegalStateException("The target of the proxy [" + proxy.getClass().getName() + "] is not a Python object: " + target);
+        return PythonContextRuntime.getContext().asValue(target);
     }
 
     /**
