@@ -236,18 +236,29 @@ def __micronaut_create_raw_instance(cls):
     return cls.__new__(cls)
 
 
-def __micronaut_create_scoped_proxy(cls, target_supplier):
+def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=None):
     """A subclass of cls that forwards every attribute to the bean the supplier returns.
 
     Method and setter overrides registered by the Java proxy creator run the interceptor chain
     before the target is reached. The proxy of an abstract class (a scoped proxy standing in for an
-    implementation of it) is instantiable: every attribute is served by the target.
+    implementation of it) is instantiable: every attribute is served by the target. The host object
+    reference of the proxy (given here, or bound once the Java side exists) is the Java AOP proxy it
+    stands in for, so the proxy, not the bean it currently resolves to, is what Java receives when
+    Python returns it, without resolving the target.
     """
     class _MicronautScopedProxy(cls):
-        def __init__(self, supplier):
+        def __init__(self, supplier, java_proxy):
             object.__setattr__(self, "_micronaut_target_supplier", supplier)
+            object.__setattr__(self, "_micronaut_java_proxy", None)
             object.__setattr__(self, "_micronaut_overrides", {})
             object.__setattr__(self, "_micronaut_setter_overrides", {})
+            if java_proxy is not None:
+                object.__getattribute__(self, "_micronaut_bind_java_proxy")(java_proxy)
+
+        def _micronaut_bind_java_proxy(self, java_proxy):
+            object.__setattr__(self, "_micronaut_java_proxy", java_proxy)
+            # visible to a plain member lookup as well as through __getattribute__
+            object.__setattr__(self, "__micronaut_value_coercible_host__", java_proxy)
 
         def _micronaut_target(self):
             target = object.__getattribute__(self, "_micronaut_target_supplier")()
@@ -274,8 +285,12 @@ def __micronaut_create_scoped_proxy(cls, target_supplier):
                 object.__getattribute__(self, "_micronaut_register_member")(name)
 
         def __getattribute__(self, name):
-            if name in ("_micronaut_target_supplier", "_micronaut_overrides", "_micronaut_setter_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_put_setter_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
+            if name in ("_micronaut_target_supplier", "_micronaut_java_proxy", "_micronaut_bind_java_proxy", "_micronaut_overrides", "_micronaut_setter_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_put_setter_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
                 return object.__getattribute__(self, name)
+            if name == "__micronaut_value_coercible_host__":
+                java_proxy = object.__getattribute__(self, "_micronaut_java_proxy")
+                if java_proxy is not None:
+                    return java_proxy
             overrides = object.__getattribute__(self, "_micronaut_overrides")
             if name in overrides:
                 return overrides[name]
@@ -304,4 +319,4 @@ def __micronaut_create_scoped_proxy(cls, target_supplier):
 
     if getattr(_MicronautScopedProxy, "__abstractmethods__", None):
         _MicronautScopedProxy.__abstractmethods__ = frozenset()
-    return _MicronautScopedProxy(target_supplier)
+    return _MicronautScopedProxy(target_supplier, java_proxy_reference)
