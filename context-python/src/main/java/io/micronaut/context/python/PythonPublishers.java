@@ -87,6 +87,23 @@ public final class PythonPublishers {
     }
 
     /**
+     * A Reactor context carrying the given propagated context, for a task that inherits the Reactor
+     * context of an enclosing task but runs in the propagated context of its caller: the propagated
+     * context a publisher finds in the Reactor context of its subscriber must be the one of the
+     * thread that subscribes, not the one of the enclosing subscription.
+     *
+     * @param reactorContext The inherited Reactor context
+     * @param propagatedContext The propagated context of the task
+     * @return The Reactor context with the propagated context written into it
+     */
+    static Object withPropagatedContext(Object reactorContext, PropagatedContext propagatedContext) {
+        if (REACTOR_AVAILABLE) {
+            return Reactor.withPropagatedContext(reactorContext, propagatedContext);
+        }
+        return reactorContext;
+    }
+
+    /**
      * Subscribe to a publisher within a reactive context: the propagated context is in scope during
      * the subscription and the Reactor context is written above the subscriber, so the source sees
      * both.
@@ -143,6 +160,10 @@ public final class PythonPublishers {
             } else {
                 ((Flux<Object>) Flux.from(publisher)).contextWrite(context).subscribe(subscriber);
             }
+        }
+
+        static Object withPropagatedContext(Object reactorContext, PropagatedContext propagatedContext) {
+            return ReactorPropagation.addPropagatedContext((Context) reactorContext, propagatedContext);
         }
 
         private static PythonReactiveContext reactiveContext(ContextView contextView) {

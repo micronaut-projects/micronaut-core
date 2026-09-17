@@ -38,7 +38,10 @@ public record PythonReactiveContext(@Nullable Object reactorContext, PropagatedC
     /**
      * The context of a coroutine started inside a task: this one, with the Reactor context of the
      * enclosing task when this one has none (an eager start carries the propagated context of the
-     * caller only, and a nested coroutine must subscribe within the enclosing transaction).
+     * caller only, and a nested coroutine must subscribe within the enclosing transaction). The
+     * propagated context of the caller is written into the inherited Reactor context, so a publisher
+     * looking it up there (a reactive transaction, tracing) finds the same context the thread runs in
+     * rather than the one of the enclosing subscription.
      *
      * @param enclosing The reactive context of the task the coroutine is started from
      * @return The context of the new task
@@ -47,7 +50,7 @@ public record PythonReactiveContext(@Nullable Object reactorContext, PropagatedC
         if (reactorContext != null || enclosing.reactorContext() == null) {
             return this;
         }
-        return new PythonReactiveContext(enclosing.reactorContext(), propagatedContext);
+        return new PythonReactiveContext(PythonPublishers.withPropagatedContext(enclosing.reactorContext(), propagatedContext), propagatedContext);
     }
 
     /**
