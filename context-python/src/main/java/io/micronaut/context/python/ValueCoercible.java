@@ -24,6 +24,9 @@ import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
 
 import java.beans.Transient;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Generated Java wrapper for a Python object that can expose its underlying polyglot value.
@@ -39,6 +42,10 @@ import java.beans.Transient;
 public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     String HOST_OBJECT_MEMBER = "__micronaut_value_coercible_host__";
     String AS_POLYGLOT_VALUE_MEMBER = "asPolyglotValue";
+    /**
+     * The accessors of the Java exception a generated exception wrapper exposes to Python.
+     */
+    List<String> THROWABLE_MEMBERS = List.of("getMessage", "getLocalizedMessage", "getCause", "getStackTrace");
 
     /**
      * Returns the wrapped Python value.
@@ -123,10 +130,14 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     @Transient
     default Object getMemberKeys() {
         Value value = asPolyglotValue();
+        Set<String> keys = new LinkedHashSet<>();
         if (value.hasMembers()) {
-            return value.getMemberKeys().toArray(new String[0]);
+            keys.addAll(value.getMemberKeys());
         }
-        return new String[0];
+        if (this instanceof Throwable) {
+            keys.addAll(THROWABLE_MEMBERS);
+        }
+        return keys.toArray(new String[0]);
     }
 
     /**
@@ -237,7 +248,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
 
     /**
      * The accessors of a generated exception wrapper, for Python code that handles the exception
-     * after it crossed Java and reads it the Java way.
+     * after it crossed Java and reads it the Java way. A generated accessor alias of a Python
+     * attribute ({@code getMessage} for a {@code message} attribute) is resolved first, by
+     * {@link #getMember(String)}, and takes precedence over the accessor of the Java exception.
      */
     private @Nullable Object throwableMember(String key) {
         if (!(this instanceof Throwable throwable)) {

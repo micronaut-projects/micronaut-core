@@ -59,6 +59,27 @@ public final class PythonExceptions {
     }
 
     /**
+     * Positional argument {@code index} of the Python exception for a primitive parameter of the
+     * Java super constructor, which cannot take a missing or {@code None} argument.
+     *
+     * @param exception The Python exception
+     * @param index The argument index
+     * @param parameterType The name of the primitive parameter type
+     * @return The argument
+     * @throws IllegalArgumentException When the exception has fewer arguments or the argument is {@code None}
+     */
+    @UsedByGeneratedCode
+    public static Value primitiveArgument(Value exception, int index, String parameterType) {
+        Value argument = argument(exception, index);
+        if (argument == null || argument.isNull()) {
+            throw new IllegalArgumentException("Argument " + index + " of the super().__init__(...) call of Python exception ["
+                + exception.getMetaObject() + "] is " + (argument == null ? "missing" : "None")
+                + ", but the matching parameter of the Java super constructor is of the primitive type [" + parameterType + "]");
+        }
+        return argument;
+    }
+
+    /**
      * Positional argument {@code index} of the Python exception as a string: the value itself when
      * it is a string, its {@code str()} otherwise, the way a Python exception message reads.
      *

@@ -45,9 +45,10 @@ import java.util.stream.Collectors;
  * time from the arity of that call and the static types of its arguments as the processor sees them:
  * literals, f-strings, constructor parameters (through their annotations), module constants and
  * calls of a class. An argument of unknown type accepts any parameter, with a preference for a
- * {@code String} parameter, the usual exception message. A constructor without a super call falls
- * back to the message constructor of the Java base, fed with {@code str(exception)}, or to its
- * no-argument constructor.
+ * {@code String} parameter, the usual exception message. A constructor without a super call, one
+ * that calls the super constructor more than once with different arguments, or one that passes
+ * its own {@code *args}/{@code **kwargs} through, falls back to the message constructor of the
+ * Java base, fed with {@code str(exception)}, or to its no-argument constructor.
  *
  * @since 5.2.0
  */
@@ -106,14 +107,14 @@ final class ThrowableSuperConstructor {
                 return new ThrowableSuperConstructor(noArguments, false);
             }
             throw new ProcessingException(element, "Python class [" + element.getName() + "] extends the Java exception class ["
-                + superType.getName() + "], which has neither a no-argument nor a message constructor; declare an __init__ method that calls super().__init__(...) with the arguments of one of its constructors: "
+                + superType.getName() + "], which has neither a no-argument nor a message constructor; declare an __init__ method that calls super().__init__(...) once, with positional arguments matching one of its constructors: "
                 + signatures(constructors));
         }
         String call = "super().__init__(" + superArguments.stream().map(SuperArgumentDef::source).collect(Collectors.joining(", ")) + ")";
         for (SuperArgumentDef argument : superArguments) {
             if (argument.isKeyword()) {
                 throw new ProcessingException(element, "The super constructor call [" + call + "] of Python class [" + element.getName()
-                    + "] passes [" + argument.source() + "]; a Python class extending the Java exception class [" + superType.getName()
+                    + "] passes [" + argument.source() + "] by keyword; a Python class extending the Java exception class [" + superType.getName()
                     + "] must pass positional arguments only, so the matching Java constructor can be resolved");
             }
         }
@@ -170,6 +171,11 @@ final class ThrowableSuperConstructor {
             ExpressionDef index = ExpressionDef.constant(i);
             if (STRING.equals(parameterType.getName())) {
                 arguments.add(PYTHON_EXCEPTIONS.invokeStatic("argumentAsString", TypeDef.STRING, exception, index));
+            } else if (parameterType.isPrimitive()) {
+                // a missing or None argument cannot become a primitive: fail with a clear message
+                ExpressionDef argument = PYTHON_EXCEPTIONS.invokeStatic("primitiveArgument", TypeDef.of(org.graalvm.polyglot.Value.class),
+                    exception, index, ExpressionDef.constant(parameterType.getName()));
+                arguments.add(converter.apply(parameterType, argument));
             } else {
                 ExpressionDef argument = PYTHON_EXCEPTIONS.invokeStatic("argument", TypeDef.of(org.graalvm.polyglot.Value.class), exception, index);
                 arguments.add(converter.apply(parameterType, argument));

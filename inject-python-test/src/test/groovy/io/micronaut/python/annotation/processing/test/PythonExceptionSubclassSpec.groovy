@@ -172,6 +172,180 @@ class TaskService:
         context?.close()
     }
 
+    void "a constructor calling the super constructor with different arguments falls back to the message constructor"() {
+        given:
+        def context = buildContext('''
+from java.lang import RuntimeException
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test import AbstractProblemLike
+
+
+class MaybeDetailed(RuntimeException):
+
+    def __init__(self, detail=None):
+        if detail:
+            super().__init__(f"detail: {detail}")
+        else:
+            super().__init__()
+
+        def helper():
+            super().__init__("never called")
+
+
+class MaybeProblem(AbstractProblemLike):
+
+    def __init__(self, detail=None):
+        if detail:
+            super().__init__("t", "title", 404, detail)
+        else:
+            super().__init__()
+
+
+@Singleton
+class MaybeService:
+
+    @Executable
+    def run(self, detail: str) -> None:
+        raise MaybeDetailed(detail)
+
+    @Executable
+    def problem(self, detail: str) -> None:
+        raise MaybeProblem(detail)
+''')
+        def service = getBean(context, "python.MaybeService")
+        def detailedType = context.classLoader.loadClass("python.MaybeDetailed")
+        def problemType = context.classLoader.loadClass("python.MaybeProblem")
+
+        when:
+        service.run("d")
+
+        then:
+        def detailed = thrown(RuntimeException)
+        detailedType.isInstance(detailed)
+        detailed.message == "detail: d"
+
+        when:
+        service.run(null)
+
+        then:
+        def plain = thrown(RuntimeException)
+        detailedType.isInstance(plain)
+        plain.message == null
+
+        when: "the base has no message constructor: its no-argument constructor is called"
+        service.problem("d")
+
+        then:
+        def problem = thrown(AbstractProblemLike)
+        problemType.isInstance(problem)
+        problem.status == 400
+
+        when:
+        service.problem(null)
+
+        then:
+        def noDetail = thrown(AbstractProblemLike)
+        problemType.isInstance(noDetail)
+        noDetail.status == 400
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a constructor passing its arguments through to the super constructor uses the message constructor"() {
+        given:
+        def context = buildContext('''
+from java.lang import RuntimeException
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+
+class PassThroughException(RuntimeException):
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+
+@Singleton
+class PassThroughService:
+
+    @Executable
+    def run(self) -> None:
+        raise PassThroughException("boom")
+
+    @Executable
+    def silent(self) -> None:
+        raise PassThroughException()
+''')
+        def service = getBean(context, "python.PassThroughService")
+        def exceptionType = context.classLoader.loadClass("python.PassThroughException")
+
+        when:
+        service.run()
+
+        then:
+        def e = thrown(RuntimeException)
+        exceptionType.isInstance(e)
+        e.message == "boom"
+
+        when:
+        service.silent()
+
+        then:
+        def silent = thrown(RuntimeException)
+        exceptionType.isInstance(silent)
+        silent.message == null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "a None argument for a primitive parameter of the Java super constructor is reported"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+from micronaut.python.annotation.processing.test import AbstractProblemLike
+
+
+class StatusProblem(AbstractProblemLike):
+
+    def __init__(self, status: int | None):
+        super().__init__("t", "title", status, "detail")
+
+
+@Singleton
+class StatusService:
+
+    @Executable
+    def run(self, status: int | None) -> None:
+        raise StatusProblem(status)
+''')
+        def service = getBean(context, "python.StatusService")
+        def problemType = context.classLoader.loadClass("python.StatusProblem")
+
+        when:
+        service.run(404)
+
+        then:
+        def problem = thrown(AbstractProblemLike)
+        problemType.isInstance(problem)
+        problem.status == 404
+
+        when:
+        service.run(null)
+
+        then:
+        def e = thrown(IllegalStateException)
+        e.message.contains("python.StatusProblem")
+        e.cause instanceof IllegalArgumentException
+        e.cause.message.contains("primitive type [int]")
+
+        cleanup:
+        context?.close()
+    }
+
     void "the Python cause of a raised exception becomes the Java cause"() {
         given:
         def context = buildContext('''
@@ -243,7 +417,8 @@ class BookController:
 class OutOfStockExceptionHandler(ExceptionHandler[OutOfStockException, HttpResponse]):
 
     def handle(self, request: HttpRequest, e: OutOfStockException) -> HttpResponse:
-        return HttpResponse.badRequest(e.getMessage())
+        accessors = [name for name in dir(e) if name in ("getMessage", "getCause")]
+        return HttpResponse.badRequest(e.getMessage() + " " + str(sorted(accessors)))
 ''', true)
         def embeddedServer = context.getBean(EmbeddedServer)
         embeddedServer.start()
@@ -255,7 +430,7 @@ class OutOfStockExceptionHandler(ExceptionHandler[OutOfStockException, HttpRespo
         then:
         def e = thrown(HttpClientResponseException)
         e.status == HttpStatus.BAD_REQUEST
-        e.response.getBody(String).get() == "No stock for 1234"
+        e.response.getBody(String).get() == "No stock for 1234 ['getCause', 'getMessage']"
 
         cleanup:
         client.close()

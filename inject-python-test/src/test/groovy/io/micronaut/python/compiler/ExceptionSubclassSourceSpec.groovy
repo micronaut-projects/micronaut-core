@@ -17,7 +17,7 @@ class TaskNotFoundProblem(AbstractProblemLike):
         expect:
         assertGeneratedSourceContains(pythonCode, '''
 public TaskNotFoundProblem(Value value) {
-    super(PythonExceptions.argumentAsString(value, 0), PythonExceptions.argumentAsString(value, 1), PythonExceptions.argument(value, 2).asInt(), PythonExceptions.argumentAsString(value, 3));
+    super(PythonExceptions.argumentAsString(value, 0), PythonExceptions.argumentAsString(value, 1), PythonExceptions.primitiveArgument(value, 2, "int").asInt(), PythonExceptions.argumentAsString(value, 3));
     this.graalpyInternalValue = value;
     PythonExceptions.attachCause(this, value);
   }

@@ -911,37 +911,59 @@ class MicronautAstVisitor(ast.NodeVisitor):
         """
         The arguments of the super().__init__(...) call of a constructor, with what the
         processor can tell about them statically, or None when the constructor does not
-        call the super constructor. A Python class extending a Java class needs them to
-        pick the Java super constructor.
+        call the super constructor with a fixed argument list: no call, several calls
+        with different arguments (the Java constructor cannot be picked statically) or
+        a call that passes the constructor's own *args/**kwargs through. A Python class
+        extending a Java class needs them to pick the Java super constructor.
         """
-        for stmt in ast.walk(func_node):
-            if not isinstance(stmt, ast.Expr) or not isinstance(stmt.value, ast.Call):
+        calls = self._super_init_calls(func_node.body)
+        if not calls:
+            return None
+        sources = {ast.unparse(call) for call in calls}
+        if len(sources) > 1:
+            return None
+        call = calls[0]
+        if any(isinstance(argument, ast.Starred) for argument in call.args) or any(
+            keyword_argument.arg is None for keyword_argument in call.keywords
+        ):
+            return None
+        parameter_names = {arg.name() for arg in arguments.arguments()}
+        super_arguments = [
+            self._super_argument(argument, parameter_names)
+            for argument in call.args
+        ]
+        for keyword_argument in call.keywords:
+            source = ast.unparse(keyword_argument)
+            super_arguments.append(SuperArgumentDef.keyword(source, keyword_argument.arg))
+        return super_arguments
+
+    def _super_init_calls(self, statements):
+        """
+        The super().__init__(...) calls of a constructor body, in source order; nested
+        functions, lambdas and classes have their own constructors and are not searched.
+        """
+        calls = []
+        pending = list(statements)
+        while pending:
+            node = pending.pop(0)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda, ast.ClassDef)):
                 continue
-            call = stmt.value
-            func = call.func
-            if not (
-                isinstance(func, ast.Attribute)
-                and func.attr == "__init__"
-                and isinstance(func.value, ast.Call)
-                and isinstance(func.value.func, ast.Name)
-                and func.value.func.id == "super"
-            ):
-                continue
-            parameter_names = {arg.name() for arg in arguments.arguments()}
-            super_arguments = [
-                self._super_argument(argument, parameter_names)
-                for argument in call.args
-            ]
-            for keyword_argument in call.keywords:
-                source = ast.unparse(keyword_argument)
-                super_arguments.append(SuperArgumentDef.keyword(source, keyword_argument.arg or "**"))
-            return super_arguments
-        return None
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Call):
+                func = node.value.func
+                if (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "__init__"
+                    and isinstance(func.value, ast.Call)
+                    and isinstance(func.value.func, ast.Name)
+                    and func.value.func.id == "super"
+                ):
+                    calls.append(node.value)
+                    continue
+            pending[0:0] = list(ast.iter_child_nodes(node))
+        return calls
 
     def _super_argument(self, node, parameter_names):
         source = ast.unparse(node)
-        if isinstance(node, ast.Starred):
-            return SuperArgumentDef.keyword(source, "*")
         if isinstance(node, ast.Name) and node.id in parameter_names:
             return SuperArgumentDef.parameter(source, node.id)
         type_name = self._static_python_type_name(node)
