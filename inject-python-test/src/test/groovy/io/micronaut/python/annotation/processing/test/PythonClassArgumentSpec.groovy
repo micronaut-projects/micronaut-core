@@ -164,7 +164,8 @@ class Probe:
 
         expect:
         probe.invokeMember("client_greeting").asString() == "hi bob"
-        probe.invokeMember("client_definition").asString() == "python.GreetingClient"
+        // an all-abstract @Client type compiles to an interface, whose bean is the introduction proxy
+        probe.invokeMember("client_definition").asString() == "python.GreetingClient\$Intercepted"
         probe.invokeMember("of_argument").asString() == "python.Book"
         probe.invokeMember("list_argument").asString() == "java.util.List<python.Book>"
         probe.invokeMember("of_named_argument").asString() == "book:python.Book"
