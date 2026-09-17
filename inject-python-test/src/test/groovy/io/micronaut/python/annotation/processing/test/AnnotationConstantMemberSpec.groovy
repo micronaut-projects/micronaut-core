@@ -15,7 +15,10 @@
  */
 package io.micronaut.python.annotation.processing.test
 
+import io.micronaut.http.annotation.Post
 import io.micronaut.http.client.HttpClient
+import io.micronaut.inject.ast.ClassElement
+import io.micronaut.inject.ast.ElementQuery
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.python.annotation.processing.test.constants.CustomSerde
 import io.micronaut.python.annotation.processing.test.constants.CustomSerializer
@@ -173,6 +176,43 @@ class Place:
 
         cleanup:
         context?.close()
+    }
+
+    void "test a class attribute of a Python class from another compilation is left to the runtime"() {
+        when: "the generated class of the other compilation declares no field for the attribute"
+        def routes = buildClassElement('''
+from micronaut.http.annotation import Controller, Post
+from io.micronaut.python.annotation.processing.test.constants import GeneratedPaths
+
+@Controller("/generated")
+class GeneratedController:
+
+    @Post(GeneratedPaths.SAVE_PATH)
+    def save(self) -> str:
+        return "saved"
+''', "GeneratedController") { ClassElement element ->
+            element.getEnclosedElements(ElementQuery.ALL_METHODS.named("save")).collect { it.stringValue(Post).orElse(null) }
+        }
+
+        then: "compilation succeeds; the value is resolved when the Python module loads"
+        routes.size() == 1
+
+        when: "a decorator default and a ** expansion name an unresolvable member"
+        buildContext('''
+from jakarta.inject import Named, Singleton
+from io.micronaut.python.annotation.processing.test.constants import MapperNames
+
+@Singleton
+@Named(**{"value": MapperNames.MISSING})
+class PropertiesMapper:
+    pass
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("MapperNames.MISSING")
+        e.message.contains("[value]")
+        e.message.contains("Named")
     }
 
     void "test an unresolvable constant member reports the member"() {

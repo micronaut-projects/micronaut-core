@@ -180,8 +180,11 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
         if (javaValue instanceof Boolean) {
             return PrimitiveElement.BOOLEAN;
         }
-        if (javaValue instanceof Integer || javaValue instanceof Long || javaValue instanceof Short || javaValue instanceof Byte) {
+        if (javaValue instanceof Integer || javaValue instanceof Short || javaValue instanceof Byte) {
             return PrimitiveElement.INT;
+        }
+        if (javaValue instanceof Long) {
+            return PrimitiveElement.LONG;
         }
         if (javaValue instanceof Double || javaValue instanceof Float) {
             return PrimitiveElement.DOUBLE;

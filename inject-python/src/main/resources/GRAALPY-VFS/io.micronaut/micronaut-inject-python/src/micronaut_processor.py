@@ -30,6 +30,10 @@ _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotati
 ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 
 
+_JAVA_INT_MIN = -2 ** 31
+_JAVA_INT_MAX = 2 ** 31 - 1
+
+
 class UnresolvedAnnotationMemberError(ValueError):
     """
     A decorator member value references a Java class member (Outer.NAME) that the class does not declare.
@@ -793,7 +797,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         if isinstance(value, bool):
             return TypeRef("bool")
         if isinstance(value, int):
-            return TypeRef("int")
+            # an int is a Java int; a value the Java int cannot hold stays an object
+            return TypeRef("int") if _JAVA_INT_MIN <= value <= _JAVA_INT_MAX else TypeRef("object")
         if isinstance(value, float):
             return TypeRef("float")
         if isinstance(value, str):
@@ -2353,19 +2358,19 @@ def merge_keyword_argument(result, kw, visitor=None, annotation_name=None):
         result[member_name] = value
         return
 
-    for key, value in extract_keyword_expansion(kw.value, visitor).items():
+    for key, value in extract_keyword_expansion(kw.value, visitor, annotation_name).items():
         result[key] = value
 
-def extract_keyword_expansion(node, visitor=None):
+def extract_keyword_expansion(node, visitor=None, annotation_name=None):
     if isinstance(node, ast.Dict):
         result = {}
         for key_node, value_node in zip(node.keys, node.values):
             if key_node is None:
-                result.update(extract_keyword_expansion(value_node, visitor))
+                result.update(extract_keyword_expansion(value_node, visitor, annotation_name))
                 continue
             key = convert_ast_value(key_node, visitor)
             if isinstance(key, str):
-                result[key] = convert_ast_value(value_node, visitor)
+                result[key] = convert_annotation_member_value(annotation_name, key, value_node, visitor)
         return result
 
     try:
@@ -2425,6 +2430,11 @@ def _resolve_java_constant(visitor, name_parts):
     if _java_class_element(visitor_context, f"{resolved_class_name}.{field_name}") is not None:
         # a nested type (Outer.Inner), resolved by name
         return None
+    if _is_generated_python_class(class_element):
+        # the generated class of a Python class from another compilation (the main sources seen
+        # from the tests, a dependency) carries no field for a class attribute: the runtime
+        # decorator reads the attribute from the Python class
+        return None
     raise UnresolvedAnnotationMemberError(
         f"class [{class_element.getName()}] declares no constant or nested type named [{field_name}]"
     )
@@ -2433,6 +2443,13 @@ def _resolve_java_constant(visitor, name_parts):
 def _is_python_class_element(class_element):
     try:
         return class_element.getClass().getName().startswith("io.micronaut.python.")
+    except Exception:
+        return False
+
+
+def _is_generated_python_class(class_element):
+    try:
+        return class_element.hasDeclaredAnnotation("io.micronaut.context.python.annotation.PythonClass")
     except Exception:
         return False
 
@@ -2493,7 +2510,7 @@ def extract_arg_defaults(func_node, visitor=None):
         if default is None or not _is_convertible_default(default, visitor):
             arg_dict[member_name] = None
         else:
-            arg_dict[member_name] = convert_ast_value(default, visitor)
+            arg_dict[member_name] = convert_annotation_member_value(func_node.name, member_name, default, visitor)
 
     return arg_dict
 

@@ -40,6 +40,10 @@ class Customizer:
     NOTHING = None
     RAW = b"bytes"
     COMPUTED = len("abc")
+    BIG = 10_000_000_000
+    NEGATIVE_BIG = -3_000_000_000
+    MAX = 2_147_483_647
+    MIN = -2_147_483_648
 
     def timeout(self) -> int:
         return self.CONNECTION_TIMEOUT
@@ -65,6 +69,35 @@ class Customizer:
         fieldTypes.RAW.name == "byte"
         fieldTypes.RAW.isArray()
         fieldTypes.COMPUTED.name == Object.name
+
+        and: "an int the Java int cannot hold is an object"
+        fieldTypes.BIG.name == Object.name
+        fieldTypes.NEGATIVE_BIG.name == Object.name
+        fieldTypes.MAX.name == "int"
+        fieldTypes.MIN.name == "int"
+    }
+
+    void "test an introspected class with an int attribute outside the Java int range"() {
+        given:
+        def context = buildContext('''
+from micronaut.core.annotation import Introspected
+
+@Introspected
+class Big:
+    big = 10_000_000_000
+    small = 5
+''')
+        def introspection = getBeanIntrospection(context, "python.Big")
+
+        when:
+        def big = introspection.instantiate()
+
+        then:
+        introspection.getRequiredProperty("big", Object).get(big) == 10_000_000_000L
+        introspection.getRequiredProperty("small", int).get(big) == 5
+
+        cleanup:
+        context?.close()
     }
 
     void "test an untyped class attribute does not break the stubs of the other classes"() {
