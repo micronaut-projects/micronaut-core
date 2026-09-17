@@ -260,9 +260,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     /**
      * Completes the {@code __init__} the processor derived from the fields of a dataclass with the fields of its
-     * dataclass bases. Python collects the fields in reverse MRO order, so the fields of the base come first and a
-     * field the subclass declares again keeps the position of its first declaration. An explicit {@code __init__}
-     * is used as declared, as in Python.
+     * dataclass bases. Python collects the fields of every dataclass in the method resolution order, walked from
+     * the most distant base to the class itself, plain classes in between contributing nothing: the fields of the
+     * bases come first and a field declared again keeps the position of its first declaration. An explicit
+     * {@code __init__} is used as declared, as in Python.
      *
      * @param constructor The constructor of the class definition, may be {@code null}
      * @return The constructor to use, may be {@code null}
@@ -271,19 +272,23 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         if (!isDataclass() || (constructor != null && !hasDataclassDecorator(constructor.decorators()))) {
             return constructor;
         }
-        if (!(getSuperType().orElse(null) instanceof PythonClassElement superType) || !superType.isDataclass()) {
-            return constructor;
-        }
-        List<ArgumentDef> inheritedFields = superType.getPrimaryConstructor()
-            .filter(PythonConstructorElement.class::isInstance)
-            .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
-            .orElse(List.of());
-        if (inheritedFields.isEmpty()) {
-            return constructor;
-        }
         Map<String, ArgumentDef> fields = new LinkedHashMap<>();
-        for (ArgumentDef inheritedField : inheritedFields) {
-            fields.put(inheritedField.name(), inheritedField);
+        List<PythonClassElement> mro = pythonMro();
+        for (int i = mro.size() - 1; i >= 0; i--) {
+            PythonClassElement base = mro.get(i);
+            if (!base.isDataclass()) {
+                continue;
+            }
+            List<ArgumentDef> inheritedFields = base.getPrimaryConstructor()
+                .filter(PythonConstructorElement.class::isInstance)
+                .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
+                .orElse(List.of());
+            for (ArgumentDef inheritedField : inheritedFields) {
+                fields.put(inheritedField.name(), inheritedField);
+            }
+        }
+        if (fields.isEmpty()) {
+            return constructor;
         }
         if (constructor != null) {
             for (ArgumentDef field : constructor.arguments().arguments()) {
@@ -305,6 +310,70 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             template.hasReturnValue(),
             null
         ).withClassDef(getNativeType());
+    }
+
+    /**
+     * The Python bases of the class in method resolution order (the C3 linearization Python uses), the class
+     * itself excluded. Bases that are not Python classes (Java types) carry no dataclass fields and are left out.
+     *
+     * @return The linearized Python bases
+     */
+    private List<PythonClassElement> pythonMro() {
+        List<PythonClassElement> bases = new ArrayList<>();
+        for (TypeRef base : getNativeType().bases()) {
+            if (findPythonClass(base) instanceof PythonClassElement pythonBase && !pythonBase.getName().equals(getName())) {
+                bases.add(pythonBase);
+            }
+        }
+        List<List<PythonClassElement>> sequences = new ArrayList<>(bases.size() + 1);
+        for (PythonClassElement base : bases) {
+            List<PythonClassElement> baseMro = new ArrayList<>();
+            baseMro.add(base);
+            baseMro.addAll(base.pythonMro());
+            sequences.add(baseMro);
+        }
+        sequences.add(new ArrayList<>(bases));
+        return c3Merge(sequences);
+    }
+
+    /**
+     * Merges the linearizations of the bases: the next class is the first head that appears in no tail. Python
+     * rejects a hierarchy without such a head; here the first head is taken so that a constructor is still derived.
+     */
+    private static List<PythonClassElement> c3Merge(List<List<PythonClassElement>> sequences) {
+        List<PythonClassElement> result = new ArrayList<>();
+        while (true) {
+            sequences.removeIf(List::isEmpty);
+            if (sequences.isEmpty()) {
+                return result;
+            }
+            PythonClassElement next = null;
+            for (List<PythonClassElement> sequence : sequences) {
+                PythonClassElement head = sequence.getFirst();
+                if (sequences.stream().noneMatch(other -> indexOfClass(other, head) > 0)) {
+                    next = head;
+                    break;
+                }
+            }
+            if (next == null) {
+                next = sequences.getFirst().getFirst();
+            }
+            result.add(next);
+            for (List<PythonClassElement> sequence : sequences) {
+                if (indexOfClass(sequence, next) == 0) {
+                    sequence.removeFirst();
+                }
+            }
+        }
+    }
+
+    private static int indexOfClass(List<PythonClassElement> sequence, PythonClassElement classElement) {
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i).getName().equals(classElement.getName())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static List<DecoratorDef> dataclassConstructorDecorators() {

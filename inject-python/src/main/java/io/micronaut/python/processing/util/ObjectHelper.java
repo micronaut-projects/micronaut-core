@@ -75,7 +75,8 @@ public final class ObjectHelper {
             .toList();
         // A bidirectional association (Book.reviews <-> Review.book) makes a hash over every property recurse
         // without end, unlike equals(), which stops at the identical object; hashing the plain values only keeps
-        // the hash consistent with equals() (a Python dataclass with such fields is not hashable at all).
+        // the hash consistent with equals() (a Python dataclass with such fields is not hashable at all). A Python
+        // enum is a plain value: it cannot refer back and stays in the hash.
         List<PropertyElement> hashCodeProps = readableProps.stream()
             .filter(p -> !referencesPythonClass(p.getGenericType()))
             .toList();
@@ -86,7 +87,7 @@ public final class ObjectHelper {
 
     private static boolean referencesPythonClass(ClassElement type) {
         if (type instanceof AbstractPythonClassElement) {
-            return true;
+            return !type.isEnum();
         }
         if (type.isArray()) {
             return referencesPythonClass(type.fromArray());

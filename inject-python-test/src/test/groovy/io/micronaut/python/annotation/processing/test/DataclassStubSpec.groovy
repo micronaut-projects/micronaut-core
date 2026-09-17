@@ -91,6 +91,71 @@ class Kitten(Cat):
         context?.close()
     }
 
+    void "test a dataclass collects the fields of every base in method resolution order"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from micronaut.core.annotation import Introspected
+
+@Introspected
+@dataclass
+class A:
+    a: int = 1
+
+@Introspected
+@dataclass
+class B:
+    b: int = 2
+
+@Introspected
+@dataclass
+class C(A, B):
+    c: int = 3
+
+class Mid(A):
+    def describe(self) -> str:
+        return "mid"
+
+@Introspected
+@dataclass
+class Leaf(Mid):
+    c: int = 3
+
+@Introspected
+@dataclass
+class Diamond(C, B):
+    d: int = 4
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def cIntrospection = getBeanIntrospection(context, "python.C")
+        def leafIntrospection = getBeanIntrospection(context, "python.Leaf")
+        def diamondIntrospection = getBeanIntrospection(context, "python.Diamond")
+
+        then: "the order of dataclasses.fields(): the most distant base first, a plain class in between contributes nothing"
+        cIntrospection.constructorArguments*.name == ["b", "a", "c"]
+        leafIntrospection.constructorArguments*.name == ["a", "c"]
+        diamondIntrospection.constructorArguments*.name == ["b", "a", "c", "d"]
+
+        when:
+        def c = cIntrospection.instantiate(20, 10, 30)
+        def leaf = leafIntrospection.instantiate(10, 30)
+        def diamond = diamondIntrospection.instantiate(20, 10, 30, 40)
+
+        then: "the Java constructor arguments match the Python __init__"
+        c.asPolyglotValue().getMember("a").asInt() == 10
+        c.asPolyglotValue().getMember("b").asInt() == 20
+        c.asPolyglotValue().getMember("c").asInt() == 30
+        leaf.asPolyglotValue().getMember("a").asInt() == 10
+        leaf.asPolyglotValue().getMember("c").asInt() == 30
+        leaf.describe() == "mid"
+        diamond.asPolyglotValue().getMember("d").asInt() == 40
+
+        cleanup:
+        context?.close()
+    }
+
     void "test a field declared again by the subclass keeps the position of the base"() {
         given:
         def pythonCode = '''

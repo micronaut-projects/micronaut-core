@@ -67,6 +67,40 @@ class Review:
         context?.close()
     }
 
+    void "test enum attributes take part in hashCode"() {
+        given:
+        def pythonCode = '''
+from dataclasses import dataclass
+from enum import Enum
+from micronaut.core.annotation import Introspected
+
+class Colour(Enum):
+    RED = "red"
+    BLUE = "blue"
+
+@Introspected
+@dataclass
+class Key:
+    colour: Colour
+    size: int
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def keyIntrospection = getBeanIntrospection(context, "python.Key")
+        def colourType = context.classLoader.loadClass("python.Colour")
+        def red = keyIntrospection.instantiate(Enum.valueOf(colourType, "RED"), 1)
+        def blue = keyIntrospection.instantiate(Enum.valueOf(colourType, "BLUE"), 1)
+
+        then: "keys differing in the enum only hash differently"
+        red != blue
+        red.hashCode() != blue.hashCode()
+        keyIntrospection.instantiate(Enum.valueOf(colourType, "RED"), 1).hashCode() == red.hashCode()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test nested list attributes are compared by value"() {
         given:
         def pythonCode = '''
@@ -78,14 +112,18 @@ class Elephant:
     values: list[list[int]] = field(default_factory=list)
     tags: dict[str, list[str]] = field(default_factory=dict)
     sizes: set[int] = field(default_factory=set)
+    labels: list[set[str]] = field(default_factory=list)
+
+class Labels(set):
+    pass
 '''
 
         when:
         def context = buildContext(pythonCode, true)
         Context polyglot = context.getBean(Context)
         def elephantType = context.classLoader.loadClass("python.Elephant")
-        def first = polyglot.eval("python", "Elephant('Dumbo', [[1] * 3] * 3, {'a': ['x']}, {1, 2})").as(elephantType)
-        def second = polyglot.eval("python", "Elephant('Dumbo', [[1, 1, 1], [1, 1, 1], [1, 1, 1]], {'a': ['x']}, {2, 1})").as(elephantType)
+        def first = polyglot.eval("python", "Elephant('Dumbo', [[1] * 3] * 3, {'a': ['x']}, {1, 2}, [Labels({'l'})])").as(elephantType)
+        def second = polyglot.eval("python", "Elephant('Dumbo', [[1, 1, 1], [1, 1, 1], [1, 1, 1]], {'a': ['x']}, {2, 1}, [{'l'}])").as(elephantType)
 
         then: "every call converts the Python data to Java collections with value equality (Objects.equals: Groovy compares lists leniently)"
         Objects.equals(first.getValues(), [[1, 1, 1], [1, 1, 1], [1, 1, 1]])
@@ -96,6 +134,10 @@ class Elephant:
         Objects.equals(first.getTags(), second.getTags())
         Objects.equals(first.getSizes(), [1, 2] as Set)
         Objects.equals(first.getSizes(), second.getSizes())
+
+        and: "a set subclass converts like a set"
+        first.getLabels()[0] instanceof Set
+        Objects.equals(first.getLabels(), second.getLabels())
 
         cleanup:
         context?.close()

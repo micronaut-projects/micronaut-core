@@ -57,6 +57,7 @@ import org.jspecify.annotations.Nullable;
 public final class PythonConversion {
 
     private static final String UTC_OFFSET = "__micronaut_utc_offset";
+    private static final int MAX_META_PARENT_DEPTH = 16;
 
     private static final String LEN = "__len__";
 
@@ -539,11 +540,28 @@ public final class PythonConversion {
             return false;
         }
         Value metaObject = value.getMetaObject();
-        if (metaObject == null) {
+        return metaObject != null && isPythonSetType(metaObject, 0);
+    }
+
+    /**
+     * Whether a Python type is {@code set} or {@code frozenset} or derives from one of them: the parents of
+     * the type are walked, so a {@code set} subclass converts like a set.
+     */
+    private static boolean isPythonSetType(Value metaObject, int depth) {
+        String typeName = metaObject.getMetaSimpleName();
+        if ("set".equals(typeName) || "frozenset".equals(typeName)) {
+            return true;
+        }
+        if (depth > MAX_META_PARENT_DEPTH || !metaObject.hasMetaParents()) {
             return false;
         }
-        String typeName = metaObject.getMetaSimpleName();
-        return "set".equals(typeName) || "frozenset".equals(typeName);
+        Value parents = metaObject.getMetaParents();
+        for (long i = 0; i < parents.getArraySize(); i++) {
+            if (isPythonSetType(parents.getArrayElement(i), depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

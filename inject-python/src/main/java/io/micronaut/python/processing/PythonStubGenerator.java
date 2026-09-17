@@ -3764,7 +3764,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 boolean sameName = methodName.equals(beanGetterName(propertyName))
                     || (isBooleanProperty(beanProperty) && methodName.equals(booleanBeanGetterName(propertyName)));
                 if (synthetic && sameName && !beanProperty.isWriteOnly()
-                    && beanProperty.getType().isAssignable(interfaceMethod.getReturnType())) {
+                    && satisfiesReturnType(beanProperty.getGenericType(), interfaceMethod.getGenericReturnType())) {
                     return true;
                 }
             } else if (parameters.length == 1 && interfaceMethod.getReturnType().isVoid()) {
@@ -3776,6 +3776,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         return false;
+    }
+
+    /**
+     * Whether a generated getter of the property type overrides the interface accessor: the type has to be
+     * assignable, and where the accessor returns a parameterized type the type arguments have to match as well,
+     * as javac requires (a {@code list[CustomObject]} attribute does not implement a getter returning a list of
+     * {@code KubernetesObject}); a type variable or wildcard of the accessor accepts any argument.
+     */
+    private static boolean satisfiesReturnType(ClassElement propertyType, ClassElement returnType) {
+        if (!propertyType.isAssignable(returnType)) {
+            return false;
+        }
+        Map<String, ClassElement> expectedArguments = returnType.getTypeArguments();
+        if (expectedArguments.isEmpty()) {
+            return true;
+        }
+        Map<String, ClassElement> actualArguments = propertyType.getTypeArguments(returnType.getName());
+        for (Map.Entry<String, ClassElement> expected : expectedArguments.entrySet()) {
+            ClassElement expectedArgument = expected.getValue();
+            if (expectedArgument instanceof GenericPlaceholderElement || expectedArgument instanceof WildcardElement) {
+                continue;
+            }
+            ClassElement actualArgument = actualArguments.get(expected.getKey());
+            if (actualArgument == null || !actualArgument.getName().equals(expectedArgument.getName())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
