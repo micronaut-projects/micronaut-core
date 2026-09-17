@@ -27,6 +27,7 @@ TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
+_JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
 ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
 
 
@@ -219,6 +220,22 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
         return None
 
+    def _resolve_compiled_python_class(self, module_name, imported_name):
+        """
+        Resolve an import of a Python class compiled by another source root (the main sources
+        imported by the tests of a project) or into a library: its generated bridge class is on
+        the compile class path, named after the package and the class. The import names either
+        the package (a member the package exports) or the module defining the class.
+        """
+        if self.visitor_context is None or not module_name:
+            return None
+        parent_name = module_name.rsplit(".", 1)[0] if "." in module_name else "python"
+        for candidate in (f"{module_name}.{imported_name}", f"{parent_name}.{imported_name}"):
+            class_element = self.visitor_context.getClassElement(candidate).orElse(None)
+            if class_element is not None and _JavaTypes.isPythonClass(class_element):
+                return candidate
+        return None
+
     def _resolve_relative_import(self, level, module_name, imported_name):
         """
         Resolve relative imports from source-root modules.
@@ -235,6 +252,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
             local_import = self._resolve_top_level_import(absolute_module, imported_name)
             if local_import is not None:
                 return local_import
+            compiled_import = self._resolve_compiled_python_class(absolute_module, imported_name)
+            if compiled_import is not None:
+                return compiled_import
             return f"{absolute_module}.{imported_name}"
 
         return f"{base_pkg}.{imported_name}" if base_pkg else imported_name
@@ -441,6 +461,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             full_name = self._resolve_relative_import(level, node.module, alias.name)
                         else:
                             local_import = self._resolve_top_level_import(node.module, alias.name)
+                            if local_import is None:
+                                local_import = self._resolve_compiled_python_class(node.module, alias.name)
                             if local_import is not None:
                                 full_name = local_import
                             else:

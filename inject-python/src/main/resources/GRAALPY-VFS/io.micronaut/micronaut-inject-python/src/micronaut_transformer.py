@@ -809,7 +809,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         variable_name = alias.asname if alias.asname else alias.name  # The name to use for the variable (e.g., "S" or "Singleton")
 
         class_element = self._resolve_imported_java_type(original_module_name, import_name)
-        if class_element is None:
+        if class_element is None or _JavaTypes.isPythonClass(class_element):
+            # The bridge of a Python class compiled by another source root or into a library:
+            # the import refers to the Python class at run time, so it stays a Python import.
             return False
         if self._is_annotation_class(class_element):
             # Generate decorator for annotations
@@ -1549,7 +1551,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 self._track_package_decorators(variable_name, f'{java_module}.{alias.name}')
             elif self._is_annotation_class(class_element):
                 self.generated_decorators.add(variable_name)
-            else:
+            elif not _JavaTypes.isPythonClass(class_element):
                 self._track_java_class(variable_name, class_element)
                 self.java_runtime_names.add(variable_name)
                 if class_element.isInterface():

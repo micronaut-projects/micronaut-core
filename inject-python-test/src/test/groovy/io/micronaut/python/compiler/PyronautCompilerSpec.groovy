@@ -709,7 +709,7 @@ class MyNestedRepeatableService:
 
         def packageInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/__init__.py")
         packageInit.exists()
-        packageInit.text.contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
+        packageMembers(packageInit.parentFile).contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
 
         cleanup:
         tempDir.deleteDir()
@@ -791,10 +791,10 @@ class AsyncImportService:
 
         def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
         propagationInit.exists()
-        propagationInit.text.contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
+        packageMembers(propagationInit.parentFile).contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
 
         def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
-        coreInit.text.contains("from . import async_")
+        packageMembers(coreInit.parentFile).contains("from . import async_")
 
         cleanup:
         tempDir.deleteDir()
@@ -850,10 +850,10 @@ class KeywordMethodService:
         def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
         sourceFile.exists()
         sourceFile.text == pythonCode
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang/__init__.py")
-            .text.contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher/__init__.py")
-            .text.contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
+        packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang"))
+            .contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
+        packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher"))
+            .contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
         new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
             .listFiles().any { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
         pythonContext.eval("python", "KeywordMethodService().imported_reactor(ImportedMono.just('imported')).block()").asString() == 'imported'
@@ -2074,5 +2074,17 @@ class NotNullExample:
         cleanup:
         context.close()
         tempSrcDir.deleteDir()
+    }
+
+    /**
+     * The members a compilation contributes to a package: the package initialiser merges the
+     * modules written next to it.
+     */
+    private static String packageMembers(File packageDirectory) {
+        packageDirectory.listFiles()
+            .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
+            .sort { it.name }
+            .collect { it.text }
+            .join('\n')
     }
 }
