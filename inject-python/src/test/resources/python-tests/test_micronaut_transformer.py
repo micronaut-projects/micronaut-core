@@ -574,5 +574,57 @@ class RuntimeImportRewriteTest(unittest.TestCase):
         self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source))))
 
 
+class UnresolvedJavaImportTest(unittest.TestCase):
+    """An import from a Java package that names no class on the classpath is a compile error."""
+
+    @staticmethod
+    def _errors(source, class_elements=no_class_elements, python_source_dirs=None, class_element=no_class_element):
+        transformer = MicronautTransformer(class_element, class_elements, python_source_dirs=python_source_dirs)
+        transformer.visit(ast.parse(source))
+        return transformer.validation_errors
+
+    def test_standard_library_and_unknown_python_packages_are_not_java_imports(self):
+        self.assertEqual([], self._errors("from typing import Annotated\nfrom dataclasses import dataclass\n"))
+        self.assertEqual([], self._errors("from pydantic import BaseModel\n"))
+        self.assertEqual([], self._errors("from .models import Pet\n"))
+
+    def test_missing_name_in_a_reserved_java_namespace_is_an_error(self):
+        errors = self._errors("from micronaut.absent.ua import UserAgentProvider\n")
+        self.assertEqual(1, len(errors))
+        self.assertIn("UserAgentProvider", errors[0])
+        self.assertIn("micronaut.absent.ua", errors[0])
+        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0])
+        self.assertEqual(1, len(self._errors("from io.lettuce.core.codec import RedisCodec\n")))
+        self.assertEqual(1, len(self._errors("from jakarta.absent import Missing\n")))
+
+    def test_missing_name_in_a_classpath_package_is_an_error(self):
+        def acme_package(package):
+            return [object()] if package == "com.acme" else []
+
+        self.assertEqual(1, len(self._errors("from com.acme import Missing\n", acme_package)))
+        self.assertEqual([], self._errors("from com.other import Missing\n", acme_package))
+
+    def test_packages_and_java_type_modules_imported_as_names_are_not_errors(self):
+        def inject_package(package):
+            return [object()] if package == "jakarta.inject" else []
+
+        def qualifier_type(name):
+            return object() if name == "jakarta.inject.Qualifier" else None
+
+        self.assertEqual([], self._errors("from jakarta import inject\n", inject_package))
+        self.assertEqual([], self._errors("from jakarta.inject.Qualifier import Qualifier\n", class_element=qualifier_type))
+
+    def test_project_python_modules_are_never_java_imports(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as source_dir:
+            os.makedirs(os.path.join(source_dir, "micronaut", "docs"))
+            with open(os.path.join(source_dir, "micronaut", "docs", "Product.py"), "w") as module:
+                module.write("class Product:\n    pass\n")
+            source = "from micronaut.docs.Product import Product\nfrom micronaut.docs import Product as Module\n"
+            self.assertEqual([], self._errors(source, python_source_dirs=[source_dir]))
+            self.assertEqual(2, len(self._errors(source)))
+
+
 if __name__ == "__main__":
     unittest.main()

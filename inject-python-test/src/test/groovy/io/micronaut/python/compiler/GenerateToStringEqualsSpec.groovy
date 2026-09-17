@@ -98,6 +98,10 @@ class Person:
     if (hostObject != null) {
       return (Person) hostObject;
     }
+    Person subclassWrapper = PythonConversion.subclassWrapper(arg1, Person.class);
+    if (subclassWrapper != null) {
+      return subclassWrapper;
+    }
     return new python.Person(arg1);
   }
 
