@@ -394,21 +394,17 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     @Override
-    protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
-        // if the event loop is shutting down no listeners will run, but the content must not leak
-        executeOrElse(ctx.executor(), () -> {
-            try {
-                nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
-                        .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
-            } catch (Exception e) {
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
-                }
-            } finally {
-                // the listeners have seen the message, the frame content it may alias can go
-                release.run();
+    protected void messageHandled(ChannelHandlerContext ctx, Object message) {
+        // published in the completing thread: the frame content a ByteBuf message aliases is
+        // released once this returns, so the listeners have to see it before that
+        try {
+            nettyEmbeddedServices.getEventPublisher(WebSocketMessageProcessedEvent.class)
+                    .publishEvent(new WebSocketMessageProcessedEvent<>(getSession(), message));
+        } catch (Exception e) {
+            if (LOG.isErrorEnabled()) {
+                LOG.error("Error publishing WebSocket message processed event: " + e.getMessage(), e);
             }
-        }, release);
+        }
     }
 
     @Override

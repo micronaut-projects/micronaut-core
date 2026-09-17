@@ -59,7 +59,6 @@ import io.netty.handler.codec.http.websocketx.PingWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.PongWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.TextWebSocketFrame;
 import io.netty.handler.codec.http.websocketx.WebSocketFrame;
-import io.netty.util.concurrent.EventExecutor;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.concurrent.ScheduledFuture;
 import org.jspecify.annotations.Nullable;
@@ -74,7 +73,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -411,15 +409,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object finalData = data;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
-                            if (e == null) {
-                                // the message may still be handed to listeners, messageHandled releases once that is done
-                                messageHandled(ctx, finalData, release);
-                            } else {
-                                try {
+                            try {
+                                if (e == null) {
+                                    messageHandled(ctx, finalData);
+                                } else {
                                     messageProcessingException(ctx, e);
-                                } finally {
-                                    release.run();
                                 }
+                            } finally {
+                                // messageHandled has handed the message to its listeners by now
+                                release.run();
                             }
                         });
                     } catch (Throwable e) {
@@ -517,22 +515,6 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Run {@code task} on the executor, or {@code onRejected} in the calling thread if the executor
-     * refuses it because it is shutting down.
-     *
-     * @param executor   The executor
-     * @param task       The task
-     * @param onRejected What to run instead when the executor rejects the task
-     */
-    protected static void executeOrElse(EventExecutor executor, Runnable task, Runnable onRejected) {
-        try {
-            executor.execute(task);
-        } catch (RejectedExecutionException e) {
-            onRejected.run();
-        }
-    }
-
-    /**
      * Decodes the aggregated content of a message into the type of the body argument. The caller keeps ownership
      * of {@code content}; the returned value may alias it (see {@link #handleWebSocketFrame}).
      *
@@ -588,31 +570,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Method called once a message has been handled by the handler.
+     * Method called once a message has been handled by the handler. When the message is a view of
+     * the frame content, that content is released after this method returns, so anything the
+     * message is handed to here must be done with it by then.
      *
      * @param ctx     The channel handler context
      * @param message The message that was handled
      */
     protected void messageHandled(ChannelHandlerContext ctx, Object message) {
         // no-op
-    }
-
-    /**
-     * Method called once a message has been handled by the handler. When the message is a view of
-     * the frame content, {@code release} frees that content; an implementation that hands the
-     * message on (e.g. to event listeners on another thread) must run it once the message is no
-     * longer needed. The default runs it after {@link #messageHandled(ChannelHandlerContext, Object)}.
-     *
-     * @param ctx     The channel handler context
-     * @param message The message that was handled
-     * @param release Releases the frame content the message aliases; must run exactly once
-     */
-    protected void messageHandled(ChannelHandlerContext ctx, Object message, Runnable release) {
-        try {
-            messageHandled(ctx, message);
-        } finally {
-            release.run();
-        }
     }
 
     /**
