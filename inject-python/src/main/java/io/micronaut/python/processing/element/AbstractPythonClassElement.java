@@ -224,12 +224,25 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
      */
     @Override
     public boolean isAbstract() {
+        return hasAbstractDeclaration() || (hasPlaceholderBodies() && PythonMethodElement.isIntroductionType(this));
+    }
+
+    /**
+     * Whether the class definition itself is abstract: an {@code ABC} or {@code Protocol} base, or a function
+     * decorated with {@code @abstractmethod}. Unlike {@link #isAbstract()} this resolves no other class, so it
+     * is safe while the class elements are being built.
+     */
+    final boolean hasAbstractDeclaration() {
         ClassDef nativeType = getNativeType();
-        return nativeType
-            .bases().stream().anyMatch(b -> b.name().equals("abc.ABC") || isProtocolType(b.name()))
-            || nativeType.functions().stream().anyMatch(FunctionDef::isAbstract)
-            || (nativeType.functions().stream().anyMatch(FunctionDef::hasPlaceholderBody)
-                && PythonMethodElement.isIntroductionType(this));
+        return nativeType.bases().stream().anyMatch(b -> b.name().equals("abc.ABC") || isProtocolType(b.name()))
+            || nativeType.functions().stream().anyMatch(FunctionDef::isAbstract);
+    }
+
+    /**
+     * Whether a function of the class has the {@code ...} placeholder body.
+     */
+    final boolean hasPlaceholderBodies() {
+        return getNativeType().functions().stream().anyMatch(FunctionDef::hasPlaceholderBody);
     }
 
     private static boolean isProtocolType(String typeName) {

@@ -166,15 +166,6 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         return methodElement;
     }
 
-    /**
-     * Whether the method is abstract. A function decorated with {@code @abstractmethod}, declared by a
-     * {@code Protocol}, or declared by an {@code ABC} with the {@code ...} placeholder body is abstract. A
-     * placeholder body is also abstract in an {@link Introduction introduction} type ({@code @Client}, a
-     * repository, an AI service), whose methods are implemented by the introduction advice; in a concrete
-     * class it is a method returning {@code None}.
-     *
-     * @return True if the method is abstract
-     */
     @Override
     protected void copyValues(AbstractPythonElement element) {
         super.copyValues(element);
@@ -184,6 +175,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         }
     }
 
+    /**
+     * Whether the method is abstract. A function decorated with {@code @abstractmethod}, declared by a
+     * {@code Protocol}, or declared by an {@code ABC} with the {@code ...} placeholder body is abstract. A
+     * placeholder body is also abstract in an {@link Introduction introduction} type ({@code @Client}, a
+     * repository, an AI service), whose methods are implemented by the introduction advice; in a concrete
+     * class it is a method returning {@code None}.
+     *
+     * @return True if the method is abstract
+     */
     @Override
     public boolean isAbstract() {
         FunctionDef functionDef = getNativeType();
