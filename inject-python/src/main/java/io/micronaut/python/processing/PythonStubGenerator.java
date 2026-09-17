@@ -3883,9 +3883,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Whether a Python method bridged on its own account can be declared as a Java method of the generated class
      * under its own name and signature. Python allows names Java does not: a Java keyword ({@code default},
      * {@code new}) is not a valid method name, and a signature {@link Object} declares can only be overridden when
-     * the method is not final ({@code notify}, {@code wait}, {@code getClass}) and the return hint is compatible
-     * ({@code hashCode} returning a string is not). Such a method is left out of the generated class, as it was
-     * before every public method was bridged, rather than failing the compilation.
+     * the method is not final ({@code notify}, {@code wait}, {@code getClass}) and the return hint is compatible:
+     * the same primitive ({@code hashCode} returning a string is not) or a subtype of the reference type
+     * ({@code toString} without a hint returns {@code Object}, which cannot override a method returning
+     * {@code String}). Such a method is left out of the generated class, as it was before every public method
+     * was bridged, rather than failing the compilation.
      *
      * @param methodElement The declared method
      * @return Whether the method can be declared in Java
@@ -3906,10 +3908,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return false;
             }
             Class<?> objectReturnType = objectMethod.getReturnType();
-            TypeDef bridgeReturnType = methodReturnType(methodElement, false);
+            ClassElement bridgeReturnType = methodElement.getGenericReturnType();
             boolean compatibleReturnType = objectReturnType.isPrimitive()
-                ? TypeDef.primitive(objectReturnType).equals(bridgeReturnType)
-                : !bridgeReturnType.isPrimitive();
+                ? TypeDef.primitive(objectReturnType).equals(methodReturnType(methodElement, false))
+                : !bridgeReturnType.isPrimitive() && bridgeReturnType.isAssignable(objectReturnType);
             if (!compatibleReturnType) {
                 return false;
             }

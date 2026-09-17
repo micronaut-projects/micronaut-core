@@ -279,6 +279,41 @@ class Helper:
         context?.close()
     }
 
+    void "an override of an Object method is bridged only when its return hint is a subtype of the Java return type"() {
+        given: "toString without a hint (Object), with an incompatible hint and with the String hint Java accepts"
+        def context = buildContext('''
+class Plain:
+    def toString(self):
+        return "plain"
+
+
+class Listed:
+    def toString(self) -> list[str]:
+        return ["a"]
+
+
+class Named:
+    def toString(self) -> str:
+        return "named"
+''')
+        def plain = context.classLoader.loadClass("python.Plain").getConstructor().newInstance()
+        def listed = context.classLoader.loadClass("python.Listed").getConstructor().newInstance()
+        def named = context.classLoader.loadClass("python.Named").getConstructor().newInstance()
+
+        expect: "an Object or a list return cannot override String toString(), the method stays on the Python object"
+        plain.class.declaredMethods*.name.count("toString") == 0
+        listed.class.declaredMethods*.name.count("toString") == 0
+        plain.asPolyglotValue().invokeMember("toString").asString() == "plain"
+        listed.asPolyglotValue().invokeMember("toString").getArrayElement(0).asString() == "a"
+
+        and: "a String return is bridged and is what Java sees"
+        named.class.getDeclaredMethod("toString").returnType == String
+        String.valueOf(named) == "named"
+
+        cleanup:
+        context?.close()
+    }
+
     void "a repeatable type annotation of a bridged method is emitted as the repeated annotation"() {
         given:
         def context = buildContext('''
