@@ -1198,8 +1198,23 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
     return future
 
 def __micronaut_complete_completion_stage_awaitable(future, value, throwable):
-    """Complete a Python future from a Java ``CompletionStage`` callback."""
+    """Complete a Python future from a Java ``CompletionStage`` callback.
 
+    A future belongs to the thread running its loop. A stage completing on another thread while a
+    Python loop drives the awaiting coroutine on the calling thread (a Java caller without a Micronaut
+    event loop) hands the completion to that loop, which wakes it up; completing the future directly
+    would leave the loop waiting.
+    """
+
+    loop = future.get_loop()
+    thread_id = getattr(loop, "_thread_id", None)
+    if thread_id is not None and thread_id != threading.get_ident() and not loop.is_closed():
+        loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
+    else:
+        _micronaut_complete_future(future, value, throwable)
+
+
+def _micronaut_complete_future(future, value, throwable):
     if future.cancelled():
         return
     if throwable is None:

@@ -56,6 +56,8 @@ class HelloService:
 The rules for what is dispatched through the proxy are:
 
 * Only intercepted methods are affected. A method without advice called through `self` is a direct Python call, as before.
+* The interceptor chain runs on the object that made the call: a bean of a scope that hands out several objects (`@Prototype`, `@ThreadLocal`, a refreshable bean) keeps the state the calling method set.
 * Keyword arguments and omitted defaulted arguments are supported: `self.format(value, suffix="!")` reaches the interceptors of `format` with the arguments laid out the way the method declares them.
-* An intercepted `async def` method called through `self` returns an awaitable, as it does when called on the proxy. The interceptors see a `CompletionStage`, as they do for a Java bean, and the caller awaits the result.
-* The bean object must have a `__dict__`; a class that declares `__slots__` keeps direct `self` calls.
+* A method declaring `*args` or `**kwargs` has no fixed argument layout, so it keeps direct `self` calls: only calls through the proxy are intercepted.
+* An intercepted `async def` method called through `self` returns an awaitable, as it does when called on the proxy. The interceptors see a `CompletionStage`, as they do for a Java bean, and the caller awaits the result. The method body runs as a task of its own: changes it makes to `contextvars` do not reach the caller, and cancelling the caller cancels the nested call only when the interceptors hand back the stage of the method.
+* The bean object must have a `__dict__`; a class that declares `__slots__` keeps direct `self` calls. The attributes are visible in `vars(self)` and are not part of the state of the bean: a copy of the bean object keeps dispatching to the original.
