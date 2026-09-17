@@ -27,9 +27,6 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +57,6 @@ public final class PythonAsyncioRuntime {
     private static final String ASYNCIO_MODULE_BINDING = "__micronaut_asyncio_module";
     private static final String ASYNCIO_MODULE_SOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_asyncio.py";
     private static final ExceptionCompleter EXCEPTION_COMPLETER = new ExceptionCompleter();
-    private static final String ASYNCIO_FALLBACK_LOADER_NAME = "__micronaut_load_asyncio_module";
     private static final AtomicReference<@Nullable String> ASYNCIO_FALLBACK_SOURCE = new AtomicReference<>();
     private static final Source IMPORT_ASYNCIO_MODULE_SOURCE = Source.newBuilder(
         PythonContextRuntime.PYTHON,
@@ -71,17 +67,6 @@ public final class PythonAsyncioRuntime {
             + "')",
         "micronaut-import-asyncio-runtime.py"
     ).cached(true).buildLiteral();
-
-    private static final Source ASYNCIO_FALLBACK_LOADER_SOURCE = Source.newBuilder(PythonContextRuntime.PYTHON, """
-        import sys as __micronaut_sys
-        import types as __micronaut_types
-
-        def __micronaut_load_asyncio_module(source):
-            module = __micronaut_types.ModuleType('micronaut_asyncio')
-            __micronaut_sys.modules['micronaut_asyncio'] = module
-            exec(source, module.__dict__)
-            return module
-        """, "micronaut-load-asyncio-runtime.py").cached(true).buildLiteral();
 
     private PythonAsyncioRuntime() {
     }
@@ -330,12 +315,12 @@ public final class PythonAsyncioRuntime {
     private static Value asyncioModule(Context context) {
         Value bindings = context.getBindings(PythonContextRuntime.PYTHON);
         if (!bindings.hasMember(ASYNCIO_MODULE_BINDING)) {
-            importAsyncioModule(context, bindings);
+            importAsyncioModule(context);
         }
         return bindings.getMember(ASYNCIO_MODULE_BINDING);
     }
 
-    private static void importAsyncioModule(Context context, Value bindings) {
+    private static void importAsyncioModule(Context context) {
         try {
             context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
         } catch (PolyglotException e) {
@@ -343,29 +328,15 @@ public final class PythonAsyncioRuntime {
             if (message == null || !message.contains("ModuleNotFoundError")) {
                 throw e;
             }
-            loadAsyncioModuleSource(context, bindings);
+            loadAsyncioModuleSource(context);
         }
     }
 
-    private static void loadAsyncioModuleSource(Context context, Value bindings) {
-        try (InputStream inputStream = PythonAsyncioRuntime.class.getClassLoader().getResourceAsStream(ASYNCIO_MODULE_SOURCE)) {
-            String source = ASYNCIO_FALLBACK_SOURCE.get();
-            if (source == null) {
-                if (inputStream == null) {
-                    throw new IllegalStateException("Missing Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE);
-                }
-                String created = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                if (!ASYNCIO_FALLBACK_SOURCE.compareAndSet(null, created)) {
-                    source = ASYNCIO_FALLBACK_SOURCE.get();
-                } else {
-                    source = created;
-                }
-            }
-            Value module = PythonContextRuntime.helper(context, ASYNCIO_FALLBACK_LOADER_NAME, ASYNCIO_FALLBACK_LOADER_SOURCE).execute(source);
-            bindings.putMember(ASYNCIO_MODULE_BINDING, module);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot load Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE, e);
-        }
+    private static void loadAsyncioModuleSource(Context context) {
+        // the virtual file system of the context does not carry the module: serve it from the classpath
+        // resource and import it again, so concurrent first imports wait for the complete module
+        PythonContextRuntime.installRuntimeModuleFinder(context, ASYNCIO_MODULE_NAME, ASYNCIO_MODULE_SOURCE, ASYNCIO_FALLBACK_SOURCE);
+        context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
     }
 
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {

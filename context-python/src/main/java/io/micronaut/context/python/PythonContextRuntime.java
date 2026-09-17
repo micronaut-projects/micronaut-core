@@ -89,16 +89,43 @@ public final class PythonContextRuntime {
     private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
     private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
     private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
-    private static final Source LOAD_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, """
-        import sys as __micronaut_sys
-        import types as __micronaut_types
+    private static final String INSTALL_RUNTIME_MODULE_FINDER = "__micronaut_install_runtime_module_finder";
+    /**
+     * Installs a meta path finder that serves runtime modules from their classpath source when the
+     * virtual file system of the context does not carry them. Going through the import system, rather
+     * than publishing a module into {@code sys.modules} and executing its source afterwards, lets
+     * concurrent first imports of the module wait on the per-module import lock until it is complete.
+     * The finder is appended after the path finder: a module the virtual file system does carry wins.
+     */
+    private static final Source INSTALL_RUNTIME_MODULE_FINDER_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_install_runtime_module_finder(name, source):
+            import importlib.machinery
+            import sys
 
-        def __micronaut_load_runtime_module(source):
-            module = __micronaut_types.ModuleType('micronaut_runtime')
-            __micronaut_sys.modules['micronaut_runtime'] = module
-            exec(source, module.__dict__)
-            return module
-        """, "micronaut-load-runtime-module.py").cached(true).buildLiteral();
+            # two threads installing at once may append two finders; both serve the same sources
+            for finder in sys.meta_path:
+                sources = getattr(finder, 'micronaut_runtime_sources', None)
+                if sources is not None:
+                    sources.setdefault(name, source)
+                    return
+
+            class MicronautRuntimeModuleFinder:
+                micronaut_runtime_sources = {name: source}
+
+                def find_spec(self, fullname, path=None, target=None):
+                    if fullname not in self.micronaut_runtime_sources:
+                        return None
+                    return importlib.machinery.ModuleSpec(fullname, self, origin=fullname + '.py')
+
+                def create_module(self, spec):
+                    return None
+
+                def exec_module(self, module):
+                    name = module.__name__
+                    exec(compile(self.micronaut_runtime_sources[name], name + '.py', 'exec'), module.__dict__)
+
+            sys.meta_path.append(MicronautRuntimeModuleFinder())
+        """, "micronaut-install-runtime-module-finder.py").cached(true).buildLiteral();
     private static final AtomicReference<@Nullable String> RUNTIME_MODULE_FALLBACK_SOURCE = new AtomicReference<>();
     private static final Source RELOAD_MODULES_SOURCE = Source.newBuilder(PYTHON, """
         import importlib
@@ -1360,18 +1387,6 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Resolve a cached helper function of the {@code micronaut_runtime} module inside the given context.
-     * <p>
-     * Helpers are stored per-context because Graal values cannot be shared across contexts. Helper
-     * initialization deliberately avoids {@link PythonContextRegistry#withContextLock(Context, Supplier)} because GraalPy
-     * operations acquire the Python GIL; taking the context monitor first can deadlock with another
-     * thread that already owns the GIL and re-enters Micronaut runtime helper code.
-     *
-     * @param context The context that owns the helper function
-     * @param name The function name in the runtime module
-     * @return The helper function value for the context
-     */
-    /**
      * Run host-initiated Python code inside an execution frame of the context, so shutdown waits for
      * it and nested bridge calls share the frame.
      *
@@ -1420,6 +1435,12 @@ public final class PythonContextRuntime {
 
     /**
      * A function of the {@code micronaut_runtime} module, resolved once per context.
+     * <p>
+     * Helpers are stored per context because Graal values cannot be shared across contexts. Their
+     * initialization deliberately takes no Java monitor, because GraalPy operations acquire the
+     * Python GIL: a thread that owns the GIL and re-enters the runtime from Python would deadlock with
+     * a thread holding the monitor while waiting for the GIL. Concurrent first calls are safe instead
+     * because the module import is serialised by the Python import lock and the caches are atomic.
      *
      * @param context The context
      * @param name The function name
@@ -1458,6 +1479,8 @@ public final class PythonContextRuntime {
         Value bindings = context.getBindings(PYTHON);
         helper = bindings.getMember(name);
         if (helper == null || PythonConversion.isNone(helper)) {
+            // two threads may install the same bootstrap helper at once: the source only defines
+            // functions, so evaluating it twice binds equivalent functions and the cache keeps one
             context.eval(source);
             helper = bindings.getMember(name);
         }
@@ -1474,23 +1497,44 @@ public final class PythonContextRuntime {
             module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         } catch (PolyglotException e) {
             // The virtual file system of this context does not carry the module (a bare context created
-            // outside the application): load it from the classpath resource instead.
-            String source = RUNTIME_MODULE_FALLBACK_SOURCE.get();
-            if (source == null) {
-                try (InputStream inputStream = PythonContextRuntime.class.getClassLoader().getResourceAsStream(RUNTIME_MODULE_RESOURCE)) {
-                    if (inputStream == null) {
-                        throw new IllegalStateException("Resource [" + RUNTIME_MODULE_RESOURCE + "] not found", e);
-                    }
-                    source = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                } catch (IOException ioException) {
-                    throw new IllegalStateException("Unable to read [" + RUNTIME_MODULE_RESOURCE + "]", ioException);
-                }
-                RUNTIME_MODULE_FALLBACK_SOURCE.compareAndSet(null, source);
-            }
-            module = helper(context, "__micronaut_load_runtime_module", LOAD_RUNTIME_MODULE_SOURCE).execute(source);
+            // outside the application, or an application whose file system lists another module set):
+            // serve it from the classpath resource and import it again. The import system serialises
+            // the concurrent first imports of a module, so every thread sees it complete; a failure that
+            // is not a missing module recurs on the second import and propagates.
+            installRuntimeModuleFinder(context, RUNTIME_MODULE_NAME, RUNTIME_MODULE_RESOURCE, RUNTIME_MODULE_FALLBACK_SOURCE);
+            module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         }
-        state.runtimeModule.set(module);
-        return module;
+        Value existing = state.runtimeModule.compareAndExchange(null, module);
+        return existing == null ? module : existing;
+    }
+
+    /**
+     * Make a runtime module importable in a context whose virtual file system does not carry it, by
+     * serving its classpath source through a meta path finder of the context. Installing is
+     * idempotent and cheap once the finder exists; the source is read once per class loader.
+     *
+     * @param context The context
+     * @param moduleName The module name
+     * @param resource The classpath resource that holds the module source
+     * @param cache The cache of the module source
+     */
+    static void installRuntimeModuleFinder(Context context, String moduleName, String resource, AtomicReference<@Nullable String> cache) {
+        String source = cache.get();
+        if (source == null) {
+            try (InputStream inputStream = PythonContextRuntime.class.getClassLoader().getResourceAsStream(resource)) {
+                if (inputStream == null) {
+                    throw new IllegalStateException("Resource [" + resource + "] not found");
+                }
+                source = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
+            } catch (IOException ioException) {
+                throw new IllegalStateException("Unable to read [" + resource + "]", ioException);
+            }
+            String cached = cache.compareAndExchange(null, source);
+            if (cached != null) {
+                source = cached;
+            }
+        }
+        helper(context, INSTALL_RUNTIME_MODULE_FINDER, INSTALL_RUNTIME_MODULE_FINDER_SOURCE).executeVoid(moduleName, source);
     }
 
     static <T extends @Nullable Object> T withPrimaryContext(Function<Context, T> callback) {

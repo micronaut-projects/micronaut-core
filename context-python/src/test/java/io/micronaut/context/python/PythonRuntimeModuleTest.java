@@ -4,10 +4,15 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -59,6 +64,51 @@ final class PythonRuntimeModuleTest {
             Value instance = PythonContextRuntime.helper(context, "__micronaut_new_uninitialized_instance")
                 .execute(context.eval(PYTHON, "class Book:\n    def __init__(self):\n        raise AssertionError('init must not run')\nBook"));
             assertEquals("Book", instance.getMetaObject().getMetaSimpleName());
+            PythonContextRegistry.unregisterContext(context);
+        }
+    }
+
+    /**
+     * Threads resolve their first helper while another thread is loading the module, in a context
+     * whose virtual file system does not carry it (lifecycle callbacks instantiating Python beans on
+     * a pool): every one of them waits for the classpath fallback to complete the module, which is
+     * loaded once, and none observes it half-built.
+     */
+    @Test
+    void concurrentFirstHelperResolutionsSeeTheCompleteModule() throws Exception {
+        int threads = 8;
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            PythonContextRegistry.registerContext(context);
+            assertFalse(context.eval(PYTHON, "import sys; 'micronaut_runtime' in sys.modules").asBoolean());
+            List<Future<Value>> resolved = new ArrayList<>();
+            try (ExecutorService executor = Executors.newFixedThreadPool(threads)) {
+                for (int i = 0; i < threads; i++) {
+                    // the module import takes seconds (asyncio); the threads arrive during the load
+                    long delay = i * 100L;
+                    String helper = i % 2 == 0 ? "__micronaut_import_module" : HELPERS.get(i % HELPERS.size());
+                    resolved.add(executor.submit(() -> {
+                        Thread.sleep(delay);
+                        return PythonContextRuntime.helper(context, helper);
+                    }));
+                }
+                for (Future<Value> future : resolved) {
+                    assertTrue(future.get().canExecute());
+                }
+            }
+            Value module = context.eval(PYTHON, "import micronaut_runtime; micronaut_runtime");
+            for (String helper : HELPERS) {
+                assertTrue(module.hasMember(helper), helper);
+                assertSame(PythonContextRuntime.helper(context, helper), PythonContextRuntime.helper(context, helper), helper + " is cached");
+            }
+            // every helper defined by the module (some alias stdlib functions) belongs to the one
+            // module object, not to a copy loaded by a racing thread
+            Value moduleCount = context.eval(PYTHON, """
+                lambda *functions: len({id(f.__globals__) for f in functions if f.__globals__.get('__name__') == 'micronaut_runtime'})""");
+            List<Value> helpers = new ArrayList<>();
+            for (Future<Value> future : resolved) {
+                helpers.add(future.get());
+            }
+            assertEquals(1, moduleCount.execute(helpers.toArray()).asInt());
             PythonContextRegistry.unregisterContext(context);
         }
     }
