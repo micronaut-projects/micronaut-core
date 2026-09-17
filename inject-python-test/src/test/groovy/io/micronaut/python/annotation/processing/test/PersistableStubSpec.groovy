@@ -50,6 +50,9 @@ class Customer:
     firstName: str
     lastName: str | None = None
 
+    def display_name(self) -> str:
+        return self.firstName if self.lastName is None else self.firstName + " " + self.lastName
+
 
 @Introspected
 @dataclass
@@ -82,6 +85,17 @@ class CustomerRepository:
     @Executable
     def find(self, data: Data, id: str) -> Customer | None:
         return data.customers.get(id)
+
+    @Executable
+    def inspect(self, data: Data, id: str) -> str:
+        c = data.customers[id]
+        same = Customer(c.id, c.firstName, c.lastName)
+        return ",".join(str(x) for x in [
+            isinstance(c, Customer),
+            c == same,
+            (c.id, c.firstName, c.lastName) == (same.id, same.firstName, same.lastName),
+            c.display_name(),
+        ])
 
     @Executable
     def describe(self, data: Data) -> str:
@@ -208,6 +222,12 @@ class CustomerRepository:
         then:
         repository.find(root, 'c1').firstName == 'Sergio B.'
         repository.describe(root) == 'Sergio B.:del Amo|Sergio'
+
+        when: "Python inspects an entry of the Java-owned collection"
+        String inspected = repository.inspect(root, 'c1')
+
+        then: "the entry is the Java object: not an instance of the Python class and not equal to one, but its attributes and methods work"
+        inspected == 'False,False,True,Sergio B. del Amo'
 
         cleanup:
         ctx?.close()

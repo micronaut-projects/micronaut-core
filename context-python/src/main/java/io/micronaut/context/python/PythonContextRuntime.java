@@ -175,30 +175,20 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Check whether the supplied context is the primary context of the installed runtime.
+     * Check whether the supplied context is the primary context of the installed runtime, the one a
+     * generated wrapper creates its Python object in.
      * <p>
      * {@link Context#equals(Object)} compares the underlying context, so the creator instance and the
      * view returned by {@link Value#getContext()} both match the primary context.
      *
      * @param context The context to compare
      * @return {@code true} when the context is the primary runtime context
-     */
-    static boolean isCurrentContext(@Nullable Context context) {
-        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
-        return runtime == null ? context == null : runtime.owns(context);
-    }
-
-    /**
-     * Whether a context is the primary context of the installed runtime, the one a generated
-     * wrapper creates its Python object in.
-     *
-     * @param context The context, or a view of one
-     * @return {@code true} when the context is the primary context
      * @since 5.2.0
      */
     @UsedByGeneratedCode
-    public static boolean isPrimaryContext(Context context) {
-        return isCurrentContext(context);
+    public static boolean isCurrentContext(@Nullable Context context) {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        return runtime == null ? context == null : runtime.owns(context);
     }
 
     /**

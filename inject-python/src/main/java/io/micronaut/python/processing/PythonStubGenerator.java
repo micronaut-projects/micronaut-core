@@ -116,6 +116,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
 
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
     public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField(CLASS_FIELD, TypeDef.CLASS);
@@ -1134,7 +1135,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 targetValue.returning()
                             ));
                             reconstructedBody = storedValue.isNull()
-                                .and(PYTHON_CONTEXT_RUNTIME.invokeStatic("isPrimaryContext", TypeDef.Primitive.BOOLEAN, targetContext).isTrue())
+                                .and(PYTHON_CONTEXT_RUNTIME.invokeStatic("isCurrentContext", TypeDef.Primitive.BOOLEAN, targetContext).isTrue())
                                 .doIfElse(createOwn, reconstructedBody);
                         }
                         return PYTHON_COERCION.invokeStatic("isValueInContext", TypeDef.Primitive.BOOLEAN, storedValue, targetContext).isTrue()
@@ -4433,7 +4434,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .doIf(StatementDef.multi(
                         aThis.field(field).assign(convertedValue),
                         PYTHON_COERCION.invokeStatic(
-                            "putMember",
+                            PUT_MEMBER,
                             TypeDef.VOID,
                             aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
                             ExpressionDef.constant(beanProperty.getName()),
@@ -4639,7 +4640,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
             if (!adaptAsyncMembers) {
                 return PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -4648,7 +4649,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -4685,7 +4686,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
             if (!adaptAsyncMembers) {
                 return PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -4694,7 +4695,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -4759,7 +4760,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 targetContext
             );
             ExpressionDef.InvokeInstanceMethod result = targetValue.invoke(
-                "putMember",
+                PUT_MEMBER,
                 TypeDef.VOID,
                 parameters
             );
@@ -4999,7 +5000,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // a Java object of this class that went to Python and comes back (a wrapper handed over by
             // reference, or an entry of a Java collection Python worked on) keeps its identity: a new
             // wrapper around it would be a stale copy the Java side never sees changes of
-            VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField("class", TypeDef.CLASS))
+            VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
             thisType.instantiate(value).returning()
@@ -5109,7 +5110,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         } else {
             coerced = PYTHON_COERCION.invokeStatic(
-                "putMember",
+                PUT_MEMBER,
                 TypeDef.VOID,
                 target,
                 name,

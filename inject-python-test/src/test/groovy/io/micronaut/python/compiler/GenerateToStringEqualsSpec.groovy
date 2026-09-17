@@ -74,7 +74,7 @@ class Person:
       PythonCoercion.rememberPooledValue(this, arg1, this.graalpyInternalValue);
       return this.asPolyglotValue();
     } else {
-      if (this.graalpyInternalValue == null && PythonContextRuntime.isPrimaryContext(arg1)) {
+      if (this.graalpyInternalValue == null && PythonContextRuntime.isCurrentContext(arg1)) {
         Value targetValue = this.asPolyglotValue();
         PythonCoercion.rememberPooledValue(this, arg1, targetValue);
         return targetValue;
