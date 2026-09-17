@@ -108,7 +108,8 @@ class MicronautTransformer(ast.NodeTransformer):
         # The transformed source is only read by the compile-time processor, which resolves Java names,
         # so the module keeps its Java name here (``io.`` included); only the runtime transformer strips it.
         transformed_module = self._to_python_import_module(java_module)
-        java_io_package = is_java_io_package(java_module)
+        # A relative import (``from .io.util import helper``) names an application sub-package, never Java
+        java_io_package = node.level == 0 and is_java_io_package(java_module)
 
         # Collect imports to transform - check if JavaVisitorContext.getClassElements returns annotations
         transformed_any = False
@@ -130,7 +131,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     if self._handle_package_import(f'{java_module}.{alias.name}'):
                         imports_java_package = True
                     else:
-                        self.validation_errors.append(unresolved_java_io_import_error(f'{java_module}.{alias.name}'))
+                        self.validation_errors.append(self._java_io_import_error(node.module, java_module, alias))
 
         if transformed_any and not imports_java_package:
             # The generated decorators and java.type() assignments replace the import
@@ -188,6 +189,25 @@ class MicronautTransformer(ast.NodeTransformer):
                 if decorator_code:
                     self.transformed_code.append(decorator_code)
         return True
+
+    def _java_io_import_error(self, python_module: str, java_module: str, alias) -> str:
+        """
+        The error for ``from io.<x> import <name>`` that resolved to nothing: either the name is unknown on the
+        classpath, or it is a Java annotation whose decorator name is already taken by another annotation
+        imported earlier (``from micronaut.http.annotation import *`` followed by
+        ``from io.swagger.v3.oas.annotations.headers import Header``), which needs an alias.
+        """
+        full_name = f'{java_module}.{alias.name}'
+        variable_name = alias.asname or alias.name
+        class_element = self._lookup_imported_class_element(java_module, alias.name)
+        if class_element is not None and variable_name in self.generated_decorators:
+            suggested_alias = f'{java_module.split(".")[1].capitalize()}{alias.name}'
+            return (
+                f"Java import [{full_name}] clashes with the decorator [{variable_name}] generated for another "
+                f"Java annotation imported earlier in this module. Import it under an alias, such as "
+                f"[from {python_module} import {alias.name} as {suggested_alias}]."
+            )
+        return unresolved_java_io_import_error(full_name)
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
@@ -1200,7 +1220,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 if class_element.isInterface():
                     self.imported_java_interface_names.add(variable_name)
 
-        if is_java_io_package(java_module):
+        if node.level == 0 and is_java_io_package(java_module):
+            # (a relative ``from .io.util import helper`` names an application sub-package, never Java)
             transformed_module = strip_java_io_prefix(self._to_python_import_module(java_module))
             return ast.copy_location(
                 ast.ImportFrom(module=transformed_module, names=node.names, level=node.level),

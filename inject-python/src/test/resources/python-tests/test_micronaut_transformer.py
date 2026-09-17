@@ -3,6 +3,7 @@ Unit tests for micronaut_transformer.py, run inside GraalPy by PythonSourceUnitT
 """
 import ast
 import unittest
+from unittest import mock
 
 from micronaut_transformer import MicronautTransformer, MicronautRuntimeTransformer, ast_equal, unparse
 
@@ -13,6 +14,17 @@ def no_class_element(name):
 
 def no_class_elements(package):
     return []
+
+
+class FakeClassElement:
+    def __init__(self, name):
+        self.name = name
+
+    def getName(self):
+        return self.name
+
+    def getSimpleName(self):
+        return self.name.split('.')[-1]
 
 
 class AstEqualTest(unittest.TestCase):
@@ -92,6 +104,36 @@ class TransformerTest(unittest.TestCase):
         self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2])
         self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3])
 
+    def test_relative_import_of_an_application_io_package_is_not_a_java_import(self):
+        source = "from .io.util import helper\nfrom ..io import util\nfrom . import io\n"
+        transformer = MicronautTransformer(no_class_element, no_class_elements)
+        transformed = transformer.visit(ast.parse(source))
+        self.assertEqual([], transformer.validation_errors)
+        self.assertTrue(ast_equal(ast.parse(source), transformed))
+
+    def test_java_io_package_import_without_alias_is_reported(self):
+        transformer = MicronautTransformer(no_class_element, lambda package: [FakeClassElement(package + ".Hidden")])
+        with mock.patch.object(MicronautTransformer, "_is_annotation_class", return_value=False):
+            transformer.visit(ast.parse("import io.swagger.v3.oas.annotations\nimport io.swagger.v3.oas.annotations as oas\n"))
+        errors = transformer.validation_errors
+        self.assertEqual(1, len(errors), errors)
+        self.assertIn(
+            "Java package import [import io.swagger.v3.oas.annotations] requires an alias such as "
+            "[import io.swagger.v3.oas.annotations as annotations]",
+            errors[0],
+        )
+
+    def test_io_annotation_clashing_with_a_generated_decorator_is_reported_with_an_alias_hint(self):
+        transformer = MicronautTransformer(FakeClassElement, no_class_elements)
+        # as left behind by ``from micronaut.http.annotation import *``
+        transformer.generated_decorators.add("Header")
+        with mock.patch.object(MicronautTransformer, "_is_annotation_class", return_value=True):
+            transformer.visit(ast.parse("from io.swagger.v3.oas.annotations.headers import Header\n"))
+        errors = transformer.validation_errors
+        self.assertEqual(1, len(errors), errors)
+        self.assertIn("Java import [io.swagger.v3.oas.annotations.headers.Header] clashes with the decorator [Header]", errors[0])
+        self.assertIn("[from io.swagger.v3.oas.annotations.headers import Header as SwaggerHeader]", errors[0])
+
 
 class RuntimeImportRewriteTest(unittest.TestCase):
     def rewrite(self, source):
@@ -119,7 +161,7 @@ class RuntimeImportRewriteTest(unittest.TestCase):
         self.assertIn("import swagger.v3.oas.annotations as oas, micronaut.http.annotation as http", code)
 
     def test_python_io_module_imports_are_untouched(self):
-        source = "import io\nfrom io import StringIO\nimport io as pyio\n"
+        source = "import io\nfrom io import StringIO\nimport io as pyio\nfrom .io.util import helper\nfrom ..io import util\n"
         self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source))))
 
 
