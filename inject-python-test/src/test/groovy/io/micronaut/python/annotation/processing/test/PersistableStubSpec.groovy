@@ -226,8 +226,8 @@ class CustomerRepository:
         when: "Python inspects an entry of the Java-owned collection"
         String inspected = repository.inspect(root, 'c1')
 
-        then: "the entry is the Java object: not an instance of the Python class and not equal to one, but its attributes and methods work"
-        inspected == 'False,False,True,Sergio B. del Amo'
+        then: "the entry is the Java object, seen through the wrapper view: an instance of the Python class, equal to one, with its attributes and methods"
+        inspected == 'True,True,True,Sergio B. del Amo'
 
         cleanup:
         ctx?.close()

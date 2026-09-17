@@ -27,7 +27,7 @@ This applies to every `Class` parameter, including the type arguments of `Argume
 
 A Java API that returns an instance of a compiled Python class returns the generated Java wrapper of the Python object: an `HttpClient.retrieve(request, Book)` call, `ObjectMapper.readValue(json, Book)` or `ApplicationContext.getBean(BookService)`. In Python such a wrapper behaves as the Python object it wraps:
 
-* `==`, `!=` and `hash()` compare the Python object (a dataclass compares by value), so a deserialized `Book` compares equal to a `Book` constructed in Python and can be looked up in a set or a dictionary.
+* `==`, `!=` and `hash()` are those of the Python object (a dataclass compares by value), so a deserialized `Book` compares equal to a `Book` constructed in Python. It can be looked up in a set or a dictionary when the Python class is hashable: a frozen dataclass, or one declared with `unsafe_hash=True` or a `__hash__` method. A non-frozen dataclass sets `__hash__` to `None`, so its wrapper is unhashable too (`TypeError: unhashable type`), as the Python object is.
 * `isinstance(book, Book)` is `True` and `book.__class__` is the Python class; `type(book)` is the interop view of the wrapper.
 * `repr()` and `str()` are those of the Python object.
 * Attributes and methods are those of the Python object, together with the public Java members of the wrapper.
