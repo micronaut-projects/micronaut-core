@@ -117,7 +117,7 @@ final class PythonInterfaceStubGenerator {
         }
         copyRuntimeAnnotations(classElement, interfaceBuilder, ElementType.TYPE, context);
         Set<String> addedMethodNames = new LinkedHashSet<>();
-        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAccessible().onlyInstance())) {
+        for (MethodElement methodElement : declaredInstanceMethods(classElement)) {
             if (!addedMethodNames.add(bridgeMethodKey(methodElement))) {
                 continue;
             }
@@ -140,6 +140,22 @@ final class PythonInterfaceStubGenerator {
             }
         }
         return interfaceBuilder.build();
+    }
+
+    /**
+     * The instance methods the Python class declares, as the element model reports them to the bean definition
+     * and proxy writers: a Python method that overrides a method of an implemented Java interface adopts the
+     * signature of that method (the boxed {@code Integer} id of a repository for an {@code int} hint), and the
+     * generated interface has to declare the same signature for the introduction proxy to implement it.
+     */
+    private static List<MethodElement> declaredInstanceMethods(AbstractPythonClassElement classElement) {
+        List<MethodElement> methods = new ArrayList<>();
+        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible().onlyInstance())) {
+            if (methodElement.getDeclaringType().equals(classElement)) {
+                methods.add(methodElement);
+            }
+        }
+        return methods;
     }
 
     /**

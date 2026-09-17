@@ -450,8 +450,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
      *     Python spelling of a Java interface;</li>
      *     <li>an {@link #isIntroductionInterface() introduction interface}: a class decorated with an
      *     {@link Introduction} stereotype ({@code @Client}, an AI service, ...) whose instance methods are all
-     *     abstract. Micronaut implements such a type with an introduction proxy, and frameworks that build the
-     *     implementation reflectively need the Java interface, not a class wrapping a Python object.</li>
+     *     abstract and none of which declares a {@code *args} parameter. Micronaut implements such a type with an
+     *     introduction proxy, and frameworks that build the implementation reflectively need the Java interface,
+     *     not a class wrapping a Python object.</li>
      * </ul>
      *
      * @return True if the class compiles to an interface
@@ -477,10 +478,14 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
         if (isIntroduction) {
             // static functions become static interface methods bridged to Python; the instance
-            // methods are all implemented by the introduction advice
+            // methods are all implemented by the introduction advice. A method with a `*args` parameter
+            // keeps the type a class served by the runtime proxy, which collects the positional arguments
+            // Python passes into the trailing array: the generated interface would declare a plain array
+            // parameter (not a Java varargs one) that a Python caller could not spread into through host interop.
             return declaredMethods.stream().allMatch(method -> method.isAbstract() || method.isStatic())
                 && declaredMethods.stream().anyMatch(MethodElement::isAbstract)
-                && declaredMethods.stream().noneMatch(PythonClassElement::isDeclaredBeanMethod);
+                && declaredMethods.stream().noneMatch(PythonClassElement::isDeclaredBeanMethod)
+                && declaredMethods.stream().noneMatch(MethodElement::isVarArgs);
         }
         return declaredMethods.stream().allMatch(MethodElement::isAbstract)
             && declaredMethods.stream().noneMatch(PythonClassElement::isIntroductionFactoryMethod);

@@ -364,6 +364,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
      * {@code Object} return is the exception, the stub narrows it to the Python type.
      */
     private static MethodElement withInheritedSignature(PythonMethodElement pythonMethod, MethodElement inheritedMethod) {
+        if (inheritedMethod instanceof PythonMethodElement) {
+            // A method inherited from a Python interface already carries the Python names and annotations, and
+            // its parameters keep the erased type next to the resolved one: the proxy generated for an interface
+            // implements the erased descriptor (save(Object) for save(T)) while the argument reports the bound type.
+            return pythonMethod.withParameters(inheritedMethod.getParameters());
+        }
         ParameterElement[] pythonParameters = pythonMethod.getParameters();
         ParameterElement[] parameters = inheritedMethod.getParameters().clone();
         if (pythonParameters.length == parameters.length) {
