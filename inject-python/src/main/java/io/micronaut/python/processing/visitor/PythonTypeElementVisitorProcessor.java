@@ -182,25 +182,46 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
-        List<AbstractBeanDefinitionBuilder> associatedBeanBuilders = List.of();
-        if (writeAssociatedBeans) {
-            // The stubs are written when the stub generator finishes, so the producer methods of the
-            // associated beans registered so far are bridged into them first
-            associatedBeanBuilders = takeAssociatedBeanBuilders(pythonVisitorContext);
-            bridgeProducerMethods(associatedBeanBuilders, pythonVisitorContext);
-        }
+        // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
+        // the producer methods of the associated beans a visitor registers in visitClass or in its own finish
+        // are bridged into the stubs before they are written
+        LoadedVisitor stubGeneratorVisitor = findStubGeneratorVisitor();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().finish(pythonVisitorContext);
-            } catch (Throwable e) {
-                failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+            if (loadedVisitor != stubGeneratorVisitor) {
+                finishVisitor(loadedVisitor, pythonVisitorContext);
             }
         }
+        List<AbstractBeanDefinitionBuilder> associatedBeanBuilders = new ArrayList<>();
         if (writeAssociatedBeans) {
-            List<AbstractBeanDefinitionBuilder> allBuilders = new ArrayList<>(associatedBeanBuilders);
-            allBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
-            writeAssociatedBeanDefinitions(pythonVisitorContext, allBuilders);
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            if (stubGeneratorVisitor != null) {
+                bridgeProducerMethods((PythonStubGenerator) stubGeneratorVisitor.getVisitor(), associatedBeanBuilders, pythonVisitorContext);
+            }
         }
+        if (stubGeneratorVisitor != null) {
+            finishVisitor(stubGeneratorVisitor, pythonVisitorContext);
+        }
+        if (writeAssociatedBeans) {
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            writeAssociatedBeanDefinitions(pythonVisitorContext, associatedBeanBuilders);
+        }
+    }
+
+    private void finishVisitor(LoadedVisitor loadedVisitor, PythonVisitorContext pythonVisitorContext) {
+        try {
+            loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        } catch (Throwable e) {
+            failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+        }
+    }
+
+    private @Nullable LoadedVisitor findStubGeneratorVisitor() {
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor() instanceof PythonStubGenerator) {
+                return loadedVisitor;
+            }
+        }
+        return null;
     }
 
     private static List<AbstractBeanDefinitionBuilder> takeAssociatedBeanBuilders(PythonVisitorContext pythonVisitorContext) {
@@ -216,17 +237,7 @@ public final class PythonTypeElementVisitorProcessor {
      * bean type, which for a Python class is the generated Java stub. The stub only bridges the Python methods
      * Micronaut needs to see, so the producer methods of the associated beans are bridged explicitly.
      */
-    private void bridgeProducerMethods(List<AbstractBeanDefinitionBuilder> beanElementBuilders, PythonVisitorContext pythonVisitorContext) {
-        PythonStubGenerator stubGenerator = null;
-        for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            if (loadedVisitor.getVisitor() instanceof PythonStubGenerator pythonStubGenerator) {
-                stubGenerator = pythonStubGenerator;
-                break;
-            }
-        }
-        if (stubGenerator == null) {
-            return;
-        }
+    private static void bridgeProducerMethods(PythonStubGenerator stubGenerator, List<AbstractBeanDefinitionBuilder> beanElementBuilders, PythonVisitorContext pythonVisitorContext) {
         for (AbstractBeanDefinitionBuilder beanElementBuilder : beanElementBuilders) {
             for (AbstractBeanDefinitionBuilder childBean : beanElementBuilder.getChildBeans()) {
                 if (childBean.getProducingElement() instanceof PythonMethodElement producerMethod) {

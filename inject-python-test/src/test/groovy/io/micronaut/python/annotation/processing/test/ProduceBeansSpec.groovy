@@ -129,8 +129,59 @@ class ProducerApplication:
         context?.close()
     }
 
+    void "test producer methods of a module imported when the visitor finishes yield child beans"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from io.micronaut.python.annotation.processing.test.beanbuilder import ProducesChild
+
+class CheckoutProcessor:
+
+    def describe(self) -> str:
+        return "checkout"
+
+class LateProduct:
+
+    def describe(self) -> str:
+        return "late"
+
+class ProducerModule:
+
+    @ProducesChild
+    def provide_processor(self) -> CheckoutProcessor:
+        return CheckoutProcessor()
+
+class LateProducerModule:
+
+    @ProducesChild
+    def provide_product(self) -> LateProduct:
+        return LateProduct()
+
+@Singleton
+class ProducerApplication:
+    pass
+''')
+
+        expect:
+        ProducerModuleVisitor.IMPORTED == ["python.ProducerModule", "python.LateProducerModule"]
+        context.getBeanDefinitions(context.classLoader.loadClass("python.LateProducerModule")).size() == 1
+        context.getBeanDefinitions(context.classLoader.loadClass("python.LateProduct")).size() == 1
+
+        when:
+        def product = getBean(context, "python.LateProduct")
+
+        then:
+        product.asPolyglotValue().invokeMember("describe").asString() == "late"
+
+        cleanup:
+        ProducerModuleVisitor.IMPORTED.clear()
+        context?.close()
+    }
+
     static class ProducerModuleVisitor implements TypeElementVisitor<Object, Object> {
         static final List<String> IMPORTED = []
+
+        private ClassElement application
 
         @Override
         void visitClass(ClassElement element, VisitorContext context) {
@@ -141,6 +192,20 @@ class ProducerApplication:
             if (module == null) {
                 throw new ProcessingException(element, "Module [python.ProducerModule] not found")
             }
+            application = element
+            importModule(element, module)
+        }
+
+        @Override
+        void finish(VisitorContext context) {
+            // a module imported when the visitor finishes, after every class was visited
+            if (application != null) {
+                context.getClassElement("python.LateProducerModule").ifPresent { importModule(application, it) }
+                application = null
+            }
+        }
+
+        private static void importModule(ClassElement element, ClassElement module) {
             MethodElement primaryConstructor = module.getPrimaryConstructor().orElse(null)
             if (primaryConstructor == null) {
                 throw new ProcessingException(element, "Cannot import module [" + module.name + "], since it has no accessible constructor")

@@ -69,6 +69,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     private Map<String, ClassElement> resolvedTypeArguments;
     private FunctionDef constructor;
+    private List<PythonClassElement> inheritedPythonClasses;
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
@@ -263,8 +264,8 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     /**
      * Finds the {@code __init__} of this class: the declared one (including the constructor derived from the
-     * fields of a dataclass), otherwise the one inherited from the nearest Python base class that declares one,
-     * which Python calls when the subclass is instantiated.
+     * fields of a dataclass), otherwise the one inherited from the first Python base class in the method
+     * resolution order that declares one, which Python calls when the subclass is instantiated.
      *
      * @return The constructor, if the class declares or inherits one
      */
@@ -273,17 +274,87 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         if (constructor != null) {
             return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
         }
-        Set<String> visited = new LinkedHashSet<>();
-        visited.add(getName());
-        ClassElement superType = getSuperType().orElse(null);
-        while (superType instanceof PythonClassElement pythonSuperType && visited.add(pythonSuperType.getName())) {
+        for (PythonClassElement pythonSuperType : inheritedPythonClasses()) {
             FunctionDef inheritedConstructor = pythonSuperType.declaredConstructor();
             if (inheritedConstructor != null) {
                 return Optional.of(new PythonConstructorElement(inheritedConstructor, environment, pythonSuperType, this, environment.metadataFactory()));
             }
-            superType = pythonSuperType.getSuperType().orElse(null);
         }
         return Optional.empty();
+    }
+
+    /**
+     * The Python classes this class inherits from, in Python's method resolution order (the C3 linearization
+     * of the compiled Python bases), without this class: the order in which Python looks up an inherited
+     * member such as {@code __init__}. For {@code class C(Mixin, Base)} the mixin comes before the base and
+     * both before the bases of the mixin.
+     *
+     * @return The inherited Python classes in method resolution order
+     */
+    private List<PythonClassElement> inheritedPythonClasses() {
+        if (inheritedPythonClasses == null) {
+            List<PythonClassElement> linearization = linearize(new LinkedHashSet<>());
+            inheritedPythonClasses = List.copyOf(linearization.subList(1, linearization.size()));
+        }
+        return inheritedPythonClasses;
+    }
+
+    private List<PythonClassElement> linearize(Set<String> inProgress) {
+        List<PythonClassElement> linearization = new ArrayList<>();
+        linearization.add(this);
+        if (!inProgress.add(getName())) {
+            // a cyclic hierarchy, which Python rejects: stop here
+            return linearization;
+        }
+        List<PythonClassElement> bases = new ArrayList<>();
+        for (TypeRef basis : getNativeType().bases()) {
+            if (findPythonClass(basis) instanceof PythonClassElement pythonBase
+                && bases.stream().noneMatch(base -> base.getName().equals(pythonBase.getName()))) {
+                bases.add(pythonBase);
+            }
+        }
+        List<List<PythonClassElement>> sequences = new ArrayList<>(bases.size() + 1);
+        for (PythonClassElement base : bases) {
+            sequences.add(new ArrayList<>(base.linearize(inProgress)));
+        }
+        sequences.add(bases);
+        merge(sequences, linearization);
+        inProgress.remove(getName());
+        return linearization;
+    }
+
+    /**
+     * The C3 merge: repeatedly takes the head of the first sequence that does not appear in the tail of any
+     * other sequence. A hierarchy without such a head is inconsistent (Python refuses to create the class);
+     * the first remaining head is taken then so that every base is still visited.
+     */
+    private static void merge(List<List<PythonClassElement>> sequences, List<PythonClassElement> linearization) {
+        while (true) {
+            sequences.removeIf(List::isEmpty);
+            if (sequences.isEmpty()) {
+                return;
+            }
+            PythonClassElement next = sequences.stream()
+                .map(List::getFirst)
+                .filter(head -> sequences.stream().noneMatch(sequence -> indexOf(sequence, head) > 0))
+                .findFirst()
+                .orElseGet(() -> sequences.getFirst().getFirst());
+            linearization.add(next);
+            for (List<PythonClassElement> sequence : sequences) {
+                if (!sequence.isEmpty() && sequence.getFirst().getName().equals(next.getName())) {
+                    sequence.removeFirst();
+                }
+            }
+        }
+    }
+
+    private static int indexOf(List<PythonClassElement> sequence, PythonClassElement element) {
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i).getName().equals(element.getName())) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /**
@@ -421,8 +492,12 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return decorators.stream().anyMatch(decorator -> DATACLASS_DECORATOR.equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
     }
 
-    private boolean hasDeclaredConstructorOrCreator() {
-        return declaredConstructor() != null || findCreatorFunction().isPresent();
+    /**
+     * Whether the class declares or inherits an {@code __init__}, or declares a {@code @Creator} function: a
+     * class constructed with arguments is never an interface.
+     */
+    private boolean hasConstructorOrCreator() {
+        return findConstructor().isPresent() || findCreatorFunction().isPresent();
     }
 
     /**
@@ -517,7 +592,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     @Override
     public boolean isInterface() {
         if (hasStereotype(Introspected.class)
-            || hasDeclaredConstructorOrCreator()
+            || hasConstructorOrCreator()
             || !getNativeType().attributes().isEmpty()
             || !getNativeType().properties().isEmpty()) {
             return false;

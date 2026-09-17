@@ -5062,9 +5062,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param visitorContext The visitor context
      */
     public void bridgeProducerMethod(PythonMethodElement producerMethod, VisitorContext visitorContext) {
-        StubEntry stubEntry = classBuilders.get(producerMethod.getDeclaringType().getName());
+        String declaringTypeName = producerMethod.getDeclaringType().getName();
+        StubEntry stubEntry = classBuilders.get(declaringTypeName);
         if (stubEntry != null) {
             addBridgeMethod(BridgeMethodSpec.of(producerMethod, stubEntry.originatingElement), stubEntry.builder, visitorContext, stubEntry.bridgedMethods);
+        } else {
+            // the declaring class is not compiled in this round (a base class of another module, for example):
+            // its stub does not get the bridge, and the child bean definition cannot invoke the producer
+            visitorContext.warn("Producer method [" + producerMethod.getName() + "] of associated bean ["
+                + producerMethod.getOwningType().getName() + "] is declared by [" + declaringTypeName
+                + "], which is not compiled in this round: the method is not bridged into the generated Java class", producerMethod);
         }
     }
 
