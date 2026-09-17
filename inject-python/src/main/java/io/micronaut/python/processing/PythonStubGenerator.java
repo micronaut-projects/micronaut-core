@@ -168,6 +168,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
+    private static final String ANN_CREATOR = "io.micronaut.core.annotation.Creator";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
     private static final String ANN_ANNOTATION_EXPRESSION_CONTEXT = "io.micronaut.context.annotation.AnnotationExpressionContext";
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
@@ -206,9 +207,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
+    private final Map<String, Boolean> junitExtensionAnnotations = new HashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
 
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
+    private static final String JUNIT_EXTEND_WITH = "org.junit.jupiter.api.extension.ExtendWith";
+    private static final String JUNIT_EXTENSIONS = "org.junit.jupiter.api.extension.Extensions";
     private static final String ANN_MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
@@ -656,7 +660,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Bridges the declared methods that Micronaut needs to see (executable, advised, lifecycle, mapper, configuration builder) and returns them.
+     * Bridges the declared methods of the class: the methods Micronaut needs to see (executable, advised, lifecycle,
+     * mapper, configuration builder) are bridged first and returned, then every other public method.
      */
     private BridgedMethods addBridgeMethods(ClassStubModel model, Set<String> addedMethodNames, boolean isConfigurationBuilderType) {
         ClassElement element = model.element();
@@ -665,7 +670,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassDef.ClassDefBuilder builder = model.builder();
         VisitorContext context = model.context();
         List<PropertyElement> beanProperties = model.beanProperties();
-        boolean isIntrospectedBean = model.isIntrospectedBean();
         boolean isAnnotationExpressionContextType = isAnnotationExpressionContextType(element, pythonVisitorContext);
         Predicate<AnnotationMetadata> bridgeMethodFilter = ann -> isJunit5Test ||
             isAnnotationExpressionContextType ||
@@ -687,27 +691,43 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .onlyInstance()
                 .onlyDeclared()
                 .annotated(bridgeMethodFilter)));
-        addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
         methodsToBridge.addAll(element.getEnclosedElements(
             ElementQuery.ALL_METHODS
                 .onlyAccessible()
                 .onlyStatic()
                 .onlyDeclared()
                 .annotated(bridgeMethodFilter)));
+        // Every other public method of the class is bridged as well: type element visitors see it on the
+        // element and may generate Java code that calls it, and frameworks that instantiate the generated
+        // Java class themselves (a serverless runtime, a test engine) invoke it reflectively. Methods
+        // already bridged with a special signature (interface, host or advised methods) are kept by key.
+        ClassElement superType = model.superType();
+        // A Python method implementing an interface or host method whose parameter types its hints do not repeat
+        // (an untyped callback parameter) is bridged with the inherited signature already; it is not an overload
+        Set<String> inheritedSignatures = new HashSet<>();
+        for (String key : addedMethodNames) {
+            inheritedSignatures.add(bridgeMethodNameAndArity(key));
+        }
+        List<MethodElement> publicMethods = element.getEnclosedElements(
+            ElementQuery.ALL_METHODS
+                .onlyAccessible()
+                .onlyDeclared()
+                .filter(method -> !methodsToBridge.contains(method)
+                    && shouldBridgeDeclaredPythonMethod(method, beanProperties)
+                    && !inheritedSignatures.contains(bridgeMethodNameAndArity(bridgeMethodKey(method)))
+                    && !overridesBridgedPythonMethodWithAnotherReturnType(method, superType))
+        );
+        List<MethodElement> allBridgedMethods = new ArrayList<>(methodsToBridge);
+        allBridgedMethods.addAll(publicMethods);
+        addReferencedPythonClassReferenceFields(builder, element, allBridgedMethods);
         // an async method that is not bridged still runs in an event-loop context when another Python bean awaits
         // it, and needs the injected members adapted as a bridged one does
-        boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod)
+        boolean hasAsyncBridgeMethod = allBridgedMethods.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod)
             || element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared())
                 .stream()
                 .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
-        boolean hasIntroductionAdviceMethod = false;
         for (MethodElement methodElement : methodsToBridge) {
-            if (methodElement.hasStereotype(InterceptorBinding.class) ||
-                methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
-                methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")) {
-                hasIntroductionAdviceMethod = true;
-            }
             addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
         }
         // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
@@ -723,29 +743,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .named(name)
                     .filter(method -> !method.hasParameters())))
             .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
-        if (hasIntroductionAdviceMethod) {
-            List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
-                ElementQuery.ALL_METHODS
-                    .onlyAccessible()
-                    .onlyInstance()
-                    .onlyDeclared()
-                    .filter(method -> !method.isAbstract())
-            );
-            for (MethodElement methodElement : concreteDeclaredMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
-            }
-        }
-        if (isIntrospectedBean) {
-            List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
-                ElementQuery.ALL_METHODS
-                    .onlyAccessible()
-                    .onlyInstance()
-                    .onlyDeclared()
-                    .filter(method -> shouldBridgeDeclaredPythonMethod(method, beanProperties))
-            );
-            for (MethodElement methodElement : concreteDeclaredMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
-            }
+        for (MethodElement methodElement : publicMethods) {
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -767,7 +766,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ElementQuery.ALL_METHODS
                 .onlyAccessible()
                 .onlyStatic()
-                .annotated(ann -> ann.hasStereotype("io.micronaut.core.annotation.Creator"))
+                .annotated(ann -> ann.hasStereotype(ANN_CREATOR))
         );
 
         // Generate static factory methods for @Creator methods
@@ -1411,10 +1410,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .onlyAccessible()
                 .onlyInstance()
                 .filter(method -> !methodsToBridge.contains(method))
-                .annotated(ann ->
-                    ann.hasStereotype(AnnotationUtil.INJECT) ||
-                        ann.hasAnnotation(ANN_CONFIGURATION_INJECT)
-                ));
+                .annotated(PythonStubGenerator::isInjectionMethod));
 
         for (MethodElement injectionMethod : injectionMethods) {
             MethodDef.MethodDefBuilder injectionMethodBuilder = MethodDef.builder(injectionMethod.getName());
@@ -1647,14 +1643,38 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 continue;
             }
             AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
-            if (annotationValue != null) {
-                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(annotationValue.getAnnotationName(), annotationValue.getValues()));
+            if (annotationValue == null) {
+                continue;
+            }
+            // A repeatable annotation (@Size, @Min) is held by its container (Size.List) in the metadata; the
+            // source names the repeated annotations, not the container, which is not importable by its binary name
+            for (AnnotationValue<?> repeated : repeatedAnnotations(annotationMetadata, annotationValue)) {
+                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(repeated.getAnnotationName(), repeated.getValues()));
             }
         }
         if (annotationDefs.isEmpty()) {
             return typeDef;
         }
         return typeDef.annotated(annotationDefs);
+    }
+
+    private static List<AnnotationValue<?>> repeatedAnnotations(AnnotationMetadata annotationMetadata, AnnotationValue<?> annotationValue) {
+        String containerName = annotationValue.getAnnotationName();
+        Map<CharSequence, Object> values = annotationValue.getValues();
+        Object value = values.size() == 1 ? values.get(AnnotationMetadata.VALUE_MEMBER) : null;
+        Object[] elements = value instanceof Object[] array ? array : value instanceof Collection<?> collection ? collection.toArray() : null;
+        if (elements == null || elements.length == 0) {
+            return List.of(annotationValue);
+        }
+        List<AnnotationValue<?>> repeated = new ArrayList<>(elements.length);
+        for (Object element : elements) {
+            if (!(element instanceof AnnotationValue<?> nested)
+                || !annotationMetadata.findRepeatableAnnotation(nested.getAnnotationName()).filter(containerName::equals).isPresent()) {
+                return List.of(annotationValue);
+            }
+            repeated.add(nested);
+        }
+        return repeated;
     }
 
     static TypeDef propertyType(PropertyElement beanProperty) {
@@ -3213,10 +3233,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         );
     }
 
-    private static boolean isRuntimeAnnotationOf(String annotationName, ElementType declaration, VisitorContext visitorContext) {
+    private boolean isRuntimeAnnotationOf(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
+            // Micronaut annotations are served by the annotation metadata, except the ones JUnit reads
+            // reflectively on the test class: @MicronautTest and the module test annotations that
+            // register their own extension through @ExtendWith
             return MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
-                || MICRONAUT_ANNOTATION_PACKAGES_TO_COPY.stream().anyMatch(annotationName::startsWith);
+                || MICRONAUT_ANNOTATION_PACKAGES_TO_COPY.stream().anyMatch(annotationName::startsWith)
+                || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext));
         }
         if (annotationName.startsWith(JAVA_LANG_PACKAGE_PREFIX)
             || TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)
@@ -3231,6 +3255,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         return PythonAnnotationTypes.retentionPolicy(annotationType) == RetentionPolicy.RUNTIME
             && PythonAnnotationTypes.targetsDeclaration(annotationType, declaration);
+    }
+
+    /**
+     * Whether an annotation registers a JUnit 5 extension: {@code @ExtendWith} itself or an annotation
+     * meta-annotated with it, such as the test annotations of the Micronaut modules that extend
+     * {@code @MicronautTest} with their own extension. JUnit finds them reflectively on the test class, so
+     * they are copied onto the generated Java class like {@code @MicronautTest}.
+     */
+    private boolean isJunitExtensionAnnotation(String annotationName, VisitorContext visitorContext) {
+        if (JUNIT_EXTEND_WITH.equals(annotationName) || JUNIT_EXTENSIONS.equals(annotationName)) {
+            return true;
+        }
+        // A repeated @ExtendWith is folded into its @Extensions container by the annotation metadata
+        return junitExtensionAnnotations.computeIfAbsent(annotationName, name -> visitorContext.getClassElement(name)
+            .filter(annotationType -> !(annotationType instanceof AbstractPythonClassElement))
+            .map(annotationType -> annotationType.hasStereotype(JUNIT_EXTEND_WITH) || annotationType.hasStereotype(JUNIT_EXTENSIONS))
+            .orElse(false));
     }
 
     /**
@@ -3465,7 +3506,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
-        boolean returnsMethodTypeVariable = !(methodElement instanceof PythonMethodElement) && !sourceSignatureMethod.getDeclaredTypeVariables().isEmpty();
+        // A return type naming a method type variable (List<S>) is converted from the erased type, so it is cast back
+        // to the declared type for Python methods declaring their own type variables as for Java signatures
+        boolean returnsMethodTypeVariable = !sourceSignatureMethod.getDeclaredTypeVariables().isEmpty();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .returns(methodSourceReturnType);
         if (methodElement.isStatic()) {
@@ -3792,11 +3835,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 && pythonMethod.getParameters().length == parameters.length);
     }
 
+    private static String bridgeMethodNameAndArity(String bridgeMethodKey) {
+        int parameters = 0;
+        for (int i = bridgeMethodKey.indexOf('('); i < bridgeMethodKey.length(); i++) {
+            if (bridgeMethodKey.charAt(i) == ';') {
+                parameters++;
+            }
+        }
+        return bridgeMethodKey.substring(0, bridgeMethodKey.indexOf('(')) + '/' + parameters;
+    }
+
+    /**
+     * Whether a declared method of a Python class is bridged to the generated Java class on its own account: every
+     * concrete public method (Python treats names starting with an underscore as private, which also leaves the
+     * dunder methods out), except the accessors of bean properties, which are generated from the property, the
+     * {@code @Creator} factories, which are generated as factory methods, the injection methods, which are
+     * generated by {@link #addInjectionMethods}, and the Python value accessor itself.
+     *
+     * @param methodElement  The declared method
+     * @param beanProperties The bean properties of the class
+     * @return Whether to bridge the method
+     */
     private static boolean shouldBridgeDeclaredPythonMethod(MethodElement methodElement, List<PropertyElement> beanProperties) {
         if (methodElement.isAbstract()
-            || methodElement.isStatic()
             || methodElement.isSynthetic()
-            || methodElement.isPrivate()) {
+            || methodElement.isPrivate()
+            || (methodElement.isStatic() && methodElement.hasStereotype(ANN_CREATOR))
+            || isInjectionMethod(methodElement)) {
             return false;
         }
         String methodName = methodElement.getName();
@@ -3875,6 +3940,45 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         return true;
+    }
+
+    /**
+     * Whether a method overrides a method bridged in the stub of a Python superclass with another return type hint
+     * ({@code int} against the inherited {@code T} or an unhinted {@code Object}), which the Java override could
+     * not always repeat. The inherited Java method dispatches to the Python override anyway, so the override is
+     * left to it rather than generating a Java method that may not compile.
+     *
+     * @param methodElement The declared method
+     * @param superType     The supertype of the class, if any
+     * @return Whether the bridge of the method is inherited
+     */
+    private boolean overridesBridgedPythonMethodWithAnotherReturnType(MethodElement methodElement, @Nullable ClassElement superType) {
+        String key = bridgeMethodKey(methodElement);
+        Set<String> visited = new HashSet<>();
+        ClassElement type = superType;
+        while (type instanceof AbstractPythonClassElement && !type.isInterface() && visited.add(type.getName())) {
+            // The declared class, not the parameterized supertype: the inherited Java method returns the declared
+            // type variable, not the type argument the subclass binds it to
+            ClassElement declared = allClasses.getOrDefault(type.getName(), type);
+            for (MethodElement inherited : declared.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible().onlyDeclared())) {
+                if (!key.equals(bridgeMethodKey(inherited)) || inherited.isStatic() != methodElement.isStatic()) {
+                    continue;
+                }
+                boolean inheritedBridged = !inherited.isAbstract() || inherited.hasStereotype(Executable.class);
+                return inheritedBridged && !sameBridgeReturnType(methodElement, inherited);
+            }
+            type = declared.getSuperType().orElse(null);
+        }
+        return false;
+    }
+
+    private static boolean sameBridgeReturnType(MethodElement method, MethodElement inherited) {
+        return methodReturnType(method, false).equals(methodReturnType(inherited, false));
+    }
+
+    private static boolean isInjectionMethod(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+            || annotationMetadata.hasAnnotation(ANN_CONFIGURATION_INJECT);
     }
 
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
