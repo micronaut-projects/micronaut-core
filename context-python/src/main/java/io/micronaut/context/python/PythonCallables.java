@@ -81,13 +81,17 @@ import java.util.function.UnaryOperator;
  * {@link #STANDARD_INTERFACES standard functional interfaces} that only applies when the number of
  * positional parameters of the callable matches the arity of the interface method, which lets the
  * overload selection of the host interop pick the overload by arity. A callable declaring exactly
- * the parameters of the interface method wins over one that accepts them through default values or
- * varargs, and value-returning interfaces take precedence over void ones so that a zero-argument
- * lambda selects {@code Supplier} over {@code Runnable}, like a Java lambda expression does.
+ * the parameters of the interface method wins over one that accepts them through default values,
+ * and value-returning interfaces take precedence over void ones so that a zero-argument lambda
+ * selects {@code Supplier} over {@code Runnable}, like a Java lambda expression does. The mappings
+ * stay out of the decision for a callable whose signature cannot be read (a {@code functools.partial},
+ * a builtin) or that only fits an arity through {@code *args}: the mapping of every overload would
+ * apply and the call be ambiguous, where the default conversion of the host interop has an answer
+ * ({@code Function} is a loose conversion of any executable, other interfaces are function proxies).
  * <p>
  * {@link PythonInterop#fn(Class, Value)} adapts a callable to any functional interface explicitly.
  *
- * @since 5.2.0
+ * @since 5.2.3
  */
 @Internal
 final class PythonCallables {
@@ -152,7 +156,7 @@ final class PythonCallables {
             value -> convertWithDefaultConversion(value, type),
             exact
         );
-        // a callable that accepts the arity through default values or *args applies next
+        // a callable that accepts the arity through default values applies next
         builder.targetTypeMapping(
             Value.class,
             type,
@@ -177,18 +181,17 @@ final class PythonCallables {
 
     /**
      * Whether the value is a Python callable that can be called with the given number of
-     * positional arguments. A callable whose signature cannot be inspected accepts any arity.
+     * positional arguments through its declared parameters, default values included. A callable
+     * whose signature cannot be inspected, or that only accepts the arity through {@code *args},
+     * accepts no arity here: it is left to the default conversion.
      *
      * @param value The value
      * @param arity The number of arguments
      * @return Whether the callable accepts the arity
      */
     static boolean acceptsArity(@Nullable Value value, int arity) {
-        if (!isCallable(value)) {
-            return false;
-        }
         Arity declared = arityOf(value);
-        return declared == null || declared.accepts(arity);
+        return declared != null && declared.accepts(arity);
     }
 
     private static boolean isCallable(@Nullable Value value) {
@@ -386,10 +389,11 @@ final class PythonCallables {
 
         /**
          * @param arity The number of arguments
-         * @return Whether the callable can be called with the arguments
+         * @return Whether the declared parameters, default values included, take the arguments;
+         * {@code *args} does not count, it would fit every overload
          */
         boolean accepts(int arity) {
-            return arity >= required && (arity <= parameters || varargs);
+            return arity >= required && arity <= parameters;
         }
     }
 }

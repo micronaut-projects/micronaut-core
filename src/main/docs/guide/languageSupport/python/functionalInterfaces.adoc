@@ -18,8 +18,8 @@ Some Java methods are overloaded on functional interfaces of different arities, 
 
 * A callable that declares exactly as many positional parameters as the interface method selects that overload: a lambda with two parameters selects `BiPredicate`, a lambda with one selects `Predicate`. A bound method does not count `self`.
 * When a value-returning interface and a `void` interface both match, the value-returning one wins: a zero-argument lambda passed to a method overloaded on `Runnable` and `Supplier` selects `Supplier`, like a Java lambda expression does.
-* Default values and `*args` count only when no overload matches the declared parameters exactly: `lambda a, b="x": ...` declares two parameters and selects `BiFunction`, `lambda a, *rest: ...` declares one and selects `Predicate`.
-* A callable whose signature cannot be inspected (a `functools.partial`, a builtin, a class) applies to every overload, as before.
+* Default values count only when no overload matches the declared parameters exactly: `lambda a, b="x": ...` declares two parameters and selects `BiFunction`; passed to a method overloaded on `BiPredicate` and a three-argument interface, `lambda a, b, c=1: ...` selects `BiPredicate`. `*args` does not make a callable fit further arities: `lambda a, *rest: ...` declares one parameter and selects `Predicate`.
+* A callable whose signature cannot be inspected (a `functools.partial`, a builtin, a class), or that only fits an arity through `*args`, is converted as it was before, by the default conversion of the host interop: a `Function` parameter accepts it ahead of any other interface, and overloads on other interfaces are ambiguous.
 
 [source,python]
 ----

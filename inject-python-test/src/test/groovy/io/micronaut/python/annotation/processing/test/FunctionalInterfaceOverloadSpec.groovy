@@ -27,6 +27,7 @@ from micronaut.context.python import PythonInterop
 from micronaut.python.annotation.processing.test import FunctionalOverloads
 from java.util.function import Consumer
 
+import functools
 import java
 
 
@@ -56,7 +57,7 @@ class LambdaCaller:
         return self.overloads.run(lambda: "value")
 
     @Executable
-    def zero_arg_runnable(self) -> str:
+    def zero_arg_function_returning_none(self) -> str:
         return self.overloads.run(print_hello)
 
     @Executable
@@ -96,6 +97,18 @@ class LambdaCaller:
         return self.overloads.run(lambda *args: "varargs")
 
     @Executable
+    def defaults_beyond_the_arity(self) -> str:
+        return self.overloads.check(lambda a, b, c=1: True)
+
+    @Executable
+    def partial_function(self) -> str:
+        return self.overloads.apply(functools.partial(join, "p"))
+
+    @Executable
+    def varargs_function(self) -> str:
+        return self.overloads.apply(lambda *args: "v")
+
+    @Executable
     def registered_is_original(self) -> bool:
         callback = lambda value: None
         self.overloads.register(callback)
@@ -124,6 +137,10 @@ class LambdaCaller:
 
 def print_hello():
     print("hello")
+
+
+def join(prefix, value):
+    return prefix + value
 '''
 
     void "Python lambdas select the functional interface overload by arity"() {
@@ -144,6 +161,31 @@ def print_hello():
         ctx?.close()
     }
 
+    void "a callable matching an arity only through defaults or varargs is chosen when nothing matches exactly"() {
+        given:
+        ApplicationContext ctx = buildContext(SOURCE, true)
+        Value caller = ctx.getBean(ctx.classLoader.loadClass('python.LambdaCaller')).asPolyglotValue()
+
+        expect: "three parameters, one with a default: only the two-argument overload fits"
+        caller.invokeMember('defaults_beyond_the_arity').asString() == 'bipredicate:true'
+
+        cleanup:
+        ctx?.close()
+    }
+
+    void "a callable whose arity cannot be read or fits every overload is converted as before"() {
+        given:
+        ApplicationContext ctx = buildContext(SOURCE, true)
+        Value caller = ctx.getBean(ctx.classLoader.loadClass('python.LambdaCaller')).asPolyglotValue()
+
+        expect: "the arity mappings stay out of the decision, the default host interop conversion applies"
+        caller.invokeMember('partial_function').asString() == 'function:pa'
+        caller.invokeMember('varargs_function').asString() == 'function:v'
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "zero-argument lambdas prefer the value-returning overload"() {
         given:
         ApplicationContext ctx = buildContext(SOURCE, true)
@@ -151,7 +193,7 @@ def print_hello():
 
         expect:
         caller.invokeMember('zero_arg_supplier').asString() == 'supplier:value'
-        caller.invokeMember('zero_arg_runnable').asString() == 'supplier:null'
+        caller.invokeMember('zero_arg_function_returning_none').asString() == 'supplier:null'
 
         cleanup:
         ctx?.close()

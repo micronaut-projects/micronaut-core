@@ -46,8 +46,10 @@ class PythonCallablesTest {
         assertArity("lambda a: a", 1, 1);
         assertArity("lambda a, b: a", 2, 2);
         assertArity("lambda a, b='x': a", 1, 2);
-        assertArity("lambda *args: args", 0, Integer.MAX_VALUE);
-        assertArity("lambda a, *args: args", 1, Integer.MAX_VALUE);
+        // *args does not make the callable fit further arities: it would fit every overload
+        assertArity("lambda *args: args", 0, 0);
+        assertArity("lambda a, *args: args", 1, 1);
+        assertArity("lambda a, b='x', *args: args", 1, 2);
         // a bound method does not count self
         assertArity("type('T', (), {'m': lambda self, a: a})().m", 1, 1);
         // a class method bound to its class
@@ -55,11 +57,12 @@ class PythonCallablesTest {
     }
 
     @Test
-    void callablesWithoutInspectableSignatureAcceptEveryArity() {
-        assertArity("__import__('functools').partial(lambda a, b: a, 1)", 0, Integer.MAX_VALUE);
-        assertArity("str.upper", 0, Integer.MAX_VALUE);
-        assertArity("type('T', (), {'__call__': lambda self, a: a})()", 0, Integer.MAX_VALUE);
-        assertArity("dict", 0, Integer.MAX_VALUE);
+    void callablesWithoutInspectableSignatureAcceptNoArity() {
+        // the arity mappings stay out of the decision: every overload would apply and the call be ambiguous
+        assertAcceptsNoArity("__import__('functools').partial(lambda a, b: a, 1)");
+        assertAcceptsNoArity("str.upper");
+        assertAcceptsNoArity("type('T', (), {'__call__': lambda self, a: a})()");
+        assertAcceptsNoArity("dict");
     }
 
     @Test
@@ -98,6 +101,7 @@ class PythonCallablesTest {
     void selectsOverloadsByArity() {
         Value overloads = context.asValue(new Overloads());
         Value python = context.eval("python", """
+            import functools
             def calls(overloads):
                 return [
                     overloads.apply(lambda a: a.upper()),
@@ -108,12 +112,17 @@ class PythonCallablesTest {
                     overloads.run(lambda *args: 'varargs'),
                     overloads.apply(lambda a, b='default': a + b),
                     overloads.check(lambda a, *rest: a == 'x'),
+                    # only fits the two-argument overload, through its default
+                    overloads.check(lambda a, b, c=1: True),
+                    # unreadable arity and *args only: the default conversion decides, Function as before
+                    overloads.apply(functools.partial(lambda prefix, value: prefix + value, 'p')),
+                    overloads.apply(lambda *args: 'v'),
                 ]
             calls
             """);
         assertEquals(
             List.of("function:A", "bifunction:ab", "predicate:true", "bipredicate:true", "supplier:value", "supplier:varargs",
-                "bifunction:ab", "predicate:true"),
+                "bifunction:ab", "predicate:true", "bipredicate:true", "function:pa", "function:v"),
             python.execute(overloads).as(List.class)
         );
     }
@@ -178,6 +187,14 @@ class PythonCallablesTest {
     void rejectsNonFunctionalInterfacesAndNonCallables() {
         assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(List.class, context.eval("python", "lambda: 1")));
         assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(Runnable.class, context.eval("python", "1")));
+    }
+
+    private void assertAcceptsNoArity(String source) {
+        Value callable = context.eval("python", source);
+        assertNull(PythonCallables.arityOf(callable), source);
+        for (int arity = 0; arity < 5; arity++) {
+            assertFalse(PythonCallables.acceptsArity(callable, arity), source + " with " + arity + " arguments");
+        }
     }
 
     private void assertArity(String source, int min, int max) {

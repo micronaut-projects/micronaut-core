@@ -29,7 +29,7 @@ import org.graalvm.polyglot.Value;
  * builder.exitCondition(PythonInterop.fn(BiPredicate, lambda scope, index: index == 3))
  * }</pre>
  *
- * @since 5.2.0
+ * @since 5.2.3
  */
 @Experimental
 public final class PythonInterop {
