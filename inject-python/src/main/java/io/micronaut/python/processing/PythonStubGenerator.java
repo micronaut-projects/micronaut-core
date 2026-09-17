@@ -3051,15 +3051,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             + " cannot be written as a " + memberType.getName() + " constant");
     }
 
-    /**
-     * Thrown when an annotation value of the metadata cannot be written to the generated Java source.
-     */
-    private static final class UnrepresentableAnnotationException extends RuntimeException {
-        UnrepresentableAnnotationException(String message) {
-            super(message);
-        }
-    }
-
     private boolean isCopiedRuntimeAnnotation(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         return copiedRuntimeAnnotations.computeIfAbsent(
             annotationName + '#' + declaration,
@@ -4746,6 +4737,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return VisitorKind.ISOLATING;
     }
 
+    /**
+     * Thrown when an annotation value of the metadata cannot be written to the generated Java source.
+     */
+    private static final class UnrepresentableAnnotationException extends RuntimeException {
+        UnrepresentableAnnotationException(String message) {
+            super(message);
+        }
+    }
+
     record StubEntry(
         ClassDef.ClassDefBuilder builder,
         ClassElement originatingElement,
@@ -4842,6 +4842,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param signatureMethod         The method whose raw signature the bridge declares
      * @param resolvedSignatureMethod The signature method with type arguments resolved
      * @param signatureTypeArguments  Type arguments applied to the signature
+     * @param introduced              Whether the method is introduced by an interface the proxy alone implements
      */
     record BridgeMethodSpec(
         MethodElement method,
