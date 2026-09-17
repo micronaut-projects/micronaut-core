@@ -348,7 +348,16 @@ class Probe:
             "books=" + str(author.books == expected.books),
             "first=" + author.books[0].label(),
             "str=" + str(author),
+            "hashable=" + Probe.hashable(author),
         ])
+
+    @staticmethod
+    def hashable(value) -> str:
+        try:
+            hash(value)
+            return "True"
+        except TypeError as e:
+            return "False (" + str(e) + ")"
 ''', true)
         def embeddedServer = context.getBean(EmbeddedServer)
         embeddedServer.start()
@@ -357,7 +366,8 @@ class Probe:
         def polyglot = context.getBean(Context)
         def probe = polyglot.eval("python", "Probe")
         def book = "isinstance=True:eq=True:req=True:ne=True:label=Micronaut (301):title=Micronaut:hash=True:in=True:repr=Book(title='Micronaut', pages=301)"
-        def author = "isinstance=True:eq=True:req=True:books=True:first=Micronaut (301):str=Author(name='Graeme', books=[Book(title='Micronaut', pages=301), Book(title='GraalPy', pages=200)])"
+        // a non-frozen dataclass sets __hash__ to None: its wrapper is unhashable as the Python object is
+        def author = "isinstance=True:eq=True:req=True:books=True:first=Micronaut (301):str=Author(name='Graeme', books=[Book(title='Micronaut', pages=301), Book(title='GraalPy', pages=200)]):hashable=False (unhashable type: 'Author')"
 
         expect:
         probe.invokeMember("read_book", mapper, '{"title":"Micronaut","pages":301}').asString() == book
