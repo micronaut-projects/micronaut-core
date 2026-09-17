@@ -258,6 +258,160 @@ class Service:
         new File(targetDir, "app/Service.class").exists()
     }
 
+    def "module-private helper classes of one name in several modules of a package compile and run"() {
+        given: "two modules each defining a plain Helper next to the service using it"
+        writeSource("app/a.py", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+
+class Helper:
+    def name(self) -> str:
+        return "a"
+
+
+@Singleton
+class ServiceA:
+    @Executable
+    def value(self) -> str:
+        return Helper().name()
+''')
+        writeSource("app/b.py", '''
+from dataclasses import dataclass
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+
+@dataclass
+class Helper:
+    suffix: str = "b"
+
+    def name(self) -> str:
+        return self.suffix
+
+
+@Singleton
+class ServiceB:
+    @Executable
+    def value(self) -> str:
+        return Helper().name()
+''')
+
+        when:
+        compile()
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+
+        then:
+        context.getBean(classLoader.loadClass("app.ServiceA")).value() == "a"
+        context.getBean(classLoader.loadClass("app.ServiceB")).value() == "b"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+    }
+
+    def "an annotated class of one name wins over a plain class of another module whatever the module order"() {
+        given: "the plain class sorts after the bean"
+        writeSource("app/${beanModule}.py", '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+
+@Singleton
+class Service:
+    @Executable
+    def value(self) -> str:
+        return "bean"
+''')
+        writeSource("app/${plainModule}.py", '''
+class Service:
+    def value(self) -> str:
+        return "plain"
+''')
+
+        when:
+        compile()
+        def classLoader = new URLClassLoader(targetDir.toURI().toURL())
+        def context = ApplicationContext.builder().classLoader(classLoader).build().start()
+
+        then:
+        context.getBean(classLoader.loadClass("app.Service")).value() == "bean"
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+
+        where:
+        beanModule | plainModule
+        "a"        | "b"
+        "b"        | "a"
+    }
+
+    def "a class annotated with an application-defined decorator conflicts with another annotated class"() {
+        given:
+        writeSource("app/timed.py", '''
+from micronaut.aop import Around
+
+
+@Around
+def Timed(func):
+    return func
+''')
+        writeSource("app/first.py", '''
+from .timed import Timed
+
+
+@Timed
+class Job:
+    def run(self) -> str:
+        return "first"
+''')
+        writeSource("app/second.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Job:
+    def run(self) -> str:
+        return "second"
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Duplicate Python type [app.Job]")
+    }
+
+    def "a class and a module of decorated functions of one name clash in the default package too"() {
+        given:
+        writeSource("service.py", '''
+from micronaut.context.annotation import Executable
+
+
+@Executable
+def run() -> str:
+    return "run"
+''')
+        writeSource("models.py", '''
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Service:
+    pass
+''')
+
+        when:
+        compile()
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Duplicate Python type [python.Service]")
+    }
+
     private void writeSource(String relativePath, String code) {
         def file = new File(srcDir, relativePath)
         file.parentFile.mkdirs()

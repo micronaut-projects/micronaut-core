@@ -29,6 +29,7 @@ import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -295,7 +296,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         .collect(Collectors.toSet());
                     for (PythonAstParser.TransformResult transformResult : transformedList) {
                         Source source = transformResult.originalSource();
-                        boolean located = false;
+                        // a source outside every source directory was already rejected by the parser
                         for (String configuredSrcDir : srcDirs) {
                             String srcDir = normalizeResourcePath(configuredSrcDir);
                             String path = normalizeResourcePath(source.getPath());
@@ -303,7 +304,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                             if (i == -1) {
                                 continue;
                             }
-                            located = true;
                             if (i > 0) {
                                 path = path.substring(i + srcDir.length() + 1);
                             }
@@ -312,16 +312,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 path = path.substring(srcDir.length() + 1);
                             }
                             String targetSource = APPLICATION_SRC_PATH + path;
-                            if (processSharedOutputs && !transformResult.allClassNames().isEmpty()) {
+                            List<String> classNames = importedClassNames(transformResult, environment);
+                            if (processSharedOutputs && !classNames.isEmpty()) {
                                 // has classes
                                 int parentIndex = path.lastIndexOf('/');
                                 if (parentIndex > -1) {
                                     String parentPath = path.substring(0, parentIndex + 1);
                                     allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                        .addAll(transformResult.allClassNames());
+                                        .addAll(classNames);
                                 } else {
                                     allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                        .addAll(transformResult.allClassNames());
+                                        .addAll(classNames);
                                 }
                             }
                             if (isAffectedSource(source)) {
@@ -333,14 +334,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                     originatingElement
                                 );
                             }
-                        }
-                        if (!located) {
-                            // Never skip a source quietly: the application would start without its module
-                            throw new ProcessingException(
-                                originatingElement,
-                                "Python source [" + source.getPath() + "] is not located in any of the Python source directories "
-                                    + Arrays.toString(srcDirs) + " and cannot be added to the application"
-                            );
                         }
                     }
 
@@ -766,7 +759,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Surfaced here instead of as the opaque "Output stream or writer has already been opened" IOException
             throw new ProcessingException(
                 originatingElement,
-                "Python source [" + filePath.substring(APPLICATION_SRC_PATH.length()) + "] is written twice: an application "
+                "Python source [" + (filePath.startsWith(APPLICATION_SRC_PATH) ? filePath.substring(APPLICATION_SRC_PATH.length()) : filePath)
+                    + "] is written twice: an application "
                     + "module and a module generated for an imported Java package or annotation map to the same file; rename the application module."
             );
         }
@@ -1050,6 +1044,20 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     throw new ProcessingException(originatingElement, "Failed to write fileslist.txt to VFS");
                 }
             });
+    }
+
+    /**
+     * The top-level classes of a source the package initializer imports: all of them except those
+     * another module's definition of the same generated Java type replaces (see {@link PythonEnvironment#shadowedTypes()}).
+     */
+    private static List<String> importedClassNames(PythonAstParser.TransformResult transformResult, @Nullable PythonEnvironment environment) {
+        List<String> classNames = transformResult.allClassNames();
+        String path = transformResult.originalSource().getPath();
+        List<String> shadowed = environment == null || path == null ? List.of() : environment.shadowedTypes().getOrDefault(path, List.of());
+        if (shadowed.isEmpty()) {
+            return classNames;
+        }
+        return classNames.stream().filter(name -> !shadowed.contains(name)).toList();
     }
 
     private static @NotNull String toListOfString(List<String> allNames) {

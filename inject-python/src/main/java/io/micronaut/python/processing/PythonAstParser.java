@@ -197,19 +197,19 @@ public final class PythonAstParser {
     }
 
     private static @NotNull String resolveQualifiedName(String packageName, ClassDef classDef) {
-        String qualifiedName = classDef.name();
-        if (!StringUtils.isEmpty(packageName)) {
-            qualifiedName = packageName + "." + qualifiedName;
-        }
-        return qualifiedName;
+        return javaTypeName(packageName, classDef.name());
     }
 
     private static @NotNull String resolveScriptQualifiedName(String packageName, ScriptDef scriptDef) {
-        String qualifiedName = scriptDef.name();
-        if (!StringUtils.isEmpty(packageName)) {
-            qualifiedName = packageName + "." + qualifiedName;
-        }
-        return qualifiedName;
+        return javaTypeName(packageName, scriptDef.name());
+    }
+
+    /**
+     * The name of the Java type generated for a Python definition; unlike {@code packageName + "." + name}
+     * a definition of the root package is not prefixed with a dot.
+     */
+    private static @NotNull String javaTypeName(String packageName, String simpleName) {
+        return StringUtils.isEmpty(packageName) ? simpleName : packageName + "." + simpleName;
     }
 
     /**
@@ -236,23 +236,19 @@ public final class PythonAstParser {
         Map<String, ClassDef> classes = new LinkedHashMap<>();
         Map<String, ScriptDef> scripts = new LinkedHashMap<>();
 
-        // Every top-level class and every script generates a Java class of its qualified name, so
-        // two definitions of one name in different sources would silently overwrite each other
-        Map<String, Definition> definitions = new LinkedHashMap<>();
+        // Every top-level class and every script generates a Java class, so two definitions of one
+        // Java type name in different sources would silently overwrite each other; they are keyed by
+        // that name here and resolved once all sources are parsed (see resolveDefinition)
+        Map<String, List<Definition>> definitions = new LinkedHashMap<>();
         String[] currentSource = new String[1];
         Value bindings = context.getBindings(PYTHON);
         bindings.putMember("callback", (Function<Object, Object>) o -> {
             if (o instanceof ClassDef classDef) {
-                String qualifiedName = resolveQualifiedName(classDef.packageName(), classDef);
-                checkUniqueDefinition(definitions, qualifiedName, new Definition(currentSource[0], true));
-                classes.put(qualifiedName, classDef);
+                String typeName = javaTypeName(classDef.packageName(), classDef.name());
+                definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], classDef));
             } else if (o instanceof ScriptDef scriptDef) {
-                String qualifiedName = resolveScriptQualifiedName(scriptDef.packageName(), scriptDef);
-                // A script of module-level assignments only yields no beans, so a class of the same
-                // name in another module of the package takes precedence over it without conflict
-                boolean significant = !scriptDef.functions().isEmpty() || !scriptDef.decorators().isEmpty();
-                checkUniqueDefinition(definitions, scriptDef.qualifiedName(), new Definition(currentSource[0], significant));
-                scripts.put(qualifiedName, scriptDef);
+                String typeName = javaTypeName(scriptDef.packageName(), scriptDef.javaSimpleName());
+                definitions.computeIfAbsent(typeName, k -> new ArrayList<>()).add(new Definition(currentSource[0], scriptDef));
             } else if (o instanceof DecoratorDef decoratorDef) {
                 decorators.put(decoratorDef.annotationName(), decoratorDef);
             }
@@ -293,28 +289,66 @@ public final class PythonAstParser {
                 );
             }
         }
+        Map<String, List<String>> shadowedTypes = new LinkedHashMap<>();
+        definitions.forEach((typeName, candidates) -> {
+            String winningSource = resolveDefinition(typeName, candidates, decorators, visitorContext).source();
+            for (Definition candidate : candidates) {
+                // a module and its class of one name (implementation.py defining Implementation) are both kept
+                if (!candidate.source().equals(winningSource)) {
+                    if (candidate.element() instanceof ClassDef classDef) {
+                        // the package initializer imports the winner only, so the runtime resolves the same definition
+                        shadowedTypes.computeIfAbsent(candidate.source(), k -> new ArrayList<>()).add(classDef.name());
+                    }
+                } else if (candidate.element() instanceof ClassDef classDef) {
+                    classes.put(resolveQualifiedName(classDef.packageName(), classDef), classDef);
+                } else if (candidate.element() instanceof ScriptDef scriptDef) {
+                    scripts.put(resolveScriptQualifiedName(scriptDef.packageName(), scriptDef), scriptDef);
+                }
+            }
+        });
         return new PythonEnvironment(
             classes,
             scripts,
             decorators,
+            shadowedTypes,
             context
         );
     }
 
-    private static void checkUniqueDefinition(Map<String, Definition> definitions, String qualifiedName, Definition definition) {
-        Definition previous = definitions.get(qualifiedName);
-        if (previous == null || (!previous.significant() && definition.significant())) {
-            definitions.put(qualifiedName, definition);
-            return;
+    /**
+     * Pick the source a generated Java type is built from. Only a definition that yields a bean,
+     * an introspection or another generated member (a class carrying Java annotations, a module with
+     * functions or decorators) conflicts with another such definition of the same name; a plain
+     * module-private class ({@code Helper}, {@code Config}) may be defined in several modules of a
+     * package, in which case the annotated definition, or else the last one, provides the Java stub.
+     */
+    private static Definition resolveDefinition(String typeName, List<Definition> candidates, Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
+        Definition winner = candidates.get(0);
+        if (candidates.size() == 1) {
+            return winner;
         }
-        if (previous.significant() && definition.significant() && !previous.source().equals(definition.source())) {
-            throw new ProcessingException(
-                null,
-                "Duplicate Python type [" + qualifiedName + "] defined in [" + definition.source() + "] and [" + previous.source() + "]: "
-                    + "a top-level class or a module with decorated functions generates a Java class named after it, so the two definitions "
-                    + "would overwrite each other; rename one of them or move it to another package"
-            );
+        boolean winnerSignificant = winner.isSignificant(decorators, visitorContext);
+        for (Definition candidate : candidates.subList(1, candidates.size())) {
+            boolean significant = candidate.isSignificant(decorators, visitorContext);
+            if (winner.conflictsWith(winnerSignificant, candidate, significant)) {
+                throw new ProcessingException(
+                    null,
+                    "Duplicate Python type [" + typeName + "] defined in [" + candidate.source() + "] and [" + winner.source() + "]: "
+                        + "an annotated top-level class or a module with functions generates a Java class named after it, so the two "
+                        + "definitions would overwrite each other; rename one of them or move it to another package"
+                );
+            }
+            boolean replace = significant || !winnerSignificant;
+            if (!winner.source().equals(candidate.source())) {
+                visitorContext.info("Python type [" + typeName + "] is defined in [" + winner.source() + "] and [" + candidate.source()
+                    + "]; the generated Java type follows [" + (replace ? candidate : winner).source() + "]", null);
+            }
+            if (replace) {
+                winner = candidate;
+                winnerSignificant = significant;
+            }
         }
+        return winner;
     }
 
     private static boolean isWithinSourceDir(String srcDir, String path) {
@@ -576,10 +610,44 @@ public final class PythonAstParser {
     /**
      * A source definition of a generated Java type.
      *
-     * @param source      The defining source
-     * @param significant Whether the definition generates beans or bridged members and so conflicts with another one
+     * @param source  The defining source
+     * @param element The class or script definition
      */
-    private record Definition(String source, boolean significant) {
+    private record Definition(String source, Object element) {
+
+        /**
+         * Whether the definition generates beans, introspections or bridged members: a class annotated
+         * with a Java annotation or an annotation defined by the application, or a module with
+         * functions or decorators. A module of assignments only and a plain class yield nothing that
+         * another definition of the same name could not replace.
+         */
+        boolean isSignificant(Map<String, DecoratorDef> decorators, VisitorContext visitorContext) {
+            if (element instanceof ScriptDef scriptDef) {
+                return !scriptDef.functions().isEmpty() || !scriptDef.decorators().isEmpty();
+            }
+            ClassDef classDef = (ClassDef) element;
+            return classDef.decorators().stream().anyMatch(decorator -> {
+                String annotationName = decorator.annotationName();
+                return decorators.containsKey(annotationName) || visitorContext.getClassElement(annotationName).isPresent();
+            });
+        }
+
+        /**
+         * Whether two definitions of one name overwrite each other: both are significant, or a
+         * module with functions meets a class, whose stub would replace the module's Java class
+         * regardless of its annotations.
+         */
+        boolean conflictsWith(boolean significant, Definition other, boolean otherSignificant) {
+            if (source.equals(other.source)) {
+                return false;
+            }
+            if (significant && otherSignificant) {
+                return true;
+            }
+            boolean script = element instanceof ScriptDef;
+            boolean otherScript = other.element instanceof ScriptDef;
+            return script != otherScript && (script ? significant : otherSignificant);
+        }
     }
 
     /**
