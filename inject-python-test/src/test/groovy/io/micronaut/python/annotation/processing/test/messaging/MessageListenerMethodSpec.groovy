@@ -214,6 +214,69 @@ class BarFactory(BaseFactory):
         context?.close()
     }
 
+    void "test a @Bean method inherited from a non-@Factory base bridges its pre-destroy method"() {
+        given:
+        def context = buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+from jakarta.inject import Singleton
+
+class Bar:
+    stopped: bool = False
+
+    def close(self):
+        self.stopped = True
+
+class BaseFactory:
+
+    @Bean(preDestroy="close")
+    @Singleton
+    def bar(self) -> Bar:
+        return Bar()
+
+@Factory
+class BarFactory(BaseFactory):
+    pass
+''')
+
+        when:
+        def wrapper = getBean(context, "python.Bar")
+        def bar = wrapper.asPolyglotValue()
+
+        then:
+        !bar.getMember("stopped").asBoolean()
+        context.classLoader.loadClass("python.Bar").getDeclaredMethod("close") != null
+
+        when:
+        context.destroyBean(wrapper)
+
+        then:
+        bar.getMember("stopped").asBoolean()
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a @Bean method inherited from a non-@Factory base is validated like a factory method"() {
+        when:
+        buildContext('''\
+from micronaut.context.annotation import Factory, Bean
+
+class BaseFactory:
+
+    @Bean
+    def bar(self):
+        return None
+
+@Factory
+class BarFactory(BaseFactory):
+    pass
+''')
+
+        then:
+        def e = thrown(RuntimeException)
+        e.message.contains("Factory methods declared with @Bean must specify a return type")
+    }
+
     void "test @Bean functions of a module-level Factory() script are factory methods"() {
         given:
         def context = buildContext('''\

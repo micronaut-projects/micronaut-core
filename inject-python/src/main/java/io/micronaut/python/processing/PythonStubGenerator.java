@@ -5035,17 +5035,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Whether a method is a factory method producing a bean. Mirrors the core bean definition creators: a
      * method carrying a declared {@code @Bean} annotation or stereotype only produces a bean when the class
-     * it is bridged for is a {@code @Factory}. Elsewhere the {@code @Bean} stereotype is incidental, for
-     * example messaging listener annotations meta-annotated with {@code @MessageListener} that are placed on
-     * methods of ordinary beans, and such methods are bridged as regular executable methods without the
-     * factory method validation.
+     * it is bridged for is a {@code @Factory}, or when a {@code @Factory} being compiled extends that class
+     * and so inherits the method as one of its bean methods. Elsewhere the {@code @Bean} stereotype is
+     * incidental, for example messaging listener annotations meta-annotated with {@code @MessageListener}
+     * that are placed on methods of ordinary beans, and such methods are bridged as regular executable
+     * methods without the factory method validation.
      *
      * @param owner              The class the method is bridged for
      * @param annotationMetadata The annotation metadata of the method
      * @return True if the method is a factory method
      */
-    private static boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
-        return owner.hasStereotype(Factory.class) && isDeclaredBeanMethod(annotationMetadata);
+    private boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
+        return isDeclaredBeanMethod(annotationMetadata)
+            && (owner.hasStereotype(Factory.class) || hasFactorySubclass(owner));
+    }
+
+    /**
+     * Whether a {@code @Factory} class among the compiled Python classes extends the given class. The bean
+     * methods such a factory inherits are bridged once, on the stub of the declaring class, so that stub
+     * has to apply the factory method validation and bridge the pre-destroy method on their behalf.
+     *
+     * @param owner The class declaring the method
+     * @return True if a compiled {@code @Factory} extends the class
+     */
+    private boolean hasFactorySubclass(ClassElement owner) {
+        String ownerName = owner.getName();
+        for (ClassElement classElement : allClasses.values()) {
+            if (!classElement.getName().equals(ownerName)
+                && classElement.hasStereotype(Factory.class)
+                && classElement.isAssignable(ownerName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
