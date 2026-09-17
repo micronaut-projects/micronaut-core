@@ -356,9 +356,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
                     if (isReconstructibleBean) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
-                        if (isSerializableStub(superType, extendsPythonClass, extendsHostClass)) {
+                        if (isSerializableStub(superType, extendsPythonClass, extendsHostClass) && !declaresInterface(interfaces, Serializable.class)) {
                             // The Java fields carry the introspected properties; the Python object is
                             // transient and rebuilt from them on the first use after deserialization.
+                            // A class listing Serializable among its bases declares it itself.
                             builder.addSuperinterface(ClassTypeDef.of(Serializable.class));
                         }
                     } else if (!extendsPythonClass) {
@@ -3728,6 +3729,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 superType.getSuperType().map(AbstractPythonClassElement.class::isInstance).orElse(false),
                 superType.getSuperType().map(type -> !(type instanceof AbstractPythonClassElement) && !type.isInterface() && !Object.class.getName().equals(type.getName())).orElse(false)
             );
+    }
+
+    private static boolean declaresInterface(Collection<ClassElement> interfaces, Class<?> interfaceType) {
+        for (ClassElement anInterface : interfaces) {
+            if (interfaceType.getName().equals(anInterface.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isConfigurationBuilderProperty(PropertyElement property) {
