@@ -58,6 +58,8 @@ import java.util.function.Function;
 @Internal
 public final class PythonAnnotationTypes {
 
+    private static final String VALUE_MEMBER = "value";
+
     private static final String JAVA_LANG_ANNOTATION = "java.lang.annotation";
     private static final Set<ElementKind> NESTED_TYPE_KINDS = EnumSet.of(
         ElementKind.ANNOTATION_TYPE, ElementKind.INTERFACE, ElementKind.CLASS, ElementKind.ENUM
@@ -259,6 +261,34 @@ public final class PythonAnnotationTypes {
             names.addAll(AnnotationMemberReflection.memberReturnTypeNames(type));
         }
         return names;
+    }
+
+    /**
+     * The declared return type name of the annotation's {@code value} member, as the source language
+     * names it (a wildcard {@code java.lang.Class}, {@code java.lang.String[]}), or {@code null} when
+     * the annotation has no {@code value} member.
+     *
+     * @param classElement The annotation element
+     * @return The return type name of {@code value}, or null
+     */
+    public static @Nullable String valueMemberTypeName(@Nullable ClassElement classElement) {
+        if (classElement == null) {
+            return null;
+        }
+        TypeElement typeElement = typeElement(classElement);
+        if (typeElement != null) {
+            for (Element enclosed : typeElement.getEnclosedElements()) {
+                if (enclosed.getKind() == ElementKind.METHOD && enclosed instanceof ExecutableElement method
+                    && method.getSimpleName().contentEquals(VALUE_MEMBER)) {
+                    return method.getReturnType().toString();
+                }
+            }
+            return null;
+        }
+        if (classElement.getNativeType() instanceof Class<?> type) {
+            return AnnotationMemberReflection.valueMemberTypeName(type);
+        }
+        return null;
     }
 
     /**

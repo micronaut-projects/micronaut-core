@@ -330,9 +330,11 @@ class DecoratorFormTest(unittest.TestCase):
 
     def test_generated_decorator_is_a_factory(self):
         transformer = MicronautTransformer(java_class_element, no_class_elements)
-        transformer.visit(ast.parse("from micronaut.context.annotation import Executable\n"))
+        transformer.visit(ast.parse("from micronaut.context.annotation import Executable, Replaces\n"))
         namespace = {}
-        exec(transformer.get_generated_decorator_code()["io.micronaut.context.annotation.Executable"], namespace)
+        generated = transformer.get_generated_decorator_code()
+        exec(generated["io.micronaut.context.annotation.Executable"], namespace)
+        exec(generated["io.micronaut.context.annotation.Replaces"], namespace)
 
         class Target:
             pass
@@ -341,9 +343,100 @@ class DecoratorFormTest(unittest.TestCase):
             pass
 
         executable = namespace["Executable"]
+        replaces = namespace["Replaces"]
         self.assertIs(Target, executable()(Target))
-        self.assertIs(Target, executable(Value)(Target))
-        self.assertIs(Target, executable(value=Value)(Target))
+        self.assertIs(Target, executable(processOnStartup=True)(Target))
+        # a class is the value of a Class-typed value member
+        self.assertIs(Target, replaces(Value)(Target))
+        self.assertIs(Target, replaces(value=Value)(Target))
+
+    def test_generated_decorator_reports_a_bare_application_it_could_not_see(self):
+        # Bean = Singleton in another module, getattr(...): the factory receives the target itself
+        transformer = MicronautTransformer(java_class_element, no_class_elements)
+        transformer.visit(ast.parse("from micronaut.context.annotation import Executable\n"))
+        namespace = {}
+        exec(transformer.get_generated_decorator_code()["io.micronaut.context.annotation.Executable"], namespace)
+        executable = namespace["Executable"]
+
+        class Target:
+            pass
+
+        def method(self):
+            pass
+
+        with self.assertRaisesRegex(TypeError, "applied bare"):
+            executable(Target)
+        with self.assertRaisesRegex(TypeError, "applied bare"):
+            executable(method)
+        # the inner decorator of another generated factory is a nested annotation value, not a target
+        self.assertIs(Target, executable(executable())(Target))
+
+    def test_alias_of_a_generated_decorator_is_called_when_bare(self):
+        code = runtime_source(
+            "from micronaut.context.annotation import Executable\n"
+            "Run = Executable\n"
+            "class Service:\n"
+            "    @Run\n"
+            "    def method(self):\n"
+            "        pass\n"
+        )
+        self.assertIn("@Run()", code)
+
+    def test_custom_annotation_with_a_required_member_stays_an_annotation_function(self):
+        source = (
+            "from micronaut.core.bind.annotation import Bindable\n"
+            "@Bindable\n"
+            "def Tagged(value: str):\n"
+            "    def decorator(target):\n"
+            "        return target\n"
+            "    return decorator\n"
+            "@Tagged('x')\n"
+            "def Composite():\n"
+            "    def decorator(target):\n"
+            "        return target\n"
+            "    return decorator\n"
+            "@Composite\n"
+            "class Bean:\n"
+            "    pass\n"
+        )
+        code = runtime_source(source)
+        self.assertIn("@Tagged('x')\ndef Composite", code)
+        self.assertIn("@Composite()\nclass Bean", code)
+
+    def test_wrapping_decorator_with_only_varargs_is_applied_bare(self):
+        source = (
+            "from micronaut.core.bind.annotation import Bindable\n"
+            "@Bindable\n"
+            "def Star(*args):\n"
+            "    def wrapper(*a, **k):\n"
+            "        return args[0](*a, **k)\n"
+            "    return wrapper\n"
+            "class Service:\n"
+            "    @Star\n"
+            "    def method(self):\n"
+            "        pass\n"
+        )
+        self.assertIn("    @Star\n    def method", runtime_source(source))
+
+    def test_a_local_decorator_shadows_a_star_imported_annotation(self):
+        source = (
+            "from micronaut.context.annotation import *\n"
+            "def Executable(target):\n"
+            "    return target\n"
+            "@Executable\n"
+            "class Local:\n"
+            "    pass\n"
+        )
+        self.assertIn("@Executable\nclass Local", runtime_source(source))
+
+    def test_an_attribute_decorator_is_not_matched_on_its_attribute_name_alone(self):
+        source = (
+            "from micronaut.context.annotation import Executable\n"
+            "@other.Executable\n"
+            "class Service:\n"
+            "    pass\n"
+        )
+        self.assertIn("@other.Executable\nclass Service", runtime_source(source))
 
 
 class TransformerTest(unittest.TestCase):

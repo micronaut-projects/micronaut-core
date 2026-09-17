@@ -38,7 +38,7 @@ class V8Engine:
     pass
 ----
 
-A function whose single required positional parameter is the decorated target is a plain Python decorator and is only applied bare, whether it returns the target (`def Timed(target): return target`) or a wrapper around it:
+A function with exactly one required positional parameter (or only `*args`) receives the decorated target when it is applied bare, as any Python decorator does; it is never rewritten to a call. That is the plain decorator returning the target (`def Timed(target): return target`), the wrapping decorator below, and an annotation whose member has no default (`def Tagged(value: str)`), which is written `@Tagged("x")`:
 
 [source,python]
 ----
@@ -54,6 +54,8 @@ def Traced(func):
 def hello(self) -> str:
     return "ok"
 ----
+
+A generated decorator applied bare through a name the compiler cannot see as the annotation (`Bean = Singleton` in another module, `getattr`) receives the class or function as its single argument; unless the annotation's `value` member holds a class, it raises a `TypeError` naming the annotation rather than replacing the target with the decorator.
 
 == Placeholder Bodies
 

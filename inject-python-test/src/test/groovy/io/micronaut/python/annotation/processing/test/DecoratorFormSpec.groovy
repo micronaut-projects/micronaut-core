@@ -158,6 +158,77 @@ class TracedService:
         context?.close()
     }
 
+    void "test a custom annotation with a required member is a stereotype of another custom annotation"() {
+        given: "Tagged takes its member positionally; Composite carries it and is applied bare"
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def Tagged(value: str):
+    def decorator(target):
+        return target
+    return decorator
+
+@Tagged("x")
+def Composite():
+    def decorator(target):
+        return target
+    return decorator
+
+@Singleton
+@Composite
+class CompositeBean:
+    pass
+''')
+
+        when:
+        def definition = getBeanDefinition(context, "python.CompositeBean")
+
+        then:
+        definition.hasAnnotation("python.Composite")
+        definition.hasStereotype("python.Tagged")
+        getBean(context, "python.CompositeBean") != null
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test a local decorator shadows a star-imported annotation and an alias of a generated decorator is applied bare"() {
+        given:
+        def context = buildContext('''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import *
+
+def Primary(target):
+    target.primary = True
+    return target
+
+Bean = Singleton
+
+@Singleton
+@Primary
+class ShadowedPrimary:
+    @Executable
+    def aliased_is_a_class(self) -> bool:
+        return isinstance(Aliased, type)
+
+@Bean
+class Aliased:
+    pass
+''', true)
+
+        when:
+        Value shadowed = getBean(context, "python.ShadowedPrimary").asPolyglotValue()
+
+        then: "the local Primary received the class; the alias is the Singleton factory, not applied to the class"
+        shadowed.getMember("primary").asBoolean()
+        shadowed.invokeMember("aliased_is_a_class").asBoolean()
+
+        cleanup:
+        context?.close()
+    }
+
     void "test an imported custom annotation function is applied bare and with parentheses"() {
         given:
         def tempDir = File.createTempDir("python-decorator-form", "")
