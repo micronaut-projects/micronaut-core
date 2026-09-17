@@ -236,6 +236,96 @@ def __micronaut_create_raw_instance(cls):
     return cls.__new__(cls)
 
 
+class _MicronautSelfInvocation:
+    """Instance attribute that routes ``self.method(...)`` of a proxied bean through the Java proxy.
+
+    The override runs the interceptor chain and then binds the class function to the target, so the
+    attribute is never re-entered. Keyword and omitted defaulted arguments are laid out positionally
+    the way the generated Java method declares them.
+    """
+
+    __slots__ = ("_function", "_override", "_parameters")
+
+    def __init__(self, function, override):
+        self._function = function
+        self._override = override
+        parameters = None
+        try:
+            signature = inspect.signature(function)
+            parameters = tuple(signature.parameters.values())[1:]
+            for parameter in parameters:
+                if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD):
+                    parameters = None
+                    break
+        except (TypeError, ValueError):
+            pass
+        self._parameters = parameters
+
+    def __call__(self, *args, **kwargs):
+        parameters = self._parameters
+        if parameters is not None and (kwargs or len(args) < len(parameters)):
+            values = list(args)
+            for parameter in parameters[len(args):]:
+                if parameter.name in kwargs:
+                    values.append(kwargs.pop(parameter.name))
+                elif parameter.default is not parameter.empty:
+                    values.append(parameter.default)
+                else:
+                    raise TypeError(f"{self._function.__qualname__}() missing required argument: '{parameter.name}'")
+            if kwargs:
+                raise TypeError(f"{self._function.__qualname__}() got an unexpected keyword argument '{next(iter(kwargs))}'")
+            args = values
+        return self._override(*args)
+
+    def __getattr__(self, name):
+        if name in _MicronautSelfInvocation.__slots__:
+            raise AttributeError(name)
+        return getattr(self._function, name)
+
+    def __repr__(self):
+        return repr(self._function)
+
+
+def __micronaut_is_coroutine_function(function):
+    return inspect.iscoroutinefunction(function)
+
+
+def __micronaut_await_stage(to_awaitable):
+    """Coroutine over the Java stage an intercepted ``async def`` produced.
+
+    The interceptor chain of an async method sees a CompletionStage, as it does for a Java bean. The
+    stage is turned into an asyncio future only when the coroutine is awaited, on the loop that awaits it.
+    """
+    async def await_stage():
+        return await to_awaitable()
+    return await_stage()
+
+
+def __micronaut_bind_self_invocations(target, proxy, names):
+    """Make the intercepted methods of a proxied bean dispatch through the proxy when called on ``self``.
+
+    A Java bean is its own proxy, so ``this.method()`` from inside the bean runs the interceptor chain.
+    A Python bean is a plain object behind the scoped proxy; an instance attribute per intercepted method
+    gives ``self.method()`` the same semantics while ``self`` stays the bean object.
+    """
+    try:
+        attributes = vars(target)
+    except TypeError:
+        # an object without __dict__ cannot carry the attributes; its self-invocations stay direct
+        return
+    if attributes.get("_micronaut_proxy") is proxy:
+        return
+    overrides = object.__getattribute__(proxy, "_micronaut_overrides")
+    cls = type(target)
+    for name in names:
+        override = overrides.get(name)
+        function = __micronaut_get_raw_class_member(cls, name)
+        if override is None or function is None or not callable(function):
+            continue
+        object.__setattr__(target, name, _MicronautSelfInvocation(function, override))
+    object.__setattr__(target, "_micronaut_proxy", proxy)
+
+
 def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=None):
     """A subclass of cls that forwards every attribute to the bean the supplier returns.
 
@@ -281,8 +371,10 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
                 names = attributes.keys()
             except Exception:
                 return
+            overrides = object.__getattribute__(self, "_micronaut_overrides")
             for name in names:
-                object.__getattribute__(self, "_micronaut_register_member")(name)
+                if name not in overrides:
+                    object.__getattribute__(self, "_micronaut_register_member")(name)
 
         def __getattribute__(self, name):
             if name in ("_micronaut_target_supplier", "_micronaut_java_proxy", "_micronaut_bind_java_proxy", "_micronaut_overrides", "_micronaut_setter_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_put_setter_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
