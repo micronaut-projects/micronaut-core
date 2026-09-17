@@ -972,8 +972,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String ownTypeName = typeModules.get(packageName);
             String ownSimpleName = ownTypeName == null ? null : packageName.substring(packageName.lastIndexOf('.') + 1);
             String ownDecoratorCode = ownTypeName == null ? null : typeModuleDecorators.get(packageName);
-            JavaClassImport ownClassImport = ownTypeName == null || ownDecoratorCode != null ? null
-                : typeModuleClasses.getOrDefault(packageName, classBinding(javaClassesInPackage, ownSimpleName, ownTypeName));
+            JavaClassImport ownClassImport = null;
+            if (ownTypeName != null && ownDecoratorCode == null) {
+                // The enclosing package may already have bound the type; look it up only otherwise
+                ownClassImport = typeModuleClasses.get(packageName);
+                if (ownClassImport == null) {
+                    ownClassImport = classBinding(javaClassesInPackage, ownSimpleName, ownTypeName);
+                }
+            }
 
             List<JavaClassImport> classBindings = new ArrayList<>(javaClassesInPackage.values());
             if (ownClassImport != null) {
