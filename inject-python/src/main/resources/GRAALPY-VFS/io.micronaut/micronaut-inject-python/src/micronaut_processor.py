@@ -2562,9 +2562,25 @@ def _is_generated_python_class(class_element):
 
 def _java_class_element(visitor_context, class_name):
     try:
-        return visitor_context.getClassElement(class_name).orElse(None)
+        return _find_class_element(visitor_context, class_name)
     except Exception:
         return None
+
+
+def _find_class_element(visitor_context, class_name):
+    """
+    Look up a class by its qualified name, trying the nested-class spellings (a.b.Outer$Nested) when the dotted
+    name (a.b.Outer.Nested) is not a class.
+    """
+    candidate = class_name
+    while True:
+        class_element = visitor_context.getClassElement(candidate).orElse(None)
+        if class_element is not None:
+            return class_element
+        last_dot = candidate.rfind('.')
+        if last_dot <= 0:
+            return None
+        candidate = f"{candidate[:last_dot]}${candidate[last_dot + 1:]}"
 
 
 def _is_convertible_default(node, visitor=None):

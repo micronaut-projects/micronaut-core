@@ -34,7 +34,9 @@ final class PythonVfsBytecodeTest {
         try (Context context = GraalPyResources.contextBuilder(vfs).allowAllAccess(true).build()) {
             String cachePath = context.eval("python", """
                 import ast
+                import importlib.util
                 import keyword
+                import os
                 import re
                 import java
                 import typing

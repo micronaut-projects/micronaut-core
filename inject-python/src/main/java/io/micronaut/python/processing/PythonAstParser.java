@@ -426,16 +426,18 @@ public final class PythonAstParser {
     /**
      * Transforms the given sources located within the given source directories. A source of a source
      * directory is transformed with its package known, so the transformer can resolve the imports of
-     * sibling modules of that directory.
+     * sibling modules of that directory; a module found in one of the directories is a Python module,
+     * never a Java import that has to resolve on the compile classpath.
      *
      * @param visitorContext The visitor context
      * @param srcDirs The source directories
      * @param pythonSource The sources
-     * @return The transformed sources
+     * @return The transformed sources, in the order of the sources
      */
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, List<String> srcDirs, Source... pythonSource) {
         runtimeArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("python_source_dirs", srcDirs.toArray(String[]::new));
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
         Set<String> missingClassElements = new java.util.HashSet<>();
         Map<String, Object[]> packageClassElementsCache = new LinkedHashMap<>();
@@ -571,7 +573,7 @@ public final class PythonAstParser {
             from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root, python_source_dirs=python_source_dirs)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.

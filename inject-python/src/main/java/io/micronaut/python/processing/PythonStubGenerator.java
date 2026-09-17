@@ -3232,18 +3232,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         VariableDef.MethodParameter methodParam,
         @Nullable ExpressionDef targetContext) {
         ClassElement genericType = param.getGenericType();
-        boolean mapOfPython = genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement;
+        boolean mapOfPython = isMapOfPythonClasses(genericType);
         boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
         if (targetContext != null) {
             // Generated Python-class arguments stay as host bridges for ordinary methods, including
-            // inside lists and maps, so Python consistently uses their generated Java accessors.
+            // inside lists and maps, so Python consistently uses their generated Java accessors; enum
+            // constants inside them become Python enum members, as bare enum arguments do.
             // Pooled bridges instead pass raw arguments to invokePooled, which converts them after
             // borrowing the target context.
             ExpressionDef parameter;
             if (mapOfPython) {
-                parameter = PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
+                parameter = PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam, targetContext);
             } else if (listOfPython) {
-                parameter = PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
+                parameter = PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam, targetContext);
             } else if (genericType instanceof PythonClassElement) {
                 parameter = methodParam;
             } else {
@@ -3269,9 +3270,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         parameters.add(parameter);
     }
 
+    /**
+     * Whether a map type has generated Python classes as its keys or its values: such a map is coerced
+     * entry by entry before it reaches Python, keys and values alike.
+     */
+    private static boolean isMapOfPythonClasses(ClassElement genericType) {
+        if (!genericType.isAssignable(Map.class)) {
+            return false;
+        }
+        Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
+        return typeArguments.get("K") instanceof PythonClassElement || typeArguments.get("V") instanceof PythonClassElement;
+    }
+
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element, ExpressionDef expr) {
         ClassElement genericType = element.getGenericType();
-        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
+        if (isMapOfPythonClasses(genericType)) {
             return PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), expr);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             return PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), expr);
@@ -5211,6 +5224,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, castType, expression);
     }
 
+    /**
+     * The body of the static {@code fromPolyglotValue} factory: {@code None} is {@code null}, an instance
+     * of a generated Python subclass is wrapped by that subclass so it keeps its runtime type, and any other
+     * value is wrapped by this type.
+     */
     private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
         return StatementDef.multi(
             PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
@@ -5222,6 +5240,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
+            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField("class", TypeDef.CLASS))
+                .newLocal("subclassWrapper", subclassWrapper ->
+                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()
         );
     }

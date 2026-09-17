@@ -352,6 +352,7 @@ languageSupport:
     standardTypes: Standard Library Type Conversions
     javaCollections: Java Collections and Serialization
     runtimeTypes: Python Classes and Objects at Run Time
+    javaImports: Importing Java Types
     keywords: Python Keywords in Java APIs
     nestedTypes: Nested Java Types
     pythonExceptions: Python Exceptions Extending Java Exceptions

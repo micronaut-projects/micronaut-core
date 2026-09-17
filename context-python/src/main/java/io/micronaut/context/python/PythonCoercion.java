@@ -33,6 +33,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -42,7 +43,6 @@ import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
-import java.util.stream.Collectors;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
@@ -90,21 +90,51 @@ public final class PythonCoercion {
     }
 
     /**
-     * Coerce a map of types that may extend from {@link ValueCoercible} back to a native value map.
+     * Coerce a map whose keys or values may extend from {@link ValueCoercible} back to a native value map.
+     * Keys are coerced like values, so a map keyed by generated Python wrappers reaches Python with its keys
+     * as Python objects.
      * @param map The map
+     * @param <K> The key type of the map
      * @param <V> The value type of the map
      * @return The resulting map
      */
-    public static <V> @Nullable Map<String, Object> coerceMap(@Nullable Map<String, V> map) {
+    public static <K, V> @Nullable Map<Object, Object> coerceMap(@Nullable Map<K, V> map) {
+        return coerceMap(map, null);
+    }
+
+    /**
+     * Coerce a map whose keys or values may extend from {@link ValueCoercible} back to a native value map
+     * for the given context: generated enum constants among the keys and values become the Python enum
+     * members of that context, as a bare enum argument does.
+     * @param map The map
+     * @param context The target context, or {@code null} when the map is converted later with its context
+     * @param <K> The key type of the map
+     * @param <V> The value type of the map
+     * @return The resulting map
+     */
+    @UsedByGeneratedCode
+    public static <K, V> @Nullable Map<Object, Object> coerceMap(@Nullable Map<K, V> map, @Nullable Context context) {
         if (map == null) {
             return null;
         }
-        return
-            map.entrySet().stream().collect(Collectors.toMap(Map.Entry::getKey, (entry) -> {
-                Object v = entry.getValue();
-                Object coerced = coerceValue(v);
-                return coerced instanceof PooledValueCoercible ? v : coerced;
-            }));
+        Map<Object, Object> result = new LinkedHashMap<>(map.size());
+        for (Map.Entry<K, V> entry : map.entrySet()) {
+            result.put(coerceElement(entry.getKey(), context), coerceElement(entry.getValue(), context));
+        }
+        return result;
+    }
+
+    /**
+     * Coerce a collection element: a generated wrapper becomes its Python value; a pooled wrapper stays the
+     * host bridge Python reads through its generated accessors, except a generated enum constant, which is
+     * the Python enum member of the target context when that is known.
+     */
+    private static @Nullable Object coerceElement(@Nullable Object element, @Nullable Context context) {
+        Object coerced = coerceValue(element);
+        if (coerced instanceof PooledValueCoercible pooledValueCoercible) {
+            return context != null && element instanceof Enum<?> ? coercePooledValue(pooledValueCoercible, context) : element;
+        }
+        return coerced;
     }
 
     /**
@@ -115,14 +145,27 @@ public final class PythonCoercion {
      *
      */
     public static <E> @Nullable List<Object> coerceList(@Nullable List<E> list) {
+        return coerceList(list, null);
+    }
+
+    /**
+     * Coerce a list of types that may extend from {@link ValueCoercible} back to a native value list for the
+     * given context: generated enum constants become the Python enum members of that context.
+     * @param list The list
+     * @param context The target context, or {@code null} when the list is converted later with its context
+     * @param <E> The element type of the list
+     * @return The resulting list
+     */
+    @UsedByGeneratedCode
+    public static <E> @Nullable List<Object> coerceList(@Nullable List<E> list, @Nullable Context context) {
         if (list == null) {
             return null;
         }
-        return
-            list.stream().map(v -> {
-                Object coerced = coerceValue(v);
-                return coerced instanceof PooledValueCoercible ? v : coerced;
-            }).toList();
+        List<@Nullable Object> result = new ArrayList<>(list.size());
+        for (E element : list) {
+            result.add(coerceElement(element, context));
+        }
+        return result;
     }
 
     /**
