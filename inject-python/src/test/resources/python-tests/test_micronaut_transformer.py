@@ -45,6 +45,16 @@ def java_class_element(name):
         return None
 
 
+def compiled_python_class_element(name):
+    """
+    The class element of the generated bridge of a Python class compiled elsewhere: a Java type carrying
+    the PythonClass annotation, which the compiler reads from the annotation metadata of the element.
+    """
+    metadata = java.type("io.micronaut.inject.annotation.MutableAnnotationMetadata")()
+    metadata.addDeclaredAnnotation("io.micronaut.context.python.annotation.PythonClass", {})
+    return _ClassElement.of(java.type(name), metadata, {})
+
+
 def java_class_elements(package):
     """
     The annotation types of a package, as the compiler answers for a package import.
@@ -596,6 +606,10 @@ class UnresolvedJavaImportTest(unittest.TestCase):
         self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0])
         self.assertEqual(1, len(self._errors("from io.lettuce.core.codec import RedisCodec\n")))
         self.assertEqual(1, len(self._errors("from jakarta.absent import Missing\n")))
+        # GraalPy's java import hook finds a spec for any java.* name: still not a Python module
+        self.assertEqual(1, len(self._errors("from java.util import NoSuchThing\n")))
+        self.assertEqual(1, len(self._errors("from java.absent import NoSuchThing\n")))
+        self.assertEqual(1, len(self._errors("from javax.absent import NoSuchThing\n")))
 
     def test_missing_name_in_a_classpath_package_is_an_error(self):
         def acme_package(package):
@@ -614,6 +628,22 @@ class UnresolvedJavaImportTest(unittest.TestCase):
 
         self.assertEqual([], self._errors("from jakarta import inject\n", inject_package))
         self.assertEqual([], self._errors("from jakarta.inject.Qualifier import Qualifier\n", class_element=qualifier_type))
+
+    def test_star_import_keeps_compiled_python_classes_as_python_imports(self):
+        def acme_package(package):
+            if package != "com.acme":
+                return []
+            return [
+                compiled_python_class_element("io.micronaut.python.processing.fixtures.CompiledPet"),
+                java_class_element("io.micronaut.context.ApplicationContext"),
+                java_class_element("io.micronaut.context.annotation.Executable"),
+            ]
+
+        transformer = MicronautTransformer(no_class_element, acme_package)
+        transformer.visit(ast.parse("from com.acme import *\n"))
+        self.assertEqual([], transformer.validation_errors)
+        self.assertEqual(["ApplicationContext = java.type('io.micronaut.context.ApplicationContext')"], transformer.java_type_assignments)
+        self.assertEqual(["ApplicationContext"], transformer._star_imported_class_names("com.acme"))
 
     def test_project_python_modules_are_never_java_imports(self):
         import os
