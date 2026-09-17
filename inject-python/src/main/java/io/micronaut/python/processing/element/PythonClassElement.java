@@ -67,6 +67,8 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 @Experimental
 public sealed class PythonClassElement extends AbstractPythonClassElement permits PythonAnnotationElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
+    private static final String JUNIT_NESTED = "org.junit.jupiter.api.Nested";
+    private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";
     private static final String DATACLASS_DECORATOR = "dataclass";
 
@@ -192,7 +194,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public boolean isStatic() {
-        return isInner();
+        // A Python class has no enclosing instance, so a nested class is a static member type of the
+        // generated class of its enclosing class; a JUnit @Nested test class is the exception, JUnit
+        // requires an inner class and constructs it with the instance of the enclosing test.
+        return isInner() && !hasDeclaredAnnotation(JUNIT_NESTED);
     }
 
     @Override
@@ -207,6 +212,40 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             ? enclosingName
             : getPackageName() + "." + enclosingName;
         return Optional.ofNullable(environment.classes().get(qualifiedEnclosingName));
+    }
+
+    /**
+     * Whether the Java class generated for this class is a member type of the Java class generated for
+     * the enclosing Python class.
+     * <p>
+     * A class nested in a Python class compiles to a member type of the generated class of its enclosing
+     * class (binary name {@code Outer$Inner}, as before), so that Java sees the nesting: JUnit runs a
+     * {@code @Nested} test class with the context of the enclosing {@code @MicronautTest}. Enums,
+     * interfaces and pooled classes are generated as top-level types named {@code Outer$Inner}, whether
+     * they are nested or enclose other classes.
+     *
+     * @return {@code true} when the generated class is a member type of the enclosing generated class
+     */
+    public boolean isMemberOfEnclosingType() {
+        return isInner()
+            && isMemberCandidate(this)
+            && getEnclosingType().filter(enclosing -> enclosing instanceof PythonClassElement && isMemberCandidate(enclosing)).isPresent();
+    }
+
+    private static boolean isMemberCandidate(ClassElement element) {
+        return !element.isEnum()
+            && !element.isInterface()
+            && !element.hasStereotype(CONTEXT_POOLED);
+    }
+
+    @Override
+    public String getCanonicalName() {
+        if (isMemberOfEnclosingType()) {
+            ClassElement enclosing = getEnclosingType().orElseThrow();
+            String name = getNativeType().name();
+            return enclosing.getCanonicalName() + "." + name.substring(name.lastIndexOf('$') + 1);
+        }
+        return getName();
     }
 
     @Override
@@ -620,6 +659,16 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
      */
     @Override
     public boolean isInterface() {
+        // Whether a Python class compiles to a Java interface is a property of the class declaration.
+        // A copy of the element carrying other annotation metadata (the produced type of a factory
+        // method merges the method's annotations, a scope or around advice among them) must answer the
+        // same as the element the stub was generated from, or a proxy of the type extends an interface.
+        if (presetAnnotationMetadata != null
+            && environment.classes().get(getName()) instanceof PythonClassElement declaredElement
+            && declaredElement != this
+            && declaredElement.presetAnnotationMetadata == null) {
+            return declaredElement.isInterface();
+        }
         if (hasStereotype(Introspected.class)
             || hasConstructorOrCreator()
             || !getNativeType().attributes().isEmpty()

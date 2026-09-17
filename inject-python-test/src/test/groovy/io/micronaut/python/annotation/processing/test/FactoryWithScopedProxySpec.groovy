@@ -47,15 +47,15 @@ class TestFactory:
         def context = buildContext(pythonCode)
         def bean = getBean(context, "python.Test")
 
-        then:
-        ScopedProxyInitCounter.count() == 1
+        then: "the scoped proxy of the Python class has no Python object of its own"
+        ScopedProxyInitCounter.count() == 0
 
         when:
         def result = bean.test()
 
-        then:
+        then: "the factory method created the bean the proxy delegates to"
         result == "good"
-        ScopedProxyInitCounter.count() == 2
+        ScopedProxyInitCounter.count() == 1
 
         cleanup:
         context?.close()

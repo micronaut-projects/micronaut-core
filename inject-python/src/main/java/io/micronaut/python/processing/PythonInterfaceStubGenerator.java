@@ -56,6 +56,7 @@ import static io.micronaut.python.processing.PythonStubGenerator.addMethodTypeVa
 import static io.micronaut.python.processing.PythonStubGenerator.bridgeMethodKey;
 import static io.micronaut.python.processing.PythonStubGenerator.methodReturnType;
 import static io.micronaut.python.processing.PythonStubGenerator.parameterizedTypeDef;
+import static io.micronaut.python.processing.PythonStubGenerator.pythonClassAnnotation;
 import static io.micronaut.python.processing.PythonStubGenerator.pythonClassReferenceExpression;
 import static io.micronaut.python.processing.PythonStubGenerator.returnConvertedValue;
 import static io.micronaut.python.processing.PythonStubGenerator.sourceMethodReturnType;
@@ -103,7 +104,9 @@ final class PythonInterfaceStubGenerator {
                                           VisitorContext context) {
         InterfaceDef.InterfaceDefBuilder interfaceBuilder = InterfaceDef.builder(typeName)
             .addModifiers(Modifier.PUBLIC)
-            .addAnnotation(Vetoed.class);
+            .addAnnotation(Vetoed.class)
+            // the runtime resolves the Python class of an AOP proxy implementing the interface from it
+            .addAnnotation(pythonClassAnnotation(classElement));
         for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
             // the bounds decide the erasure of the interface methods, which the introduction proxy implements
             List<TypeDef> bounds = placeholder.getBounds().stream()

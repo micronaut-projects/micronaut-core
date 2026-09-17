@@ -20,6 +20,7 @@ dependencies {
     api(libs.jakarta.inject.api)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(libs.junit.platform.launcher)
     testImplementation(libs.micronaut.test.junit5)
     testImplementation(platform(libs.test.boms.micronaut.validation))
     testImplementation(platform(libs.test.boms.micronaut.data))

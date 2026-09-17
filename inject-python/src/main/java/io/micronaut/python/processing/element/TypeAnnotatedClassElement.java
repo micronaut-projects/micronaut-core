@@ -219,6 +219,11 @@ public sealed class TypeAnnotatedClassElement implements ClassElement permits Ty
     }
 
     @Override
+    public String getCanonicalName() {
+        return delegate.getCanonicalName();
+    }
+
+    @Override
     public boolean isEnum() {
         return delegate.isEnum();
     }
