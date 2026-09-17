@@ -54,6 +54,7 @@ import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.DefaultFactoryDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -1874,13 +1875,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean hasDataclassDefaultFactory(ParameterElement parameter, String factoryName) {
-        if (!(parameter.getNativeType() instanceof ArgumentDef argumentDef)) {
-            return false;
-        }
-        if (argumentDef.defaultValue() instanceof String defaultFactoryName) {
-            return factoryName.equals(defaultFactoryName) || defaultFactoryName.endsWith("." + factoryName);
-        }
-        return false;
+        return parameter.getNativeType() instanceof ArgumentDef argumentDef
+            && argumentDef.defaultValue() instanceof DefaultFactoryDef factory
+            && factory.isBuiltin(factoryName);
     }
 
     private static boolean isFrozenPythonDataclass(ClassElement element) {
@@ -2900,7 +2897,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 continue;
             }
             try {
-                builder.addAnnotation(reflectiveAnnotationDef(av, visitorContext));
+                builder.addAnnotation(reflectiveAnnotationDef(av, element, visitorContext));
             } catch (UnrepresentableAnnotationException e) {
                 visitorContext.warn("Annotation @" + annotationName + " is not copied onto the generated Java declaration of ["
                     + element.getName() + "], reflection-based frameworks will not see it: " + e.getMessage(), element);
@@ -2910,11 +2907,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     /**
      * Builds the source representation of an annotation, checking that every member value can be written as a
-     * Java constant of the member type. The metadata can hold values the source cannot express, such as an
-     * unresolved Python expression for a nested annotation, and a member that does not compile would break the
-     * whole generated class.
+     * Java constant of the member type. The metadata can hold members the annotation type does not declare
+     * (added by an annotation mapper) and values the source cannot express, such as an unresolved Python
+     * expression for a nested annotation. Such a member is left out, with a warning, when the annotation type
+     * fills it with its default: a member that does not compile would break the whole generated class. Only a
+     * member without a default cannot be left out, and then the annotation as a whole is not copied.
+     *
+     * @param annotation The annotation
+     * @param element    The annotated Python element, for the warnings
+     * @param context    The visitor context
+     * @return The annotation definition
+     * @throws UnrepresentableAnnotationException When the annotation cannot be written at all
      */
-    private static AnnotationDef reflectiveAnnotationDef(AnnotationValue<?> annotation, VisitorContext context) {
+    private static AnnotationDef reflectiveAnnotationDef(AnnotationValue<?> annotation, Element element, VisitorContext context) {
         String annotationName = annotation.getAnnotationName();
         ClassElement annotationType = context.getClassElement(annotationName)
             .orElseThrow(() -> new UnrepresentableAnnotationException("the annotation type cannot be resolved"));
@@ -2922,14 +2927,28 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (MethodElement member : annotationType.getMethods()) {
             memberTypes.putIfAbsent(member.getName(), member.getReturnType());
         }
+        Set<String> defaultedMembers = PythonAnnotationTypes.defaultedMembers(annotationType);
         AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(annotationType));
         for (Map.Entry<CharSequence, Object> entry : annotation.getValues().entrySet()) {
             String memberName = entry.getKey().toString();
             ClassElement memberType = memberTypes.get(memberName);
             if (memberType == null) {
-                throw new UnrepresentableAnnotationException("@" + annotationName + " has no member '" + memberName + "'");
+                // A mapper added the member: it is served by the annotation metadata, not the annotation type
+                context.warn("The " + memberDescription(annotationName, memberName) + " is not declared by the annotation type"
+                    + " and is not copied onto the generated Java declaration of [" + element.getName() + "]", element);
+                continue;
             }
-            Object value = reflectiveMemberValue(annotationName, memberName, entry.getValue(), memberType, context);
+            Object value;
+            try {
+                value = reflectiveMemberValue(annotationName, memberName, entry.getValue(), memberType, element, context);
+            } catch (UnrepresentableAnnotationException e) {
+                if (!defaultedMembers.contains(memberName)) {
+                    throw e;
+                }
+                context.warn("The " + memberDescription(annotationName, memberName) + " keeps its default on the generated Java declaration of ["
+                    + element.getName() + "], reflection-based frameworks will not see its value: " + e.getMessage(), element);
+                continue;
+            }
             if (value instanceof Collection<?> collection) {
                 builder.addMember(memberName, new ArrayList<Object>(collection));
             } else {
@@ -2940,12 +2959,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     @SuppressWarnings("unchecked")
-    private static Object reflectiveMemberValue(String annotationName, String memberName, Object value, ClassElement memberType, VisitorContext context) {
+    private static Object reflectiveMemberValue(String annotationName, String memberName, Object value, ClassElement memberType, Element element, VisitorContext context) {
         if (memberType.isArray()) {
             ClassElement componentType = memberType.fromArray();
             List<Object> values = new ArrayList<>();
-            for (Object element : memberValues(value)) {
-                values.add(reflectiveMemberValue(annotationName, memberName, element, componentType, context));
+            for (Object elementValue : memberValues(value)) {
+                values.add(reflectiveMemberValue(annotationName, memberName, elementValue, componentType, element, context));
             }
             return values;
         }
@@ -2960,7 +2979,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (!PythonAnnotationTypes.isAnnotationType(memberType)) {
                 throw unrepresentable(annotationName, memberName, value, memberType);
             }
-            return reflectiveAnnotationDef(nested, context);
+            return reflectiveAnnotationDef(nested, element, context);
         }
         String typeName = memberType.getName();
         if (String.class.getName().equals(typeName)) {
@@ -3047,8 +3066,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static UnrepresentableAnnotationException unrepresentable(String annotationName, String memberName, Object value, ClassElement memberType) {
-        return new UnrepresentableAnnotationException("the value [" + value + "] of member '" + memberName + "' of @" + annotationName
+        return new UnrepresentableAnnotationException("the value [" + value + "] of " + memberDescription(annotationName, memberName)
             + " cannot be written as a " + memberType.getName() + " constant");
+    }
+
+    private static String memberDescription(String annotationName, String memberName) {
+        return "member '" + memberName + "' of @" + annotationName;
     }
 
     private boolean isCopiedRuntimeAnnotation(String annotationName, ElementType declaration, VisitorContext visitorContext) {
@@ -3385,13 +3408,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (variadicArguments != null) {
                         pythonArguments = PYTHON_INVOCATION.invokeStatic(WITH_VARARGS, TypeDef.OBJECT.array(), pythonArguments, variadicArguments);
                     }
-                    invokedValue = PYTHON_INVOCATION.invokeStatic(
-                        spec.introduced() ? "invokeIntroducedMethod" : "invokePythonMethod",
-                        POLYGLOT_VALUE,
-                        targetValue,
-                        ExpressionDef.constant(pythonFunctionName),
-                        pythonArguments
-                    );
+                    if (spec.introduced()) {
+                        invokedValue = PYTHON_INVOCATION.invokeStatic(
+                            "invokeIntroducedMethod",
+                            POLYGLOT_VALUE,
+                            targetValue,
+                            ExpressionDef.constant(pythonFunctionName),
+                            classLiteral(effectiveReturnType),
+                            pythonArguments
+                        );
+                    } else {
+                        invokedValue = PYTHON_INVOCATION.invokeStatic(
+                            "invokePythonMethod",
+                            POLYGLOT_VALUE,
+                            targetValue,
+                            ExpressionDef.constant(pythonFunctionName),
+                            pythonArguments
+                        );
+                    }
                 }
 
                 if (isJunit5Test) {
@@ -4120,7 +4154,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         String booleanGetterName = booleanBeanGetterName(beanProperty.getName());
         if (addBooleanAlias && isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
-            addGetterDynamic(beanProperty, builder, propertyType, booleanGetterName, visitorContext);
+            // the alias carries no annotations: one annotated getter per property (JPA property access)
+            addGetterDynamic(beanProperty, builder, propertyType, booleanGetterName, null);
         }
     }
 

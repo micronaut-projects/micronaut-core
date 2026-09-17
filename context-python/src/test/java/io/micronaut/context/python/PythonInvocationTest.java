@@ -75,4 +75,39 @@ final class PythonInvocationTest {
             PythonContextRegistry.unregisterContext(context);
         }
     }
+
+    /**
+     * An introduced method exists as a member of the proxy only. An instance that is not the proxy answers
+     * {@code None} for a reference or void return type; a primitive return type has no such answer and the
+     * missing member is reported.
+     */
+    @Test
+    void invokeIntroducedMethodAnswersNoneForMissingReferenceMembersOnly() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            PythonContextRegistry.registerContext(context);
+            Value proxy = context.eval(PYTHON, """
+                class EntityProxy:
+                    def find_name(self, id):
+                        return "name " + str(id)
+                    def count(self):
+                        return 3
+                EntityProxy()
+                """);
+            Value entity = context.eval(PYTHON, """
+                class Entity:
+                    pass
+                Entity()
+                """);
+            assertEquals("name 1", PythonInvocation.invokeIntroducedMethod(proxy, "find_name", String.class, new Object[] {1}).asString());
+            assertEquals(3, PythonInvocation.invokeIntroducedMethod(proxy, "count", int.class, null).asInt());
+            assertTrue(PythonInvocation.invokeIntroducedMethod(entity, "find_name", String.class, new Object[] {1}).isNull());
+            assertTrue(PythonInvocation.invokeIntroducedMethod(entity, "refresh", void.class, null).isNull());
+            IllegalStateException missing = assertThrows(IllegalStateException.class,
+                () -> PythonInvocation.invokeIntroducedMethod(entity, "count", int.class, null));
+            assertTrue(missing.getMessage().contains("[count]"), missing.getMessage());
+            assertTrue(missing.getMessage().contains("[int]"), missing.getMessage());
+            assertEquals(0, PythonContextRegistry.activeExecutions());
+            PythonContextRegistry.unregisterContext(context);
+        }
+    }
 }

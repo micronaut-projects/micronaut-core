@@ -36,8 +36,10 @@ import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -169,6 +171,42 @@ public final class PythonAnnotationTypes {
         AnnotationMetadata metadata = classElement.getAnnotationMetadata();
         return !metadata.hasAnnotation(Target.class.getName())
             || contains(metadata.enumValues(Target.class.getName(), AnnotationMetadata.VALUE_MEMBER, ElementType.class), declaration);
+    }
+
+    /**
+     * The names of the members of the annotation type that declare a default value, read from the annotation
+     * type itself: the annotation metadata leaves out empty defaults, and the defaults of a Java annotation
+     * type are not resolvable through the metadata builder of the Python visitor context.
+     *
+     * @param classElement The annotation element
+     * @return The names of the members with a default
+     */
+    public static Set<String> defaultedMembers(@Nullable ClassElement classElement) {
+        if (classElement == null) {
+            return Set.of();
+        }
+        Set<String> members = new HashSet<>();
+        TypeElement typeElement = typeElement(classElement);
+        if (typeElement != null) {
+            for (Element enclosed : typeElement.getEnclosedElements()) {
+                if (enclosed instanceof ExecutableElement member && member.getDefaultValue() != null) {
+                    members.add(member.getSimpleName().toString());
+                }
+            }
+            return members;
+        }
+        if (classElement.getNativeType() instanceof Class<?> type) {
+            for (Method member : type.getDeclaredMethods()) {
+                if (member.getDefaultValue() != null) {
+                    members.add(member.getName());
+                }
+            }
+            return members;
+        }
+        for (CharSequence member : classElement.getAnnotationMetadata().getDefaultValues(classElement.getName()).keySet()) {
+            members.add(member.toString());
+        }
+        return members;
     }
 
     /**

@@ -111,15 +111,24 @@ public final class PythonInvocation {
      * {@code @Introduction}. The proxy of the class carries such a method as a Python member; an instance
      * that is not the proxy (an entity instantiated by JPA, a value created from Java) has no member of
      * that name and, as in Java where only the proxy class implements the introduced interface, no
-     * implementation for it: the result is then {@code None}.
+     * implementation for it: the result is then {@code None} when the method returns a reference or
+     * nothing. A method returning a primitive has no value to answer without an implementation, so the
+     * missing member is reported instead of surfacing later as a failed conversion of {@code None}.
      *
      * @param receiver The Python receiver
      * @param name The method name
+     * @param returnType The declared return type of the introduced method
      * @param arguments The method arguments, or {@code null} for none
      * @return The invocation result, or {@code None} if the receiver has no such member
+     * @throws IllegalStateException If the receiver has no such member and the method returns a primitive
      */
-    public static Value invokeIntroducedMethod(Value receiver, String name, Object @Nullable [] arguments) {
+    public static Value invokeIntroducedMethod(Value receiver, String name, Class<?> returnType, Object @Nullable [] arguments) {
         if (!receiver.hasMember(name)) {
+            if (returnType.isPrimitive() && returnType != void.class) {
+                throw new IllegalStateException("The introduced method [" + name + "] returning [" + returnType.getName()
+                    + "] is only implemented by the proxy of the Python class, and the receiver [" + receiver
+                    + "] is not the proxy: it was not created through the bean context");
+            }
             return receiver.getContext().asValue(null);
         }
         return invokePythonMethod(receiver, name, arguments);
