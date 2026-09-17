@@ -34,7 +34,6 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
-import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -350,6 +349,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
             } else {
                 Argument<?> bodyArgument = this.getBodyArgument();
                 Object data;
+                // the aggregated message content when the bound argument aliases it; released once the handler completes
+                ByteBuf handlerOwnedContent = null;
 
                 if (WebSocketFrame.class.isAssignableFrom(bodyArgument.getType())) {
                     data = msg.retain();
@@ -381,34 +382,13 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                         content = buffer;
                     }
 
-                    data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
-                    content.release();
-                }
-
-                if (data == null) {
-                    MediaType mediaType;
-                    try {
-                        mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
-                    } catch (IllegalArgumentException e) {
-                        exceptionCaught(ctx, e);
+                    DecodedMessage decoded = decodeContent(ctx, content, bodyArgument, messageHandler);
+                    if (decoded == null) {
+                        // the failure has been reported and the content released
                         return;
                     }
-                    try {
-                        data = mediaTypeCodecRegistry.findCodec(mediaType)
-                            .map(codec -> codec.decode(bodyArgument, new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content())))
-                            .orElse(null);
-                    } catch (CodecException e) {
-                        messageProcessingException(ctx, e);
-                        return;
-                    }
-                    if (data == null) {
-                        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType)
-                            .orElse(null);
-                        if (reader != null) {
-                            ByteBuffer<ByteBuf> byteBuffer = new NettyByteBufferFactory(ctx.alloc()).wrap(msg.content().retain());
-                            data = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
-                        }
-                    }
+                    data = decoded.data();
+                    handlerOwnedContent = decoded.ownedContent();
                 }
 
                 if (data != null) {
@@ -418,6 +398,8 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
                             Collections.singletonMap(bodyArgument, data)
                     );
 
+                    ByteBuf finalHandlerOwnedContent = handlerOwnedContent;
+                    Runnable release = finalHandlerOwnedContent == null ? () -> { } : finalHandlerOwnedContent::release;
                     try {
                         BoundExecutable boundExecutable = executableBinder.bind(
                                 messageHandler.getExecutableMethod(),
@@ -427,13 +409,19 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
 
                         Object finalData = data;
                         invokeExecutable(boundExecutable, messageHandler).onComplete((v, e) -> {
-                            if (e == null) {
-                                messageHandled(ctx, finalData);
-                            } else {
-                                messageProcessingException(ctx, e);
+                            try {
+                                if (e == null) {
+                                    messageHandled(ctx, finalData);
+                                } else {
+                                    messageProcessingException(ctx, e);
+                                }
+                            } finally {
+                                // messageHandled has handed the message to its listeners by now
+                                release.run();
                             }
                         });
                     } catch (Throwable e) {
+                        release.run();
                         messageProcessingException(ctx, e);
                     }
 
@@ -495,6 +483,85 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         }
     }
 
+    /**
+     * Decode the aggregated content, releasing it unless the bound value aliases it. A decoding
+     * failure is reported through {@link #messageProcessingException} and the content released.
+     *
+     * @param ctx            The context
+     * @param content        The aggregated message content
+     * @param bodyArgument   The body argument
+     * @param messageHandler The message handler
+     * @return The decoded message, or {@code null} if decoding failed
+     */
+    @Nullable
+    private DecodedMessage decodeContent(ChannelHandlerContext ctx, ByteBuf content, Argument<?> bodyArgument, MethodExecutionHandle<?, ?> messageHandler) {
+        boolean releaseContent = true;
+        try {
+            Object data = decodeMessage(ctx, content, bodyArgument, messageHandler);
+            if (data == content || (data instanceof ByteBuffer<?> byteBuffer && byteBuffer.asNativeBuffer() == content)) {
+                // the argument is a view of the frame content: ownership passes to the handler invocation
+                releaseContent = false;
+                return new DecodedMessage(data, content);
+            }
+            return new DecodedMessage(data, null);
+        } catch (Exception e) {
+            messageProcessingException(ctx, e);
+            return null;
+        } finally {
+            if (releaseContent) {
+                content.release();
+            }
+        }
+    }
+
+    /**
+     * Decodes the aggregated content of a message into the type of the body argument. The caller keeps ownership
+     * of {@code content}; the returned value may alias it (see {@link #handleWebSocketFrame}).
+     *
+     * @param ctx            The context
+     * @param content        The aggregated message content
+     * @param bodyArgument   The body argument
+     * @param messageHandler The message handler
+     * @return The decoded message, or {@code null} if no converter, codec or reader can decode it
+     */
+    @Nullable
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private Object decodeMessage(ChannelHandlerContext ctx, ByteBuf content, Argument<?> bodyArgument, MethodExecutionHandle<?, ?> messageHandler) {
+        if (bodyArgument.getType().isInstance(content)) {
+            // CompositeByteBuf is Iterable, which the conversion service does not pass through unchanged
+            return content;
+        }
+        Object data = conversionService.convert(content, ByteBuf.class, bodyArgument).orElse(null);
+        if (data != null) {
+            return data;
+        }
+        MediaType mediaType = messageHandler.stringValue(Consumes.class).map(MediaType::of).orElse(MediaType.APPLICATION_JSON_TYPE);
+        NettyByteBufferFactory bufferFactory = new NettyByteBufferFactory(ctx.alloc());
+        data = mediaTypeCodecRegistry.findCodec(mediaType)
+            .map(codec -> codec.decode(bodyArgument, bufferFactory.wrap(content)))
+            .orElse(null);
+        if (data != null) {
+            return data;
+        }
+        MessageBodyReader<?> reader = messageBodyHandlerRegistry.findReader(bodyArgument, mediaType).orElse(null);
+        if (reader == null) {
+            return null;
+        }
+        // the reader takes ownership of the buffer it is given and releases it once the message has been read
+        ByteBuffer<ByteBuf> byteBuffer = bufferFactory.wrap(content.retain());
+        boolean read = false;
+        try {
+            Object value = reader.read((Argument) bodyArgument, mediaType, new SimpleHttpHeaders(), byteBuffer);
+            read = true;
+            return value;
+        } finally {
+            if (!read) {
+                // readers only release on success
+                content.release();
+            }
+        }
+    }
+
     private void messageProcessingException(ChannelHandlerContext ctx, Throwable e) {
         if (LOG.isErrorEnabled()) {
             LOG.error("Error Processing WebSocket Message [{}]: {}", webSocketBean, e.getMessage(), e);
@@ -503,7 +570,9 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
     }
 
     /**
-     * Method called once a message has been handled by the handler.
+     * Method called once a message has been handled by the handler. When the message is a view of
+     * the frame content, that content is released after this method returns, so anything the
+     * message is handed to here must be done with it by then.
      *
      * @param ctx     The channel handler context
      * @param message The message that was handled
@@ -661,5 +730,15 @@ public abstract class AbstractNettyWebSocketHandler extends SimpleChannelInbound
         if (buffer != null) {
             buffer.release();
         }
+    }
+
+    /**
+     * The decoded message and, when the bound value is a view of the frame content, that content,
+     * whose ownership passes to the handler invocation.
+     *
+     * @param data         The decoded message, or {@code null} if nothing can decode it
+     * @param ownedContent The content the handler invocation owns, or {@code null} if it was released
+     */
+    private record DecodedMessage(@Nullable Object data, @Nullable ByteBuf ownedContent) {
     }
 }
