@@ -116,6 +116,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
 
+    /**
+     * The {@code class} member of a type: {@code Type.class}.
+     */
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
     private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
@@ -5240,7 +5243,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField("class", TypeDef.CLASS))
+            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("subclassWrapper", subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()

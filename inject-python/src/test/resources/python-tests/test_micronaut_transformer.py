@@ -629,7 +629,9 @@ class UnresolvedJavaImportTest(unittest.TestCase):
         self.assertEqual([], self._errors("from jakarta import inject\n", inject_package))
         self.assertEqual([], self._errors("from jakarta.inject.Qualifier import Qualifier\n", class_element=qualifier_type))
 
-    def test_star_import_keeps_compiled_python_classes_as_python_imports(self):
+    def test_star_import_binds_compiled_python_classes_through_their_bridge(self):
+        # the generated bridge of a Python class compiled elsewhere is bound like any other class of the
+        # package: a star-imported Python class is not resolved on the processor side, its bridge is
         def acme_package(package):
             if package != "com.acme":
                 return []
@@ -642,8 +644,11 @@ class UnresolvedJavaImportTest(unittest.TestCase):
         transformer = MicronautTransformer(no_class_element, acme_package)
         transformer.visit(ast.parse("from com.acme import *\n"))
         self.assertEqual([], transformer.validation_errors)
-        self.assertEqual(["ApplicationContext = java.type('io.micronaut.context.ApplicationContext')"], transformer.java_type_assignments)
-        self.assertEqual(["ApplicationContext"], transformer._star_imported_class_names("com.acme"))
+        self.assertEqual([
+            "CompiledPet = java.type('io.micronaut.python.processing.fixtures.CompiledPet')",
+            "ApplicationContext = java.type('io.micronaut.context.ApplicationContext')",
+        ], transformer.java_type_assignments)
+        self.assertEqual(["CompiledPet", "ApplicationContext"], transformer._star_imported_class_names("com.acme"))
 
     def test_project_python_modules_are_never_java_imports(self):
         import os
