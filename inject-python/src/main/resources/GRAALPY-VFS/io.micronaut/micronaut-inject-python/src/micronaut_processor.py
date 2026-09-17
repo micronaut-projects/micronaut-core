@@ -27,6 +27,13 @@ TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
 SuperArgumentDef = java.type("io.micronaut.python.processing.model.SuperArgumentDef")
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
+ElementQuery = java.type("io.micronaut.inject.ast.ElementQuery")
+
+
+class UnresolvedAnnotationMemberError(ValueError):
+    """
+    A decorator member value references a Java class member (Outer.NAME) that the class does not declare.
+    """
 
 # What ast.literal_eval raises for a node that is not a literal; anything else is a bug worth seeing.
 _LITERAL_EVAL_ERRORS = (ValueError, TypeError, SyntaxError, MemoryError, RecursionError)
@@ -168,6 +175,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_annotation_source_loading = set()
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
+        self.unresolved_member_errors = []  # Decorator members referencing a Java class member that does not exist
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -500,6 +508,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
                 )
                 result = super().visit(node)
+                if self.unresolved_member_errors:
+                    raise ValueError(self.unresolved_member_errors[0])
 
                 # A MicronautTest module owns all of its top-level functions. Other
                 # scripts retain the existing decorated-function-only behavior.
@@ -618,8 +628,9 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     # Generate constructor from dataclass attributes
                     dataclass_args = []
                     for attr in self.current_class_attributes:
-                        # Only include attributes with type annotations (required for dataclass)
-                        if attr.typeName() and attr.typeName() != "None":
+                        # Only annotated attributes are dataclass fields; an unannotated
+                        # class attribute (typed from its literal) is a plain class variable
+                        if attr.annotation() is not None and attr.typeName() and attr.typeName() != "None":
                             # Create argument with same name as attribute
                             # a default factory is called by Python: it is not a value the generated code can reproduce
                             default_value = DefaultFactoryDef(attr.defaultFactoryName()) if attr.defaultFactoryName() is not None else attr.value()
@@ -713,7 +724,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 # Determine if it's a class variable (static) or instance variable
                 # For Micronaut properties, treat class attributes as instance fields
                 is_static = False  # Regular Python attributes should be writable
-                type_name = None  # No type annotation for simple assignments
+                # No type annotation: the type of the assigned literal, otherwise object
+                type_name = self._literal_type(node.value)
 
                 self._track_current_class_constant(attr_name, node.value)
                 attr_def = JavaAttributeDef(attr_name, None, type_name, value, True, [], None, is_static, None)
@@ -769,6 +781,32 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 attr_def = JavaAttributeDef(attr_name, annotation, type_name, value, node.value is not None, decorators, None, is_static, None, default_factory_name)
                 self.current_class_attributes.append(attr_def)
                 self.last_attribute = attr_def
+
+    def _literal_type(self, value_node):
+        """
+        The Python type of a literal initializer (CONNECTION_TIMEOUT = 25000 is an int) as a TypeRef;
+        an initializer that is not a literal, or None, is typed object.
+        """
+        resolved, value = self._literal_constant_value(value_node)
+        if not resolved or value is None:
+            return TypeRef("object")
+        if isinstance(value, bool):
+            return TypeRef("bool")
+        if isinstance(value, int):
+            return TypeRef("int")
+        if isinstance(value, float):
+            return TypeRef("float")
+        if isinstance(value, str):
+            return TypeRef("str")
+        if isinstance(value, (bytes, bytearray)):
+            return TypeRef("bytes")
+        if isinstance(value, (list, tuple)):
+            return TypeRef("list")
+        if isinstance(value, dict):
+            return TypeRef("dict")
+        if isinstance(value, (set, frozenset)):
+            return TypeRef("set")
+        return TypeRef("object")
 
     def _dataclass_default_factory_name(self, value_node):
         if not isinstance(value_node, ast.Call):
@@ -1485,21 +1523,20 @@ class MicronautAstVisitor(ast.NodeVisitor):
         Parse a metadata call like Gt(0) or Outer.Inner(0) into a DecoratorDef.
         """
         if isinstance(call_node, ast.Call) and isinstance(call_node.func, (ast.Name, ast.Attribute)):
+            decorator_name = ast.unparse(call_node.func)
             # Extract arguments
             members = {}
 
             # For positional args
             for i, arg in enumerate(call_node.args):
-                value = convert_ast_value(arg, self)
-                if i == 0:
-                    members['value'] = value
-                else:
-                    members[f'arg{i}'] = value
+                member_name = 'value' if i == 0 else f'arg{i}'
+                members[member_name] = convert_annotation_member_value(decorator_name, member_name, arg, self)
 
             # For keyword args
             for kw in call_node.keywords:
                 if kw.arg:
-                    members[normalize_python_keyword_alias(kw.arg)] = convert_ast_value(kw.value, self)
+                    member_name = normalize_python_keyword_alias(kw.arg)
+                    members[member_name] = convert_annotation_member_value(decorator_name, member_name, kw.value, self)
 
             if isinstance(call_node.func, ast.Attribute):
                 return self._parse_attribute_metadata(call_node.func, members)
@@ -2133,7 +2170,6 @@ def decorator_to_function(visitor, node):
 
             if decorator_declaration is not None:
                 members = extract_call_arguments_with_defaults(decorator_declaration, node, visitor, decorator_declaration.annotationName())
-                members = resolve_annotation_member_constants(decorator_declaration.annotationName(), members, visitor)
                 return DecoratorDef(
                     decorator_name,
                     decorator_declaration.annotationName(),
@@ -2144,7 +2180,6 @@ def decorator_to_function(visitor, node):
             else:
                 # Direct annotation or Java annotation used as a decorator
                 members = extract_call_arguments_with_defaults(None, node, visitor, resolved_decorator_fqn)
-                members = resolve_annotation_member_constants(resolved_decorator_fqn, members, visitor)
                 # Resolve names in member values
                 resolved_members = {}
                 for key, value in members.items():
@@ -2175,23 +2210,14 @@ def decorator_to_function(visitor, node):
         case _:
             return None
 
-def resolve_annotation_member_constants(annotation_name, members, visitor=None):
-    if visitor is None or annotation_name != "jakarta.inject.Named":
-        return members
-    value = members.get("value")
-    if not isinstance(value, str):
-        return members
-    constant_value = None
-    if value in visitor.local_constant_values:
-        constant_value = visitor.local_constant_values[value]
-    elif visitor.current_class is not None:
-        class_name = visitor.current_class.name().replace("$", ".")
-        constant_value = visitor.local_constant_values.get(f"{class_name}.{value}")
-    if constant_value is None:
-        return members
-    resolved = dict(members)
-    resolved["value"] = constant_value
-    return resolved
+def _current_class_constant_key(visitor, name):
+    """
+    The key under which a constant of the class being visited is tracked, or None outside a class.
+    """
+    current_class = getattr(visitor, 'current_class', None)
+    if current_class is None:
+        return None
+    return f"{current_class.name().replace('$', '.')}.{name}"
 
 
 def convert_ast_value(node, visitor=None):
@@ -2206,6 +2232,10 @@ def convert_ast_value(node, visitor=None):
         if visitor is not None:
             if hasattr(visitor, 'local_constant_values') and name in visitor.local_constant_values:
                 return visitor.local_constant_values[name]
+            # a constant of the class being visited (SAVE_PATH = "/save" used as @Post(SAVE_PATH))
+            class_constant_key = _current_class_constant_key(visitor, name)
+            if class_constant_key is not None and class_constant_key in visitor.local_constant_values:
+                return visitor.local_constant_values[class_constant_key]
             # Check imported types first
             imported_name = visitor.imported_types.get(name)
             if imported_name:
@@ -2306,7 +2336,14 @@ def convert_ast_call_to_decorator(node, visitor=None):
     return None
 
 def convert_annotation_member_value(annotation_name, member_name, node, visitor=None):
-    return convert_ast_value(node, visitor)
+    try:
+        return convert_ast_value(node, visitor)
+    except UnresolvedAnnotationMemberError as e:
+        # reported once the module is visited; the value stays the dotted name meanwhile
+        visitor.unresolved_member_errors.append(
+            f"Cannot resolve the value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name}: {e}"
+        )
+        return ast.unparse(node)
 
 
 def merge_keyword_argument(result, kw, visitor=None, annotation_name=None):
@@ -2346,43 +2383,66 @@ def extract_keyword_expansion(node, visitor=None):
 
 def _resolve_java_constant(visitor, name_parts):
     """
-    Try to resolve a qualified name as a Java constant (e.g., ['StringUtils', 'TRUE'] -> "true")
-    Returns the constant value if found, None otherwise.
+    Try to resolve a qualified name as a Java constant (e.g., ['StringUtils', 'TRUE'] -> "true").
+    Returns the constant value if found, None if the name does not denote a Java class or the
+    member is not a compile-time constant (an enum constant, a nested type), and raises
+    UnresolvedAnnotationMemberError when the class declares no such member at all.
     """
     if visitor is None or len(name_parts) < 2:
+        return None
+    visitor_context = getattr(visitor, 'visitor_context', None)
+    if visitor_context is None:
         return None
 
     # The last part is the field name, everything before is the class name
     field_name = name_parts[-1]
-    class_name_parts = name_parts[:-1]
-    class_name = '.'.join(class_name_parts)
+    class_name = '.'.join(name_parts[:-1])
 
-    # First check if the class name is in java_type_assignments (imported types)
-    resolved_class_name = visitor.java_type_assignments.get(class_name, class_name)
+    # Resolve the class through the java.type() alias of an import, an import or a local class
+    resolved_class_name = visitor.java_type_assignments.get(class_name)
+    if resolved_class_name is None:
+        resolved_class_name = visitor.imported_types.get(class_name)
+    if resolved_class_name is None and hasattr(visitor, '_resolve_dotted_name'):
+        resolved_class_name = visitor._resolve_dotted_name(name_parts[:-1])
+    if resolved_class_name is None:
+        resolved_class_name = class_name
 
-    # Try to get the class element from the visitor context
+    class_element = _java_class_element(visitor_context, resolved_class_name)
+    if class_element is None:
+        return None
+    if _is_python_class_element(class_element):
+        # a class attribute of a Python class from another module (Paths.SAVE_PATH); any other
+        # attribute may exist at runtime and is left to the runtime decorator
+        for field in class_element.getFields():
+            if field.getName() == field_name:
+                return field.getConstantValue()
+        return None
+    # Look the field up by name: materialising every field of the class (getFields()) resolves the types
+    # of the other fields too, and one whose type is not on the classpath postpones the processing round
+    field = class_element.getEnclosedElement(ElementQuery.ALL_FIELDS.includeEnumConstants().named(field_name)).orElse(None)
+    if field is not None:
+        return field.getConstantValue()
+    if _java_class_element(visitor_context, f"{resolved_class_name}.{field_name}") is not None:
+        # a nested type (Outer.Inner), resolved by name
+        return None
+    raise UnresolvedAnnotationMemberError(
+        f"class [{class_element.getName()}] declares no constant or nested type named [{field_name}]"
+    )
+
+
+def _is_python_class_element(class_element):
     try:
-        if hasattr(visitor, 'visitor_context') and visitor.visitor_context is not None:
-            class_element = visitor.visitor_context.getClassElement(resolved_class_name).orElse(None)
-            if class_element is not None:
-                # Try to find the field using getFields() method
-                fields = class_element.getFields()
-                for field in fields:
-                    if field.getName() == field_name:
-                        if hasattr(field, 'getConstantValue'):
-                            constant_value = field.getConstantValue()
-                            # Check if it's an Optional or the value directly
-                            if hasattr(constant_value, 'isPresent') and constant_value.isPresent():
-                                return constant_value.get()
-                            elif constant_value is not None:
-                                # Direct value
-                                return constant_value
-                        break
+        return class_element.getClass().getName().startswith("io.micronaut.python.")
     except Exception:
-        # If constant resolution fails, continue with fallback
-        pass
+        return False
 
-    return None
+
+def _java_class_element(visitor_context, class_name):
+    try:
+        return visitor_context.getClassElement(class_name).orElse(None)
+    except Exception:
+        return None
+
 
 def _is_convertible_default(node, visitor=None):
     """

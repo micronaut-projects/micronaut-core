@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
@@ -28,6 +29,7 @@ import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.util.PythonDocstrings;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.FieldElement;
+import io.micronaut.inject.ast.PrimitiveElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
@@ -131,10 +133,7 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
             );
         }
         // Infer from value if no annotation
-        if (attributeDef.value() != null) {
-            return inferTypeFromValue(attributeDef.value());
-        }
-        return environment.visitorContext().getClassElement(Object.class).orElse(null);
+        return inferTypeFromValue(attributeDef.value());
     }
 
     private ClassElement withDeclaredTypeAnnotationMetadata(AttributeDef attributeDef, ClassElement baseType) {
@@ -178,19 +177,29 @@ public final class PythonFieldElement extends AbstractPythonElement implements F
     }
 
     private ClassElement inferTypeFromValue(Object javaValue) {
-        if (javaValue == null) {
-            return environment.visitorContext().getClassElement(Object.class).orElse(null);
+        if (javaValue instanceof Boolean) {
+            return PrimitiveElement.BOOLEAN;
         }
-        if (javaValue instanceof Integer) {
-            return environment.visitorContext().getClassElement(int.class).orElse(null);
-        } else if (javaValue instanceof Double || javaValue instanceof Float) {
-            return environment.visitorContext().getClassElement(double.class).orElse(null);
-        } else if (javaValue instanceof String) {
-            return environment.visitorContext().getClassElement(String.class).orElse(null);
-        } else if (javaValue instanceof Boolean) {
-            return environment.visitorContext().getClassElement(boolean.class).orElse(null);
+        if (javaValue instanceof Integer || javaValue instanceof Long || javaValue instanceof Short || javaValue instanceof Byte) {
+            return PrimitiveElement.INT;
         }
-        return environment.visitorContext().getClassElement(Object.class).orElse(null);
+        if (javaValue instanceof Double || javaValue instanceof Float) {
+            return PrimitiveElement.DOUBLE;
+        }
+        if (javaValue instanceof String) {
+            return classElementOf(String.class);
+        }
+        if (javaValue instanceof List<?>) {
+            return classElementOf(List.class);
+        }
+        if (javaValue instanceof Map<?, ?>) {
+            return classElementOf(Map.class);
+        }
+        return classElementOf(Object.class);
+    }
+
+    private ClassElement classElementOf(Class<?> type) {
+        return environment.visitorContext().getClassElement(type).orElseGet(() -> ClassElement.of(type));
     }
 
     @Override
