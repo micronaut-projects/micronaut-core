@@ -17,6 +17,7 @@ package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -50,12 +51,14 @@ import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.python.processing.model.TypeVar;
 import io.micronaut.python.processing.util.AnnotationNames;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
 import io.micronaut.inject.ast.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
+import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 /**
@@ -223,9 +226,30 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             } else if (defaultConstructor.isPresent() && defaultConstructor.get().getParameters().length == 0) {
                 // a no-arg __init__, declared or inherited
                 return defaultConstructor;
+            } else if (defaultConstructor.isPresent() && isCallableWithoutArguments(defaultConstructor.get())
+                && !MethodGenUtils.hasAllDefaultsParameters(Arrays.asList(defaultConstructor.get().getParameters()))) {
+                // every parameter of __init__ has a default (a dataclass whose fields all have defaults) but not
+                // all of them are literals the introspection can pass itself: the generated Java class offers a
+                // no-arg constructor that creates the object through the Python constructor, which applies them
+                return Optional.of(implicitConstructor());
             }
         }
         return super.getDefaultConstructor();
+    }
+
+    /**
+     * Whether the given {@code __init__} takes parameters that all have a default value, so the Python
+     * class can be instantiated without arguments.
+     *
+     * @param constructor The constructor
+     * @return True if it is a constructor whose parameters all have defaults
+     */
+    public static boolean isCallableWithoutArguments(MethodElement constructor) {
+        if (!(constructor instanceof ConstructorElement) || !(constructor.getNativeType() instanceof FunctionDef functionDef)) {
+            return false;
+        }
+        List<ArgumentDef> arguments = functionDef.arguments() == null ? List.of() : functionDef.arguments().arguments();
+        return !arguments.isEmpty() && arguments.stream().allMatch(ArgumentDef::hasDefaultValue);
     }
 
     @Override
