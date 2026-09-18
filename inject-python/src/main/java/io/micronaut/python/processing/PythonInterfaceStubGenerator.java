@@ -211,11 +211,8 @@ final class PythonInterfaceStubGenerator {
     static void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
-            if (!isRuntimeAnnotationOf(annotationName, declaration, visitorContext)) {
-                continue;
-            }
             AnnotationValue<Annotation> annotationValue = annotationMetadata.getAnnotation(annotationName);
-            if (annotationValue == null) {
+            if (!isRuntimeAnnotationOf(annotationName, declaration, visitorContext) || annotationValue == null) {
                 continue;
             }
             try {

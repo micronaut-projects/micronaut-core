@@ -54,8 +54,8 @@ public class ReflectiveServiceInterceptor implements MethodInterceptor<Object, O
             for (int i = 0; i < parameterAnnotations.length; i++) {
                 String name = "p" + i;
                 for (Annotation annotation : parameterAnnotations[i]) {
-                    if (annotation instanceof Var var) {
-                        name = var.value();
+                    if (annotation instanceof Var variable) {
+                        name = variable.value();
                     }
                 }
                 response.append(' ').append(name).append('=').append(args[i]);
