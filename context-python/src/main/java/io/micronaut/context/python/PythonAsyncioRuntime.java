@@ -19,11 +19,13 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.async.publisher.Publishers;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -54,6 +56,9 @@ public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
     private static final String AWAITABLE_COMPLETER_NAME = "__micronaut_complete_completion_stage_awaitable";
+    private static final String LOOP_INSTALLER_NAME = "__micronaut_install_asyncio_event_loop";
+    private static final String ITERATOR_PUBLISHER_NAME = "__micronaut_async_iterator_publisher";
+    private static final String PUBLISHER_AWAITABLE_NAME = "__micronaut_publisher_awaitable";
     private static final AtomicReference<RuntimeState> STATE = new AtomicReference<>(new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
     private static final String ASYNCIO_MODULE_NAME = "micronaut_asyncio";
@@ -124,6 +129,80 @@ public final class PythonAsyncioRuntime {
             scheduler.run();
         }
         return future;
+    }
+
+    /**
+     * Expose the async iterator (an async generator object, typically) a bridge method returned as a
+     * Reactive Streams {@link Publisher}. The iterator is advanced on the current Micronaut event
+     * loop as the subscriber requests elements; without one, and without a running Python loop, the
+     * call fails rather than driving the generator synchronously.
+     *
+     * @param value The Python async iterator
+     * @return A cold publisher that can be subscribed to once
+     */
+    @SuppressWarnings("rawtypes")
+    @UsedByGeneratedCode
+    public static Publisher toPublisher(@Nullable Value value) {
+        RuntimeState runtimeState = state();
+        if (!runtimeState.enabled()) {
+            throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async generator bridge methods.");
+        }
+        if (value == null || value.isNull()) {
+            return Publishers.empty();
+        }
+        Context context = value.getContext();
+        PythonEventLoop eventLoop = currentEventLoop(runtimeState);
+        Value publisher = asyncioHelper(context, ITERATOR_PUBLISHER_NAME).execute(value, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
+        return publisher.asHostObject();
+    }
+
+    /**
+     * The Python view of a publisher returned by a Java member: awaiting it requests one item and
+     * cancels, as {@link #toAwaitable} does for a stage, while {@code as_async_iterable} unwraps the
+     * publisher to consume every item. Nothing is subscribed until one of the two happens.
+     *
+     * @param context The Python context
+     * @param publisher The publisher, or a value convertible to one
+     * @return The Python awaitable
+     */
+    static Value publisherAwaitable(Context context, Object publisher) {
+        return asyncioHelper(context, PUBLISHER_AWAITABLE_NAME).execute(publisher);
+    }
+
+    /**
+     * Python entry point of the publisher awaitable: the asyncio future of the publisher's first item.
+     *
+     * @param publisher The publisher
+     * @return The future
+     */
+    @Internal
+    public static Value awaitPublisher(Value publisher) {
+        Object source = publisher.isHostObject() ? publisher.asHostObject() : publisher;
+        CompletionStage<?> stage = PythonCoercion.AsyncMemberAdapter.publisherStage(source);
+        if (stage == null) {
+            throw new IllegalArgumentException("Not a publisher: " + publisher);
+        }
+        return toAwaitable(Context.getCurrent(), stage);
+    }
+
+    /**
+     * The Python asyncio loop of the current Micronaut event loop, installed on demand. Called by the
+     * {@code micronaut_asyncio} module when a stream is created outside a running coroutine.
+     *
+     * @return The loop, or {@code null} when the calling thread has no admitted event loop
+     */
+    @Internal
+    public static @Nullable Value currentAsyncioLoop() {
+        RuntimeState runtimeState = state();
+        if (!runtimeState.enabled()) {
+            throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable Python-native streaming.");
+        }
+        PythonEventLoop eventLoop = currentEventLoop(runtimeState);
+        if (eventLoop == null) {
+            return null;
+        }
+        Context context = Context.getCurrent();
+        return asyncioHelper(context, LOOP_INSTALLER_NAME).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
     }
 
     /**

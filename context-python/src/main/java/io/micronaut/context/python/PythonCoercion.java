@@ -680,9 +680,9 @@ public final class PythonCoercion {
             if (value instanceof CompletionStage<?> completionStage) {
                 return PythonAsyncioRuntime.toAwaitable(context, completionStage);
             }
-            CompletionStage<?> publisherStage = publisherStage(value);
-            if (publisherStage != null) {
-                return PythonAsyncioRuntime.toAwaitable(context, publisherStage);
+            if (value != null && Publishers.isConvertibleToPublisher(value)) {
+                // lazily subscribed: awaiting requests one item, as_async_iterable takes the publisher itself
+                return PythonAsyncioRuntime.publisherAwaitable(context, value);
             }
             if (value instanceof Value polyglotValue) {
                 if (polyglotValue.isHostObject()) {
@@ -690,9 +690,8 @@ public final class PythonCoercion {
                     if (hostObject instanceof CompletionStage<?> completionStage) {
                         return PythonAsyncioRuntime.toAwaitable(context, completionStage);
                     }
-                    CompletionStage<?> hostPublisherStage = publisherStage(hostObject);
-                    if (hostPublisherStage != null) {
-                        return PythonAsyncioRuntime.toAwaitable(context, hostPublisherStage);
+                    if (Publishers.isConvertibleToPublisher(hostObject)) {
+                        return PythonAsyncioRuntime.publisherAwaitable(context, hostObject);
                     }
                 }
                 try {
@@ -704,7 +703,13 @@ public final class PythonCoercion {
             return null;
         }
 
-        private static @Nullable CompletionStage<?> publisherStage(@Nullable Object value) {
+        /**
+         * Subscribe to a publisher for its first item: the stage of a Python {@code await}.
+         *
+         * @param value The publisher, or a value convertible to one
+         * @return The stage, or {@code null} when the value is not a publisher
+         */
+        static @Nullable CompletionStage<?> publisherStage(@Nullable Object value) {
             if (!Publishers.isConvertibleToPublisher(value)) {
                 return null;
             }

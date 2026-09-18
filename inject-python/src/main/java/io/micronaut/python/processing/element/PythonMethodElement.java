@@ -25,6 +25,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
+import io.micronaut.python.processing.model.TypeRef;
 import java.util.concurrent.CompletionStage;
 
 import io.micronaut.aop.InterceptorBinding;
@@ -72,6 +74,11 @@ import javax.lang.model.element.Element;
 @SuppressWarnings("checkstyle:InnerTypeLast")
 @Experimental
 public non-sealed class PythonMethodElement extends AbstractPythonElement implements MethodElement, ElementProvider {
+    private static final String PUBLISHER_NAME = "org.reactivestreams.Publisher";
+    private static final Set<String> ASYNC_ITERATOR_NAMES = Set.of(
+        "AsyncIterator", "typing.AsyncIterator", "collections.abc.AsyncIterator",
+        "AsyncIterable", "typing.AsyncIterable", "collections.abc.AsyncIterable",
+        "AsyncGenerator", "typing.AsyncGenerator", "collections.abc.AsyncGenerator");
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";
 
@@ -170,6 +177,16 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
      */
     public boolean isAsync() {
         return getNativeType().isAsync();
+    }
+
+    /**
+     * Returns whether this method is an async generator ({@code async def} with a {@code yield}),
+     * bridged as a {@code Publisher} of its elements.
+     *
+     * @return Whether this method is an async generator
+     */
+    public boolean isAsyncGenerator() {
+        return getNativeType().isAsync() && getNativeType().isGenerator();
     }
 
     @Override
@@ -518,7 +535,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
             ReturnDef returnDef = functionDef.returnType();
             if (returnDef != null && returnDef.typeAnnotation() != null) {
-                ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(returnDef.typeAnnotation(), getBoundGenericTypes()
+                ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(bridgeReturnTypeRef(functionDef, returnDef), getBoundGenericTypes()
                 );
 
                 baseType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
@@ -536,7 +553,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private ClassElement resolveReturnType(FunctionDef functionDef) {
         ReturnDef returnDef = functionDef.returnType();
         if (returnDef != null && returnDef.typeAnnotation() != null) {
-            ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(returnDef.typeAnnotation(), getRawBoundGenericTypes()
+            ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(bridgeReturnTypeRef(functionDef, returnDef), getRawBoundGenericTypes()
             );
 
             baseType = withDeclaredReturnAnnotationMetadata(returnDef, baseType);
@@ -577,6 +594,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (!functionDef.isAsync()) {
             return awaitedType;
         }
+        if (functionDef.isGenerator()) {
+            return asyncGeneratorReturnType(awaitedType);
+        }
         ClassElement completionStage = environment.visitorContext()
             .getClassElement(CompletionStage.class.getName())
             .orElseGet(() -> ClassElement.of(CompletionStage.class));
@@ -585,6 +605,46 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
             return completionStage.withTypeArguments(Map.of("T", stageValueType));
         } catch (UnsupportedOperationException e) {
             return ClassElement.of(CompletionStage.class, AnnotationMetadata.EMPTY_METADATA, Map.of("T", stageValueType));
+        }
+    }
+
+    /**
+     * The return annotation an async generator is resolved with: {@code AsyncIterator[T]},
+     * {@code AsyncIterable[T]} and {@code AsyncGenerator[T, S]} name the elements of the generator
+     * and become {@code Publisher[T]}. Only the async-generator return position is mapped this way:
+     * elsewhere (parameters, properties, a coroutine returning an iterator) the names keep their
+     * ordinary resolution, since nothing converts such a value.
+     */
+    private static TypeRef bridgeReturnTypeRef(FunctionDef functionDef, ReturnDef returnDef) {
+        TypeRef annotation = returnDef.typeAnnotation();
+        if (!functionDef.isAsync() || !functionDef.isGenerator() || !ASYNC_ITERATOR_NAMES.contains(annotation.name())) {
+            return annotation;
+        }
+        List<TypeRef> typeArguments = annotation.typeArguments();
+        return typeArguments.isEmpty()
+            ? new TypeRef(PUBLISHER_NAME)
+            : new TypeRef(PUBLISHER_NAME, List.of(typeArguments.getFirst()));
+    }
+
+    /**
+     * The bridge return type of an async generator: {@code Publisher<T>}. An {@code AsyncIterator[T]},
+     * {@code AsyncGenerator[T, S]} or {@code Publisher[T]} annotation already resolves to a publisher
+     * and is kept; any other annotation names the element type, and no annotation means {@code Object}.
+     */
+    private ClassElement asyncGeneratorReturnType(ClassElement annotatedType) {
+        if (PUBLISHER_NAME.equals(annotatedType.getName())) {
+            return annotatedType;
+        }
+        ClassElement publisher = environment.visitorContext()
+            .getClassElement(PUBLISHER_NAME)
+            .orElseGet(() -> ClassElement.of(PUBLISHER_NAME, true, AnnotationMetadata.EMPTY_METADATA));
+        ClassElement elementType = annotatedType.isVoid()
+            ? environment.visitorContext().getClassElement(Object.class).orElse(ClassElement.of(Object.class))
+            : asyncStageValueType(annotatedType);
+        try {
+            return publisher.withTypeArguments(Map.of("T", elementType));
+        } catch (UnsupportedOperationException e) {
+            return ClassElement.of(PUBLISHER_NAME, true, AnnotationMetadata.EMPTY_METADATA, Map.of("T", elementType));
         }
     }
 
