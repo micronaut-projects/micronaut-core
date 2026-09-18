@@ -101,6 +101,26 @@ def __micronaut_async_member_value(target, adapter, context):
     return _MicronautAsyncMember(target, adapter, context)
 
 
+def __micronaut_has_coroutine_methods(cls):
+    for base in getattr(cls, "__mro__", (cls,)):
+        if base is object:
+            continue
+        for member in vars(base).values():
+            if isinstance(member, (staticmethod, classmethod)):
+                member = member.__func__
+            if inspect.iscoroutinefunction(member):
+                return True
+    return False
+
+
+def __micronaut_is_plain_bean_instance(obj, qualname):
+    """Whether obj is an instance of the bean class itself, not an introduction or a scoped proxy."""
+    cls = type(obj)
+    if cls.__qualname__ != qualname:
+        return False
+    return not cls.__dict__.get("__micronaut_introduction__", False) and not inspect.isabstract(cls)
+
+
 def __micronaut_transferable_member_names(obj):
     try:
         return list(vars(obj).keys())

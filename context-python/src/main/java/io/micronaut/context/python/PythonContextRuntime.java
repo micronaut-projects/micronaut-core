@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.BeanProvider;
+import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -33,6 +34,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Optional;
+import java.util.Set;
 import java.util.Objects;
 import java.util.HashMap;
 import java.util.Map;
@@ -65,6 +70,22 @@ public final class PythonContextRuntime {
     private static final String SET_INSTANCE_PROPERTY = "__micronaut_set_instance_property";
     private static final String SET_INSTANCE_PROPERTIES = "__micronaut_set_instance_properties";
     private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
+    private static final String HAS_COROUTINE_METHODS = "__micronaut_has_coroutine_methods";
+    private static final String IS_PLAIN_BEAN_INSTANCE = "__micronaut_is_plain_bean_instance";
+    private static final ScopedValue<Set<Value>> EVENT_LOOP_INSTANCES_IN_PROGRESS = ScopedValue.newInstance();
+    private static final ClassValue<Optional<PythonClassReference>> PYTHON_CLASS_REFERENCES = new ClassValue<>() {
+        @Override
+        protected Optional<PythonClassReference> computeValue(Class<?> type) {
+            PythonClass annotation = type.getAnnotation(PythonClass.class);
+            return annotation == null ? Optional.empty() : Optional.of(new PythonClassReference(
+                annotation.packageName(),
+                annotation.rootName(),
+                annotation.nestedMemberNames(),
+                annotation.displayName(),
+                annotation.cacheKey()
+            ));
+        }
+    };
     private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
     private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
     private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
@@ -231,11 +252,148 @@ public final class PythonContextRuntime {
         // an execution frame of that context so a close waits for them
         Context eventLoopContext = pool.getEventLoopContext(eventLoop);
         return PythonContextRegistry.withTrackedExecutionFrame(eventLoopContext, () -> {
-            Value target = pool.getEventLoopClass(eventLoop, classReference);
-            PythonCoercion.copyTransferableMembers(fallback, target);
-            copyRememberedAsyncMembers(fallback, target);
-            return target;
+            Value target = eventLoopInstance(pool, eventLoop, classReference, fallback);
+            return target == null ? fallback : target;
         });
+    }
+
+    /**
+     * Resolve an injected Python bean for the context of the object it is assigned to.
+     * <p>
+     * In an event-loop context this is the bean's instance in that context: an async method of the bean, awaited
+     * there, must return a coroutine of that context. In the bean's own context it is the bean's Python object, as
+     * constructor injection passes it. Introductions and scoped proxies keep their Java-side interception and are
+     * not resolved.
+     *
+     * @param bean The generated wrapper of the bean
+     * @param targetContext The context of the object the bean is assigned to
+     * @return The context-local Python object, or null when the wrapper is used as it is
+     */
+    static @Nullable Value asyncBeanValue(ValueCoercible bean, Context targetContext) {
+        Value source = bean.asPolyglotValue();
+        if (source == null || PythonConversion.isNone(source)) {
+            return null;
+        }
+        PythonClassReference classReference = PYTHON_CLASS_REFERENCES.get(bean.getClass()).orElse(null);
+        if (classReference == null) {
+            return null;
+        }
+        if (targetContext.equals(source.getContext())) {
+            return isPlainBeanInstance(source, classReference) ? source : null;
+        }
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        PythonPool pool = runtime == null ? null : runtime.pool();
+        if (pool == null || isReuseContext()) {
+            return null;
+        }
+        PythonEventLoop eventLoop = PythonAsyncioRuntime.currentEventLoopForContext();
+        if (eventLoop == null || !targetContext.equals(pool.findEventLoopContext(eventLoop)) || !isPlainBeanInstance(source, classReference)) {
+            return null;
+        }
+        return eventLoopInstance(pool, eventLoop, classReference, source);
+    }
+
+    private static @Nullable Value eventLoopInstance(PythonPool pool, PythonEventLoop eventLoop, PythonClassReference classReference, Value source) {
+        Set<Value> inProgress = EVENT_LOOP_INSTANCES_IN_PROGRESS.isBound() ? EVENT_LOOP_INSTANCES_IN_PROGRESS.get() : null;
+        if (inProgress == null) {
+            Set<Value> created = Collections.newSetFromMap(new IdentityHashMap<>());
+            return ScopedValue.where(EVENT_LOOP_INSTANCES_IN_PROGRESS, created)
+                .call(() -> eventLoopInstance(pool, eventLoop, classReference, source, created));
+        }
+        return eventLoopInstance(pool, eventLoop, classReference, source, inProgress);
+    }
+
+    private static @Nullable Value eventLoopInstance(PythonPool pool,
+                                           PythonEventLoop eventLoop,
+                                           PythonClassReference classReference,
+                                           Value source,
+                                           Set<Value> inProgress) {
+        Context context = pool.getEventLoopContext(eventLoop);
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        if (!inProgress.add(source)) {
+            // a bean reached again through its own dependencies: its instance, unless it is still being created
+            PythonContextRegistry.AsyncInstance existing = state.asyncInstances.get(source);
+            return existing == null ? null : existing.target();
+        }
+        try {
+            // one event-loop instance per startup instance: prototypes and factory-produced instances of a class
+            // keep their own arguments and state
+            PythonContextRegistry.AsyncInstance instance = state.asyncInstances.get(source);
+            if (instance == null) {
+                Value target = newEventLoopInstance(findClass(classReference, context), rememberedConstructorArguments(source));
+                instance = new PythonContextRegistry.AsyncInstance(target, Set.copyOf(PythonCoercion.transferableMemberNames(target)));
+                PythonContextRegistry.AsyncInstance prior = state.asyncInstances.putIfAbsent(source, instance);
+                if (prior != null) {
+                    instance = prior;
+                }
+            }
+            Value target = instance.target();
+            // members the event-loop __init__ set are its own: a value derived there from context-local state
+            // must not be replaced by the startup instance's
+            PythonCoercion.copyTransferableMembers(source, target, instance.constructorMembers());
+            copyRememberedAsyncMembers(source, target);
+            return target;
+        } finally {
+            inProgress.remove(source);
+        }
+    }
+
+    /*
+     * The startup instance's __init__ ran with the injected constructor arguments: the event-loop instance runs it
+     * with the same arguments, each resolved for the event-loop context as an async member is.
+     */
+    private static Value newEventLoopInstance(Value cls, Object @Nullable [] constructorArguments) {
+        if (!cls.canInstantiate()) {
+            return cls;
+        }
+        if (constructorArguments == null) {
+            return withContextClassLoader(cls::newInstance);
+        }
+        Context context = cls.getContext();
+        Object[] arguments = new Object[constructorArguments.length];
+        for (int i = 0; i < arguments.length; i++) {
+            arguments[i] = PythonCoercion.asyncConstructorArgument(context, constructorArguments[i]);
+        }
+        return withContextClassLoader(() -> cls.newInstance(arguments));
+    }
+
+    private static boolean isPlainBeanInstance(Value source, PythonClassReference classReference) {
+        String[] nested = classReference.nestedMemberNames();
+        String qualifiedName = nested.length == 0
+            ? classReference.rootName()
+            : classReference.rootName() + "." + String.join(".", nested);
+        return helper(source.getContext(), IS_PLAIN_BEAN_INSTANCE).execute(source, qualifiedName).asBoolean();
+    }
+
+    private static Object @Nullable [] rememberedConstructorArguments(Value source) {
+        PythonContextRegistry.ContextState state = PythonContextRegistry.existingState(source.getContext());
+        if (state == null) {
+            return null;
+        }
+        synchronized (state) {
+            return state.asyncConstructorArguments.get(source);
+        }
+    }
+
+    /*
+     * Only instances of classes with coroutine methods are resolved in an event-loop context, never with a reused
+     * context: others keep no arguments. The pool may not be registered yet when an eager bean is created.
+     */
+    private static void rememberConstructorArguments(Context context, PythonClassReference classReference, Value pythonClass, Value instance, Object[] args) {
+        if (args.length == 0 || isReuseContext()) {
+            return;
+        }
+        PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+        Boolean hasCoroutineMethods = state.coroutineClasses.get(classReference.cacheKey());
+        if (hasCoroutineMethods == null) {
+            hasCoroutineMethods = helper(context, HAS_COROUTINE_METHODS).execute(pythonClass).asBoolean();
+            state.coroutineClasses.put(classReference.cacheKey(), hasCoroutineMethods);
+        }
+        if (hasCoroutineMethods) {
+            synchronized (state) {
+                state.asyncConstructorArguments.put(instance, args.clone());
+            }
+        }
     }
 
     /**
@@ -729,7 +887,9 @@ public final class PythonContextRuntime {
     public static Value newInstance(Context context, PythonClassReference classReference, Object... args) {
         return PythonContextRegistry.withExecutionFrame(context, () -> {
             Value pythonClass = findClass(classReference, context);
-            return instantiate(classReference, args, pythonClass);
+            Value instance = instantiate(classReference, args, pythonClass);
+            rememberConstructorArguments(context, classReference, pythonClass, instance, args);
+            return instance;
         });
     }
 

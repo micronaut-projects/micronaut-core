@@ -27,11 +27,14 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -721,6 +724,15 @@ final class PythonContextRegistry {
     /**
      * The runtime state of one GraalPy context.
      */
+    /**
+     * The event-loop instance of a startup-context object.
+     *
+     * @param target The event-loop instance
+     * @param constructorMembers The members its own {@code __init__} set
+     */
+    record AsyncInstance(Value target, Set<String> constructorMembers) {
+    }
+
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
@@ -731,6 +743,18 @@ final class PythonContextRegistry {
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
         final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
+        /**
+         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
+         * created per request is forgotten with its wrapper, which holds the key.
+         */
+        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
+        /**
+         * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
+         * wrapper holds the key.
+         */
+        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
+        /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
+        final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -745,6 +769,9 @@ final class PythonContextRegistry {
 
         private void clear() {
             asyncMembers.clear();
+            asyncConstructorArguments.clear();
+            asyncInstances.clear();
+            coroutineClasses.clear();
             helpers.clear();
             classes.clear();
             runtimeModule.set(null);

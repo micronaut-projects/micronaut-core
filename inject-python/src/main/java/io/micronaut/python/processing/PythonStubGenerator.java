@@ -610,7 +610,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .onlyStatic()
                 .onlyDeclared()
                 .annotated(bridgeMethodFilter)));
-        boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
+        // an async method that is not bridged still runs in an event-loop context when another Python bean awaits
+        // it, and needs the injected members adapted as a bridged one does
+        boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod)
+            || element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared())
+                .stream()
+                .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
         boolean hasIntroductionAdviceMethod = false;
         for (MethodElement methodElement : methodsToBridge) {
