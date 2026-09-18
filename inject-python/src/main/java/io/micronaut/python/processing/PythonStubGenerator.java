@@ -147,6 +147,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";
     private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
+    private static final String WITH_VARARGS = "withVarargs";
+    private static final String PYTHON_METHOD_KEY_PREFIX = "python:";
     private static final Set<String> TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE = Set.of(
         "io.micronaut.core.annotation.NonNull",
         "io.micronaut.core.annotation.Nullable",
@@ -1519,6 +1521,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean typeArgument,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (anInterface.isArray() && (anInterface instanceof GenericPlaceholderElement || anInterface instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            return sourceSignatureType(anInterface.fromArray(), typeArgument, signatureTypeArguments).array(anInterface.getArrayDimensions());
+        }
         if (anInterface instanceof WildcardElement wildcardElement) {
             if (!wildcardElement.getLowerBounds().isEmpty()) {
                 return TypeDef.wildcardSupertypeOf(sourceSignatureType(wildcardElement.getLowerBounds().getFirst(), true, signatureTypeArguments));
@@ -1582,6 +1588,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ClassElement resolvedType,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (signatureType.isArray() && (signatureType instanceof GenericPlaceholderElement || signatureType instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            ClassElement resolvedComponentType = resolvedType != null && resolvedType.isArray() ? resolvedType.fromArray() : resolvedType;
+            return bridgeSignatureType(signatureType.fromArray(), resolvedComponentType, signatureTypeArguments).array(signatureType.getArrayDimensions());
+        }
         if (signatureType instanceof WildcardElement wildcardElement) {
             if (!wildcardElement.getLowerBounds().isEmpty()) {
                 return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedType, signatureTypeArguments));
@@ -2246,6 +2257,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> resolvedTypeArguments,
         Map<String, ClassElement> inferredMethodBounds
     ) {
+        methodTypeVariables(methodElement, resolvedTypeArguments, inferredMethodBounds).forEach(methodBuilder::addTypeVariable);
+    }
+
+    private static List<TypeDef.TypeVariable> methodTypeVariables(
+        MethodElement methodElement,
+        Map<String, ClassElement> resolvedTypeArguments,
+        Map<String, ClassElement> inferredMethodBounds
+    ) {
+        List<TypeDef.TypeVariable> typeVariables = new ArrayList<>();
         for (GenericPlaceholderElement placeholder : methodElement.getDeclaredTypeVariables()) {
             List<TypeDef> bounds = placeholder.getBounds().stream()
                 .filter(bound -> !Object.class.getName().equals(bound.getName()))
@@ -2255,13 +2275,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (bounds.isEmpty() && inferredBound != null && !isObjectType(inferredBound)) {
                 bounds = List.of(sourceSignatureType(inferredBound, true, resolvedTypeArguments));
             }
-            methodBuilder.addTypeVariable(
-                TypeDef.variable(
-                    placeholder.getVariableName(),
-                    bounds
-                )
-            );
+            typeVariables.add(TypeDef.variable(placeholder.getVariableName(), bounds));
         }
+        return typeVariables;
     }
 
     private static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
@@ -2695,19 +2711,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         MethodElement methodElement = spec.method();
         ClassElement bridgeOwner = spec.owner();
         boolean isJunit5Test = spec.junit5Test();
-        boolean isScript = spec.script();
         ClassElement returnTypeOverride = spec.returnTypeOverride();
         MethodElement signatureMethod = spec.signatureMethod();
         MethodElement resolvedSignatureMethod = spec.resolvedSignatureMethod();
         Map<String, ClassElement> signatureTypeArguments = spec.signatureTypeArguments();
         String pythonFunctionName = methodElement.getName();
-        String key = bridgeMethodKey(methodElement);
-        // Check if method name has already been added to avoid duplicates
-        if (addedMethodNames.contains(key)) {
+        Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
+        Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
+        boolean genericToArray = "toArray".equals(signatureMethod.getName())
+            && signatureMethod.getParameters().length == 1
+            && (signatureMethod.getDeclaredTypeVariables().size() == 1 || resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1);
+        MethodElement sourceSignatureMethod = resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1
+            ? resolvedSignatureMethod
+            : signatureMethod;
+        List<TypeDef.TypeVariable> methodTypeVariables = methodTypeVariables(sourceSignatureMethod, bridgeSignatureTypeArguments, inferredMethodBounds);
+        List<ParameterDef> parameterDefs = bridgeParameters(spec, sourceSignatureMethod, genericToArray, bridgeSignatureTypeArguments);
+        // Duplicates are detected on the Java signature the stub emits, not on the Python method:
+        // a Java interface may declare same-arity overloads (generate(Class<T>) and generate(T))
+        // that Python, which has no overloading, implements with a single method. Each overload
+        // needs its own bridge or javac rejects the stub as not implementing the interface. The
+        // key is built from the emitted (resolved) parameter types rather than the declaring
+        // method, so a generic interface method (handle(T) implemented for String) and a plain
+        // interface method with the same erasure (handle(String)) are bridged once. The Python
+        // method key is recorded too so the later declared-method pass does not bridge a method
+        // again under its Python signature.
+        String key = bridgeMethodKey(pythonFunctionName, parameterDefs, methodTypeVariables);
+        String pythonKey = PYTHON_METHOD_KEY_PREFIX + bridgeMethodKey(methodElement);
+        boolean declaredSignature = signatureMethod == methodElement;
+        if (addedMethodNames.contains(key) || declaredSignature && addedMethodNames.contains(pythonKey)) {
             return;
         }
 
         addedMethodNames.add(key);
+        addedMethodNames.add(pythonKey);
 
         if (isDeclaredBeanMethod(methodElement.getAnnotationMetadata())) {
             if (isAsyncPythonMethod(methodElement)) {
@@ -2740,15 +2776,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
 
-        Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
-        Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
         ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
-        boolean genericToArray = "toArray".equals(signatureMethod.getName())
-            && signatureMethod.getParameters().length == 1
-            && (signatureMethod.getDeclaredTypeVariables().size() == 1 || resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1);
-        MethodElement sourceSignatureMethod = resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1
-            ? resolvedSignatureMethod
-            : signatureMethod;
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
@@ -2760,28 +2788,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else {
             methodBuilder.addModifiers(Modifier.PUBLIC);
         }
-        addMethodTypeVariables(sourceSignatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
+        methodTypeVariables.forEach(methodBuilder::addTypeVariable);
 
         copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
         if (isJunit5Test && !methodElement.hasDeclaredAnnotation(JUNIT_TEST)) {
             methodBuilder.addAnnotation(JUNIT_TEST);
         }
+        parameterDefs.forEach(methodBuilder::addParameter);
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
-        @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
-        @NonNull ParameterElement[] resolvedSignatureParameters = resolvedSignatureMethod.getParameters();
-        int receiverOffset = isScript && parameters.length > 0 && "self".equals(parameters[0].getName()) ? 1 : 0;
-        for (int i = receiverOffset; i < parameters.length; i++) {
-            @NonNull ParameterElement parameter = parameters[i];
-            ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
-            ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
-            TypeDef parameterType = genericToArray
-                ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
-                : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
-            ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), parameterType).build();
-            methodBuilder.addParameter(parameterDef);
-        }
+        int receiverOffset = parameters.length - parameterDefs.size();
 
+        boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
@@ -2792,7 +2809,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassElement declaringType = methodElement.getDeclaringType();
                     arguments.add(pythonClassReference(bridgeOwner, declaringType));
                     arguments.add(ExpressionDef.constant(pythonFunctionName));
-                    arguments.addAll(methodParameters);
+                    if (spreadsVarargs) {
+                        // `*args`: the trailing Java array is spread into positional Python arguments
+                        arguments.add(PYTHON_INVOCATION.invokeStatic(
+                            WITH_VARARGS,
+                            TypeDef.OBJECT.array(),
+                            TypeDef.OBJECT.array().instantiate(methodParameters.subList(0, methodParameters.size() - 1)),
+                            methodParameters.getLast()
+                        ));
+                    } else {
+                        arguments.addAll(methodParameters);
+                    }
                     invokedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                         "invokeStaticMethod",
                         POLYGLOT_VALUE,
@@ -2814,17 +2841,29 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (receiverOffset == 1) {
                         parameterExpressions.add(aThis);
                     }
+                    ExpressionDef variadicArguments = null;
                     for (int i = receiverOffset; i < parameters.length; i++) {
                         @NonNull ParameterElement parameter = parameters[i];
                         VariableDef.MethodParameter methodParameter = methodParameters.get(i - receiverOffset);
-                        coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                        if (spreadsVarargs && i == parameters.length - 1) {
+                            // `*args`: the trailing Java array is spread into positional Python arguments
+                            List<ExpressionDef> variadic = new ArrayList<>(1);
+                            coerceParameterToPolyglotValue(parameter, variadic, methodParameter, targetContext);
+                            variadicArguments = variadic.getFirst();
+                        } else {
+                            coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                        }
+                    }
+                    ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(parameterExpressions);
+                    if (variadicArguments != null) {
+                        pythonArguments = PYTHON_INVOCATION.invokeStatic(WITH_VARARGS, TypeDef.OBJECT.array(), pythonArguments, variadicArguments);
                     }
                     invokedValue = PYTHON_INVOCATION.invokeStatic(
                         "invokePythonMethod",
                         POLYGLOT_VALUE,
                         targetValue,
                         ExpressionDef.constant(pythonFunctionName),
-                        TypeDef.OBJECT.array().instantiate(parameterExpressions)
+                        pythonArguments
                     );
                 }
 
@@ -2941,9 +2980,98 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static String bridgeMethodKey(MethodElement methodElement) {
         StringBuilder key = new StringBuilder(methodElement.getName()).append('(');
         for (ParameterElement parameter : methodElement.getParameters()) {
-            key.append(parameter.getType().getName()).append(';');
+            ClassElement type = parameter.getType();
+            key.append(type.getName());
+            key.append("[]".repeat(type.getArrayDimensions()));
+            key.append(';');
         }
         return key.append(')').toString();
+    }
+
+    /**
+     * The parameters of a bridge method as the stub emits them: the Python parameters typed with the
+     * (resolved) Java signature the bridge implements.
+     */
+    private static List<ParameterDef> bridgeParameters(
+        BridgeMethodSpec spec,
+        MethodElement sourceSignatureMethod,
+        boolean genericToArray,
+        Map<String, ClassElement> bridgeSignatureTypeArguments
+    ) {
+        MethodElement methodElement = spec.method();
+        MethodElement signatureMethod = spec.signatureMethod();
+        @NonNull ParameterElement[] parameters = methodElement.getParameters();
+        @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
+        @NonNull ParameterElement[] resolvedSignatureParameters = spec.resolvedSignatureMethod().getParameters();
+        int receiverOffset = spec.script() && parameters.length > 0 && "self".equals(parameters[0].getName()) ? 1 : 0;
+        List<ParameterDef> parameterDefs = new ArrayList<>(parameters.length);
+        for (int i = receiverOffset; i < parameters.length; i++) {
+            @NonNull ParameterElement parameter = parameters[i];
+            ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
+            ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
+            TypeDef parameterType = genericToArray
+                ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
+                : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
+            parameterDefs.add(ParameterDef.builder(parameter.getName(), parameterType).build());
+        }
+        return parameterDefs;
+    }
+
+    /**
+     * The key of a bridge method as javac sees it: the method name and the erasure of each emitted
+     * parameter type, with method type variables erased to their first bound.
+     */
+    private static String bridgeMethodKey(String name, List<ParameterDef> parameters, List<TypeDef.TypeVariable> methodTypeVariables) {
+        Map<String, TypeDef> bounds = new LinkedHashMap<>();
+        for (TypeDef.TypeVariable typeVariable : methodTypeVariables) {
+            bounds.put(typeVariable.name(), typeVariable.bounds().isEmpty() ? TypeDef.OBJECT : typeVariable.bounds().getFirst());
+        }
+        StringBuilder key = new StringBuilder(name).append('(');
+        for (ParameterDef parameter : parameters) {
+            key.append(erasedTypeName(parameter.getType(), bounds)).append(';');
+        }
+        return key.append(')').toString();
+    }
+
+    private static String erasedTypeName(TypeDef type, Map<String, TypeDef> methodTypeVariableBounds) {
+        return switch (type) {
+            case TypeDef.Array array -> erasedTypeName(array.componentType(), methodTypeVariableBounds) + "[]".repeat(array.dimensions());
+            case TypeDef.TypeVariable typeVariable -> {
+                TypeDef bound = methodTypeVariableBounds.get(typeVariable.name());
+                if (bound == null) {
+                    bound = typeVariable.bounds().isEmpty() ? TypeDef.OBJECT : typeVariable.bounds().getFirst();
+                }
+                yield bound instanceof TypeDef.TypeVariable ? Object.class.getName() : erasedTypeName(bound, methodTypeVariableBounds);
+            }
+            case TypeDef.Wildcard wildcard -> wildcard.upperBounds().isEmpty()
+                ? Object.class.getName()
+                : erasedTypeName(wildcard.upperBounds().getFirst(), methodTypeVariableBounds);
+            case TypeDef.AnnotatedTypeDef annotated -> erasedTypeName(annotated.typeDef(), methodTypeVariableBounds);
+            case ClassTypeDef.AnnotatedClassTypeDef annotated -> erasedTypeName(annotated.typeDef(), methodTypeVariableBounds);
+            case TypeDef.Primitive primitive -> primitive.name();
+            case ClassTypeDef classTypeDef -> classTypeDef.getName();
+            default -> type.toString();
+        };
+    }
+
+    /**
+     * Whether the bridge spreads its trailing array parameter into positional Python arguments: the Python
+     * implementation declares {@code *args}. When the bridged method is the Java interface method itself
+     * (the Python type hints did not match its signature), the Python method is looked up by name and arity.
+     */
+    private static boolean spreadsVarargs(MethodElement methodElement, ClassElement owner) {
+        ParameterElement[] parameters = methodElement.getParameters();
+        if (parameters.length == 0 || !parameters[parameters.length - 1].getType().isArray()) {
+            return false;
+        }
+        if (methodElement instanceof PythonMethodElement pythonMethod) {
+            return pythonMethod.isVarArgs();
+        }
+        return owner.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named(methodElement.getName()))
+            .stream()
+            .anyMatch(declared -> declared instanceof PythonMethodElement pythonMethod
+                && pythonMethod.isVarArgs()
+                && pythonMethod.getParameters().length == parameters.length);
     }
 
     private static boolean shouldBridgeDeclaredPythonMethod(MethodElement methodElement, List<PropertyElement> beanProperties) {

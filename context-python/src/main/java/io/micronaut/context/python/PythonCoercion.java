@@ -140,6 +140,11 @@ public final class PythonCoercion {
             return standardType;
         }
         if (value != null && value.getClass().isArray()) {
+            if (value instanceof byte[]) {
+                // a byte[] payload is already an interop array; keeping it lets Python pass it on to
+                // Java byte[] parameters and overloads unchanged
+                return value;
+            }
             int length = Array.getLength(value);
             Object[] result = new Object[length];
             for (int i = 0; i < length; i++) {

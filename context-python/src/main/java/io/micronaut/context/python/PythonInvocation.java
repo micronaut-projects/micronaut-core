@@ -16,6 +16,9 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.UsedByGeneratedCode;
+import java.lang.reflect.Array;
+import java.util.Arrays;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
@@ -72,6 +75,35 @@ public final class PythonInvocation {
             }
             return PythonContextRuntime.helper(context, INVOKE_METHOD).execute(receiver, name, args);
         });
+    }
+
+    /**
+     * Spread a Java varargs array into the positional arguments of a Python call.
+     * <p>
+     * A Python {@code *args} parameter is bridged as a trailing Java array. Python expects the
+     * elements as separate positional arguments, so the generated bridge appends them to the
+     * fixed arguments instead of passing the array as a single argument.
+     *
+     * @param arguments The fixed arguments
+     * @param varargs The varargs array, or {@code null} for no additional arguments
+     * @return The positional arguments of the Python call
+     */
+    @UsedByGeneratedCode
+    public static Object[] withVarargs(Object[] arguments, @Nullable Object varargs) {
+        if (varargs == null) {
+            return arguments;
+        }
+        if (!varargs.getClass().isArray()) {
+            Object[] result = Arrays.copyOf(arguments, arguments.length + 1);
+            result[arguments.length] = varargs;
+            return result;
+        }
+        int length = Array.getLength(varargs);
+        Object[] result = Arrays.copyOf(arguments, arguments.length + length);
+        for (int i = 0; i < length; i++) {
+            result[arguments.length + i] = Array.get(varargs, i);
+        }
+        return result;
     }
 
     /**
