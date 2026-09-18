@@ -18,7 +18,6 @@ package io.micronaut.python.annotation.processing.test
 import io.micronaut.context.annotation.Primary
 import io.micronaut.context.event.BeanCreatedEventListener
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.python.annotation.processing.test.javatypes.DefaultImportedConnectionFactory
 import io.micronaut.python.annotation.processing.test.javatypes.ImportedConnectionFactory
 import io.micronaut.python.annotation.processing.test.javatypes.ImportedOptions
 import io.micronaut.python.annotation.processing.test.javatypes.ImportedPooledConnection
