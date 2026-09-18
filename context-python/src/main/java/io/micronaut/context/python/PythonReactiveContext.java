@@ -60,8 +60,6 @@ public record PythonReactiveContext(@Nullable Object reactorContext, PropagatedC
      * @param callback The callback
      */
     public void run(Runnable callback) {
-        try (PropagatedContext.Scope ignored = propagatedContext.propagate()) {
-            callback.run();
-        }
+        propagatedContext.propagate(callback);
     }
 }

@@ -1507,9 +1507,8 @@ final class PythonAsyncioRuntimeTest {
                 """).execute(target);
 
             CompletionStage stage;
-            try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement("E2")).propagate()) {
-                stage = PythonAsyncioRuntime.toCompletionStage(coroutine);
-            }
+            stage = PropagatedContext.getOrEmpty().plus(new TestElement("E2"))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
             eventLoop.runUntilComplete(stage);
 
             assertEquals("E2/E2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
@@ -1683,9 +1682,8 @@ final class PythonAsyncioRuntimeTest {
     }
 
     private static CompletionStage<?> startUnder(String element, Value coroutine) {
-        try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement(element)).propagate()) {
-            return PythonAsyncioRuntime.toCompletionStage(coroutine);
-        }
+        return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+            .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
     }
 
     @Test
@@ -1850,9 +1848,8 @@ final class PythonAsyncioRuntimeTest {
 
         @SuppressWarnings("rawtypes")
         public CompletionStage startNestedUnder(String element, Value coroutineFactory) {
-            try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement(element)).propagate()) {
-                return PythonAsyncioRuntime.toCompletionStage(coroutineFactory.execute());
-            }
+            return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutineFactory.execute()));
         }
     }
 

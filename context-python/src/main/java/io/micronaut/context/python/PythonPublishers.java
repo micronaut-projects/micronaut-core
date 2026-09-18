@@ -117,13 +117,14 @@ public final class PythonPublishers {
             subscribeUnchecked(publisher, subscriber);
             return;
         }
-        try (PropagatedContext.Scope ignored = reactiveContext.propagatedContext().propagate()) {
-            if (REACTOR_AVAILABLE && reactiveContext.reactorContext() != null) {
-                Reactor.subscribe(publisher, subscriber, reactiveContext.reactorContext());
+        Object reactorContext = reactiveContext.reactorContext();
+        reactiveContext.propagatedContext().propagate(() -> {
+            if (REACTOR_AVAILABLE && reactorContext != null) {
+                Reactor.subscribe(publisher, subscriber, reactorContext);
             } else {
                 subscribeUnchecked(publisher, subscriber);
             }
-        }
+        });
     }
 
     @SuppressWarnings("unchecked")
@@ -166,17 +167,17 @@ public final class PythonPublishers {
             return ReactorPropagation.addPropagatedContext((Context) reactorContext, propagatedContext);
         }
 
-        private static PythonReactiveContext reactiveContext(ContextView contextView) {
-            PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView)
-                .orElseGet(PropagatedContext::getOrEmpty);
-            return new PythonReactiveContext(Context.of(contextView), propagatedContext);
-        }
-
         /**
          * The future of the first subscriber, shared with the later ones.
          */
         private static final class Started {
             private @Nullable CompletableFuture<Object> future;
+
+            private static PythonReactiveContext reactiveContext(ContextView contextView) {
+                PropagatedContext propagatedContext = ReactorPropagation.findPropagatedContext(contextView)
+                    .orElseGet(PropagatedContext::getOrEmpty);
+                return new PythonReactiveContext(Context.of(contextView), propagatedContext);
+            }
 
             synchronized CompletableFuture<Object> get(ContextView contextView, Function<PythonReactiveContext, CompletableFuture<Object>> starter) {
                 if (future == null) {

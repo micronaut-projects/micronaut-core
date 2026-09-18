@@ -104,9 +104,9 @@ public final class PythonAsyncioRuntime {
     @UsedByGeneratedCode
     public static Publisher<Object> toPublisher(Value value) {
         return PythonPublishers.deferred(reactiveContext -> {
-            try (PropagatedContext.Scope ignored = reactiveContext.propagatedContext().propagate()) {
-                return toCompletionStage(value, reactiveContext).toCompletableFuture();
-            }
+            return reactiveContext.propagatedContext().propagate(
+                () -> toCompletionStage(value, reactiveContext).toCompletableFuture()
+            );
         });
     }
 

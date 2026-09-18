@@ -123,9 +123,8 @@ final class NettyPythonAsyncioRuntimeTest {
                 """).execute(new ElementReader());
 
             CompletionStage stage = NettyPythonEventLoopProvider.bind(eventLoop, () -> {
-                try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement("E1")).propagate()) {
-                    return PythonAsyncioRuntime.toCompletionStage(coroutine);
-                }
+                return PropagatedContext.getOrEmpty().plus(new TestElement("E1"))
+                    .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
             });
 
             assertEquals("E1|E1|E1", stage.toCompletableFuture().get(5, TimeUnit.SECONDS));
@@ -207,9 +206,8 @@ final class NettyPythonAsyncioRuntimeTest {
 
     private static CompletionStage<?> startUnder(EventLoop eventLoop, String element, Value coroutine) {
         return NettyPythonEventLoopProvider.bind(eventLoop, () -> {
-            try (PropagatedContext.Scope ignored = PropagatedContext.getOrEmpty().plus(new TestElement(element)).propagate()) {
-                return PythonAsyncioRuntime.toCompletionStage(coroutine);
-            }
+            return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
         });
     }
 
