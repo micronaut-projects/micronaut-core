@@ -36,6 +36,9 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.python.processing.model.ArgumentDef;
+import io.micronaut.python.processing.model.ArgumentsDef;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
@@ -61,8 +64,10 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 public sealed class PythonClassElement extends AbstractPythonClassElement permits PythonAnnotationElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";
+    private static final String DATACLASS_DECORATOR = "dataclass";
 
     private Map<String, ClassElement> resolvedTypeArguments;
+    private FunctionDef constructor;
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
@@ -209,11 +214,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     @Override
     public Optional<MethodElement> getDefaultConstructor() {
         Optional<MethodElement> primaryConstructor = getPrimaryConstructor();
-        if (primaryConstructor.isEmpty()) {
-            if (!hasDeclaredAnnotation("dataclass")) {
-                // python class with no explicit constructor return default
-                return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
-            }
+        if (primaryConstructor.isEmpty() && !hasDeclaredAnnotation(DATACLASS_DECORATOR)) {
+            // python class with no explicit constructor return default
+            return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
         }
         return super.getDefaultConstructor();
     }
@@ -235,11 +238,148 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
 
         // Fall back to regular constructor
-        FunctionDef constructor = getNativeType().constructor();
+        if (constructor == null) {
+            constructor = withInheritedDataclassFields(getNativeType().constructor());
+        }
         if (constructor != null) {
             return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether this class is decorated with {@code @dataclass}.
+     *
+     * @return {@code true} for a Python dataclass
+     */
+    public boolean isDataclass() {
+        return hasDataclassDecorator(getNativeType().decorators());
+    }
+
+    /**
+     * Completes the {@code __init__} the processor derived from the fields of a dataclass with the fields of its
+     * dataclass bases. Python collects the fields of every dataclass in the method resolution order, walked from
+     * the most distant base to the class itself, plain classes in between contributing nothing: the fields of the
+     * bases come first and a field declared again keeps the position of its first declaration. An explicit
+     * {@code __init__} is used as declared, as in Python.
+     *
+     * @param constructor The constructor of the class definition, may be {@code null}
+     * @return The constructor to use, may be {@code null}
+     */
+    private @Nullable FunctionDef withInheritedDataclassFields(@Nullable FunctionDef constructor) {
+        if (!isDataclass() || (constructor != null && !hasDataclassDecorator(constructor.decorators()))) {
+            return constructor;
+        }
+        Map<String, ArgumentDef> fields = new LinkedHashMap<>();
+        List<PythonClassElement> mro = pythonMro();
+        for (int i = mro.size() - 1; i >= 0; i--) {
+            PythonClassElement base = mro.get(i);
+            if (!base.isDataclass()) {
+                continue;
+            }
+            List<ArgumentDef> inheritedFields = base.getPrimaryConstructor()
+                .filter(PythonConstructorElement.class::isInstance)
+                .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
+                .orElse(List.of());
+            for (ArgumentDef inheritedField : inheritedFields) {
+                fields.put(inheritedField.name(), inheritedField);
+            }
+        }
+        if (fields.isEmpty()) {
+            return constructor;
+        }
+        if (constructor != null) {
+            for (ArgumentDef field : constructor.arguments().arguments()) {
+                fields.put(field.name(), field);
+            }
+        }
+        FunctionDef template = constructor != null ? constructor : new FunctionDef(FunctionDef.CONSTRUCTOR_NAME, dataclassConstructorDecorators());
+        return new FunctionDef(
+            template.name(),
+            ArgumentsDef.of(List.copyOf(fields.values())),
+            template.decorators(),
+            template.returnType(),
+            template.typeComment(),
+            template.typeParams(),
+            template.documentation(),
+            template.isAbstract(),
+            template.isStatic(),
+            template.isAsync(),
+            template.hasReturnValue(),
+            null
+        ).withClassDef(getNativeType());
+    }
+
+    /**
+     * The Python bases of the class in method resolution order (the C3 linearization Python uses), the class
+     * itself excluded. Bases that are not Python classes (Java types) carry no dataclass fields and are left out.
+     *
+     * @return The linearized Python bases
+     */
+    private List<PythonClassElement> pythonMro() {
+        List<PythonClassElement> bases = new ArrayList<>();
+        for (TypeRef base : getNativeType().bases()) {
+            if (findPythonClass(base) instanceof PythonClassElement pythonBase && !pythonBase.getName().equals(getName())) {
+                bases.add(pythonBase);
+            }
+        }
+        List<List<PythonClassElement>> sequences = new ArrayList<>(bases.size() + 1);
+        for (PythonClassElement base : bases) {
+            List<PythonClassElement> baseMro = new ArrayList<>();
+            baseMro.add(base);
+            baseMro.addAll(base.pythonMro());
+            sequences.add(baseMro);
+        }
+        sequences.add(new ArrayList<>(bases));
+        return c3Merge(sequences);
+    }
+
+    /**
+     * Merges the linearizations of the bases: the next class is the first head that appears in no tail. Python
+     * rejects a hierarchy without such a head; here the first head is taken so that a constructor is still derived.
+     */
+    private static List<PythonClassElement> c3Merge(List<List<PythonClassElement>> sequences) {
+        List<PythonClassElement> result = new ArrayList<>();
+        while (true) {
+            sequences.removeIf(List::isEmpty);
+            if (sequences.isEmpty()) {
+                return result;
+            }
+            PythonClassElement next = null;
+            for (List<PythonClassElement> sequence : sequences) {
+                PythonClassElement head = sequence.getFirst();
+                if (sequences.stream().noneMatch(other -> indexOfClass(other, head) > 0)) {
+                    next = head;
+                    break;
+                }
+            }
+            if (next == null) {
+                next = sequences.getFirst().getFirst();
+            }
+            result.add(next);
+            for (List<PythonClassElement> sequence : sequences) {
+                if (indexOfClass(sequence, next) == 0) {
+                    sequence.removeFirst();
+                }
+            }
+        }
+    }
+
+    private static int indexOfClass(List<PythonClassElement> sequence, PythonClassElement classElement) {
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i).getName().equals(classElement.getName())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static List<DecoratorDef> dataclassConstructorDecorators() {
+        return List.of(new DecoratorDef(DATACLASS_DECORATOR, DATACLASS_DECORATOR));
+    }
+
+    private static boolean hasDataclassDecorator(List<DecoratorDef> decorators) {
+        return decorators.stream().anyMatch(decorator -> DATACLASS_DECORATOR.equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
     }
 
     @Override

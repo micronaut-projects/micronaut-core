@@ -395,7 +395,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // Track method names that have been added to avoid duplicates
                     Set<String> addedMethodNames = stubEntry.bridgedMethods();
 
-                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, isDeclaredBean, isIntroductionBean, isAopProxy);
+                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, isDeclaredBean, isIntroductionBean, isAopProxy, beanProperties);
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
                     final FieldDef pythonValueSyncingFinal = pythonValueSyncing;
@@ -487,7 +487,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Bridges the methods of implemented Java interfaces, overridden host methods and abstract introduction methods; returns whether an interceptor binding was found on the way.
      */
     @SuppressWarnings("java:S107") // the flags describe one bean kind; a record for them is a refactoring of its own
-    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy) {
+    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy, List<PropertyElement> beanProperties) {
         Collection<ClassElement> interfaces = classElement.getInterfaces();
         for (ClassElement anInterface : interfaces) {
             TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
@@ -503,7 +503,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
                     MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
                     MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
-                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))) {
+                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))
+                        && !(bridgeMethod == interfaceMethod && isImplementedByPropertyAccessor(interfaceMethod, beanProperties))) {
                         if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
                             isAopProxy = true;
                         }
@@ -1177,10 +1178,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
             final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
             final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
+            // A dataclass takes the fields of its dataclass base first; an introspected base is constructed from
+            // them. Any other Python base only wraps the Python object, which then has to exist up front.
+            final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
+            final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                     if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties) {
+                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties || requiresPythonInstance) {
                             List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                             if (hasDefaultedConstructorParameters) {
                                 arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
@@ -1209,6 +1214,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         List<StatementDef> assignments = new ArrayList<>();
                         if (extendsHostClass) {
                             assignments.add(aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, parameters, methodParameters)));
+                        } else if (extendsPythonClass) {
+                            List<ExpressionDef> superArguments = new ArrayList<>(superConstructorParameterIndexes.length);
+                            for (int index : superConstructorParameterIndexes) {
+                                superArguments.add(methodParameters.get(index));
+                            }
+                            assignments.add(aThis.superRef().invokeSuperConstructor(superArguments));
                         }
                         for (int i = 0; i < parameters.length; i++) {
                             @NonNull ParameterElement parameter = parameters[i];
@@ -1867,6 +1878,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .orElseGet(() -> new ArrayList<>(methodParameters));
     }
 
+    /**
+     * The positions, among the constructor parameters, of the arguments of the constructor of an introspected Python
+     * base class, which a dataclass inherits as its leading fields. {@code null} when the base has to be constructed
+     * from the Python object instead: it is not introspected, or its constructor takes a parameter of another name.
+     */
+    private static int @Nullable [] pythonSuperConstructorParameterIndexes(ClassElement superType, ParameterElement[] parameters) {
+        if (!superType.hasStereotype(Introspected.class)) {
+            return null;
+        }
+        ParameterElement[] superParameters = superType.getPrimaryConstructor()
+            .map(MethodElement::getParameters)
+            .orElse(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+        int[] indexes = new int[superParameters.length];
+        for (int i = 0; i < superParameters.length; i++) {
+            indexes[i] = indexOfParameter(parameters, superParameters[i].getName());
+            if (indexes[i] < 0) {
+                return null;
+            }
+        }
+        return indexes;
+    }
+
+    private static int indexOfParameter(ParameterElement[] parameters, String name) {
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
     private static boolean matchesConstructorPrefix(ConstructorElement constructor, ParameterElement[] parameters) {
         ParameterElement[] superParameters = constructor.getParameters();
         if (superParameters.length > parameters.length) {
@@ -2326,6 +2368,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static TypeDef constructorParameterType(ParameterElement parameter) {
         ClassElement genericType = parameter.getGenericType();
+        if (genericType instanceof GenericPlaceholderElement) {
+            // the field of a generic dataclass attribute (result: T) has the type variable as its type
+            return sourceSignatureType(genericType);
+        }
         if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
             return parameterizedTypeDef(genericType);
         }
@@ -3700,6 +3746,64 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return pythonProperty.getAttributeField();
         }
         return beanProperty.getField();
+    }
+
+    /**
+     * Whether a Java interface accessor is implemented by the getter or setter generated for an attribute of the same
+     * name, so a dataclass can implement an interface such as {@code KubernetesObject} through its attributes
+     * ({@code apiVersion} implements {@code getApiVersion()}). The Python class declares no method of that name, and
+     * the attribute type must satisfy the interface signature for the generated accessor to override it.
+     */
+    private static boolean isImplementedByPropertyAccessor(MethodElement interfaceMethod, List<PropertyElement> beanProperties) {
+        String methodName = interfaceMethod.getName();
+        ParameterElement[] parameters = interfaceMethod.getParameters();
+        for (PropertyElement beanProperty : beanProperties) {
+            String propertyName = beanProperty.getName();
+            if (parameters.length == 0 && !interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getReadMethod().map(MethodElement::isSynthetic).orElse(true);
+                boolean sameName = methodName.equals(beanGetterName(propertyName))
+                    || (isBooleanProperty(beanProperty) && methodName.equals(booleanBeanGetterName(propertyName)));
+                if (synthetic && sameName && !beanProperty.isWriteOnly()
+                    && satisfiesReturnType(beanProperty.getGenericType(), interfaceMethod.getGenericReturnType())) {
+                    return true;
+                }
+            } else if (parameters.length == 1 && interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getWriteMethod().map(MethodElement::isSynthetic).orElse(true);
+                if (synthetic && methodName.equals(beanSetterName(propertyName)) && !beanProperty.isReadOnly()
+                    && parameters[0].getType().getName().equals(beanProperty.getType().getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a generated getter of the property type overrides the interface accessor: the type has to be
+     * assignable, and where the accessor returns a parameterized type the type arguments have to match as well,
+     * as javac requires (a {@code list[CustomObject]} attribute does not implement a getter returning a list of
+     * {@code KubernetesObject}); a type variable or wildcard of the accessor accepts any argument.
+     */
+    private static boolean satisfiesReturnType(ClassElement propertyType, ClassElement returnType) {
+        if (!propertyType.isAssignable(returnType)) {
+            return false;
+        }
+        Map<String, ClassElement> expectedArguments = returnType.getTypeArguments();
+        if (expectedArguments.isEmpty()) {
+            return true;
+        }
+        Map<String, ClassElement> actualArguments = propertyType.getTypeArguments(returnType.getName());
+        for (Map.Entry<String, ClassElement> expected : expectedArguments.entrySet()) {
+            ClassElement expectedArgument = expected.getValue();
+            if (expectedArgument instanceof GenericPlaceholderElement || expectedArgument instanceof WildcardElement) {
+                continue;
+            }
+            ClassElement actualArgument = actualArguments.get(expected.getKey());
+            if (actualArgument == null || !actualArgument.getName().equals(expectedArgument.getName())) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {

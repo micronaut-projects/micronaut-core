@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -56,6 +57,7 @@ import org.jspecify.annotations.Nullable;
 public final class PythonConversion {
 
     private static final String UTC_OFFSET = "__micronaut_utc_offset";
+    private static final int MAX_META_PARENT_DEPTH = 16;
 
     private static final String LEN = "__len__";
 
@@ -473,7 +475,93 @@ public final class PythonConversion {
         if (mappedWrapper != null) {
             return mappedWrapper;
         }
+        Object container = convertNestedContainer(value, targetType);
+        if (container != null) {
+            return (T) container;
+        }
         return value.as(targetType);
+    }
+
+    /**
+     * Convert a Python container whose element types are unknown (the element of a {@code list[list[int]]}
+     * attribute reaches this method as a plain {@link List}) to a Java collection with value semantics, so two
+     * conversions of equal Python data are equal. {@link Value#as(Class)} would return a view of the Python object
+     * that compares by identity, which breaks the generated {@code equals}/{@code hashCode} of the classes holding
+     * such attributes. Nested containers are converted the same way; every other element is mapped by GraalPy.
+     *
+     * @param value The value
+     * @param targetType The target type
+     * @return The Java collection, or {@code null} when the target is not a plain collection type
+     */
+    private static @Nullable Object convertNestedContainer(Value value, Class<?> targetType) {
+        if (value.isHostObject() || value.isString() || value.isNull()) {
+            return null;
+        }
+        if ((targetType == List.class || targetType == Collection.class || targetType == Iterable.class) && value.hasArrayElements()) {
+            return convertElements(value, PythonConversion::convertNestedElement);
+        }
+        if (targetType == Set.class && value.hasIterator() && !value.hasArrayElements()) {
+            Set<@Nullable Object> result = new HashSet<>();
+            Value iterator = value.getIterator();
+            while (iterator.hasIteratorNextElement()) {
+                result.add(convertNestedElement(iterator.getIteratorNextElement()));
+            }
+            return result;
+        }
+        if (targetType == Map.class && value.hasHashEntries()) {
+            Map<@Nullable Object, @Nullable Object> result = new HashMap<>();
+            Value entries = value.getHashEntriesIterator();
+            while (entries.hasIteratorNextElement()) {
+                Value entry = entries.getIteratorNextElement();
+                result.put(convertNestedElement(entry.getArrayElement(0)), convertNestedElement(entry.getArrayElement(1)));
+            }
+            return result;
+        }
+        return null;
+    }
+
+    private static @Nullable Object convertNestedElement(Value element) {
+        if (!element.isHostObject() && !element.isString() && !element.isNull()) {
+            if (element.hasArrayElements()) {
+                return convertNestedContainer(element, List.class);
+            }
+            if (element.hasHashEntries()) {
+                return convertNestedContainer(element, Map.class);
+            }
+            if (isPythonSet(element)) {
+                return convertNestedContainer(element, Set.class);
+            }
+        }
+        return convertValue(element, Object.class);
+    }
+
+    private static boolean isPythonSet(Value value) {
+        if (!value.hasIterator()) {
+            return false;
+        }
+        Value metaObject = value.getMetaObject();
+        return metaObject != null && isPythonSetType(metaObject, 0);
+    }
+
+    /**
+     * Whether a Python type is {@code set} or {@code frozenset} or derives from one of them: the parents of
+     * the type are walked, so a {@code set} subclass converts like a set.
+     */
+    private static boolean isPythonSetType(Value metaObject, int depth) {
+        String typeName = metaObject.getMetaSimpleName();
+        if ("set".equals(typeName) || "frozenset".equals(typeName)) {
+            return true;
+        }
+        if (depth > MAX_META_PARENT_DEPTH || !metaObject.hasMetaParents()) {
+            return false;
+        }
+        Value parents = metaObject.getMetaParents();
+        for (long i = 0; i < parents.getArraySize(); i++) {
+            if (isPythonSetType(parents.getArrayElement(i), depth + 1)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
