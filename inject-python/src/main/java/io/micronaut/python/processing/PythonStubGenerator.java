@@ -92,6 +92,7 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import io.micronaut.python.processing.util.ObjectHelper;
+import io.micronaut.python.processing.util.PythonJavaTypes;
 
 /**
  * Generates Java stubs for Python classes, scripts, enums, interfaces, and annotations.
@@ -439,29 +440,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             Set<MethodElement> methodSet = new LinkedHashSet<>();
             for (int i = 0; i < methods.size(); i++) {
                 MethodElement method = methods.get(i);
-                if (methodSet.contains(method) || method.isDefault()) {
-                    continue;
+                if (!methodSet.contains(method)) {
+                    MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
+                    MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
+                    MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
+                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))) {
+                        if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
+                            isAopProxy = true;
+                        }
+                        ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
+                        if (returnTypeOverride == null && bridgeMethod != interfaceMethod) {
+                            returnTypeOverride = resolveDeclaredBridgeReturnType(bridgeMethod, interfaceMethod);
+                        }
+                        // The generated Java stub must implement the Java interface signature,
+                        // not the Python source annotation signature. Python annotations are
+                        // often raw while Java interfaces may declare parameterized or wildcard
+                        // forms. Use the raw declaring method as the source signature and apply
+                        // the resolved interface arguments separately; using the already-resolved
+                        // method would collapse method variables such as CrudRepository's
+                        // <S extends E> into the entity type and produce same-erasure methods
+                        // that fail to override.
+                        Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
+                        addBridgeMethod(
+                            BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments),
+                            builder, context, addedMethodNames);
+                    }
+                    methodSet.add(method);
                 }
-                MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
-                MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
-                MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
-                if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
-                    isAopProxy = true;
-                }
-                ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
-                // The generated Java stub must implement the Java interface signature,
-                // not the Python source annotation signature. Python annotations are
-                // often raw while Java interfaces may declare parameterized or wildcard
-                // forms. Use the raw declaring method as the source signature and apply
-                // the resolved interface arguments separately; using the already-resolved
-                // method would collapse method variables such as CrudRepository's
-                // <S extends E> into the entity type and produce same-erasure methods
-                // that fail to override.
-                Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
-                addBridgeMethod(
-                    BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments),
-                    builder, context, addedMethodNames);
-                methodSet.add(method);
             }
         }
         if (extendsHostClass) {
@@ -3105,6 +3110,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             || property.getWriteMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false);
     }
 
+    /**
+     * Whether the Python class declares a method with the name and arity of the interface method, whatever
+     * its type hints: an unannotated {@code def greet(self, who)} overrides {@code greet(String)} too. The
+     * interface signature is bridged for it and the Python method is looked up by name at run time.
+     */
+    private static boolean declaresOverride(ClassElement element, MethodElement interfaceMethod) {
+        int arity = interfaceMethod.getParameters().length;
+        return element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named(interfaceMethod.getName()))
+            .stream()
+            .anyMatch(declared -> declared.getParameters().length == arity
+                || declared instanceof PythonMethodElement pythonMethod && pythonMethod.isVarArgs() && pythonMethod.getParameters().length <= arity);
+    }
+
     private static MethodElement resolveDeclaredBridgeMethod(ClassElement element, MethodElement interfaceMethod) {
         for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance())) {
             // Python annotations may omit the return type even when a Java interface
@@ -3116,6 +3134,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         return interfaceMethod;
+    }
+
+    /**
+     * The return type the bridge of a Python override converts the Python result to when the Python hint
+     * names a different primitive or boxed type than the Java method ({@code -> int} for {@code long count()},
+     * or no hint at all): the stub declares the Java type, so the conversion has to produce it.
+     */
+    private static @Nullable ClassElement resolveDeclaredBridgeReturnType(MethodElement declaredMethod, MethodElement interfaceMethod) {
+        ClassElement interfaceReturnType = interfaceMethod.getGenericReturnType();
+        if (interfaceReturnType instanceof GenericPlaceholderElement || interfaceReturnType.isVoid() || !PythonJavaTypes.isPrimitiveOrBoxedType(interfaceReturnType)) {
+            return null;
+        }
+        ClassElement declaredReturnType = declaredMethod.getGenericReturnType();
+        if (declaredReturnType.isVoid() || declaredReturnType.getName().equals(interfaceReturnType.getName())) {
+            return null;
+        }
+        return interfaceReturnType;
     }
 
     private static MethodElement withOwningInterface(MethodElement method, ClassElement anInterface) {
@@ -3233,6 +3268,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String parameterTypeName = parameter.getType().getName();
         String interfaceTypeName = interfaceParameter.getType().getName();
         if (parameterTypeName.equals(interfaceTypeName)) {
+            return true;
+        }
+        // Python has no overloading: a `def find(self, id: int)` overrides `find(Integer)` as well as
+        // `find(ID)` resolved to Integer, so a primitive hint matches the boxed Java type.
+        if (PythonJavaTypes.isSameOrBoxedType(parameter.getType(), interfaceParameter.getGenericType())) {
             return true;
         }
         String parameterGenericTypeName = parameter.getGenericType().getName();
