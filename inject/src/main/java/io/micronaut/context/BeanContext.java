@@ -228,6 +228,14 @@ public interface BeanContext extends
     /**
      * Destroys the given bean.
      *
+     * <p>The beans that were created for this one are destroyed with it only when the context still holds the
+     * registration the bean was created with, which is the case for a singleton and for a bean held by a custom
+     * scope. Nothing holds the registration of a {@code @Prototype} obtained from {@link #getBean} or of a bean
+     * from {@link #createBean}: such an instance has its own {@code @PreDestroy} invoked, but the beans created for
+     * it are not destroyed. To destroy one of those with its dependents, ask for its registration with
+     * {@link #getBeanRegistration(Argument, Qualifier)} and destroy that with
+     * {@link #destroyBean(BeanRegistration)}.</p>
+     *
      * @param bean The bean
      * @param <T>  The concrete class
      * @return The destroy instance
