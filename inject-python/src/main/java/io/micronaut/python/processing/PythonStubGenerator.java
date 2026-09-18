@@ -526,6 +526,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Emits the property, snapshot and Python value fields of a class stub.
      */
+    @SuppressWarnings("java:S107") // the flags describe generated state; a state record would obscure the call sites
     private StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean extendsHostClass, boolean isJunit5Test, boolean hasDynamicBeanProperties, VisitorContext context) {
         Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
         // Last value written to the Python object for every property. The generated

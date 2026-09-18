@@ -15,7 +15,6 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.context.ApplicationContext
 import io.micronaut.python.annotation.processing.test.services.MethodContributions
 import io.micronaut.python.annotation.processing.test.services.MethodContributor
 import io.micronaut.python.compiler.PyronautCompiler
