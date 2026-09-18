@@ -120,6 +120,13 @@ public record SuperArgumentDef(
     }
 
     /**
+     * @return Whether the argument spreads the constructor's own {@code *args} or {@code **kwargs} into the call
+     */
+    public boolean isSpread() {
+        return "*".equals(keyword) || "**".equals(keyword);
+    }
+
+    /**
      * @return Whether the argument refers to a constructor parameter
      */
     public boolean isParameter() {

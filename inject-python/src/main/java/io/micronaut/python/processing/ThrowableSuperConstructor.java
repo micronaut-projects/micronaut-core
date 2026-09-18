@@ -184,12 +184,22 @@ final class ThrowableSuperConstructor {
         return arguments;
     }
 
+    /**
+     * The super constructor arguments of the class when they form a fixed argument list; a constructor
+     * calling {@code super().__init__(...)} differently on different branches, or spreading its own
+     * {@code *args}/{@code **kwargs} into the call, cannot be matched statically and falls back to the
+     * message constructor.
+     */
     private static @Nullable List<SuperArgumentDef> superArguments(ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement pythonClass)) {
             return null;
         }
         FunctionDef constructor = pythonClass.getNativeType().constructor();
-        return constructor == null ? null : constructor.superArguments();
+        List<SuperArgumentDef> superArguments = constructor == null ? null : constructor.superArguments();
+        if (superArguments != null && superArguments.stream().anyMatch(argument -> argument.isConflicting() || argument.isSpread())) {
+            return null;
+        }
+        return superArguments;
     }
 
     private static List<@Nullable ClassElement> argumentTypes(ClassElement element, List<SuperArgumentDef> superArguments, PythonVisitorContext visitorContext) {
