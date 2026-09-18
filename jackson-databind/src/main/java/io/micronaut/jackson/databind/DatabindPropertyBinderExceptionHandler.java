@@ -39,7 +39,8 @@ import java.util.Optional;
 final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBinderExceptionHandler {
     @Override
     public Optional<ConversionErrorException> toConversionError(@Nullable Object object, Exception e) {
-        if (e instanceof InvalidFormatException ife) {
+        InvalidFormatException ife = findInvalidFormatException(e);
+        if (ife != null) {
             Object originalValue = ife.getValue();
             var conversionError = new ConversionError() {
                 @Override
@@ -63,5 +64,13 @@ final class DatabindPropertyBinderExceptionHandler implements JsonBeanPropertyBi
             return Optional.of(new ConversionErrorException(Argument.of(ife.getTargetType(), name), conversionError));
         }
         return Optional.empty();
+    }
+
+    @Nullable
+    private static InvalidFormatException findInvalidFormatException(Exception e) {
+        if (e instanceof InvalidFormatException ife) {
+            return ife;
+        }
+        return e.getCause() instanceof InvalidFormatException ife ? ife : null;
     }
 }
