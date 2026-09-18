@@ -581,7 +581,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_QUALIFIER_BY_TYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class);
 
-    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory");
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory", Object.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
@@ -1584,7 +1584,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
     private void addInstantiateMethod() {
         boolean isParametrized = isParametrized();
 
-        if (isConstructorIntercepted(elementProducerDefinition.annotationMetadata())) {
+        if (isConstructorIntercepted(elementProducerDefinition.annotationMetadata()) || resolvesInterceptorsForProxiedTarget()) {
             Method resolveValuesMethod;
             Method defaultInstantiateMethod;
             ClassTypeDef interceptedInterface;
@@ -2224,7 +2224,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 getQualifier(factoryClass, argumentExpression)
             ).cast(factoryTypeDef).newLocal("factoryBean");
         additionalStatements.add(defineAndAssign);
-        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY));
+        // by instance: the interceptors of an advised bean are resolved before the factory is looked up, so the
+        // factory need not be the first dependent
+        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY, defineAndAssign.variable()));
         return defineAndAssign.variable();
     }
 
@@ -2961,6 +2963,39 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
      */
     public boolean hasInterceptedLifecycle() {
         return isPostConstructIntercepted() || isPreDestroyIntercepted();
+    }
+
+    /**
+     * Whether this definition resolves the interceptors bound to the bean while creating it although nothing
+     * intercepts the bean's constructor: the bean is the target of a proxy and is not a singleton.
+     *
+     * <p>Such a proxy fronts a different target from one call to the next, one per thread, request or refresh,
+     * and takes the interceptors of each call from the target of that call rather than from a set it resolved
+     * once, see {@code io.micronaut.aop.beandefinition.TargetInterceptorRegistrations}. Resolving them with the
+     * target, as a bean with constructor advice does, makes them one set per target that is created with it,
+     * shared by its lifecycle phases and its methods, and destroyed with it. The set is resolved by the same
+     * {@code InterceptedBeanDefinition} that handles constructor advice, through a constructor interceptor chain
+     * that selects nothing for a constructor without advice.</p>
+     *
+     * <p>A singleton target is left as it is: proxy and target are one to one, and the proxy's own set serves the
+     * target's methods as it always has. So is a {@code @Nullable} bean, which a factory may produce as
+     * {@code null}: a constructor interceptor chain does not allow that, and the customizer that stands in for the
+     * null target has no registration of its own to carry a set.</p>
+     *
+     * @return {@code true} if this definition resolves its interceptors for the proxy that fronts it
+     * @since 5.2.2
+     */
+    private boolean resolvesInterceptorsForProxiedTarget() {
+        boolean proxiedTarget = isProxyTarget
+            || (proxiedBean && (isSuperFactory || elementProducerDefinition instanceof MethodDefinition<?, ?>));
+        if (!proxiedTarget
+            || StringUtils.isNotEmpty(interceptedType)
+            || beanTypeElement.isAssignable("io.micronaut.aop.Interceptor")
+            || annotationMetadata.hasStereotype(AnnotationUtil.NULLABLE)) {
+            return false;
+        }
+        String scope = annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
+        return !isSingleton(scope) && annotationMetadata.getAnnotation(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS) != null;
     }
 
     private static MethodDefinition<ClassElement, MethodElement> createMethodDefinition(ClassElement beanType,

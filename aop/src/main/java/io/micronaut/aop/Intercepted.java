@@ -56,6 +56,11 @@ public interface Intercepted extends InterceptedBean {
      * particular has no other route to them: it runs with a fresh resolution context, and the proxy instance is the
      * only thing that survives from creation to destruction.</p>
      *
+     * <p>A proxy whose target is not a singleton, such as a scoped proxy, keeps its own registrations as well but
+     * does not intercept its targets with them: each target resolves its own set when it is created, and the proxy
+     * selects the interceptors of every call from the set of the target of that call, so that a non-singleton
+     * interceptor is one instance per target. See {@code io.micronaut.aop.beandefinition.TargetInterceptorRegistrations}.</p>
+     *
      * <p>Proxies generated before this existed keep the empty default; the runtime then resolves interceptors by
      * binding as it always did.</p>
      *

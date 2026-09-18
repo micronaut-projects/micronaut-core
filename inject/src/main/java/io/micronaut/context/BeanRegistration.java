@@ -16,6 +16,7 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
@@ -148,6 +149,24 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     public T getBean() {
         return bean;
+    }
+
+    /**
+     * The interceptor registrations resolved while this bean was created, when the context tracked them.
+     *
+     * <p>A bean with interceptor bindings resolves the interceptors bound to it once, while it is created, and the
+     * registration created alongside it keeps them so that later phases of the bean's life reach the same instances:
+     * its pre-destroy interception, and the methods of a proxy that fronts it when the bean is not a singleton. The
+     * elements are registrations of interceptors, typed loosely here because this module does not know the
+     * interceptor type.</p>
+     *
+     * @return The interceptor registrations, or {@code null} when none were tracked
+     * @since 5.2.2
+     */
+    @Internal
+    @Nullable
+    public List<?> getInterceptorRegistrations() {
+        return null;
     }
 
     @Override
