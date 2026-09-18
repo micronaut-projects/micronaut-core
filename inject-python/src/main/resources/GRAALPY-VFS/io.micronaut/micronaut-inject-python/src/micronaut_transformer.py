@@ -334,7 +334,7 @@ class MicronautTransformer(ast.NodeTransformer):
                     # the processor resolves ``oas.Operation`` through the import, which therefore stays.
                     if self._handle_package_import(f'{java_module}.{alias.name}'):
                         imports_java_package = True
-                    else:
+                    elif not self._imports_compiled_python_class(java_module, alias.name):
                         self.validation_errors.append(self._java_io_import_error(node.module, java_module, alias))
 
         if transformed_any and not imports_java_package:
@@ -393,6 +393,15 @@ class MicronautTransformer(ast.NodeTransformer):
                 if decorator_code:
                     self.transformed_code.append(decorator_code)
         return True
+
+    def _imports_compiled_python_class(self, java_module: str, import_name: str) -> bool:
+        """
+        Whether ``from <java_module> import <import_name>`` names the class generated for a Python class of
+        another compilation (another source root, or a library): the import refers to the Python class at
+        run time, so it stays a Python import and is not an unresolved Java import.
+        """
+        class_element = self._lookup_imported_class_element(java_module, import_name)
+        return class_element is not None and _JavaTypes.isPythonClass(class_element)
 
     def _java_io_import_error(self, python_module: str, java_module: str, alias) -> str:
         """
