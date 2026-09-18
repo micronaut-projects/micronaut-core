@@ -800,6 +800,20 @@ public final class PythonCoercion {
     }
 
     /**
+     * Complete a future with the first item of a publisher: the publisher is subscribed to, a single
+     * item is requested and the subscription is cancelled once it arrives; an empty publisher
+     * completes the future with {@code null}.
+     *
+     * @param publisher The publisher
+     * @return The future completed by the publisher
+     */
+    static PythonAsyncioRuntime.PythonCompletableFuture scalarFuture(Publisher<?> publisher) {
+        PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
+        publisher.subscribe(new ScalarPublisherSubscriber(future));
+        return future;
+    }
+
+    /**
      * Scalar reactive await bridge. It requests a single item, completes with the first value, and cancels upstream.
      */
     private static final class ScalarPublisherSubscriber implements Subscriber<Object> {
@@ -953,9 +967,7 @@ public final class PythonCoercion {
             } catch (RuntimeException e) {
                 return null;
             }
-            PythonAsyncioRuntime.PythonCompletableFuture future = new PythonAsyncioRuntime.PythonCompletableFuture();
-            publisher.subscribe(new ScalarPublisherSubscriber(future));
-            return future;
+            return scalarFuture(publisher);
         }
     }
 }
