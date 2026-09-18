@@ -194,15 +194,14 @@ public final class PythonInterfaceDefaults {
             Object[] converted = null;
             RuntimeException conversionFailure = null;
             for (Method candidate : overloads) {
-                if (candidate.getParameterCount() != argumentCount) {
-                    continue;
-                }
-                try {
-                    converted = convertArguments(candidate, values);
-                    method = candidate;
-                    break;
-                } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException | PolyglotException e) {
-                    conversionFailure = e;
+                if (candidate.getParameterCount() == argumentCount) {
+                    try {
+                        converted = convertArguments(candidate, values);
+                        method = candidate;
+                        break;
+                    } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException | PolyglotException e) {
+                        conversionFailure = e;
+                    }
                 }
             }
             if (method == null) {
