@@ -93,6 +93,7 @@ final class GraalPyHostAccessFactory {
         registerObjectMapping(builder, pythonClassResolver);
         registerStandardLibraryMappings(builder);
         registerSequenceMappings(builder);
+        PythonCallables.registerStandardInterfaces(builder);
         return builder.build();
     }
 
@@ -347,11 +348,10 @@ final class GraalPyHostAccessFactory {
 
     private static @Nullable Class<?> resolvePythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
         try {
-            if (value != null && !value.isNull() && value.hasMembers()
-                && value.hasMember("_target") && value.hasMember("_resolved")) {
+            if (value != null && !value.isNull() && value.hasMembers() && value.hasMember("_target")) {
                 Value target = value.getMember("_target");
                 if (target != null && target.isString()) {
-                    target = value.invokeMember("_resolved");
+                    target = value.hasMember("_resolved") ? value.invokeMember("_resolved") : null;
                 }
                 if (target != null && !target.isNull()) {
                     Class<?> facadeTarget = target.as(Class.class);
