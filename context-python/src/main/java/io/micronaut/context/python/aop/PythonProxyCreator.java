@@ -28,12 +28,12 @@ import io.micronaut.context.python.PythonContextRuntime;
 import io.micronaut.context.python.PythonCoercion;
 import io.micronaut.context.python.PythonConversion;
 import io.micronaut.context.python.PythonInvocation;
+import io.micronaut.context.python.PythonPublishers;
 import io.micronaut.context.python.PythonAsyncioRuntime;
 import io.micronaut.context.python.TargetTypeMapping;
 import io.micronaut.context.python.ValueCoercible;
 import io.micronaut.context.python.ValueCoercibles;
 import io.micronaut.context.python.annotation.PythonClass;
-import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
@@ -602,7 +602,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             case Stream<?> stream -> stream.map(value -> unbox(context, value));
             case Optional<?> optional -> optional.map(value -> unbox(context, value));
             case CompletionStage<?> completionStage -> completionStage;
-            case Publisher<?> publisher -> Publishers.map(publisher, value -> unbox(context, value));
+            case Publisher<?> publisher -> PythonPublishers.map(publisher, value -> unbox(context, value));
             default -> result;
         };
     }
