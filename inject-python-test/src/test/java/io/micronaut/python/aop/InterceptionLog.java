@@ -31,7 +31,7 @@ public final class InterceptionLog {
         METHODS.clear();
     }
 
-    public static void record(String methodName) {
+    public static void recordInterception(String methodName) {
         METHODS.add(methodName);
     }
 
