@@ -26,9 +26,13 @@ import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.ElementFactory;
 import io.micronaut.inject.ast.PackageElement;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadataFactory;
+import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.ClassWriterOutputVisitor;
 import io.micronaut.inject.writer.GeneratedFile;
+import io.micronaut.sourcegen.model.ObjectDef;
 
+import java.io.IOException;
+import java.io.OutputStream;
 import java.lang.annotation.RetentionPolicy;
 import java.net.URI;
 import java.net.URL;
@@ -387,6 +391,23 @@ public interface VisitorContext extends MutableConvertibleValues<Object>, ClassW
     @Experimental
     default void addGeneratedResource(String resource) {
         info("EXPERIMENTAL: Compile time resource contribution to the context is experimental", null);
+    }
+
+    /**
+     * Writes the given object definition. The default implementation generates bytecode directly using
+     * {@code sourcegen-bytecode-writer}. Language specific implementations may override this to use a different
+     * {@code SourceGenerator}, for example one that writes actual source code.
+     *
+     * @param objectDef            The object definition to write
+     * @param originatingElements  The originating elements
+     * @throws IOException If an error occurs writing the class
+     * @since 5.2
+     */
+    @Internal
+    default void visitObjectDef(ObjectDef objectDef, Element... originatingElements) throws IOException {
+        try (OutputStream outputStream = visitClass(objectDef.getName(), originatingElements)) {
+            outputStream.write(ByteCodeWriterUtils.writeByteCode(objectDef, this));
+        }
     }
 
     /**
