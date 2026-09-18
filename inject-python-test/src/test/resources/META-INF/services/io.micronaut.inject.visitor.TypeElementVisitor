@@ -23,3 +23,4 @@ io.micronaut.python.annotation.processing.test.annotate.InheritedParameterAnnota
 io.micronaut.python.compiler.FailingTypeElementVisitor
 io.micronaut.python.annotation.processing.test.PythonAnnotationElementSpec$InheritedVisitor
 io.micronaut.python.annotation.processing.test.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
+io.micronaut.python.annotation.processing.test.ProduceBeansSpec$ProducerModuleVisitor

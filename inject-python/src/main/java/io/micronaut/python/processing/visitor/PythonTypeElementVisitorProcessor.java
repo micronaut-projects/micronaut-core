@@ -52,7 +52,9 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
@@ -180,15 +182,68 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
+        // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
+        // the producer methods of the associated beans a visitor registers in visitClass or in its own finish
+        // are bridged into the stubs before they are written
+        LoadedVisitor stubGeneratorVisitor = findStubGeneratorVisitor();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().finish(pythonVisitorContext);
-            } catch (Throwable e) {
-                failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+            if (loadedVisitor != stubGeneratorVisitor) {
+                finishVisitor(loadedVisitor, pythonVisitorContext);
             }
         }
+        List<AbstractBeanDefinitionBuilder> associatedBeanBuilders = new ArrayList<>();
         if (writeAssociatedBeans) {
-            writeAssociatedBeanDefinitions(pythonVisitorContext);
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            if (stubGeneratorVisitor != null) {
+                bridgeProducerMethods((PythonStubGenerator) stubGeneratorVisitor.getVisitor(), associatedBeanBuilders, pythonVisitorContext);
+            }
+        }
+        if (stubGeneratorVisitor != null) {
+            finishVisitor(stubGeneratorVisitor, pythonVisitorContext);
+        }
+        if (writeAssociatedBeans) {
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            writeAssociatedBeanDefinitions(pythonVisitorContext, associatedBeanBuilders);
+        }
+    }
+
+    private void finishVisitor(LoadedVisitor loadedVisitor, PythonVisitorContext pythonVisitorContext) {
+        try {
+            loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        } catch (Throwable e) {
+            failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+        }
+    }
+
+    private @Nullable LoadedVisitor findStubGeneratorVisitor() {
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor() instanceof PythonStubGenerator) {
+                return loadedVisitor;
+            }
+        }
+        return null;
+    }
+
+    private static List<AbstractBeanDefinitionBuilder> takeAssociatedBeanBuilders(PythonVisitorContext pythonVisitorContext) {
+        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return List.of();
+        }
+        return javaVisitorContext.getBeanElementBuilders();
+    }
+
+    /**
+     * A child bean produced with {@code BeanElementBuilder.produceBeans(...)} invokes its producer method on the
+     * bean type, which for a Python class is the generated Java stub. The stub only bridges the Python methods
+     * Micronaut needs to see, so the producer methods of the associated beans are bridged explicitly.
+     */
+    private static void bridgeProducerMethods(PythonStubGenerator stubGenerator, List<AbstractBeanDefinitionBuilder> beanElementBuilders, PythonVisitorContext pythonVisitorContext) {
+        for (AbstractBeanDefinitionBuilder beanElementBuilder : beanElementBuilders) {
+            for (AbstractBeanDefinitionBuilder childBean : beanElementBuilder.getChildBeans()) {
+                if (childBean.getProducingElement() instanceof PythonMethodElement producerMethod) {
+                    stubGenerator.bridgeProducerMethod(producerMethod, pythonVisitorContext);
+                }
+            }
         }
     }
 
@@ -319,12 +374,7 @@ public final class PythonTypeElementVisitorProcessor {
         );
     }
 
-    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
-        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
-        if (javaVisitorContext == null) {
-            return;
-        }
-        List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext, List<AbstractBeanDefinitionBuilder> beanElementBuilders) {
         if (beanElementBuilders.isEmpty()) {
             return;
         }
