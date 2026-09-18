@@ -410,6 +410,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * Emits the property, snapshot and Python value fields of a class stub.
      */
+    @SuppressWarnings("java:S107") // the flags describe the generated state fields; a state record would obscure the call sites
     private StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean isJunit5Test, boolean hasDynamicBeanProperties, VisitorContext context) {
         Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
         // Last value written to the Python object for every property. The generated
@@ -2899,11 +2900,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
-            if (!isCopiedRuntimeAnnotation(annotationName, declaration, visitorContext)) {
-                continue;
-            }
             AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
-            if (av == null) {
+            if (!isCopiedRuntimeAnnotation(annotationName, declaration, visitorContext) || av == null) {
                 continue;
             }
             try {
@@ -2942,27 +2940,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (Map.Entry<CharSequence, Object> entry : annotation.getValues().entrySet()) {
             String memberName = entry.getKey().toString();
             ClassElement memberType = memberTypes.get(memberName);
+            boolean copyMember = true;
             if (memberType == null) {
                 // A mapper added the member: it is served by the annotation metadata, not the annotation type
                 context.warn("The " + memberDescription(annotationName, memberName) + " is not declared by the annotation type"
                     + " and is not copied onto the generated Java declaration of [" + element.getName() + "]", element);
-                continue;
+                copyMember = false;
             }
-            Object value;
-            try {
-                value = reflectiveMemberValue(annotationName, memberName, entry.getValue(), memberType, element, context);
-            } catch (UnrepresentableAnnotationException e) {
-                if (!defaultedMembers.contains(memberName)) {
-                    throw e;
+            Object value = null;
+            if (copyMember) {
+                try {
+                    value = reflectiveMemberValue(annotationName, memberName, entry.getValue(), memberType, element, context);
+                } catch (UnrepresentableAnnotationException e) {
+                    if (!defaultedMembers.contains(memberName)) {
+                        throw e;
+                    }
+                    context.warn("The " + memberDescription(annotationName, memberName) + " keeps its default on the generated Java declaration of ["
+                        + element.getName() + "], reflection-based frameworks will not see its value: " + e.getMessage(), element);
+                    copyMember = false;
                 }
-                context.warn("The " + memberDescription(annotationName, memberName) + " keeps its default on the generated Java declaration of ["
-                    + element.getName() + "], reflection-based frameworks will not see its value: " + e.getMessage(), element);
-                continue;
             }
-            if (value instanceof Collection<?> collection) {
-                builder.addMember(memberName, new ArrayList<Object>(collection));
-            } else {
-                builder.addMember(memberName, value);
+            if (copyMember) {
+                if (value instanceof Collection<?> collection) {
+                    builder.addMember(memberName, new ArrayList<>(collection));
+                } else {
+                    builder.addMember(memberName, value);
+                }
             }
         }
         return builder.build();
@@ -3002,7 +3005,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return primitiveMemberValue(annotationName, memberName, value, memberType);
         }
         if (Class.class.getName().equals(typeName)) {
-            String className = value instanceof AnnotationClassValue<?> classValue ? classValue.getName() : value instanceof CharSequence ? value.toString() : null;
+            String className;
+            if (value instanceof AnnotationClassValue<?> classValue) {
+                className = classValue.getName();
+            } else if (value instanceof CharSequence) {
+                className = value.toString();
+            } else {
+                className = null;
+            }
             if (className != null) {
                 ClassElement type = context.getClassElement(className).orElse(null);
                 if (type != null) {
@@ -3012,7 +3022,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             throw unrepresentable(annotationName, memberName, value, memberType);
         }
         if (memberType.isEnum()) {
-            String constantName = value instanceof Enum<?> enumValue ? enumValue.name() : value instanceof CharSequence ? value.toString() : null;
+            String constantName;
+            if (value instanceof Enum<?> enumValue) {
+                constantName = enumValue.name();
+            } else if (value instanceof CharSequence) {
+                constantName = value.toString();
+            } else {
+                constantName = null;
+            }
             boolean known = constantName != null && (memberType instanceof EnumElement enumElement
                 ? enumElement.values().contains(constantName)
                 : javax.lang.model.SourceVersion.isIdentifier(constantName));

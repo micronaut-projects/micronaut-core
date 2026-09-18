@@ -34,8 +34,6 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testRuntimeOnly(libs.apiguardian)
-
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
     testImplementation("io.micronaut.data:micronaut-data-processor") {
@@ -55,6 +53,7 @@ dependencies {
     testImplementation("com.h2database:h2")
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     testImplementation(libs.managed.snakeyaml)
+    testRuntimeOnly(libs.apiguardian)
 }
 
 tasks.withType<Test>().configureEach {
