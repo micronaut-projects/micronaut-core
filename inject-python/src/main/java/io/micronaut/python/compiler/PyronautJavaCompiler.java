@@ -1028,6 +1028,16 @@ final class PyronautJavaCompiler {
         return classLoader;
     }
 
+    private static void closeClassLoader(ClassLoader classLoader) {
+        if (classLoader instanceof URLClassLoader urlClassLoader) {
+            try {
+                urlClassLoader.close();
+            } catch (IOException ignored) {
+                // Nothing useful can be done while releasing a compiler class loader.
+            }
+        }
+    }
+
     /**
      * Keeps application annotation processors isolated from processors bundled
      * with the launcher. Micronaut Data discovers its method matchers through
@@ -1063,16 +1073,6 @@ final class PyronautJavaCompiler {
                     resolveClass(loaded);
                 }
                 return loaded;
-            }
-        }
-    }
-
-    private static void closeClassLoader(ClassLoader classLoader) {
-        if (classLoader instanceof URLClassLoader urlClassLoader) {
-            try {
-                urlClassLoader.close();
-            } catch (IOException ignored) {
-                // Nothing useful can be done while releasing a compiler class loader.
             }
         }
     }
