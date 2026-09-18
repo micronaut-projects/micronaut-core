@@ -390,14 +390,15 @@ final class DefaultEnvironmentAndPackageDeducer implements EnvironmentNamesDeduc
         try {
             //Read out dir output
             InputStream is = process.getInputStream();
-            InputStreamReader isr = new InputStreamReader(is);
-            BufferedReader br = new BufferedReader(isr);
-            String line;
-            while ((line = br.readLine()) != null) {
-                stdout.append(line);
+            try (InputStreamReader isr = new InputStreamReader(is)) {
+                BufferedReader br = new BufferedReader(isr);
+                String line;
+                while ((line = br.readLine()) != null) {
+                    stdout.append(line);
+                }
+                } catch (IOException e) {
+                // ignore
             }
-        } catch (IOException e) {
-            // ignore
         }
 
         return stdout;
