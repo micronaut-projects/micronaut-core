@@ -1,4 +1,4 @@
-import io.micronaut.build.internal.python.PythonVfsBytecodeCompile
+import io.micronaut.build.python.PythonVfsBytecodeCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-library")

@@ -1,7 +1,14 @@
 plugins {
     id("io.micronaut.build.internal.convention-base")
-    id("io.micronaut.build.internal.python")
+    id("io.micronaut.build.internal.convention-python")
     id("me.champeau.jmh") version "0.7.3"
+}
+
+micronautBuild {
+    python {
+        // the benchmark tests are part of the regular CI, not of the Python CI
+        testsEnabled = true
+    }
 }
 
 dependencies {

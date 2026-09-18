@@ -1,0 +1,16 @@
+// Applies the shared Python compiler plugin, using the compiler built by this repository
+// instead of the published one.
+plugins {
+    id 'io.micronaut.build.internal.python'
+}
+
+micronautBuild {
+    python {
+        compilerVersion = ''
+    }
+}
+
+dependencies {
+    pyronautCompiler(projects.micronautInjectPython)
+    pyronautCompiler(projects.micronautContextPython)
+}
