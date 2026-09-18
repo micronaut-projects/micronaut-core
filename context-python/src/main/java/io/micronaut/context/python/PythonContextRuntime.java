@@ -263,7 +263,7 @@ public final class PythonContextRuntime {
         return runtime == null ? null : runtime.pooledExecutorServiceProvider();
     }
 
-    private static <T> T withContextClassLoader(Supplier<T> action) {
+    static <T> T withContextClassLoader(Supplier<T> action) {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
         return runtime == null ? action.get() : runtime.withContextClassLoader(action);
     }
