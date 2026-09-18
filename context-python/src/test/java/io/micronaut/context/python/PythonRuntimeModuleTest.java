@@ -9,6 +9,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.LockSupport;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,7 +93,7 @@ final class PythonRuntimeModuleTest {
                         long delay = i * 100L;
                         String helper = i % 2 == 0 ? "__micronaut_import_module" : HELPERS.get(i % HELPERS.size());
                         resolved.add(executor.submit(() -> {
-                            Thread.sleep(delay);
+                            LockSupport.parkNanos(TimeUnit.MILLISECONDS.toNanos(delay));
                             return PythonContextRuntime.helper(context, helper);
                         }));
                     }
