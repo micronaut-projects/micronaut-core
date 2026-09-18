@@ -78,25 +78,43 @@ public class EnvironmentEndpoint {
     }
 
     /**
-     * Gets the keys to be displayed by the environment endpoint.
-     * Defaults to ["activeEnvironments", "packages", "propertySources"] if not configured.
-     * Configurable via {@code endpoints.env.active-keys}.
-     *
-     * @return The list of active sections.
-     */
-    public List<String> getActiveKeys() {
-        return activeKeys;
-    }
-
-    /**
-     * Sets the sections to be displayed by the environment endpoint.
-     * Example: {@code endpoints.env.active-keys=activeEnvironments,packages}
-     *
-     * @param activeKeys The list of sections. If an empty list is provided, no sections will be displayed.
-     */
-    public void setActiveKeys(List<String> activeKeys) {
-        this.activeKeys = activeKeys;
-    }
+      * Gets the keys to be displayed by the environment endpoint.
+      * Defaults to ["activeEnvironments", "packages", "propertySources"] if not configured.
+      * Configurable via {@code endpoints.env.active-keys} or {@code endpoints.env.keys}.
+      *
+      * @return The list of active sections.
+      */
+     public List<String> getActiveKeys() {
+         return activeKeys;
+     }
+ 
+     /**
+      * Alias accessor for configuration binding from {@code endpoints.env.keys}.
+      *
+      * @return The list of active sections.
+      */
+     public List<String> getKeys() {
+         return getActiveKeys();
+     }
+ 
+     /**
+      * Sets the sections to be displayed by the environment endpoint.
+      * Example: {@code endpoints.env.active-keys=activeEnvironments,packages}
+      *
+      * @param activeKeys The list of sections. If an empty list is provided, no sections will be displayed.
+      */
+     public void setActiveKeys(List<String> activeKeys) {
+         this.activeKeys = activeKeys;
+     }
+ 
+     /**
+      * Alias mutator for configuration binding from {@code endpoints.env.keys}.
+      *
+      * @param keys The list of sections. If an empty list is provided, no sections will be displayed.
+      */
+     public void setKeys(List<String> keys) {
+         setActiveKeys(keys);
+     }
 
     /**
      * @return The environment information as a map with the following keys: activeEnvironments, packages and
