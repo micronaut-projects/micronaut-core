@@ -15,6 +15,7 @@
  */
 package io.micronaut.scheduling.processor;
 
+import io.micronaut.aop.ScheduledInvocation;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.bind.DefaultExecutableBeanContextBinder;
 import io.micronaut.context.bind.ExecutableBeanContextBinder;
@@ -143,7 +144,7 @@ public class ScheduledMethodProcessor implements ExecutableMethodProcessor<Sched
                     boolean shouldRun = finalAnnotationValue.booleanValue(MEMBER_CONDITION).orElse(true);
                     if (shouldRun) {
                         try {
-                            boundExecutable.invoke(bean);
+                            ScheduledInvocation.invoke(method, bean, boundExecutable.getBoundArguments());
                         } catch (Throwable e) {
                             handleException(beanDefinition.getBeanType(), bean, e);
                         }
