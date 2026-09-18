@@ -171,6 +171,8 @@ final class GraalPyContextFactoryTest {
 
     public static final class KeywordLiteral {
         public final String from = "really from";
+        // Deliberately keeps the keyword-suffixed name to verify that a real member wins over the alias.
+        @SuppressWarnings("java:S116")
         public final String from_ = "really from_";
     }
 
