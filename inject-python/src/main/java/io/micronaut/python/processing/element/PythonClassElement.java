@@ -237,9 +237,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         }
 
         // Fall back to regular constructor
-        Optional<MethodElement> constructor = findConstructor();
-        if (constructor.isPresent()) {
-            return constructor;
+        Optional<MethodElement> primaryConstructor = findConstructor();
+        if (primaryConstructor.isPresent()) {
+            return primaryConstructor;
         }
         // A class that neither declares nor inherits __init__ is constructed without arguments. Report that
         // implicit constructor like the Java model reports the implicit default constructor of a Java class, so
@@ -270,9 +270,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
      * @return The constructor, if the class declares or inherits one
      */
     private Optional<MethodElement> findConstructor() {
-        FunctionDef constructor = declaredConstructor();
-        if (constructor != null) {
-            return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
+        FunctionDef declaredConstructor = declaredConstructor();
+        if (declaredConstructor != null) {
+            return Optional.of(new PythonConstructorElement(declaredConstructor, environment, this, this, environment.metadataFactory()));
         }
         for (PythonClassElement pythonSuperType : inheritedPythonClasses()) {
             FunctionDef inheritedConstructor = pythonSuperType.declaredConstructor();
