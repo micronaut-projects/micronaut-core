@@ -21,14 +21,10 @@ import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -59,6 +55,10 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
      * needs; each interception point filters it again by its own binding and kind. Resolving once is what lets a
      * non-singleton interceptor be shared by every phase of one bean.</p>
      *
+     * <p>When this bean is the target of a proxy with {@code proxyTarget = true}, the non-singleton interceptor
+     * instances the proxy was constructed with are selected instead of new ones, so that the proxy's method calls
+     * share them too.</p>
+     *
      * <p>Override to supply the set another way. Returning {@code null} leaves each interception point to resolve its
      * own, which is the behaviour of a bean that declares no interceptor binding at all.</p>
      *
@@ -72,14 +72,7 @@ public interface InterceptedBeanDefinition<T> extends InstantiatableBeanDefiniti
                                                                                    AnnotationMetadataProvider constructor) {
         // The constructor already exposes this bean's metadata combined with the constructor's, so use it rather
         // than building a second hierarchy around it on every bean creation.
-        AnnotationMetadata metadata = constructor.getAnnotationMetadata();
-        if (metadata.getAnnotationValuesByName(AnnotationUtil.ANN_INTERCEPTOR_BINDING).isEmpty()) {
-            return null;
-        }
-        return new ArrayList(resolutionContext.getBeanRegistrations(
-            Interceptor.ARGUMENT,
-            Qualifiers.byInterceptorBinding(metadata)
-        ));
+        return SharedInterceptorRegistrations.resolve(resolutionContext, this, constructor.getAnnotationMetadata());
     }
 
     @Override

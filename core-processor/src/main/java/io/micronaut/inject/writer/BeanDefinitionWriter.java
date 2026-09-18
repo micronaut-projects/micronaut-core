@@ -581,7 +581,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_QUALIFIER_BY_TYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class);
 
-    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory");
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory", Object.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
@@ -2224,7 +2224,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 getQualifier(factoryClass, argumentExpression)
             ).cast(factoryTypeDef).newLocal("factoryBean");
         additionalStatements.add(defineAndAssign);
-        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY));
+        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY, defineAndAssign.variable()));
         return defineAndAssign.variable();
     }
 
