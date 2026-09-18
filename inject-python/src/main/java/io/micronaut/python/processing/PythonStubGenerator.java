@@ -2563,16 +2563,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         int index = 0;
         for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
             GenericPlaceholderElement placeholder = placeholderFor(declaredPlaceholders, entry.getKey(), index++);
-            if (placeholder == null) {
-                continue;
-            }
-            ClassElement typeArgument = entry.getValue();
-            if (!isDeclaredPlaceholderArgument(typeArgument, placeholder) && !isObjectType(typeArgument)) {
-                continue;
-            }
-            ClassElement bound = firstBound(placeholder);
-            if (referencesRawType(bound, rawTypeName, new HashSet<>()) || referencesPlaceholder(bound, placeholder, new HashSet<>())) {
-                return true;
+            if (placeholder != null) {
+                ClassElement typeArgument = entry.getValue();
+                if (isDeclaredPlaceholderArgument(typeArgument, placeholder) || isObjectType(typeArgument)) {
+                    ClassElement bound = firstBound(placeholder);
+                    if (referencesRawType(bound, rawTypeName, new HashSet<>()) || referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+                        return true;
+                    }
+                }
             }
         }
         return false;
