@@ -352,9 +352,13 @@ public abstract class HttpClientConfiguration {
     /**
      * Obtains the connection pool configuration.
      *
-     * @return The connection pool configuration.
+     * Subclasses may override to provide a specific ConnectionPoolConfiguration instance.
+     *
+     * @return The connection pool configuration. Defaults to a new ConnectionPoolConfiguration instance.
      */
-    public abstract ConnectionPoolConfiguration getConnectionPoolConfiguration();
+    public ConnectionPoolConfiguration getConnectionPoolConfiguration() {
+        return new ConnectionPoolConfiguration();
+    }
 
     /**
      * @return The {@link SslConfiguration} for the client
