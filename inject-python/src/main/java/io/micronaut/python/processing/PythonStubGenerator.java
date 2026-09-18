@@ -440,36 +440,33 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             Set<MethodElement> methodSet = new LinkedHashSet<>();
             for (int i = 0; i < methods.size(); i++) {
                 MethodElement method = methods.get(i);
-                if (methodSet.contains(method)) {
-                    continue;
+                if (!methodSet.contains(method)) {
+                    MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
+                    MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
+                    MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
+                    if (!(method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod))) {
+                        if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
+                            isAopProxy = true;
+                        }
+                        ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
+                        if (returnTypeOverride == null && bridgeMethod != interfaceMethod) {
+                            returnTypeOverride = resolveDeclaredBridgeReturnType(bridgeMethod, interfaceMethod);
+                        }
+                        // The generated Java stub must implement the Java interface signature,
+                        // not the Python source annotation signature. Python annotations are
+                        // often raw while Java interfaces may declare parameterized or wildcard
+                        // forms. Use the raw declaring method as the source signature and apply
+                        // the resolved interface arguments separately; using the already-resolved
+                        // method would collapse method variables such as CrudRepository's
+                        // <S extends E> into the entity type and produce same-erasure methods
+                        // that fail to override.
+                        Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
+                        addBridgeMethod(
+                            BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments),
+                            builder, context, addedMethodNames);
+                    }
+                    methodSet.add(method);
                 }
-                MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
-                MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
-                MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
-                if (method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod)) {
-                    // A default method the Python class does not override keeps its Java implementation.
-                    continue;
-                }
-                if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
-                    isAopProxy = true;
-                }
-                ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
-                if (returnTypeOverride == null && bridgeMethod != interfaceMethod) {
-                    returnTypeOverride = resolveDeclaredBridgeReturnType(bridgeMethod, interfaceMethod);
-                }
-                // The generated Java stub must implement the Java interface signature,
-                // not the Python source annotation signature. Python annotations are
-                // often raw while Java interfaces may declare parameterized or wildcard
-                // forms. Use the raw declaring method as the source signature and apply
-                // the resolved interface arguments separately; using the already-resolved
-                // method would collapse method variables such as CrudRepository's
-                // <S extends E> into the entity type and produce same-erasure methods
-                // that fail to override.
-                Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
-                addBridgeMethod(
-                    BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments),
-                    builder, context, addedMethodNames);
-                methodSet.add(method);
             }
         }
         if (extendsHostClass) {

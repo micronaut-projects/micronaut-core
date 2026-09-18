@@ -20,11 +20,11 @@ import java.util.Optional;
 /**
  * A repository style interface whose id parameter resolves to a boxed type.
  */
-public interface BoxedIdRepository<E, ID> {
+public interface BoxedIdRepository<E, I> {
 
-    Optional<E> findById(ID id);
+    Optional<E> findById(I id);
 
-    void deleteById(ID id);
+    void deleteById(I id);
 
     long count();
 }
