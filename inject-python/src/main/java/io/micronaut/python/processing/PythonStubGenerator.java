@@ -960,7 +960,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     statements.add((StatementDef) methodParameters.get(1).invoke("finished", TypeDef.VOID));
                     statements.add(aThis.field(pythonValueField(model)).assign(value));
                     if (isIntrospectedBean) {
-                        statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields, isFrozenPythonDataclass(model.element())));
+                        statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields));
                     }
                     statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
                     return StatementDef.multi(statements);
@@ -3617,7 +3617,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
                     if (av != null) {
                         try {
-                            builder.addAnnotation(reflectiveAnnotationDef(av, visitorContext));
+                            builder.addAnnotation(reflectiveAnnotationDef(av, element, visitorContext));
                         } catch (UnrepresentableAnnotationException e) {
                             visitorContext.warn("Annotation @" + annotationName + " of the test base is not copied onto ["
                                 + element.getName() + "]: " + e.getMessage(), element);
