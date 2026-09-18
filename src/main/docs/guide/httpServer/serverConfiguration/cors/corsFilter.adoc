@@ -1,0 +1,27 @@
+All server-side CORS processing is performed by a single filter, api:http.server.cors.CorsFilter[]. Unlike `micronaut.server.cors.enabled`, which is `false` by default, the filter itself is *enabled by default*, because it also serves routes that declare CORS rules with the ann:http.server.cors.CrossOrigin[] annotation.
+
+To remove the filter entirely, set `micronaut.server.cors.filter.enabled` to `false`:
+
+.Disabling the CORS Filter
+[configuration]
+----
+micronaut:
+  server:
+    cors:
+      filter:
+        enabled: false
+----
+
+The two properties control different things:
+
+|===
+|Property |Default |Effect
+
+|`micronaut.server.cors.enabled`
+|`false`
+|Enables the server-wide CORS <<corsConfiguration, configurations>>. When `false`, routes annotated with ann:http.server.cors.CrossOrigin[] are still processed.
+
+|`micronaut.server.cors.filter.enabled`
+|`true`
+|Registers the api:http.server.cors.CorsFilter[] bean. When `false`, no CORS processing takes place at all, including <<annotationBasedCors, annotation-based configuration>>.
+|===
