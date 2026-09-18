@@ -197,8 +197,20 @@ public final class PythonContextRuntime {
 
     /**
      * Whether generated calls must use the primary context: no pool is registered or the context is reused.
+     * The runtime is installed on demand first, so a pooled entry point reached before the runtime exists
+     * routes to the pool once the application has configured one.
      */
     private static boolean usePrimaryContext() {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.require();
+        return runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
+    }
+
+    /**
+     * Whether an entry point that already holds a context must use that context instead of the pool:
+     * no runtime is installed yet (the caller may run while the context bean is still being built),
+     * no pool is registered or the context is reused.
+     */
+    private static boolean useGivenContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
         return runtime == null || runtime.pool() == null || PythonApplicationRuntime.isReuseContext();
     }
@@ -463,7 +475,7 @@ public final class PythonContextRuntime {
     public static Value findPooledClass(PythonClassReference classReference, Context context) {
         // the caller owns the context (a borrowed pooled context, its loop's context); the load is
         // still counted as an execution so a close waits for it
-        return PythonContextRegistry.withExecutionFrame(context, () -> usePrimaryContext()
+        return PythonContextRegistry.withExecutionFrame(context, () -> useGivenContext()
             ? findClass(classReference, context)
             : getPythonPool().getClass(context, classReference));
     }
@@ -527,7 +539,7 @@ public final class PythonContextRuntime {
      */
     @UsedByGeneratedCode
     public static Value findPooledScript(String packageName, String scriptName, Context context) {
-        return PythonContextRegistry.withExecutionFrame(context, () -> usePrimaryContext()
+        return PythonContextRegistry.withExecutionFrame(context, () -> useGivenContext()
             ? findScript(packageName, scriptName, context)
             : getPythonPool().getScript(context, packageName, scriptName));
     }
