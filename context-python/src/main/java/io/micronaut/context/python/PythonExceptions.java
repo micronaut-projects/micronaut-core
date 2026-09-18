@@ -160,7 +160,7 @@ public final class PythonExceptions {
         return str.execute(value).asString();
     }
 
-    private static @Nullable Value arguments(Value exception) {
+    private static @Nullable Value arguments(@Nullable Value exception) {
         if (exception == null || !exception.hasMembers() || !exception.hasMember(ARGS)) {
             return null;
         }
