@@ -34,8 +34,6 @@ dependencies {
     }
     testImplementation(libs.junit.jupiter.api)
     testImplementation(libs.junit.jupiter.params)
-    testRuntimeOnly(libs.apiguardian)
-
     testImplementation(platform(libs.test.boms.micronaut.data))
     testImplementation(platform(libs.test.boms.micronaut.sql))
     testImplementation("io.micronaut.data:micronaut-data-processor") {
@@ -48,13 +46,21 @@ dependencies {
         exclude(group = "io.micronaut")
     }
     testImplementation("io.micronaut.sql:micronaut-jdbc-hikari")
+    testImplementation("io.micronaut.sql:micronaut-hibernate-jpa")
+    testImplementation("io.micronaut.data:micronaut-data-hibernate-jpa") {
+        exclude(group = "io.micronaut")
+    }
     testImplementation("com.h2database:h2")
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     testImplementation(libs.managed.snakeyaml)
+    testRuntimeOnly(libs.apiguardian)
 }
 
 tasks.withType<Test>().configureEach {
     systemProperty("micronaut.python.pool.enabled", "false")
+    // Hibernate JPA is on the test classpath for the hibernate examples, which enable it with @Property;
+    // the other examples defining a DataSource must not get a SessionFactory.
+    systemProperty("jpa.enabled", "false")
     // Module tests use the default client; JIT warm-up under the parallel full-suite run exceeded the 10s default once.
     systemProperty("micronaut.http.client.read-timeout", "30s")
     // The asyncio context-isolation test compares IDs across pooled contexts.

@@ -265,6 +265,22 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return false;
     }
 
+    /**
+     * Whether the interface is implemented through an {@code @Introduction} of the class rather than
+     * declared as a base of the Python class. The proxy of the class implements its methods.
+     *
+     * @param anInterface The interface
+     * @return Whether it is an introduction interface
+     */
+    public boolean isIntroductionInterface(ClassElement anInterface) {
+        for (ClassElement introductionInterface : introductionInterfaces) {
+            if (introductionInterface.getName().equals(anInterface.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     @Override
     public Collection<ClassElement> getInterfaces() {
         List<TypeRef> bases = getNativeType().bases();

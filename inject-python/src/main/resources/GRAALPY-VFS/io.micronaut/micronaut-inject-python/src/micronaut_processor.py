@@ -21,6 +21,7 @@ PropertyDef = java.type("io.micronaut.python.processing.model.PropertyDef")
 DecoratorDef = java.type("io.micronaut.python.processing.model.DecoratorDef")
 ArgumentsDef = java.type("io.micronaut.python.processing.model.ArgumentsDef")
 ArgumentDef = java.type("io.micronaut.python.processing.model.ArgumentDef")
+DefaultFactoryDef = java.type("io.micronaut.python.processing.model.DefaultFactoryDef")
 ReturnDef = java.type("io.micronaut.python.processing.model.ReturnDef")
 TypeRef = java.type("io.micronaut.python.processing.model.TypeRef")
 ScriptDef = java.type("io.micronaut.python.processing.model.ScriptDef")
@@ -616,7 +617,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Only include attributes with type annotations (required for dataclass)
                         if attr.typeName() and attr.typeName() != "None":
                             # Create argument with same name as attribute
-                            default_value = attr.defaultFactoryName() if attr.defaultFactoryName() is not None else attr.value()
+                            # a default factory is called by Python: it is not a value the generated code can reproduce
+                            default_value = DefaultFactoryDef(attr.defaultFactoryName()) if attr.defaultFactoryName() is not None else attr.value()
                             arg_def = ArgumentDef.of(
                                 attr.name(),  # arg_name
                                 attr.annotation() or "",  # annotation

@@ -34,9 +34,12 @@ import javax.lang.model.type.DeclaredType;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Repeatable;
 import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.EnumSet;
+import java.util.HashSet;
 import java.util.List;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -114,6 +117,96 @@ public final class PythonAnnotationTypes {
         AnnotationMetadata metadata = classElement.getAnnotationMetadata();
         return !metadata.hasAnnotation(Target.class.getName())
             || contains(metadata.enumValues(Target.class.getName(), AnnotationMetadata.VALUE_MEMBER, ElementType.class));
+    }
+
+    /**
+     * The retention of the annotation type. Java keeps an annotation without {@code @Retention} in the
+     * class file only ({@link RetentionPolicy#CLASS}), so that is the answer when the element declares
+     * none.
+     *
+     * @param classElement The annotation element
+     * @return The retention policy
+     */
+    public static RetentionPolicy retentionPolicy(@Nullable ClassElement classElement) {
+        if (classElement == null) {
+            return RetentionPolicy.CLASS;
+        }
+        TypeElement typeElement = typeElement(classElement);
+        if (typeElement != null) {
+            Retention retention = typeElement.getAnnotation(Retention.class);
+            return retention == null ? RetentionPolicy.CLASS : retention.value();
+        }
+        if (classElement.getNativeType() instanceof Class<?> type) {
+            Retention retention = type.getAnnotation(Retention.class);
+            return retention == null ? RetentionPolicy.CLASS : retention.value();
+        }
+        return classElement.getAnnotationMetadata()
+            .enumValue(Retention.class.getName(), AnnotationMetadata.VALUE_MEMBER, RetentionPolicy.class)
+            .orElse(RetentionPolicy.CLASS);
+    }
+
+    /**
+     * Whether the annotation type may be placed on a declaration of the given kind. An annotation
+     * without {@code @Target} may be placed on every declaration; an explicit {@code @Target} has to
+     * name the declaration kind itself. {@link ElementType#TYPE_USE} is deliberately not treated as
+     * permitting a declaration: a type-use annotation belongs to the type, not the member.
+     *
+     * @param classElement The annotation element
+     * @param declaration The declaration kind ({@link ElementType#TYPE}, {@link ElementType#FIELD}, {@link ElementType#METHOD}, ...)
+     * @return Whether the annotation may be placed on such a declaration
+     */
+    public static boolean targetsDeclaration(@Nullable ClassElement classElement, ElementType declaration) {
+        if (classElement == null) {
+            return false;
+        }
+        TypeElement typeElement = typeElement(classElement);
+        if (typeElement != null) {
+            Target target = typeElement.getAnnotation(Target.class);
+            return target == null || contains(target.value(), declaration);
+        }
+        if (classElement.getNativeType() instanceof Class<?> type) {
+            Target target = type.getAnnotation(Target.class);
+            return target == null || contains(target.value(), declaration);
+        }
+        AnnotationMetadata metadata = classElement.getAnnotationMetadata();
+        return !metadata.hasAnnotation(Target.class.getName())
+            || contains(metadata.enumValues(Target.class.getName(), AnnotationMetadata.VALUE_MEMBER, ElementType.class), declaration);
+    }
+
+    /**
+     * The names of the members of the annotation type that declare a default value, read from the annotation
+     * type itself: the annotation metadata leaves out empty defaults, and the defaults of a Java annotation
+     * type are not resolvable through the metadata builder of the Python visitor context.
+     *
+     * @param classElement The annotation element
+     * @return The names of the members with a default
+     */
+    public static Set<String> defaultedMembers(@Nullable ClassElement classElement) {
+        if (classElement == null) {
+            return Set.of();
+        }
+        Set<String> members = new HashSet<>();
+        TypeElement typeElement = typeElement(classElement);
+        if (typeElement != null) {
+            for (Element enclosed : typeElement.getEnclosedElements()) {
+                if (enclosed instanceof ExecutableElement member && member.getDefaultValue() != null) {
+                    members.add(member.getSimpleName().toString());
+                }
+            }
+            return members;
+        }
+        if (classElement.getNativeType() instanceof Class<?> type) {
+            for (Method member : type.getDeclaredMethods()) {
+                if (member.getDefaultValue() != null) {
+                    members.add(member.getName());
+                }
+            }
+            return members;
+        }
+        for (CharSequence member : classElement.getAnnotationMetadata().getDefaultValues(classElement.getName()).keySet()) {
+            members.add(member.toString());
+        }
+        return members;
     }
 
     /**
@@ -265,8 +358,12 @@ public final class PythonAnnotationTypes {
     }
 
     private static boolean contains(ElementType[] targets) {
+        return contains(targets, ElementType.ANNOTATION_TYPE);
+    }
+
+    private static boolean contains(ElementType[] targets, ElementType expected) {
         for (ElementType target : targets) {
-            if (target == ElementType.ANNOTATION_TYPE) {
+            if (target == expected) {
                 return true;
             }
         }
