@@ -96,6 +96,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     static final String PYTHON_APPLICATION_ANNOTATION = "io.micronaut.context.python.annotation.PythonApplication";
     private static final String PYTHON_LANGUAGE = "python";
     private static final String RELATIVE_IMPORT_PREFIX = "from .";
+    private static final String IMPORT_SEPARATOR = " import ";
     /**
      * The Python facade of a Java type, defined in the package initializers that need it: it maps
      * keyword-safe member names ({@code with_}) to the Java member and lets a Python class list a
@@ -493,7 +494,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 List<String> types = entry.getValue();
                                 String moduleName = NameUtils.filename(entry.getKey().filename);
                                 for (String type : types) {
-                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(" import ").append(type).append('\n');
+                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(IMPORT_SEPARATOR).append(type).append('\n');
                                     if (!members.isEmpty()) {
                                         memberModules.append(", ");
                                     }
@@ -1134,7 +1135,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 } else {
                     writePythonToVfs(filesList, APPLICATION_SRC_PATH + packagePath + "/" + decoratorName + ".py", decorator.getValue(), originatingElement);
                 }
-                initContent.append(RELATIVE_IMPORT_PREFIX).append(decoratorName).append(" import ").append(decoratorName).append("\n");
+                initContent.append(RELATIVE_IMPORT_PREFIX).append(decoratorName).append(IMPORT_SEPARATOR).append(decoratorName).append("\n");
                 allNames.add(decoratorName);
             }
 
@@ -1145,7 +1146,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 String typeModule = childModule(packageName, typeName);
                 if (typeModules.containsKey(typeModule) && toPythonModuleName(javaClassImport.className()).equals(typeModule)) {
                     typeModuleClasses.put(typeModule, javaClassImport);
-                    initContent.append(RELATIVE_IMPORT_PREFIX).append(typeName).append(" import ").append(typeName).append("\n");
+                    initContent.append(RELATIVE_IMPORT_PREFIX).append(typeName).append(IMPORT_SEPARATOR).append(typeName).append("\n");
                 } else {
                     appendClassBinding(initContent, typeName, javaClassImport);
                 }
@@ -1158,7 +1159,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     String relativeSubPackage = subPackage.substring(packageName.length() + 1);
                     if (!relativeSubPackage.contains(".") && !allNames.contains(relativeSubPackage)) { // Direct child package
                         if (typeModules.containsKey(subPackage)) {
-                            initContent.append(RELATIVE_IMPORT_PREFIX).append(relativeSubPackage).append(" import ").append(relativeSubPackage).append("\n");
+                            initContent.append(RELATIVE_IMPORT_PREFIX).append(relativeSubPackage).append(IMPORT_SEPARATOR).append(relativeSubPackage).append("\n");
                         } else {
                             initContent.append("from . import ").append(relativeSubPackage).append("\n");
                         }
