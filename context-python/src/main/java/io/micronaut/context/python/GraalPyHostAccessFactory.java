@@ -595,36 +595,6 @@ final class GraalPyHostAccessFactory {
         return pythonClassResolver.findClass(moduleName, simpleName);
     }
 
-    /**
-     * The names the Java class generated for a Python class can have, given the module the class is
-     * defined in. The compiler places a class in the Java package named after the Python package of
-     * its module (the module itself when the class is defined in a package initializer) and puts the
-     * classes of a top-level module, and of the main script, in the {@code python} package.
-     *
-     * @param moduleName The Python module of the class, or {@code null} when unknown
-     * @param simpleName The qualified name of the class within its module
-     * @return The candidate class names, most specific first
-     */
-    private static List<String> generatedClassNames(@Nullable String moduleName, String simpleName) {
-        String generatedSimpleName = simpleName.replace('.', '$');
-        List<String> names = new ArrayList<>(3);
-        if (moduleName == null || moduleName.isBlank() || MAIN_MODULE.equals(moduleName)) {
-            names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
-            return names;
-        }
-        int packageSeparator = moduleName.lastIndexOf('.');
-        if (packageSeparator > 0) {
-            names.add(moduleName.substring(0, packageSeparator) + "." + generatedSimpleName);
-        } else {
-            names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
-        }
-        String packageInitializerName = moduleName + "." + generatedSimpleName;
-        if (!names.contains(packageInitializerName)) {
-            names.add(packageInitializerName);
-        }
-        return names;
-    }
-
     private static @Nullable String stringMember(Value value, String memberName) {
         if (!value.hasMember(memberName)) {
             return null;
@@ -704,6 +674,36 @@ final class GraalPyHostAccessFactory {
                 }
             }
             return uniqueMappingsBySimpleName.getOrDefault(key.simpleName(), Optional.empty()).orElse(null);
+        }
+
+        /**
+         * The names the Java class generated for a Python class can have, given the module the class is
+         * defined in. The compiler places a class in the Java package named after the Python package of
+         * its module (the module itself when the class is defined in a package initializer) and puts the
+         * classes of a top-level module, and of the main script, in the {@code python} package.
+         *
+         * @param moduleName The Python module of the class, or {@code null} when unknown
+         * @param simpleName The qualified name of the class within its module
+         * @return The candidate class names, most specific first
+         */
+        private static List<String> generatedClassNames(@Nullable String moduleName, String simpleName) {
+            String generatedSimpleName = simpleName.replace('.', '$');
+            List<String> names = new ArrayList<>(3);
+            if (moduleName == null || moduleName.isBlank() || MAIN_MODULE.equals(moduleName)) {
+                names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
+                return names;
+            }
+            int packageSeparator = moduleName.lastIndexOf('.');
+            if (packageSeparator > 0) {
+                names.add(moduleName.substring(0, packageSeparator) + "." + generatedSimpleName);
+            } else {
+                names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
+            }
+            String packageInitializerName = moduleName + "." + generatedSimpleName;
+            if (!names.contains(packageInitializerName)) {
+                names.add(packageInitializerName);
+            }
+            return names;
         }
 
         /**
