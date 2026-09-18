@@ -491,7 +491,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
                 .build();
             builder.addField(pythonValueSyncing);
-            if (pythonValue != null && !hasDynamicBeanProperties && ownershipMatters(beanProperties)) {
+            if (!hasDynamicBeanProperties && ownershipMatters(beanProperties)) {
                 // Set when the Python object is created from the Java fields (the wrapper was
                 // constructed from Java or loaded from storage): the fields own the state, and
                 // collections and nested objects are handed to Python by reference so Python

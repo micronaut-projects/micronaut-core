@@ -383,11 +383,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      */
     @Singleton
     PythonApplicationRuntime pythonRuntime(@Named(PYTHON) org.graalvm.polyglot.Context context) {
-        PythonApplicationRuntime runtime = providedContext ? PythonApplicationRuntime.current() : this.runtime.get();
-        if (runtime == null || !runtime.owns(context)) {
+        PythonApplicationRuntime applicationRuntime = providedContext ? PythonApplicationRuntime.current() : this.runtime.get();
+        if (applicationRuntime == null || !applicationRuntime.owns(context)) {
             throw new IllegalStateException("The Python runtime is not installed for the primary GraalPy context");
         }
-        return runtime;
+        return applicationRuntime;
     }
 
     /**
@@ -405,11 +405,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             return;
         }
         var ctx = event.getBean();
-        PythonApplicationRuntime runtime = this.runtime.get();
-        if (ctx == null || runtime == null || !runtime.owns(ctx) || !this.runtime.compareAndSet(runtime, null)) {
+        PythonApplicationRuntime installedRuntime = this.runtime.get();
+        if (installedRuntime == null || !installedRuntime.owns(ctx) || !this.runtime.compareAndSet(installedRuntime, null)) {
             return;
         }
-        PythonApplicationRuntime.uninstall(runtime);
+        PythonApplicationRuntime.uninstall(installedRuntime);
         PythonContextRegistry.closeWhenIdleAfterCurrentFrame(ctx, () -> closeContext(ctx));
     }
 
@@ -439,8 +439,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     @Override
     public CompletionStage<?> shutdownGracefully() {
-        PythonApplicationRuntime runtime = this.runtime.get();
-        Context ctx = runtime != null ? runtime.context() : null;
+        PythonApplicationRuntime applicationRuntime = this.runtime.get();
+        Context ctx = applicationRuntime != null ? applicationRuntime.context() : null;
         if (ctx == null || PythonContextRuntime.isReuseContext()) {
             gracefulShutdown.complete(null);
             return gracefulShutdown;
