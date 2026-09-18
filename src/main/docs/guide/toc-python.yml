@@ -294,6 +294,7 @@ languageSupport:
     standardTypes: Standard Library Type Conversions
     keywords: Python Keywords in Java APIs
     overloads: Java Overloads and Variadic Parameters
+    pythonExceptions: Python Exceptions Extending Java Exceptions
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

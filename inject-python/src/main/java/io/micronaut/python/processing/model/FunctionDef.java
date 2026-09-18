@@ -16,6 +16,7 @@
 package io.micronaut.python.processing.model;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,6 +39,8 @@ import java.util.Objects;
  * @param isAsync Whether the function was declared with {@code async def}.
  * @param hasReturnValue Whether the function body contains a return statement with a non-None value.
  * @param declaringClass Declaring class, can be null if there is none
+ * @param superArguments The arguments of the {@code super().__init__(...)} call of a constructor, or
+ * {@code null} when the function is not a constructor or does not call the super constructor
  * @see <a href="https://docs.python.org/3/library/ast.html#ast.FunctionDef">Python AST FunctionDef</a>
  */
 @Experimental
@@ -53,7 +56,8 @@ public record FunctionDef(
     boolean isStatic,
     boolean isAsync,
     boolean hasReturnValue,
-    ClassDef declaringClass
+    ClassDef declaringClass,
+    @Nullable List<SuperArgumentDef> superArguments
 ) implements ElementDef, MemberDef {
 
     public static final String CONSTRUCTOR_NAME = "__init__";
@@ -70,6 +74,17 @@ public record FunctionDef(
             typeParams = List.of();
         }
         // declaringClassName can be null
+        if (superArguments != null) {
+            superArguments = List.copyOf(superArguments);
+        }
+    }
+
+    /**
+     * Creates a function without a recorded super constructor call.
+     */
+    @SuppressWarnings("checkstyle:ParameterNumber")
+    public FunctionDef(String name, ArgumentsDef arguments, List<DecoratorDef> decorators, ReturnDef returnType, String typeComment, List<TypeVar> typeParams, String documentation, boolean isAbstract, boolean isStatic, boolean isAsync, boolean hasReturnValue, ClassDef declaringClass) {
+        this(name, arguments, decorators, returnType, typeComment, typeParams, documentation, isAbstract, isStatic, isAsync, hasReturnValue, declaringClass, null);
     }
 
     // Simplified constructors for easier Python interop
@@ -174,7 +189,8 @@ public record FunctionDef(
             isStatic,
             isAsync,
             hasReturnValue,
-            classDef
+            classDef,
+            superArguments
         );
         return new FunctionDef(
             name,
@@ -188,7 +204,32 @@ public record FunctionDef(
             isStatic,
             isAsync,
             hasReturnValue,
-            classDef
+            classDef,
+            superArguments
+        );
+    }
+
+    /**
+     * Records the arguments of the {@code super().__init__(...)} call of this constructor.
+     *
+     * @param superArguments The arguments, or {@code null} when the constructor does not call the super constructor
+     * @return The function with the super constructor call recorded
+     */
+    public FunctionDef withSuperArguments(@Nullable List<SuperArgumentDef> superArguments) {
+        return new FunctionDef(
+            name,
+            arguments,
+            decorators,
+            returnType,
+            typeComment,
+            typeParams,
+            documentation,
+            isAbstract,
+            isStatic,
+            isAsync,
+            hasReturnValue,
+            declaringClass,
+            superArguments
         );
     }
 }
