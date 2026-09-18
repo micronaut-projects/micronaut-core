@@ -71,10 +71,12 @@ final class PythonAsyncioStreamsTest {
     }
 
     @AfterEach
-    void tearDown() {
+    void tearDown() throws Exception {
         PythonAsyncioRuntime.setEventLoopProviders(List.of());
-        context.close(true);
+        // stop the loop before the context: a callback still queued must not be entering a context
+        // that is being closed under it
         eventLoop.close();
+        context.close(true);
     }
 
     // ---- Java publisher -> Python async for ----
@@ -893,8 +895,9 @@ final class PythonAsyncioStreamsTest {
         }
 
         @Override
-        public void close() {
+        public void close() throws InterruptedException {
             executor.shutdownNow();
+            assertTrue(executor.awaitTermination(10, TimeUnit.SECONDS), "the loop thread did not stop");
         }
     }
 }
