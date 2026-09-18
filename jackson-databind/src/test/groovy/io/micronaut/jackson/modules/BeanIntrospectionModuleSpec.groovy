@@ -1073,6 +1073,61 @@ class BeanIntrospectionModuleSpec extends Specification {
         // without reflection we only see JsonIgnore on the whole property
         ignoreReflectiveProperties << [false]
     }
+    @Introspected
+    static class BeanWithDefaults {
+        String foo = "bar"
+        List<Integer> fizz = [4]
+        int buzz
+    }
+
+
+    void "class uses default value if missing when serializing"() {
+
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def values = objectMapper.readValue('{"fizz":[7], "buzz": null}', BeanWithDefaults)
+
+        then:
+        values.foo == "bar"
+        values.fizz == [7]
+        values.buzz == 0
+
+        cleanup:
+        ctx.close()
+    }
+    @Introspected
+    @EqualsAndHashCode
+    static class IntrospectionCreatorWithDefaults {
+        String name = "example"
+        int age
+
+        @Creator
+        public IntrospectionCreatorWithDefaults(String name, int age) {
+            this.name = name
+            this.age = age
+        }
+    }
+
+
+    void "class uses default value of primitive constructor arg for introspected class if missing when serializing"() {
+
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ObjectMapper objectMapper = ctx.getBean(ObjectMapper)
+
+        when:
+        def values = objectMapper.readValue('{}', IntrospectionCreatorWithDefaults)
+
+        then:
+        values.name == null
+        values.age == 0
+
+        cleanup:
+        ctx.close()
+    }
 
     @Introspected
     static class IgnoreBean2 {
