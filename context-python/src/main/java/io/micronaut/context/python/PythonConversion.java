@@ -233,16 +233,10 @@ public final class PythonConversion {
         if (isNone(graalValue)) {
             return null;
         }
-        if (graalValue.isHostObject()) {
-            Object host = graalValue.as(Object.class);
-            if (host instanceof List<?> list) {
-                List<T> out = new ArrayList<>(list.size());
-                for (Object o : list) {
-                    @SuppressWarnings("unchecked") T cast = (T) o;
-                    out.add(cast);
-                }
-                return out;
-            }
+        if (graalValue.isHostObject() && graalValue.asHostObject() instanceof List<?> list) {
+            // a Java list that went through Python comes back as the same list, not a copy
+            @SuppressWarnings("unchecked") List<T> host = (List<T>) list;
+            return host;
         }
         // A failing element conversion is an error, not an empty result.
         return convertElements(graalValue, element -> convertValue(element, elementType));
@@ -337,17 +331,10 @@ public final class PythonConversion {
         if (isNone(graalValue)) {
             return null;
         }
-        if (graalValue.isHostObject()) {
-            Object host = graalValue.as(Object.class);
-            if (host instanceof Map<?, ?> map) {
-                Map<K, V> out = new HashMap<>();
-                for (Map.Entry<?, ?> e : map.entrySet()) {
-                    @SuppressWarnings("unchecked") K k = (K) e.getKey();
-                    @SuppressWarnings("unchecked") V v = (V) e.getValue();
-                    out.put(k, v);
-                }
-                return out;
-            }
+        if (graalValue.isHostObject() && graalValue.asHostObject() instanceof Map<?, ?> map) {
+            // a Java map that went through Python comes back as the same map, not a copy
+            @SuppressWarnings("unchecked") Map<K, V> host = (Map<K, V>) map;
+            return host;
         }
         Map<K, V> result = new HashMap<>();
         if (graalValue.hasHashEntries()) {
@@ -427,14 +414,12 @@ public final class PythonConversion {
             return null;
         }
 
-        Set<@Nullable T> result = new HashSet<>();
         if (graalValue.isHostObject() && graalValue.asHostObject() instanceof Set<?> hostSet) {
-            for (Object element : hostSet) {
-                @SuppressWarnings("unchecked") T cast = (T) element;
-                result.add(cast);
-            }
-            return result;
+            // a Java set that went through Python comes back as the same set, not a copy
+            @SuppressWarnings("unchecked") Set<T> host = (Set<T>) hostSet;
+            return host;
         }
+        Set<@Nullable T> result = new HashSet<>();
         if (!graalValue.hasIterator()) {
             throw new IllegalArgumentException("Cannot convert Python value to a Set: " + graalValue);
         }

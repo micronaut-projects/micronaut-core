@@ -59,6 +59,10 @@ public final class PythonCoercion {
 
     private static final String PUT_MEMBER = "__micronaut_put_member";
 
+    private static final String PYTHON_LIST = "__micronaut_python_list";
+
+    private static final String PYTHON_DICT = "__micronaut_python_dict";
+
     private static final String ASYNC_MEMBER_VALUE = "__micronaut_async_member_value";
 
     private static final String TO_PYTHON_STANDARD_TYPE = "__micronaut_to_python_standard_type";
@@ -175,11 +179,56 @@ public final class PythonCoercion {
                 throw new IllegalArgumentException("Cannot pass a polyglot Value to a different context");
             }
             case List<?> list -> {
+                return coerceCollectionToContext(list, context);
+            }
+            case Map<?, ?> map -> {
+                return coerceCollectionToContext(map, context);
+            }
+            case Set<?> set -> {
+                return coerceCollectionToContext(set, context);
+            }
+            default -> {
+            }
+        }
+        return value;
+    }
+
+    /**
+     * Coerces a Java collection for a Python context.
+     *
+     * <p>A view of a Python collection ({@link PythonCollectionView}, or the Java view GraalPy returns
+     * from {@link Value#as(Class)}) of the target context is the Python collection itself, and a
+     * {@link PythonCollectionView} of another context is copied into a native collection. A plain JDK
+     * collection (a {@code java.util} implementation such as {@link ArrayList} or {@link HashMap},
+     * including the unmodifiable ones) is copied with coerced elements, so Python receives a mutable
+     * collection of Python objects and never mutates Java state it was merely handed. A collection of
+     * any other class, for example a cache or a view that implements {@link Map}, is passed by
+     * reference: it keeps its identity and its API, and is never iterated or copied.</p>
+     */
+    private static @Nullable Object coerceCollectionToContext(Object collection, Context context) {
+        if (collection instanceof PythonCollectionView view) {
+            // a Python-owned collection stays a native Python collection in another context as well
+            return view.isIn(context) ? view.pythonValue() : pythonCollectionElement(view, context);
+        }
+        if (isGuestBackedCollection(collection)) {
+            Value guest = Value.asValue(collection);
+            if (isValueInContext(guest, context)) {
+                // a view of a Python collection of this context: hand the collection itself back
+                return guest;
+            }
+            return copyCollection(collection, context);
+        }
+        return isPlainCollection(collection) ? copyCollection(collection, context) : collection;
+    }
+
+    private static Object copyCollection(Object collection, Context context) {
+        return switch (collection) {
+            case List<?> list -> {
                 List<@Nullable Object> result = new ArrayList<>(list.size());
                 for (Object element : list) {
                     result.add(coerceToContext(element, context));
                 }
-                return result;
+                yield result;
             }
             case Map<?, ?> map -> {
                 Map<Object, Object> result = new HashMap<>();
@@ -189,26 +238,211 @@ public final class PythonCoercion {
                         coerceToContext(entry.getValue(), context)
                     );
                 }
-                return result;
+                yield result;
             }
             case Set<?> set -> {
                 Set<@Nullable Object> result = new HashSet<>();
                 for (Object element : set) {
                     result.add(coerceToContext(element, context));
                 }
-                return result;
+                yield result;
             }
-            default -> {
+            default -> collection;
+        };
+    }
+
+    private static boolean isPlainCollection(Object collection) {
+        return collection.getClass().getName().startsWith("java.util.");
+    }
+
+    /**
+     * The Java view of a {@code list} attribute of a Python object, for the generated field of the
+     * property: the Python list stays the attribute and the source of truth, reads and writes through
+     * the returned list reach it. A Java list assigned to the attribute is returned as it is, and an
+     * iterable that is not a list is converted the way {@link PythonConversion#convertList} does.
+     *
+     * @param member The attribute value
+     * @param elementType The declared element type
+     * @param <E> The element type
+     * @return The list, or {@code null} for {@code None}
+     */
+    @UsedByGeneratedCode
+    @SuppressWarnings("unchecked")
+    public static <E> @Nullable List<E> listView(Value member, Class<E> elementType) {
+        if (PythonConversion.isNone(member)) {
+            return null;
+        }
+        if (member.isHostObject() && member.asHostObject() instanceof List<?> list) {
+            return (List<E>) list;
+        }
+        if (member.hasArrayElements()) {
+            return new PythonListView<>(member, elementType);
+        }
+        return PythonConversion.convertList(member, elementType);
+    }
+
+    /**
+     * The Java view of a {@code dict} attribute of a Python object, for the generated field of the
+     * property, as {@link #listView} for a list.
+     *
+     * @param member The attribute value
+     * @param keyType The declared key type
+     * @param valueType The declared value type
+     * @param <K> The key type
+     * @param <V> The value type
+     * @return The map, or {@code null} for {@code None}
+     */
+    @UsedByGeneratedCode
+    @SuppressWarnings("unchecked")
+    public static <K, V> @Nullable Map<K, V> mapView(Value member, Class<K> keyType, Class<V> valueType) {
+        if (PythonConversion.isNone(member)) {
+            return null;
+        }
+        if (member.isHostObject() && member.asHostObject() instanceof Map<?, ?> map) {
+            return (Map<K, V>) map;
+        }
+        if (member.hasHashEntries()) {
+            return new PythonMapView<>(member, keyType, valueType);
+        }
+        return PythonConversion.convertMap(member, keyType, valueType);
+    }
+
+    /**
+     * Writes the list held by the generated field of a property to the attribute of the Python object
+     * and returns the field value to hold from then on. A view of the attribute of this context is
+     * already current. Any other Java list is copied into a new Python list, so the attribute keeps
+     * its native type, and the view of that list becomes the field value: the collection assigned
+     * from Java is detached from that point. A collection class of its own (not a JDK one) is passed
+     * by reference, as an argument would be.
+     *
+     * @param target The Python object
+     * @param name The attribute name
+     * @param value The field value
+     * @param elementType The declared element type
+     * @return The list to keep in the field
+     */
+    @UsedByGeneratedCode
+    public static @Nullable List<?> putListMember(Value target, String name, @Nullable List<?> value, Class<?> elementType) {
+        Context context = target.getContext();
+        if (value == null || isAssignedAsIs(value, context)) {
+            putMember(target, name, value);
+            return value;
+        }
+        memberSetter(context).executeVoid(target, name, pythonList(value, context));
+        return listView(target.getMember(name), elementType);
+    }
+
+    /**
+     * Writes the map held by the generated field of a property to the attribute of the Python object
+     * and returns the field value to hold from then on, as {@link #putListMember} for a list.
+     *
+     * @param target The Python object
+     * @param name The attribute name
+     * @param value The field value
+     * @param keyType The declared key type
+     * @param valueType The declared value type
+     * @return The map to keep in the field
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Map<?, ?> putMapMember(Value target, String name, @Nullable Map<?, ?> value, Class<?> keyType, Class<?> valueType) {
+        Context context = target.getContext();
+        if (value == null || isAssignedAsIs(value, context)) {
+            putMember(target, name, value);
+            return value;
+        }
+        memberSetter(context).executeVoid(target, name, pythonDict(value, context));
+        return mapView(target.getMember(name), keyType, valueType);
+    }
+
+    /**
+     * Whether a field value is assigned to the Python attribute as it is: a view of a collection of
+     * the target context, or a collection class of its own that is passed by reference. A plain JDK
+     * collection, or a view of another context, is copied into a native Python collection.
+     */
+    private static boolean isAssignedAsIs(Object value, Context context) {
+        if (value instanceof PythonCollectionView view) {
+            return view.isIn(context);
+        }
+        return !isPlainCollection(value);
+    }
+
+    /**
+     * Converts an element of a Python collection read through a view: a nested Python list or dict
+     * requested as a plain {@link List} or {@link Map} is viewed in turn, so nested collections keep
+     * the same semantics; every other element is converted to the declared type.
+     */
+    @SuppressWarnings("unchecked")
+    static <T> @Nullable T viewElement(Value element, Class<T> targetType) {
+        if (!element.isHostObject() && !element.isString()) {
+            if (targetType == List.class && element.hasArrayElements()) {
+                return (T) new PythonListView<>(element, Object.class);
+            }
+            if (targetType == Map.class && element.hasHashEntries()) {
+                return (T) new PythonMapView<>(element, Object.class, Object.class);
             }
         }
-        return value;
+        return PythonConversion.convertValue(element, targetType);
+    }
+
+    /**
+     * A new Python list with the coerced elements of a Java list; nested plain lists and maps become
+     * Python lists and dicts as well.
+     */
+    private static Value pythonList(List<?> list, Context context) {
+        Object[] items = new Object[list.size()];
+        int i = 0;
+        for (Object element : list) {
+            items[i++] = pythonCollectionElement(element, context);
+        }
+        return PythonContextRuntime.helper(context, PYTHON_LIST).execute((Object) items);
+    }
+
+    private static Value pythonDict(Map<?, ?> map, Context context) {
+        Object[] keys = new Object[map.size()];
+        Object[] values = new Object[map.size()];
+        int i = 0;
+        for (Map.Entry<?, ?> entry : map.entrySet()) {
+            keys[i] = pythonCollectionElement(entry.getKey(), context);
+            values[i++] = pythonCollectionElement(entry.getValue(), context);
+        }
+        return PythonContextRuntime.helper(context, PYTHON_DICT).execute(keys, values);
+    }
+
+    /**
+     * Coerces a value written through a view into a Python collection: a plain Java list or map
+     * becomes a Python list or dict, so the Python collection holds Python values only.
+     *
+     * @param value The value
+     * @param context The context of the Python collection
+     * @return The coerced value
+     */
+    static @Nullable Object viewValue(@Nullable Object value, Context context) {
+        return pythonCollectionElement(value, context);
+    }
+
+    private static @Nullable Object pythonCollectionElement(@Nullable Object element, Context context) {
+        if (element instanceof List<?> list && (isPlainCollection(list) || list instanceof PythonCollectionView)) {
+            return pythonList(list, context);
+        }
+        if (element instanceof Map<?, ?> map && (isPlainCollection(map) || map instanceof PythonCollectionView)) {
+            return pythonDict(map, context);
+        }
+        return coerceToContext(element, context);
+    }
+
+    /**
+     * Whether a collection is the Java view of a Python collection, as returned by
+     * {@link Value#as(Class)} for {@link List}, {@link Map} and {@link Set} targets.
+     */
+    private static boolean isGuestBackedCollection(Object collection) {
+        return collection.getClass().getName().startsWith("com.oracle.truffle.polyglot.");
     }
 
     /**
      * Coerce a value using the generated Java bridge's declared parameter type.
-     * Some host objects implement collection interfaces as an implementation
-     * detail and should stay host objects unless the Python method declares the
-     * plain collection contract.
+     * A collection argument is only rebuilt with coerced elements when the Python
+     * method declares the plain collection contract; a parameter declared with a
+     * more specific type (a cache, a view) always stays the host object it is.
      *
      * @param value The value to coerce
      * @param context The target context

@@ -16,6 +16,7 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
@@ -128,6 +129,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_SHORT = "asShort";
     private static final String AS_DOUBLE = "asDouble";
     private static final String AS_FLOAT = "asFloat";
+    private static final String JAVA_LANG_STRING = "java.lang.String";
+    private static final String SERIAL_VERSION_UID = "serialVersionUID";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -354,6 +357,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
                     if (isReconstructibleBean) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+                        if (isSerializableStub(superType, extendsPythonClass, extendsHostClass) && !declaresInterface(interfaces, Serializable.class)) {
+                            // The Java fields carry the introspected properties; the Python object is
+                            // transient and rebuilt from them on the first use after deserialization.
+                            // A class listing Serializable among its bases declares it itself.
+                            builder.addSuperinterface(ClassTypeDef.of(Serializable.class));
+                            // a fixed UID: the serialized form is the property values, not the shape of the stub
+                            builder.addField(FieldDef.builder(SERIAL_VERSION_UID)
+                                .ofType(TypeDef.Primitive.LONG)
+                                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                                .initializer(ExpressionDef.constant(1L))
+                                .build());
+                        }
                     } else if (!extendsPythonClass) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
                     }
@@ -911,13 +926,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                     continue;
                                 }
                                 ExpressionDef fieldRef = aThis.field(field);
-                                StatementDef write = PYTHON_COERCION.invokeStatic(
-                                    "putMember",
-                                    TypeDef.VOID,
-                                    storedValue,
-                                    ExpressionDef.constant(beanProperty.getName()),
-                                    coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
-                                );
+                                StatementDef write = propertyWrite(aThis, storedValue, beanProperty, field);
                                 FieldDef snapshot = syncSnapshotFields.get(beanProperty.getName());
                                 if (snapshot == null) {
                                     syncStatements.add(write);
@@ -1051,6 +1060,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             for (PropertyElement beanProperty : beanProperties) {
                                 FieldDef field = propertyFields.get(beanProperty.getName());
                                 if (field != null) {
+                                    if (isSharedCollectionProperty(beanProperty)) {
+                                        reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field));
+                                        continue;
+                                    }
                                     memberNames.add(ExpressionDef.constant(beanProperty.getName()));
                                     memberValues.add(coerceTypedElementToPolyglotValue(
                                         beanProperty, aThis.field(field), targetContext
@@ -3694,6 +3707,40 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             || beanProperty.getWriteMethod().filter(method -> !method.isSynthetic()).isPresent();
     }
 
+    /**
+     * Whether the stub of a reconstructible bean (an {@code @Introspected} class whose state is fully
+     * held by the generated property fields) can implement {@link Serializable}.
+     *
+     * <p>Java serialization writes the property fields only; the GraalPy value and the sync state are
+     * transient, and {@code asPolyglotValue()} recreates the Python object from the fields on the first
+     * use after deserialization. A Python superclass must be reconstructible as well, and a Java
+     * superclass must itself be serializable, otherwise its state could not be written.</p>
+     */
+    private static boolean isSerializableStub(@Nullable ClassElement superType, boolean extendsPythonClass, boolean extendsHostClass) {
+        if (superType == null || (!extendsPythonClass && !extendsHostClass)) {
+            return true;
+        }
+        if (extendsHostClass) {
+            return superType.isAssignable(Serializable.class);
+        }
+        return superType.hasStereotype(Introspected.class)
+            && superType.getBeanProperties().stream().noneMatch(PythonStubGenerator::isDynamicBeanProperty)
+            && isSerializableStub(
+                superType.getSuperType().orElse(null),
+                superType.getSuperType().map(AbstractPythonClassElement.class::isInstance).orElse(false),
+                superType.getSuperType().map(type -> !(type instanceof AbstractPythonClassElement) && !type.isInterface() && !Object.class.getName().equals(type.getName())).orElse(false)
+            );
+    }
+
+    private static boolean declaresInterface(Collection<ClassElement> interfaces, Class<?> interfaceType) {
+        for (ClassElement anInterface : interfaces) {
+            if (interfaceType.getName().equals(anInterface.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static boolean isConfigurationBuilderProperty(PropertyElement property) {
         return property.hasAnnotation(ANN_CONFIGURATION_BUILDER)
             || property.getReadMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false)
@@ -4027,7 +4074,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(StatementDef.multi(
-                        aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), value)),
+                        aThis.field(field).assign(propertyFieldValue(beanProperty, value)),
                         ExpressionDef.trueValue().returning()
                     ))
             );
@@ -4366,7 +4413,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Character" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String" ->
+                case JAVA_LANG_STRING ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
@@ -4513,7 +4560,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String propertyName = beanProperty.getName();
         ExpressionDef.InvokeInstanceMethod member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(propertyName));
         if (isCollectionLike(beanProperty.getGenericType())) {
-            return aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), member));
+            return aThis.field(field).assign(propertyFieldValue(beanProperty, member));
         }
         ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(propertyName));
         // Read the member once into a local: the nullable conversions test and convert it separately.
@@ -4542,6 +4589,87 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         return statements;
+    }
+
+    /**
+     * The value of the generated field of a property read from the attribute of the Python object. A
+     * list or dict of plain element types is viewed rather than copied: the Python collection stays the
+     * attribute and the source of truth, and the Java field reads and writes through to it, so an
+     * {@code append} in Python and an {@code add} in Java reach the same collection and the attribute
+     * keeps its native Python type. Every other property value is converted.
+     */
+    private ExpressionDef propertyFieldValue(PropertyElement beanProperty, ExpressionDef member) {
+        ClassElement type = beanProperty.getGenericType();
+        if (isSharedCollectionProperty(beanProperty)) {
+            if (type.isAssignable(List.class)) {
+                return uncheckedCast(PYTHON_COERCION.invokeStatic("listView", ClassTypeDef.of(List.class), member, toClassExpression(type.getTypeArguments().get("E"))), type);
+            }
+            Map<String, ClassElement> typeArguments = type.getTypeArguments();
+            return uncheckedCast(PYTHON_COERCION.invokeStatic("mapView", ClassTypeDef.of(Map.class), member,
+                toClassExpression(typeArguments.get("K")), toClassExpression(typeArguments.get("V"))), type);
+        }
+        return convertValueForType(type, member);
+    }
+
+    /**
+     * Writes the generated field of a property to the attribute of the Python object during a sync and
+     * assigns the field the value to hold from then on. A viewed list or dict of this context is already
+     * the attribute; a collection assigned from Java is copied into a native Python collection, which
+     * the field views from then on.
+     */
+    private static StatementDef propertyWrite(VariableDef.This aThis, ExpressionDef target, PropertyElement beanProperty, FieldDef field) {
+        ClassElement type = beanProperty.getGenericType();
+        ExpressionDef fieldRef = aThis.field(field);
+        ExpressionDef name = ExpressionDef.constant(beanProperty.getName());
+        if (isSharedCollectionProperty(beanProperty)) {
+            if (type.isAssignable(List.class)) {
+                return aThis.field(field).assign(uncheckedCast(PYTHON_COERCION.invokeStatic("putListMember", ClassTypeDef.of(List.class),
+                    target, name, fieldRef, toClassExpression(type.getTypeArguments().get("E"))), type));
+            }
+            Map<String, ClassElement> typeArguments = type.getTypeArguments();
+            return aThis.field(field).assign(uncheckedCast(PYTHON_COERCION.invokeStatic("putMapMember", ClassTypeDef.of(Map.class),
+                target, name, fieldRef, toClassExpression(typeArguments.get("K")), toClassExpression(typeArguments.get("V"))), type));
+        }
+        return PYTHON_COERCION.invokeStatic(
+            "putMember",
+            TypeDef.VOID,
+            target,
+            name,
+            coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
+        );
+    }
+
+    /**
+     * Whether a list or dict property holds only plain values (strings, numbers, booleans, nested
+     * lists and dicts of those), so the Java field can view the Python collection. A collection of
+     * Python objects or of converted standard types is converted on every crossing instead.
+     */
+    private static boolean isSharedCollectionProperty(PropertyElement beanProperty) {
+        return isSharedCollectionType(beanProperty.getGenericType());
+    }
+
+    private static boolean isSharedCollectionType(ClassElement type) {
+        if (type.isAssignable(List.class)) {
+            return isPlainElementType(type.getTypeArguments().get("E"));
+        }
+        if (type.isAssignable(Map.class)) {
+            return isPlainElementType(type.getTypeArguments().get("K")) && isPlainElementType(type.getTypeArguments().get("V"));
+        }
+        return false;
+    }
+
+    private static boolean isPlainElementType(@Nullable ClassElement type) {
+        if (type == null || type instanceof GenericPlaceholderElement || type.isArray()) {
+            return false;
+        }
+        if (type.isPrimitive()) {
+            return true;
+        }
+        return switch (type.getName()) {
+            case JAVA_LANG_STRING, "java.lang.Boolean", "java.lang.Byte", JAVA_LANG_SHORT, "java.lang.Integer",
+                 "java.lang.Long", JAVA_LANG_FLOAT, JAVA_LANG_DOUBLE, "java.lang.Character" -> true;
+            default -> isSharedCollectionType(type);
+        };
     }
 
     /**
@@ -4732,7 +4860,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String":
+                case JAVA_LANG_STRING:
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
