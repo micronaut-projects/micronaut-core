@@ -29,6 +29,7 @@ import java.util.Optional;
  */
 @Internal
 @Experimental
+@SuppressWarnings("java:S2160") // EnumElement equality is defined by the delegated element model.
 public final class TypeAnnotatedEnumElement extends TypeAnnotatedClassElement implements EnumElement {
 
     private final EnumElement delegate;
