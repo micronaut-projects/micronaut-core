@@ -973,7 +973,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         VariableDef.MethodParameter value = methodParameters.get(0);
                         return new ExpressionDef.InvokeInstanceMethod(aThis, constructingConstructor, List.of(
                             value,
-                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value, javaClassType(model.element()).getStaticField("class", TypeDef.CLASS))
+                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value, javaClassType(model.element()).getStaticField(CLASS_FIELD, TypeDef.CLASS))
                         ));
                     })
             );
@@ -1586,7 +1586,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (!model.extendsJavaBase() || model.isJunit5Test()) {
             return StatementDef.multi();
         }
-        ExpressionDef stubClass = javaClassType(model.element()).getStaticField("class", TypeDef.CLASS);
+        ExpressionDef stubClass = javaClassType(model.element()).getStaticField(CLASS_FIELD, TypeDef.CLASS);
         return aThis.field(pythonValueField(model)).isNull().doIf(
             PYTHON_JAVA_BASES.invokeStatic("underConstruction", POLYGLOT_VALUE, stubClass).newLocal("constructing", constructing ->
                 constructing.isNonNull().doIf(constructing.returning())
@@ -5564,9 +5564,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
                 .isTrue()
                 .doIf(ExpressionDef.nullValue().returning()),
-            PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField("class", TypeDef.CLASS))
+            PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("bound", bound -> bound.isNonNull().doIf(bound.returning())),
-            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField("class", TypeDef.CLASS))
+            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("subclassWrapper", subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()
