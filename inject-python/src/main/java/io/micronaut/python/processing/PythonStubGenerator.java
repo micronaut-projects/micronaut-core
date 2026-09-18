@@ -1641,17 +1641,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         List<AnnotationDef> annotationDefs = new ArrayList<>();
         for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
-            if (TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)) {
-                continue;
-            }
-            AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
-            if (annotationValue == null) {
-                continue;
-            }
-            // A repeatable annotation (@Size, @Min) is held by its container (Size.List) in the metadata; the
-            // source names the repeated annotations, not the container, which is not importable by its binary name
-            for (AnnotationValue<?> repeated : repeatedAnnotations(annotationMetadata, annotationValue)) {
-                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(repeated.getAnnotationName(), repeated.getValues()));
+            if (!TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)) {
+                AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
+                if (annotationValue != null) {
+                    // A repeatable annotation (@Size, @Min) is held by its container (Size.List) in the metadata; the
+                    // source names the repeated annotations, not the container, which is not importable by its binary name
+                    for (AnnotationValue<?> repeated : repeatedAnnotations(annotationMetadata, annotationValue)) {
+                        annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(repeated.getAnnotationName(), repeated.getValues()));
+                    }
+                }
             }
         }
         if (annotationDefs.isEmpty()) {
@@ -1664,7 +1662,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String containerName = annotationValue.getAnnotationName();
         Map<CharSequence, Object> values = annotationValue.getValues();
         Object value = values.size() == 1 ? values.get(AnnotationMetadata.VALUE_MEMBER) : null;
-        Object[] elements = value instanceof Object[] array ? array : value instanceof Collection<?> collection ? collection.toArray() : null;
+        Object[] elements;
+        if (value instanceof Object[] array) {
+            elements = array;
+        } else if (value instanceof Collection<?> collection) {
+            elements = collection.toArray();
+        } else {
+            elements = null;
+        }
         if (elements == null || elements.length == 0) {
             return List.of(annotationValue);
         }
