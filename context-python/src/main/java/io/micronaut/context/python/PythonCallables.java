@@ -356,6 +356,7 @@ final class PythonCallables {
      */
     private record CallableInvocationHandler(Value callable, Method method) implements InvocationHandler {
 
+        @SuppressWarnings("java:S2583") // InvocationHandler passes null arguments for zero-parameter methods.
         @Override
         public @Nullable Object invoke(Object proxy, Method invoked, Object[] args) throws Throwable {
             if (invoked.getDeclaringClass() == Object.class) {

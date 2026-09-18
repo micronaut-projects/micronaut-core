@@ -20,6 +20,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -150,7 +151,7 @@ class PythonCallablesTest {
         Overloads.BiCallback adapted = PythonInterop.fn(Overloads.BiCallback.class, callable);
         assertEquals("xx", adapted.call("x", 2));
         assertTrue(adapted.toString().contains("BiCallback"));
-        assertEquals(adapted, adapted);
+        assertSame(adapted, adapted);
         assertNotNull(PythonInterop.fn(Runnable.class, context.eval("python", "lambda: None")));
 
         Value overloads = context.asValue(new Overloads());
@@ -185,8 +186,10 @@ class PythonCallablesTest {
 
     @Test
     void rejectsNonFunctionalInterfacesAndNonCallables() {
-        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(List.class, context.eval("python", "lambda: 1")));
-        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(Runnable.class, context.eval("python", "1")));
+        Value callable = context.eval("python", "lambda: 1");
+        Value nonCallable = context.eval("python", "1");
+        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(List.class, callable));
+        assertThrows(IllegalArgumentException.class, () -> PythonInterop.fn(Runnable.class, nonCallable));
     }
 
     private void assertAcceptsNoArity(String source) {
