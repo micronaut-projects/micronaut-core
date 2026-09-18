@@ -188,7 +188,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_PACKAGE_PREFIX = "java.lang.";
     private static final String WITH_VARARGS = "withVarargs";
     private static final String PYTHON_METHOD_KEY_PREFIX = "python:";
-    private static final Set<String> TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE = Set.of(
+    static final Set<String> TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE = Set.of(
         "io.micronaut.core.annotation.NonNull",
         "io.micronaut.core.annotation.Nullable",
         "jakarta.annotation.Nonnull",
@@ -318,7 +318,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (interfaceDefs.containsKey(classElement.getName())) {
                             return;
                         }
-                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(buildInterfaceDef(classElement, typeName, interfaces), classElement));
+                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(PythonInterfaceStubGenerator.buildInterfaceDef(classElement, typeName, interfaces, allClasses, context), classElement));
                         return;
                     }
 
@@ -1394,7 +1394,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     }
 
-    private static TypeDef parameterizedTypeDef(ClassElement anInterface) {
+    static TypeDef parameterizedTypeDef(ClassElement anInterface) {
         Map<String, ClassElement> typeArguments = resolvedTypeArguments(anInterface);
         TypeDef interfaceTypeDef = javaClassType(anInterface);
         List<? extends GenericPlaceholderElement> declaredPlaceholders = anInterface.getDeclaredGenericPlaceholders();
@@ -1599,7 +1599,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return TypeDef.of(beanProperty.getType());
     }
 
-    private static TypeDef sourceSignatureType(ClassElement anInterface) {
+    static TypeDef sourceSignatureType(ClassElement anInterface) {
         return sourceSignatureType(anInterface, false, Map.of());
     }
 
@@ -2176,37 +2176,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return left.getName().equals(right.getName());
     }
 
-    private static InterfaceDef buildInterfaceDef(AbstractPythonClassElement classElement,
-                                                  String typeName,
-                                                  Collection<ClassElement> interfaces) {
-        InterfaceDef.InterfaceDefBuilder interfaceBuilder = InterfaceDef.builder(typeName)
-            .addModifiers(Modifier.PUBLIC);
-        for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
-            interfaceBuilder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
-        }
-        for (ClassElement anInterface : interfaces) {
-            interfaceBuilder.addSuperinterface(parameterizedTypeDef(anInterface));
-        }
-        Set<String> addedMethodNames = new LinkedHashSet<>();
-        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAccessible().onlyInstance())) {
-            String key = bridgeMethodKey(methodElement);
-            if (!addedMethodNames.add(key)) {
-                continue;
-            }
-            MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(methodElement.getName())
-                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                .returns(sourceMethodReturnType(methodElement, false));
-            addMethodTypeVariables(methodElement, methodBuilder);
-            for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
-                methodBuilder.addParameter(ParameterDef
-                    .builder(parameter.getName(), sourceSignatureType(parameter.getGenericType()))
-                    .build());
-            }
-            interfaceBuilder.addMethod(methodBuilder.build());
-        }
-        return interfaceBuilder.build();
-    }
-
     private static @Nullable DecoratorDef findScriptDecorator(PythonScriptElement scriptElement, PythonVisitorContext context) {
         return context
             .getProcessingEnvironment()
@@ -2404,7 +2373,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return sourceSignatureType(methodElement.getGenericReturnType());
     }
 
-    private static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
+    static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
         addMethodTypeVariables(methodElement, methodBuilder, Map.of());
     }
 
@@ -2776,22 +2745,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static FieldDef pythonClassReferenceField(String fieldName, ClassElement element) {
+        return FieldDef.builder(fieldName)
+            .ofType(PYTHON_CLASS_REFERENCE)
+            .addModifiers(Modifier.STATIC, Modifier.FINAL)
+            .initializer(pythonClassReferenceExpression(element))
+            .build();
+    }
+
+    /**
+     * The expression instantiating the {@code PythonClassReference} of a Python class.
+     *
+     * @param element The Python class
+     * @return The instantiation expression
+     */
+    static ExpressionDef pythonClassReferenceExpression(ClassElement element) {
         PythonClassReferenceDef classReference = pythonClassReferenceDef(element);
         List<ExpressionDef> nestedMembers = new ArrayList<>();
         for (String nestedMemberName : classReference.nestedMemberNames()) {
             nestedMembers.add(ExpressionDef.constant(nestedMemberName));
         }
-        return FieldDef.builder(fieldName)
-            .ofType(PYTHON_CLASS_REFERENCE)
-            .addModifiers(Modifier.STATIC, Modifier.FINAL)
-            .initializer(PYTHON_CLASS_REFERENCE.instantiate(
-                ExpressionDef.constant(classReference.packageName()),
-                ExpressionDef.constant(classReference.rootName()),
-                TypeDef.STRING.array().instantiate(nestedMembers),
-                ExpressionDef.constant(classReference.displayName()),
-                ExpressionDef.constant(classReference.cacheKey())
-            ))
-            .build();
+        return PYTHON_CLASS_REFERENCE.instantiate(
+            ExpressionDef.constant(classReference.packageName()),
+            ExpressionDef.constant(classReference.rootName()),
+            TypeDef.STRING.array().instantiate(nestedMembers),
+            ExpressionDef.constant(classReference.displayName()),
+            ExpressionDef.constant(classReference.cacheKey())
+        );
     }
 
     static AnnotationDef pythonClassAnnotation(ClassElement element) {
@@ -3625,7 +3604,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return returnType;
     }
 
-    private static String bridgeMethodKey(MethodElement methodElement) {
+    static String bridgeMethodKey(MethodElement methodElement) {
         StringBuilder key = new StringBuilder(methodElement.getName()).append('(');
         for (ParameterElement parameter : methodElement.getParameters()) {
             ClassElement type = parameter.getType();
@@ -4592,7 +4571,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
+    static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
         return returnConvertedValue(allClasses, returnType, invokedValue, null);
     }
 
