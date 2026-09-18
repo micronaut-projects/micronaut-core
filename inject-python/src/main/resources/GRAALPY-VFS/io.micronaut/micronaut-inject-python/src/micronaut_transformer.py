@@ -344,8 +344,10 @@ class MicronautTransformer(ast.NodeTransformer):
         for alias in node.names:
             if alias.name == '*':
                 # Handle star imports - scan the entire package
-                if self._handle_star_import(java_module, transformed_module):
+                star_bindings = self._handle_star_import(java_module, transformed_module)
+                if star_bindings:
                     transformed_any = True
+                    bindings.extend(ast.copy_location(binding, node) for binding in star_bindings if isinstance(binding, ast.stmt))
                 elif java_io_package and not self.callback_get_class_elements(java_module):
                     self.validation_errors.append(unresolved_java_io_import_error(java_module, 'package'))
             else:
@@ -1101,17 +1103,18 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return ".".join(parts)
         return None
 
-    def _handle_star_import(self, original_module_name: str, transformed_module_name: str) -> bool:
+    def _handle_star_import(self, original_module_name: str, transformed_module_name: str) -> list:
         """
         Handle star imports like 'from jakarta.inject import *': every annotation of the package becomes a
         decorator and every other top-level class is bound under its simple name, as an explicit import of it
         would be, so the generated package module exports it at run time.
-        Returns True if any imports were transformed.
+        Returns the ``java.type()`` assignments binding the classes of the package (``True`` alone when only
+        decorators were generated), or an empty list when the import was not transformed.
         """
         # Get all ClassElements in the package
         class_elements = self.callback_get_class_elements(original_module_name)
         if class_elements:
-            transformed_any = False
+            transformed_any = []
             for class_element in class_elements:
                 if self._is_nested_type(class_element):
                     # A package scan also lists nested types; a star import binds top-level names only.
@@ -1126,16 +1129,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
                     if decorator_code:
                         self.transformed_code.append(decorator_code)
-                        transformed_any = True
+                        transformed_any.append(True)
                 else:
                     self._track_java_class(import_name, class_element)
                     self._collect_java_class_import(transformed_module_name, import_name, class_element)
-                    self.java_type_assignments.append(f"{import_name} = java.type('{class_element.getName()}')")
                     self.has_java_import = True
-                    transformed_any = True
+                    transformed_any.append(ast.parse(f"{import_name} = java.type('{class_element.getName()}')").body[0])
             return transformed_any
 
-        return False
+        return []
 
     def _star_imported_class_names(self, java_module_name: str) -> List[str]:
         """

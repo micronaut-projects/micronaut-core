@@ -642,12 +642,13 @@ class UnresolvedJavaImportTest(unittest.TestCase):
             ]
 
         transformer = MicronautTransformer(no_class_element, acme_package)
-        transformer.visit(ast.parse("from com.acme import *\n"))
+        module = transformer.visit(ast.parse("from com.acme import *\n"))
         self.assertEqual([], transformer.validation_errors)
+        # the bindings take the place of the import, as they do for an explicit import
         self.assertEqual([
             "CompiledPet = java.type('io.micronaut.python.processing.fixtures.CompiledPet')",
             "ApplicationContext = java.type('io.micronaut.context.ApplicationContext')",
-        ], transformer.java_type_assignments)
+        ], [unparse(statement) for statement in module.body if isinstance(statement, ast.Assign) and "java.type(" in unparse(statement)])
         self.assertEqual(["CompiledPet", "ApplicationContext"], transformer._star_imported_class_names("com.acme"))
 
     def test_project_python_modules_are_never_java_imports(self):
