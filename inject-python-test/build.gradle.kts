@@ -46,7 +46,7 @@ dependencies {
     }
     testImplementation("jakarta.data:jakarta.data-api:1.1.0-M3")
     // A non-Micronaut io.* package: Python's stdlib io module must not shadow it
-    testImplementation("io.swagger.core.v3:swagger-annotations:2.2.55")
+    testImplementation(libs.swagger.annotations)
     testImplementation(projects.micronautHttpServerNetty)
     testImplementation(projects.micronautHttpClient)
     testImplementation(projects.micronautJacksonDatabind)
