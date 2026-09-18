@@ -335,24 +335,22 @@ public final class PythonConversion {
         candidates.add(TOP_LEVEL_PACKAGE + '.' + simpleName);
         ClassLoader classLoader = declaredType.getClassLoader();
         for (String candidate : candidates) {
-            Class<?> type;
+            Class<?> type = null;
             try {
                 type = Class.forName(candidate, false, classLoader);
             } catch (ClassNotFoundException | LinkageError e) {
-                continue;
             }
-            if (type == declaredType || !declaredType.isAssignableFrom(type) || !isGeneratedFor(type, moduleName, qualifiedName)) {
-                continue;
-            }
-            try {
-                Method factory = type.getMethod(FROM_POLYGLOT_VALUE, Value.class);
-                // the factory must be the subclass's own: an inherited one is the declared type's, which
-                // would wrap the value as the declared type again
-                if (Modifier.isStatic(factory.getModifiers()) && factory.getDeclaringClass() == type) {
-                    return factory;
+            if (type != null && type != declaredType && declaredType.isAssignableFrom(type) && isGeneratedFor(type, moduleName, qualifiedName)) {
+                try {
+                    Method factory = type.getMethod(FROM_POLYGLOT_VALUE, Value.class);
+                    // the factory must be the subclass's own: an inherited one is the declared type's, which
+                    // would wrap the value as the declared type again
+                    if (Modifier.isStatic(factory.getModifiers()) && factory.getDeclaringClass() == type) {
+                        return factory;
+                    }
+                } catch (NoSuchMethodException e) {
+                    // not a generated wrapper
                 }
-            } catch (NoSuchMethodException e) {
-                // not a generated wrapper
             }
         }
         return null;
