@@ -440,6 +440,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             && PythonContextRuntime.helper(owner.getContext(), IS_COROUTINE_FUNCTION).execute(originalFunction).asBoolean();
     }
 
+    @SuppressWarnings("java:S107") // these parameters describe the complete proxy invocation context
     private <T> ProxyExecutable proxiedFunction(
         boolean isIntroduction,
         boolean bindOriginalFunction,
@@ -856,7 +857,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         private final RuntimeProxyDefinition<T> proxyDefinition;
         private final Value pythonClass;
         private final List<InterceptedFunction<T>> interceptedFunctions = new ArrayList<>();
-        private volatile WeakReference<Object> boundTarget = new WeakReference<>(null);
+        private final AtomicReference<WeakReference<Object>> boundTarget = new AtomicReference<>(new WeakReference<>(null));
 
         SelfInvocationBinder(RuntimeProxyDefinition<T> proxyDefinition, Value pythonClass) {
             this.proxyDefinition = proxyDefinition;
@@ -870,9 +871,13 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Override
         public T get() {
             T target = proxyDefinition.targetBean();
-            if (!interceptedFunctions.isEmpty() && boundTarget.get() != target) {
-                bind(target);
-                boundTarget = new WeakReference<>(target);
+            if (!interceptedFunctions.isEmpty() && boundTarget.get().get() != target) {
+                synchronized (boundTarget) {
+                    if (boundTarget.get().get() != target) {
+                        bind(target);
+                        boundTarget.set(new WeakReference<>(target));
+                    }
+                }
             }
             return target;
         }

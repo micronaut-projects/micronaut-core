@@ -42,7 +42,7 @@ InterceptionLog = java.type("io.micronaut.python.aop.InterceptionLog")
 @InterceptorBean(TestAround)
 class RecordingInterceptor(MethodInterceptor):
     def intercept(self, context: MethodInvocationContext):
-        InterceptionLog.record(context.getMethodName())
+        InterceptionLog.recordInterception(context.getMethodName())
         return context.proceed()
 '''
 
@@ -311,7 +311,7 @@ Function = java.type("java.util.function.Function")
 @InterceptorBean(TestAround)
 class DelayingInterceptor(MethodInterceptor):
     def intercept(self, context: MethodInvocationContext):
-        InterceptionLog.record(context.getMethodName())
+        InterceptionLog.recordInterception(context.getMethodName())
         stage = context.proceed().toCompletableFuture()
         return stage.thenApplyAsync(Function.identity(), CompletableFuture.delayedExecutor(300, TimeUnit.MILLISECONDS))
 
