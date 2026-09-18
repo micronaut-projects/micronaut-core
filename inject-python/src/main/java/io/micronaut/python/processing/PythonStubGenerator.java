@@ -112,12 +112,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
 
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
-    public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
+    public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField(CLASS_FIELD, TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     private static final String SYNC_SNAPSHOT_FIELD_PREFIX = "graalpyInternalSynced_";
     private static final String MEMBER_LOCAL_PREFIX = "pythonMember_";
     private static final String BOOLEAN_TYPE = "boolean";
+    private static final String SHORT_TYPE = "short";
+    private static final String DOUBLE_TYPE = "double";
+    private static final String FLOAT_TYPE = "float";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -2996,7 +3000,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (className != null) {
                 ClassElement type = context.getClassElement(className).orElse(null);
                 if (type != null) {
-                    return ClassTypeDef.of(type).getStaticField("class", TypeDef.of(Class.class));
+                    return ClassTypeDef.of(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
                 }
             }
             throw unrepresentable(annotationName, memberName, value, memberType);
@@ -3033,13 +3037,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return number.intValue();
                 case "long":
                     return number.longValue();
-                case "short":
+                case SHORT_TYPE:
                     return number.shortValue();
                 case "byte":
                     return number.byteValue();
-                case "double":
+                case DOUBLE_TYPE:
                     return number.doubleValue();
-                case "float":
+                case FLOAT_TYPE:
                     return number.floatValue();
                 default:
                     break;
@@ -3163,7 +3167,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 "convertValue",
                 thisType,
                 methodParameters.get(0),
-                thisType.getStaticField("class", TypeDef.CLASS)
+                thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS)
             ).returning()));
         Set<String> addedMethodNames = new LinkedHashSet<>();
         MethodElement jsonValueMethod = enumJsonValueMethod(classElement);
@@ -4628,13 +4632,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 invokedValue.invoke("asInt", TypeDef.Primitive.INT);
             case BOOLEAN_TYPE, "java.lang.Boolean" ->
                 invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
-            case "double", "java.lang.Double" ->
+            case DOUBLE_TYPE, "java.lang.Double" ->
                 invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
-            case "float", "java.lang.Float" ->
+            case FLOAT_TYPE, "java.lang.Float" ->
                 invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT);
             case "long", "java.lang.Long" ->
                 invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
-            case "short", "java.lang.Short" ->
+            case SHORT_TYPE, "java.lang.Short" ->
                 invokedValue.invoke("asShort", TypeDef.Primitive.SHORT);
             case "byte", "java.lang.Byte" ->
                 invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
@@ -4678,10 +4682,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return switch (type.getName()) {
                 case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
                 case BOOLEAN_TYPE -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
-                case "double" -> member.invoke("asDouble", TypeDef.Primitive.DOUBLE);
-                case "float" -> member.invoke("asFloat", TypeDef.Primitive.FLOAT);
+                case DOUBLE_TYPE -> member.invoke("asDouble", TypeDef.Primitive.DOUBLE);
+                case FLOAT_TYPE -> member.invoke("asFloat", TypeDef.Primitive.FLOAT);
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
-                case "short" -> member.invoke("asShort", TypeDef.Primitive.SHORT);
+                case SHORT_TYPE -> member.invoke("asShort", TypeDef.Primitive.SHORT);
                 case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
                 case "char" -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                 default -> member.invoke("asString", ClassTypeDef.STRING);
