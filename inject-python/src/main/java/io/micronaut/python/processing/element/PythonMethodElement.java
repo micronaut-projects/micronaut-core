@@ -27,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.Introduction;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -173,9 +175,24 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         }
     }
 
+    /**
+     * Whether the method is abstract. A function decorated with {@code @abstractmethod}, declared by a
+     * {@code Protocol}, or declared by an {@code ABC} with the {@code ...} placeholder body is abstract. A
+     * placeholder body is also abstract in an {@link Introduction introduction} type ({@code @Client}, a
+     * repository, an AI service), whose methods are implemented by the introduction advice; in a concrete
+     * class it is a method returning {@code None}.
+     *
+     * @return True if the method is abstract
+     */
     @Override
     public boolean isAbstract() {
-        return getNativeType().isAbstract();
+        FunctionDef functionDef = getNativeType();
+        return functionDef.isAbstract()
+            || (functionDef.hasPlaceholderBody() && isIntroductionType(owningType));
+    }
+
+    static boolean isIntroductionType(ClassElement classElement) {
+        return classElement.hasStereotype(Introduction.class) && !classElement.isAssignable(Interceptor.class);
     }
 
     /**

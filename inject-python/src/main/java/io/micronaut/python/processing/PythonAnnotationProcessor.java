@@ -647,6 +647,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             return parser.transform(
                 javaVisitorContext,
+                Arrays.asList(srcDirs),
                 selectTransformSources(sources).toArray(new Source[0])
             );
         }

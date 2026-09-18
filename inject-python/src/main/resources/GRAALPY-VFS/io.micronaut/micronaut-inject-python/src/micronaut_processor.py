@@ -152,6 +152,12 @@ def is_protocol_type_name(type_name):
     """
     return type_name in ("typing.Protocol", "typing_extensions.Protocol", "Protocol")
 
+def is_abc_type_name(type_name):
+    """
+    Returns True if the type name references abc.ABC.
+    """
+    return type_name in ("abc.ABC", "ABC")
+
 
 class MicronautAstVisitor(ast.NodeVisitor):
 
@@ -369,14 +375,18 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Extract function docstring
                         func_doc = self._extract_docstring(node)
 
+                        is_placeholder = is_placeholder_method(node)
+                        # A placeholder body declares an abstract method only where Python itself would not
+                        # instantiate the class: an ABC or a Protocol. Whether an introduction type makes it
+                        # abstract too is decided by the Java element model, which knows the class stereotypes.
                         is_abstract = (
                             is_abstract_method(node) or
                             self._current_class_is_protocol() or
-                            is_placeholder_method(node)
+                            (is_placeholder and self._current_class_is_abc())
                         )
                         is_static = is_static_method(node)
 
-                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node))
+                        func_def = JavaFuncDef(node.name, arguments, decorators, return_type, "", func_type_params, func_doc, is_abstract, is_static, is_async, has_return_value(node), is_placeholder, None)
                         if self.current_class is not None:
                             if node.name == "__init__":
                                 if is_async:
@@ -1606,7 +1616,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         is_abstract = is_abstract_method(func_node)
         is_static = is_static_method(func_node)
 
-        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node))
+        func_def = JavaFuncDef(func_node.name, arguments, decorators, return_type_annotation, "", [], func_doc, is_abstract, is_static, False, has_return_value(func_node), is_placeholder_method(func_node), None)
 
         # Update the property based on type
         if property_type == "getter":
@@ -1832,6 +1842,17 @@ class MicronautAstVisitor(ast.NodeVisitor):
             return False
         for base in self.current_class.bases():
             if is_protocol_type_name(base.name()):
+                return True
+        return False
+
+    def _current_class_is_abc(self):
+        """
+        Returns True if the current class directly extends abc.ABC.
+        """
+        if self.current_class is None:
+            return False
+        for base in self.current_class.bases():
+            if is_abc_type_name(base.name()):
                 return True
         return False
 

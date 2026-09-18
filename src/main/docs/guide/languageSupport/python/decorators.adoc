@@ -1,0 +1,81 @@
+Java annotations are applied to Python classes, functions and parameters as decorators, and as `Annotated[...]` metadata. Whether a decorator is applied bare or called follows from how it is written, as for a Java annotation: `@Singleton` and `@Singleton()` are the same annotation, and every argument of a call is an annotation value. A single positional argument is the `value` member, whatever its type:
+
+[source,python]
+----
+from org.junit.jupiter.api import MethodOrderer, Test, TestMethodOrder
+
+@TestMethodOrder(MethodOrderer.OrderAnnotation)  # <1>
+class OrderedTest:
+
+    @Test  # <2>
+    def first(self):
+        pass
+----
+
+<1> The class `MethodOrderer.OrderAnnotation` is the `value` of the annotation, as `@TestMethodOrder(MethodOrderer.OrderAnnotation.class)` is in Java
+<2> A bare decorator is the annotation without members
+
+== Custom Annotations
+
+A custom annotation is a function returning a decorator, itself decorated with the annotations that make up its stereotype. Its parameters are the annotation members and their defaults the member defaults. It is applied like a generated decorator, bare or called, in the module that defines it and in modules that import it:
+
+[source,python]
+----
+from jakarta.inject import Qualifier
+
+@Qualifier
+def Cylinders(value: int = 4):
+    def decorator(target):
+        return target
+    return decorator
+
+@Cylinders        # value = 4
+class FourCylinderEngine:
+    pass
+
+@Cylinders(8)
+class V8Engine:
+    pass
+----
+
+A function with exactly one required positional parameter (or only `*args`) receives the decorated target when it is applied bare, as any Python decorator does; it is never rewritten to a call. That is the plain decorator returning the target (`def Timed(target): return target`), the wrapping decorator below, and an annotation whose member has no default (`def Tagged(value: str)`), which is written `@Tagged("x")`:
+
+[source,python]
+----
+from micronaut.core.bind.annotation import Bindable
+
+@Bindable
+def Traced(func):
+    def wrapper(*args, **kwargs):
+        return "traced:" + func(*args, **kwargs)
+    return wrapper
+
+@Traced   # Traced(hello), never Traced()(hello)
+def hello(self) -> str:
+    return "ok"
+----
+
+A custom annotation function whose members are only `*args` (`def Tags(*values: str)`) is likewise a function with only `*args`: written `@Tags("a", "b")` or `@Tags()` it is the annotation with those values, but applied bare it receives the decorated target as its only value, like any Python decorator, and the compiler does not rewrite it. Give such an annotation a regular member with a default instead when it is meant to be applied bare.
+
+A generated decorator applied bare through a name the compiler cannot see as the annotation (`Bean = Singleton` in another module, `getattr`) receives the class or function as its single argument; unless the annotation's `value` member holds a class, it raises a `TypeError` naming the annotation rather than replacing the target with the decorator.
+
+== Placeholder Bodies
+
+A method whose body is only `...` is abstract where Python itself would not instantiate the class, and where the method is implemented by Micronaut:
+
+* in a class extending `abc.ABC` or `typing.Protocol`, or when decorated with `@abstractmethod`;
+* in a class carrying an api:aop.Introduction[] stereotype, such as a declarative HTTP client, a Micronaut Data repository or an AI service, whose methods are implemented by the introduction advice.
+
+In any other class the placeholder is a method body that returns `None`, so a concrete bean whose methods are placeholders, such as a messaging listener written before its handlers, is a concrete, injectable bean:
+
+[source,python]
+----
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class MessageListener:
+    @Executable
+    def on_message(self, message: str) -> None:
+        ...
+----
