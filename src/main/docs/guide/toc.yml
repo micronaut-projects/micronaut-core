@@ -350,6 +350,7 @@ languageSupport:
     standardTypes: Standard Library Type Conversions
     javaCollections: Java Collections and Serialization
     keywords: Python Keywords in Java APIs
+    nestedTypes: Nested Java Types
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

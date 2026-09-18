@@ -40,6 +40,7 @@ public final class PythonJavaTypes {
         "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
         "java.lang.Float", "java.lang.Boolean", "java.lang.Character"
     );
+    private static final String PYTHON_CLASS_ANNOTATION = "io.micronaut.context.python.annotation.PythonClass";
 
     private PythonJavaTypes() {
     }
@@ -60,6 +61,17 @@ public final class PythonJavaTypes {
         }
         // Reflection-backed elements (ClassElement.of(Class)) do not answer isAssignable(String).
         return THROWABLE_ROOTS.contains(classElement.getName());
+    }
+
+    /**
+     * Whether the type is a Java class the Python compiler generated from a Python class. Such a
+     * class names a Python module, not a Java type, when it appears as the module of an import.
+     *
+     * @param classElement The type
+     * @return Whether it was generated from Python
+     */
+    public static boolean isPythonClass(@Nullable ClassElement classElement) {
+        return classElement != null && classElement.hasAnnotation(PYTHON_CLASS_ANNOTATION);
     }
 
     /**
