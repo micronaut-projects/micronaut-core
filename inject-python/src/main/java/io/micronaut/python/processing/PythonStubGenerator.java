@@ -4667,8 +4667,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return true;
         }
         return switch (type.getName()) {
-            case JAVA_LANG_STRING, "java.lang.Boolean", "java.lang.Byte", "java.lang.Short", "java.lang.Integer",
-                 "java.lang.Long", "java.lang.Float", "java.lang.Double", "java.lang.Character" -> true;
+            case JAVA_LANG_STRING, "java.lang.Boolean", "java.lang.Byte", JAVA_LANG_SHORT, "java.lang.Integer",
+                 "java.lang.Long", JAVA_LANG_FLOAT, JAVA_LANG_DOUBLE, "java.lang.Character" -> true;
             default -> isSharedCollectionType(type);
         };
     }
