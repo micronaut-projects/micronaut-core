@@ -1059,17 +1059,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             List<ExpressionDef> memberValues = new ArrayList<>();
                             for (PropertyElement beanProperty : beanProperties) {
                                 FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field == null) {
-                                    continue;
+                                if (field != null) {
+                                    if (isSharedCollectionProperty(beanProperty)) {
+                                        reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field));
+                                        continue;
+                                    }
+                                    memberNames.add(ExpressionDef.constant(beanProperty.getName()));
+                                    memberValues.add(coerceTypedElementToPolyglotValue(
+                                        beanProperty, aThis.field(field), targetContext
+                                    ).cast(TypeDef.OBJECT));
                                 }
-                                if (isSharedCollectionProperty(beanProperty)) {
-                                    reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field));
-                                    continue;
-                                }
-                                memberNames.add(ExpressionDef.constant(beanProperty.getName()));
-                                memberValues.add(coerceTypedElementToPolyglotValue(
-                                    beanProperty, aThis.field(field), targetContext
-                                ).cast(TypeDef.OBJECT));
                             }
                             if (!memberNames.isEmpty()) {
                                 reuseStatements.add(putMembers(storedValue, memberNames, memberValues));

@@ -34,6 +34,7 @@ import java.util.RandomAccess;
  * @since 5.2.0
  */
 @Internal
+@SuppressWarnings("java:S2160") // AbstractList provides value-based equality over this view's elements.
 final class PythonListView<E> extends AbstractList<E> implements PythonCollectionView, RandomAccess, Serializable {
 
     @Serial

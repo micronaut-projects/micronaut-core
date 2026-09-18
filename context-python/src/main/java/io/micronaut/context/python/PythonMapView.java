@@ -38,6 +38,7 @@ import java.util.Set;
  * @since 5.2.0
  */
 @Internal
+@SuppressWarnings("java:S2160") // AbstractMap provides value-based equality over this view's entries.
 final class PythonMapView<K, V> extends AbstractMap<K, V> implements PythonCollectionView, Serializable {
 
     @Serial
