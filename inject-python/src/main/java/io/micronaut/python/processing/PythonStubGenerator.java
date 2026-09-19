@@ -64,6 +64,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -3381,7 +3382,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         addedMethodNames.add(key);
         addedMethodNames.add(pythonKey);
 
-        if (isDeclaredBeanMethod(methodElement.getAnnotationMetadata())) {
+        if (isFactoryBeanMethod(bridgeOwner, methodElement.getAnnotationMetadata())) {
             if (isAsyncPythonMethod(methodElement)) {
                 throw new ProcessingException(methodElement, "Factory methods declared with @Bean cannot be async.");
             }
@@ -5015,11 +5016,58 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
     }
 
+    /**
+     * Whether a method carries a declared {@code @Bean} annotation or stereotype. Every such method is bridged:
+     * a {@code @Factory} needs the bridge for its bean methods, including those it inherits from a base class
+     * that is not itself a {@code @Factory}, as the bean definition of an inherited bean method calls the
+     * bridge of the declaring stub. Visitors can also add {@code @Bean} directly to Python methods after
+     * metadata parsing, and those methods need bridges so that the generated bean definitions can call them.
+     * A plain bridge is harmless elsewhere.
+     *
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method declares a {@code @Bean} annotation or stereotype
+     */
     private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
-        // Visitors can add @Bean directly to Python methods after metadata parsing. Those
-        // methods still need Java bridge methods so generated bean definitions can call them.
         return annotationMetadata.hasDeclaredAnnotation(Bean.class)
             || annotationMetadata.hasDeclaredStereotype(Bean.class);
+    }
+
+    /**
+     * Whether a method is a factory method producing a bean. Mirrors the core bean definition creators: a
+     * method carrying a declared {@code @Bean} annotation or stereotype only produces a bean when the class
+     * it is bridged for is a {@code @Factory}, or when a {@code @Factory} being compiled extends that class
+     * and so inherits the method as one of its bean methods. Elsewhere the {@code @Bean} stereotype is
+     * incidental, for example messaging listener annotations meta-annotated with {@code @MessageListener}
+     * that are placed on methods of ordinary beans, and such methods are bridged as regular executable
+     * methods without the factory method validation.
+     *
+     * @param owner              The class the method is bridged for
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method is a factory method
+     */
+    private boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
+        return isDeclaredBeanMethod(annotationMetadata)
+            && (owner.hasStereotype(Factory.class) || hasFactorySubclass(owner));
+    }
+
+    /**
+     * Whether a {@code @Factory} class among the compiled Python classes extends the given class. The bean
+     * methods such a factory inherits are bridged once, on the stub of the declaring class, so that stub
+     * has to apply the factory method validation and bridge the pre-destroy method on their behalf.
+     *
+     * @param owner The class declaring the method
+     * @return True if a compiled {@code @Factory} extends the class
+     */
+    private boolean hasFactorySubclass(ClassElement owner) {
+        String ownerName = owner.getName();
+        for (ClassElement classElement : allClasses.values()) {
+            if (!classElement.getName().equals(ownerName)
+                && classElement.hasStereotype(Factory.class)
+                && classElement.isAssignable(ownerName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
