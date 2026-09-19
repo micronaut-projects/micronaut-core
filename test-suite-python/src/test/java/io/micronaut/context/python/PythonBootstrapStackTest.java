@@ -26,13 +26,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The generated launcher and package initialisers keep the import chain of the bootstrap shallow.
  * <p>
  * GraalPy runs interpreted on a stock JDK and keeps dozens of Java frames per Python frame, and it
- * reports the Java {@code StackOverflowError} as a Python {@code RecursionError}. The shim packages of
- * this test suite import their subpackages eagerly, so the deepest import chain of the launcher nests
- * twelve package levels ({@code micronaut.test.extensions.junit5.annotation} through
+ * reports the Java {@code StackOverflowError} as a Python {@code RecursionError}. While the shim
+ * packages of this test suite imported their subpackages eagerly, the deepest import chain of the
+ * launcher nested twelve package levels ({@code micronaut.test.extensions.junit5.annotation} through
  * {@code org.junit.jupiter.api} to {@code org.junit.platform.commons.annotation}), and every Python
- * frame a package initialiser adds per level is multiplied by twelve. Initialisers importing their
+ * frame a package initialiser adds per level was multiplied by twelve. Initialisers importing their
  * members modules through {@code importlib.import_module} from nested functions needed a 640 KB stack
- * on macOS arm64 and failed intermittently at the 1 MB default of Linux x64.
+ * on macOS arm64 and failed intermittently at the 1 MB default of Linux x64; initialisers running the
+ * members modules at their own level reached an import from 167 Python frames. A shim package now
+ * imports a subpackage on its first access, so the import system imports the packages of a dotted name
+ * one after the other instead of nesting them, and the deepest import is reached from 55 frames.
  * <p>
  * The stack a frame takes depends on the platform, the number of Python frames does not: the test
  * re-runs the launcher with an import hook that records the deepest Python frame chain an import is
@@ -41,10 +44,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PythonBootstrapStackTest {
 
     /**
-     * Above the deepest import chain of the initialisers that run the members modules at their own
-     * level, below the one of the initialisers that imported them from nested functions.
+     * Above the deepest import chain of the initialisers that import their subpackages on first access,
+     * below the one of the initialisers that imported them eagerly.
      */
-    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 200);
+    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 100);
 
     private static final String RERUN_LAUNCHER_WITH_DEPTH_RECORDER = """
         def __micronaut_rerun_launcher():

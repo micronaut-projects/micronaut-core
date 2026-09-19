@@ -794,7 +794,7 @@ class AsyncImportService:
         packageMembers(propagationInit.parentFile).contains("ReactorPropagation = _micronaut_java_type('io.micronaut.core.async.propagation.ReactorPropagation')")
 
         def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
-        packageMembers(coreInit.parentFile).contains("from . import async_")
+        packageMembers(coreInit.parentFile).contains("__micronaut_subpackages__ = [\"async_\"]")
 
         cleanup:
         tempDir.deleteDir()

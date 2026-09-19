@@ -66,7 +66,7 @@ class Helper:
 
         then: "the Java shims and the application module are contributed to the same package, whose initializer merges them (a module importing a Java type from its own package while it initializes is served by the merger)"
         members.contains("ApplicationContext = _micronaut_java_type('io.micronaut.context.ApplicationContext', True)")
-        members.contains("from . import annotation")
+        members.contains("__micronaut_subpackages__ = [\"annotation\"]")
         members.contains("from .helper import Helper")
         vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_merge_members")
         vfsFile("micronaut/context/helper.py").exists()
