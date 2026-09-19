@@ -943,13 +943,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 }
             }
 
-            // For Python, attributes are not real fields since Python uses dynamic attributes
-            // So we don't return them as FieldElement instances to avoid injection issues
-            // Properties are handled separately via PropertyElement
-            // if (elementType == FieldElement.class ||
-            //     elementType == MemberElement.class) {
-            //     elements.addAll(classNode.attributes());
-            // }
+            // The declared attributes of a class are its fields for a field query (findField, ALL_FIELDS):
+            // visitors that read a class through its fields, such as an entity referenced by a JSON view, a
+            // serialization mixin or a JAXB type with field access, see the same attributes the generated
+            // Java class declares as fields. A member query (ALL_FIELD_AND_METHODS) does not report them:
+            // attributes are injected and introspected as properties, and the bean definition would
+            // otherwise process an injected attribute twice.
+            if (elementType == FieldElement.class) {
+                elements.addAll(classNode.attributes());
+            }
 
             // Add properties if the query is for properties or members
             if (elementType == PropertyElement.class ||

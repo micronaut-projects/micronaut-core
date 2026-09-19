@@ -53,6 +53,8 @@ import io.micronaut.python.processing.visitor.PythonVisitorContext;
 @Internal
 public final class PythonTypeResolver {
 
+    private static final String TYPE_USE_ELEMENT_NAME = "$typeUse";
+
     private final PythonVisitorContext visitorContext;
 
     public PythonTypeResolver(PythonVisitorContext visitorContext) {
@@ -100,23 +102,23 @@ public final class PythonTypeResolver {
         List<TypeRef> typeArguments = typeRef.typeArguments();
         List<DecoratorDef> typeUseDecorators = typeRef.typeUseDecorators();
         if (typeRef.isUnion()) {
-            return withTypeUseDecorators(resolveUnionType(typeRef, visitorContext, boundGenerics), typeUseDecorators, visitorContext);
+            return resolveUnionType(typeRef, visitorContext, boundGenerics);
         }
         if (isAnnotatedType(name) && !typeArguments.isEmpty()) {
             ClassElement baseType = resolvePythonTypeToJava(typeArguments.getFirst(), visitorContext, boundGenerics);
-            return withTypeUseAnnotations(baseType, typeArguments.subList(1, typeArguments.size()), visitorContext);
+            return withTypeUseAnnotations(baseType, typeRef, typeArguments.subList(1, typeArguments.size()), visitorContext);
         }
         if (typeArguments.isEmpty()) {
             ClassElement boundGeneric = boundGenerics.get(name);
             if (boundGeneric != null) {
-                return withTypeUseDecorators(boundGeneric, typeUseDecorators, visitorContext);
+                return withTypeUseDecorators(boundGeneric, typeRef, typeUseDecorators, visitorContext);
             }
         }
         ClassElement rawType = resolvePythonTypeToJava(name, visitorContext, boundGenerics);
         if (!typeArguments.isEmpty()) {
             ClassElement collectionType = resolveCollectionTypeArguments(rawType, typeArguments, visitorContext, boundGenerics);
             if (collectionType != null) {
-                return withTypeUseDecorators(collectionType, typeUseDecorators, visitorContext);
+                return withTypeUseDecorators(collectionType, typeRef, typeUseDecorators, visitorContext);
             }
         }
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = rawType.getDeclaredGenericPlaceholders();
@@ -129,9 +131,9 @@ public final class PythonTypeResolver {
                 String variableName = placeHolder.getVariableName();
                 resolvedTypeArguments.put(variableName, resolvedType);
             }
-            return withTypeUseDecorators(rawType.withTypeArguments(resolvedTypeArguments), typeUseDecorators, visitorContext);
+            return withTypeUseDecorators(rawType.withTypeArguments(resolvedTypeArguments), typeRef, typeUseDecorators, visitorContext);
         }
-        return withTypeUseDecorators(rawType, typeUseDecorators, visitorContext);
+        return withTypeUseDecorators(rawType, typeRef, typeUseDecorators, visitorContext);
     }
 
     private static boolean isAnnotatedType(String name) {
@@ -140,6 +142,7 @@ public final class PythonTypeResolver {
 
     private static ClassElement withTypeUseAnnotations(
         ClassElement baseType,
+        TypeRef typeNode,
         List<TypeRef> annotationTypes,
         PythonVisitorContext visitorContext
     ) {
@@ -154,25 +157,39 @@ public final class PythonTypeResolver {
             }
             decorators.add(new DecoratorDef(annotationName, annotationName));
         }
-        return withTypeUseDecorators(baseType, decorators, visitorContext);
+        return withTypeUseDecorators(baseType, typeNode, decorators, visitorContext);
     }
 
+    /**
+     * Wraps a resolved type with the annotation metadata of its type-use decorators. The metadata is the one
+     * cached for the type node, so a visitor annotating the type argument of a parameter (the validation visitor
+     * marks a constrained collection element) mutates the metadata every later resolution of the node answers.
+     */
     private static ClassElement withTypeUseDecorators(
         ClassElement baseType,
+        TypeRef typeNode,
         List<DecoratorDef> decorators,
         PythonVisitorContext visitorContext
     ) {
         if (decorators.isEmpty()) {
             return baseType;
         }
-        AnnotationMetadata annotationMetadata = visitorContext
-            .getAnnotationMetadataBuilder()
-            .buildDeclared(new AttributeDef("$typeUse", null, null, null, decorators, null, false, null));
-        if (annotationMetadata.isEmpty()) {
+        ElementAnnotationMetadata metadata = typeUseAnnotationMetadata(typeNode, decorators, visitorContext);
+        if (metadata.isEmpty()) {
             return baseType;
         }
-        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
         return TypeAnnotatedClassElement.of(baseType, metadata);
+    }
+
+    private static ElementAnnotationMetadata typeUseAnnotationMetadata(
+        TypeRef typeNode,
+        List<DecoratorDef> decorators,
+        PythonVisitorContext visitorContext
+    ) {
+        return visitorContext.getElementAnnotationMetadataFactory().buildTypeUseAnnotations(
+            typeNode,
+            new AttributeDef(TYPE_USE_ELEMENT_NAME, null, null, null, decorators, null, false, null)
+        );
     }
 
     private static @Nullable ClassElement resolveCollectionTypeArguments(
@@ -225,6 +242,7 @@ public final class PythonTypeResolver {
                 return boxedClassElement;
             }
             if (annotationMetadata instanceof ElementAnnotationMetadata elementAnnotationMetadata) {
+                // the cached metadata of the type node: a boxed type argument keeps sharing it
                 return TypeAnnotatedClassElement.of(boxedClassElement, elementAnnotationMetadata);
             }
             var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
@@ -315,22 +333,26 @@ public final class PythonTypeResolver {
 
     /**
      * A union with exactly one member besides {@code None} is that member, boxed and marked nullable;
-     * any other union has no Java counterpart and resolves to {@code Object}.
+     * any other union has no Java counterpart and resolves to {@code Object}. The metadata cached for the
+     * union node carries the nullability and the type-use decorators of the node together
+     * ({@code Annotated[str | None, NotBlank]} places the constraint on the union): a node has one cached
+     * metadata, so building it from the nullability alone would drop the decorators.
      */
     private static ClassElement resolveUnionType(TypeRef union, PythonVisitorContext visitorContext, Map<String, ClassElement> boundGenerics) {
         List<TypeRef> members = union.nonNoneMembers();
         if (members.size() != 1 || !union.isNullableUnion()) {
-            return visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+            ClassElement objectType = visitorContext.getClassElement(Object.class).orElse(ClassElement.of(Object.class));
+            return withTypeUseDecorators(objectType, union, union.typeUseDecorators(), visitorContext);
         }
         ClassElement resolvedType = resolvePythonTypeToJava(members.getFirst(), visitorContext, boundGenerics);
         ClassElement boxedType = boxPrimitiveTypeIfNeeded(resolvedType, visitorContext);
-        AnnotationMetadata annotationMetadata = visitorContext
-            .getAnnotationMetadataBuilder()
-            .buildDeclared(new AttributeDef("$typeUse", union.toString(), union, null, List.of(), null, false, null));
-        if (annotationMetadata.isEmpty()) {
+        ElementAnnotationMetadata metadata = visitorContext.getElementAnnotationMetadataFactory().buildTypeUseAnnotations(
+            union,
+            new AttributeDef(TYPE_USE_ELEMENT_NAME, union.toString(), union, null, union.typeUseDecorators(), null, false, null)
+        );
+        if (metadata.isEmpty()) {
             return boxedType;
         }
-        var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
         return TypeAnnotatedClassElement.of(boxedType, metadata);
     }
 
