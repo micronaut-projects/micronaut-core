@@ -119,6 +119,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     /**
      * The {@code class} member of a type: {@code Type.class}.
      */
+    private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
+    private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
     private static final String PUT_MEMBER = "putMember";
     private static final String CLASS_FIELD = "class";
@@ -1164,8 +1166,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         if (!beanProperties.isEmpty()) {
-            builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers"));
-            addValueCoerciblePropertyMembers(builder, beanProperties, propertyFields);
+            builder.addSuperinterface(ClassTypeDef.of(GENERATED_PROPERTY_MEMBERS_CANONICAL));
+            addValueCoerciblePropertyMembers(builder, beanProperties, propertyFields, !propertyFields.isEmpty() || inheritsPropertyMemberHooks(model));
         }
 
     }
@@ -4910,10 +4912,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "set" + NameUtils.capitalize(name);
     }
 
+    /**
+     * Whether the generated class inherits property member hooks ({@code micronautValueCoercibleSetMember},
+     * {@code micronautValueCoerciblePutMember}) that write fields, which a class without property fields
+     * of its own overrides to return false. When the effective inherited implementation is the interface
+     * default (no base, an Object or interface base, or a Python base whose stub writes no fields), the
+     * override would only return false as the default does, so none is declared.
+     */
+    private static boolean inheritsPropertyMemberHooks(ClassStubModel model) {
+        ClassElement superType = model.superType();
+        if (superType == null || !(model.extendsPythonClass() || model.extendsHostClass())) {
+            return false;
+        }
+        if (superType instanceof AbstractPythonClassElement pythonSuperType) {
+            // the stub of a Python base writes fields, and so declares hooks that do more than return
+            // false, only when it is introspected with bean properties; a plain base inherits the default
+            // or returns false itself
+            return pythonSuperType.hasStereotype(Introspected.class) && !pythonSuperType.getBeanProperties().isEmpty();
+        }
+        // a compiled stub or another Java base implementing the interface: its hook bodies are not known
+        // here, so the override suppressing them is kept
+        return superType.isAssignable(GENERATED_PROPERTY_MEMBERS);
+    }
+
     private void addValueCoerciblePropertyMembers(
         ClassDef.ClassDefBuilder builder,
         List<PropertyElement> beanProperties,
-        Map<String, FieldDef> propertyFields
+        Map<String, FieldDef> propertyFields,
+        boolean overridePropertyMemberHooks
     ) {
         // Precompute JavaBean accessor aliases for ValueCoercible. The runtime proxy only consults
         // these generated tables, avoiding reflection over generated wrapper methods.
@@ -4951,6 +4977,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter("key", TypeDef.STRING)
             .returns(TypeDef.STRING)
             .build((aThis, methodParameters) -> propertyNameMatchBody(methodParameters.getFirst(), setterMappings)));
+        if (!overridePropertyMemberHooks) {
+            // the interface defaults return false, which is all the bodies below would do without property fields
+            return;
+        }
         builder.addMethod(MethodDef.builder("micronautValueCoercibleSetMember")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
