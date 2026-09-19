@@ -30,6 +30,28 @@ def normalize_python_keyword_alias(name: str) -> str:
 
 from ast import unparse
 
+# ``io`` is Python's built-in module, so a Python import of ``io.<anything>`` can only ever name a Java
+# package (io.micronaut, io.swagger, io.kubernetes, ...). The generated runtime packages therefore live
+# without the ``io.`` prefix (``micronaut.context.annotation``, ``swagger.v3.oas.annotations``) and the
+# runtime transformer rewrites such imports accordingly.
+JAVA_IO_PACKAGE_PREFIX = 'io.'
+
+
+def is_java_io_package(module_name: Optional[str]) -> bool:
+    return bool(module_name) and module_name.startswith(JAVA_IO_PACKAGE_PREFIX)
+
+
+def strip_java_io_prefix(module_name: str) -> str:
+    return module_name[len(JAVA_IO_PACKAGE_PREFIX):] if is_java_io_package(module_name) else module_name
+
+
+def unresolved_java_io_import_error(name: str, kind: str = 'import') -> str:
+    return (
+        f"Cannot resolve Java {kind} [{name}]: io is Python's built-in module, so io.* imports always refer to "
+        f"Java packages, but no such {'class or package' if kind == 'import' else 'package'} was found on the "
+        "compile classpath. Add the dependency that provides it or fix the import."
+    )
+
 _AnnotationTypes = java.type("io.micronaut.python.processing.util.PythonAnnotationTypes")
 _JavaTypes = java.type("io.micronaut.python.processing.util.PythonJavaTypes")
 
@@ -83,40 +105,37 @@ class MicronautTransformer(ast.NodeTransformer):
 
         java_module = self._to_java_import_module(node.module)
 
-        # Special handling for io. prefixed imports to avoid conflict with Python's builtin io module
+        # The transformed source is only read by the compile-time processor, which resolves Java names,
+        # so the module keeps its Java name here (``io.`` included); only the runtime transformer strips it.
         transformed_module = self._to_python_import_module(java_module)
-        if transformed_module.startswith('io.'):
-            transformed_module = transformed_module[3:]  # Remove 'io.' prefix
+        # A relative import (``from .io.util import helper``) names an application sub-package, never Java
+        java_io_package = node.level == 0 and is_java_io_package(java_module)
 
         # Collect imports to transform - check if JavaVisitorContext.getClassElements returns annotations
         transformed_any = False
+        imports_java_package = False
         for alias in node.names:
             if alias.name == '*':
                 # Handle star imports - scan the entire package
                 if self._handle_star_import(java_module, transformed_module):
                     transformed_any = True
+                elif java_io_package and not self.callback_get_class_elements(java_module):
+                    self.validation_errors.append(unresolved_java_io_import_error(java_module, 'package'))
             else:
                 # Handle specific imports
                 if self._handle_specific_import(java_module, transformed_module, alias):
                     transformed_any = True
+                elif java_io_package:
+                    # ``from io.swagger.v3.oas import annotations as oas`` imports a Java package, not a class:
+                    # the processor resolves ``oas.Operation`` through the import, which therefore stays.
+                    if self._handle_package_import(f'{java_module}.{alias.name}'):
+                        imports_java_package = True
+                    else:
+                        self.validation_errors.append(self._java_io_import_error(node.module, java_module, alias))
 
-        # If any imports were transformed, replace the import with the transformed module name
-        if transformed_any:
-            if transformed_module != node.module:
-                # Create a new ImportFrom node with the transformed module name
-                new_node = ast.ImportFrom(
-                    module=transformed_module,
-                    names=node.names,
-                    level=node.level
-                )
-                # Copy other attributes
-                new_node.lineno = node.lineno
-                new_node.end_lineno = node.end_lineno
-                new_node.col_offset = node.col_offset
-                new_node.end_col_offset = node.end_col_offset
-                return new_node
-            else:
-                return None  # Remove the import from the AST
+        if transformed_any and not imports_java_package:
+            # The generated decorators and java.type() assignments replace the import
+            return None
 
         return node
 
@@ -139,22 +158,56 @@ class MicronautTransformer(ast.NodeTransformer):
         or @a.Executable can be recognized at runtime without requiring the module to exist.
         If any decorators are generated, remove the import from the AST.
         """
-        transformed_any = False
-
         for alias in node.names:
-            original_module_name = alias.name
-            java_module_name = self._to_java_import_module(original_module_name)
+            java_module_name = self._to_java_import_module(alias.name)
             # Scan the entire package for annotation types
-            class_elements = self.callback_get_class_elements(java_module_name)
-            if class_elements:
-                for class_element in class_elements:
-                    if self._is_annotation_class(class_element):
-                        import_name = class_element.getSimpleName()
-                        decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
-                        if decorator_code:
-                            self.transformed_code.append(decorator_code)
+            resolved = self._handle_package_import(java_module_name)
+            if is_java_io_package(java_module_name):
+                if not resolved:
+                    self.validation_errors.append(unresolved_java_io_import_error(java_module_name, 'package'))
+                elif not alias.asname:
+                    self.validation_errors.append(
+                        f"Java package import [import {alias.name}] requires an alias such as "
+                        f"[import {alias.name} as {alias.name.split('.')[-1]}]: io is Python's built-in module, "
+                        f"so the name io cannot refer to the Java package at runtime."
+                    )
 
         return node
+
+    def _handle_package_import(self, java_package_name: str) -> bool:
+        """
+        Generate decorators for every annotation type of a Java package imported as a module
+        (``import io.micronaut.context.annotation as a``). Returns whether the package exists.
+        """
+        class_elements = self.callback_get_class_elements(java_package_name)
+        if not class_elements:
+            return False
+        for class_element in class_elements:
+            if self._is_annotation_class(class_element):
+                import_name = class_element.getSimpleName()
+                decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
+                if decorator_code:
+                    self.transformed_code.append(decorator_code)
+        return True
+
+    def _java_io_import_error(self, python_module: str, java_module: str, alias) -> str:
+        """
+        The error for ``from io.<x> import <name>`` that resolved to nothing: either the name is unknown on the
+        classpath, or it is a Java annotation whose decorator name is already taken by another annotation
+        imported earlier (``from micronaut.http.annotation import *`` followed by
+        ``from io.swagger.v3.oas.annotations.headers import Header``), which needs an alias.
+        """
+        full_name = f'{java_module}.{alias.name}'
+        variable_name = alias.asname or alias.name
+        class_element = self._lookup_imported_class_element(java_module, alias.name)
+        if class_element is not None and variable_name in self.generated_decorators:
+            suggested_alias = f'{java_module.split(".")[1].capitalize()}{alias.name}'
+            return (
+                f"Java import [{full_name}] clashes with the decorator [{variable_name}] generated for another "
+                f"Java annotation imported earlier in this module. Import it under an alias, such as "
+                f"[from {python_module} import {alias.name} as {suggested_alias}]."
+            )
+        return unresolved_java_io_import_error(full_name)
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         """
@@ -496,67 +549,47 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
         Handle specific imports like 'from jakarta.inject import Singleton' or 'from jakarta.inject import Singleton as S'
-        Returns True if the import was transformed.
+        Returns True if the import names a Java type (annotation or class) and was transformed.
         """
         import_name = alias.name  # The actual name being imported (e.g., "Singleton")
         variable_name = alias.asname if alias.asname else alias.name  # The name to use for the variable (e.g., "S" or "Singleton")
 
-        full_name = f"{original_module_name}.{import_name}"
-
-        # Try to get the ClassElement
-        class_element = self.callback_get_class_element(full_name)
-        if class_element:
-            # Check if it's an annotation
-            if self._is_annotation_class(class_element):
-                # Generate decorator for annotations
-                decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
-                if decorator_code:
-                    self.transformed_code.append(decorator_code)
-                    return True
-            else:
-                self._track_java_class(variable_name, class_element)
-                # Collect Java class import for VFS generation
-                self._collect_java_class_import(
-                    transformed_module_name,
-                    import_name,
-                    variable_name,
-                    class_element
-                )
-                # Generate java.type() assignment for regular Java types
-                java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
-                self.java_type_assignments.append(java_type_assignment)
-                self.has_java_import = True
+        class_element = self._lookup_imported_class_element(original_module_name, import_name)
+        if class_element is None:
+            return False
+        if self._is_annotation_class(class_element):
+            # Generate decorator for annotations
+            decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
+            if decorator_code:
+                self.transformed_code.append(decorator_code)
                 return True
-        else:
-            # Try with different naming conventions
-            # Java style: Singleton -> singleton
+            # The same annotation was already imported under this name
+            return class_element.getName() in self.generated_decorator_code
+        self._track_java_class(variable_name, class_element)
+        # Collect Java class import for VFS generation
+        self._collect_java_class_import(
+            transformed_module_name,
+            import_name,
+            variable_name,
+            class_element
+        )
+        # Generate java.type() assignment for regular Java types
+        java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
+        self.java_type_assignments.append(java_type_assignment)
+        self.has_java_import = True
+        return True
+
+    def _lookup_imported_class_element(self, java_module: str, import_name: str):
+        """
+        The ClassElement named by ``from <java_module> import <import_name>``, accepting the Python
+        snake_case spelling of the Java name (``singleton`` for ``Singleton``) as well.
+        """
+        class_element = self.callback_get_class_element(f"{java_module}.{import_name}")
+        if class_element is None:
             alt_name = self._to_python_case(import_name)
             if alt_name != import_name:
-                alt_full_name = f"{original_module_name}.{alt_name}"
-                class_element = self.callback_get_class_element(alt_full_name)
-                if class_element:
-                    # Check if it's an annotation
-                    if self._is_annotation_class(class_element):
-                        # Generate decorator for annotations
-                        decorator_code = self._generate_decorator_from_class_element(class_element, variable_name)
-                        if decorator_code:
-                            self.transformed_code.append(decorator_code)
-                            return True
-                    else:
-                        self._track_java_class(variable_name, class_element)
-                        # Collect Java class import for VFS generation
-                        self._collect_java_class_import(
-                            transformed_module_name,
-                            import_name,
-                            variable_name,
-                            class_element
-                        )
-                        # Generate java.type() assignment for regular Java types
-                        java_type_assignment = f"{variable_name} = java.type('{class_element.getName()}')"
-                        self.java_type_assignments.append(java_type_assignment)
-                        self.has_java_import = True
-                        return True
-        return False
+                class_element = self.callback_get_class_element(f"{java_module}.{alt_name}")
+        return class_element
 
     def _track_java_type_assignment(self, node: ast.Assign):
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
@@ -1187,8 +1220,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 if class_element.isInterface():
                     self.imported_java_interface_names.add(variable_name)
 
-        if java_module.startswith('io.micronaut.'):
-            transformed_module = self._to_python_import_module(java_module)[3:]
+        if node.level == 0 and is_java_io_package(java_module):
+            # (a relative ``from .io.util import helper`` names an application sub-package, never Java)
+            transformed_module = strip_java_io_prefix(self._to_python_import_module(java_module))
             return ast.copy_location(
                 ast.ImportFrom(module=transformed_module, names=node.names, level=node.level),
                 node
@@ -1196,7 +1230,18 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return node
 
     def visit_Import(self, node: ast.Import):
-        return node
+        """
+        Rewrite ``import io.micronaut.context.annotation as a`` (any Java ``io.*`` package) to the generated
+        runtime package, which lives without the ``io.`` prefix.
+        """
+        if not any(is_java_io_package(alias.name) for alias in node.names):
+            return node
+        names = [
+            ast.alias(name=strip_java_io_prefix(alias.name), asname=alias.asname)
+            if is_java_io_package(alias.name) else alias
+            for alias in node.names
+        ]
+        return ast.copy_location(ast.Import(names=names), node)
 
     def visit_ClassDef(self, node: ast.ClassDef) -> ast.ClassDef:
         has_imported_interface_base = any(

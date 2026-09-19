@@ -68,6 +68,7 @@ micronaut-sourcegen = "2.1.0"
 icu4j = "76.1"
 jfrunit = "1.0.0.Alpha2"
 junit4 = "4.13.2"
+swagger = "2.2.55"
 zacsweers-kotlin-compile-testing = "0.13.0"
 errorprone-gradle-plugin = "4.4.0"
 nullaway = "0.13.8"
@@ -186,6 +187,7 @@ managed-reactor = { module = "io.projectreactor:reactor-core", version.ref = "ma
 managed-reactor-test = { module = "io.projectreactor:reactor-test", version.ref = "managed-reactor" }
 
 managed-snakeyaml = { module = "org.yaml:snakeyaml", version.ref = "managed-snakeyaml" }
+swagger-annotations = { module = "io.swagger.core.v3:swagger-annotations", version.ref = "swagger" }
 managed-jspecify = { module = "org.jspecify:jspecify", version.ref = "managed-jspecify" }
 
 sonatype-scan = { module = "org.sonatype.gradle.plugins:scan-gradle-plugin", version.ref = "sonatype-scan" }
