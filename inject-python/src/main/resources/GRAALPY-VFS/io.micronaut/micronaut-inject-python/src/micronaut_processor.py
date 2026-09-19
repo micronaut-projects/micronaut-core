@@ -547,6 +547,11 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     for statement in node.body:
                         if isinstance(statement, (ast.Import, ast.ImportFrom)):
                             self.visit(statement)
+                else:
+                    self._visit_guarded_bindings(node)
+                return node
+            case ast.Try() | ast.TryStar():
+                self._visit_guarded_bindings(node)
                 return node
             case ast.Expr():
                 # Handle potential field docstrings - string literals that follow attribute assignments
@@ -599,6 +604,26 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 return result
             case _:
                 return node
+
+    def _visit_guarded_bindings(self, node):
+        """
+        Track the imports and java.type() aliases a module binds inside try/except or if blocks,
+        such as an optional import guarded by ``except ImportError``. Only the bindings are
+        recorded, so a name used later in an annotation member or a generic base resolves to the
+        same qualified Java type as a module-level import.
+        """
+        if self.current_class is not None or self.in_function:
+            return
+        blocks = [getattr(node, 'body', []), getattr(node, 'orelse', []), getattr(node, 'finalbody', [])]
+        blocks.extend(handler.body for handler in getattr(node, 'handlers', []))
+        for block in blocks:
+            for statement in block:
+                if isinstance(statement, (ast.Import, ast.ImportFrom)):
+                    self.visit(statement)
+                elif isinstance(statement, ast.Assign):
+                    self._track_java_type_assignments(statement)
+                elif isinstance(statement, (ast.If, ast.Try, ast.TryStar)):
+                    self._visit_guarded_bindings(statement)
 
     def _is_type_checking_guard(self, test_node):
         if isinstance(test_node, ast.Name):
@@ -1482,6 +1507,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         elif isinstance(type_node, ast.BinOp) and isinstance(type_node.op, ast.BitOr):
             # Handle union types like X | Y, extract non-None types
             return self._extract_union_type(type_node)
+        elif self._java_type_call_name(type_node) is not None:
+            return self._java_type_call_name(type_node)
         else:
             return ast.unparse(type_node)
 
@@ -1938,9 +1965,27 @@ class MicronautAstVisitor(ast.NodeVisitor):
             # PEP 604 unions stay structured: TypeRef("|", [members...]), None included, so the Java
             # side can box primitives and mark the element nullable without parsing strings.
             return TypeRef.unionOf([self._parse_type(member) for member in self._union_members(type_node)])
+        elif self._java_type_call_name(type_node) is not None:
+            # An inline java.type("a.b.C") base names the Java type directly
+            return TypeRef(self._java_type_call_name(type_node))
         else:
             # Fallback for other expression types
             return TypeRef(ast.unparse(type_node))
+
+    def _java_type_call_name(self, node):
+        """
+        The class name of an inline ``java.type("a.b.C")`` call, or None for any other node.
+        """
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)):
+            return None
+        if not (isinstance(node.func.value, ast.Name) and node.func.value.id == 'java' and node.func.attr == 'type'):
+            return None
+        if len(node.args) != 1 or node.keywords:
+            return None
+        argument = node.args[0]
+        if isinstance(argument, ast.Constant) and isinstance(argument.value, str):
+            return argument.value
+        return None
 
     def _union_members(self, type_node):
         """

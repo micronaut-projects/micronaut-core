@@ -281,6 +281,78 @@ public class PythonAstParserTest {
     }
 
     @Test
+    void testTryBlockImportOfJavaClassKeepsTransformedCodeParseable() {
+        PythonAstParser parser = new PythonAstParser();
+        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "java.security.Principal".equals(args[0])) {
+                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                }
+                if ("getClassElement".equals(method.getName()) && args != null && args.length == 1
+                    && "jakarta.inject.Singleton".equals(args[0])) {
+                    return Optional.of(ClassElement.of(jakarta.inject.Singleton.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+
+        PythonAstParser.TransformResult result = parser.transform(visitorContext, """
+            try:
+                from java.security import Principal
+            except ImportError:
+                Principal = None
+
+            class Demo(Principal):
+                def getName(self) -> str:
+                    return "demo"
+            """);
+
+        // the import became a generated binding in its place, so the try/except guard is kept
+        assertTrue(result.code().contains("try:\n    Principal = java.type('java.security.Principal')\nexcept ImportError:\n    Principal = None\n"));
+        assertTrue(result.javaClassImports().containsKey("java.security"));
+        assertEquals("java.security.Principal", result.javaClassImports().get("java.security").get(0).get("class_name"));
+        // the runtime code strips the interface base
+        assertTrue(result.runtimeCode().contains("try:\n    Principal = java.type('java.security.Principal')\nexcept ImportError:"));
+        assertTrue(result.runtimeCode().contains("class Demo:"));
+        assertTrue(parser.requiresRuntimeBytecode(result));
+
+        PythonAstParser.TransformResult finallyResult = parser.transform(visitorContext, """
+            try:
+                from java.security import Principal
+            finally:
+                from jakarta.inject import Singleton
+            """);
+
+        // a class binding replaces the import in place; an annotation import becomes a hoisted decorator, and
+        // the final body it leaves empty is filled (a try needs a handler or a final body)
+        assertTrue(finallyResult.code().endsWith("try:\n    Principal = java.type('java.security.Principal')\nfinally:\n    pass"));
+        assertTrue(finallyResult.code().contains("def Singleton("));
+    }
+
+    @Test
     void testRuntimeTransformStripsConcreteJavaThrowableBases() {
         PythonAstParser parser = new PythonAstParser();
         VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(

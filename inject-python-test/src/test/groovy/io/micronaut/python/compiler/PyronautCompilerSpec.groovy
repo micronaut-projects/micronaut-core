@@ -791,7 +791,7 @@ class AsyncImportService:
 
         def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
         propagationInit.exists()
-        packageMembers(propagationInit.parentFile).contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
+        packageMembers(propagationInit.parentFile).contains("ReactorPropagation = _micronaut_java_type('io.micronaut.core.async.propagation.ReactorPropagation')")
 
         def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
         packageMembers(coreInit.parentFile).contains("from . import async_")
@@ -800,7 +800,7 @@ class AsyncImportService:
         tempDir.deleteDir()
     }
 
-    def "test imported Java keyword methods use generated facades and direct aliases use mapped bytecode"() {
+    def "test imported Java keyword methods and direct aliases use mapped bytecode"() {
         given:
         def pythonCode = '''
 from java.lang import Thread
@@ -851,9 +851,9 @@ class KeywordMethodService:
         sourceFile.exists()
         sourceFile.text == pythonCode
         packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang"))
-            .contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
+            .contains("Thread = _micronaut_java_type('java.lang.Thread')")
         packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher"))
-            .contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
+            .contains("Mono = _micronaut_java_type('reactor.core.publisher.Mono')")
         new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
             .listFiles().any { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
         pythonContext.eval("python", "KeywordMethodService().imported_reactor(ImportedMono.just('imported')).block()").asString() == 'imported'
