@@ -355,6 +355,18 @@ public final class PythonAstParser {
         return path.startsWith(srcDir) || path.startsWith("/private" + srcDir);
     }
 
+    private static String sourceRootOf(List<String> srcDirs, Source source) {
+        String path = source.getPath();
+        if (path != null) {
+            for (String srcDir : srcDirs) {
+                if (isWithinSourceDir(srcDir, path)) {
+                    return srcDir;
+                }
+            }
+        }
+        return "";
+    }
+
     public static String getPackageNameOfSource(String srcDir, Source source) {
         String path = source.getPath();
         String packageName = "python";
@@ -408,6 +420,20 @@ public final class PythonAstParser {
     }
 
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
+        return transform(visitorContext, List.of(), pythonSource);
+    }
+
+    /**
+     * Transforms the given sources located within the given source directories. A source of a source
+     * directory is transformed with its package known, so the transformer can resolve the imports of
+     * sibling modules of that directory.
+     *
+     * @param visitorContext The visitor context
+     * @param srcDirs The source directories
+     * @param pythonSource The sources
+     * @return The transformed sources
+     */
+    public @NotNull List<TransformResult> transform(VisitorContext visitorContext, List<String> srcDirs, Source... pythonSource) {
         runtimeArtifacts.clear();
         Value bindings = context.getBindings(PYTHON);
         Map<String, ClassElement> classElementCache = new LinkedHashMap<>();
@@ -444,6 +470,9 @@ public final class PythonAstParser {
         List<TransformResult> results = new ArrayList<>();
         for (Source source : pythonSource) {
             bindings.putMember("src", source.getCharacters());
+            String sourceRoot = sourceRootOf(srcDirs, source);
+            bindings.putMember("source_root", sourceRoot);
+            bindings.putMember("package_name", sourceRoot.isEmpty() ? "" : getPackageNameOfSource(sourceRoot, source));
 
             Value result;
             try {
@@ -542,12 +571,12 @@ public final class PythonAstParser {
             from micronaut_transformer import MicronautRuntimeTransformer, MicronautTransformer, ast_equal, unparse
 
             tree = ast.parse(src)
-            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements)
+            transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, False, package_name, source_root)
             transformed_tree = transformer.visit(tree)
             # The diagnostic runtime source is only read by tests and error reports, so it is
             # produced on demand instead of costing a parse, a transformer pass and an unparse per file.
-            def diagnostic_runtime_code(source=src):
-                diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True)
+            def diagnostic_runtime_code(source=src, package_name=package_name, source_root=source_root):
+                diagnostic_runtime_transformer = MicronautTransformer(callback_get_class_element, callback_get_class_elements, True, package_name, source_root)
                 return unparse(diagnostic_runtime_transformer.visit(ast.parse(source)))
             executable_runtime_tree = ast.parse(src)
             # Transformers mutate in place, so a pristine parse (cheaper than a deep copy) is kept for
@@ -557,7 +586,9 @@ public final class PythonAstParser {
             runtime_transformer = MicronautRuntimeTransformer(
                 callback_get_class_element,
                 callback_get_class_elements,
-                missing_decorator_code
+                missing_decorator_code,
+                package_name,
+                source_root
             )
             transformed_runtime_tree = runtime_transformer.visit(executable_runtime_tree)
             ast.fix_missing_locations(transformed_runtime_tree)

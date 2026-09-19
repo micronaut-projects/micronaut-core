@@ -136,7 +136,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())) {
             return;
         }
-        if (isAbstract()) {
+        // isAbstract() resolves the bases of an introduction type with placeholder bodies through the class
+        // elements, which are still being built here: the declaration alone decides (an interceptor carrying
+        // the introduction stereotype is a declared bean and returned above)
+        if (hasAbstractDeclaration() || (hasPlaceholderBodies() && hasStereotype(Introduction.class))) {
             return;
         }
         if (hasPropertyInjectionPoint()) {
@@ -440,7 +443,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             template.isStatic(),
             template.isAsync(),
             template.hasReturnValue(),
-            null
+            template.hasPlaceholderBody(),
+            null,
+            template.superArguments()
         ).withClassDef(getNativeType());
     }
 

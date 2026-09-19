@@ -141,6 +141,7 @@ public class PythonElementAnnotationMetadataFactory extends AbstractElementAnnot
             functionDef.isStatic(),
             functionDef.isAsync(),
             functionDef.hasReturnValue(),
+            functionDef.hasPlaceholderBody(),
             functionDef.declaringClass()
         );
     }
