@@ -150,9 +150,9 @@ class Dto${i}:
         Files.walk(root).filter { Files.isRegularFile(it) }.forEach { Path path ->
             String relative = root.relativize(path).toString().replace(File.separatorChar, '/' as char)
             String kind
-            if (relative ==~ /app\/\$\w+\$Definition\.class/ && !relative.contains('TargetTypeMapping')) {
+            if (relative ==~ /app\/[$]\w+[$]Definition\.class/ && !relative.contains('TargetTypeMapping')) {
                 kind = 'definitions'
-            } else if (relative ==~ /app\/\$\w+\$Introspection\.class/) {
+            } else if (relative ==~ /app\/[$]\w+[$]Introspection\.class/) {
                 kind = 'introspections'
             } else if (relative.contains('TargetTypeMapping')) {
                 kind = 'targetTypeMappings'
