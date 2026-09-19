@@ -537,7 +537,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                             }
                             membersContent.insert(0, memberModules.append("}\n").toString());
-                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, membersContent, members, List.of(), initialisedPackages, originatingElement);
+                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, new PackageContribution(membersContent, members, List.of()), initialisedPackages, originatingElement);
                         }
                     }
                 }
@@ -1006,24 +1006,21 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * @param filesList The virtual file system file list
      * @param directory The directory of the package (or the sources root) in the virtual file system
      * @param root Whether the directory is the root of the sources, whose members the launcher imports
-     * @param membersContent The Python source binding the members
-     * @param members The names of the members
-     * @param subPackages The names of the subpackages, which the initialiser imports on first access
+     * @param contribution The members this compilation contributes
      * @param initialisedPackages The initialisers and members modules already written by this compilation
      * @param originatingElement The originating element
      */
     private void writePackageMembers(StringBuilder filesList,
                                      String directory,
                                      boolean root,
-                                     StringBuilder membersContent,
-                                     List<String> members,
-                                     List<String> subPackages,
+                                     PackageContribution contribution,
                                      Set<String> initialisedPackages,
                                      ClassElement originatingElement) {
-        if (!subPackages.isEmpty()) {
-            membersContent.append("\n__micronaut_subpackages__ = ").append(toListOfString(subPackages));
+        StringBuilder membersContent = contribution.content();
+        if (!contribution.subPackages().isEmpty()) {
+            membersContent.append("\n__micronaut_subpackages__ = ").append(toListOfString(contribution.subPackages()));
         }
-        String content = membersContent.append("\n__all__ = ").append(toListOfString(members)).append('\n').toString();
+        String content = membersContent.append("\n__all__ = ").append(toListOfString(contribution.members())).append('\n').toString();
         String membersPath = directory + PACKAGE_MEMBERS_MODULE_PREFIX + contentHash(content) + ".py";
         if (initialisedPackages.add(membersPath)) {
             writePythonToVfs(filesList, membersPath, content, originatingElement);
@@ -1205,7 +1202,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             }
 
-            writePackageMembers(filesList, APPLICATION_SRC_PATH + packagePath + "/", false, initContent, allNames, subPackageNames, initialisedPackages, originatingElement);
+            writePackageMembers(filesList, APPLICATION_SRC_PATH + packagePath + "/", false, new PackageContribution(initContent, allNames, subPackageNames), initialisedPackages, originatingElement);
         }
 
         // Write fileslist.txt
@@ -1298,11 +1295,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             .collect(Collectors.joining("."));
     }
 
-    private static String toPackageName(String parentPath) {
-        String path = parentPath.endsWith("/") ? parentPath.substring(0, parentPath.length() - 1) : parentPath;
-        return path.replace('/', '.');
-    }
-
     private static void collectPackageNames(Set<String> decoratorsByPackage, Set<String> allPackages) {
         for (String packageName : decoratorsByPackage) {
             if (!packageName.isEmpty()) {
@@ -1321,6 +1313,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassLoader(ClassLoader classLoader) {
         this.classLoader = classLoader;
+    }
+
+    /**
+     * The members a compilation contributes to a package (or, at the root of the sources, to the
+     * launcher): the Python source binding them, their names, and the names of the subpackages the
+     * package initialiser imports on their first access.
+     *
+     * @param content The Python source binding the members
+     * @param members The names of the members
+     * @param subPackages The names of the subpackages
+     */
+    private record PackageContribution(StringBuilder content, List<String> members, List<String> subPackages) {
     }
 
     record PathEntry(String parent, String filename) {
