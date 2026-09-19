@@ -60,6 +60,10 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
             builderType.getMethod("classpath", List.class).invoke(builder, classpath);
             builderType.getMethod("annotationProcessorPath", List.class).invoke(builder, classpath);
             builderType.getMethod("options", List.class).invoke(builder, List.of("-A" + SOURCE_ROOT_OPTION + "=" + sourceRoot));
+            String profileReportFile = System.getProperty(PyronautCompilerPlugin.PROFILE_PROPERTY);
+            if (profileReportFile != null && !profileReportFile.isBlank()) {
+                builderType.getMethod("profileReportFile", File.class).invoke(builder, new File(profileReportFile));
+            }
             Object instance = builderType.getMethod("build").invoke(builder);
             instance.getClass().getMethod("compile").invoke(instance);
         } catch (InvocationTargetException e) {

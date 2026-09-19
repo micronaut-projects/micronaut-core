@@ -26,6 +26,7 @@ import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import io.micronaut.python.compiler.CompilationProfiler;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.NotNull;
@@ -231,6 +232,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private boolean processAggregatingVisitors = true;
     private Path outputDirectory;
     private PythonProcessingSession processingSession;
+    private @Nullable CompilationProfiler profiler;
     private final Set<String> writtenVfsPaths = new LinkedHashSet<>();
 
     /**
@@ -292,6 +294,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Internal
     public void setOutputDirectory(Path outputDirectory) {
         this.outputDirectory = outputDirectory;
+    }
+
+    /**
+     * Sets the profiler of the compilation, or null when it is not profiled.
+     *
+     * @param profiler The profiler
+     */
+    @Internal
+    public void setProfiler(@Nullable CompilationProfiler profiler) {
+        this.profiler = profiler;
     }
 
     /**
@@ -365,9 +377,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private void initializeParser() {
         if (parser == null) {
-            parser = processingSession == null
-                ? new PythonAstParser(classLoader, incrementalSources != null)
-                : processingSession.parser(classLoader, incrementalSources != null);
+            try (var _ = CompilationProfiler.span(profiler, "python.graalpy-context")) {
+                parser = processingSession == null
+                    ? new PythonAstParser(classLoader, incrementalSources != null)
+                    : processingSession.parser(classLoader, incrementalSources != null);
+            }
         }
     }
 
@@ -380,13 +394,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             );
             PythonEnvironment environment = null;
             // Transform the code for processing (to detect Micronaut annotations)
-            List<PythonAstParser.TransformResult> transformedList =
-                applyASTTransforms(values, originatingElement);
+            List<PythonAstParser.TransformResult> transformedList;
+            try (var _ = CompilationProfiler.span(profiler, "python.transform")) {
+                transformedList = applyASTTransforms(values, originatingElement);
+            }
+            CompilationProfiler.increment(profiler, "python.transformed-sources", transformedList.size());
             // Extract decorators from the code
             if (transformedList.isEmpty()) {
                 return;
             }
-            processPythonSourceVisitors(transformedList, values);
+            try (var _ = CompilationProfiler.span(profiler, "python.source-visitors")) {
+                processPythonSourceVisitors(transformedList, values);
+            }
             transformedList.stream()
                 .flatMap(transformResult -> transformResult.validationErrors().stream())
                 .findFirst()
@@ -398,25 +417,14 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String[] srcDirs = values.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
-                try {
-                    List<Source> sourceList = transformedList
-                        .stream()
-                        .map(PythonAstParser.TransformResult::transformedSource)
-                        .toList();
-                    environment = parser.parse(
-                        sourceList,
-                        Arrays.asList(srcDirs),
-                        javaVisitorContext
-                    );
-                } catch (Exception e) {
-                    throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
-                }
+                environment = parseModel(transformedList, srcDirs, originatingElement);
             }
 
             String mainPy;
             StringBuilder filesList = new StringBuilder();
             Set<String> initialisedPackages = new HashSet<>();
             boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
+            CompilationProfiler.Span vfsPhase = CompilationProfiler.span(profiler, "python.vfs");
             if (StringUtils.isNotEmpty(values.code())) {
                 PythonAstParser.TransformResult transformResult = transformedList.get(0);
                 mainPy = transformResult.originalSource().getCharacters().toString();
@@ -507,6 +515,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             }
 
+            vfsPhase.close();
+
             // Create processing environment and visitor context
             PythonProcessingEnvironment processingEnvironment =
                 new PythonProcessingEnvironment(environment, javaVisitorContext, element);
@@ -516,6 +526,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             for (PythonAstParser.TransformResult transformResult : transformedList) {
 
                 Map<String, String> decorators = transformResult.decorators();
+                if (profiler != null) {
+                    // the decorator source every source renders for each imported annotation: the merged
+                    // map below keeps one per annotation
+                    profiler.count("python.decorator-entries", decorators.size());
+                    profiler.count("python.decorator-chars", decorators.values().stream().mapToLong(String::length).sum());
+                }
                 allDecorators.putAll(decorators);
 
                 Map<String, List<Map<String, String>>> javaClassImports = transformResult.javaClassImports();
@@ -526,38 +542,51 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             }
             if (processSharedOutputs) {
-                writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
-                writeFilesList(filesList, originatingElement);
+                try (var _ = CompilationProfiler.span(profiler, "python.manifest")) {
+                    writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
+                    writeFilesList(filesList, originatingElement);
+                }
             }
+            CompilationProfiler.increment(profiler, "python.unique-decorators", allDecorators.size());
 
             // Run type element visitor processing
             ClassLoader effectiveClassLoader = this.classLoader != null
                 ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
             Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
             if (processAggregatingVisitors) {
-                PythonTypeElementVisitorProcessor aggregatingVisitors =
-                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
-                aggregatingVisitors.init(processingEnvironment);
-                aggregatingVisitors.process(
+                try (var _ = CompilationProfiler.span(profiler, "python.visitors.aggregating")) {
+                    PythonTypeElementVisitorProcessor aggregatingVisitors =
+                        new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
+                    aggregatingVisitors.init(processingEnvironment);
+                    aggregatingVisitors.process(
+                        processingEnvironment,
+                        element1 -> true,
+                        incrementalSources == null,
+                        false
+                    );
+                }
+            }
+            try (var _ = CompilationProfiler.span(profiler, "python.visitors.isolating")) {
+                PythonTypeElementVisitorProcessor isolatingVisitors =
+                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
+                isolatingVisitors.init(processingEnvironment);
+                isolatingVisitors.process(
                     processingEnvironment,
-                    ignored -> true,
-                    incrementalSources == null,
-                    false
+                    affectedElements,
+                    incrementalSources != null,
+                    true
                 );
             }
-            PythonTypeElementVisitorProcessor isolatingVisitors =
-                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
-            isolatingVisitors.init(processingEnvironment);
-            isolatingVisitors.process(
-                processingEnvironment,
-                affectedElements,
-                incrementalSources != null,
-                true
-            );
 
             // Process bean definitions for Python classes
-            var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
-            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
+            try (var _ = CompilationProfiler.span(profiler, "python.bean-definitions")) {
+                var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
+                beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
+            }
+            if (profiler != null) {
+                profiler.count("python.classes", environment.classes().size());
+                profiler.count("python.decorators", environment.decorators().size());
+            }
 
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
@@ -644,6 +673,27 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
         }
         return element -> names.contains(element.getName());
+    }
+
+    /**
+     * Builds the model of the transformed sources.
+     */
+    private PythonEnvironment parseModel(List<PythonAstParser.TransformResult> transformedList,
+                                         String[] srcDirs,
+                                         ClassElement originatingElement) {
+        try (var _ = CompilationProfiler.span(profiler, "python.model")) {
+            List<Source> sourceList = transformedList
+                .stream()
+                .map(PythonAstParser.TransformResult::transformedSource)
+                .toList();
+            return parser.parse(
+                sourceList,
+                Arrays.asList(srcDirs),
+                javaVisitorContext
+            );
+        } catch (Exception e) {
+            throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
     }
 
     private void processPythonSourceVisitors(List<PythonAstParser.TransformResult> transformedList,
@@ -839,7 +889,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!compilePythonBytecode || unchanged) {
             return;
         }
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
             PythonBytecodeCompiler.Result result = bytecodeCompiler().compile(content, filePath);
             writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
         } catch (ProcessingException e) {
@@ -858,7 +908,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
             return;
         }
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
             PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
                 transformResult,
                 runtimeFilename(filePath)

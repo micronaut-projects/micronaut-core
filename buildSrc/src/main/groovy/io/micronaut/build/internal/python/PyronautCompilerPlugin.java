@@ -27,6 +27,8 @@ import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskProvider;
 
+import java.util.Map;
+
 import static org.apache.groovy.util.BeanUtils.capitalize;
 
 /**
@@ -34,6 +36,12 @@ import static org.apache.groovy.util.BeanUtils.capitalize;
  * sources.
  */
 public class PyronautCompilerPlugin implements Plugin<Project> {
+
+    /**
+     * The system property naming the file the Python compile tasks append their compilation profile to.
+     */
+    public static final String PROFILE_PROPERTY = "micronaut.python.compiler.profile";
+
     @Override
     public void apply(Project project) {
         // Pyronaut generates Java classes so we need the Java plugin
@@ -137,6 +145,11 @@ public class PyronautCompilerPlugin implements Plugin<Project> {
                                                                  SourceDirectorySet sourceDirectorySet) {
         return project.getTasks().register(taskName, PythonCompile.class, task -> {
             task.getSource().convention(sourceDirectorySet.getSourceDirectories());
+            // -Dmicronaut.python.compiler.profile=<file> on the Gradle invocation profiles the compilation in
+            // the worker and appends the profile to that file (see PyronautCompiler.Builder.profileReportFile)
+            task.getSystemProperties().putAll(project.getProviders().systemProperty(PROFILE_PROPERTY)
+                .map(file -> Map.of(PROFILE_PROPERTY, project.getLayout().getProjectDirectory().file(file).getAsFile().getAbsolutePath()))
+                .orElse(Map.of()));
             task.getDestinationDir()
                 .convention(project.getLayout().getBuildDirectory().dir("classes/python/" + sourceSet.getName()));
             task.getClasspath().from(pyronautCompilerClasspath);
