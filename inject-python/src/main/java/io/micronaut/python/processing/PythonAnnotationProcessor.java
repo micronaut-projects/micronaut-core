@@ -29,6 +29,7 @@ import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.NotNull;
+import org.jspecify.annotations.Nullable;
 
 import javax.annotation.processing.ProcessingEnvironment;
 import javax.annotation.processing.RoundEnvironment;
@@ -90,6 +91,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private boolean processAggregatingVisitors = true;
     private Path outputDirectory;
     private PythonProcessingSession processingSession;
+    private final Set<String> writtenVfsPaths = new LinkedHashSet<>();
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -230,6 +232,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private void processAnnotation(TypeElement element, PythonApplicationValues values) {
+        writtenVfsPaths.clear();
         try {
             ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
                 element.getQualifiedName().toString(),
@@ -272,6 +275,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             String mainPy;
             StringBuilder filesList = new StringBuilder();
+            Map<String, SourcePackage> sourcePackages = new LinkedHashMap<>();
             boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
             if (StringUtils.isNotEmpty(values.code())) {
                 PythonAstParser.TransformResult transformResult = transformedList.get(0);
@@ -291,8 +295,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         .flatMap(tr -> tr.exportedTypes().stream())
                         .collect(Collectors.toSet());
                     for (PythonAstParser.TransformResult transformResult : transformedList) {
+                        Source source = transformResult.originalSource();
+                        // a source outside every source directory was already rejected by the parser
                         for (String configuredSrcDir : srcDirs) {
-                            Source source = transformResult.originalSource();
                             String srcDir = normalizeResourcePath(configuredSrcDir);
                             String path = normalizeResourcePath(source.getPath());
                             int i = path.indexOf(srcDir);
@@ -307,16 +312,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 path = path.substring(srcDir.length() + 1);
                             }
                             String targetSource = APPLICATION_SRC_PATH + path;
-                            if (processSharedOutputs && !transformResult.allClassNames().isEmpty()) {
+                            List<String> classNames = importedClassNames(transformResult, environment);
+                            if (processSharedOutputs && !classNames.isEmpty()) {
                                 // has classes
                                 int parentIndex = path.lastIndexOf('/');
                                 if (parentIndex > -1) {
                                     String parentPath = path.substring(0, parentIndex + 1);
                                     allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                        .addAll(transformResult.allClassNames());
+                                        .addAll(classNames);
                                 } else {
                                     allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                        .addAll(transformResult.allClassNames());
+                                        .addAll(classNames);
                                 }
                             }
                             if (isAffectedSource(source)) {
@@ -353,18 +359,20 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                                 writePythonToVfs(filesList, mainFilePath, mainContent.toString(), originatingElement);
                             } else {
-                                String initFilePath = APPLICATION_SRC_PATH + parent + "__init__.py";
-                                StringBuilder initContent = new StringBuilder();
+                                // A source package shares its __init__.py with the Java package shims when a
+                                // Python package coincides with an imported Java package, so the initializer
+                                // is merged and written once in writeAllToVFS
                                 List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
                                     .filter(entry -> entry.getKey().parent.equals(parent))
                                     .toList();
+                                List<String> moduleImports = new ArrayList<>();
                                 List<String> exportedTypes = new ArrayList<>();
                                 for (Map.Entry<PathEntry, List<String>> entry : entries) {
                                     List<String> types = entry.getValue();
                                     String filename = entry.getKey().filename;
                                     if (!types.isEmpty()) {
                                         for (String type : types) {
-                                            initContent.append("from .").append(NameUtils.filename(filename)).append(" import ").append(type).append('\n');
+                                            moduleImports.add("from ." + NameUtils.filename(filename) + " import " + type);
                                             // Check if this type has decorators (is in allExportedTypes)
                                             if (allExportedTypes.contains(type)) {
                                                 exportedTypes.add(type);
@@ -372,10 +380,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                         }
                                     }
                                 }
-                                if (!exportedTypes.isEmpty()) {
-                                    initContent.append("\n__all__ = ").append(toListOfString(exportedTypes)).append("\n");
-                                }
-                                writePythonToVfs(filesList, initFilePath, initContent.toString(), originatingElement);
+                                String packageName = toPackageName(parent);
+                                sourcePackages.put(packageName, new SourcePackage(moduleImports, exportedTypes));
                             }
                         }
                     }
@@ -401,7 +407,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             }
             if (processSharedOutputs) {
-                writeAllToVFS(filesList, allDecorators, allImports, originatingElement);
+                writeAllToVFS(filesList, allDecorators, allImports, sourcePackages, originatingElement);
             }
 
             // Run type element visitor processing
@@ -749,6 +755,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                            String content,
                                            ClassElement originatingElement) {
         boolean unchanged = false;
+        if (!writtenVfsPaths.add(filePath)) {
+            // Surfaced here instead of as the opaque "Output stream or writer has already been opened" IOException
+            throw new ProcessingException(
+                originatingElement,
+                "Python source [" + (filePath.startsWith(APPLICATION_SRC_PATH) ? filePath.substring(APPLICATION_SRC_PATH.length()) : filePath)
+                    + "] is written twice: an application "
+                    + "module and a module generated for an imported Java package or annotation map to the same file; rename the application module."
+            );
+        }
         var generatedFile = javaVisitorContext.visitMetaInfFile(filePath, originatingElement).orElse(null);
         if (generatedFile != null) {
             try {
@@ -832,6 +847,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         StringBuilder filesList,
         Map<String, String> decorators,
         Map<String, List<Map<String, String>>> javaClassImports,
+        Map<String, SourcePackage> sourcePackages,
         ClassElement originatingElement) {
         // Collect all packages that need __init__.py files
         Map<String, List<String>> decoratorsByPackage = new LinkedHashMap<>();
@@ -900,10 +916,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         // Add packages from Java classes
         collectPackageNames(javaClassesByPackage.keySet(), allPackages);
 
+        // Add the application source packages. A source package that coincides with an imported Java
+        // package (or a parent of one) shares the __init__.py with the generated Java package shim.
+        // Parent packages of a source package are not added so that they remain namespace packages.
+        Set<String> generatedPackages = new LinkedHashSet<>(allPackages);
+        allPackages.addAll(sourcePackages.keySet());
+
         // Write __init__.py files for all packages
         for (String packageName : allPackages) {
             List<String> decoratorsInPackage = decoratorsByPackage.get(packageName);
             Map<String, JavaClassImport> javaClassesInPackage = javaClassesByPackage.get(packageName);
+            SourcePackage sourcePackage = sourcePackages.get(packageName);
 
             String packagePath = packageName.replace('.', '/');
             String initFilePath = APPLICATION_SRC_PATH + packagePath + "/__init__.py";
@@ -976,13 +999,26 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 }
             }
 
-            // Add imports for subpackages
-            for (String subPackage : allPackages) {
+            // Add imports for generated subpackages
+            for (String subPackage : generatedPackages) {
                 if (subPackage.startsWith(packageName + ".") && !subPackage.equals(packageName)) {
                     String relativeSubPackage = subPackage.substring(packageName.length() + 1);
                     if (!relativeSubPackage.contains(".")) { // Direct child package
                         initContent.append("from . import ").append(relativeSubPackage).append("\n");
                         allNames.add(relativeSubPackage);
+                    }
+                }
+            }
+
+            // Add the application modules of the package after the Java shims so that a module
+            // importing a Java type from its own package finds it on the partially initialized package
+            if (sourcePackage != null) {
+                for (String moduleImport : sourcePackage.moduleImports()) {
+                    initContent.append(moduleImport).append("\n");
+                }
+                for (String exportedType : sourcePackage.exportedTypes()) {
+                    if (!allNames.contains(exportedType)) {
+                        allNames.add(exportedType);
                     }
                 }
             }
@@ -1010,6 +1046,20 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             });
     }
 
+    /**
+     * The top-level classes of a source the package initializer imports: all of them except those
+     * another module's definition of the same generated Java type replaces (see {@link PythonEnvironment#shadowedTypes()}).
+     */
+    private static List<String> importedClassNames(PythonAstParser.TransformResult transformResult, @Nullable PythonEnvironment environment) {
+        List<String> classNames = transformResult.allClassNames();
+        String path = transformResult.originalSource().getPath();
+        List<String> shadowed = environment == null || path == null ? List.of() : environment.shadowedTypes().getOrDefault(path, List.of());
+        if (shadowed.isEmpty()) {
+            return classNames;
+        }
+        return classNames.stream().filter(name -> !shadowed.contains(name)).toList();
+    }
+
     private static @NotNull String toListOfString(List<String> allNames) {
         return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
     }
@@ -1026,6 +1076,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return Arrays.stream(name.split("\\."))
             .map(PythonKeywords::toPythonName)
             .collect(Collectors.joining("."));
+    }
+
+    private static String toPackageName(String parentPath) {
+        String path = parentPath.endsWith("/") ? parentPath.substring(0, parentPath.length() - 1) : parentPath;
+        return path.replace('/', '.');
     }
 
     private static void collectPackageNames(Set<String> decoratorsByPackage, Set<String> allPackages) {
@@ -1063,6 +1118,15 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     record PathEntry(String parent, String filename) {
+    }
+
+    /**
+     * The application modules of a Python source package.
+     *
+     * @param moduleImports The {@code from .module import Type} statements of the package initializer
+     * @param exportedTypes The decorated types exported by the package
+     */
+    private record SourcePackage(List<String> moduleImports, List<String> exportedTypes) {
     }
 
     private record PythonApplicationValues(String code, String[] src) {
