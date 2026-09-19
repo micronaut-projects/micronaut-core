@@ -183,7 +183,7 @@ class MicronautTransformer(ast.NodeTransformer):
         if not class_elements:
             return False
         for class_element in class_elements:
-            if self._is_annotation_class(class_element):
+            if self._is_annotation_class(class_element) and not self._is_nested_type(class_element):
                 import_name = class_element.getSimpleName()
                 decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
                 if decorator_code:
@@ -456,6 +456,16 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             return None
         return self.generic_visit(node)
 
+    def visit_If(self, node: ast.If):
+        """
+        Keep a conditional block valid when every statement in it was a transformed import
+        (``if TYPE_CHECKING: from a.b import JavaType``).
+        """
+        self.generic_visit(node)
+        if not node.body:
+            node.body = [ast.copy_location(ast.Pass(), node)]
+        return node
+
     def visit_Attribute(self, node: ast.Attribute):
         self.generic_visit(node)
         java_method_name = self._java_keyword_method_name(node)
@@ -548,13 +558,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
 
     def _handle_specific_import(self, original_module_name: str, transformed_module_name: str, alias) -> bool:
         """
-        Handle specific imports like 'from jakarta.inject import Singleton' or 'from jakarta.inject import Singleton as S'
-        Returns True if the import names a Java type (annotation or class) and was transformed.
+        Handle specific imports like 'from jakarta.inject import Singleton' or 'from jakarta.inject import Singleton as S'.
+        The module may also name a Java type: 'from a.b.Outer import Inner' imports a nested type and
+        'from a.b.Outer import Outer' the type itself.
+        Returns True if the import was transformed.
         """
         import_name = alias.name  # The actual name being imported (e.g., "Singleton")
         variable_name = alias.asname if alias.asname else alias.name  # The name to use for the variable (e.g., "S" or "Singleton")
 
-        class_element = self._lookup_imported_class_element(original_module_name, import_name)
+        class_element = self._resolve_imported_java_type(original_module_name, import_name)
         if class_element is None:
             return False
         if self._is_annotation_class(class_element):
@@ -579,6 +591,27 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         self.has_java_import = True
         return True
 
+    def _resolve_imported_java_type(self, module_name: str, import_name: str):
+        """
+        The Java type a 'from module import name' statement imports, or None when the import is not a Java
+        type. A module that itself names a Java type exports the type's nested types and, under its own
+        simple name, the type itself; naming anything else there is an error, because no Python module can
+        provide it at run time.
+        """
+        class_element = self._lookup_imported_class_element(module_name, import_name)
+        if class_element is not None:
+            return class_element
+        outer_element = self._java_type_module(module_name)
+        if outer_element is None:
+            return None
+        if import_name == module_name.rsplit('.', 1)[-1]:
+            return outer_element
+        self.validation_errors.append(
+            f"Cannot import [{import_name}] from [{module_name}]: Java type [{outer_element.getName()}] "
+            f"has no nested type named [{import_name}]"
+        )
+        return None
+
     def _lookup_imported_class_element(self, java_module: str, import_name: str):
         """
         The ClassElement named by ``from <java_module> import <import_name>``, accepting the Python
@@ -590,6 +623,19 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             if alt_name != import_name:
                 class_element = self.callback_get_class_element(f"{java_module}.{alt_name}")
         return class_element
+
+    def _java_type_module(self, module_name: str):
+        """
+        The Java type named by the module of a from-import, or None when the module is a package or a Python
+        module. A class generated from a Python source is not a Java type module.
+        """
+        class_element = self.callback_get_class_element(module_name)
+        if class_element is None or _JavaTypes.isPythonClass(class_element):
+            return None
+        return class_element
+
+    def _is_nested_type(self, class_element) -> bool:
+        return '$' in str(class_element.getName())
 
     def _track_java_type_assignment(self, node: ast.Assign):
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
@@ -717,8 +763,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if class_elements:
             transformed_any = False
             for class_element in class_elements:
-                # Check if it's an annotation
-                if self._is_annotation_class(class_element):
+                # A package scan also lists nested types; a star import binds top-level names only
+                if self._is_annotation_class(class_element) and not self._is_nested_type(class_element):
                     import_name = class_element.getSimpleName()
                     decorator_code = self._generate_decorator_from_class_element(class_element, import_name)
                     if decorator_code:
@@ -746,9 +792,6 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         meta-annotations, and register it under the annotation's own name.
         """
         annotation_name = class_element.getName()
-        # skip inners for now
-        if "$" in annotation_name:
-            return None
         return self._generate_decorator(class_element, import_name, annotation_name, with_meta_annotations=True)
 
     def _generate_decorator_from_class_element_with_name(self, class_element, import_name: str, custom_annotation_name: str) -> Optional[str]:
@@ -808,7 +851,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             meta_class_element = self.callback_get_class_element(meta_annotation_name)
             if not meta_class_element or not self._is_annotation_class(meta_class_element):
                 continue
-            meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, meta_class_element)
+            meta_decorator_name = self._meta_decorator_name(meta_annotation_name, annotation_name, decorator_name, meta_class_element)
             if meta_decorator_name == decorator_name and meta_annotation_name != annotation_name:
                 continue
             if '$' in meta_annotation_name and meta_decorator_name not in nested_member_names:
@@ -905,13 +948,14 @@ def {decorator_name}({param_signature}):
         """
         Generate decorators for the annotation types returned by the annotation's members.
         """
+        own_nested_prefix = str(class_element.getName()) + '$'
         for return_type_name in _AnnotationTypes.memberReturnTypeNames(class_element):
             nested_annotation_element = self.callback_get_class_element(return_type_name)
             if not nested_annotation_element or not self._is_annotation_class(nested_annotation_element):
                 continue
             # Skip annotations nested inside the current annotation; they are handled as nested members.
-            nested_name = nested_annotation_element.getName()
-            if nested_name.startswith(parent_name.replace('.', '$') + '$'):
+            nested_name = str(nested_annotation_element.getName())
+            if nested_name.startswith(own_nested_prefix):
                 continue
             if '$' in nested_name:
                 annotation_simple_name = nested_name.split('$')[-1]
@@ -964,6 +1008,7 @@ def {nested_decorator_name}(*args, **kwargs):
 ''')
                 lines.append(f'''
 
+{simple_name} = {nested_decorator_name}
 {parent_name}.{simple_name} = {nested_decorator_name}
 ''')
             else:
@@ -981,9 +1026,9 @@ except Exception:
             lines.insert(0, "\nimport java\n")
         return ''.join(prelude_lines), ''.join(lines), nested_member_names
 
-    def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, meta_class_element) -> str:
+    def _meta_decorator_name(self, meta_annotation_name: str, annotation_name: str, decorator_name: str, meta_class_element) -> str:
         if meta_annotation_name.startswith(annotation_name + '$'):
-            return f"_{annotation_name.split('.')[-1]}_{meta_annotation_name.split('$')[-1]}"
+            return f"_{decorator_name}_{meta_annotation_name.split('$')[-1]}"
         if '$' in meta_annotation_name:
             return meta_annotation_name.split('$')[-1]
         return meta_class_element.getSimpleName()
@@ -1212,7 +1257,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         for alias in node.names:
             if alias.name == '*':
                 continue
-            class_element = self.callback_get_class_element(f'{java_module}.{alias.name}')
+            class_element = self._resolve_imported_java_type(java_module, alias.name)
             if class_element and not self._is_annotation_class(class_element):
                 variable_name = alias.asname if alias.asname else alias.name
                 self._track_java_class(variable_name, class_element)

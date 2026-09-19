@@ -1124,10 +1124,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             decorator = self.to_decorator_from_reference(decorator_reference)
                             decorators.append(decorator)
                         elif isinstance(metadata, ast.Attribute):
-                            # Handle qualified decorator names like validation.NotBlank
-                            decorator_name = f"{metadata.value.id}.{metadata.attr}"
-                            decorator = DecoratorDef(decorator_name, decorator_name, None, {}, [])
-                            decorators.append(decorator)
+                            # Handle qualified decorator names like validation.NotBlank or Outer.Inner
+                            decorators.append(self._parse_attribute_metadata(metadata, {}))
                         # For other metadata types (strings, numbers), we could handle them
                         # but for now, focus on decorator names and calls
                 else:
@@ -1365,12 +1363,33 @@ class MicronautAstVisitor(ast.NodeVisitor):
         else:
             return False
 
+    def _parse_attribute_metadata(self, attribute_node, members):
+        """
+        Parse qualified ``Annotated[...]`` metadata such as ``validation.NotBlank`` or the nested annotation
+        ``Outer.Inner`` into a DecoratorDef, resolving the qualifier through the imports and generated
+        decorators of the module.
+        """
+        names = []
+        current = attribute_node
+        while isinstance(current, ast.Attribute):
+            names.insert(0, current.attr)
+            current = current.value
+        if isinstance(current, ast.Name):
+            names.insert(0, current.id)
+        else:
+            names.insert(0, ast.unparse(current))
+        resolved_name = self._resolve_dotted_name(names)
+        known_decorator = find_known_decorator_by_annotation_name(self, resolved_name)
+        if known_decorator is not None:
+            return DecoratorDef(names[-1], known_decorator.annotationName(), known_decorator.repeatedName(), members,
+                                known_decorator.stereotypes())
+        return DecoratorDef(names[-1], resolved_name, None, members, [])
+
     def _parse_metadata_call(self, call_node):
         """
-        Parse a metadata call like Gt(0) into a DecoratorDef.
+        Parse a metadata call like Gt(0) or Outer.Inner(0) into a DecoratorDef.
         """
-        if isinstance(call_node, ast.Call) and isinstance(call_node.func, ast.Name):
-            decorator_name = call_node.func.id
+        if isinstance(call_node, ast.Call) and isinstance(call_node.func, (ast.Name, ast.Attribute)):
             # Extract arguments
             members = {}
 
@@ -1387,8 +1406,10 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 if kw.arg:
                     members[normalize_python_keyword_alias(kw.arg)] = convert_ast_value(kw.value, self)
 
+            if isinstance(call_node.func, ast.Attribute):
+                return self._parse_attribute_metadata(call_node.func, members)
             # Create DecoratorDef with annotationName = name (assuming it's a Micronaut annotation)
-            return self.to_decorator_from_reference_with_members(decorator_name, members)
+            return self.to_decorator_from_reference_with_members(call_node.func.id, members)
 
         return None
 
@@ -1969,6 +1990,11 @@ def decorator_to_function(visitor, node):
             resolved_name = '.'.join(names)
             if visitor is not None and hasattr(visitor, '_resolve_dotted_name'):
                 resolved_name = visitor._resolve_dotted_name(names)
+            known_decorator = find_known_decorator_by_annotation_name(visitor, resolved_name) if visitor is not None else None
+            if known_decorator is not None:
+                # A nested annotation of a generated decorator (@Outer.Inner) keeps that decorator's metadata
+                return DecoratorDef(simple_name or resolved_name, known_decorator.annotationName(),
+                                    known_decorator.repeatedName(), {}, known_decorator.stereotypes())
             return DecoratorDef(simple_name or resolved_name, resolved_name, None, {}, [])
         # when a decorator takes argument values it is represented by ast.Call
         # here we parse out the constants to the call and set them as the named
