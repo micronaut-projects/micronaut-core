@@ -211,6 +211,25 @@ final class PythonApplicationRuntime {
     }
 
     /**
+     * Whether a context is the primary context of an installed runtime: the one generated code
+     * resolves, or an enclosing application's that becomes current again once the nested one is
+     * uninstalled. A context whose runtime was uninstalled (its application closed) is not.
+     *
+     * @param context The context, or a view of one
+     * @return {@code true} when an installed runtime owns the context
+     */
+    static boolean isInstalled(Context context) {
+        synchronized (INSTALLED) {
+            for (PythonApplicationRuntime installed : INSTALLED) {
+                if (installed.owns(context)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+    }
+
+    /**
      * Remove every installed runtime.
      *
      * @return The runtimes that were installed, in installation order

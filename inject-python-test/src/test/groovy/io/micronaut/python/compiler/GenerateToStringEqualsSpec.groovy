@@ -36,6 +36,9 @@ class Person:
 
   @Override
   public Value asPolyglotValue() {
+    if (this instanceof io.micronaut.aop.InterceptedProxy) {
+      return PythonCoercion.interceptedTargetValue((InterceptedProxy) this);
+    }
     if (this.graalpyInternalValue != null) {
       if (this.graalpyInternalValueSyncing) {
         return this.graalpyInternalValue;

@@ -135,6 +135,26 @@ final class PythonContextRegistry {
     }
 
     /**
+     * Drop the Python scoped proxies created in a context for the beans of an application that shuts
+     * down while the context lives on (a reused context): the proxies, and the bean context they
+     * resolve their targets through, are then no longer reachable from the context state. A proxy of
+     * an application still running gets a new Python scoped proxy on its next use.
+     *
+     * @param context The context the application used
+     */
+    static void forgetScopedProxies(Context context) {
+        ContextState state;
+        synchronized (LOCK) {
+            state = CONTEXT_STATES.get(context);
+        }
+        if (state != null) {
+            synchronized (state.scopedProxies) {
+                state.scopedProxies.clear();
+            }
+        }
+    }
+
+    /**
      * Drop the state of a context without running its listeners.
      * <p>
      * Used when the primary context of an application is reset: its executions leave the aggregate
@@ -761,6 +781,8 @@ final class PythonContextRegistry {
         final AtomicReference<@Nullable Value> runtimeModule = new AtomicReference<>();
         /** Python classes resolved in this context, keyed by their qualified name. */
         final Map<String, Value> classes = new ConcurrentHashMap<>();
+        /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
+        final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -774,6 +796,7 @@ final class PythonContextRegistry {
             coroutineClasses.clear();
             helpers.clear();
             classes.clear();
+            scopedProxies.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

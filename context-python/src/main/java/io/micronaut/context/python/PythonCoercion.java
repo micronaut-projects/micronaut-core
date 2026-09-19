@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.aop.InterceptedProxy;
+import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -33,6 +35,7 @@ import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -42,6 +45,7 @@ import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.proxy.ProxyExecutable;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
@@ -67,6 +71,16 @@ public final class PythonCoercion {
     private static final String ASYNC_MEMBER_VALUE = "__micronaut_async_member_value";
 
     private static final String TO_PYTHON_STANDARD_TYPE = "__micronaut_to_python_standard_type";
+
+    private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
+
+    /** The Python class reference a generated type in the hierarchy of a class carries, if any; cached per class. */
+    private static final ClassValue<Optional<PythonContextRuntime.PythonClassReference>> PYTHON_CLASS_REFERENCES = new ClassValue<>() {
+        @Override
+        protected Optional<PythonContextRuntime.PythonClassReference> computeValue(Class<?> type) {
+            return Optional.ofNullable(findPythonClassReference(type));
+        }
+    };
 
     private static final AsyncMemberAdapter ASYNC_MEMBER_ADAPTER = new AsyncMemberAdapter();
 
@@ -121,6 +135,7 @@ public final class PythonCoercion {
         return switch (value) {
             case ValueCoercible valueCoercible when !(value instanceof PooledValueCoercible) ->
                 valueCoercible.asPolyglotValue();
+            case InterceptedProxy<?> proxy when isPythonInterfaceProxy(proxy) -> interceptedTargetValue(proxy);
             case null, default -> value;
         };
     }
@@ -178,6 +193,9 @@ public final class PythonCoercion {
                     return polyglotValue;
                 }
                 throw new IllegalArgumentException("Cannot pass a polyglot Value to a different context");
+            }
+            case InterceptedProxy<?> proxy when isPythonInterfaceProxy(proxy) -> {
+                return interceptedTargetValue(proxy);
             }
             case List<?> list -> {
                 return coerceCollectionToContext(list, context);
@@ -475,6 +493,7 @@ public final class PythonCoercion {
             case PooledValueCoercible pooledValueCoercible ->
                 coercePooledValue(pooledValueCoercible, context);
             case ValueCoercible _, Value _ -> coerceToContext0(value, context);
+            case InterceptedProxy<?> proxy when isPythonInterfaceProxy(proxy) -> interceptedTargetValue(proxy);
             case List<?> _ when List.class.equals(declaredType) ->
                 coerceToContext(value, context);
             case Map<?, ?> _ when Map.class.equals(declaredType) ->
@@ -609,6 +628,112 @@ public final class PythonCoercion {
             }
             return result;
         });
+    }
+
+    /**
+     * The Python object standing in for an AOP proxy of a Python class.
+     * <p>
+     * A generated proxy of a Python class (the scoped proxy of a {@code @Refreshable} factory bean, for
+     * example) is a subclass of the generated stub, or an implementation of the generated interface, that
+     * stands in for the bean its scope currently holds; it has no Python object of its own. Python code
+     * receiving the proxy gets a Python scoped proxy of the same class instead: every attribute read, write
+     * and method call is forwarded to the Python object of the bean the proxy resolves through its scope at
+     * that moment, so a refreshed or replaced bean is seen by Python callers the way Java callers see it.
+     * The Python proxy is created once per proxy instance and context. The target is not resolved here:
+     * a lazy proxy resolves it on the first use from Python, and a target that turns out to be a Java
+     * object (a Java implementation of a Python abstract base class) is forwarded to as the host object
+     * it is. The Python proxy carries the AOP proxy as its host object reference, so when Python hands
+     * it back to Java (a method returning the injected bean) Java receives the AOP proxy again, with its
+     * scope and interceptors, rather than the bean the scope holds at that moment.
+     *
+     * @param proxy The proxy, a generated stub instance or an implementation of a generated interface
+     * @return The Python scoped proxy of the intercepted target
+     * @since 5.2.0
+     */
+    @UsedByGeneratedCode
+    public static Value interceptedTargetValue(InterceptedProxy<?> proxy) {
+        Context context = PythonContextRuntime.getContext();
+        return PythonContextRuntime.withExecutionFrame(context, () -> {
+            PythonContextRegistry.ContextState state = PythonContextRegistry.state(context);
+            synchronized (state.scopedProxies) {
+                Value scopedProxy = state.scopedProxies.get(proxy);
+                if (scopedProxy != null) {
+                    return scopedProxy;
+                }
+            }
+            // the Python class of the generated type the proxy extends or implements; the target itself is
+            // not resolved here, a lazy proxy resolves it on the first use
+            PythonContextRuntime.PythonClassReference classReference = pythonClassReference(proxy.getClass());
+            Value pythonClass = classReference != null
+                ? PythonContextRuntime.findClass(classReference, context)
+                : interceptedTargetObject(proxy).getMetaObject();
+            Value scopedProxy = PythonContextRuntime.helper(context, SCOPED_PROXY_FACTORY)
+                .execute(pythonClass, (ProxyExecutable) arguments -> interceptedTargetObject(proxy), new ValueCoercible.HostObjectReference(proxy));
+            synchronized (state.scopedProxies) {
+                Value existing = state.scopedProxies.putIfAbsent(proxy, scopedProxy);
+                return existing == null ? scopedProxy : existing;
+            }
+        });
+    }
+
+    /**
+     * Whether a value is an AOP proxy of a generated Python type without a Python object of its own: a
+     * proxy implementing a generated interface, which Python code receives as a Python scoped proxy.
+     * Decided from the proxy type alone, so a lazy proxy is not resolved by the conversion.
+     *
+     * @param value The value
+     * @return {@code true} for a proxy of a generated Python interface
+     */
+    static boolean isPythonInterfaceProxy(@Nullable Object value) {
+        return value instanceof InterceptedProxy<?> && !(value instanceof ValueCoercible) && pythonClassReference(value.getClass()) != null;
+    }
+
+    /**
+     * The object the Python scoped proxy forwards to, resolved through the scope on every use: the Python
+     * object of a Python target, or the host object of a Java one (a Java implementation of a Python
+     * abstract base class behind a scoped proxy), whose interface methods Python calls as on any Java
+     * object.
+     */
+    private static Value interceptedTargetObject(InterceptedProxy<?> proxy) {
+        Object target = proxy.interceptedTarget();
+        if (target instanceof ValueCoercible valueCoercible) {
+            return valueCoercible.asPolyglotValue();
+        }
+        return PythonContextRuntime.getContext().asValue(target);
+    }
+
+    /**
+     * The Python class reference of a generated type in the hierarchy of a class: its superclasses and the
+     * interfaces they implement carry the {@link PythonClass} annotation of the generated stub or interface.
+     */
+    private static PythonContextRuntime.@Nullable PythonClassReference pythonClassReference(Class<?> type) {
+        return PYTHON_CLASS_REFERENCES.get(type).orElse(null);
+    }
+
+    private static PythonContextRuntime.@Nullable PythonClassReference findPythonClassReference(Class<?> type) {
+        for (Class<?> current = type; current != null && current != Object.class; current = current.getSuperclass()) {
+            PythonClass annotation = current.getAnnotation(PythonClass.class);
+            if (annotation != null) {
+                return pythonClassReference(annotation);
+            }
+            for (Class<?> anInterface : current.getInterfaces()) {
+                PythonContextRuntime.PythonClassReference reference = pythonClassReference(anInterface);
+                if (reference != null) {
+                    return reference;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static PythonContextRuntime.PythonClassReference pythonClassReference(PythonClass annotation) {
+        return new PythonContextRuntime.PythonClassReference(
+            annotation.packageName(),
+            annotation.rootName(),
+            annotation.nestedMemberNames(),
+            annotation.displayName(),
+            annotation.cacheKey()
+        );
     }
 
     /**
