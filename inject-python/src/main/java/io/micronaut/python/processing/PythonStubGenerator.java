@@ -1102,24 +1102,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, storedValue
                         ));
                         if (!isFrozenDataclass) {
-                            List<ExpressionDef> memberNames = new ArrayList<>();
-                            List<ExpressionDef> memberValues = new ArrayList<>();
-                            for (PropertyElement beanProperty : beanProperties) {
-                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field != null) {
-                                    if (isSharedCollectionProperty(beanProperty)) {
-                                        reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field, null, null));
-                                        continue;
-                                    }
-                                    memberNames.add(ExpressionDef.constant(beanProperty.getName()));
-                                    memberValues.add(coerceTypedElementToPolyglotValue(
-                                        beanProperty, aThis.field(field), targetContext
-                                    ).cast(TypeDef.OBJECT));
-                                }
-                            }
-                            if (!memberNames.isEmpty()) {
-                                reuseStatements.add(putMembers(storedValue, memberNames, memberValues));
-                            }
                             // the object of this context: the same sync as any other bridge crossing,
                             // so the fields of a Java-owned object stay shared by reference
                             reuseStatements.add(aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning());
