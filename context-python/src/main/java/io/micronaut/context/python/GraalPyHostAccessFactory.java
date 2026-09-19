@@ -52,6 +52,12 @@ final class GraalPyHostAccessFactory {
 
     /** The name of the Python datetime module, which its own datetime type shares. */
     private static final String DATETIME = "datetime";
+    private static final String BUILTINS = "builtins";
+    /**
+     * The finite built-in Python containers (besides sequences) accepted by {@code Collection} and
+     * {@code Iterable} parameters.
+     */
+    private static final List<String> FINITE_CONTAINER_TYPES = List.of("set", "frozenset", "dict_keys", "dict_values", "dict_items");
 
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
@@ -86,7 +92,100 @@ final class GraalPyHostAccessFactory {
         registerPythonClassMapping(builder, pythonClassResolver);
         registerObjectMapping(builder, pythonClassResolver);
         registerStandardLibraryMappings(builder);
+        registerSequenceMappings(builder);
         return builder.build();
+    }
+
+    /**
+     * Overload resolution for Python sequences.
+     * <p>
+     * Host interop only knows {@code List} for array-like guest values, and it accepts any object with
+     * members as a {@code Map}. A Python {@code list} passed to overloads such as
+     * {@code success(String, Collection)} / {@code success(String, Map)} therefore selected the
+     * {@code Map} overload, and {@code Collection} or {@code Iterable} parameters received an
+     * interface proxy. These mappings take precedence over the default (loose) conversions so a
+     * sequence selects the collection overload, and Python {@code bytes} / {@code bytearray} select
+     * a {@code byte[]} overload instead of an {@code Object} or stream one.
+     * <p>
+     * A sequence is passed as the live host view of the Python object; a set, frozenset or dictionary
+     * view is copied into a Java list, so Java-side mutations of that list do not reach Python.
+     */
+    private static void registerSequenceMappings(HostAccess.Builder builder) {
+        builder.targetTypeMapping(Value.class, List.class,
+            GraalPyHostAccessFactory::isSequence,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, Collection.class,
+            GraalPyHostAccessFactory::isSequenceOrContainer,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, Iterable.class,
+            GraalPyHostAccessFactory::isSequenceOrContainer,
+            GraalPyHostAccessFactory::asList);
+        builder.targetTypeMapping(Value.class, byte[].class,
+            value -> value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements(),
+            GraalPyHostAccessFactory::readBytes);
+    }
+
+    /**
+     * A Python sequence (list, tuple): not a host object (a Java byte[] or List keeps the default host
+     * conversion, or {@code Files.write(Path, byte[])} would become ambiguous with the Iterable overload)
+     * and not a bytes-like buffer, which maps to {@code byte[]}.
+     */
+    private static boolean isSequence(@Nullable Value value) {
+        return value != null && !value.isNull() && !value.isHostObject() && !value.hasBufferElements() && value.hasArrayElements();
+    }
+
+    /**
+     * A Python sequence or a finite built-in container ({@code set}, {@code frozenset} and the dictionary
+     * views): these are copied into a Java list for a {@code Collection} or {@code Iterable} parameter.
+     * Other iterables (generators, {@code itertools} iterators) are not matched, because copying would
+     * consume a lazy iterable eagerly or never finish for an infinite one; an {@code Iterable} parameter
+     * keeps the default lazy host view for them.
+     */
+    private static boolean isSequenceOrContainer(@Nullable Value value) {
+        if (isSequence(value)) {
+            return true;
+        }
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasIterator() || value.hasHashEntries()) {
+            return false;
+        }
+        for (String containerType : FINITE_CONTAINER_TYPES) {
+            if (PythonCoercion.isPythonType(value, BUILTINS, containerType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Object> asList(Value value) {
+        if (value.hasArrayElements()) {
+            // Value.as(List.class) would re-enter this mapping; the default Object conversion of an
+            // array-like value is the same live List view, which keeps the identity of the Python
+            // sequence when it is handed back to Python.
+            Object converted = value.as(Object.class);
+            if (converted instanceof List<?> list) {
+                return (List<Object>) list;
+            }
+            long size = value.getArraySize();
+            List<Object> elements = new ArrayList<>(Math.toIntExact(size));
+            for (long i = 0; i < size; i++) {
+                elements.add(value.getArrayElement(i).as(Object.class));
+            }
+            return elements;
+        }
+        List<Object> elements = new ArrayList<>();
+        Value iterator = value.getIterator();
+        while (iterator.hasIteratorNextElement()) {
+            elements.add(iterator.getIteratorNextElement().as(Object.class));
+        }
+        return elements;
+    }
+
+    private static byte[] readBytes(Value value) {
+        int size = Math.toIntExact(value.getBufferSize());
+        byte[] bytes = new byte[size];
+        value.readBuffer(0, bytes, 0, size);
+        return bytes;
     }
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
