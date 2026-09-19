@@ -236,6 +236,133 @@ def __micronaut_create_raw_instance(cls):
     return cls.__new__(cls)
 
 
+class _MicronautSelfInvocation:
+    """Instance attribute that routes ``self.method(...)`` of a proxied bean through the interceptor chain.
+
+    The override was created for the bean object that carries the attribute, so the chain runs on the
+    calling object; it binds the class function to that object, so the attribute is never re-entered.
+    Keyword and omitted defaulted arguments are laid out positionally the way the generated Java method
+    declares them.
+    """
+
+    __slots__ = ("_function", "_override", "_parameters")
+
+    def __init__(self, function, override, parameters):
+        self._function = function
+        self._override = override
+        self._parameters = parameters
+
+    def __call__(self, *args, **kwargs):
+        parameters = self._parameters
+        if kwargs or len(args) < len(parameters):
+            values = list(args)
+            for parameter in parameters[len(args):]:
+                if parameter.name in kwargs:
+                    values.append(kwargs.pop(parameter.name))
+                elif parameter.default is not parameter.empty:
+                    values.append(parameter.default)
+                else:
+                    raise TypeError(f"{self._function.__qualname__}() missing required argument: '{parameter.name}'")
+            if kwargs:
+                raise TypeError(f"{self._function.__qualname__}() got an unexpected keyword argument '{next(iter(kwargs))}'")
+            args = values
+        return self._override(*args)
+
+    def __getattr__(self, name):
+        if name in _MicronautSelfInvocation.__slots__:
+            raise AttributeError(name)
+        return getattr(self._function, name)
+
+    def __repr__(self):
+        return repr(self._function)
+
+
+class _MicronautStageAwaitable:
+    """Awaitable over the Java stage an intercepted ``async def`` produced.
+
+    The interceptor chain of an async method sees a CompletionStage, as it does for a Java bean. A Python
+    caller awaits this object, which turns the stage into an asyncio future on the loop that awaits it;
+    the Java bridge reads the stage back from ``_micronaut_java_stage`` and hands it to a Java caller as
+    it is.
+    """
+
+    __slots__ = ("_micronaut_java_stage", "_to_awaitable")
+
+    def __init__(self, stage, to_awaitable):
+        self._micronaut_java_stage = stage
+        self._to_awaitable = to_awaitable
+
+    def __await__(self):
+        return self._to_awaitable().__await__()
+
+
+# the parameter layout of a class function, computed once per function: a bean of a prototype-like scope
+# is bound on every instantiation
+_micronaut_self_invocation_layouts = {}
+
+
+def _micronaut_self_invocation_layout(function):
+    """The parameters after ``self``, or ``None`` when the layout cannot be mapped onto the Java method.
+
+    A method taking ``*args`` or ``**kwargs`` has no positional layout, and the generated Java method
+    has no parameter for a keyword-only one; the self-invocations of such methods stay direct rather
+    than dropping or misplacing arguments.
+    """
+    try:
+        return _micronaut_self_invocation_layouts[function]
+    except KeyError:
+        pass
+    except TypeError:
+        return None
+    parameters = None
+    try:
+        parameters = tuple(inspect.signature(function).parameters.values())[1:]
+        for parameter in parameters:
+            if parameter.kind in (parameter.VAR_POSITIONAL, parameter.VAR_KEYWORD, parameter.KEYWORD_ONLY):
+                parameters = None
+                break
+    except (TypeError, ValueError):
+        pass
+    _micronaut_self_invocation_layouts[function] = parameters
+    return parameters
+
+
+def __micronaut_is_coroutine_function(function):
+    return inspect.iscoroutinefunction(function)
+
+
+def __micronaut_await_stage(stage, to_awaitable):
+    return _MicronautStageAwaitable(stage, to_awaitable)
+
+
+def __micronaut_bind_self_invocations(target, names, overrides):
+    """Make the intercepted methods of a proxied bean dispatch through the interceptor chain when called on ``self``.
+
+    A Java bean is its own proxy, so ``this.method()`` from inside the bean runs the interceptor chain.
+    A Python bean is a plain object behind the scoped proxy; an instance attribute per intercepted method
+    gives ``self.method()`` the same semantics while ``self`` stays the bean object. ``overrides`` are the
+    chains created for this target, one per name.
+    """
+    try:
+        attributes = vars(target)
+    except TypeError:
+        # an object without __dict__ cannot carry the attributes; its self-invocations stay direct
+        return
+    cls = type(target)
+    for i in range(len(names)):
+        name = names[i]
+        if isinstance(attributes.get(name), _MicronautSelfInvocation):
+            # already bound: the same target resolved again
+            continue
+        function = __micronaut_get_raw_class_member(cls, name)
+        if function is None or not callable(function):
+            continue
+        parameters = _micronaut_self_invocation_layout(function)
+        if parameters is None:
+            continue
+        object.__setattr__(target, name, _MicronautSelfInvocation(function, overrides[i], parameters))
+
+
 def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=None):
     """A subclass of cls that forwards every attribute to the bean the supplier returns.
 
@@ -281,8 +408,10 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
                 names = attributes.keys()
             except Exception:
                 return
+            overrides = object.__getattribute__(self, "_micronaut_overrides")
             for name in names:
-                object.__getattribute__(self, "_micronaut_register_member")(name)
+                if name not in overrides:
+                    object.__getattribute__(self, "_micronaut_register_member")(name)
 
         def __getattribute__(self, name):
             if name in ("_micronaut_target_supplier", "_micronaut_java_proxy", "_micronaut_bind_java_proxy", "_micronaut_overrides", "_micronaut_setter_overrides", "_micronaut_target", "_micronaut_put_override", "_micronaut_put_setter_override", "_micronaut_register_member", "_micronaut_sync_target_attributes"):
