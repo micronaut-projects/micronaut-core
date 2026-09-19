@@ -315,7 +315,7 @@ class ProductRepository(CrudRepository[Product, int]):
 """
 
         when:
-        def definition = buildBeanDefinition("python", "ProductRepository\$RuntimeProxy", pythonCode)
+        def definition = buildBeanDefinition("python", "ProductRepository\$Intercepted", pythonCode)
         def deleteById = definition.executableMethods.findAll { it.methodName == "deleteById" }
         def findById = definition.executableMethods.findAll { it.methodName == "findById" }
         def runtimeDeleteById = definition.beanType.methods.findAll { it.name == "deleteById" && !it.synthetic }

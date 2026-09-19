@@ -305,6 +305,11 @@ public final class PythonTypeElementVisitorProcessor {
         if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
             return;
         }
+        if (element.isInterface()) {
+            // An interface has no Python state or behaviour to proxy: Micronaut compiles the
+            // introduction proxy for the generated Java interface as it does for a Java one.
+            return;
+        }
         if (element.hasStereotype(Around.class)) {
             element.annotate(Around.class, builder -> builder.member("proxyTarget", true));
         }

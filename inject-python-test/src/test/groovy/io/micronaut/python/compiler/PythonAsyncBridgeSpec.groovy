@@ -49,8 +49,8 @@ return (CompletionStage<String>) PythonAsyncioRuntime.toCompletionStage(pythonCo
 ''')
     }
 
-    void "abstract async client method bridge returns completion stage of awaited result type"() {
-        expect:
+    void "abstract async client method returns completion stage of awaited result type"() {
+        expect: "the client is a Java interface; the introduction proxy implements the method"
         assertGeneratedSourceContains('''
 from abc import ABC, abstractmethod
 from micronaut.http.annotation import Get
@@ -63,7 +63,9 @@ class BackendClient(ABC):
     async def message(self) -> str:
         ...
 ''', '''
-public CompletionStage<String> message() {
+public interface BackendClient {
+  CompletionStage<String> message();
+}
 ''')
     }
 
