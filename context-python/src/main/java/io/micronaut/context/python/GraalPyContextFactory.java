@@ -402,6 +402,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
         if (PythonContextRuntime.isReuseContext() || providedContext) {
+            // the context outlives this application: the Python scoped proxies of its beans must not
+            var ctx = event.getBean();
+            if (ctx != null) {
+                PythonContextRegistry.forgetScopedProxies(ctx);
+            }
             return;
         }
         var ctx = event.getBean();

@@ -331,9 +331,12 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * <p>
      * GraalPy can box proxy members as host objects, and this record gives Micronaut a stable
      * marker that distinguishes an intentional bridge back-reference from ordinary user members.
+     * A Python scoped proxy exposes the AOP proxy it stands in for the same way, so the proxy
+     * rather than the bean it currently resolves to is what returns to Java.
      *
-     * @param value The generated Java wrapper behind the Python proxy.
+     * @param value The generated Java wrapper behind the Python proxy, or the AOP proxy behind a
+     *              Python scoped proxy.
      */
-    record HostObjectReference(ValueCoercible value) {
+    record HostObjectReference(Object value) {
     }
 }

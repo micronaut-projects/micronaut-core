@@ -587,7 +587,7 @@ public final class PythonConversion {
             if (value.isHostObject()) {
                 return convertObjectResponseBody(value.asHostObject());
             }
-            ValueCoercible host = ValueCoercibles.hostObject(value);
+            Object host = ValueCoercibles.hostObject(value, Object.class);
             if (host != null) {
                 return host;
             }
@@ -610,8 +610,9 @@ public final class PythonConversion {
      */
     private static <T> @Nullable T convertMappedWrapper(Value value, Class<T> targetType) {
         try {
-            ValueCoercible host = ValueCoercibles.hostObject(value);
-            if (host != null && targetType.isInstance(host)) {
+            // a generated wrapper, or the AOP proxy a Python scoped proxy stands in for
+            Object host = ValueCoercibles.hostObject(value, targetType);
+            if (host != null) {
                 return targetType.cast(host);
             }
             if (value.isHostObject()) {

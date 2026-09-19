@@ -81,6 +81,7 @@ import static io.micronaut.aop.Adapter.InternalAttributes.ADAPTED_BEAN;
 public final class PythonProxyCreator implements RuntimeProxyCreator {
 
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
+    private static final String SCOPED_PROXY_BIND_JAVA_PROXY_METHOD = "_micronaut_bind_java_proxy";
     private static final String RAW_INSTANCE_FACTORY = "__micronaut_create_raw_instance";
     private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
@@ -303,6 +304,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         if (proxy == null) {
             throw new IllegalStateException("Python proxy target cannot be null");
         }
+        // the Python proxy returned to Java resolves to this proxy again, not to a new wrapper of it
+        proxyValue.getMember(SCOPED_PROXY_BIND_JAVA_PROXY_METHOD).execute(new ValueCoercible.HostObjectReference(proxy));
         return proxy;
     }
 
