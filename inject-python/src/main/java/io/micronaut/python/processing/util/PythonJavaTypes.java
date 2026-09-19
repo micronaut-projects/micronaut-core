@@ -18,6 +18,7 @@ package io.micronaut.python.processing.util;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
 
 import java.util.Set;
 
@@ -31,6 +32,9 @@ import java.util.Set;
 @Internal
 public final class PythonJavaTypes {
 
+    /** The annotation the generated bridge class of every Python class carries. */
+    public static final String PYTHON_CLASS_ANNOTATION = "io.micronaut.context.python.annotation.PythonClass";
+
     /** The bases a reflection-backed element cannot answer {@code isAssignable(String)} for. */
     private static final Set<String> THROWABLE_ROOTS = Set.of(
         "java.lang.Throwable", "java.lang.Exception", "java.lang.RuntimeException", "java.lang.Error"
@@ -40,7 +44,6 @@ public final class PythonJavaTypes {
         "java.lang.Integer", "java.lang.Long", "java.lang.Short", "java.lang.Byte", "java.lang.Double",
         "java.lang.Float", "java.lang.Boolean", "java.lang.Character"
     );
-    private static final String PYTHON_CLASS_ANNOTATION = "io.micronaut.context.python.annotation.PythonClass";
 
     private PythonJavaTypes() {
     }
@@ -64,14 +67,18 @@ public final class PythonJavaTypes {
     }
 
     /**
-     * Whether the type is a Java class the Python compiler generated from a Python class. Such a
-     * class names a Python module, not a Java type, when it appears as the module of an import.
+     * Whether the type is a Python class: one of the sources being compiled, or the generated bridge
+     * of a Python class compiled earlier (by another source root of the project, or into a library)
+     * found on the class path. Such a bridge is a Java class, but its Python class is what an import
+     * of it refers to at run time, so the transformer keeps the import instead of replacing it with a
+     * reference to the Java type.
      *
      * @param classElement The type
-     * @return Whether it was generated from Python
+     * @return Whether it is a Python class
      */
     public static boolean isPythonClass(@Nullable ClassElement classElement) {
-        return classElement != null && classElement.hasAnnotation(PYTHON_CLASS_ANNOTATION);
+        return classElement instanceof AbstractPythonClassElement
+            || (classElement != null && classElement.hasAnnotation(PYTHON_CLASS_ANNOTATION));
     }
 
     /**

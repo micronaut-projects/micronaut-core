@@ -346,6 +346,7 @@ languageSupport:
     pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
     decorators: Annotations as Decorators
+    sourceRoots: Main and Test Sources
     typeOrdering: Type Ordering and Forward References
     interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions
