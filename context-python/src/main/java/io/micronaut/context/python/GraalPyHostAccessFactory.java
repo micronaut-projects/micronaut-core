@@ -15,10 +15,13 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.python.annotation.PythonClass;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
+import org.graalvm.polyglot.HostAccess.TargetMappingPrecedence;
 import org.graalvm.polyglot.Value;
 import org.graalvm.polyglot.proxy.ProxyObject;
 import org.jspecify.annotations.Nullable;
@@ -63,17 +66,44 @@ final class GraalPyHostAccessFactory {
      */
     private static final List<String> FINITE_CONTAINER_TYPES = List.of("set", "frozenset", "dict_keys", "dict_values", "dict_items");
 
+    /** The module of classes defined by the main script, which the compiler places in the top-level package. */
+    private static final String MAIN_MODULE = "__main__";
+
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
      *
      * @param mappings The discovered TargetTypeMapping beans
+     * @param beanContext The bean context, whose class loader loads the generated classes
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, BeanContext beanContext) {
+        return hostAccess(mappings, beanContext.getClassLoader());
+    }
+
+    /**
+     * Builds a HostAccess instance for a context created outside the bean context, loading the
+     * generated classes through the context class loader of the calling thread.
+     *
+     * @param mappings The TargetTypeMapping instances
+     * @return A HostAccess configured with custom target type mappings
+     */
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings) {
+        return hostAccess(mappings, (ClassLoader) null);
+    }
+
+    /**
+     * Builds a HostAccess instance and registers all TargetTypeMapping instances.
+     *
+     * @param mappings The TargetTypeMapping instances
+     * @param classLoader The class loader of the generated classes, or {@code null} to use the context
+     *                    class loader of the calling thread
+     * @return A HostAccess configured with custom target type mappings
+     */
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, @Nullable ClassLoader classLoader) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
-        PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings);
+        PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings, classLoader);
         Map<Class<?>, List<TargetTypeMapping<?>>> assignableMappings = new LinkedHashMap<>();
         for (TargetTypeMapping<?> mapping : mappings) {
             register(builder, mapping, pythonClassResolver);
@@ -98,6 +128,7 @@ final class GraalPyHostAccessFactory {
         registerStandardLibraryMappings(builder);
         registerSequenceMappings(builder);
         PythonCallables.registerStandardInterfaces(builder);
+        registerNumericMappings(builder);
         return builder.build();
     }
 
@@ -191,6 +222,53 @@ final class GraalPyHostAccessFactory {
         byte[] bytes = new byte[size];
         value.readBuffer(0, bytes, 0, size);
         return bytes;
+    }
+
+    /**
+     * Numeric parameters. Host interop converts a guest number to a primitive or boxed numeric
+     * parameter when the value fits the type losslessly, and selects the most specific of the
+     * overloads the arguments fit. These mappings apply the same rule (the predicates are the
+     * interop fits-in checks) with the highest precedence, so the selection is unchanged but the
+     * cached call site guards its arguments through the mappings instead of the interop primitive
+     * type checks. Those checks reject a mix of arguments they were built from, such as
+     * {@code of(0.15, 0.25)} for the overloads {@code of(float...)} and {@code of(double...)}
+     * (0.25 also fits {@code float}) or {@code of(300, 1)} next to {@code of(byte...)}: with
+     * Java assertions enabled (as in a Gradle test JVM) the host call fails with an
+     * {@code AssertionError} in {@code HostExecuteNode.fillArgTypesArray}, without them the call
+     * site falls back to the uncached path. Parameters of type {@code Number} or
+     * {@code BigInteger} are not covered.
+     */
+    private static void registerNumericMappings(HostAccess.Builder builder) {
+        builder.targetTypeMapping(Value.class, Byte.class, GraalPyHostAccessFactory::fitsInByte, Value::asByte, TargetMappingPrecedence.HIGHEST);
+        builder.targetTypeMapping(Value.class, Short.class, GraalPyHostAccessFactory::fitsInShort, Value::asShort, TargetMappingPrecedence.HIGHEST);
+        builder.targetTypeMapping(Value.class, Integer.class, GraalPyHostAccessFactory::fitsInInt, Value::asInt, TargetMappingPrecedence.HIGHEST);
+        builder.targetTypeMapping(Value.class, Long.class, GraalPyHostAccessFactory::fitsInLong, Value::asLong, TargetMappingPrecedence.HIGHEST);
+        builder.targetTypeMapping(Value.class, Float.class, GraalPyHostAccessFactory::fitsInFloat, Value::asFloat, TargetMappingPrecedence.HIGHEST);
+        builder.targetTypeMapping(Value.class, Double.class, GraalPyHostAccessFactory::fitsInDouble, Value::asDouble, TargetMappingPrecedence.HIGHEST);
+    }
+
+    private static boolean fitsInByte(@Nullable Value value) {
+        return value != null && value.fitsInByte();
+    }
+
+    private static boolean fitsInShort(@Nullable Value value) {
+        return value != null && value.fitsInShort();
+    }
+
+    private static boolean fitsInInt(@Nullable Value value) {
+        return value != null && value.fitsInInt();
+    }
+
+    private static boolean fitsInLong(@Nullable Value value) {
+        return value != null && value.fitsInLong();
+    }
+
+    private static boolean fitsInFloat(@Nullable Value value) {
+        return value != null && value.fitsInFloat();
+    }
+
+    private static boolean fitsInDouble(@Nullable Value value) {
+        return value != null && value.fitsInDouble();
     }
 
     private static void registerStandardLibraryMappings(HostAccess.Builder builder) {
@@ -434,8 +512,21 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable Class<?> loadClass(String className) {
+        return loadClass(className, null);
+    }
+
+    /**
+     * Loads a class by name through the preferred loader, the loader of the current Python
+     * application, the context class loader and this class's loader, in that order.
+     *
+     * @param className the binary class name
+     * @param preferredLoader the loader to try first, if any
+     * @return the class, or {@code null} when no loader knows it
+     */
+    private static @Nullable Class<?> loadClass(String className, @Nullable ClassLoader preferredLoader) {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
         ClassLoader[] loaders = {
+            preferredLoader,
             runtime == null ? null : runtime.classLoader(),
             Thread.currentThread().getContextClassLoader(),
             GraalPyHostAccessFactory.class.getClassLoader()
@@ -504,14 +595,6 @@ final class GraalPyHostAccessFactory {
         return pythonClassResolver.findClass(moduleName, simpleName);
     }
 
-    private static String toGeneratedClassName(String moduleName, String simpleName) {
-        String generatedSimpleName = simpleName.replace('.', '$');
-        if (moduleName.equals(generatedSimpleName) || moduleName.endsWith("." + generatedSimpleName)) {
-            return moduleName;
-        }
-        return moduleName + "." + generatedSimpleName;
-    }
-
     private static @Nullable String stringMember(Value value, String memberName) {
         if (!value.hasMember(memberName)) {
             return null;
@@ -523,13 +606,21 @@ final class GraalPyHostAccessFactory {
         return member.asString();
     }
 
+    /**
+     * Resolves a Python class to the Java class the compiler generated for it: through the target
+     * type mapping registered for a concrete class, or by loading the generated class by name, which
+     * covers the interfaces and abstract classes generated for Python protocols, abstract base classes
+     * and introduction types, for which no mapping exists.
+     */
     private static final class PythonClassResolver {
         private final Map<Class<?>, TargetTypeMapping<?>> mappingsByTargetType;
         private final Map<String, Class<?>> mappingsByClassName;
         private final Map<String, Optional<Class<?>>> uniqueMappingsBySimpleName;
         private final Map<PythonClassLookupKey, Optional<Class<?>>> resolvedClasses = new ConcurrentHashMap<>();
+        private final @Nullable ClassLoader classLoader;
 
-        private PythonClassResolver(Collection<TargetTypeMapping<?>> mappings) {
+        private PythonClassResolver(Collection<TargetTypeMapping<?>> mappings, @Nullable ClassLoader classLoader) {
+            this.classLoader = classLoader;
             Map<Class<?>, TargetTypeMapping<?>> byType = new HashMap<>(mappings.size());
             Map<String, Class<?>> byName = new HashMap<>(mappings.size());
             Map<String, Class<?>> bySimpleName = new HashMap<>(mappings.size());
@@ -569,13 +660,64 @@ final class GraalPyHostAccessFactory {
         }
 
         private @Nullable Class<?> resolveClass(PythonClassLookupKey key) {
-            if (key.moduleName() != null) {
-                Class<?> exact = mappingsByClassName.get(toGeneratedClassName(key.moduleName(), key.simpleName()));
+            List<String> classNames = generatedClassNames(key.moduleName(), key.simpleName());
+            for (String className : classNames) {
+                Class<?> exact = mappingsByClassName.get(className);
                 if (exact != null) {
                     return exact;
                 }
             }
+            for (String className : classNames) {
+                Class<?> generated = loadGeneratedClass(className);
+                if (generated != null) {
+                    return generated;
+                }
+            }
             return uniqueMappingsBySimpleName.getOrDefault(key.simpleName(), Optional.empty()).orElse(null);
+        }
+
+        /**
+         * The names the Java class generated for a Python class can have, given the module the class is
+         * defined in. The compiler places a class in the Java package named after the Python package of
+         * its module (the module itself when the class is defined in a package initializer) and puts the
+         * classes of a top-level module, and of the main script, in the {@code python} package.
+         *
+         * @param moduleName The Python module of the class, or {@code null} when unknown
+         * @param simpleName The qualified name of the class within its module
+         * @return The candidate class names, most specific first
+         */
+        private static List<String> generatedClassNames(@Nullable String moduleName, String simpleName) {
+            String generatedSimpleName = simpleName.replace('.', '$');
+            List<String> names = new ArrayList<>(3);
+            if (moduleName == null || moduleName.isBlank() || MAIN_MODULE.equals(moduleName)) {
+                names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
+                return names;
+            }
+            int packageSeparator = moduleName.lastIndexOf('.');
+            if (packageSeparator > 0) {
+                names.add(moduleName.substring(0, packageSeparator) + "." + generatedSimpleName);
+            } else {
+                names.add(PythonContextRuntime.PYTHON + "." + generatedSimpleName);
+            }
+            String packageInitializerName = moduleName + "." + generatedSimpleName;
+            if (!names.contains(packageInitializerName)) {
+                names.add(packageInitializerName);
+            }
+            return names;
+        }
+
+        /**
+         * Loads a generated class by name. A class is accepted when the Python compiler generated it
+         * (it carries {@link PythonClass}) or when it is an interface, the form the compiler gives a
+         * Python protocol or abstract base class, so an unrelated Java class that shares the name of
+         * a Python class is not mistaken for its generated class.
+         */
+        private @Nullable Class<?> loadGeneratedClass(String className) {
+            Class<?> loaded = loadClass(className, classLoader);
+            if (loaded == null) {
+                return null;
+            }
+            return loaded.isInterface() || loaded.isAnnotationPresent(PythonClass.class) ? loaded : null;
         }
     }
 

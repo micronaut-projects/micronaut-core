@@ -9,8 +9,9 @@ from micronaut.http.client.sse import SseClient
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
+from .Headline import Headline
+
 Flux = java.type("reactor.core.publisher.Flux")
-HeadlineClass = java.type("micronaut.docs.server.sse.Headline")
 
 
 @Property(name="spec.name", value="HeadlineControllerSpec")
@@ -21,7 +22,7 @@ class HeadlineControllerSpec:
     @Test
     def testConsumeEventStreamObject(self):
         events = Flux.from_(
-            self.client.eventStream(HttpRequest.GET("/headlines"), HeadlineClass)
+            self.client.eventStream(HttpRequest.GET("/headlines"), Headline)
         ).collectList().block()
 
         assert events.size() == 2, "events size: " + str(events.size())
