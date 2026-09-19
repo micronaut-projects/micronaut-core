@@ -53,6 +53,7 @@ public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
     private static final String AWAITABLE_COMPLETER_NAME = "__micronaut_complete_completion_stage_awaitable";
+    private static final String JAVA_STAGE_MEMBER = "_micronaut_java_stage";
     private static final AtomicReference<RuntimeState> STATE = new AtomicReference<>(new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
     private static final String ASYNCIO_MODULE_NAME = "micronaut_asyncio";
@@ -130,6 +131,10 @@ public final class PythonAsyncioRuntime {
             future.complete(null);
             return future;
         }
+        CompletionStage<Object> javaStage = javaStage(value);
+        if (javaStage != null) {
+            return javaStage;
+        }
         Context context = value.getContext();
         PythonCompletableFuture future = new PythonCompletableFuture();
         PythonContextRegistry.enterExecution(context);
@@ -151,6 +156,24 @@ public final class PythonAsyncioRuntime {
             scheduler.run();
         }
         return future;
+    }
+
+    /**
+     * The Java stage an awaitable carries, or {@code null} for a Python awaitable. An intercepted
+     * {@code async def} of a proxied bean hands its {@link CompletionStage} to Python callers as an
+     * awaitable that remembers the stage under {@code _micronaut_java_stage}: a Java caller of the
+     * bridge gets that stage back as it is, without a loop driving it on the calling thread.
+     */
+    @SuppressWarnings("unchecked")
+    private static @Nullable CompletionStage<Object> javaStage(Value value) {
+        if (!value.hasMember(JAVA_STAGE_MEMBER)) {
+            return null;
+        }
+        Value member = value.getMember(JAVA_STAGE_MEMBER);
+        if (member != null && member.isHostObject() && member.asHostObject() instanceof CompletionStage<?> stage) {
+            return (CompletionStage<Object>) stage;
+        }
+        return null;
     }
 
     /**

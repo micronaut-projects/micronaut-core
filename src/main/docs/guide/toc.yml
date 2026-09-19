@@ -359,6 +359,7 @@ languageSupport:
     functionalInterfaces: Python Callables as Functional Interfaces
     javaInterfaces: Implementing Java Interfaces
     generatedClasses: Generated Java Classes
+    aopProxies: AOP Proxies
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
