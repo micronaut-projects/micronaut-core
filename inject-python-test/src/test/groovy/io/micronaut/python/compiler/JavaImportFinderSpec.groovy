@@ -53,7 +53,8 @@ def _shims():
     from micronaut.http.HttpResponse import HttpResponse as HttpResponseType
     from micronaut.http.client.exceptions import HttpClientResponseException
     from micronaut.core.type import Argument
-    return SingleResult, ReactorPropagation, ConversionService, ConvertibleValues, NameUtils, StringUtils, Mapper, Requires, HttpResponse, HttpResponseType, HttpClientResponseException, Argument
+    from micronaut.http.annotation import Error
+    return SingleResult, ReactorPropagation, ConversionService, ConvertibleValues, NameUtils, StringUtils, Mapper, Requires, HttpResponse, HttpResponseType, HttpClientResponseException, Argument, Error
 
 
 def _loaded(name):
@@ -117,6 +118,17 @@ class Probe:
             result['bare_guard'] = 'no error'
         except TypeError as e:
             result['bare_guard'] = 'TypeError'
+        # an annotation whose value member holds a class takes a class as its argument
+        from micronaut.http.annotation import Error
+        result['class_value_bare'] = callable(Error(Probe))
+        # the compiler records that, so an annotation absent at run time still takes the class
+        import micronaut_java_imports
+        result['class_value_recorded'] = callable(micronaut_java_imports._MicronautJavaAnnotation('missing.ClassValued', None, True)(Probe))
+        try:
+            micronaut_java_imports._MicronautJavaAnnotation('missing.Plain', None, None)(Probe)
+            result['class_value_unrecorded'] = 'no error'
+        except TypeError:
+            result['class_value_unrecorded'] = 'TypeError'
 
         from micronaut.http import HttpResponse
         from micronaut.http.HttpResponse import HttpResponse as HttpResponseType
@@ -188,6 +200,7 @@ class Probe:
         manifest.member("micronaut.core.naming", "NameUtils") == ["io.micronaut.core.naming.NameUtils", "class"]
         manifest.member("micronaut.context.annotation", "Executable") == ["io.micronaut.context.annotation.Executable", "annotation"]
         manifest.member("micronaut.http", "HttpResponse") == ["io.micronaut.http.HttpResponse", "interface"]
+        manifest.member("micronaut.http.annotation", "Error") == ["io.micronaut.http.annotation.Error", "annotation", "class-value"]
         manifest.members["micronaut.core"] == null
     }
 
@@ -240,6 +253,9 @@ class Probe:
         report.decorator_nested_annotation == "io.micronaut.context.annotation.Mapper\$Mapping"
         report.decorator_nested_returns_target == "True"
         report.bare_guard == "TypeError"
+        report.class_value_bare == "True"
+        report.class_value_recorded == "True"
+        report.class_value_unrecorded == "TypeError"
 
         and: "the module of a type exports the type, and importing it keeps the type on the package"
         report.type_module == "True"

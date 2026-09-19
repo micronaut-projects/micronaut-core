@@ -949,7 +949,7 @@ class ErrorController:
         def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
         sourceFile.exists()
         sourceFile.text == pythonCode
-        JavaImportsManifest.read(tempDir).member("micronaut.http.annotation", "Error") == ["io.micronaut.http.annotation.Error", "annotation"]
+        JavaImportsManifest.read(tempDir).member("micronaut.http.annotation", "Error") == ["io.micronaut.http.annotation.Error", "annotation", "class-value"]
 
         cleanup:
         tempDir.deleteDir()
