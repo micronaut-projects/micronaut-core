@@ -73,7 +73,7 @@ class PythonMetadataBenchmarkSpec extends Specification {
         for (int round = 0; round < startupRounds; round++) {
             for (Map scenario : scenarios) {
                 for (String backend : rotate(BACKENDS, round)) {
-                    List<String> command = [java, '-Dpolyglot.engine.WarnInterpreterOnly=false', '-Xshare:auto', '-cp', classpath,
+                    List<String> command = [java, '--limit-modules=java.se,jdk.unsupported,jdk.management,jdk.zipfs', '-Dpolyglot.engine.WarnInterpreterOnly=false', '-Xshare:auto', '-cp', classpath,
                         'io.micronaut.context.python.runtime.PythonRuntimeMetadataRunner', outputs[backend].absolutePath,
                         "bean=${scenario.bean}".toString(), "introspection=${scenario.introspection}".toString(), 'property=name', 'startups=2']
                     File log = File.createTempFile('benchmark-run', '.log')
