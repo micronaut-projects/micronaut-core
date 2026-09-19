@@ -3662,24 +3662,29 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * The value a bridged {@code async def} returns: the coroutine as a {@link CompletionStage}, adapted
-     * to the reactive type the Java signature declares when that is not a completion stage.
+     * The value a bridged {@code async def} returns: the coroutine as a {@link CompletionStage}, or,
+     * when the Java signature declares a publisher type, a publisher that starts the coroutine on
+     * subscription in the reactive context of the subscriber, adapted to the declared type.
      */
     private static ExpressionDef coroutineResult(
         ExpressionDef pythonCoroutine,
         TypeDef methodSourceReturnType,
         @Nullable ClassElement declaredReturnType
     ) {
-        ExpressionDef completionStage = PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !declaredReturnType.isAssignable(CompletionStage.class)) {
+            ExpressionDef publisher = PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                "toPublisher",
+                ClassTypeDef.of(PUBLISHER),
+                pythonCoroutine
+            );
+            return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT, publisher, classLiteral(declaredReturnType))
+                .cast(methodSourceReturnType);
+        }
+        return PYTHON_ASYNCIO_RUNTIME.invokeStatic(
             "toCompletionStage",
             TypeDef.of(CompletionStage.class),
             pythonCoroutine
-        ).cast(TypeDef.of(CompletionStage.class));
-        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !declaredReturnType.isAssignable(CompletionStage.class)) {
-            return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT, completionStage, classLiteral(declaredReturnType))
-                .cast(methodSourceReturnType);
-        }
-        return completionStage.cast(methodSourceReturnType);
+        ).cast(TypeDef.of(CompletionStage.class)).cast(methodSourceReturnType);
     }
 
     private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {

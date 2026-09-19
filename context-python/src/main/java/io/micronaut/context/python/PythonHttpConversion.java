@@ -71,7 +71,7 @@ public final class PythonHttpConversion {
      */
     @SuppressWarnings("unchecked")
     public static <T> Publisher<T> convertPublisher(Publisher<?> publisher, Class<T> itemType) {
-        return Publishers.map((Publisher<Object>) publisher, item -> convertPublishedValue(item, itemType));
+        return PythonPublishers.map((Publisher<Object>) publisher, item -> convertPublishedValue(item, itemType));
     }
 
     /**
@@ -85,7 +85,7 @@ public final class PythonHttpConversion {
      */
     @SuppressWarnings("unchecked")
     public static <T> Publisher<T> convertPublisher(Publisher<?> publisher, PolyglotValueConverter<T> converter) {
-        return Publishers.map((Publisher<Object>) publisher, item -> {
+        return PythonPublishers.map((Publisher<Object>) publisher, item -> {
             if (item == null) {
                 return null;
             }

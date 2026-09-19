@@ -17,7 +17,10 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanProvider;
+import io.micronaut.core.async.propagation.ReactorPropagation;
 import io.micronaut.core.async.publisher.Publishers;
+import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.graceful.GracefulShutdownManager;
 import org.graalvm.polyglot.Context;
@@ -28,8 +31,10 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.publisher.Mono;
 
 import java.lang.ref.WeakReference;
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -1409,6 +1414,279 @@ final class PythonAsyncioRuntimeTest {
     }
 
     @Test
+    void toPublisherStartsTheCoroutineOnSubscriptionInTheReactorContextOfTheSubscriber() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            AtomicBoolean started = new AtomicBoolean();
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target, started):
+                    started.set(True)
+                    first = await target.client.transaction()
+                    second = await target.client.transaction()
+                    return first + "/" + second
+                values
+                """).execute(target, started);
+
+            Publisher<Object> publisher = PythonAsyncioRuntime.toPublisher(coroutine);
+
+            assertFalse(started.get());
+            assertEquals("T1/T1", Mono.from(publisher).contextWrite(reactor.util.context.Context.of("tx", "T1")).block());
+            assertTrue(started.get());
+        }
+    }
+
+    @Test
+    void toPublisherSharesTheResultOfTheFirstSubscription() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            AtomicInteger runs = new AtomicInteger();
+            Value coroutine = context.eval(PYTHON, """
+                async def once(runs):
+                    return runs.incrementAndGet()
+                once
+                """).execute(runs);
+
+            Mono<Object> publisher = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine));
+
+            assertEquals(1, publisher.block());
+            assertEquals(1, publisher.block());
+            assertEquals(1, runs.get());
+        }
+    }
+
+    @Test
+    void toPublisherRunsTheCoroutineInThePropagatedContextOfTheSubscriber() {
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    direct = target.client.propagatedElement()
+                    awaited = await target.client.propagatedElementMono()
+                    return direct + "/" + awaited
+                values
+                """).execute(target);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new TestElement("E1"));
+
+            String result = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine))
+                .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx, propagatedContext))
+                .map(String.class::cast)
+                .block();
+
+            assertEquals("E1/E1", result);
+            assertTrue(PropagatedContext.getOrEmpty().find(TestElement.class).isEmpty());
+        }
+    }
+
+    @Test
+    void eventLoopCallbacksRunInThePropagatedContextOfTheCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    first = target.client.propagatedElement()
+                    await target.client.transaction()
+                    second = target.client.propagatedElement()
+                    return first + "/" + second
+                values
+                """).execute(target);
+
+            CompletionStage stage;
+            stage = PropagatedContext.getOrEmpty().plus(new TestElement("E2"))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E2/E2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void aTaskResumedByAnotherTaskKeepsThePropagatedContextOfItsOwnCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutines = context.eval(PYTHON, """
+                import asyncio
+                event = asyncio.Event()
+
+                async def waiter(client):
+                    await event.wait()
+                    return "B=" + client.propagatedElement()
+
+                async def setter(client):
+                    event.set()
+                    await asyncio.sleep(0)
+                    return "A=" + client.propagatedElement()
+
+                (waiter, setter)
+                """);
+            ContextualClient client = new ContextualClient();
+
+            // B starts under "B" and waits for the event; A starts under "A" and sets it: B is resumed
+            // by a callback A scheduled, and must still run in its own context
+            CompletionStage<?> waiter = startUnder("B", coroutines.getArrayElement(0).execute(client));
+            CompletionStage<?> setter = startUnder("A", coroutines.getArrayElement(1).execute(client));
+            eventLoop.runUntilComplete(setter);
+            eventLoop.runUntilComplete(waiter);
+
+            assertEquals("A=A", setter.toCompletableFuture().get(1, TimeUnit.SECONDS));
+            assertEquals("B=B", waiter.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void aCoroutineResumedByAnotherThreadKeepsThePropagatedContextOfItsCaller() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def values(target):
+                    before = target.client.propagatedElement()
+                    delayed = await target.client.delayed()
+                    after = target.client.propagatedElement()
+                    return before + "/" + delayed + "/" + after
+                values
+                """).execute(target);
+
+            // the awaited publisher completes on a Reactor scheduler thread, which has no context
+            CompletionStage<?> stage = startUnder("E2", coroutine);
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E2/d/E2", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void aFailingCallbackOfATaskWithAContextIsReportedAndDoesNotStopTheTask() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value coroutine = context.eval(PYTHON, """
+                import asyncio
+                async def run(client):
+                    loop = asyncio.get_running_loop()
+                    def failing():
+                        raise ValueError("boom")
+                    loop.call_soon(failing)
+                    await asyncio.sleep(0)
+                    return client.propagatedElement()
+                run
+                """).execute(new ContextualClient());
+
+            // the callback runs through the context restoring hop; its failure goes to the loop's exception handler
+            CompletionStage<?> stage = startUnder("E3", coroutine);
+            eventLoop.runUntilComplete(stage);
+
+            assertEquals("E3", stage.toCompletableFuture().get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void anEagerCoroutineStartedInsideATaskInheritsTheReactorContextOfTheTask() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def inner(target):
+                    return "inner:" + target.client.propagatedElement() + "/" + await target.client.transaction()
+
+                async def outer(target):
+                    first = await target.client.transaction()
+                    # a Java method awaited by the task starts a second coroutine eagerly and returns its stage
+                    nested = await target.client.startNested(lambda: inner(target))
+                    return first + "/" + nested
+                outer
+                """).execute(target);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new TestElement("S"));
+
+            CompletableFuture<Object> result = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine))
+                .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx.put("tx", "T1"), propagatedContext))
+                .toFuture();
+            eventLoop.runUntilComplete(result);
+
+            assertEquals("T1/inner:S/T1", result.get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    @Test
+    void anEagerCoroutineStartedInsideATaskCarriesTheCallersPropagatedContextInTheInheritedReactorContext() throws Exception {
+        RecordingEventLoop eventLoop = new RecordingEventLoop();
+        PythonAsyncioRuntime.setEventLoopProviders(List.of(() -> Optional.of(eventLoop)));
+        try (Context context = Context.newBuilder(PYTHON).allowAllAccess(true).build()) {
+            Value target = context.eval(PYTHON, """
+                class Target:
+                    pass
+                Target()
+                """);
+            PythonCoercion.putMember(target, "client", PythonCoercion.asyncMemberValue(target, new ContextualClient()));
+            Value coroutine = context.eval(PYTHON, """
+                async def inner(target):
+                    return "inner:" + target.client.propagatedElement() + "/" + await target.client.transaction() + "/" + await target.client.reactorPropagatedElement()
+
+                async def outer(target):
+                    first = await target.client.transaction()
+                    # the Java method adds a propagated element before it starts the second coroutine
+                    nested = await target.client.startNestedUnder("X", lambda: inner(target))
+                    return first + "/" + nested
+                outer
+                """).execute(target);
+            PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new TestElement("S"));
+
+            CompletableFuture<Object> result = Mono.from(PythonAsyncioRuntime.toPublisher(coroutine))
+                .contextWrite(ctx -> ReactorPropagation.addPropagatedContext(ctx.put("tx", "T1"), propagatedContext))
+                .toFuture();
+            eventLoop.runUntilComplete(result);
+
+            // the thread, the Reactor context and the propagated context stored in it agree
+            assertEquals("T1/inner:X/T1/X", result.get(1, TimeUnit.SECONDS));
+        } finally {
+            PythonAsyncioRuntime.setEventLoopProviders(List.of());
+        }
+    }
+
+    private static CompletionStage<?> startUnder(String element, Value coroutine) {
+        return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+            .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutine));
+    }
+
+    @Test
     void cancellingPublisherAwaitCancelsSubscription() throws Exception {
         RecordingEventLoop eventLoop = new RecordingEventLoop();
         NeverPublisher publisher = new NeverPublisher();
@@ -1524,6 +1802,54 @@ final class PythonAsyncioRuntimeTest {
     public static final class AsyncClient {
         public CompletionStage<String> message() {
             return CompletableFuture.completedFuture("backend");
+        }
+    }
+
+    /**
+     * A propagated context element the tests carry through the Reactor context and the thread.
+     *
+     * @param name The element name
+     */
+    public record TestElement(String name) implements PropagatedContextElement {
+    }
+
+    /**
+     * Members whose results read the Reactor context of their subscriber or the propagated context of the caller.
+     */
+    public static final class ContextualClient {
+
+        public Mono<String> transaction() {
+            return Mono.deferContextual(ctx -> Mono.just(ctx.getOrDefault("tx", "none")));
+        }
+
+        public String propagatedElement() {
+            return PropagatedContext.getOrEmpty().find(TestElement.class).map(TestElement::name).orElse("none");
+        }
+
+        public Mono<String> propagatedElementMono() {
+            return Mono.fromSupplier(this::propagatedElement);
+        }
+
+        public Mono<String> delayed() {
+            return Mono.delay(Duration.ofMillis(20)).thenReturn("d");
+        }
+
+        public Mono<String> reactorPropagatedElement() {
+            return Mono.deferContextual(ctx -> Mono.just(ReactorPropagation.findPropagatedContext(ctx)
+                .flatMap(propagated -> propagated.find(TestElement.class))
+                .map(TestElement::name)
+                .orElse("none")));
+        }
+
+        @SuppressWarnings("rawtypes")
+        public CompletionStage startNested(Value coroutineFactory) {
+            return PythonAsyncioRuntime.toCompletionStage(coroutineFactory.execute());
+        }
+
+        @SuppressWarnings("rawtypes")
+        public CompletionStage startNestedUnder(String element, Value coroutineFactory) {
+            return PropagatedContext.getOrEmpty().plus(new TestElement(element))
+                .propagate(() -> PythonAsyncioRuntime.toCompletionStage(coroutineFactory.execute()));
         }
     }
 
