@@ -172,7 +172,7 @@ public final class PythonTypeResolver {
             return baseType;
         }
         var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
-        return new TypeAnnotatedClassElement(baseType, metadata);
+        return TypeAnnotatedClassElement.of(baseType, metadata);
     }
 
     private static @Nullable ClassElement resolveCollectionTypeArguments(
@@ -225,10 +225,10 @@ public final class PythonTypeResolver {
                 return boxedClassElement;
             }
             if (annotationMetadata instanceof ElementAnnotationMetadata elementAnnotationMetadata) {
-                return new TypeAnnotatedClassElement(boxedClassElement, elementAnnotationMetadata);
+                return TypeAnnotatedClassElement.of(boxedClassElement, elementAnnotationMetadata);
             }
             var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
-            return new TypeAnnotatedClassElement(boxedClassElement, metadata);
+            return TypeAnnotatedClassElement.of(boxedClassElement, metadata);
         }
         return resolvedType;
     }
@@ -331,7 +331,7 @@ public final class PythonTypeResolver {
             return boxedType;
         }
         var metadata = visitorContext.getElementAnnotationMetadataFactory().buildMutable(annotationMetadata);
-        return new TypeAnnotatedClassElement(boxedType, metadata);
+        return TypeAnnotatedClassElement.of(boxedType, metadata);
     }
 
     /**

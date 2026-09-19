@@ -647,7 +647,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         AnnotationMetadata returnAnnotationMetadata = typeAnnotationMetadata.isEmpty()
             ? annotationMetadata
             : new AnnotationMetadataHierarchy(true, typeAnnotationMetadata, annotationMetadata);
-        return new TypeAnnotatedClassElement(
+        return TypeAnnotatedClassElement.of(
             baseType,
             elementAnnotationMetadataFactory.buildMutable(returnAnnotationMetadata)
         );

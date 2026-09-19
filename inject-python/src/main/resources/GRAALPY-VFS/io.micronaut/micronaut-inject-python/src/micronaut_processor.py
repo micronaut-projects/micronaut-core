@@ -634,10 +634,14 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         # Create constructor function def
                         arguments_def = ArgumentsDef.of(dataclass_args)
                         return_def = ReturnDef.none()
+                        # The dataclass marker tells the class element that this __init__ was derived
+                        # from the fields, so the fields of dataclass bases (declared in other modules)
+                        # can be prepended when the class is resolved; an explicit __init__ keeps its
+                        # own signature, as in Python.
                         dataclass_constructor = JavaFuncDef(
                             "__init__",  # name
                             arguments_def,  # arguments
-                            [],  # decorators
+                            [DecoratorDef("dataclass", "dataclass", None, {}, [])],  # decorators
                             return_def,  # return_type
                             "",  # type_comment
                             [],  # type_params
