@@ -70,9 +70,11 @@ class PythonBootstrapStackTest {
                         deepest[1] = name
                     return None
 
-            # the generated modules import again, from the launcher down
+            # the generated modules and the file-less Java package modules import again, from the launcher down
             for name, module in list(sys.modules.items()):
-                if (getattr(module, '__file__', None) or '').startswith('/graalpy_vfs/src/'):
+                file = getattr(module, '__file__', None) or ''
+                origin = getattr(getattr(module, '__spec__', None), 'origin', None) or ''
+                if file.startswith('/graalpy_vfs/src/') or origin.startswith('java:'):
                     del sys.modules[name]
             recorder = DepthRecorder()
             sys.meta_path.insert(0, recorder)

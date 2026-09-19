@@ -417,6 +417,10 @@ class MicronautTransformer(ast.NodeTransformer):
         class_elements = self.callback_get_class_elements(java_package_name)
         if not class_elements:
             return False
+        # the package itself is imported at run time (import a.b as p; p.Cls), whether or not a class of it is:
+        # recorded under its Java name, which the class elements know (micronaut.core.beans is io.micronaut.core.beans)
+        java_package = str(class_elements[0].getName()).split('$')[0].rsplit('.', 1)[0]
+        self.java_class_imports.setdefault(self._to_python_import_module(java_package), [])
         for class_element in class_elements:
             if self._is_annotation_class(class_element) and not self._is_nested_type(class_element):
                 import_name = class_element.getSimpleName()

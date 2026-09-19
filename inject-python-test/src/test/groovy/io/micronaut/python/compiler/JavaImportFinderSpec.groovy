@@ -139,6 +139,10 @@ class Probe:
         from micronaut.http.client.exceptions import HttpClientResponseException
         result['class_instantiation'] = HttpClientResponseException("boom", HttpResponse.badRequest()).getMessage()
 
+        # a package imported as a module without a class import of its own resolves its classes on the class path
+        import micronaut.core.beans as core_beans
+        result['package_only_import'] = core_beans.BeanIntrospector.SHARED is not None
+
         core = sys.modules['micronaut.core']
         result['missing'] = hasattr(core, 'no_such_subpackage')
         try:
@@ -195,6 +199,8 @@ class Probe:
         manifest.packages["micronaut.core"] == "io.micronaut.core"
         manifest.packages["micronaut.core.async_"] == "io.micronaut.core.async"
         manifest.packages["jakarta.inject"] == "jakarta.inject"
+        manifest.packages["micronaut.core.beans"] == "io.micronaut.core.beans"
+        manifest.members["micronaut.core.beans"] == null
         manifest.types["micronaut.http.HttpResponse"] == "io.micronaut.http.HttpResponse"
         manifest.member("micronaut.core.convert", "ConversionService") == ["io.micronaut.core.convert.ConversionService", "interface"]
         manifest.member("micronaut.core.naming", "NameUtils") == ["io.micronaut.core.naming.NameUtils", "class"]
@@ -261,6 +267,9 @@ class Probe:
         report.type_module == "True"
         report.type_module_import_keeps_class == "True"
         report.class_instantiation == "boom"
+
+        and: "a package imported as a module without a class import resolves its classes"
+        report.package_only_import == "True"
 
         and: "a name that is no member, and a package the sources do not import, stay missing"
         report.missing == "False"
