@@ -85,6 +85,15 @@ final class PythonApplicationRuntime {
     }
 
     /**
+     * The application class loader that built the primary context.
+     *
+     * @return The class loader, or {@code null} when it is not known
+     */
+    @Nullable ClassLoader classLoader() {
+        return classLoader;
+    }
+
+    /**
      * The runtime generated code resolves.
      *
      * @return The installed runtime, or {@code null} when no application is running

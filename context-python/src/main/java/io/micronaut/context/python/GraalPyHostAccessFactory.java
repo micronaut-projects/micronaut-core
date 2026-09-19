@@ -49,6 +49,10 @@ import java.util.concurrent.ConcurrentHashMap;
 final class GraalPyHostAccessFactory {
 
     public static final String CLASS_META = "__class__";
+    private static final String FACADE_TARGET = "_target";
+    private static final String FACADE_RESOLVED = "_resolved";
+    private static final String DECORATOR_CLASS = "java_class";
+    private static final String DECORATOR_CLASS_NAME = "java_class_name";
 
     /** The name of the Python datetime module, which its own datetime type shares. */
     private static final String DATETIME = "datetime";
@@ -346,18 +350,28 @@ final class GraalPyHostAccessFactory {
         );
     }
 
+    /**
+     * The Java class a Python value stands for when it is passed where a {@code Class} is expected:
+     * a generated Python class maps to its Java stub, a generated annotation decorator to the
+     * annotation type, and the facade a generated package module binds a Java class to when the
+     * class is absent from the class path resolves that class on demand.
+     *
+     * @param value The value
+     * @param pythonClassResolver The resolver of generated Python classes
+     * @return The class, or {@code null} if the value does not stand for a Java class
+     */
     private static @Nullable Class<?> resolvePythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
+        if (value == null || value.isNull()) {
+            return null;
+        }
         try {
-            if (value != null && !value.isNull() && value.hasMembers() && value.hasMember("_target")) {
-                Value target = value.getMember("_target");
-                if (target != null && target.isString()) {
-                    target = value.hasMember("_resolved") ? value.invokeMember("_resolved") : null;
+            if (value.hasMembers()) {
+                Class<?> javaClass = resolveFacadeClass(value);
+                if (javaClass == null) {
+                    javaClass = resolveAnnotationDecoratorClass(value);
                 }
-                if (target != null && !target.isNull()) {
-                    Class<?> facadeTarget = target.as(Class.class);
-                    if (facadeTarget != null) {
-                        return facadeTarget;
-                    }
+                if (javaClass != null) {
+                    return javaClass;
                 }
             }
         } catch (RuntimeException ignored) {
@@ -368,6 +382,75 @@ final class GraalPyHostAccessFactory {
         } catch (RuntimeException ignored) {
             return null;
         }
+    }
+
+    /**
+     * The class behind the facade a generated package module binds a Java class to when the class
+     * is absent from the class path at import time: it holds the class name in {@code _target} and
+     * resolves it through {@code _resolved()}.
+     */
+    private static @Nullable Class<?> resolveFacadeClass(Value value) {
+        if (!value.hasMember(FACADE_TARGET)) {
+            return null;
+        }
+        Value target = value.getMember(FACADE_TARGET);
+        if (target != null && target.isString()) {
+            target = value.hasMember(FACADE_RESOLVED) ? value.invokeMember(FACADE_RESOLVED) : null;
+        }
+        return target == null || target.isNull() ? null : hostClass(target);
+    }
+
+    /**
+     * The class a value naming a host class stands for: the {@code java.type(...)} view of the
+     * class or a {@code Class} host object.
+     */
+    private static @Nullable Class<?> hostClass(Value value) {
+        if (value.isHostObject() && value.asHostObject() instanceof Class<?> hostClass) {
+            return hostClass;
+        }
+        return value.as(Class.class);
+    }
+
+    /**
+     * The annotation type a generated annotation decorator stands for. The decorator carries the
+     * type as {@code java_class} when the type is loadable from Python, and always its name as
+     * {@code java_class_name}, which is loaded through the application class loader otherwise.
+     */
+    private static @Nullable Class<?> resolveAnnotationDecoratorClass(Value value) {
+        if (!value.canExecute() || !value.hasMember(DECORATOR_CLASS_NAME)) {
+            return null;
+        }
+        if (value.hasMember(DECORATOR_CLASS)) {
+            Value javaClass = value.getMember(DECORATOR_CLASS);
+            if (javaClass != null && !javaClass.isNull()) {
+                return hostClass(javaClass);
+            }
+        }
+        Value className = value.getMember(DECORATOR_CLASS_NAME);
+        if (className == null || !className.isString()) {
+            return null;
+        }
+        return loadClass(className.asString());
+    }
+
+    private static @Nullable Class<?> loadClass(String className) {
+        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
+        ClassLoader[] loaders = {
+            runtime == null ? null : runtime.classLoader(),
+            Thread.currentThread().getContextClassLoader(),
+            GraalPyHostAccessFactory.class.getClassLoader()
+        };
+        for (ClassLoader loader : loaders) {
+            if (loader == null) {
+                continue;
+            }
+            try {
+                return Class.forName(className, false, loader);
+            } catch (ClassNotFoundException | LinkageError ignored) {
+                // try the next loader
+            }
+        }
+        return null;
     }
 
     private static @Nullable TargetTypeMapping<?> findMapping(@Nullable Value value, PythonClassResolver pythonClassResolver) {

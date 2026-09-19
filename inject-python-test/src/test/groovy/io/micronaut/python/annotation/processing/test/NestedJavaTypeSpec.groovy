@@ -253,11 +253,11 @@ class Command:
         !new File(srcPath, "micronaut/python/annotation/processing/test/nested/OuterMarker.py").exists()
 
         and: "a class module binds the class and the nested types imported from it"
-        hostInit.contains("OuterHost = java.type('io.micronaut.python.annotation.processing.test.nested.OuterHost')")
-        hostInit.contains("Inner = java.type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Inner')")
+        hostInit.contains("OuterHost = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost')")
+        hostInit.contains("Inner = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Inner')")
         hostInit.contains("from .Builder import Builder")
-        builderInit.contains("Builder = java.type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder')")
-        builderInit.contains("Stage = java.type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder\$Stage')")
+        builderInit.contains("Builder = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder')")
+        builderInit.contains("Stage = _micronaut_java_type('io.micronaut.python.annotation.processing.test.nested.OuterHost\$Builder\$Stage')")
 
         and: "an annotation module holds its decorator and exports the nested annotations"
         markerInit.contains('@micronaut_annotation("io.micronaut.python.annotation.processing.test.nested.OuterMarker"')
