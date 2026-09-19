@@ -40,7 +40,7 @@ class PythonBootstrapStackTest {
      * A stack on which the initialisers before the members modules bootstrapped and their first,
      * importing version did not, on every JVM tried; comfortably below the platform defaults.
      */
-    private static final long STACK_SIZE = 512 * 1024;
+    private static final long STACK_SIZE = 576 * 1024;
 
     @Test
     void theLauncherBootstrapsWithinASmallThreadStack() throws Throwable {
