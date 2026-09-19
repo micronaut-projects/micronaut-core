@@ -81,14 +81,16 @@ class _MicronautJavaAnnotation:
     A nested type of the annotation (``Requires.Sdk``) is an attribute of the decorator.
     """
 
-    def __init__(self, name, host_class):
+    def __init__(self, name, host_class, value_holds_class=None):
         self.java_class_name = name
         self.java_class = getattr(host_class, 'class') if host_class is not None else None
         self.__name__ = name.rsplit('.', 1)[-1].split('$')[-1]
         self.__qualname__ = self.__name__
         self.__module__ = _micronaut_python_module_name(name.rsplit('.', 1)[0]) if '.' in name else ''
         self.__doc__ = f"Micronaut annotation decorator for {name}."
-        self._value_holds_class = None
+        # whether the value member holds a class: recorded by the compiler (the annotation may be absent at
+        # run time), else found by reflection on first need
+        self._value_holds_class = value_holds_class
 
     def __call__(self, *args, **kwargs):
         if len(args) == 1 and not kwargs and (isinstance(args[0], type) or (
@@ -141,19 +143,19 @@ _micronaut_java_annotations = {}
 _micronaut_java_annotations_lock = _micronaut_threading.Lock()
 
 
-def _micronaut_java_annotation(name, host_class=None):
+def _micronaut_java_annotation(name, host_class=None, value_holds_class=None):
     """The one decorator of an annotation type, by binary name."""
     decorator = _micronaut_java_annotations.get(name)
     if decorator is None:
         with _micronaut_java_annotations_lock:
             decorator = _micronaut_java_annotations.get(name)
             if decorator is None:
-                decorator = _MicronautJavaAnnotation(name, host_class if host_class is not None else _micronaut_host_class(name))
+                decorator = _MicronautJavaAnnotation(name, host_class if host_class is not None else _micronaut_host_class(name), value_holds_class)
                 _micronaut_java_annotations[name] = decorator
     return decorator
 
 
-def _micronaut_java_member(name, kind=None):
+def _micronaut_java_member(name, kind=None, flags=()):
     """
     The Python value of a Java type: the decorator of an annotation, the host class of any other type,
     or the facade of a type absent from the run time class path. ``kind`` is what the compiler recorded
@@ -167,7 +169,7 @@ def _micronaut_java_member(name, kind=None):
         java_class = getattr(host_class, 'class')
         kind = 'annotation' if java_class.isAnnotation() else 'interface' if java_class.isInterface() else 'class'
     if kind == 'annotation':
-        return _micronaut_java_annotation(name, host_class)
+        return _micronaut_java_annotation(name, host_class, True if 'class-value' in flags else None)
     if host_class is None:
         return _MicronautJavaType(name, kind == 'interface')
     return host_class
@@ -177,7 +179,7 @@ def _micronaut_java_type_member(binary_name, name):
     """A nested type of a Java type: recorded by the compiler or on the class path, else None."""
     recorded = _micronaut_java_imports().members.get(_micronaut_python_module_name(binary_name), {}).get(name)
     if recorded is not None:
-        return _micronaut_java_member(recorded[0], recorded[1])
+        return _micronaut_java_member(recorded[0], recorded[1], recorded[2:])
     return _micronaut_java_member(binary_name + '$' + name)
 
 
@@ -286,7 +288,23 @@ def __micronaut_reset_java_imports():
         _micronaut_java_imports_cache = None
 
 
-class _MicronautJavaPackage(_micronaut_types.ModuleType):
+class _MicronautJavaAwareModule(_micronaut_types.ModuleType):
+    """
+    A module the Java types of a Java package are imported through: a Java package served from the
+    manifests, or an application package sharing its name with one. The import system binds an imported
+    sub-module on its package; for the module of a Java type (import a.b.Outer, from a.b.Outer import
+    Inner) the package keeps the type itself under its name.
+    """
+
+    def __setattr__(self, name, value):
+        if isinstance(value, _MicronautJavaPackage):
+            java_type = value.__dict__.get('__micronaut_java_type__')
+            if java_type is not None:
+                value = java_type
+        super().__setattr__(name, value)
+
+
+class _MicronautJavaPackage(_MicronautJavaAwareModule):
     """
     A Java package, or a Java type whose nested types are imported from it, as a module. Its members
     resolve on first access: a sub-package or a nested type imports as a module, a class binds to the
@@ -304,29 +322,39 @@ class _MicronautJavaPackage(_micronaut_types.ModuleType):
             raise AttributeError(f"module '{self.__name__}' has no attribute '{name}'")
         return value
 
-    def __setattr__(self, name, value):
-        # the import system binds an imported sub-module on its package: for the module of a Java type
-        # (import a.b.Outer, from a.b.Outer import Inner) the package keeps the type itself under its name
-        if isinstance(value, _MicronautJavaPackage):
-            java_type = value.__dict__.get('__micronaut_java_type__')
-            if java_type is not None:
-                value = java_type
-        super().__setattr__(name, value)
-
     def __dir__(self):
         return sorted({*self.__dict__, *self._micronaut_all()})
 
     def _micronaut_all(self):
-        imports = _micronaut_java_imports()
-        members = imports.members.get(self.__name__, {})
-        names = [name for name in members if not name.startswith('_')]
-        java_type = self.__dict__.get('__micronaut_java_type_name__')
-        if java_type is not None:
-            simple_name = java_type.rsplit('.', 1)[-1].split('$')[-1]
-            if simple_name not in names:
-                names.insert(0, simple_name)
-        names.extend(name for name in imports.subpackages(self.__name__) if name not in names)
-        return names
+        return _micronaut_java_package_names(self.__name__, self.__dict__.get('__micronaut_java_type_name__'))
+
+
+def _micronaut_java_package_names(module_name, type_name=None):
+    """The names a Java package exports: the recorded members, the type of a type module, then the direct sub-packages."""
+    imports = _micronaut_java_imports()
+    names = [name for name in imports.members.get(module_name, {}) if not name.startswith('_')]
+    if type_name is not None:
+        simple_name = type_name.rsplit('.', 1)[-1].split('$')[-1]
+        if simple_name not in names:
+            names.insert(0, simple_name)
+    names.extend(name for name in imports.subpackages(module_name) if name not in names)
+    return names
+
+
+def __micronaut_java_package_initialised(module):
+    """
+    Completes the initialiser of an application package that shares its name with a Java package: the
+    Java members and sub-packages join ``__all__``, so a star import binds them through the initialiser's
+    ``__getattr__`` fallback, and the module keeps a Java type on its name when the type's module is imported.
+    """
+    if _micronaut_java_imports().java_name(module.__name__) is None:
+        return
+    exported = module.__dict__.setdefault('__all__', [])
+    for name in _micronaut_java_package_names(module.__name__):
+        if name not in exported:
+            exported.append(name)
+    if not isinstance(module, _MicronautJavaAwareModule):
+        module.__class__ = _MicronautJavaAwareModule
 
 
 def _micronaut_java_package_member(module_name, name):
@@ -347,7 +375,7 @@ def _micronaut_java_package_member(module_name, name):
         return _micronaut_java_member(type_name, recorded[1] if recorded is not None else None) or _MicronautJavaType(type_name)
     recorded = imports.members.get(module_name, {}).get(name)
     if recorded is not None:
-        return _micronaut_java_member(recorded[0], recorded[1])
+        return _micronaut_java_member(recorded[0], recorded[1], recorded[2:])
     child = module_name + '.' + name
     if child in imports.packages or child in imports.types:
         module = importlib.import_module(child)
@@ -427,5 +455,6 @@ __micronaut_install_java_import_finder()
 
 # the helpers the Java side and the generated package initialisers look up by name
 __micronaut_java_package_member = _micronaut_java_package_member
+__micronaut_java_package_names = _micronaut_java_package_names
 __micronaut_java_annotation = _micronaut_java_annotation
 __micronaut_java_imports = _micronaut_java_imports

@@ -58,6 +58,19 @@ class Helper:
     @Executable
     def value(self) -> str:
         return "ok" if self.context is not None else "missing"
+
+    @Executable
+    def probes(self) -> str:
+        import sys
+        namespace = {}
+        exec('from micronaut.context import *', namespace)
+        import micronaut.context.ApplicationContext
+        import micronaut.context as pkg
+        return ';'.join([
+            'star_java=' + str('ApplicationContext' in namespace and 'annotation' in namespace),
+            'star_python=' + str('Helper' in namespace),
+            'type_module_keeps_class=' + str(not isinstance(pkg.ApplicationContext, type(sys)) and getattr(pkg.ApplicationContext, 'class').getName() == 'io.micronaut.context.ApplicationContext'),
+        ])
 ''')
 
         when:
@@ -84,6 +97,9 @@ class Helper:
 
         then:
         helper.value() == "ok"
+
+        and: "a star import binds the Java members and sub-packages next to the Python members, and importing a type's module keeps the type on the package"
+        helper.probes() == "star_java=True;star_python=True;type_module_keeps_class=True"
 
         cleanup:
         context?.close()
