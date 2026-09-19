@@ -140,6 +140,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JAVA_LANG_STRING = "java.lang.String";
     private static final String SERIAL_VERSION_UID = "serialVersionUID";
     private static final String AS_OBJECT_METHOD = "asObject";
+    private static final String CONVERT_VALUE = "convertValue";
+    private static final String EQUALS_METHOD = "equals";
+    private static final String VALUE_PARAMETER = "value";
+    private static final String NEW_INSTANCE = "newInstance";
+    private static final String NEW_INTRODUCTION = "newIntroduction";
+    private static final String IS_NONE = "isNone";
+    private static final String SUBCLASS_WRAPPER = "subclassWrapper";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -618,7 +625,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             // inherited signature are not always resolved against the extended type
                             ClassElement parameterType = parameters[i].getGenericType();
                             converted.add(isParameterizedReference(parameterType)
-                                ? PYTHON_CONVERSION.invokeStatic("convertValue", ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
+                                ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
                                 : convertValueForType(parameterType, argument));
                         }
                         ExpressionDef.InvokeInstanceMethod invocation = aThis.superRef().invoke(method.getName(), TypeDef.OBJECT, converted);
@@ -627,7 +634,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             : invocation.returning();
                         overloads.add(condition.doIf(result));
                     }
-                    statements.add(ExpressionDef.constant(entry.getKey()).invoke("equals", TypeDef.Primitive.BOOLEAN, name).isTrue().doIf(StatementDef.multi(overloads)));
+                    statements.add(ExpressionDef.constant(entry.getKey()).invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, name).isTrue().doIf(StatementDef.multi(overloads)));
                 }
                 statements.add(PYTHON_JAVA_BASES.invokeStatic("noSuchMethod", ClassTypeDef.of(IllegalArgumentException.class),
                     ExpressionDef.constant(superType.getName()), name, arguments).doThrow());
@@ -887,7 +894,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                     MethodDef.constructor()
                         .addModifiers(Modifier.PUBLIC)
-                        .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                        .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                         .build(((aThis, methodParameters) -> {
                                 VariableDef.MethodParameter val = methodParameters.get(0);
                                 List<StatementDef> assigns = new ArrayList<>();
@@ -907,7 +914,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                     MethodDef.constructor()
                         .addModifiers(Modifier.PUBLIC)
-                        .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                        .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                         .build(((aThis, methodParameters) -> {
                                 if (extendsPythonClass) {
                                     return aThis.superRef().invokeSuperConstructor(methodParameters.get(0));
@@ -951,7 +958,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             JavaSuperConstructor superConstructor = model.javaSuperConstructor();
             MethodDef constructingConstructor = MethodDef.constructor()
                 .addModifiers(Modifier.PRIVATE)
-                .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                 .addParameter(ParameterDef.of("construction", JAVA_BASE_CONSTRUCTION))
                 .build((aThis, methodParameters) -> {
                     VariableDef.MethodParameter value = methodParameters.get(0);
@@ -968,7 +975,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
-                    .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                    .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                     .build((aThis, methodParameters) -> {
                         VariableDef.MethodParameter value = methodParameters.get(0);
                         return new ExpressionDef.InvokeInstanceMethod(aThis, constructingConstructor, List.of(
@@ -989,7 +996,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
-                    .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                    .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                     .build((aThis, methodParameters) -> {
                         VariableDef.MethodParameter value = methodParameters.get(0);
                         return StatementDef.multi(
@@ -1230,7 +1237,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (beanProperties.isEmpty() && pythonValueFinal != null) {
             ExpressionDef storedValue = aThis.field(pythonValueField(model));
             ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                isAbstractIntro ? "newIntroduction" : "newInstance",
+                isAbstractIntro ? NEW_INTRODUCTION : NEW_INSTANCE,
                 POLYGLOT_VALUE,
                 List.of(pythonClassReference(element, pythonClassReference))
             );
@@ -1257,7 +1264,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
             }
             reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                "newIntroduction",
+                NEW_INTRODUCTION,
                 POLYGLOT_VALUE,
                 arguments
             );
@@ -1393,7 +1400,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     arguments.add(coerceTypedElementToPolyglotValue(beanProperty, aThis.field(field), targetContext).cast(TypeDef.OBJECT));
                 }
             }
-            ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic("newIntroduction", POLYGLOT_VALUE, arguments);
+            ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INTRODUCTION, POLYGLOT_VALUE, arguments);
             reconstructedBody = introduction.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
                     REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
@@ -1401,7 +1408,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 targetValue.returning()
             ));
         } else if (beanProperties.isEmpty()) {
-            ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE,
+            ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE,
                 List.of(targetContext, pythonClassReference(element, pythonClassReference)));
             reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
@@ -1494,7 +1501,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (isJunit5Test) {
                     ExpressionDef storedValue = aThis.field(pythonValueField(model));
                     ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        "newInstance",
+                        NEW_INSTANCE,
                         POLYGLOT_VALUE,
                         List.of(
                             pythonClassReference(element, pythonClassReference)
@@ -1524,11 +1531,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // an owned object is created again when the application it was created in has shut
                     // down (its runtime is no longer installed); the field is volatile and the check is
                     // repeated under the stub's monitor, so concurrent callers share one new object
-                    ExpressionDef.InvokeStaticMethod newInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)));
+                    ExpressionDef.InvokeStaticMethod newInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)));
                     return StatementDef.multi(
                         returnInterceptedTargetValue(aThis),
                         returnObjectUnderConstruction(model, aThis),
-                        aThis.field(pythonValueFinal).newLocal("value", value -> StatementDef.multi(
+                        aThis.field(pythonValueFinal).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
                             aThis.field(ownedClassReference).isNonNull()
                                 .and(PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse())
                                 .doIf(new StatementDef.Synchronized(aThis, StatementDef.multi(
@@ -1569,7 +1576,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return aThis.superRef().invokeSuperConstructor(classReference);
         }
         return aThis.superRef().invokeSuperConstructor(
-            PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(classReference))
+            PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference))
         );
     }
 
@@ -1619,7 +1626,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static ExpressionDef newInstanceUnlessProxy(VariableDef.This aThis, ExpressionDef classReference) {
         return aThis.instanceOf(INTERCEPTED_PROXY).doIfElse(
             ExpressionDef.nullValue().cast(POLYGLOT_VALUE),
-            PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE, List.of(classReference))
+            PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference))
         );
     }
 
@@ -1820,7 +1827,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return StatementDef.multi();
                 } else if (extendsJavaBase) {
                     return invokeValueConstructor(aThis, PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        isAbstractIntroNoArg ? "newIntroduction" : "newInstance",
+                        isAbstractIntroNoArg ? NEW_INTRODUCTION : NEW_INSTANCE,
                         POLYGLOT_VALUE,
                         List.of(pythonClassReference(element, pythonClassReference))
                     ));
@@ -1841,7 +1848,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static StatementDef invokeValueConstructor(VariableDef.This aThis, ExpressionDef value) {
         MethodDef valueConstructor = MethodDef.constructor()
-            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+            .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
             .build();
         return new ExpressionDef.InvokeInstanceMethod(aThis, valueConstructor, List.of(value));
     }
@@ -1853,7 +1860,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private StatementDef pythonInstanceConstructorBody(ClassStubModel model, boolean introduction, VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
         ClassElement element = model.element();
         ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-            introduction ? "newIntroduction" : "newInstance",
+            introduction ? NEW_INTRODUCTION : NEW_INSTANCE,
             POLYGLOT_VALUE,
             List.of(pythonClassReference(element, model.pythonClassReference()))
         );
@@ -2606,9 +2613,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static String constructorFactoryMethod(boolean introduction, boolean hasDefaultedParameters) {
         if (introduction) {
-            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : "newIntroduction";
+            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : NEW_INTRODUCTION;
         }
-        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : "newInstance";
+        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : NEW_INSTANCE;
     }
 
     private static boolean hasConfigurationInjectConstructor(ClassElement element) {
@@ -3937,7 +3944,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter(POLYGLOT_VALUE)
             .returns(thisType)
             .build((aThis, methodParameters) -> PYTHON_CONVERSION.invokeStatic(
-                "convertValue",
+                CONVERT_VALUE,
                 thisType,
                 methodParameters.get(0),
                 thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS)
@@ -3966,7 +3973,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                    .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant("value"))
+                    .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(VALUE_PARAMETER))
                     .invoke("asString", TypeDef.STRING)
                     .returning()));
         }
@@ -4948,14 +4955,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("key", TypeDef.STRING)
-            .addParameter("value", POLYGLOT_VALUE)
+            .addParameter(VALUE_PARAMETER, POLYGLOT_VALUE)
             .returns(TypeDef.Primitive.BOOLEAN)
             .build((aThis, methodParameters) -> propertySetterBody(aThis, methodParameters.getFirst(), methodParameters.get(1), setterProperties, propertyFields)));
         builder.addMethod(MethodDef.builder("micronautValueCoerciblePutMember")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("key", TypeDef.STRING)
-            .addParameter("value", POLYGLOT_VALUE)
+            .addParameter(VALUE_PARAMETER, POLYGLOT_VALUE)
             .returns(TypeDef.Primitive.BOOLEAN)
             .build((aThis, methodParameters) -> putMemberMatchBody(aThis, methodParameters.get(0), methodParameters.get(1), beanProperties, propertyFields)));
     }
@@ -4965,7 +4972,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (Map.Entry<String, String> entry : mappings.entrySet()) {
             statements.add(
                 ExpressionDef.constant(entry.getKey())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(ExpressionDef.constant(entry.getValue()).returning())
             );
@@ -4991,7 +4998,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ExpressionDef convertedValue = convertRuntimeValue(beanProperty.getGenericType(), value);
             statements.add(
                 ExpressionDef.constant(entry.getKey())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(StatementDef.multi(
                         aThis.field(field).assign(convertedValue),
@@ -5025,7 +5032,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             statements.add(
                 ExpressionDef.constant(beanProperty.getName())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(StatementDef.multi(
                         aThis.field(field).assign(propertyFieldValue(beanProperty, value)),
@@ -5561,13 +5568,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static StatementDef boundOrNewFromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
         return StatementDef.multi(
-            PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+            PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
                 .isTrue()
                 .doIf(ExpressionDef.nullValue().returning()),
             PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("bound", bound -> bound.isNonNull().doIf(bound.returning())),
-            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal("subclassWrapper", subclassWrapper ->
+            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()
         );
@@ -5580,7 +5587,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
         return StatementDef.multi(
-            PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+            PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
                 .isTrue()
                 .doIf(ExpressionDef.nullValue().returning()),
             // a Java object of this class that went to Python and comes back (a wrapper handed over by
@@ -5589,8 +5596,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
                 .newLocal("hostObject", hostObject -> hostObject.isNonNull()
                     .doIf(hostObject.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic("subclassWrapper", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal("subclassWrapper", subclassWrapper ->
+            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
                     subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()
         );
@@ -5828,7 +5835,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
-        return PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+        return PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
             .isTrue()
             .doIfElse(ExpressionDef.nullValue(), nonNullValue);
     }
@@ -5850,7 +5857,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef convertRuntimeValue(ClassElement targetType, ExpressionDef value) {
-        return PYTHON_CONVERSION.invokeStatic("convertValue", ClassTypeDef.OBJECT,
+        return PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT,
                 value, classLiteral(targetType))
             .cast(sourceSignatureType(targetType));
     }

@@ -30,9 +30,7 @@ import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -57,21 +55,8 @@ final class JavaSuperConstructor {
 
     private static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
     private static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
-    private static final String STRING = String.class.getName();
-    private static final String OBJECT = Object.class.getName();
     private static final String PYTHON_CLASS = "Python class [";
     private static final String OF_PYTHON_CLASS = "] of Python class [";
-    private static final String SHORT = "short";
-    private static final String BYTE = "byte";
-    private static final String CHAR = "char";
-    private static final String INT = "int";
-    private static final String LONG = "long";
-    private static final String FLOAT = "float";
-    private static final String DOUBLE = "double";
-    private static final int REJECTED = -1;
-    private static final int ACCEPTED = 0;
-    private static final int ASSIGNABLE = 1;
-    private static final int EXACT = 2;
 
     private final ConstructorElement constructor;
 
@@ -124,7 +109,7 @@ final class JavaSuperConstructor {
             }
             visitorContext.fail(PYTHON_CLASS + element.getSimpleName() + "] extends the Java class ["
                 + superType.getName() + "], which has no no-argument constructor; declare an __init__ method that calls super().__init__(...) with the arguments of one of its constructors: "
-                + signatures(constructors), element);
+                + SuperConstructorMatching.signatures(constructors), element);
             return null;
         }
         String call = "super().__init__(" + superArguments.stream().map(SuperArgumentDef::source).collect(Collectors.joining(", ")) + ")";
@@ -142,34 +127,17 @@ final class JavaSuperConstructor {
                 return null;
             }
         }
-        List<@Nullable ClassElement> argumentTypes = argumentTypes(element, superArguments, visitorContext);
-        int bestScore = REJECTED;
-        List<ConstructorElement> best = new ArrayList<>();
-        for (ConstructorElement candidate : constructors) {
-            if (candidate.getParameters().length != superArguments.size()) {
-                continue;
-            }
-            int score = score(candidate, argumentTypes, visitorContext);
-            if (score == REJECTED) {
-                continue;
-            }
-            if (score > bestScore) {
-                bestScore = score;
-                best.clear();
-            }
-            if (score == bestScore) {
-                best.add(candidate);
-            }
-        }
+        List<@Nullable ClassElement> argumentTypes = SuperConstructorMatching.argumentTypes(element, superArguments, visitorContext);
+        List<ConstructorElement> best = SuperConstructorMatching.bestMatches(constructors, argumentTypes, visitorContext, true);
         if (best.isEmpty()) {
             visitorContext.fail("No constructor of the Java class [" + superType.getName()
                 + "] accepts the arguments of the super constructor call [" + call + OF_PYTHON_CLASS + element.getSimpleName()
-                + "] (argument types: " + describe(argumentTypes) + "); the constructors of [" + superType.getName() + "] are: " + signatures(constructors), element);
+                + "] (argument types: " + SuperConstructorMatching.describe(argumentTypes) + "); the constructors of [" + superType.getName() + "] are: " + SuperConstructorMatching.signatures(constructors), element);
             return null;
         }
         if (best.size() > 1) {
             visitorContext.fail("The super constructor call [" + call + OF_PYTHON_CLASS + element.getSimpleName()
-                + "] matches more than one constructor of the Java class [" + superType.getName() + "]: " + signatures(best)
+                + "] matches more than one constructor of the Java class [" + superType.getName() + "]: " + SuperConstructorMatching.signatures(best)
                 + "; annotate the constructor parameters or pass literals so a single constructor matches", element);
             return null;
         }
@@ -195,7 +163,7 @@ final class JavaSuperConstructor {
         if (noArguments == null) {
             visitorContext.fail("Python test class [" + element.getSimpleName() + "] extends the Java class ["
                 + superType.getName() + "], which has no no-argument constructor; a test class is instantiated before its Python object exists, so the base cannot receive the arguments of super().__init__(...): "
-                + signatures(constructors), element);
+                + SuperConstructorMatching.signatures(constructors), element);
             return null;
         }
         return new JavaSuperConstructor(noArguments);
@@ -211,7 +179,7 @@ final class JavaSuperConstructor {
     List<ExpressionDef> arguments(ExpressionDef pythonObject, BiFunction<ClassElement, ExpressionDef, ExpressionDef> converter) {
         ParameterElement[] parameters = constructor.getParameters();
         List<ExpressionDef> arguments = new ArrayList<>(parameters.length);
-        String description = signature(constructor);
+        String description = SuperConstructorMatching.signature(constructor);
         for (int i = 0; i < parameters.length; i++) {
             ExpressionDef argument = PYTHON_JAVA_BASES.invokeStatic("argument", POLYGLOT_VALUE, pythonObject, ExpressionDef.constant(i), ExpressionDef.constant(description));
             arguments.add(converter.apply(parameters[i].getGenericType(), argument));
@@ -232,140 +200,5 @@ final class JavaSuperConstructor {
         }
         FunctionDef constructor = pythonClass.getNativeType().constructor();
         return constructor == null ? null : constructor.superArguments();
-    }
-
-    private static List<@Nullable ClassElement> argumentTypes(ClassElement element, List<SuperArgumentDef> superArguments, PythonVisitorContext visitorContext) {
-        Map<String, ParameterElement> parameters = element.getPrimaryConstructor()
-            .map(constructor -> Arrays.stream(constructor.getParameters()).collect(Collectors.toMap(ParameterElement::getName, parameter -> parameter, (left, right) -> left)))
-            .orElse(Map.of());
-        List<@Nullable ClassElement> types = new ArrayList<>(superArguments.size());
-        for (SuperArgumentDef argument : superArguments) {
-            ClassElement type = null;
-            if (argument.isParameter()) {
-                ParameterElement parameter = parameters.get(argument.parameterName());
-                if (parameter != null) {
-                    type = parameter.getGenericType();
-                }
-            } else if (argument.type() != null) {
-                type = visitorContext.getTypeResolver().resolve(argument.type(), Map.of());
-            }
-            if (type != null && !type.isPrimitive() && OBJECT.equals(type.getName())) {
-                type = null;
-            }
-            types.add(type);
-        }
-        return types;
-    }
-
-    private static int score(ConstructorElement candidate, List<@Nullable ClassElement> argumentTypes, PythonVisitorContext visitorContext) {
-        ParameterElement[] parameters = candidate.getParameters();
-        int total = 0;
-        for (int i = 0; i < parameters.length; i++) {
-            int score = compatibility(argumentTypes.get(i), parameters[i].getType(), visitorContext);
-            if (score == REJECTED) {
-                return REJECTED;
-            }
-            total += score;
-        }
-        return total;
-    }
-
-    private static int compatibility(@Nullable ClassElement argument, ClassElement parameter, PythonVisitorContext visitorContext) {
-        if (argument == null) {
-            return STRING.equals(parameter.getName()) ? ASSIGNABLE : ACCEPTED;
-        }
-        if (argument.isPrimitive() && "void".equals(argument.getName())) {
-            // None: any reference parameter
-            return parameter.isPrimitive() ? REJECTED : ACCEPTED;
-        }
-        if (OBJECT.equals(parameter.getName())) {
-            return ASSIGNABLE;
-        }
-        if (argument.isPrimitive() && parameter.isPrimitive()) {
-            if (argument.getName().equals(parameter.getName())) {
-                return EXACT;
-            }
-            return widens(argument.getName(), parameter.getName()) ? ASSIGNABLE : REJECTED;
-        }
-        if (argument.isPrimitive()) {
-            String boxed = boxedName(argument.getName());
-            if (boxed == null) {
-                return REJECTED;
-            }
-            if (boxed.equals(parameter.getName())) {
-                return EXACT;
-            }
-            String unboxedParameter = unboxedName(parameter.getName());
-            if (unboxedParameter != null) {
-                // a Python int against a Long parameter: GraalPy converts it as it widens the primitive
-                return widens(argument.getName(), unboxedParameter) ? ASSIGNABLE : REJECTED;
-            }
-            ClassElement boxedElement = visitorContext.getClassElement(boxed).orElse(null);
-            return boxedElement != null && boxedElement.isAssignable(parameter) ? ASSIGNABLE : REJECTED;
-        }
-        if (parameter.isPrimitive()) {
-            String boxed = boxedName(parameter.getName());
-            if (argument.getName().equals(boxed)) {
-                return EXACT;
-            }
-            String unboxed = unboxedName(argument.getName());
-            return unboxed != null && widens(unboxed, parameter.getName()) ? ASSIGNABLE : REJECTED;
-        }
-        if (argument.getName().equals(parameter.getName())) {
-            return EXACT;
-        }
-        return argument.isAssignable(parameter) ? ASSIGNABLE : REJECTED;
-    }
-
-    private static boolean widens(String from, String to) {
-        return switch (from) {
-            case BYTE -> List.of(SHORT, INT, LONG, FLOAT, DOUBLE).contains(to);
-            case SHORT, CHAR -> List.of(INT, LONG, FLOAT, DOUBLE).contains(to);
-            case INT -> List.of(LONG, FLOAT, DOUBLE).contains(to);
-            case LONG -> List.of(FLOAT, DOUBLE).contains(to);
-            case FLOAT -> DOUBLE.equals(to);
-            default -> false;
-        };
-    }
-
-    private static @Nullable String boxedName(String primitive) {
-        return switch (primitive) {
-            case INT -> Integer.class.getName();
-            case LONG -> Long.class.getName();
-            case DOUBLE -> Double.class.getName();
-            case FLOAT -> Float.class.getName();
-            case "boolean" -> Boolean.class.getName();
-            case SHORT -> Short.class.getName();
-            case BYTE -> Byte.class.getName();
-            case CHAR -> Character.class.getName();
-            default -> null;
-        };
-    }
-
-    private static @Nullable String unboxedName(String boxed) {
-        for (String primitive : List.of(INT, LONG, DOUBLE, FLOAT, "boolean", SHORT, BYTE, CHAR)) {
-            if (boxed.equals(boxedName(primitive))) {
-                return primitive;
-            }
-        }
-        return null;
-    }
-
-    private static String describe(List<@Nullable ClassElement> argumentTypes) {
-        return argumentTypes.stream()
-            .map(type -> type == null ? "?" : type.getName())
-            .collect(Collectors.joining(", ", "[", "]"));
-    }
-
-    private static String signature(ConstructorElement constructor) {
-        return Arrays.stream(constructor.getParameters())
-            .map(parameter -> parameter.getType().getName())
-            .collect(Collectors.joining(", ", "(", ")"));
-    }
-
-    private static String signatures(List<ConstructorElement> constructors) {
-        return constructors.stream()
-            .map(JavaSuperConstructor::signature)
-            .collect(Collectors.joining(", ", "[", "]"));
     }
 }
