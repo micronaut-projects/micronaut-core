@@ -20,6 +20,7 @@ dependencies {
     api(libs.jakarta.inject.api)
 
     testImplementation(libs.junit.jupiter)
+    testImplementation(projects.micronautContextPythonRuntime)
     testImplementation(libs.junit.platform.launcher)
     testImplementation(libs.micronaut.test.junit5)
     testImplementation(platform(libs.test.boms.micronaut.validation))
@@ -59,5 +60,16 @@ dependencies {
 tasks {
     sourcesJar {
         from("$projectDir/src/main/groovy")
+    }
+}
+
+val runtimeMetadataPrototypeClasspath by configurations.creating
+dependencies {
+    runtimeMetadataPrototypeClasspath(projects.micronautContextPythonRuntime)
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(runtimeMetadataPrototypeClasspath)
+    doFirst {
+        systemProperty("runtimeMetadataPrototypeClasspath", runtimeMetadataPrototypeClasspath.asPath)
     }
 }
