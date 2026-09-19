@@ -30,9 +30,7 @@ import io.micronaut.sourcegen.model.TypeDef;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 
@@ -57,16 +55,6 @@ final class ThrowableSuperConstructor {
 
     private static final ClassTypeDef PYTHON_EXCEPTIONS = ClassTypeDef.of("io.micronaut.context.python.PythonExceptions");
     private static final String STRING = String.class.getName();
-    private static final String OBJECT = Object.class.getName();
-    private static final String SHORT = "short";
-    private static final String INT = "int";
-    private static final String LONG = "long";
-    private static final String FLOAT = "float";
-    private static final String DOUBLE = "double";
-    private static final int REJECTED = -1;
-    private static final int ACCEPTED = 0;
-    private static final int ASSIGNABLE = 1;
-    private static final int EXACT = 2;
 
     private final @Nullable ConstructorElement constructor;
     private final boolean messageFallback;
@@ -108,7 +96,7 @@ final class ThrowableSuperConstructor {
             }
             throw new ProcessingException(element, "Python class [" + element.getName() + "] extends the Java exception class ["
                 + superType.getName() + "], which has neither a no-argument nor a message constructor; declare an __init__ method that calls super().__init__(...) once, with positional arguments matching one of its constructors: "
-                + signatures(constructors));
+                + SuperConstructorMatching.signatures(constructors));
         }
         String call = "super().__init__(" + superArguments.stream().map(SuperArgumentDef::source).collect(Collectors.joining(", ")) + ")";
         for (SuperArgumentDef argument : superArguments) {
@@ -118,33 +106,19 @@ final class ThrowableSuperConstructor {
                     + "] must pass positional arguments only, so the matching Java constructor can be resolved");
             }
         }
-        List<@Nullable ClassElement> argumentTypes = argumentTypes(element, superArguments, visitorContext);
+        List<@Nullable ClassElement> argumentTypes = SuperConstructorMatching.argumentTypes(element, superArguments, visitorContext);
         List<ConstructorElement> candidates = constructors.stream()
             .filter(candidate -> candidate.getParameters().length == superArguments.size())
             .toList();
-        int bestScore = REJECTED;
-        List<ConstructorElement> best = new ArrayList<>();
-        for (ConstructorElement candidate : candidates) {
-            int score = score(candidate, argumentTypes, visitorContext);
-            if (score == REJECTED) {
-                continue;
-            }
-            if (score > bestScore) {
-                bestScore = score;
-                best.clear();
-            }
-            if (score == bestScore) {
-                best.add(candidate);
-            }
-        }
+        List<ConstructorElement> best = SuperConstructorMatching.bestMatches(candidates, argumentTypes, visitorContext, false);
         if (best.isEmpty()) {
             throw new ProcessingException(element, "No constructor of the Java exception class [" + superType.getName()
                 + "] accepts the arguments of the super constructor call [" + call + "] of Python class [" + element.getName()
-                + "] (argument types: " + describe(argumentTypes) + "); the constructors of [" + superType.getName() + "] are: " + signatures(constructors));
+                + "] (argument types: " + SuperConstructorMatching.describe(argumentTypes) + "); the constructors of [" + superType.getName() + "] are: " + SuperConstructorMatching.signatures(constructors));
         }
         if (best.size() > 1) {
             throw new ProcessingException(element, "The super constructor call [" + call + "] of Python class [" + element.getName()
-                + "] matches more than one constructor of the Java exception class [" + superType.getName() + "]: " + signatures(best)
+                + "] matches more than one constructor of the Java exception class [" + superType.getName() + "]: " + SuperConstructorMatching.signatures(best)
                 + "; annotate the constructor parameters or pass literals so a single constructor matches");
         }
         return new ThrowableSuperConstructor(best.get(0), false);
@@ -200,131 +174,5 @@ final class ThrowableSuperConstructor {
             return null;
         }
         return superArguments;
-    }
-
-    private static List<@Nullable ClassElement> argumentTypes(ClassElement element, List<SuperArgumentDef> superArguments, PythonVisitorContext visitorContext) {
-        Map<String, ParameterElement> parameters = element.getPrimaryConstructor()
-            .map(constructor -> Arrays.stream(constructor.getParameters()).collect(Collectors.toMap(ParameterElement::getName, parameter -> parameter, (left, right) -> left)))
-            .orElse(Map.of());
-        List<@Nullable ClassElement> types = new ArrayList<>(superArguments.size());
-        for (SuperArgumentDef argument : superArguments) {
-            ClassElement type = null;
-            if (argument.isParameter()) {
-                ParameterElement parameter = parameters.get(argument.parameterName());
-                if (parameter != null) {
-                    type = parameter.getGenericType();
-                }
-            } else if (argument.type() != null) {
-                type = visitorContext.getTypeResolver().resolve(argument.type(), Map.of());
-            }
-            if (type != null && !type.isPrimitive() && OBJECT.equals(type.getName())) {
-                type = null;
-            }
-            types.add(type);
-        }
-        return types;
-    }
-
-    private static int score(ConstructorElement candidate, List<@Nullable ClassElement> argumentTypes, PythonVisitorContext visitorContext) {
-        ParameterElement[] parameters = candidate.getParameters();
-        int total = 0;
-        for (int i = 0; i < parameters.length; i++) {
-            int score = compatibility(argumentTypes.get(i), parameters[i].getType(), visitorContext);
-            if (score == REJECTED) {
-                return REJECTED;
-            }
-            total += score;
-        }
-        return total;
-    }
-
-    private static int compatibility(@Nullable ClassElement argument, ClassElement parameter, PythonVisitorContext visitorContext) {
-        if (argument == null) {
-            return STRING.equals(parameter.getName()) ? ASSIGNABLE : ACCEPTED;
-        }
-        if (argument.isPrimitive() && "void".equals(argument.getName())) {
-            // None: any reference parameter
-            return parameter.isPrimitive() ? REJECTED : ACCEPTED;
-        }
-        if (OBJECT.equals(parameter.getName())) {
-            return ASSIGNABLE;
-        }
-        if (argument.isPrimitive() && parameter.isPrimitive()) {
-            if (argument.getName().equals(parameter.getName())) {
-                return EXACT;
-            }
-            return widens(argument.getName(), parameter.getName()) ? ASSIGNABLE : REJECTED;
-        }
-        if (argument.isPrimitive()) {
-            String boxed = boxedName(argument.getName());
-            if (boxed == null) {
-                return REJECTED;
-            }
-            if (boxed.equals(parameter.getName())) {
-                return EXACT;
-            }
-            ClassElement boxedElement = visitorContext.getClassElement(boxed).orElse(null);
-            return boxedElement != null && boxedElement.isAssignable(parameter) ? ASSIGNABLE : REJECTED;
-        }
-        if (parameter.isPrimitive()) {
-            String boxed = boxedName(parameter.getName());
-            if (argument.getName().equals(boxed)) {
-                return EXACT;
-            }
-            String unboxed = unboxedName(argument.getName());
-            return unboxed != null && widens(unboxed, parameter.getName()) ? ASSIGNABLE : REJECTED;
-        }
-        if (argument.getName().equals(parameter.getName())) {
-            return EXACT;
-        }
-        return argument.isAssignable(parameter) ? ASSIGNABLE : REJECTED;
-    }
-
-    private static boolean widens(String from, String to) {
-        return switch (from) {
-            case "byte" -> List.of(SHORT, INT, LONG, FLOAT, DOUBLE).contains(to);
-            case SHORT, "char" -> List.of(INT, LONG, FLOAT, DOUBLE).contains(to);
-            case INT -> List.of(LONG, FLOAT, DOUBLE).contains(to);
-            case LONG -> List.of(FLOAT, DOUBLE).contains(to);
-            case FLOAT -> DOUBLE.equals(to);
-            default -> false;
-        };
-    }
-
-    private static @Nullable String boxedName(String primitive) {
-        return switch (primitive) {
-            case INT -> Integer.class.getName();
-            case LONG -> Long.class.getName();
-            case DOUBLE -> Double.class.getName();
-            case FLOAT -> Float.class.getName();
-            case "boolean" -> Boolean.class.getName();
-            case SHORT -> Short.class.getName();
-            case "byte" -> Byte.class.getName();
-            case "char" -> Character.class.getName();
-            default -> null;
-        };
-    }
-
-    private static @Nullable String unboxedName(String boxed) {
-        for (String primitive : List.of(INT, LONG, DOUBLE, FLOAT, "boolean", SHORT, "byte", "char")) {
-            if (boxed.equals(boxedName(primitive))) {
-                return primitive;
-            }
-        }
-        return null;
-    }
-
-    private static String describe(List<@Nullable ClassElement> argumentTypes) {
-        return argumentTypes.stream()
-            .map(type -> type == null ? "?" : type.getName())
-            .collect(Collectors.joining(", ", "[", "]"));
-    }
-
-    private static String signatures(List<ConstructorElement> constructors) {
-        return constructors.stream()
-            .map(constructor -> Arrays.stream(constructor.getParameters())
-                .map(parameter -> parameter.getType().getName())
-                .collect(Collectors.joining(", ", "(", ")")))
-            .collect(Collectors.joining(", ", "[", "]"));
     }
 }
