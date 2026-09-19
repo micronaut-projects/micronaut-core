@@ -88,23 +88,26 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             spec.loader.exec_module(module)
         """, "micronaut-load-vfs-module.py").cached(true).buildLiteral();
     /**
-     * Python code that gives every Java object the trailing-underscore aliases of members named after a
-     * Python keyword ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
-     * {@code Specification.and(other)}).
+     * Python code that completes the members of every Java object with what GraalPy host interop does not
+     * resolve: the trailing-underscore aliases of members named after a Python keyword
+     * ({@code builder.from_(...)} for {@code Builder.from(...)}, {@code spec.and_(other)} for
+     * {@code Specification.and(other)}), and the public methods a class inherits from a non-public
+     * superclass (see {@link PythonHostMembers}).
      * <p>
-     * The compiler rewrites such aliases only on names it can resolve statically (imported Java classes
-     * and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy foreign
-     * objects, so the alias is resolved here instead: a Python class registered with
+     * The compiler rewrites keyword aliases only on names it can resolve statically (imported Java
+     * classes and {@code java.type(...)} aliases). Objects that Java returns at runtime are plain GraalPy
+     * foreign objects, so the alias is resolved here instead: a Python class registered with
      * {@code polyglot.register_interop_type} for {@code java.lang.Object} enters the type of every host
      * object instance and its {@code __getattr__} runs only after the regular foreign member lookup has
-     * failed, retrying with the underscore stripped. The rule is the one the compiler applies
-     * ({@code keyword.iskeyword}), so the same spelling works everywhere.
+     * failed, retrying with the underscore stripped (the rule the compiler applies, {@code keyword.iskeyword},
+     * so the same spelling works everywhere) and then asking the runtime for an inherited member.
      */
-    private static final Source KEYWORD_ALIASES_SOURCE = Source.newBuilder(PYTHON, """
-        def __micronaut_register_keyword_aliases():
+    private static final Source JAVA_OBJECT_MEMBERS_SOURCE = Source.newBuilder(PYTHON, """
+        def __micronaut_register_java_object_members():
             import keyword
             import java
             from polyglot import register_interop_type
+            host_members = java.type('io.micronaut.context.python.PythonHostMembers')
 
             class MicronautJavaObject:
                 __slots__ = ()
@@ -115,13 +118,17 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                             return getattr(self, name[:-1])
                         except AttributeError:
                             pass  # report the spelling the caller used, not the stripped one
+                    if not name.startswith('__'):
+                        member = host_members.inheritedMember(self, name)
+                        if member is not None:
+                            return member
                     raise AttributeError(f"foreign object has no attribute '{name}'")
 
             register_interop_type(java.type('java.lang.Object'), MicronautJavaObject)
 
-        __micronaut_register_keyword_aliases()
-        del __micronaut_register_keyword_aliases
-        """, "micronaut-keyword-aliases.py").cached(true).buildLiteral();
+        __micronaut_register_java_object_members()
+        del __micronaut_register_java_object_members
+        """, "micronaut-java-object-members.py").cached(true).buildLiteral();
     /**
      * Installs the Python view of the generated Java wrappers ({@link ValueCoercible}). A wrapper a
      * Java call returns to Python is a foreign object; GraalPy treats an instance of a registered
@@ -359,10 +366,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 context.eval(PYTHON, "import builtins; builtins.__MN_CTX_ID__ = '" + id + "'");
                 LOG.debug("GraalPy Context ID registered in {}ms", System.currentTimeMillis() - now);
             }
-            // Before any application code runs: Java objects answer to keyword-safe member aliases
+            // Before any application code runs: Java objects answer to keyword-safe member aliases and to
+            // the public methods GraalPy does not expose because a non-public superclass declares them
             now = System.currentTimeMillis();
-            context.eval(KEYWORD_ALIASES_SOURCE);
-            LOG.debug("GraalPy keyword aliases registered in {}ms", System.currentTimeMillis() - now);
+            context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
+            LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
             evaluateMain(classLoader, INTERNAL_MAIN, context);

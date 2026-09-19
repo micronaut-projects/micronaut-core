@@ -16,7 +16,7 @@ from micronaut.python.annotation.processing.test.collections import Serializable
 class OnSerializableBase(SerializableBase):
     def __init__(self, name: str):
         self.name = name
-''', 'public class OnSerializableBase extends SerializableBase implements PooledValueCoercible, Serializable {')
+''', 'public class OnSerializableBase extends SerializableBase implements PooledValueCoercible, Serializable, ValueCoercible.JavaBaseMembers {')
     }
 
     void "a Python class on a Java base that is not serializable is not serializable"() {
@@ -29,6 +29,6 @@ from micronaut.python.annotation.processing.test.collections import PlainBase
 class OnPlainBase(PlainBase):
     def __init__(self, name: str):
         self.name = name
-''', 'public class OnPlainBase extends PlainBase implements PooledValueCoercible {')
+''', 'public class OnPlainBase extends PlainBase implements PooledValueCoercible, ValueCoercible.JavaBaseMembers {')
     }
 }
