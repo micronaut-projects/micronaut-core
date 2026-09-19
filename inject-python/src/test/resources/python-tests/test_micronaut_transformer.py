@@ -45,6 +45,16 @@ def java_class_element(name):
         return None
 
 
+def compiled_python_class_element(name):
+    """
+    The class element of the generated bridge of a Python class compiled elsewhere: a Java type carrying
+    the PythonClass annotation, which the compiler reads from the annotation metadata of the element.
+    """
+    metadata = java.type("io.micronaut.inject.annotation.MutableAnnotationMetadata")()
+    metadata.addDeclaredAnnotation("io.micronaut.context.python.annotation.PythonClass", {})
+    return _ClassElement.of(java.type(name), metadata, {})
+
+
 def java_class_elements(package):
     """
     The annotation types of a package, as the compiler answers for a package import.
@@ -572,6 +582,85 @@ class RuntimeImportRewriteTest(unittest.TestCase):
     def test_python_io_module_imports_are_untouched(self):
         source = "import io\nfrom io import StringIO\nimport io as pyio\nfrom .io.util import helper\nfrom ..io import util\n"
         self.assertTrue(ast_equal(ast.parse(source), MicronautRuntimeTransformer(no_class_element, no_class_elements).visit(ast.parse(source))))
+
+
+class UnresolvedJavaImportTest(unittest.TestCase):
+    """An import from a Java package that names no class on the classpath is a compile error."""
+
+    @staticmethod
+    def _errors(source, class_elements=no_class_elements, python_source_dirs=None, class_element=no_class_element):
+        transformer = MicronautTransformer(class_element, class_elements, python_source_dirs=python_source_dirs)
+        transformer.visit(ast.parse(source))
+        return transformer.validation_errors
+
+    def test_standard_library_and_unknown_python_packages_are_not_java_imports(self):
+        self.assertEqual([], self._errors("from typing import Annotated\nfrom dataclasses import dataclass\n"))
+        self.assertEqual([], self._errors("from pydantic import BaseModel\n"))
+        self.assertEqual([], self._errors("from .models import Pet\n"))
+
+    def test_missing_name_in_a_reserved_java_namespace_is_an_error(self):
+        errors = self._errors("from micronaut.absent.ua import UserAgentProvider\n")
+        self.assertEqual(1, len(errors))
+        self.assertIn("UserAgentProvider", errors[0])
+        self.assertIn("micronaut.absent.ua", errors[0])
+        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0])
+        self.assertEqual(1, len(self._errors("from io.lettuce.core.codec import RedisCodec\n")))
+        self.assertEqual(1, len(self._errors("from jakarta.absent import Missing\n")))
+        # GraalPy's java import hook finds a spec for any java.* name: still not a Python module
+        self.assertEqual(1, len(self._errors("from java.util import NoSuchThing\n")))
+        self.assertEqual(1, len(self._errors("from java.absent import NoSuchThing\n")))
+        self.assertEqual(1, len(self._errors("from javax.absent import NoSuchThing\n")))
+
+    def test_missing_name_in_a_classpath_package_is_an_error(self):
+        def acme_package(package):
+            return [object()] if package == "com.acme" else []
+
+        self.assertEqual(1, len(self._errors("from com.acme import Missing\n", acme_package)))
+        self.assertEqual([], self._errors("from com.other import Missing\n", acme_package))
+
+    def test_packages_and_java_type_modules_imported_as_names_are_not_errors(self):
+        def inject_package(package):
+            return [object()] if package == "jakarta.inject" else []
+
+        def qualifier_type(name):
+            # a real element: the import resolution asks the Java side whether the type is a Python class
+            return java_class_element("io.micronaut.context.annotation.Executable") if name == "jakarta.inject.Qualifier" else None
+
+        self.assertEqual([], self._errors("from jakarta import inject\n", inject_package))
+        self.assertEqual([], self._errors("from jakarta.inject.Qualifier import Qualifier\n", class_element=qualifier_type))
+
+    def test_star_import_binds_compiled_python_classes_through_their_bridge(self):
+        # the generated bridge of a Python class compiled elsewhere is bound like any other class of the
+        # package: a star-imported Python class is not resolved on the processor side, its bridge is
+        def acme_package(package):
+            if package != "com.acme":
+                return []
+            return [
+                compiled_python_class_element("io.micronaut.python.processing.fixtures.CompiledPet"),
+                java_class_element("io.micronaut.context.ApplicationContext"),
+                java_class_element("io.micronaut.context.annotation.Executable"),
+            ]
+
+        transformer = MicronautTransformer(no_class_element, acme_package)
+        module = transformer.visit(ast.parse("from com.acme import *\n"))
+        self.assertEqual([], transformer.validation_errors)
+        # the bindings take the place of the import, as they do for an explicit import
+        self.assertEqual([
+            "CompiledPet = java.type('io.micronaut.python.processing.fixtures.CompiledPet')",
+            "ApplicationContext = java.type('io.micronaut.context.ApplicationContext')",
+        ], [unparse(statement) for statement in module.body if isinstance(statement, ast.Assign) and "java.type(" in unparse(statement)])
+        self.assertEqual(["CompiledPet", "ApplicationContext"], transformer._star_imported_class_names("com.acme"))
+
+    def test_project_python_modules_are_never_java_imports(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as source_dir:
+            os.makedirs(os.path.join(source_dir, "micronaut", "docs"))
+            with open(os.path.join(source_dir, "micronaut", "docs", "Product.py"), "w") as module:
+                module.write("class Product:\n    pass\n")
+            source = "from micronaut.docs.Product import Product\nfrom micronaut.docs import Product as Module\n"
+            self.assertEqual([], self._errors(source, python_source_dirs=[source_dir]))
+            self.assertEqual(2, len(self._errors(source)))
 
 
 if __name__ == "__main__":
