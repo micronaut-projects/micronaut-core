@@ -1253,7 +1253,13 @@ public final class PythonContextRuntime {
         return resolved;
     }
 
-    private static String classCacheKey(PythonClassReference classReference) {
+    /**
+     * The key of a class in the per-context class cache.
+     *
+     * @param classReference The class reference
+     * @return The cache key
+     */
+    static String classCacheKey(PythonClassReference classReference) {
         String[] nested = classReference.nestedMemberNames();
         if (nested.length == 0) {
             return qualifiedName(classReference) + '#' + classReference.rootName();

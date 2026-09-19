@@ -200,4 +200,59 @@ class PythonSourceRootsTest {
             }
         }
     }
+
+    @Test
+    void aStarImportOfTheMainRootPackageBindsItsClasses() throws Exception {
+        Path mainSources = Files.createDirectories(temporaryDirectory.resolve("src/main/python/example"));
+        Files.writeString(mainSources.resolve("greeting_service.py"), """
+            from jakarta.inject import Singleton
+
+            @Singleton
+            class GreetingService:
+                def greet(self, name: str) -> str:
+                    return f"Hello {name}"
+            """);
+        // a star import of the main package from another package: the compiled classes of the main root are
+        // what the star import binds, so the parameter type is the generated class, not Object
+        Path testSources = Files.createDirectories(temporaryDirectory.resolve("src/test/python/other"));
+        Files.writeString(testSources.resolve("greeting_consumer.py"), """
+            from jakarta.inject import Singleton
+            from example import *
+
+            @Singleton
+            class GreetingConsumer:
+                def __init__(self, service: GreetingService):
+                    self.service = service
+
+                def greet(self, name: str) -> str:
+                    return self.service.greet(name)
+            """);
+        File mainOutput = Files.createDirectories(temporaryDirectory.resolve("classes/main")).toFile();
+        File testOutput = Files.createDirectories(temporaryDirectory.resolve("classes/test")).toFile();
+        PyronautCompiler.builder()
+            .pythonSrc(mainSources.getParent().toString())
+            .targetDir(mainOutput)
+            .build()
+            .compile();
+        PyronautCompiler.builder()
+            .pythonSrc(testSources.getParent().toString())
+            .targetDir(testOutput)
+            .classpath(List.of(mainOutput))
+            .build()
+            .compile();
+
+        try (URLClassLoader classLoader = new URLClassLoader(new URL[]{mainOutput.toURI().toURL(), testOutput.toURI().toURL()})) {
+            Class<?> service = classLoader.loadClass("example.GreetingService");
+            Class<?> consumer = classLoader.loadClass("other.GreetingConsumer");
+            List<List<Class<?>>> constructors = Arrays.stream(consumer.getDeclaredConstructors())
+                .map(constructor -> List.<Class<?>>of(constructor.getParameterTypes()))
+                .toList();
+            assertTrue(constructors.contains(List.of(service)), "constructor parameter types: " + constructors);
+
+            try (ApplicationContext context = ApplicationContext.builder().classLoader(classLoader).build().start()) {
+                Object bean = context.getBean(consumer);
+                assertEquals("Hello Python", ((ValueCoercible) bean).asPolyglotValue().invokeMember("greet", "Python").asString());
+            }
+        }
+    }
 }
