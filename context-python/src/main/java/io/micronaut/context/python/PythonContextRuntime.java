@@ -175,23 +175,28 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * Check whether the supplied context is the primary context of the installed runtime.
+     * Check whether the supplied context is the primary context of the installed runtime, the one a
+     * generated wrapper creates its Python object in.
      * <p>
      * {@link Context#equals(Object)} compares the underlying context, so the creator instance and the
      * view returned by {@link Value#getContext()} both match the primary context.
      *
      * @param context The context to compare
      * @return {@code true} when the context is the primary runtime context
+     * @since 5.2.0
      */
-    static boolean isCurrentContext(@Nullable Context context) {
+    @UsedByGeneratedCode
+    public static boolean isCurrentContext(@Nullable Context context) {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
         return runtime == null ? context == null : runtime.owns(context);
     }
 
     /**
-     * Uninstall the application runtime. This method is called during application shutdown
-     * to ensure proper cleanup and prevent memory leaks; with context reuse enabled it only
-     * reloads the Python modules of the primary context.
+     * Uninstall every installed application runtime, so no application is running as far as
+     * generated code is concerned; with context reuse enabled it only reloads the Python modules
+     * of the primary context. An application shutting down uninstalls its own runtime through
+     * {@link GraalPyContextFactory}; this method serves tests and tooling that reset the JVM-wide
+     * state between applications.
      */
     public static void resetContext() {
         PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
@@ -202,8 +207,9 @@ public final class PythonContextRuntime {
             runtime.context().eval(RELOAD_MODULES_SOURCE);
             return;
         }
-        PythonApplicationRuntime.uninstall(runtime);
-        PythonContextRegistry.forgetContext(runtime.context());
+        for (PythonApplicationRuntime uninstalled : PythonApplicationRuntime.uninstallAll()) {
+            PythonContextRegistry.forgetContext(uninstalled.context());
+        }
     }
 
     /**
