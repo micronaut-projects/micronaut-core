@@ -9,6 +9,7 @@ import asyncio
 import datetime
 import importlib
 import inspect
+import keyword
 import pkgutil
 import sys
 import uuid
@@ -196,6 +197,28 @@ def __micronaut_prepare_introduction(cls):
         cls._is_protocol = False
     cls.__micronaut_introduction__ = True
     return cls
+
+
+def __micronaut_install_java_interface_defaults(cls, default_methods):
+    """Add the default methods of the implemented Java interfaces that the class does not define.
+
+    Each added method invokes the Java default implementation on the Java view of the instance
+    (PythonInterfaceDefaults); a method the class or a Python base defines is left alone.
+    """
+    for default_method in default_methods:
+        name = default_method.name()
+        if keyword.iskeyword(name):
+            # a Java method named like a Python keyword is called through its keyword-safe alias
+            name = name + "_"
+        if hasattr(cls, name):
+            continue
+
+        def method(self, *args, _default_method=default_method):
+            return _default_method.invoke(self, args)
+
+        method.__name__ = name
+        method.__qualname__ = cls.__qualname__ + "." + name
+        setattr(cls, name, method)
 
 
 def __micronaut_create_raw_instance(cls):

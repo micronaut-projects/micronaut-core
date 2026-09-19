@@ -234,6 +234,21 @@ class AnnotationFunctionScanner:
         self._cache[key] = names
         return names
 
+# A single leading underscore: a double-underscore name is mangled when it is referenced inside a class
+# body, and the decorator is applied to classes defined inside a class or a method as well
+JAVA_INTERFACE_DEFAULTS_DECORATOR = '_micronaut_java_interface_defaults'
+
+# The runtime class of a Python type does not extend the Java interfaces it implements, so the default
+# methods of those interfaces are added by the runtime (io.micronaut.context.python.PythonInterfaceDefaults)
+JAVA_INTERFACE_DEFAULTS_DECORATOR_CODE = f'''
+def {JAVA_INTERFACE_DEFAULTS_DECORATOR}(*interface_names):
+    def decorator(cls):
+        import java
+        return java.type('io.micronaut.context.python.PythonInterfaceDefaults').install(cls, interface_names)
+    return decorator
+'''
+
+
 class MicronautTransformer(ast.NodeTransformer):
     """
     AST transformer that converts Java imports into appropriate Python constructs.
@@ -277,6 +292,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.class_depth = 0
         self.function_depth = 0
         self.uses_builtin_exception = False
+        self.uses_java_interface_defaults = False
 
     def visit_ImportFrom(self, node: ast.ImportFrom):
         """
@@ -419,9 +435,11 @@ class MicronautTransformer(ast.NodeTransformer):
             )
 
         # Add generated code at the beginning
-        if self.transformed_code or self.java_type_assignments or self.has_java_import or self.uses_builtin_exception:
+        if (self.transformed_code or self.java_type_assignments or self.has_java_import
+                or self.uses_builtin_exception or self.uses_java_interface_defaults):
             # Create AST nodes for the generated code
             generated_nodes = []
+            generated_nodes.extend(self._java_interface_defaults_nodes())
 
             # Add import java statement if we have java.type() calls
             if self.has_java_import:
@@ -487,6 +505,12 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         scanner = AnnotationFunctionScanner(self.callback_get_class_element, self.package_name, self.source_root)
         self.annotation_functions.update(scanner.scan(node))
 
+    def _java_interface_defaults_nodes(self):
+        """The decorator that adds the default methods of the implemented Java interfaces to a class."""
+        if not self.uses_java_interface_defaults:
+            return []
+        return ast.parse(JAVA_INTERFACE_DEFAULTS_DECORATOR_CODE).body
+
     def _generated_code_insert_index(self, node: ast.Module) -> int:
         insert_at = 0
         if node.body and self._is_module_docstring(node.body[0]):
@@ -538,6 +562,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if self.strip_java_interface_bases and node.bases:
             original_base_count = len(node.bases)
             runtime_bases = []
+            java_interface_names = []
             replaced_throwable = False
             has_python_exception_base = any(
                 isinstance(base, ast.Name)
@@ -546,7 +571,9 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 for base in node.bases
             )
             for base in node.bases:
-                if self._is_java_interface_base(base):
+                java_interface_name = self._java_interface_base_name(base)
+                if java_interface_name is not None:
+                    java_interface_names.append(java_interface_name)
                     continue
                 if self._is_java_throwable_base(base):
                     if not replaced_throwable and not has_python_exception_base:
@@ -584,6 +611,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     for keyword in node.keywords
                     if keyword.arg != "new_style"
                 ]
+            if java_interface_names:
+                # The stripped interfaces leave the instances without the default methods of the Java
+                # interfaces; the outermost decorator adds them to the class after every other decorator ran
+                self.uses_java_interface_defaults = True
+                node.decorator_list.insert(0, ast.copy_location(ast.Call(
+                    func=ast.Name(id=JAVA_INTERFACE_DEFAULTS_DECORATOR, ctx=ast.Load()),
+                    args=[ast.Constant(name) for name in java_interface_names],
+                    keywords=[]
+                ), node))
         if is_module_level_class and node.decorator_list:
             for decorator in node.decorator_list:
                 decorator_name = self._get_decorator_name(decorator)
@@ -892,13 +928,19 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         return aliases.get(node.attr)
 
     def _is_java_interface_base(self, base: ast.AST) -> bool:
+        return self._java_interface_base_name(base) is not None
+
+    def _java_interface_base_name(self, base: ast.AST) -> Optional[str]:
+        """The Java name of a base that is a Java interface, or None for any other base."""
         class_name = self._java_type_name(base)
         if class_name:
             class_element = self.callback_get_class_element(class_name)
             if class_element:
-                return class_element.isInterface()
+                return class_element.getName() if class_element.isInterface() else None
         base_name = self._base_name(base)
-        return base_name in self.java_interface_names
+        if base_name in self.java_interface_names:
+            return self.java_class_elements[base_name].getName()
+        return None
 
     def _is_java_throwable_base(self, base: ast.AST) -> bool:
         """Strip Java Throwable bases from native runtime bytecode.
@@ -1459,10 +1501,11 @@ class MicronautRuntimeTransformer(MicronautTransformer):
                 ast.Import(names=[ast.alias(name='builtins', asname=None)])
             )
 
-        if not (self.transformed_code or self.java_type_assignments or self.uses_builtin_exception):
+        if not (self.transformed_code or self.java_type_assignments or self.uses_builtin_exception
+                or self.uses_java_interface_defaults):
             return node
 
-        generated_nodes = []
+        generated_nodes = list(self._java_interface_defaults_nodes())
         if self.transformed_code:
             generated_nodes.extend(ast.parse('''
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):

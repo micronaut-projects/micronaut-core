@@ -411,6 +411,8 @@ public class PythonAstParserTest {
 
         assertFalse(interfaceResult.runtimeCode().contains("does not support Python class"));
         assertTrue(interfaceResult.runtimeCode().contains("class Worker:"));
+        assertTrue(interfaceResult.runtimeCode().contains("def _micronaut_java_interface_defaults(*interface_names):"));
+        assertTrue(interfaceResult.runtimeCode().contains("@_micronaut_java_interface_defaults('java.lang.Runnable')\nclass Worker:"));
         assertTrue(parser.requiresRuntimeBytecode(interfaceResult));
     }
 
