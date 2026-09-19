@@ -37,6 +37,7 @@ import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -50,6 +51,7 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 
@@ -123,6 +125,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     private final ApplicationContext applicationContext;
     private boolean providedContext = false;
+    /** The runtime installed for the context this factory built; {@code null} for a provided (reused) context. */
+    private final AtomicReference<@Nullable PythonApplicationRuntime> runtime = new AtomicReference<>();
     private final CompletableFuture<Void> gracefulShutdown = new CompletableFuture<>();
 
     public GraalPyContextFactory(ApplicationContext applicationContext) {
@@ -161,7 +165,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             var context = buildContext(hostAccess, engine, classLoader, contextConfiguration);
 
             // Make context available to bridge classes
-            PythonContextRuntime.setContext(context, classLoader);
+            runtime.set(PythonContextRuntime.setContext(context, classLoader));
             LOG.debug("Created Primary GraalPy Context in {}ms", System.currentTimeMillis() - now);
             return context;
 
@@ -368,40 +372,45 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     /**
      * The Python runtime of this application, bound to the primary context.
+     * <p>
+     * The runtime this factory installed, not the one generated code currently resolves: while a
+     * nested application is running, the enclosing application still binds its pool and its asyncio
+     * configuration to its own runtime. A provided (reused) context has no runtime of its own, its
+     * runtime is the installed one.
      *
      * @param context The primary context
      * @return The runtime installed for the context
      */
     @Singleton
     PythonApplicationRuntime pythonRuntime(@Named(PYTHON) org.graalvm.polyglot.Context context) {
-        PythonApplicationRuntime runtime = PythonApplicationRuntime.current();
-        if (runtime == null || !runtime.owns(context)) {
+        PythonApplicationRuntime applicationRuntime = providedContext ? PythonApplicationRuntime.current() : this.runtime.get();
+        if (applicationRuntime == null || !applicationRuntime.owns(context)) {
             throw new IllegalStateException("The Python runtime is not installed for the primary GraalPy context");
         }
-        return runtime;
+        return applicationRuntime;
     }
 
     /**
      * Cleanup method called during application shutdown.
-     * Uninstalls the application runtime to prevent memory leaks.
+     * <p>
+     * When the destroyed context is the one this factory built, the runtime of this application is
+     * uninstalled right away, so generated code of an enclosing application (a nested
+     * {@code ApplicationContext.run(...)} in a Python test) resolves its own runtime again, and the
+     * context is closed once it is idle. Any other context, one of an enclosing application or a
+     * reused one, is left alone.
      */
     @Override
     public void onDestroyed(BeanDestroyedEvent<Context> event) {
-        if (!PythonContextRuntime.isReuseContext()) {
-            var ctx = event.getBean();
-            if (ctx != null) {
-                PythonContextRegistry.closeWhenIdleAfterCurrentFrame(ctx, () -> {
-                    closeContext(ctx);
-                    if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
-                        PythonContextRuntime.resetContext();
-                    }
-                });
-                return;
-            }
-            if (!providedContext && PythonContextRuntime.isCurrentContext(ctx)) {
-                PythonContextRuntime.resetContext();
-            }
+        if (PythonContextRuntime.isReuseContext() || providedContext) {
+            return;
         }
+        var ctx = event.getBean();
+        PythonApplicationRuntime installedRuntime = this.runtime.get();
+        if (installedRuntime == null || !installedRuntime.owns(ctx) || !this.runtime.compareAndSet(installedRuntime, null)) {
+            return;
+        }
+        PythonApplicationRuntime.uninstall(installedRuntime);
+        PythonContextRegistry.closeWhenIdleAfterCurrentFrame(ctx, () -> closeContext(ctx));
     }
 
     static void closeContext(Context ctx) {
@@ -430,7 +439,8 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
     @Override
     public CompletionStage<?> shutdownGracefully() {
-        Context ctx = PythonContextRuntime.isInitialized() ? PythonContextRuntime.getContext() : null;
+        PythonApplicationRuntime applicationRuntime = this.runtime.get();
+        Context ctx = applicationRuntime != null ? applicationRuntime.context() : null;
         if (ctx == null || PythonContextRuntime.isReuseContext()) {
             gracefulShutdown.complete(null);
             return gracefulShutdown;

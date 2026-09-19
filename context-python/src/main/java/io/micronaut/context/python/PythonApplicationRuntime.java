@@ -24,6 +24,8 @@ import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -39,9 +41,12 @@ import java.util.function.Supplier;
  * application context. Generated bridge code has no application context at hand and goes through
  * the static entry points of {@link PythonContextRuntime}, which resolve the runtime installed last
  * by {@link #install(PythonApplicationRuntime)}; one JVM therefore serves generated code from one
- * application at a time. {@link #uninstall(PythonApplicationRuntime)} only clears the reference when
- * it still points at the given runtime, so a runtime that was replaced while its shutdown was pending
- * cannot remove its successor.
+ * application at a time. Applications nest: a test started by {@code @MicronautTest} runs a second
+ * {@code ApplicationContext.run(...)} from Python, and every application owns its own primary context
+ * and runtime. The installed runtimes are therefore kept in order, and
+ * {@link #uninstall(PythonApplicationRuntime)} removes exactly the given runtime, wherever it is: when
+ * the nested application shuts down, generated code resolves the runtime of the enclosing application
+ * again, and an enclosing application that shuts down first cannot remove the nested one.
  * <p>
  * Context reuse ({@link #setReuseContext(boolean)}) is a JVM-wide policy: the installed runtime then
  * outlives the application contexts that use it and a reset only reloads the Python modules.
@@ -68,6 +73,8 @@ final class PythonApplicationRuntime {
     // next context replaces it, which must not keep the failed context alive
     private static final AtomicReference<@Nullable WeakReference<BeanContext>> BOOTSTRAP_CONTEXT = new AtomicReference<>();
     private static final ThreadLocal<Boolean> BOOTSTRAPPING = ThreadLocal.withInitial(() -> false);
+    /** The installed runtimes, the one generated code resolves last; guarded by itself. */
+    private static final List<PythonApplicationRuntime> INSTALLED = new ArrayList<>();
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
 
     private final Context context;
@@ -175,22 +182,46 @@ final class PythonApplicationRuntime {
     }
 
     /**
-     * Make a runtime the one generated code resolves.
+     * Make a runtime the one generated code resolves. A runtime installed earlier stays installed
+     * behind it and is resolved again once this one is uninstalled.
      *
      * @param runtime The runtime
      */
     static void install(PythonApplicationRuntime runtime) {
-        CURRENT.set(runtime);
+        synchronized (INSTALLED) {
+            INSTALLED.remove(runtime);
+            INSTALLED.add(runtime);
+            CURRENT.set(runtime);
+        }
     }
 
     /**
-     * Clear the installed runtime when it is still the given one.
+     * Remove an installed runtime. Generated code then resolves the runtime installed before it, if
+     * any; a runtime installed after it is not affected.
      *
      * @param runtime The runtime being shut down
-     * @return {@code true} when the runtime was installed and has been cleared
+     * @return {@code true} when the runtime was installed and has been removed
      */
     static boolean uninstall(PythonApplicationRuntime runtime) {
-        return CURRENT.compareAndSet(runtime, null);
+        synchronized (INSTALLED) {
+            boolean removed = INSTALLED.remove(runtime);
+            CURRENT.set(INSTALLED.isEmpty() ? null : INSTALLED.getLast());
+            return removed;
+        }
+    }
+
+    /**
+     * Remove every installed runtime.
+     *
+     * @return The runtimes that were installed, in installation order
+     */
+    static List<PythonApplicationRuntime> uninstallAll() {
+        synchronized (INSTALLED) {
+            List<PythonApplicationRuntime> removed = List.copyOf(INSTALLED);
+            INSTALLED.clear();
+            CURRENT.set(null);
+            return removed;
+        }
     }
 
     /**
