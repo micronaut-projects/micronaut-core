@@ -15,7 +15,6 @@
  */
 package io.micronaut.python.annotation.processing.test
 
-import io.micronaut.core.reflect.exception.InstantiationException
 import io.micronaut.inject.ast.ClassElement
 
 /**
@@ -113,9 +112,9 @@ class Conf:
         introspection.getRequiredProperty("port", Integer).get(instance) == 9090
     }
 
-    void "a dataclass with a mutable default is left to the stub rather than materialised"() {
+    void "a dataclass with a mutable default is constructed through its Python constructor"() {
         given: 'a default_factory, which Python must evaluate itself'
-        def introspection = buildBeanIntrospection("python.Tags", '''
+        def context = buildContext('''
 from dataclasses import dataclass, field
 from typing import List
 from micronaut.core.annotation import Introspected
@@ -125,14 +124,16 @@ from micronaut.core.annotation import Introspected
 class Tags:
     names: List[str] = field(default_factory=list)
 ''')
+        def introspection = getBeanIntrospection(context, "python.Tags")
 
-        expect: 'no caller-side default is available, so no-arg instantiation is refused'
-        introspection != null
+        when: 'no caller-side default is available, so the no-arg constructor creates the Python object'
+        def instance = introspection.instantiate()
 
-        when:
-        introspection.instantiate()
+        then: 'the default factory ran'
+        instance.names == []
+        instance.asPolyglotValue().getMember("names").arraySize == 0
 
-        then:
-        thrown(InstantiationException)
+        cleanup:
+        context?.close()
     }
 }

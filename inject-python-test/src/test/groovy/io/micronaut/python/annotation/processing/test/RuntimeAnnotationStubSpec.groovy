@@ -140,8 +140,8 @@ class Reader:
         and: "the builtin list, dict and set factories are applied as empty collections"
         book.tags == []
 
-        and: "a default factory the generated code cannot reproduce leaves the field unset for the framework to fill"
-        book.stamp == null
+        and: "a default factory the generated code cannot reproduce is applied by creating the object through the Python class"
+        book.stamp == "stamped"
 
         when: "the fields are populated reflectively and the object crosses into Python"
         bookClass.getDeclaredField("title").set(book, "The Stand")
@@ -150,7 +150,7 @@ class Reader:
         then:
         book.summary() == "The Stand (10)"
         book.asPolyglotValue().getMember("id").asInt() == 42
-        book.stamp == null
+        book.stamp == "stamped"
 
         cleanup:
         context?.close()

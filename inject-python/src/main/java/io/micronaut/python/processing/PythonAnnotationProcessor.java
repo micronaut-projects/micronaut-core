@@ -301,7 +301,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         javaVisitorContext
                     );
                 } catch (Exception e) {
-                    throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + e.getMessage());
+                    throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
                 }
             }
 

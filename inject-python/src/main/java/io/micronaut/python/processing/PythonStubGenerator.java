@@ -56,6 +56,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.DecoratorDef;
 import io.micronaut.python.processing.model.DefaultFactoryDef;
+import io.micronaut.python.processing.model.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -1288,7 +1289,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     }
                 }))
             );
-            if (isIntrospectedBean
+            if (!isJunit5Test && PythonClassElement.isCallableWithoutArguments(pythonConstructor)) {
+                // Every parameter has a default (a dataclass whose fields all have defaults): the class can also
+                // be constructed without arguments, through its own __init__() so that the Python defaults apply.
+                builder.addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, methodParameters) ->
+                    pythonInstanceConstructorBody(model, isAbstractIntroCtor, aThis, methodParameters)
+                ));
+            } else if (isIntrospectedBean
                 && constructorParametersBackedByFields
                 && !hasDynamicBeanProperties
                 && !hasConfigurationBuilderProperty
@@ -1297,52 +1304,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 addNoArgumentConstructor(builder, parameters, beanProperties, propertyFields);
             }
         } else {
-            if (isIntrospectedBean && pythonConstructor != null && pythonConstructor.getParameters().length != 0) {
-                    // add default constructor
-                    MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
-                    jsonCreatorClassElement.ifPresent(t ->
-                        defaultConstructor.addAnnotation(t.getName())
-                    );
-
-                    builder.addMethod(defaultConstructor.build());
-            }
-
             MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
             final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+            // An introspected class whose attributes have defaults (count: int = 5) has to be created through its
+            // Python class for the defaults to apply; an ordinary introspected bean stays lazy.
+            final boolean appliesPythonDefaults = isIntrospectedBean
+                && beanProperties.stream().anyMatch(PythonStubGenerator::hasPythonDefaultValue)
+                && isPythonConstructibleWithoutArguments(element);
             builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                 if (isJunit5Test) {
                     return StatementDef.multi();
-                } else if (isIntrospectedBean && hasConfigurationBuilderProperty) {
-                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        isAbstractIntroNoArg ? "newIntroduction" : "newInstance",
-                        POLYGLOT_VALUE,
-                        List.of(pythonClassReference(element, pythonClassReference))
-                    );
-                    if (extendsHostClass) {
-                        return StatementDef.multi(
-                            aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, new ParameterElement[0], methodParameters)),
-                            initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, false)
-                        );
-                    }
-                    return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, extendsPythonClass);
-                } else if (isIntrospectedBean) {
+                } else if (isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults) {
                     // Keep ordinary introspected beans lazy; resolving their Python class here
                     // would break beans whose Python constructor requires arguments.
                     return StatementDef.multi();
                 } else {
-                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
-                        .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
-                            List.of(
-                                pythonClassReference(element, pythonClassReference)
-                            )
-                        );
-                    if (extendsPythonClass) {
-                        return aThis.superRef().invokeSuperConstructor(pythonInstance);
-                    } else if (extendsThrowable) {
-                        return invokeValueConstructor(aThis, pythonInstance);
-                    } else {
-                        return aThis.field(pythonValueField(model)).assign(pythonInstance);
-                    }
+                    return pythonInstanceConstructorBody(model, isAbstractIntroNoArg, aThis, methodParameters);
                 }
             })));
         }
@@ -1357,6 +1334,69 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
             .build();
         return new ExpressionDef.InvokeInstanceMethod(aThis, valueConstructor, List.of(value));
+    }
+
+    /**
+     * The body of a no-arg constructor that creates the Python object through its own constructor, so that the
+     * defaults of the Python class apply, and reads the fields of an introspected class from it.
+     */
+    private StatementDef pythonInstanceConstructorBody(ClassStubModel model, boolean introduction, VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
+        ClassElement element = model.element();
+        ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+            introduction ? "newIntroduction" : "newInstance",
+            POLYGLOT_VALUE,
+            List.of(pythonClassReference(element, model.pythonClassReference()))
+        );
+        if (model.isIntrospectedBean()) {
+            if (model.extendsHostClass()) {
+                return StatementDef.multi(
+                    aThis.superRef().invokeSuperConstructor(superConstructorArguments(model.superType(), new ParameterElement[0], methodParameters)),
+                    initializeFromPolyglotValue(aThis, pythonInstance, model.beanProperties(), model.propertyFields(), model.syncSnapshotFields(), model.pythonValue(), false)
+                );
+            }
+            return initializeFromPolyglotValue(aThis, pythonInstance, model.beanProperties(), model.propertyFields(), model.syncSnapshotFields(), model.pythonValue(), model.extendsPythonClass());
+        }
+        if (model.extendsPythonClass()) {
+            return aThis.superRef().invokeSuperConstructor(pythonInstance);
+        }
+        if (!model.isJunit5Test() && model.extendsHostClass() && model.superType().isAssignable(Throwable.class)) {
+            // the Value constructor forwards the Python super().__init__ arguments to the Java base
+            return invokeValueConstructor(aThis, pythonInstance);
+        }
+        if (model.extendsHostClass()) {
+            return StatementDef.multi(
+                aThis.superRef().invokeSuperConstructor(superConstructorArguments(model.superType(), new ParameterElement[0], methodParameters)),
+                aThis.field(pythonValueField(model)).assign(pythonInstance)
+            );
+        }
+        return aThis.field(pythonValueField(model)).assign(pythonInstance);
+    }
+
+    /**
+     * Whether the attribute backing the property declares a default value (an initializer in the class body,
+     * which only the Python class applies).
+     */
+    private static boolean hasPythonDefaultValue(PropertyElement beanProperty) {
+        return beanProperty instanceof PythonPropertyElement pythonProperty
+            && pythonProperty.getNativeType().field() != null
+            && pythonProperty.getNativeType().field().hasDefaultValue();
+    }
+
+    /**
+     * Whether the Python class can be instantiated without arguments: the {@code __init__} it declares or
+     * inherits from the nearest Python base class that declares one takes no required parameter.
+     */
+    private static boolean isPythonConstructibleWithoutArguments(ClassElement element) {
+        ClassElement current = element;
+        while (current instanceof AbstractPythonClassElement pythonClassElement) {
+            FunctionDef constructor = pythonClassElement.getNativeType().constructor();
+            if (constructor != null) {
+                return constructor.arguments() == null
+                    || constructor.arguments().arguments().stream().allMatch(ArgumentDef::hasDefaultValue);
+            }
+            current = current.getSuperType().orElse(null);
+        }
+        return true;
     }
 
     /**
