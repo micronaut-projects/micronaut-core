@@ -85,15 +85,43 @@ class PythonBootstrapBenchmark {
         __micronaut_rerun_launcher()
         """;
 
+    private static final String MANIFEST_RELOAD = """
+        import sys, time
+        runtime = sys.modules.get('micronaut_runtime')
+        if runtime is not None and hasattr(runtime, '__micronaut_reset_java_imports'):
+            runtime.__micronaut_reset_java_imports()
+            started = time.perf_counter()
+            runtime.__micronaut_java_imports()
+            round((time.perf_counter() - started) * 1000, 1)
+        else:
+            None
+        """;
+
+    /**
+     * The bootstrap phases log their durations at debug level; logback is on the runtime class path only.
+     */
+    private static void enableDebugLogging() {
+        try {
+            Object logger = org.slf4j.LoggerFactory.getLogger(GraalPyContextFactory.class);
+            Class<?> levelClass = Class.forName("ch.qos.logback.classic.Level");
+            Object debug = levelClass.getField("DEBUG").get(null);
+            logger.getClass().getMethod("setLevel", levelClass).invoke(logger, debug);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            System.out.println("PYTHON_BOOTSTRAP_BENCHMARK debug logging unavailable: " + e);
+        }
+    }
+
     @Test
     void measureBootstrap() throws Exception {
         ClassLoader classLoader = getClass().getClassLoader();
+        enableDebugLogging();
         List<String> rows = new ArrayList<>();
         try (Engine engine = GraalPyEngineFactory.buildPythonEngine()) {
+            // the contexts of an engine share one host access configuration
+            org.graalvm.polyglot.HostAccess hostAccess = GraalPyContextFactory.bootstrapHostAccess(classLoader);
             for (int run = 1; run <= CONTEXTS; run++) {
                 long start = System.nanoTime();
-                Context context = GraalPyContextFactory.buildContext(
-                    GraalPyContextFactory.bootstrapHostAccess(classLoader), engine, classLoader);
+                Context context = GraalPyContextFactory.buildContext(hostAccess, engine, classLoader);
                 long buildMillis = (System.nanoTime() - start) / 1_000_000;
                 try {
                     Value counts = context.eval(PythonContextRuntime.PYTHON, COUNT_MODULES);
@@ -104,9 +132,11 @@ class PythonBootstrapBenchmark {
                     Value deepest = context.eval(PythonContextRuntime.PYTHON, DEEPEST_IMPORT);
                     int depth = deepest.getArrayElement(0).asInt();
                     String module = deepest.getArrayElement(1).asString();
+                    // the time the runtime takes to read the Java import manifests again (this revision only)
+                    Value manifestMillis = context.eval(PythonContextRuntime.PYTHON, MANIFEST_RELOAD);
                     String row = String.format(
-                        "{\"run\": %d, \"buildMillis\": %d, \"modules\": %d, \"generatedModules\": %d, \"javaShimModules\": %d, \"javaPackageModules\": %d, \"deepestImportFrames\": %d, \"deepestImport\": \"%s\"}",
-                        run, buildMillis, modules, generated, shims, fileless, depth, module);
+                        "{\"run\": %d, \"buildMillis\": %d, \"modules\": %d, \"generatedModules\": %d, \"javaShimModules\": %d, \"javaPackageModules\": %d, \"deepestImportFrames\": %d, \"deepestImport\": \"%s\", \"manifestReloadMillis\": %s}",
+                        run, buildMillis, modules, generated, shims, fileless, depth, module, manifestMillis.isNumber() ? String.valueOf(manifestMillis.asDouble()) : "null");
                     System.out.println("PYTHON_BOOTSTRAP_BENCHMARK " + row);
                     rows.add(row);
                 } finally {
