@@ -33,9 +33,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * frame a package initialiser adds per level was multiplied by twelve. Initialisers importing their
  * members modules through {@code importlib.import_module} from nested functions needed a 640 KB stack
  * on macOS arm64 and failed intermittently at the 1 MB default of Linux x64; initialisers running the
- * members modules at their own level reached an import from 167 Python frames. A shim package now
- * imports a subpackage on its first access, so the import system imports the packages of a dotted name
- * one after the other instead of nesting them, and the deepest import is reached from 55 frames.
+ * members modules at their own level reached an import from 167 Python frames, and packages importing
+ * their subpackages on first access from 55. The Java packages are now served by the import finder of
+ * {@code micronaut_java_imports} without generated modules, so importing one nests no package
+ * initialiser at all, and the deepest import of the launcher is reached from 23 frames.
  * <p>
  * The stack a frame takes depends on the platform, the number of Python frames does not: the test
  * re-runs the launcher with an import hook that records the deepest Python frame chain an import is
@@ -44,10 +45,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PythonBootstrapStackTest {
 
     /**
-     * Above the deepest import chain of the initialisers that import their subpackages on first access,
-     * below the one of the initialisers that imported them eagerly.
+     * Above the deepest import chain now that the Java packages are served by the import finder without
+     * generated modules (23 frames, reaching {@code micronaut.test}), below the one of the generated
+     * initialisers that imported their subpackages on first access (55 frames).
      */
-    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 100);
+    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 40);
 
     private static final String RERUN_LAUNCHER_WITH_DEPTH_RECORDER = """
         def __micronaut_rerun_launcher():

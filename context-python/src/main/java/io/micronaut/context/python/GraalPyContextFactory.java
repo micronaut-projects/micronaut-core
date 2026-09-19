@@ -371,6 +371,11 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             now = System.currentTimeMillis();
             context.eval(JAVA_OBJECT_MEMBERS_SOURCE);
             LOG.debug("GraalPy Java object members registered in {}ms", System.currentTimeMillis() - now);
+            // Before the application modules import: the Java packages, types and annotations they import
+            // are served by the finder of the runtime module, from the manifests the compiler wrote
+            now = System.currentTimeMillis();
+            PythonContextRuntime.installJavaImportFinder(context);
+            LOG.debug("GraalPy Java import finder installed in {}ms", System.currentTimeMillis() - now);
             // Try to load the generated pyronaut_application.py from META-INF
             now = System.currentTimeMillis();
             evaluateMain(classLoader, INTERNAL_MAIN, context);
