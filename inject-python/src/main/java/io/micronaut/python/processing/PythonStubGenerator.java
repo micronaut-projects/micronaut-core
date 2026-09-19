@@ -1108,7 +1108,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 FieldDef field = propertyFields.get(beanProperty.getName());
                                 if (field != null) {
                                     if (isSharedCollectionProperty(beanProperty)) {
-                                        reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field));
+                                        reuseStatements.add(propertyWrite(aThis, storedValue, beanProperty, field, null, null));
                                         continue;
                                     }
                                     memberNames.add(ExpressionDef.constant(beanProperty.getName()));
