@@ -53,6 +53,7 @@ import io.micronaut.python.processing.model.MemberDef;
 import io.micronaut.python.processing.model.PropertyDef;
 import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.python.processing.util.PythonDocstrings;
+import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
@@ -331,8 +332,12 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
             } else if (allElements.get(representedMethodIndex) instanceof PythonMethodElement representedMethod
-                && inheritedMethod.isAbstract()) {
-                allElements.set(representedMethodIndex, (T) representedMethod.withParameters(inheritedMethod.getParameters()));
+                && !inheritedMethod.isStatic()
+                && !inheritedMethod.isPrivate()) {
+                // A Python override of an interface method, abstract or default, adopts the Java signature the
+                // generated stub implements: the Python hints may be lossy (int for a boxed Integer id, list[T]
+                // for Iterable<T>) and the bean definition dispatches to the stub method.
+                allElements.set(representedMethodIndex, (T) withInheritedSignature(representedMethod, inheritedMethod));
             } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
                 && !representedMethod.getDeclaringType().equals(this)
                 && representedMethod.isAbstract()) {
@@ -340,6 +345,36 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
         }
         return allElements;
+    }
+
+    /**
+     * Applies the signature of the overridden Java method to a Python override. The parameters keep the Python
+     * names and annotations (a {@code @Query} refers to them by name) while taking the resolved Java types. The
+     * return type is adopted when its erasure differs from the Python one, since that is when the stub declares
+     * the Java one ({@code long} for a {@code -> int} hint, {@code Iterable<T>} for {@code list[T]}); an
+     * {@code Object} return is the exception, the stub narrows it to the Python type.
+     */
+    private static MethodElement withInheritedSignature(PythonMethodElement pythonMethod, MethodElement inheritedMethod) {
+        ParameterElement[] pythonParameters = pythonMethod.getParameters();
+        ParameterElement[] parameters = inheritedMethod.getParameters().clone();
+        if (pythonParameters.length == parameters.length) {
+            for (int i = 0; i < parameters.length; i++) {
+                ParameterElement pythonParameter = pythonParameters[i];
+                AnnotationMetadata inheritedMetadata = parameters[i].getAnnotationMetadata();
+                AnnotationMetadata annotationMetadata = inheritedMetadata.isEmpty()
+                    ? pythonParameter.getAnnotationMetadata()
+                    : new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(pythonParameter.getAnnotationMetadata()));
+                parameters[i] = ParameterElement.of(parameters[i].getGenericType(), pythonParameter.getName())
+                    .withAnnotationMetadata(annotationMetadata);
+            }
+        }
+        ClassElement inheritedReturnType = inheritedMethod.getGenericReturnType();
+        ClassElement returnType = null;
+        if (!Object.class.getName().equals(inheritedReturnType.getName())
+            && !inheritedReturnType.getName().equals(pythonMethod.getGenericReturnType().getName())) {
+            returnType = inheritedReturnType;
+        }
+        return pythonMethod.withInheritedSignature(parameters, returnType);
     }
 
     private MethodElement resolveInheritedInterfaceMethod(ClassElement anInterface, MethodElement inheritedMethod) {
@@ -547,6 +582,11 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return -1;
     }
 
+    /**
+     * Whether the parameter types of a Python method match those of the inherited Java method by erasure. A
+     * Python {@code int} hint is a primitive {@code int} while a Java {@code ID} argument resolves to the boxed
+     * {@code Integer}: Python has no overloading, so the two are the same method.
+     */
     private static boolean hasSameRawParameterTypes(MethodElement methodElement, MethodElement inheritedMethod) {
         ParameterElement[] parameters = methodElement.getParameters();
         ParameterElement[] inheritedParameters = inheritedMethod.getParameters();
@@ -554,7 +594,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!parameters[i].getType().getName().equals(inheritedParameters[i].getType().getName())) {
+            if (!PythonJavaTypes.isSameOrBoxedType(parameters[i].getType(), inheritedParameters[i].getType())) {
                 return false;
             }
         }

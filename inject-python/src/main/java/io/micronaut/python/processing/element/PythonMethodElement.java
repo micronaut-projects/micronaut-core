@@ -83,6 +83,11 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
+    // The signature this method adopts from the Java method it overrides (see withInheritedSignature). Held in
+    // fields rather than in a subclass so that copies made by withAnnotationMetadata keep it and so that a
+    // copy still equals the method it was made from.
+    private ParameterElement @Nullable [] signatureParameters;
+    private @Nullable ClassElement signatureReturnType;
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
     private Collection<MethodElement> resolvedOverriddenMethods;
@@ -156,6 +161,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         );
         copyValues(methodElement);
         return methodElement;
+    }
+
+    @Override
+    protected void copyValues(AbstractPythonElement element) {
+        super.copyValues(element);
+        if (element instanceof PythonMethodElement methodElement) {
+            methodElement.signatureParameters = signatureParameters;
+            methodElement.signatureReturnType = signatureReturnType;
+        }
     }
 
     @Override
@@ -357,7 +371,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ClassElement getReturnType() {
-        return returnType;
+        return signatureReturnType != null ? signatureReturnType : returnType;
     }
 
     @Override
@@ -386,6 +400,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ParameterElement[] getParameters() {
+        if (signatureParameters != null) {
+            return signatureParameters.clone();
+        }
         if (resolvedParameters == null) {
             resolvedParameters = resolveParameters();
         }
@@ -394,20 +411,24 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withParameters(ParameterElement... newParameters) {
-        // Since PythonMethodElement is based on parsed Python code,
-        // we create a synthetic MethodElement with the new parameters
-        return new PythonMethodElement(
-            getNativeType(),
-            environment,
-            declaringType,
-            owningType,
-            elementAnnotationMetadataFactory
-        ) {
-            @Override
-            public ParameterElement[] getParameters() {
-                return newParameters;
-            }
-        };
+        return withInheritedSignature(newParameters, null);
+    }
+
+    /**
+     * Returns a copy of this method that reports the given signature instead of the one derived from the
+     * Python type hints. A Python method that overrides a Java method adopts the Java signature this way: the
+     * hints are lossy ({@code int} for a boxed {@code Integer} id, {@code list[T]} for {@code Iterable<T>}) while
+     * the generated stub implements the Java signature, and the bean definition has to dispatch to that one.
+     *
+     * @param newParameters The parameters
+     * @param newReturnType The return type, or {@code null} to keep the declared one
+     * @return The copy
+     */
+    public MethodElement withInheritedSignature(ParameterElement[] newParameters, @Nullable ClassElement newReturnType) {
+        PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
+        methodElement.signatureParameters = newParameters.clone();
+        methodElement.signatureReturnType = newReturnType;
+        return methodElement;
     }
 
     @Override
@@ -448,6 +469,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ClassElement getGenericReturnType() {
+        if (signatureReturnType != null) {
+            return signatureReturnType;
+        }
         return resolveGenericReturnType(getNativeType());
     }
 
@@ -705,13 +729,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        PythonMethodElement methodElement = new PythonMethodElement(
-            getNativeType(),
-            environment,
-            declaringType,
-            owningType,
-            getElementAnnotationMetadataFactory()
-        );
+        PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
         methodElement.presetAnnotationMetadata = annotationMetadata;
         return methodElement;
     }

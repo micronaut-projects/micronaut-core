@@ -55,6 +55,19 @@ final class PythonJavaTypesTest {
     }
 
     @Test
+    void boxedTypesMatchTheirPrimitiveWithTheSameArrayDimensions() {
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Integer.class)));
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(int[].class)));
+        // int[] and Integer[] are distinct Java types, unlike int and Integer
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(Integer[].class)));
+        assertTrue(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(String.class), ClassElement.of(String.class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Integer[].class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(Integer[].class), ClassElement.of(int.class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int[].class), ClassElement.of(int[][].class)));
+        assertFalse(PythonJavaTypes.isSameOrBoxedType(ClassElement.of(int.class), ClassElement.of(Long.class)));
+    }
+
+    @Test
     void nestedTypesAreAnsweredOnceWithTheirFacts() {
         Map<String, ClassElement> known = Map.of(
             Outer.class.getName() + "$Item", ClassElement.of(Outer.Item.class),
