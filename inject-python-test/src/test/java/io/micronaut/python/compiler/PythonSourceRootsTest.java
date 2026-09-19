@@ -86,8 +86,9 @@ class PythonSourceRootsTest {
             .build()
             .compile();
 
-        assertTrue(new File(testOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
-        assertTrue(new File(mainOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
+        // each root records the Java packages it imports in a manifest of its own; the runtime merges them
+        assertTrue(hasJavaImportsManifest(testOutput));
+        assertTrue(hasJavaImportsManifest(mainOutput));
 
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{mainOutput.toURI().toURL(), testOutput.toURI().toURL()})) {
             Class<?> service = classLoader.loadClass("example.GreetingService");
@@ -254,5 +255,11 @@ class PythonSourceRootsTest {
                 assertEquals("Hello Python", ((ValueCoercible) bean).asPolyglotValue().invokeMember("greet", "Python").asString());
             }
         }
+    }
+
+    private static boolean hasJavaImportsManifest(File output) {
+        File[] files = new File(output, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH).listFiles();
+        return files != null && java.util.Arrays.stream(files)
+            .anyMatch(file -> file.getName().startsWith(PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX));
     }
 }

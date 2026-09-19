@@ -1601,6 +1601,17 @@ public final class PythonContextRuntime {
      * @param e The exception of the failed import
      * @return True if the module was not found
      */
+    /**
+     * Installs the meta path finder serving the Java packages, types and annotations the compiled
+     * Python sources import, which the runtime module installs when it is imported: importing it
+     * here makes sure the finder is in place before the application modules import.
+     *
+     * @param context The context
+     */
+    static void installJavaImportFinder(Context context) {
+        helper(context, "__micronaut_install_java_import_finder").executeVoid();
+    }
+
     static boolean isModuleNotFound(PolyglotException e) {
         String message = e.getMessage();
         return message != null && message.contains("ModuleNotFoundError");
