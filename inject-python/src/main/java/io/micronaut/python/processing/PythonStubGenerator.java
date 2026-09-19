@@ -145,6 +145,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef PYTHON_COERCION = ClassTypeDef.of("io.micronaut.context.python.PythonCoercion");
     public static final ClassTypeDef PYTHON_CONVERSION = ClassTypeDef.of("io.micronaut.context.python.PythonConversion");
+    public static final ClassTypeDef PYTHON_EXCEPTIONS = ClassTypeDef.of("io.micronaut.context.python.PythonExceptions");
     public static final ClassTypeDef PYTHON_HTTP_CONVERSION = ClassTypeDef.of("io.micronaut.context.python.PythonHttpConversion");
     public static final ClassTypeDef PYTHON_INVOCATION = ClassTypeDef.of("io.micronaut.context.python.PythonInvocation");
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
@@ -630,16 +631,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         if (!isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class)) {
-            // Python exceptions raised from GraalPy can surface as host adapter exceptions.
-            // The runtime remaps those adapters back to the generated Throwable subtype
-            // through this Value constructor so Micronaut exception handlers can match it.
+            // A Python exception raised from GraalPy is remapped by the runtime to the generated
+            // Throwable subtype through this Value constructor so Micronaut exception handlers can
+            // match it. The Java base receives the arguments of the Python super().__init__(...)
+            // call, read back from the exception's args, so the message and the state of the base
+            // survive the crossing into Java.
+            ThrowableSuperConstructor superConstructor = ThrowableSuperConstructor.resolve(model.element(), superType, model.pythonVisitorContext());
             builder.addMethod(
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
                     .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                    .build((aThis, methodParameters) ->
-                        aThis.field(pythonValueField(model)).assign(methodParameters.get(0))
-                    )
+                    .build((aThis, methodParameters) -> {
+                        VariableDef.MethodParameter value = methodParameters.get(0);
+                        return StatementDef.multi(
+                            aThis.superRef().invokeSuperConstructor(superConstructor.arguments(value, this::convertValueForType)),
+                            aThis.field(pythonValueField(model)).assign(value),
+                            PYTHON_EXCEPTIONS.invokeStatic("attachCause", TypeDef.VOID, aThis, value)
+                        );
+                    })
             );
         }
 
@@ -1132,6 +1141,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean extendsHostClass = model.extendsHostClass();
         boolean isIntrospectedBean = model.isIntrospectedBean();
         boolean isJunit5Test = model.isJunit5Test();
+        boolean extendsThrowable = !isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class);
         List<PropertyElement> beanProperties = model.beanProperties();
         boolean hasDynamicBeanProperties = model.hasDynamicBeanProperties();
         boolean hasConfigurationBuilderProperty = model.hasConfigurationBuilderProperty();
@@ -1263,6 +1273,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, extendsPythonClass);
                         } else if (extendsPythonClass) {
                             return aThis.superRef().invokeSuperConstructor(pythonInstance);
+                        } else if (extendsThrowable) {
+                            // the Value constructor forwards the Python super().__init__ arguments to the Java base
+                            return invokeValueConstructor(aThis, pythonInstance);
                         } else if (extendsHostClass) {
                             List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
                             return StatementDef.multi(
@@ -1325,6 +1338,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         );
                     if (extendsPythonClass) {
                         return aThis.superRef().invokeSuperConstructor(pythonInstance);
+                    } else if (extendsThrowable) {
+                        return invokeValueConstructor(aThis, pythonInstance);
                     } else {
                         return aThis.field(pythonValueField(model)).assign(pythonInstance);
                     }
@@ -1332,6 +1347,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             })));
         }
 
+    }
+
+    /**
+     * {@code this(value)}: delegates to the constructor that wraps an existing Python value.
+     */
+    private static StatementDef invokeValueConstructor(VariableDef.This aThis, ExpressionDef value) {
+        MethodDef valueConstructor = MethodDef.constructor()
+            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+            .build();
+        return new ExpressionDef.InvokeInstanceMethod(aThis, valueConstructor, List.of(value));
     }
 
     /**
