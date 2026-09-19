@@ -16,7 +16,6 @@
 
 package io.micronaut.python.compiler
 
-import groovy.json.JsonOutput
 import spock.lang.Requires
 import spock.lang.Specification
 
@@ -92,7 +91,7 @@ class PythonMetadataBenchmarkSpec extends Specification {
             }
         }
         reportDirectory.mkdirs()
-        new File(reportDirectory, 'benchmark.json').text = JsonOutput.prettyPrint(JsonOutput.toJson(report))
+        new File(reportDirectory, 'benchmark.json').text = json(report, 0)
         new File(reportDirectory, 'benchmark.md').text = summarize(report)
 
         then:
@@ -229,6 +228,21 @@ class Dto${i}:
             md << "\n"
         }
         md.toString()
+    }
+
+    private static String json(Object value, int depth) {
+        String pad = '  ' * (depth + 1)
+        String close = '  ' * depth
+        if (value instanceof Map) {
+            return '{\n' + value.collect { k, v -> pad + '"' + k + '": ' + json(v, depth + 1) }.join(',\n') + '\n' + close + '}'
+        }
+        if (value instanceof Collection) {
+            return '[\n' + value.collect { pad + json(it, depth + 1) }.join(',\n') + '\n' + close + ']'
+        }
+        if (value instanceof Number || value instanceof Boolean || value == null) {
+            return String.valueOf(value)
+        }
+        return '"' + String.valueOf(value).replace('\\', '\\\\').replace('"', '\\"').replace('\n', '\\n') + '"'
     }
 
     private static double median(List<Double> values) {
