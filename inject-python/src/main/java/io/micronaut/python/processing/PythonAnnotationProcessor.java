@@ -152,10 +152,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         # through a module named __micronaut_members_<hash>; this initialiser merges the modules of
         # every compilation on the class path, so the source roots that share a package do not
         # shadow each other. The code of a members module runs here in a namespace of its own rather
-        # than being imported: a package importing its subpackages eagerly nests the import machinery
-        # once per package level, and GraalPy keeps dozens of Java frames per Python frame, so the
-        # frames this initialiser adds to every level decide whether a deep package tree bootstraps
-        # within the thread stack.
+        # than being imported, and the subpackages a members module names (__micronaut_subpackages__)
+        # are imported on first access rather than with the package: GraalPy keeps dozens of Java
+        # frames per Python frame, so every package level an import nests decides whether a deep
+        # package tree bootstraps within the thread stack. __all__ lists the members and then the
+        # subpackages: a star import binds the direct subpackages, importing them, as it does for any
+        # package whose __all__ names its submodules.
         import importlib as __micronaut_importlib
         import os as __micronaut_os
         from importlib.machinery import SourceFileLoader as __micronaut_SourceFileLoader
@@ -169,6 +171,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         ))
         # the namespace of each contribution merged so far, partial while its code runs
         __micronaut_namespaces = {}
+        # the subpackages of the contributions merged so far, imported on first access
+        __micronaut_subpackages = set()
         __all__ = []
 
 
@@ -180,23 +184,31 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             # they are merged when its import completes
             for name in namespace.get('__all__', ()):
                 value = namespace[name]
-                # the first module defining a name wins, unless it bound a Java class absent from the
-                # class path to a facade and a later one has the class itself
-                if name in __all__ and type(globals()[name]).__name__ != '_MicronautJavaType':
+                # the first module defining a name (or a subpackage) wins, unless it bound a Java class
+                # absent from the class path to a facade and a later one has the class itself
+                if name in __all__ and type(globals().get(name)).__name__ != '_MicronautJavaType':
                     continue
                 globals()[name] = value
                 if name not in __all__:
                     __all__.append(name)
+            for name in namespace.get('__micronaut_subpackages__', ()):
+                if name not in __all__:
+                    __micronaut_subpackages.add(name)
+                    __all__.append(name)
 
 
         def __getattr__(name):
+            # a subpackage, imported on its first access (from . import annotation, or an attribute of the
+            # package); importing it binds it on the package, so it is served here once
+            if name in __micronaut_subpackages:
+                return __micronaut_importlib.import_module(__name__ + '.' + name)
             # a module of this package importing a member from the package while the package initialises:
             # a contribution whose code runs may have bound the member already, or names the module defining
             # it (its member map is bound before its imports run, so a sibling is served whichever module the
             # contribution imports first); otherwise the remaining contributions are merged until one defines
-            # the member. A subpackage (from . import annotation) is left to the import system, which imports
-            # it itself.
-            if not name.startswith('__') and not any(__micronaut_os.path.isdir(directory + '/' + name) for directory in __path__):
+            # the member. A subpackage of a contribution not merged yet is left to the import system, which
+            # imports it itself.
+            if '__micronaut_namespaces' in globals() and not name.startswith('__') and not any(__micronaut_os.path.isdir(directory + '/' + name) for directory in __path__):
                 for contribution in __micronaut_contributions:
                     namespace = __micronaut_namespaces.get(contribution)
                     if namespace is None:
@@ -209,9 +221,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 for contribution in __micronaut_contributions:
                     if contribution not in __micronaut_namespaces:
                         __micronaut_merge_members(contribution)
-                    if name in __all__:
+                    if name in __all__ and name not in __micronaut_subpackages:
                         return globals()[name]
             raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
+
+
+        def __dir__():
+            return sorted({*globals(), *__micronaut_subpackages})
 
 
         try:
@@ -219,9 +235,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 if __micronaut_contribution not in __micronaut_namespaces:
                     __micronaut_merge_members(__micronaut_contribution)
         finally:
-            del __getattr__
-        del __micronaut_merge_members, __micronaut_namespaces, __micronaut_contributions
-        del __micronaut_importlib, __micronaut_os, __micronaut_SourceFileLoader
+            del __micronaut_merge_members, __micronaut_namespaces, __micronaut_contributions
+            del __micronaut_os, __micronaut_SourceFileLoader
         globals().pop('__micronaut_contribution', None)
         """;
     private static final String LAUNCHER_SOURCE = """
@@ -522,7 +537,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                 }
                             }
                             membersContent.insert(0, memberModules.append("}\n").toString());
-                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, membersContent, members, initialisedPackages, originatingElement);
+                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, membersContent, members, List.of(), initialisedPackages, originatingElement);
                         }
                     }
                 }
@@ -993,6 +1008,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      * @param root Whether the directory is the root of the sources, whose members the launcher imports
      * @param membersContent The Python source binding the members
      * @param members The names of the members
+     * @param subPackages The names of the subpackages, which the initialiser imports on first access
      * @param initialisedPackages The initialisers and members modules already written by this compilation
      * @param originatingElement The originating element
      */
@@ -1001,8 +1017,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                      boolean root,
                                      StringBuilder membersContent,
                                      List<String> members,
+                                     List<String> subPackages,
                                      Set<String> initialisedPackages,
                                      ClassElement originatingElement) {
+        if (!subPackages.isEmpty()) {
+            membersContent.append("\n__micronaut_subpackages__ = ").append(toListOfString(subPackages));
+        }
         String content = membersContent.append("\n__all__ = ").append(toListOfString(members)).append('\n').toString();
         String membersPath = directory + PACKAGE_MEMBERS_MODULE_PREFIX + contentHash(content) + ".py";
         if (initialisedPackages.add(membersPath)) {
@@ -1168,22 +1188,24 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 allNames.add(typeName);
             }
 
-            // Add imports for subpackages
+            // The subpackages: the type of a type module is a member, imported with the package; any other
+            // subpackage is imported by the package initialiser on first access
+            List<String> subPackageNames = new ArrayList<>();
             for (String subPackage : allPackages) {
                 if (subPackage.startsWith(packageName + ".") && !subPackage.equals(packageName)) {
                     String relativeSubPackage = subPackage.substring(packageName.length() + 1);
-                    if (!relativeSubPackage.contains(".") && !allNames.contains(relativeSubPackage)) { // Direct child package
+                    if (!relativeSubPackage.contains(".") && !allNames.contains(relativeSubPackage) && !subPackageNames.contains(relativeSubPackage)) { // Direct child package
                         if (typeModules.containsKey(subPackage)) {
                             initContent.append(RELATIVE_IMPORT_PREFIX).append(relativeSubPackage).append(IMPORT_SEPARATOR).append(relativeSubPackage).append("\n");
+                            allNames.add(relativeSubPackage);
                         } else {
-                            initContent.append("from . import ").append(relativeSubPackage).append("\n");
+                            subPackageNames.add(relativeSubPackage);
                         }
-                        allNames.add(relativeSubPackage);
                     }
                 }
             }
 
-            writePackageMembers(filesList, APPLICATION_SRC_PATH + packagePath + "/", false, initContent, allNames, initialisedPackages, originatingElement);
+            writePackageMembers(filesList, APPLICATION_SRC_PATH + packagePath + "/", false, initContent, allNames, subPackageNames, initialisedPackages, originatingElement);
         }
 
         // Write fileslist.txt
