@@ -58,7 +58,7 @@ Branch `claude/kind-euler-2nyv6v`, stacked on the head of #13249 (`python/lazy-s
 
 ## Benchmark
 
-`PythonBootstrapBenchmark` (enabled by `MICRONAUT_PYTHON_BENCHMARK=true`; `MICRONAUT_PYTHON_BENCHMARK_CONTEXTS`
+`PythonBootstrapBenchmarkTest` (enabled by `MICRONAUT_PYTHON_BENCHMARK=true`; `MICRONAUT_PYTHON_BENCHMARK_CONTEXTS`
 contexts, results to the file named by `MICRONAUT_PYTHON_BENCHMARK_OUTPUT`) builds contexts on one engine
 from the `test-suite-python` class path. Per context it records `GraalPyContextFactory.buildContext` plus
 the import of `micronaut_runtime` (charged to both revisions), the generated modules in `sys.modules`,
