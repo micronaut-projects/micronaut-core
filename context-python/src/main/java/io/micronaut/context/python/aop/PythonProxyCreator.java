@@ -871,15 +871,20 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         @Override
         public T get() {
             T target = proxyDefinition.targetBean();
-            if (!interceptedFunctions.isEmpty() && boundTarget.get().get() != target) {
+            if (!interceptedFunctions.isEmpty() && !isBound(target)) {
                 synchronized (boundTarget) {
-                    if (boundTarget.get().get() != target) {
+                    if (!isBound(target)) {
                         bind(target);
                         boundTarget.set(new WeakReference<>(target));
                     }
                 }
             }
             return target;
+        }
+
+        private boolean isBound(T target) {
+            WeakReference<Object> bound = boundTarget.get();
+            return bound != null && bound.get() == target;
         }
 
         private void bind(T target) {
