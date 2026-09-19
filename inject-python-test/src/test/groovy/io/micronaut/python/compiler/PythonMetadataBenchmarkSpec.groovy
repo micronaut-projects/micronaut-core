@@ -124,7 +124,7 @@ class Repo${i}:
 
 @Singleton
 class Service${i}:
-    def __init__(self, repo: Repo${i}, name: Annotated[str, Value("\\${app.name:svc}")]):
+    def __init__(self, repo: Repo${i}, name: Annotated[str, Value("\${app.name:svc}")]):
         self.repo = repo
         self.name = name
 
