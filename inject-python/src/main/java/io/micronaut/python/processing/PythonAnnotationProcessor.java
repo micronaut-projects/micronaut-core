@@ -23,6 +23,7 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
+import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
@@ -1035,6 +1036,22 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
         if (packages.isEmpty() && types.isEmpty()) {
             return;
+        }
+        // a type only nested types are imported through (from a.b.Outer import Inner) is a member of its
+        // package as well, so the package binds it and knows its kind when the class is missing at run time
+        for (Map.Entry<String, String> type : types.entrySet()) {
+            int lastDot = type.getKey().lastIndexOf('.');
+            if (lastDot <= 0) {
+                continue;
+            }
+            Map<String, String[]> parentMembers = members.computeIfAbsent(type.getKey().substring(0, lastDot), k -> new TreeMap<>());
+            String simpleName = type.getKey().substring(lastDot + 1);
+            if (!parentMembers.containsKey(simpleName)) {
+                ClassElement element = javaVisitorContext.getClassElement(type.getValue()).orElse(null);
+                String kind = PythonAnnotationTypes.isAnnotationType(element) ? "annotation"
+                    : element != null && element.isInterface() ? "interface" : "class";
+                parentMembers.put(simpleName, new String[] {type.getValue(), kind});
+            }
         }
         for (Map.Entry<String, Map<String, String[]>> module : members.entrySet()) {
             for (Map.Entry<String, String[]> member : module.getValue().entrySet()) {
