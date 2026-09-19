@@ -27,6 +27,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -621,6 +622,33 @@ public final class PythonCoercion {
     public static void putMember(Value target, String name, @Nullable Object value) {
         Context context = target.getContext();
         memberSetter(context).executeVoid(target, name, coerceToContext(value, context));
+    }
+
+    /**
+     * Assign a member on a Python value, handing a Java collection or a generated wrapper to Python
+     * as the host object it is instead of a converted copy.
+     *
+     * <p>Used by the generated wrapper of an introspected class whose state is owned by its Java
+     * fields (the object was created from Java or loaded from storage): the Python attribute then is
+     * the Java collection, so an item added or removed in Python is added or removed from the Java
+     * field, and a nested object is the Java wrapper, so a write to its attribute reaches the Java
+     * field of that wrapper. A frozen dataclass, a polyglot value or a value of a standard type is
+     * coerced as by {@link #putMember(Value, String, Object)}.</p>
+     *
+     * @param target The Python object to update
+     * @param name The member name
+     * @param value The member value
+     */
+    @UsedByGeneratedCode
+    public static void putMemberByReference(Value target, String name, @Nullable Object value) {
+        Context context = target.getContext();
+        Object member = switch (value) {
+            case null -> null;
+            case Collection<?> _, Map<?, ?> _ when !isGuestBackedCollection(value) -> value;
+            case PooledValueCoercible _, ValueCoercible _ when !(value instanceof Enum<?>) -> value;
+            default -> coerceToContext(value, context);
+        };
+        memberSetter(context).executeVoid(target, name, member);
     }
 
     /**
