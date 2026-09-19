@@ -21,6 +21,8 @@ import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -35,7 +37,7 @@ import java.util.List;
  * as JSON, so runs on different revisions can be compared.
  */
 @EnabledIfEnvironmentVariable(named = "MICRONAUT_PYTHON_BENCHMARK", matches = "true")
-class PythonBootstrapBenchmark {
+class PythonBootstrapBenchmarkTest {
 
     private static final int CONTEXTS = Integer.parseInt(System.getenv().getOrDefault("MICRONAUT_PYTHON_BENCHMARK_CONTEXTS", "6"));
 
@@ -147,6 +149,7 @@ class PythonBootstrapBenchmark {
                 }
             }
         }
+        assertEquals(CONTEXTS, rows.size(), "every context was measured");
         String output = System.getenv("MICRONAUT_PYTHON_BENCHMARK_OUTPUT");
         if (output != null && !output.isBlank()) {
             Files.writeString(Path.of(output), "[\n" + String.join(",\n", rows) + "\n]\n", StandardCharsets.UTF_8);
