@@ -107,9 +107,9 @@ class Holder:
         polyglot.eval("python", "ImportedConnectionFactory").as(Class) == ImportedConnectionFactory
 
         and: "a class absent from the class path is bound to a facade that fails on first use"
-        // the facade is the runtime's: a Java package module binds a missing class to it
-        polyglot.eval("python", "import micronaut_runtime; type(micronaut_runtime._MicronautJavaType('missing.Type')).__name__").asString() == "_MicronautJavaType"
-        polyglot.eval("python", "micronaut_runtime._MicronautJavaType('missing.Type')._target").asString() == "missing.Type"
+        // the facade is the Java imports module's: a Java package module binds a missing class to it
+        polyglot.eval("python", "import micronaut_java_imports; type(micronaut_java_imports._MicronautJavaType('missing.Type')).__name__").asString() == "_MicronautJavaType"
+        polyglot.eval("python", "micronaut_java_imports._MicronautJavaType('missing.Type')._target").asString() == "missing.Type"
 
         cleanup:
         context?.close()
