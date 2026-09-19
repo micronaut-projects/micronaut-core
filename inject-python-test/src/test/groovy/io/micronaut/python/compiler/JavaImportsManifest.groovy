@@ -40,23 +40,23 @@ class JavaImportsManifest {
     static List<File> files(File targetDir) {
         def srcDir = new File(targetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}")
         (srcDir.listFiles() ?: new File[0])
-            .findAll { it.name.startsWith(PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX) && it.name.endsWith('.json') }
+            .findAll { it.name.startsWith(PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX) && it.name.endsWith('.py') }
             .sort { it.name }
     }
 
     /** The merged manifests of a target directory. */
     static JavaImportsManifest read(File targetDir) {
-        merge(files(targetDir).collect { parseJson(it.text) as Map })
+        merge(files(targetDir).collect { parseManifest(it.text) })
     }
 
     /** The merged manifests the class loader serves, found through the file lists of the virtual file system. */
     static JavaImportsManifest read(ClassLoader classLoader) {
         List<Map> manifests = []
         classLoader.getResources("META-INF/${PythonAnnotationProcessor.APPLICATION_PATH}fileslist.txt").each { url ->
-            url.text.readLines().findAll { it.contains("/src/${PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX}") }.each { entry ->
+            url.text.readLines().findAll { it.contains("/src/${PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX}") && it.endsWith('.py') }.each { entry ->
                 def resource = classLoader.getResource(entry.startsWith('/') ? entry.substring(1) : entry)
                 if (resource != null) {
-                    manifests << (parseJson(resource.text) as Map)
+                    manifests << parseManifest(resource.text)
                 }
             }
         }
@@ -78,15 +78,19 @@ class JavaImportsManifest {
     }
 
     /**
-     * Parses the manifest, whose values are strings, objects and arrays of strings, without a JSON library
-     * on the test class path.
+     * Parses the manifest module: three dict literals ({@code PACKAGES}, {@code TYPES}, {@code MEMBERS}) in JSON
+     * syntax, read without a JSON library on the test class path.
      */
-    static Object parseJson(String text) {
-        def parser = new JsonParser(text)
-        def value = parser.value()
-        parser.skipSpace()
-        assert parser.position == text.length() : "trailing content in manifest at ${parser.position}"
-        value
+    static Map parseManifest(String text) {
+        Map manifest = [:]
+        ['PACKAGES', 'TYPES', 'MEMBERS'].each { name ->
+            int start = text.indexOf("\n${name} = ")
+            assert start >= 0 : "no ${name} in the manifest"
+            def parser = new JsonParser(text)
+            parser.position = start + name.length() + 4
+            manifest[name.toLowerCase()] = parser.value()
+        }
+        manifest
     }
 
     private static class JsonParser {

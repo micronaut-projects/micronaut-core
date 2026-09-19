@@ -88,13 +88,13 @@ class PythonBootstrapBenchmark {
     private static final String MANIFEST_RELOAD = """
         import sys, time
         runtime = sys.modules.get('micronaut_runtime')
+        millis = None
         if runtime is not None and hasattr(runtime, '__micronaut_reset_java_imports'):
             runtime.__micronaut_reset_java_imports()
             started = time.perf_counter()
             runtime.__micronaut_java_imports()
-            round((time.perf_counter() - started) * 1000, 1)
-        else:
-            None
+            millis = round((time.perf_counter() - started) * 1000, 1)
+        millis
         """;
 
     /**
@@ -122,6 +122,9 @@ class PythonBootstrapBenchmark {
             for (int run = 1; run <= CONTEXTS; run++) {
                 long start = System.nanoTime();
                 Context context = GraalPyContextFactory.buildContext(hostAccess, engine, classLoader);
+                // the runtime module is imported on the first bridge call at the latest; the bootstrap of this
+                // revision may import it earlier, so both count it
+                PythonContextRuntime.helper(context, "__micronaut_loaded_module");
                 long buildMillis = (System.nanoTime() - start) / 1_000_000;
                 try {
                     Value counts = context.eval(PythonContextRuntime.PYTHON, COUNT_MODULES);

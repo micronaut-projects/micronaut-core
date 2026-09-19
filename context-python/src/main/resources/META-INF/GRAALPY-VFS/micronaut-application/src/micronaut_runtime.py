@@ -508,20 +508,19 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
 # Java annotation (``from jakarta.inject import Singleton``) runs unchanged at run time, so the Java
 # packages it imports must be importable as Python modules. No module file exists for them: the
 # compiler records the Java packages, types and annotations every module imports in a manifest
-# (``__micronaut_java_imports_<hash>.json`` next to the sources of its compilation), and the meta path
+# (``__micronaut_java_imports_<hash>.py`` next to the sources of its compilation), and the meta path
 # finder installed here serves them from the manifests of every compilation on the path. A package is a
 # module object without a file whose attributes resolve to host classes on first access; an annotation
 # is a callable that carries the annotation type and returns its target, as the compiler-generated
 # decorators did; a class the run time class path lacks is a facade resolving it on first use.
 # ---------------------------------------------------------------------------------------------------
 import importlib.machinery as _micronaut_importlib_machinery
-import json as _micronaut_json
 import os as _micronaut_os
 import threading as _micronaut_threading
 import types as _micronaut_types
 
 _MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX = "__micronaut_java_imports_"
-_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX = ".json"
+_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX = ".py"
 
 
 class _MicronautJavaType:
@@ -697,11 +696,11 @@ class _MicronautJavaImports:
         self.manifests = []
 
     def merge(self, manifest):
-        for python_name, java_name in manifest.get('packages', {}).items():
+        for python_name, java_name in manifest.get('PACKAGES', {}).items():
             self.packages.setdefault(python_name, java_name)
-        for python_name, java_name in manifest.get('types', {}).items():
+        for python_name, java_name in manifest.get('TYPES', {}).items():
             self.types.setdefault(python_name, java_name)
-        for python_name, members in manifest.get('members', {}).items():
+        for python_name, members in manifest.get('MEMBERS', {}).items():
             merged = self.members.setdefault(python_name, {})
             for simple_name, member in members.items():
                 # the first compilation defining a name wins, unless it lacks the class a later one has
@@ -764,9 +763,13 @@ def _micronaut_java_imports():
                         continue
                     for file in sorted(files):
                         if file.startswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_PREFIX) and file.endswith(_MICRONAUT_JAVA_IMPORTS_MANIFEST_SUFFIX):
+                            # a module of dict literals, run in a namespace of its own like a members module: the
+                            # loader uses the bytecode cache the compiler may have written next to it
                             path = _micronaut_os.path.join(entry, file)
-                            with open(path, encoding='utf-8') as manifest:
-                                imports.merge(_micronaut_json.load(manifest))
+                            name = file[:-3]
+                            namespace = {'__name__': name, '__file__': path}
+                            exec(_micronaut_importlib_machinery.SourceFileLoader(name, path).get_code(name), namespace)
+                            imports.merge(namespace)
                             imports.manifests.append(path)
                 _micronaut_java_imports_cache = imports
     return imports
