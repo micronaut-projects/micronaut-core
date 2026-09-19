@@ -712,6 +712,29 @@ class _MicronautJavaImports:
     def java_name(self, python_name):
         return self.types.get(python_name) or self.packages.get(python_name)
 
+    def resolve_type(self, python_name):
+        """
+        The Java type a module name not recorded as a module stands for: a member of a recorded module
+        imported as a module itself (from jakarta.inject.Qualifier import Qualifier, as the compiler-generated
+        code imports a meta-annotation), or a class of a recorded package on the class path. Remembered as a
+        type module once found; None when the name is no Java type.
+        """
+        parent, _, name = python_name.rpartition('.')
+        if not parent:
+            return None
+        parent_java_name = self.java_name(parent)
+        if parent_java_name is None:
+            return None
+        recorded = self.members.get(parent, {}).get(name)
+        if recorded is not None:
+            java_name = recorded[0]
+        else:
+            java_name = parent_java_name + ('$' if parent in self.types else '.') + name
+            if _micronaut_host_class(java_name) is None:
+                return None
+        self.types[python_name] = java_name
+        return java_name
+
     def subpackages(self, python_name):
         prefix = python_name + '.'
         return sorted({
@@ -850,7 +873,9 @@ class _MicronautJavaImportFinder:
         imports = _micronaut_java_imports()
         java_name = imports.java_name(fullname)
         if java_name is None:
-            return None
+            java_name = imports.resolve_type(fullname)
+            if java_name is None:
+                return None
         directories = []
         segment = fullname.rsplit('.', 1)[-1]
         for entry in (path if path is not None else sys.path):

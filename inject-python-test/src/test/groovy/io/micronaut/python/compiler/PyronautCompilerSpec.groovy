@@ -1252,9 +1252,9 @@ class Message:
         then:
         filesList.contains("/src/__main__.py")
         filesList.contains("/src/__pycache__/__main__.")
-        filesList.contains("/src/micronaut/core/annotation/Introspected.py")
-        filesList.contains("/src/micronaut/core/annotation/__pycache__/Introspected.")
-        filesList.contains("/src/micronaut/core/__pycache__/__init__.")
+        // the imported annotation is served from the manifest: no module and no bytecode for it
+        filesList.contains("/src/${PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX}")
+        !filesList.contains("/src/micronaut/")
         messageClass.getMethod("formattedDateCreated").returnType == String
         message.formattedDateCreated() == "formatted: today"
 

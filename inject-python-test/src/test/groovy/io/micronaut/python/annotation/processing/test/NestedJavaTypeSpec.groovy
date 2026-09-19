@@ -245,20 +245,20 @@ class Command:
         def nested = "micronaut.python.annotation.processing.test.nested"
 
         then: "the package and every type nested types are imported through are modules"
-        manifest.packages[nested] == NESTED
-        manifest.types["${nested}.OuterHost"] == "${NESTED}.OuterHost"
-        manifest.types["${nested}.OuterHost.Builder"] == "${NESTED}.OuterHost\$Builder"
-        manifest.types["${nested}.OuterMarker"] == "${NESTED}.OuterMarker"
+        manifest.packages[nested] == "io.${NESTED}"
+        manifest.types["${nested}.OuterHost"] == "io.${NESTED}.OuterHost"
+        manifest.types["${nested}.OuterHost.Builder"] == "io.${NESTED}.OuterHost\$Builder"
+        manifest.types["${nested}.OuterMarker"] == "io.${NESTED}.OuterMarker"
         !new File(srcPath, "micronaut/python/annotation/processing/test/nested").exists()
 
         and: "the package knows its types, a type module the nested types imported from it"
-        manifest.member(nested, "OuterHost") == ["${NESTED}.OuterHost", "class"]
-        manifest.member(nested, "OuterMarker") == ["${NESTED}.OuterMarker", "annotation"]
-        manifest.member("${nested}.OuterHost", "Inner") == ["${NESTED}.OuterHost\$Inner", "class"]
-        manifest.member("${nested}.OuterHost.Builder", "Stage") == ["${NESTED}.OuterHost\$Builder\$Stage", "class"]
+        manifest.member(nested, "OuterHost") == ["io.${NESTED}.OuterHost", "class"]
+        manifest.member(nested, "OuterMarker") == ["io.${NESTED}.OuterMarker", "annotation"]
+        manifest.member("${nested}.OuterHost", "Inner") == ["io.${NESTED}.OuterHost\$Inner", "class"]
+        manifest.member("${nested}.OuterHost.Builder", "Stage") == ["io.${NESTED}.OuterHost\$Builder\$Stage", "class"]
 
         and: "a nested annotation is an annotation member of its outer type"
-        manifest.member("${nested}.OuterMarker", "Tagged") == ["${NESTED}.OuterMarker\$Tagged", "annotation"]
+        manifest.member("${nested}.OuterMarker", "Tagged") == ["io.${NESTED}.OuterMarker\$Tagged", "annotation"]
 
         cleanup:
         tempDir.deleteDir()
