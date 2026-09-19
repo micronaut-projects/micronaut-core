@@ -28,6 +28,21 @@ publisher = Flux.from_(source)
 
 The `from_` call is rewritten during processing to call the Java `from` method.
 
+The same convention applies to objects that Java returns at runtime, such as builders and the values of method calls, where no rewriting is possible. Every Java object answers to the trailing underscore form of a member named after a Python keyword, so a builder's `from` method or a specification's `and`, `or` and `not` combinators are called as `from_`, `and_`, `or_` and `not_`:
+
+[source,python]
+----
+from micronaut.email import Email
+
+email = (Email.builder()
+    .from_("sender@example.com")
+    .to("john@example.com")
+    .subject("Hello")
+    .build())
+----
+
+The underscore is only dropped when the remaining name is a Python keyword and the Java object has no member with the underscored name; a Java method that is really called `from_` is still reached as `from_`.
+
 == Java packages under `io`
 
 `io` is a module of the Python standard library, so Python itself cannot import from a package named `io.something`. Java packages under `io` such as `io.micronaut`, `io.swagger` or `io.kubernetes` are nevertheless imported with their Java names; the Python compiler support recognises that an `io.*` import can only refer to a Java package and rewrites it for the runtime:

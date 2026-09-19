@@ -866,6 +866,85 @@ class KeywordMethodService:
         tempDir.deleteDir()
     }
 
+    def "test Python keyword aliases resolve on Java objects returned at runtime"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.python.compiler import KeywordMessage, KeywordSpecification
+
+
+@Singleton
+class KeywordAliasService:
+    def message(self):
+        return KeywordMessage.builder().from_("sender@example.com").to("john@example.com").build()
+
+    def sender(self, message):
+        return message.from_()
+
+    def combined(self):
+        a = KeywordSpecification.named("a")
+        b = KeywordSpecification.named("b")
+        return a.and_(b).or_(b.not_()).name()
+
+    def same(self):
+        a = KeywordSpecification.named("a")
+        return a.is_(KeywordSpecification.named("a")) and a.in_(["a", "b"]) and not a.is_(a.not_())
+
+    def missing(self, message):
+        return message.missing_()
+
+    def missing_keyword(self, message):
+        return message.while_()
+'''
+        def tempDir = File.createTempDir("python-test-keyword-alias", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        def message = pythonContext.eval("python", "KeywordAliasService().message()").asHostObject()
+
+        then: "the alias is resolved at runtime, not rewritten by the compiler"
+        !pythonContext.eval("python", "'getattr' in KeywordAliasService.sender.__code__.co_names or 'getattr' in KeywordAliasService.message.__code__.co_names").asBoolean()
+        message instanceof KeywordMessage
+        message.from() == 'sender@example.com'
+        message.to() == 'john@example.com'
+        pythonContext.eval("python", "KeywordAliasService().sender(KeywordMessage.builder().from_('x@y').build())").asString() == 'x@y'
+        pythonContext.eval("python", "KeywordAliasService().combined()").asString() == '((a and b) or not b)'
+        pythonContext.eval("python", "KeywordAliasService().same()").asBoolean()
+
+        and: "the explicit spelling and the alias agree"
+        pythonContext.eval("python", "getattr(KeywordMessage.builder().from_('x@y').build(), 'from')()").asString() == 'x@y'
+        pythonContext.eval("python", "m = KeywordMessage.builder(); hasattr(m, 'from_') and hasattr(m, 'from') and not hasattr(m, 'nope_') and not hasattr(m, 'nope')").asBoolean()
+
+        when: "a member that exists under neither spelling"
+        pythonContext.eval("python", "KeywordAliasService().missing(KeywordMessage.builder().build())")
+
+        then:
+        def error = thrown(PolyglotException)
+        error.message.contains("foreign object has no attribute 'missing_'")
+
+        when: "a keyword alias whose stripped member does not exist either"
+        pythonContext.eval("python", "KeywordAliasService().missing_keyword(KeywordMessage.builder().build())")
+
+        then: "the error names the alias the caller used"
+        def keywordError = thrown(PolyglotException)
+        keywordError.message.contains("foreign object has no attribute 'while_'")
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+        tempDir.deleteDir()
+    }
+
     def "test Python keyword-safe annotation members keep original runtime source"() {
         given:
         def pythonCode = '''
