@@ -6,6 +6,9 @@ it does not hide build-time bytecode in resources or run javac at application st
 
 Based on `claude/kind-euler-2nyv6v` snapshot `c71342b8df`.
 
+See [the implementation work plan](IMPLEMENTATION_PLAN.md) for the path from this
+prototype to a supported runtime-generation mode.
+
 ## Run the experiment
 
 From this checkout:
