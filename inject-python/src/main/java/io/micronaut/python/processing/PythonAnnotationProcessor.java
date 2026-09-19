@@ -118,12 +118,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         # this initialiser adds to every package level decide whether a deep package tree bootstraps
         # within the thread stack. A package that shares its name with a Java package (application
         # modules under micronaut/context next to io.micronaut.context) serves the Java members
-        # through the Java imports of the runtime, which the packages without Python modules are
-        # served from entirely.
+        # through micronaut_java_imports, which serves the packages without Python modules entirely.
         import importlib as __micronaut_importlib
         import os as __micronaut_os
         from importlib.machinery import SourceFileLoader as __micronaut_SourceFileLoader
-        import micronaut_runtime as __micronaut_runtime
+        import micronaut_java_imports as __micronaut_java_imports
 
         # the members modules next to this initialiser, by name
         __micronaut_contributions = dict(sorted(
@@ -174,7 +173,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                         return globals()[name]
             if not name.startswith('__'):
                 # a Java class, annotation or sub-package of the Java package of the same name
-                value = __micronaut_runtime.__micronaut_java_package_member(__name__, name)
+                value = __micronaut_java_imports.__micronaut_java_package_member(__name__, name)
                 if value is not None:
                     return value
             raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

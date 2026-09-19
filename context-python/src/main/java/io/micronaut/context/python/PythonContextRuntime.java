@@ -87,6 +87,10 @@ public final class PythonContextRuntime {
         }
     };
     private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
+    private static final String JAVA_IMPORTS_MODULE_NAME = "micronaut_java_imports";
+    private static final String JAVA_IMPORTS_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_java_imports.py";
+    private static final Source IMPORT_JAVA_IMPORTS_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + JAVA_IMPORTS_MODULE_NAME + "')", "micronaut-import-java-imports.py").cached(true).buildLiteral();
+    private static final AtomicReference<@Nullable String> JAVA_IMPORTS_MODULE_FALLBACK_SOURCE = new AtomicReference<>();
     private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
     private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
     private static final String INSTALL_RUNTIME_MODULE_FINDER = "__micronaut_install_runtime_module_finder";
@@ -1585,8 +1589,10 @@ public final class PythonContextRuntime {
             }
             // The virtual file system of this context does not carry the module (a bare context created
             // outside the application, or an application whose file system lists another module set):
-            // serve it from the classpath resource and import it again. The import system serialises
-            // the concurrent first imports of a module, so every thread sees it complete.
+            // serve it, and the Java imports module it imports, from the classpath resources and import
+            // it again. The import system serialises the concurrent first imports of a module, so every
+            // thread sees it complete.
+            installJavaImportFinder(context);
             installRuntimeModuleFinder(context, RUNTIME_MODULE_NAME, RUNTIME_MODULE_RESOURCE, RUNTIME_MODULE_FALLBACK_SOURCE);
             module = context.eval(IMPORT_RUNTIME_MODULE_SOURCE);
         }
@@ -1603,13 +1609,24 @@ public final class PythonContextRuntime {
      */
     /**
      * Installs the meta path finder serving the Java packages, types and annotations the compiled
-     * Python sources import, which the runtime module installs when it is imported: importing it
-     * here makes sure the finder is in place before the application modules import.
+     * Python sources import, which the {@code micronaut_java_imports} module installs when it is
+     * imported: importing it here makes sure the finder is in place before the application modules
+     * import. The module is small and does not import the runtime module, whose import stays deferred
+     * to the first bridge call.
      *
      * @param context The context
      */
     static void installJavaImportFinder(Context context) {
-        helper(context, "__micronaut_install_java_import_finder").executeVoid();
+        try {
+            context.eval(IMPORT_JAVA_IMPORTS_MODULE_SOURCE);
+        } catch (PolyglotException e) {
+            if (!isModuleNotFound(e)) {
+                throw e;
+            }
+            // served from the class path resource like the runtime module (see runtimeModule)
+            installRuntimeModuleFinder(context, JAVA_IMPORTS_MODULE_NAME, JAVA_IMPORTS_MODULE_RESOURCE, JAVA_IMPORTS_MODULE_FALLBACK_SOURCE);
+            context.eval(IMPORT_JAVA_IMPORTS_MODULE_SOURCE);
+        }
     }
 
     static boolean isModuleNotFound(PolyglotException e) {

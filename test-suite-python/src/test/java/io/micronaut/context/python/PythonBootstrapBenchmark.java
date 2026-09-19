@@ -71,7 +71,7 @@ class PythonBootstrapBenchmark {
             for name, module in list(sys.modules.items()):
                 file = getattr(module, '__file__', None) or ''
                 origin = getattr(getattr(module, '__spec__', None), 'origin', None) or ''
-                if (file.startswith('/graalpy_vfs/src/') and name != 'micronaut_runtime') or origin.startswith('java:'):
+                if file.startswith('/graalpy_vfs/src/') or origin.startswith('java:'):
                     del sys.modules[name]
             recorder = DepthRecorder()
             sys.meta_path.insert(0, recorder)
@@ -87,7 +87,7 @@ class PythonBootstrapBenchmark {
 
     private static final String MANIFEST_RELOAD = """
         import sys, time
-        runtime = sys.modules.get('micronaut_runtime')
+        runtime = sys.modules.get('micronaut_java_imports') or sys.modules.get('micronaut_runtime')
         millis = None
         if runtime is not None and hasattr(runtime, '__micronaut_reset_java_imports'):
             runtime.__micronaut_reset_java_imports()
