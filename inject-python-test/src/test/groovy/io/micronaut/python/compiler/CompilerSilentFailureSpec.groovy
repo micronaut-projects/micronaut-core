@@ -62,15 +62,13 @@ class Helper:
 
         when:
         compile()
-        def initializer = vfsFile("micronaut/context/__init__.py").text.readLines()
+        def members = packageMembers(vfsFile("micronaut/context"), 2)
 
-        then: "the Java shims come first so the module can import them from its own package while it initializes"
-        initializer.indexOf("ApplicationContext = java.type('io.micronaut.context.ApplicationContext')") <
-            initializer.indexOf("from .helper import Helper")
-        initializer.indexOf("from . import annotation") < initializer.indexOf("from .helper import Helper")
-        initializer.last().startsWith('__all__ = ["ApplicationContext",')
-        initializer.last().contains('"annotation"')
-        initializer.last().endsWith('"Helper"]')
+        then: "the Java shims and the application module are contributed to the same package, whose initializer merges them (a module importing a Java type from its own package while it initializes is served by the merger)"
+        members.contains("java.type('io.micronaut.context.ApplicationContext')")
+        members.contains("from . import annotation")
+        members.contains("from .helper import Helper")
+        vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_merge_members")
         vfsFile("micronaut/context/helper.py").exists()
         vfsFile("micronaut/context/annotation/Executable.py").exists()
 
@@ -103,13 +101,12 @@ class Registry:
 
         when:
         compile()
-        def initializer = vfsFile("jakarta/inject/__init__.py").text.readLines()
+        def members = packageMembers(vfsFile("jakarta/inject"), 2)
 
         then:
-        initializer.indexOf("from .Singleton import Singleton") < initializer.indexOf("from .registry import Registry")
-        initializer.last().startsWith('__all__ = [')
-        initializer.last().contains('"Singleton"')
-        initializer.last().endsWith('"Registry"]')
+        members.contains("from .Singleton import Singleton")
+        members.contains("from .registry import Registry")
+        vfsFile("jakarta/inject/__init__.py").text.contains("__micronaut_merge_members")
 
         when:
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
@@ -167,7 +164,7 @@ class LoggingService:
 
         then:
         new File(targetDir, "app/LoggingService.class").exists()
-        vfsFile("org/slf4j/__init__.py").text.contains("LoggerFactory = java.type('org.slf4j.LoggerFactory')")
+        packageMembers(vfsFile("org/slf4j")).contains("LoggerFactory = java.type('org.slf4j.LoggerFactory')")
 
         when:
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
@@ -428,5 +425,18 @@ class Service:
 
     private File vfsFile(String relativePath) {
         new File(targetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}${relativePath}")
+    }
+
+    /**
+     * The members contributed to a package by the given number of contributions (the application modules of the
+     * package and the Java shims imported from it are contributed separately), written to members modules next to
+     * the initializer that merges them.
+     */
+    private static String packageMembers(File packageDirectory, int contributions = 1) {
+        def modules = packageDirectory.listFiles()
+            .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
+            .sort { it.name }
+        assert modules.size() == contributions : "${contributions} members module(s) expected in ${packageDirectory}: ${modules*.name}"
+        modules*.text.join('\n')
     }
 }
