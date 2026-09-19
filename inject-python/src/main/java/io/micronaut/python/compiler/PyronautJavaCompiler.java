@@ -108,6 +108,16 @@ final class PyronautJavaCompiler {
     private PythonProcessingSession pythonProcessingSession;
     private Set<String> incrementalPythonSources;
     private boolean processAggregatingPythonVisitors = true;
+    private CompilationProfiler profiler;
+
+    /**
+     * Sets the profiler of the compilation, or null when it is not profiled.
+     *
+     * @param profiler The profiler
+     */
+    void setProfiler(CompilationProfiler profiler) {
+        this.profiler = profiler;
+    }
 
     /**
      * Set the callback to be invoked for each class element created during processing.
@@ -217,12 +227,15 @@ final class PyronautJavaCompiler {
         }
 
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
-        ClassLoader classLoader = pythonProcessingSession == null
-            ? createAnnotationProcessorClassLoader(processorClasspath)
-            : pythonProcessingSession.classLoader(
-                processorClasspath,
-                () -> createAnnotationProcessorClassLoader(processorClasspath)
-            );
+        ClassLoader classLoader;
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            classLoader = pythonProcessingSession == null
+                ? createAnnotationProcessorClassLoader(processorClasspath)
+                : pythonProcessingSession.classLoader(
+                    processorClasspath,
+                    () -> createAnnotationProcessorClassLoader(processorClasspath)
+                );
+        }
         try {
             @SuppressWarnings({"rawtypes", "unchecked"})
             List<TypeElementVisitor<?, ?>> visitors = (List) SoftServiceLoader
@@ -410,12 +423,15 @@ final class PyronautJavaCompiler {
         List<File> processorClasspath = mergeClasspath(annotationProcessorPath, classpath);
         List<File> compileClasspath = effectiveClasspath(classpath);
         List<String> options = buildCompilerOptions(compileClasspath, bootclasspath, annotationProcessorPath, compilerOptions);
-        ClassLoader classLoader = pythonProcessingSession == null
-            ? createAnnotationProcessorClassLoader(processorClasspath)
-            : pythonProcessingSession.classLoader(
-                processorClasspath,
-                () -> createAnnotationProcessorClassLoader(processorClasspath)
-            );
+        ClassLoader classLoader;
+        try (var _ = CompilationProfiler.span(profiler, "javac.processor-class-loader")) {
+            classLoader = pythonProcessingSession == null
+                ? createAnnotationProcessorClassLoader(processorClasspath)
+                : pythonProcessingSession.classLoader(
+                    processorClasspath,
+                    () -> createAnnotationProcessorClassLoader(processorClasspath)
+                );
+        }
         System.setProperty(VisitorContext.MICRONAUT_PROCESSING_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         System.setProperty(MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER, StringUtils.TRUE);
         ClassLoader previous = Thread.currentThread().getContextClassLoader();
@@ -425,7 +441,7 @@ final class PyronautJavaCompiler {
             ? trackingFileManager.targetDirectory()
             : null;
         List<Processor> processors;
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "javac.processors")) {
             processors = getAnnotationProcessors(classLoader, outputDirectory);
         } catch (RuntimeException | LinkageError e) {
             if (pythonProcessingSession == null) {
@@ -449,6 +465,7 @@ final class PyronautJavaCompiler {
             IncrementalProcessorTracker processorTracker = null;
             if (task instanceof JavacTask javacTask) {
                 compilationTracker = new JavaCompilationTracker(javacTask);
+                compilationTracker.setProfiler(profiler);
                 javacTask.addTaskListener(compilationTracker);
                 if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
                     trackingFileManager.setSourceResolver(
@@ -469,7 +486,9 @@ final class PyronautJavaCompiler {
             if (!taskProcessors.isEmpty()) {
                 task.setProcessors(taskProcessors);
             }
-            success = task.call();
+            try (var _ = CompilationProfiler.span(profiler, "javac.task")) {
+                success = task.call();
+            }
             if (success) {
                 reportProcessorMessages(diagnosticCollector);
             }
@@ -1017,6 +1036,7 @@ final class PyronautJavaCompiler {
         pythonProcessor.setProcessAggregatingVisitors(processAggregatingPythonVisitors);
         pythonProcessor.setOutputDirectory(outputDirectory);
         pythonProcessor.setProcessingSession(pythonProcessingSession);
+        pythonProcessor.setProfiler(profiler);
         if (classElementCallback != null) {
             pythonProcessor.setClassElementCallback(classElementCallback);
         }

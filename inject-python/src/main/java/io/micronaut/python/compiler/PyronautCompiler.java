@@ -16,6 +16,7 @@
 package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.PythonSourceVisitor;
@@ -24,12 +25,14 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -80,6 +83,8 @@ public final class PyronautCompiler {
     private final PythonIncrementalMode pythonIncrementalMode;
     private final PythonProcessingSession pythonProcessingSession;
     private final Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
+    private final File profileReportFile;
+    private final Consumer<CompilationProfile> profileCallback;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -105,6 +110,8 @@ public final class PyronautCompiler {
         this.pythonIncrementalMode = builder.pythonIncrementalMode;
         this.pythonProcessingSession = builder.pythonProcessingSession;
         this.incrementalCompilationPlanCallback = builder.incrementalCompilationPlanCallback;
+        this.profileReportFile = builder.profileReportFile;
+        this.profileCallback = builder.profileCallback;
         validateConfiguration();
     }
 
@@ -136,13 +143,18 @@ public final class PyronautCompiler {
      * @throws IllegalStateException if processing fails
      */
     public ClassLoader buildClassLoader() {
-        PyronautJavaCompiler compiler = createCompiler();
+        CompilationProfiler profiler = createProfiler();
+        PyronautJavaCompiler compiler = createCompiler(profiler);
         if (classElementCallback != null) {
             compiler.setClassElementCallback(classElementCallback);
         }
-        JavaFileObject[] sources = createJavaSources();
-        Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+        try (var _ = CompilationProfiler.span(profiler, "compiler.build-class-loader")) {
+            JavaFileObject[] sources = createJavaSources();
+            Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+            return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+        } finally {
+            finishProfile(profiler);
+        }
     }
 
     private ClassLoader createRuntimeClassLoader() {
@@ -174,8 +186,16 @@ public final class PyronautCompiler {
         if (targetDir == null) {
             throw new IllegalStateException("targetDir must be specified for file system processing mode");
         }
+        CompilationProfiler profiler = createProfiler();
+        PyronautJavaCompiler compiler = createCompiler(profiler);
+        try (var _ = CompilationProfiler.span(profiler, "compiler.compile")) {
+            compile(compiler);
+        } finally {
+            finishProfile(profiler);
+        }
+    }
 
-        PyronautJavaCompiler compiler = createCompiler();
+    private void compile(PyronautJavaCompiler compiler) {
         if (!incremental) {
             JavaFileObject[] sources = createJavaSources();
             compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
@@ -332,13 +352,53 @@ public final class PyronautCompiler {
         return List.copyOf(options);
     }
 
-    private PyronautJavaCompiler createCompiler() {
+    private @Nullable CompilationProfiler createProfiler() {
+        if (profileReportFile == null && profileCallback == null) {
+            return null;
+        }
+        CompilationProfiler profiler = new CompilationProfiler();
+        profiler.attribute("target", targetDir == null ? "memory" : targetDir.getAbsolutePath());
+        profiler.attribute("incremental", Boolean.toString(incremental));
+        profiler.attribute("session", Boolean.toString(pythonProcessingSession != null));
+        return profiler;
+    }
+
+    private void finishProfile(@Nullable CompilationProfiler profiler) {
+        if (profiler == null) {
+            return;
+        }
+        if (targetDir != null) {
+            try (var _ = profiler.phase("compiler.inventory")) {
+                profiler.inventory(targetDir.toPath());
+            }
+        }
+        CompilationProfile profile = profiler.finish();
+        if (profileCallback != null) {
+            profileCallback.accept(profile);
+        }
+        if (profileReportFile != null) {
+            try {
+                Path report = profileReportFile.toPath().toAbsolutePath();
+                if (report.getParent() != null) {
+                    Files.createDirectories(report.getParent());
+                }
+                Files.writeString(report, profile.render() + System.lineSeparator(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to write the compilation profile to " + profileReportFile, e);
+            }
+        }
+    }
+
+    private PyronautJavaCompiler createCompiler(@Nullable CompilationProfiler profiler) {
         PyronautJavaCompiler compiler = new PyronautJavaCompiler();
         compiler.setVerboseErrors(verboseErrors);
         if (errorDumpDirectory != null) {
             compiler.setErrorDumpDirectory(errorDumpDirectory);
         }
-        compiler.setSourceSnapshots(createSourceSnapshots());
+        compiler.setProfiler(profiler);
+        try (var _ = CompilationProfiler.span(profiler, "compiler.source-snapshots")) {
+            compiler.setSourceSnapshots(createSourceSnapshots());
+        }
         compiler.setCompilePythonBytecode(compilePythonBytecode);
         compiler.setAnnotationProcessors(annotationProcessors);
         compiler.setPythonSourceVisitors(pythonSourceVisitors);
@@ -581,6 +641,8 @@ public final class PyronautCompiler {
         private PythonIncrementalMode pythonIncrementalMode = PythonIncrementalMode.CONSERVATIVE;
         private PythonProcessingSession pythonProcessingSession;
         private Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
+        private File profileReportFile;
+        private Consumer<CompilationProfile> profileCallback;
 
         private Builder() {
         }
@@ -871,6 +933,32 @@ public final class PyronautCompiler {
          */
         public Builder annotationProcessors(List<? extends Processor> annotationProcessors) {
             this.annotationProcessors = List.copyOf(annotationProcessors);
+            return this;
+        }
+
+        /**
+         * Profiles the compilation and appends the profile (phase timings, counters and the inventory of
+         * the output) to the given file, one block of {@code key=value} lines per compilation. Off by
+         * default: the compiler then records nothing.
+         *
+         * @param profileReportFile The file to append the profile to
+         * @return this builder
+         * @since 5.3.0
+         */
+        public Builder profileReportFile(File profileReportFile) {
+            this.profileReportFile = profileReportFile;
+            return this;
+        }
+
+        /**
+         * Profiles the compilation and hands the profile to the callback when it ends.
+         *
+         * @param profileCallback The callback
+         * @return this builder
+         * @since 5.3.0
+         */
+        public Builder profileCallback(Consumer<CompilationProfile> profileCallback) {
+            this.profileCallback = profileCallback;
             return this;
         }
 
