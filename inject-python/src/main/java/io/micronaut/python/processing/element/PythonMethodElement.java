@@ -624,7 +624,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (awaitedType.isVoid()) {
             return ClassElement.of(Void.class);
         }
-        if (!awaitedType.isPrimitive()) {
+        if (!awaitedType.isPrimitive() || awaitedType.isArray()) {
             return awaitedType;
         }
         return switch (awaitedType.getName()) {
