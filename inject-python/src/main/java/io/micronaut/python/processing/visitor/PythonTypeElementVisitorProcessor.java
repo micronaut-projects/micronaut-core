@@ -56,6 +56,8 @@ import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor;
+import io.micronaut.python.processing.PythonRuntimeMetadataWriter;
 import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
@@ -175,6 +177,10 @@ public final class PythonTypeElementVisitorProcessor {
         List<ClassElement> allClasses = collectClassElements(environment, pythonVisitorContext, sourceFilter);
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
+                if (loadedVisitor.getVisitor() instanceof IntrospectedTypeElementVisitor
+                    && PythonRuntimeMetadataWriter.isSelected(element, pythonVisitorContext)) {
+                    continue;
+                }
                 if (element.hasAnnotation(Generated.class)) {
                     continue;
                 }

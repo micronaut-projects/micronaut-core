@@ -32,6 +32,7 @@ import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.PythonRuntimeMetadataWriter;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.ObjectDef;
 
@@ -75,7 +76,8 @@ public final class PythonBeanDefinitionProcessor {
     private void processClassElement(ClassElement classElement, PythonVisitorContext visitorContext) {
         try {
             // Skip generated classes and vetoed classes
-            if (isGenerated(classElement) || isVetoed(classElement)) {
+            if (isGenerated(classElement) || isVetoed(classElement)
+                || PythonRuntimeMetadataWriter.isSelected(classElement, visitorContext)) {
                 return;
             }
 

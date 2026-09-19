@@ -553,6 +553,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             ClassLoader effectiveClassLoader = this.classLoader != null
                 ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
             Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
+            if (incrementalSources != null && PythonRuntimeMetadataWriter.isEnabled(processingEnvironment.visitorContext())) {
+                throw new ProcessingException(originatingElement, "Runtime metadata prototype requires a full Python compilation");
+            }
+            PythonRuntimeMetadataWriter.write(processingEnvironment);
             if (processAggregatingVisitors) {
                 try (var _ = CompilationProfiler.span(profiler, "python.visitors.aggregating")) {
                     PythonTypeElementVisitorProcessor aggregatingVisitors =
