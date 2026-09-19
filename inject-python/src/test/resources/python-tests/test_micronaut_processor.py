@@ -190,6 +190,32 @@ class Contract(Protocol):
         self.assertFalse(operations["concrete"].hasPlaceholderBody())
         self.assertTrue(classes["Contract"].functions()[0].isAbstract())
 
+    def test_docstrings_are_cleaned_like_inspect_getdoc(self):
+        visitor, items = visit("""
+class Llama:
+    \"\"\"
+    A llama.
+
+    Llamas are domesticated.
+        Indented line.
+    \"\"\"
+
+    name: str
+    \"\"\"
+        The name.
+    \"\"\"
+
+    def speak(self) -> str:
+        \"\"\"
+        Says hello.
+        \"\"\"
+        return "hello"
+""")
+        llama = [item for item in items if item.getClass().getSimpleName() == "ClassDef"][0]
+        self.assertEqual("A llama.\n\nLlamas are domesticated.\n    Indented line.", llama.documentation())
+        self.assertEqual("The name.", llama.attributes()[0].documentation())
+        self.assertEqual("Says hello.", llama.functions()[0].documentation())
+
     def test_python_defined_annotation_becomes_decorator_def(self):
         visitor, items = visit("""
 def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
