@@ -404,6 +404,9 @@ class _MicronautJavaImportFinder:
     Java package's path, so the Python modules in it import as usual.
     """
 
+    # identifies the finder across reloads of this module, which define the class anew
+    micronaut_java_import_finder = True
+
     def find_spec(self, fullname, path=None, target=None):
         imports = _micronaut_java_imports()
         java_name = imports.java_name(fullname)
@@ -439,9 +442,14 @@ class _MicronautJavaImportFinder:
 
 
 def __micronaut_install_java_import_finder():
-    """Installs the Java import finder ahead of the path finder, once per context."""
-    for finder in sys.meta_path:
-        if isinstance(finder, _MicronautJavaImportFinder):
+    """
+    Installs the Java import finder ahead of the path finder, once per context: a reload of this module
+    replaces the finder it installed before, so one finder serves and it runs the reloaded code.
+    """
+    for i, finder in enumerate(sys.meta_path):
+        if getattr(finder, 'micronaut_java_import_finder', False):
+            if not isinstance(finder, _MicronautJavaImportFinder):
+                sys.meta_path[i] = _MicronautJavaImportFinder()
             return
     index = len(sys.meta_path)
     for i, finder in enumerate(sys.meta_path):

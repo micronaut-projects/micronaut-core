@@ -87,12 +87,16 @@ public final class PythonContextRuntime {
         }
     };
     private static final String RUNTIME_MODULE_NAME = "micronaut_runtime";
+    private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
+    private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
+    /**
+     * The module serving the Java packages, types and annotations the compiled Python sources import; see
+     * {@link #installJavaImportFinder(Context)}.
+     */
     private static final String JAVA_IMPORTS_MODULE_NAME = "micronaut_java_imports";
     private static final String JAVA_IMPORTS_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_java_imports.py";
     private static final Source IMPORT_JAVA_IMPORTS_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + JAVA_IMPORTS_MODULE_NAME + "')", "micronaut-import-java-imports.py").cached(true).buildLiteral();
     private static final AtomicReference<@Nullable String> JAVA_IMPORTS_MODULE_FALLBACK_SOURCE = new AtomicReference<>();
-    private static final String RUNTIME_MODULE_RESOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_runtime.py";
-    private static final Source IMPORT_RUNTIME_MODULE_SOURCE = Source.newBuilder(PYTHON, "__import__('" + RUNTIME_MODULE_NAME + "')", "micronaut-import-runtime.py").cached(true).buildLiteral();
     private static final String INSTALL_RUNTIME_MODULE_FINDER = "__micronaut_install_runtime_module_finder";
     /**
      * Installs a meta path finder that serves runtime modules from their classpath source when the
