@@ -57,7 +57,7 @@ import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 import io.micronaut.inject.beans.visitor.IntrospectedTypeElementVisitor;
-import io.micronaut.python.processing.PythonRuntimeMetadataWriter;
+import io.micronaut.python.processing.metadata.PythonMetadataBackend;
 import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
@@ -178,7 +178,8 @@ public final class PythonTypeElementVisitorProcessor {
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
             for (ClassElement element : allClasses) {
                 if (loadedVisitor.getVisitor() instanceof IntrospectedTypeElementVisitor
-                    && PythonRuntimeMetadataWriter.isSelected(element, pythonVisitorContext)) {
+                    && PythonMetadataBackend.isSelected(element, pythonVisitorContext)) {
+                    // A model backend captures the introspection after all visitors, in the bean definition phase
                     continue;
                 }
                 if (element.hasAnnotation(Generated.class)) {

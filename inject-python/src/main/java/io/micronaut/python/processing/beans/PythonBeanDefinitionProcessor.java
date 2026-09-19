@@ -32,9 +32,12 @@ import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
-import io.micronaut.python.processing.PythonRuntimeMetadataWriter;
+import io.micronaut.python.processing.metadata.PythonMetadataBackend;
+import io.micronaut.python.processing.metadata.PythonMetadataModelBuilder;
+import io.micronaut.python.processing.metadata.PythonMetadataOutputs;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.ObjectDef;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Processor for creating bean definitions from Python classes.
@@ -46,6 +49,7 @@ import io.micronaut.sourcegen.model.ObjectDef;
 public final class PythonBeanDefinitionProcessor {
 
     private final Set<String> processed = new java.util.HashSet<>();
+    private @Nullable PythonMetadataOutputs metadataOutputs;
 
     public void processBeanDefinitions(
         PythonProcessingEnvironment processingEnvironment
@@ -65,19 +69,29 @@ public final class PythonBeanDefinitionProcessor {
         Predicate<ClassElement> sourceFilter
     ) {
         PythonVisitorContext visitorContext = processingEnvironment.visitorContext();
+        PythonMetadataBackend backend = PythonMetadataBackend.of(visitorContext);
+        metadataOutputs = backend.isModel() ? new PythonMetadataOutputs(backend) : null;
         for (ClassElement classElement : processingEnvironment.classes().values().stream().filter(sourceFilter).toList()) {
             processClassElement(classElement, visitorContext);
         }
         for (ClassElement classElement : processingEnvironment.scripts().values().stream().filter(sourceFilter).toList()) {
             processClassElement(classElement, visitorContext);
         }
+        if (metadataOutputs != null) {
+            metadataOutputs.finish(visitorContext);
+        }
     }
 
     private void processClassElement(ClassElement classElement, PythonVisitorContext visitorContext) {
         try {
             // Skip generated classes and vetoed classes
-            if (isGenerated(classElement) || isVetoed(classElement)
-                || PythonRuntimeMetadataWriter.isSelected(classElement, visitorContext)) {
+            if (isGenerated(classElement) || isVetoed(classElement)) {
+                return;
+            }
+            if (metadataOutputs != null && PythonMetadataBackend.isSelected(classElement, visitorContext)) {
+                // The model backends: the same analysis, recorded after every visitor ran, instead of emitted
+                new PythonMetadataModelBuilder(visitorContext).build(classElement)
+                    .ifPresent(model -> metadataOutputs.write(classElement, model, visitorContext));
                 return;
             }
 

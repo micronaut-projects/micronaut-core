@@ -13,15 +13,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * A versioned model as saved by the compiler.
  *
+ * @param formatVersion The format version the model was written with
+ * @param producer      The version of the compiler that wrote the model
+ * @param sourcePath    The Python source the class was compiled from, for diagnostics
+ * @param classModel    The class model
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
+public record PythonMetadataModel(int formatVersion, String producer, String sourcePath, ClassModel classModel) {
 
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+    /**
+     * The current format version.
+     */
+    public static final int FORMAT_VERSION = 1;
+}

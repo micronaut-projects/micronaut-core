@@ -1,1 +1,1 @@
-io.micronaut.context.python.runtime.RuntimePythonIntrospectionFallback
+io.micronaut.context.python.runtime.PythonRuntimeIntrospectionFallback

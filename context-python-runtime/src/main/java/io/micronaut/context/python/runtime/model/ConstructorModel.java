@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
+import java.util.List;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * The bean constructor.
  *
+ * @param annotationMetadata The constructor annotation metadata
+ * @param parameters         The parameters
+ * @param injectionPoints    The resolution strategy of each parameter, in order
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+public record ConstructorModel(AnnotationMetadataModel annotationMetadata, List<ArgumentModel> parameters,
+                               List<InjectionPointModel> injectionPoints) {
+}

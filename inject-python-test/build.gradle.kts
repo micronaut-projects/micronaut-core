@@ -63,13 +63,21 @@ tasks {
     }
 }
 
-val runtimeMetadataPrototypeClasspath by configurations.creating
+// The application class path of the separate-JVM tests: the Python runtime and the runtime metadata backend, and
+// neither compiler. The tests assert that no compiler, AST API or source generator class resolves on it.
+val pythonApplicationClasspath = configurations.create("pythonApplicationClasspath")
 dependencies {
-    runtimeMetadataPrototypeClasspath(projects.micronautContextPythonRuntime)
+    pythonApplicationClasspath(projects.micronautContextPython)
+    pythonApplicationClasspath(projects.micronautContextPythonRuntime)
 }
 tasks.withType<Test>().configureEach {
-    dependsOn(runtimeMetadataPrototypeClasspath)
+    dependsOn(pythonApplicationClasspath)
     doFirst {
-        systemProperty("runtimeMetadataPrototypeClasspath", runtimeMetadataPrototypeClasspath.asPath)
+        systemProperty("pythonApplicationClasspath", pythonApplicationClasspath.asPath)
+    }
+    // The metadata backend benchmark is opt-in: -Dpython.metadata.benchmark=true and its sizing properties
+    listOf("python.metadata.benchmark", "python.metadata.benchmark.modules", "python.metadata.benchmark.compileRounds",
+        "python.metadata.benchmark.startupRounds", "python.metadata.benchmark.report").forEach { name ->
+        System.getProperty(name)?.let { systemProperty(name, it) }
     }
 }

@@ -19,6 +19,8 @@ dependencies {
     api(mnSourcegen.micronaut.sourcegen.generator.java)
     api(mnSourcegen.micronaut.sourcegen.generator)
     api(mnSourcegen.micronaut.sourcegen.annotations)
+    // the resolved metadata model, its codec and the shared generator of the model backends
+    api(projects.micronautContextPythonRuntime)
     api(libs.managed.graalpy) {
         artifact {
             type = "pom"

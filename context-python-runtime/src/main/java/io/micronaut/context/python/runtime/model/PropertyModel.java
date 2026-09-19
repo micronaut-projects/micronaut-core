@@ -13,15 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
+import org.jspecify.annotations.Nullable;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * A bean property of an introspection.
  *
+ * @param name        The property name
+ * @param argument    The property type, generics and annotation metadata
+ * @param readMethod  The read method, if readable
+ * @param writeMethod The write method, if writable
+ * @param readOnly    Whether the property is read only
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+public record PropertyModel(String name, ArgumentModel argument, @Nullable MethodModel readMethod,
+                            @Nullable MethodModel writeMethod, boolean readOnly) {
+}

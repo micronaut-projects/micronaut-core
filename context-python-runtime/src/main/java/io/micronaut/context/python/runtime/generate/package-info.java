@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * Bytecode generation of definitions and introspections from the resolved model, shared by the build-time and the
+ * runtime backend. The generator depends on ASM and the Micronaut runtime only.
  *
  * @since 5.3.0
  */
 @Internal
 @NullMarked
-package io.micronaut.context.python.runtime;
+package io.micronaut.context.python.runtime.generate;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullMarked;

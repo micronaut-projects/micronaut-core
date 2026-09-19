@@ -15,52 +15,54 @@
  */
 package io.micronaut.context.python.runtime;
 
-import io.micronaut.context.RuntimeBeanDefinition;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import jakarta.inject.Singleton;
+import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.beans.BeanIntrospectionReference;
 
-import java.util.Optional;
-
-/** Shared behavior for actual runtime-generated bean definition subclasses. */
+/**
+ * The lightweight reference of a runtime-generated introspection: discoverable and filterable from the saved model,
+ * generated on first load.
+ *
+ * @since 5.3.0
+ */
 @Internal
-public abstract class RuntimePythonBeanDefinition implements RuntimeBeanDefinition<Object> {
+public final class PythonRuntimeIntrospectionReference implements BeanIntrospectionReference<Object> {
+
     private final Class<Object> beanType;
-    private final AnnotationMetadata metadata;
 
-    /**
-     * Initializes shared definition metadata.
-     *
-     * @param beanType The wrapper class described by this definition
-     */
     @SuppressWarnings("unchecked")
-    protected RuntimePythonBeanDefinition(Class<?> beanType) {
+    PythonRuntimeIntrospectionReference(Class<?> beanType) {
         this.beanType = (Class<Object>) beanType;
-        metadata = RuntimePythonModel.metadata(true);
     }
 
     @Override
-    public final Class<Object> getBeanType() {
-        return beanType;
-    }
-
-    @Override
-    public final String getBeanDefinitionName() {
-        return getClass().getName();
-    }
-
-    @Override
-    public final boolean isSingleton() {
+    public boolean isPresent() {
         return true;
     }
 
     @Override
-    public final Optional<String> getScopeName() {
-        return Optional.of(Singleton.class.getName());
+    public Class<Object> getBeanType() {
+        return beanType;
     }
 
     @Override
-    public final AnnotationMetadata getAnnotationMetadata() {
-        return metadata;
+    public BeanIntrospection<Object> load() {
+        return PythonRuntimeMetadata.introspection(beanType);
+    }
+
+    @Override
+    public AnnotationMetadata getAnnotationMetadata() {
+        return PythonRuntimeMetadata.annotationMetadata(beanType);
+    }
+
+    @Override
+    public String getName() {
+        return beanType.getName();
+    }
+
+    @Override
+    public String toString() {
+        return "PythonRuntimeIntrospectionReference(" + beanType.getName() + ")";
     }
 }

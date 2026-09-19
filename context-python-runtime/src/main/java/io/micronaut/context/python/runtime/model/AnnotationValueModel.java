@@ -13,15 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
+import java.util.Map;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * A nested annotation value.
  *
+ * @param annotationName The annotation name
+ * @param values         The member values, in declaration order
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+public record AnnotationValueModel(String annotationName, Map<String, Object> values) {
+}

@@ -13,15 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * A class-valued annotation member, by name. The class is resolved by the backend, never by the codec.
  *
+ * @param name The binary class name
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+public record ClassValueModel(String name) {
+}

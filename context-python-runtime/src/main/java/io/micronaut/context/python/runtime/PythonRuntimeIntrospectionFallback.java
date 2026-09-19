@@ -21,20 +21,27 @@ import io.micronaut.core.beans.BeanIntrospectionFallback;
 
 import java.util.Optional;
 
-/** Generates introspections only for classes with an explicit compiler-written runtime model. */
+/**
+ * Known-class lookup of runtime-generated introspections, for introspectors that never went through a context and
+ * therefore have no composed provider. A claimed class whose generation fails is an error, not a lookup miss.
+ *
+ * @since 5.3.0
+ */
 @Internal
-public final class RuntimePythonIntrospectionFallback implements BeanIntrospectionFallback {
-    /** Creates a fallback for compiler-written Python runtime models. */
-    public RuntimePythonIntrospectionFallback() {
+public final class PythonRuntimeIntrospectionFallback implements BeanIntrospectionFallback {
+
+    /**
+     * Creates the fallback.
+     */
+    public PythonRuntimeIntrospectionFallback() {
+        PythonRuntimeIntrospectionsProvider.install();
     }
 
     @Override
     @SuppressWarnings("unchecked")
     public <T> Optional<BeanIntrospection<T>> findIntrospection(Class<T> beanType) {
-        ClassLoader loader = beanType.getClassLoader();
-        if (loader == null || loader.getResource(RuntimePythonModel.PATH + beanType.getName() + ".properties") == null) {
-            return Optional.empty();
-        }
-        return Optional.of((BeanIntrospection<T>) RuntimePythonMetadata.introspection(beanType));
+        return PythonRuntimeMetadata.findModel(beanType)
+            .filter(model -> model.classModel().introspection() != null)
+            .map(model -> (BeanIntrospection<T>) PythonRuntimeMetadata.introspection(beanType));
     }
 }

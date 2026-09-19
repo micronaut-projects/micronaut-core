@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * The resolved metadata backends of the Python compiler: capturing the model of a class after all visitors ran, and
+ * emitting it as class files at build time or as a saved model for runtime generation.
  *
  * @since 5.3.0
  */
 @Internal
 @NullMarked
-package io.micronaut.context.python.runtime;
+package io.micronaut.python.processing.metadata;
 
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.NullMarked;

@@ -13,15 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package io.micronaut.context.python.runtime.model;
+
+import java.util.List;
+
 /**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
+ * An array-valued annotation member with a recorded component kind, so that the backend materializes the same array
+ * type the build-time writer would have emitted.
  *
+ * @param componentKind The component kind
+ * @param primitive     Whether the component type is primitive
+ * @param elements      The elements
  * @since 5.3.0
  */
-@Internal
-@NullMarked
-package io.micronaut.context.python.runtime;
-
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+public record ArrayValueModel(ValueKind componentKind, boolean primitive, List<Object> elements) {
+}

@@ -13,15 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-/**
- * Runtime generation of Python bean definitions and introspections from the resolved metadata the compiler saved.
- * The types of this package are implementation details of the experimental runtime generation mode.
- *
- * @since 5.3.0
- */
-@Internal
-@NullMarked
 package io.micronaut.context.python.runtime;
 
-import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.NullMarked;
+/**
+ * A dependency of the sample bean.
+ */
+public class SampleDependency {
+}
