@@ -236,7 +236,7 @@ class Dto${i}:
         BACKENDS.each { backend ->
             report.inventory[backend].sort { it.key }.each { kind, v -> md << "| $backend | $kind | ${v.files} | ${v.bytes} |\n" }
         }
-        md << "\n## Startup and first use in a fresh JVM (ms, medians; fallback interpreter)\n\n"
+        md << "\n## Startup and first use in a fresh JVM (ms, medians; Truffle runtime: ${runtimes.join(', ')})\n\n"
         ['few', 'many'].each { scenario ->
             md << "### Scenario: $scenario\n\n| backend | context start | first bean | all beans | first introspection | all introspections | warm start | generated classes | loaded classes | heap after GC (MB) | JVM wall |\n|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|\n"
             BACKENDS.each { backend ->

@@ -18,28 +18,36 @@ within every round. The `few` scenario resolves one bean and one introspection; 
 bean and introspection. Both scenarios ask the context for all bean definitions once, which loads (and, in the
 runtime backend, generates) every definition; the generated-class counts include them.
 
-Commit `f3aecece839c4717d4b00da4a47c7c7e3e14f702` (this branch), Sourcegen 2.1.0, ASM 9.10.1, Gradle 9.7.1, the
-Micronaut version below is the one the built runtime reports. The Truffle JIT could not be measured: this JDK is
-not a GraalVM and the Graal compiler is not on the class path, so every run uses GraalPy's fallback interpreter.
+Commit `ab2d944ac8753e9328775b7048e2973182a70561` (this branch), Sourcegen 2.1.0, ASM 9.10.1, Gradle 9.7.1, the
+Micronaut version below is the one the built runtime reports.
+
+Measured on Oracle GraalVM 25.0.4, and still without the Truffle JIT. Each measured JVM reports the Truffle runtime
+it resolved, and every run of this set reports `Interpreted`. GraalPy gives the reason itself: `The polyglot engine
+uses a fallback runtime that does not support runtime compilation to native code. The following cause was found:
+Version check failed.` The Python runtime of this repository is GraalPy 25.3.4.1, whose Truffle requires a Graal
+compiler of its own version, and the newest GraalVM published for JDK 25 carries the 25.0 compiler. A JIT run needs
+a 25.3-aligned GraalVM. The numbers below therefore measure the same interpreted Python runtime as the earlier
+Temurin set, on a different JDK; the Python costs they are dominated by would be much smaller with a JIT, which
+would make the differences between the backends more visible, not less.
 
 ## Reading the numbers
 
 - Compilation time is the same for the three backends within the noise of this machine: the compiler and runtime
-  medians are 5.3 s and 5.2 s, and every backend's own spread (5.0 s to 22.7 s) dwarfs the difference between
+  medians are 6.0 s and 5.8 s, and every backend's own spread (5.1 s to 23.1 s) dwarfs the difference between
   them, first compilations of a session included. Emitting the metadata classes is not where the Python compiler
   spends its time.
 - The runtime backend ships 644 KB fewer class bytes (no definition or introspection classes, no 120 service
   entries) and 144 KB of models and catalog instead. The build-time model backend's classes are 40% smaller than
   the compiler's (252 KB against 368 KB of definitions, 124 KB against 276 KB of introspections: they initialize
   from the model instead of carrying the metadata as bytecode) but its output also carries the models.
-- Context start (4.4 s, dominated by creating the GraalPy context and its first import) and first bean (3.3 s to
-  3.7 s, the Python side of the first bean) do not move. The runtime backend's context start is inside the spread
-  of the other two.
-- The first introspection is faster in the runtime backend (9 ms against 23 ms and 29 ms): materializing one
+- Context start (4.5 s to 4.7 s, dominated by creating the GraalPy context and its first import) and first bean
+  (4.3 s to 4.6 s, the Python side of the first bean) do not move. The runtime backend's context start is inside
+  the spread of the other two.
+- The first introspection is faster in the runtime backend (9.6 ms against 16.8 ms and 27.4 ms): materializing one
   model and defining one class is cheaper than initializing the compiler's introspection class. Resolving all 40
-  introspections is slower (64 ms against 29 ms and 21 ms): about 1.6 ms of generation per class against class
+  introspections is slower (65 ms against 34 ms and 28 ms): about 1.6 ms of generation per class against class
   loading. Neither is visible next to the Python costs.
-- Retained heap after GC differs by about 1 MB (42.5 MB against 41.4 MB) with 120 generated classes, and the
+- Retained heap after GC differs by about 1 MB (42.9 MB against 41.6 MB) with 120 generated classes, and the
   loaded-class count by about 85 classes (the runtime module and ASM).
 
 No startup or memory benefit is claimed from these runs; the benefits established are the smaller packaged
@@ -49,22 +57,23 @@ the compilation time is.
 
 # Python metadata backends: measurements
 
-- java: OpenJDK 64-Bit Server VM 25.0.4.1+1-LTS
+- java: Java HotSpot(TM) 64-Bit Server VM 25.0.4+7-LTS-jvmci-b01
 - os: Linux amd64
 - cpus: 4
-- commit: f3aecece839c4717d4b00da4a47c7c7e3e14f702
+- commit: ab2d944ac8753e9328775b7048e2973182a70561
 - graalpy: 25.3.4.1
-- pythonRuntime: GraalPy fallback interpreter (no Truffle JIT on this JDK: the Graal compiler is not on the class path)
 - micronaut: 5.2.3-SNAPSHOT
 - fixture: [modules:40, beans:80, introspections:40]
+
+- pythonRuntime: GraalPy on the Truffle runtime the measured JVMs resolved: Interpreted
 
 ## Compilation (ms, 3 alternating rounds per backend)
 
 | backend | median | min | max |
 |---|---:|---:|---:|
-| compiler | 5332.4 | 5111.4 | 22684.7 |
-| model-build-time | 7274.8 | 5001.4 | 11591.4 |
-| model-runtime | 5230.9 | 5147.3 | 8069.9 |
+| compiler | 5952.4 | 5711.7 | 23100.1 |
+| model-build-time | 6260.3 | 5077.1 | 9095.5 |
+| model-runtime | 5795.1 | 5537.7 | 7325.2 |
 
 ## Output inventory
 
@@ -75,7 +84,7 @@ the compilation time is.
 | compiler | pythonResources | 84 | 392264 |
 | compiler | serviceEntries | 120 | 0 |
 | compiler | targetTypeMappings | 600 | 685941 |
-| compiler | wrapperClasses | 121 | 540900 |
+| compiler | wrapperClasses | 121 | 540901 |
 | compiler | wrapperSources | 120 | 634656 |
 | model-build-time | definitions | 80 | 252390 |
 | model-build-time | introspections | 40 | 123533 |
@@ -83,30 +92,30 @@ the compilation time is.
 | model-build-time | pythonResources | 84 | 392264 |
 | model-build-time | serviceEntries | 120 | 0 |
 | model-build-time | targetTypeMappings | 600 | 685941 |
-| model-build-time | wrapperClasses | 121 | 540900 |
+| model-build-time | wrapperClasses | 121 | 540901 |
 | model-build-time | wrapperSources | 120 | 634656 |
 | model-runtime | catalog | 1 | 9450 |
 | model-runtime | models | 120 | 134891 |
 | model-runtime | pythonResources | 84 | 392264 |
 | model-runtime | targetTypeMappings | 600 | 685941 |
-| model-runtime | wrapperClasses | 121 | 540900 |
+| model-runtime | wrapperClasses | 121 | 540901 |
 | model-runtime | wrapperSources | 120 | 634656 |
 
-## Startup and first use in a fresh JVM (ms, medians; fallback interpreter)
+## Startup and first use in a fresh JVM (ms, medians; Truffle runtime: Interpreted)
 
 ### Scenario: few
 
 | backend | context start | first bean | all beans | first introspection | all introspections | warm start | generated classes | loaded classes | heap after GC (MB) | JVM wall |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| compiler | 4440.7 | 3606.3 | 0.0 | 24.5 | 0.9 | 1523.3 | 0.0 | 21870.0 | 41.0 | 12492.0 |
-| model-build-time | 4512.6 | 3735.2 | 0.0 | 29.0 | 1.1 | 1914.5 | 0.0 | 21919.0 | 42.1 | 12353.0 |
-| model-runtime | 4442.6 | 3559.9 | 0.0 | 9.0 | 0.5 | 1621.9 | 81.0 | 21915.0 | 42.1 | 12343.0 |
+| compiler | 4782.6 | 4634.0 | 0.1 | 20.1 | 1.6 | 2336.0 | 0.0 | 22030.0 | 41.4 | 15593.0 |
+| model-build-time | 4488.0 | 4383.6 | 0.0 | 27.4 | 1.0 | 2870.6 | 0.0 | 22080.0 | 42.9 | 15667.0 |
+| model-runtime | 4627.6 | 4373.8 | 0.0 | 9.5 | 0.5 | 2588.3 | 81.0 | 22074.0 | 42.7 | 15530.0 |
 
 ### Scenario: many
 
 | backend | context start | first bean | all beans | first introspection | all introspections | warm start | generated classes | loaded classes | heap after GC (MB) | JVM wall |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| compiler | 4357.1 | 3325.1 | 61.6 | 23.1 | 29.1 | 1556.1 | 0.0 | 21868.0 | 41.4 | 11886.0 |
-| model-build-time | 4474.3 | 3527.4 | 61.5 | 29.0 | 20.6 | 1509.4 | 0.0 | 21917.0 | 42.3 | 12436.0 |
-| model-runtime | 4453.6 | 3638.3 | 62.9 | 8.5 | 64.0 | 1479.1 | 120.0 | 21953.0 | 42.5 | 12078.0 |
+| compiler | 4531.2 | 4488.7 | 79.7 | 16.8 | 33.7 | 2337.6 | 0.0 | 22032.0 | 41.6 | 15551.0 |
+| model-build-time | 4581.3 | 4307.0 | 81.2 | 27.4 | 28.4 | 2474.6 | 0.0 | 22077.0 | 42.4 | 15383.0 |
+| model-runtime | 4665.8 | 4422.5 | 76.6 | 9.6 | 65.5 | 2311.5 | 120.0 | 22115.0 | 42.9 | 15430.0 |
 
