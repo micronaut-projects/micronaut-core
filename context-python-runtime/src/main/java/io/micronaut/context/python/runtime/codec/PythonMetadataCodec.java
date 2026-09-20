@@ -318,6 +318,10 @@ public final class PythonMetadataCodec {
                     argument(beanMethod.returnArgument());
                     annotationMetadata(beanMethod.annotationMetadata());
                 }
+                out.writeBoolean(introspection.creator() != null);
+                if (introspection.creator() != null) {
+                    method(introspection.creator());
+                }
                 out.writeBoolean(introspection.enumConstants() != null);
                 if (introspection.enumConstants() != null) {
                     out.writeInt(introspection.enumConstants().size());
@@ -586,6 +590,7 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < beanMethodCount; i++) {
                     beanMethods.add(new BeanMethodModel(method(), argument(), annotationMetadata()));
                 }
+                MethodModel creator = in.readBoolean() ? method() : null;
                 List<EnumConstantModel> enumConstants = null;
                 if (in.readBoolean()) {
                     int constantCount = count("enum constant");
@@ -596,7 +601,7 @@ public final class PythonMetadataCodec {
                     enumConstants = List.copyOf(enumConstants);
                 }
                 introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments,
-                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants);
+                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, creator);
             }
             return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }

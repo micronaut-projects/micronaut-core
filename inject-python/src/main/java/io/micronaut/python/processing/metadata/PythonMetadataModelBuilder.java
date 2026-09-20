@@ -192,7 +192,7 @@ public final class PythonMetadataModelBuilder {
             // An enum is never instantiated by the introspection: the constants are the instances
             String enumIntrospectionName = introspectionName(classElement);
             return new IntrospectionModel(enumIntrospectionName, AnnotationMetadataModel.EMPTY, List.of(),
-                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants);
+                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, null);
         }
         MethodElement constructor = classElement.getPrimaryConstructor().orElse(null);
         MethodElement defaultConstructor = classElement.getDefaultConstructor().orElse(null);
@@ -200,16 +200,14 @@ public final class PythonMetadataModelBuilder {
         if (instantiating == null) {
             throw unsupported(classElement, "an introspected class without a constructor");
         }
-        if (instantiating.isStatic()) {
-            throw unsupported(classElement, "a static creator method");
-        }
+        MethodModel creator = instantiating.isStatic() ? method(classElement, classElement, instantiating) : null;
         List<ArgumentModel> constructorArguments = new ArrayList<>();
         for (ParameterElement parameter : instantiating.getParameters()) {
             constructorArguments.add(argument(classElement, parameter.getName(), parameter.getGenericType(), parameter.getAnnotationMetadata()));
         }
         String introspectionName = introspectionName(classElement);
         return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
-            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null);
+            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null, creator);
     }
 
     private String introspectionName(ClassElement classElement) {

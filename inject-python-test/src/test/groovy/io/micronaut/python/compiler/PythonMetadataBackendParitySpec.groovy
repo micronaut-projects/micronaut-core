@@ -41,7 +41,7 @@ from typing import Annotated, Optional
 from jakarta.inject import Singleton, Inject, Named
 from jakarta.annotation import PostConstruct, PreDestroy
 from jakarta.validation.constraints import NotBlank, Min
-from micronaut.core.annotation import Introspected
+from micronaut.core.annotation import Introspected, Creator
 from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean, Context, ConfigurationProperties
 from micronaut.http.annotation import Controller, Get, QueryValue
 from micronaut.context import BeanRegistration
@@ -212,6 +212,18 @@ class Feature:
         pass
 
 @Introspected
+class Ticket:
+    code: str
+
+    def __init__(self, code: str):
+        self.code = code
+
+    @staticmethod
+    @Creator
+    def issue(code: str) -> "Ticket":
+        return Ticket("issued-" + code)
+
+@Introspected
 class Fuel(Enum):
     PETROL = "petrol"
     DIESEL = "diesel"
@@ -284,7 +296,7 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig|Fuel)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig|Fuel|Ticket)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
@@ -295,14 +307,14 @@ class Person:
                                              'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class', 'garage/$Fuel$Introspection.class',
                                              'garage/$Garage$Definition.class', 'garage/$GarageConfig$Definition.class', 'garage/$GarageConfig$Introspection.class',
                                              'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
-                                             'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class',
+                                             'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class', 'garage/$Ticket$Introspection.class',
                                              'garage/$Trip$Definition.class']
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
         models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Fuel', 'garage.Garage', 'garage.GarageConfig',
                                    'garage.GarageController',
-                                   'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
+                                   'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Ticket', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class of its own and no service entry, and a catalog instead'
         // Two artifacts are generated from Java classes that a visitor adds for a Python class, by the ordinary Java
@@ -448,6 +460,10 @@ class Person:
             def fuel = introspector.getIntrospection(loader.loadClass('garage.Fuel'))
             result['fuel'] = introspection(fuel)
             result['fuel.constants'] = fuel.constants.collect { [it.value.name(), it.annotationMetadata.annotationNames.sort()] }
+            def ticket = introspector.getIntrospection(loader.loadClass('garage.Ticket'))
+            result['ticket'] = introspection(ticket)
+            result['ticket.instantiate'] = ticket.instantiate('abc').code
+            result['ticket.staticCreator'] = ticket.constructor.arguments*.name
             result['introspected'] = introspector.findIntrospectedTypes { it.name.startsWith('garage.') }*.name.sort()
             result['introspections.enumerated'] = introspector.findIntrospections { it.name.startsWith('garage.') }*.beanType*.name.sort()
             def person = introspector.getIntrospection(loader.loadClass('garage.Person'))

@@ -598,28 +598,43 @@ public final class PythonMetadataClassGenerator {
             return writer.toByteArray();
         }
         booleanMethod(writer, "hasConstructor", "()Z", true);
+        MethodModel creator = introspection.creator();
+        if (creator != null) {
+            // A static creator: the bean is not created through a constructor of its type
+            booleanMethod(writer, "isStaticCreator", "()Z", true);
+        }
         List<ArgumentModel> constructorArguments = introspection.constructorArguments();
         if (constructorArguments.isEmpty()) {
             MethodVisitor instantiate = writer.visitMethod(Opcodes.ACC_PUBLIC, "instantiate", "()" + OBJECT_DESC, null, null);
             instantiate.visitCode();
-            instantiate.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
-            instantiate.visitInsn(Opcodes.DUP);
-            instantiate.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", "()V", false);
+            if (creator == null) {
+                instantiate.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
+                instantiate.visitInsn(Opcodes.DUP);
+                instantiate.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", "()V", false);
+            } else {
+                invoke(instantiate, creator);
+            }
             instantiate.visitInsn(Opcodes.ARETURN);
             instantiate.visitMaxs(0, 0);
             instantiate.visitEnd();
         }
         MethodVisitor internal = writer.visitMethod(Opcodes.ACC_PROTECTED, "instantiateInternal", "([" + OBJECT_DESC + ")" + OBJECT_DESC, null, null);
         internal.visitCode();
-        internal.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
-        internal.visitInsn(Opcodes.DUP);
+        if (creator == null) {
+            internal.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
+            internal.visitInsn(Opcodes.DUP);
+        }
         for (int i = 0; i < constructorArguments.size(); i++) {
             internal.visitVarInsn(Opcodes.ALOAD, 1);
             pushInt(internal, i);
             internal.visitInsn(Opcodes.AALOAD);
             convert(internal, constructorArguments.get(i).typeName());
         }
-        internal.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", descriptor(constructorArguments, "void"), false);
+        if (creator == null) {
+            internal.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", descriptor(constructorArguments, "void"), false);
+        } else {
+            invoke(internal, creator);
+        }
         internal.visitInsn(Opcodes.ARETURN);
         internal.visitMaxs(0, 0);
         internal.visitEnd();
