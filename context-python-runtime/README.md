@@ -117,7 +117,8 @@ types and candidate selection; `@Context` eager initialization; type arguments o
 it (`$Factory$Method<n>$Definition`), instantiated by looking the factory bean up through the resolution context
 (qualified by the factory class) and invoking the method, with the method's own annotation metadata over the
 factory class's, its parameters as injection points, `@Bean(preDestroy = ...)` lifecycle methods and
-`@Bean(typed = ...)` exposed types. A `@Named` without a value takes its implicit value, as the writer applies it:
+`@Bean(typed = ...)` exposed types. A Python attribute annotated with `@Bean` is a factory method of its accessor,
+so a factory field, which the language cannot express, stays rejected. A `@Named` without a value takes its implicit value, as the writer applies it:
 the decapitalized simple name of a class, or the name of a factory method, injected method parameter or
 constructor parameter. Introspections: constructors with arguments, readable, writable and read-only properties of
 any type, generics, property annotation metadata, property indexes, `@Executable` bean methods, enums with their
@@ -132,7 +133,7 @@ pipeline, identically in all three backends. The output of the runtime backend t
 introspection class and its service entry (asserted by the parity harness), and nothing else of the metadata.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
-fallback): factory fields, AOP around and introduction proxies (including `@Validated` constraints on bean
+fallback): AOP around and introduction proxies (including `@Validated` constraints on bean
 methods), configuration builders, iterable beans (`@EachProperty`, `@EachBean`), `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder, targetPackage)`,
 which all ask for the introspection of another class, and incremental compilation of the model backends. The model
