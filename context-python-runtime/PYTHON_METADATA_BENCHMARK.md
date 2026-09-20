@@ -18,29 +18,29 @@ within every round. The `few` scenario resolves one bean and one introspection; 
 bean and introspection. Both scenarios ask the context for all bean definitions once, which loads (and, in the
 runtime backend, generates) every definition; the generated-class counts include them.
 
-Commit `604b891aa0bf4b8aff5d409840e1d062e5d6292c` (this branch), Sourcegen 2.1.0, ASM 9.10.1, Gradle 9.7.1, the
+Commit `f3aecece839c4717d4b00da4a47c7c7e3e14f702` (this branch), Sourcegen 2.1.0, ASM 9.10.1, Gradle 9.7.1, the
 Micronaut version below is the one the built runtime reports. The Truffle JIT could not be measured: this JDK is
 not a GraalVM and the Graal compiler is not on the class path, so every run uses GraalPy's fallback interpreter.
 
 ## Reading the numbers
 
-- Compilation time is the same for the three backends: the medians are within 0.3 s of each other for a 4.5 s
-  compilation, and the spread of a backend is larger than the difference between backends (the compiler backend's
-  15 s outlier is the first compilation of the session, before the worker warmed up). Emitting the metadata
-  classes is not where the Python compiler spends its time.
+- Compilation time is the same for the three backends within the noise of this machine: the compiler and runtime
+  medians are 5.3 s and 5.2 s, and every backend's own spread (5.0 s to 22.7 s) dwarfs the difference between
+  them, first compilations of a session included. Emitting the metadata classes is not where the Python compiler
+  spends its time.
 - The runtime backend ships 644 KB fewer class bytes (no definition or introspection classes, no 120 service
-  entries) and 140 KB of models and catalog instead. The build-time model backend's classes are 40% smaller than
-  the compiler's (they initialize from the model instead of carrying the metadata as bytecode) but its output also
-  carries the models.
-- Context start (3.9 s, dominated by creating the GraalPy context and its first import) and first bean (3.0 s,
-  the Python side of the first bean) do not move. Generating 80 definitions during context start costs nothing
-  measurable: the runtime backend's context start is inside the spread of the other two.
-- The first introspection is faster in the runtime backend (6 ms against 21 ms and 35 ms): materializing one
+  entries) and 144 KB of models and catalog instead. The build-time model backend's classes are 40% smaller than
+  the compiler's (252 KB against 368 KB of definitions, 124 KB against 276 KB of introspections: they initialize
+  from the model instead of carrying the metadata as bytecode) but its output also carries the models.
+- Context start (4.4 s, dominated by creating the GraalPy context and its first import) and first bean (3.3 s to
+  3.7 s, the Python side of the first bean) do not move. The runtime backend's context start is inside the spread
+  of the other two.
+- The first introspection is faster in the runtime backend (9 ms against 23 ms and 29 ms): materializing one
   model and defining one class is cheaper than initializing the compiler's introspection class. Resolving all 40
-  introspections is slower (65 ms against 29 ms and 19 ms): about 1.6 ms of generation per class against class
+  introspections is slower (64 ms against 29 ms and 21 ms): about 1.6 ms of generation per class against class
   loading. Neither is visible next to the Python costs.
 - Retained heap after GC differs by about 1 MB (42.5 MB against 41.4 MB) with 120 generated classes, and the
-  loaded-class count by about 30 classes (the runtime module and ASM).
+  loaded-class count by about 85 classes (the runtime module and ASM).
 
 No startup or memory benefit is claimed from these runs; the benefits established are the smaller packaged
 output and the removal of the metadata classes from the build, at no measurable cost. The plan's other
@@ -52,7 +52,7 @@ the compilation time is.
 - java: OpenJDK 64-Bit Server VM 25.0.4.1+1-LTS
 - os: Linux amd64
 - cpus: 4
-- commit: 604b891aa0bf4b8aff5d409840e1d062e5d6292c
+- commit: f3aecece839c4717d4b00da4a47c7c7e3e14f702
 - graalpy: 25.3.4.1
 - pythonRuntime: GraalPy fallback interpreter (no Truffle JIT on this JDK: the Graal compiler is not on the class path)
 - micronaut: 5.2.3-SNAPSHOT
@@ -62,9 +62,9 @@ the compilation time is.
 
 | backend | median | min | max |
 |---|---:|---:|---:|
-| compiler | 4530.3 | 4447.8 | 15163.4 |
-| model-build-time | 4856.6 | 4274.1 | 6070.2 |
-| model-runtime | 4557.6 | 4326.8 | 4977.7 |
+| compiler | 5332.4 | 5111.4 | 22684.7 |
+| model-build-time | 7274.8 | 5001.4 | 11591.4 |
+| model-runtime | 5230.9 | 5147.3 | 8069.9 |
 
 ## Output inventory
 
@@ -75,21 +75,21 @@ the compilation time is.
 | compiler | pythonResources | 84 | 392264 |
 | compiler | serviceEntries | 120 | 0 |
 | compiler | targetTypeMappings | 600 | 685941 |
-| compiler | wrapperClasses | 121 | 540901 |
+| compiler | wrapperClasses | 121 | 540900 |
 | compiler | wrapperSources | 120 | 634656 |
-| model-build-time | definitions | 80 | 248448 |
+| model-build-time | definitions | 80 | 252390 |
 | model-build-time | introspections | 40 | 123533 |
-| model-build-time | models | 120 | 131269 |
+| model-build-time | models | 120 | 134891 |
 | model-build-time | pythonResources | 84 | 392264 |
 | model-build-time | serviceEntries | 120 | 0 |
 | model-build-time | targetTypeMappings | 600 | 685941 |
-| model-build-time | wrapperClasses | 121 | 540901 |
+| model-build-time | wrapperClasses | 121 | 540900 |
 | model-build-time | wrapperSources | 120 | 634656 |
 | model-runtime | catalog | 1 | 9450 |
-| model-runtime | models | 120 | 131269 |
+| model-runtime | models | 120 | 134891 |
 | model-runtime | pythonResources | 84 | 392264 |
 | model-runtime | targetTypeMappings | 600 | 685941 |
-| model-runtime | wrapperClasses | 121 | 540901 |
+| model-runtime | wrapperClasses | 121 | 540900 |
 | model-runtime | wrapperSources | 120 | 634656 |
 
 ## Startup and first use in a fresh JVM (ms, medians; fallback interpreter)
@@ -98,15 +98,15 @@ the compilation time is.
 
 | backend | context start | first bean | all beans | first introspection | all introspections | warm start | generated classes | loaded classes | heap after GC (MB) | JVM wall |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| compiler | 3900.3 | 3001.9 | 0.0 | 21.2 | 3.1 | 1448.9 | 0.0 | 21868.0 | 41.4 | 10722.0 |
-| model-build-time | 4012.7 | 2942.9 | 0.0 | 35.3 | 0.9 | 1419.8 | 0.0 | 21901.0 | 42.3 | 10694.0 |
-| model-runtime | 3883.6 | 2943.2 | 0.0 | 6.6 | 0.4 | 1699.0 | 81.0 | 21900.0 | 41.9 | 10829.0 |
+| compiler | 4440.7 | 3606.3 | 0.0 | 24.5 | 0.9 | 1523.3 | 0.0 | 21870.0 | 41.0 | 12492.0 |
+| model-build-time | 4512.6 | 3735.2 | 0.0 | 29.0 | 1.1 | 1914.5 | 0.0 | 21919.0 | 42.1 | 12353.0 |
+| model-runtime | 4442.6 | 3559.9 | 0.0 | 9.0 | 0.5 | 1621.9 | 81.0 | 21915.0 | 42.1 | 12343.0 |
 
 ### Scenario: many
 
 | backend | context start | first bean | all beans | first introspection | all introspections | warm start | generated classes | loaded classes | heap after GC (MB) | JVM wall |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| compiler | 3923.0 | 3020.5 | 67.4 | 22.5 | 28.6 | 1383.7 | 0.0 | 21869.0 | 41.4 | 10817.0 |
-| model-build-time | 3894.2 | 2891.0 | 67.4 | 30.9 | 19.0 | 1719.4 | 0.0 | 21899.0 | 42.4 | 11198.0 |
-| model-runtime | 3867.3 | 3074.2 | 66.8 | 6.0 | 64.7 | 1488.0 | 120.0 | 21937.0 | 42.5 | 10895.0 |
+| compiler | 4357.1 | 3325.1 | 61.6 | 23.1 | 29.1 | 1556.1 | 0.0 | 21868.0 | 41.4 | 11886.0 |
+| model-build-time | 4474.3 | 3527.4 | 61.5 | 29.0 | 20.6 | 1509.4 | 0.0 | 21917.0 | 42.3 | 12436.0 |
+| model-runtime | 4453.6 | 3638.3 | 62.9 | 8.5 | 64.0 | 1479.1 | 120.0 | 21953.0 | 42.5 | 12078.0 |
 
