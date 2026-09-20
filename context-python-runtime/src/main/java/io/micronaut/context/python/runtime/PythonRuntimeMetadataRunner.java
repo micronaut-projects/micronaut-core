@@ -79,6 +79,25 @@ public final class PythonRuntimeMetadataRunner {
      * @throws Exception If anything fails
      */
     @SuppressWarnings("unchecked")
+    /**
+     * The Truffle runtime the measured JVM resolved, which says whether the Python language runs on the Truffle JIT
+     * or on its fallback interpreter. Read reflectively: this module does not depend on Truffle, which is on the
+     * class path of an application that embeds Python.
+     *
+     * @return The runtime name, or why it could not be read
+     */
+    private static String truffleRuntime() {
+        try {
+            Class<?> truffle = Class.forName("com.oracle.truffle.api.Truffle");
+            Object runtime = truffle.getMethod("getRuntime").invoke(null);
+            return (String) runtime.getClass().getMethod("getName").invoke(runtime);
+        } catch (ClassNotFoundException e) {
+            return "absent";
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return "unknown (" + e + ")";
+        }
+    }
+
     public static void main(String[] args) throws Exception {
         Map<String, String> options = new LinkedHashMap<>();
         for (int i = 1; i < args.length; i++) {
@@ -109,6 +128,7 @@ public final class PythonRuntimeMetadataRunner {
         System.out.println("SOURCEGEN_ABSENT=true");
         long jvmStart = ManagementFactory.getRuntimeMXBean().getStartTime();
         System.out.println("JVM_UPTIME_AT_MAIN_MS=" + (System.currentTimeMillis() - jvmStart));
+        System.out.println("TRUFFLE_RUNTIME=" + truffleRuntime());
         try (URLClassLoader loader = new URLClassLoader(new URL[]{Path.of(args[0]).toUri().toURL()}, PythonRuntimeMetadataRunner.class.getClassLoader())) {
             List<Class<?>> beanTypes = classes(loader, options.get("bean"));
             List<Class<?>> introspectedTypes = classes(loader, options.get("introspection"));

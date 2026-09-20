@@ -73,7 +73,7 @@ class PythonMetadataBenchmarkSpec extends Specification {
         for (int round = 0; round < startupRounds; round++) {
             for (Map scenario : scenarios) {
                 for (String backend : rotate(BACKENDS, round)) {
-                    List<String> command = [java, '--limit-modules=java.se,jdk.unsupported,jdk.management,jdk.zipfs', '-Dpolyglot.engine.WarnInterpreterOnly=false', '-Xshare:auto', '-cp', classpath,
+                    List<String> command = [java, limitModules(), '-Dpolyglot.engine.WarnInterpreterOnly=false', '-Xshare:auto', '-cp', classpath,
                         'io.micronaut.context.python.runtime.PythonRuntimeMetadataRunner', outputs[backend].absolutePath,
                         "bean=${scenario.bean}".toString(), "introspection=${scenario.introspection}".toString(), 'property=name', 'startups=2']
                     File log = File.createTempFile('benchmark-run', '.log')
@@ -177,6 +177,22 @@ class Dto${i}:
         kinds
     }
 
+    /**
+     * The modules the measured JVM is limited to: what the application needs, never the compiler, and the Graal
+     * compiler when the JDK has it, so that GraalPy runs with the Truffle JIT rather than its fallback interpreter.
+     */
+    private static String limitModules() {
+        List<String> required = ['java.se', 'jdk.unsupported', 'jdk.management', 'jdk.zipfs']
+        return '--limit-modules=' + (required + graalModules()).join(',')
+    }
+
+    private static List<String> graalModules() {
+        Set<String> system = java.lang.module.ModuleFinder.ofSystem().findAll()*.descriptor()*.name() as Set
+        return ['jdk.graal.compiler', 'jdk.graal.compiler.management', 'org.graalvm.truffle.compiler',
+                'org.graalvm.collections', 'org.graalvm.word', 'org.graalvm.nativeimage',
+                'com.oracle.graal.graal_enterprise'].findAll { system.contains(it) }
+    }
+
     private static Map environment() {
         String commit = 'unknown'
         try {
@@ -193,7 +209,7 @@ class Dto${i}:
             cpus: Runtime.runtime.availableProcessors(),
             commit: commit,
             graalpy: graalpy.find() ? graalpy.group(1) : 'unknown',
-            pythonRuntime: 'GraalPy fallback interpreter (no Truffle JIT on this JDK: the Graal compiler is not on the class path)',
+            // The measured JVMs report the Truffle runtime they resolved; the summary reads it from their metrics
             micronaut: io.micronaut.core.version.VersionUtils.MICRONAUT_VERSION,
         ]
     }
@@ -208,6 +224,9 @@ class Dto${i}:
         md << "# Python metadata backends: measurements\n\n"
         report.environment.each { k, v -> md << "- $k: $v\n" }
         md << "- fixture: ${report.fixture}\n\n"
+        Set<String> runtimes = report.startup.collect { it.TRUFFLE_RUNTIME ?: 'unknown' } as Set
+        md << "- pythonRuntime: GraalPy on the Truffle runtime the measured JVMs resolved: ${runtimes.join(', ')}\n"
+        md << "\n"
         md << "## Compilation (ms, ${report.compile.size() / BACKENDS.size()} alternating rounds per backend)\n\n| backend | median | min | max |\n|---|---:|---:|---:|\n"
         BACKENDS.each { backend ->
             List<Double> values = report.compile.findAll { it.backend == backend }*.compileMs.sort()
