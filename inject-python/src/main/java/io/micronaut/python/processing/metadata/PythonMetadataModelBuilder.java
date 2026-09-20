@@ -112,7 +112,7 @@ public final class PythonMetadataModelBuilder {
         List<BeanDefinitionModel> beanDefinitions;
         try {
             beanDefinitions = beanDefinitions(classElement);
-        } catch (PythonInterceptionFallback fallback) {
+        } catch (PythonCompilerFallback fallback) {
             // The proxy an interception needs is written by the compiler, so its definitions are too
             compilerDefinitions = true;
             beanDefinitions = List.of();

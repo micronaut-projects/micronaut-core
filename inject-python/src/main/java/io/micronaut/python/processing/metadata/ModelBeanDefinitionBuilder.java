@@ -116,7 +116,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         }
         if (constructorDefinition.annotationMetadata().hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
             || classElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw new PythonInterceptionFallback("an intercepted bean");
+            throw new PythonCompilerFallback("an intercepted bean");
         }
         checkInjectScope(constructorDefinition.constructorElement());
     }
@@ -150,10 +150,10 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces a type variable");
         }
         if (method.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS) || beanTypeElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw new PythonInterceptionFallback(construct + ", which produces an intercepted bean");
+            throw new PythonCompilerFallback(construct + ", which produces an intercepted bean");
         }
         if (classElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw new PythonInterceptionFallback("an intercepted factory");
+            throw new PythonCompilerFallback("an intercepted factory");
         }
         checkInjectScope(method);
     }
@@ -217,12 +217,12 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
 
     @Override
     public BeanDefinitionBuilder<ClassElement, MethodElement, FieldElement, List<BeanDefinitionModel>> addFieldConfigurationBuilder(FieldElement fieldElement, AnnotationMetadata annotationMetadata, List<MethodDefinition<ClassElement, MethodElement>> builderMethods) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "a configuration builder (" + fieldElement.getName() + ")");
+        throw new PythonCompilerFallback("a configuration builder (" + fieldElement.getName() + ")");
     }
 
     @Override
     public BeanDefinitionBuilder<ClassElement, MethodElement, FieldElement, List<BeanDefinitionModel>> addMethodConfigurationBuilder(MethodElement methodElement, AnnotationMetadata annotationMetadata, List<MethodDefinition<ClassElement, MethodElement>> builderMethods) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "a configuration builder (" + methodElement.getName() + ")");
+        throw new PythonCompilerFallback("a configuration builder (" + methodElement.getName() + ")");
     }
 
     private ModelBeanDefinitionBuilder add(MethodDefinition<ClassElement, MethodElement> methodDefinition, boolean postConstruct, boolean preDestroy) {
@@ -231,7 +231,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, "the method " + method.getName() + ", which requires reflection");
         }
         if (methodDefinition.booleanInjectionPoint() != null) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "the configuration builder property " + method.getName());
+            throw new PythonCompilerFallback("the configuration builder property " + method.getName());
         }
         if (methodDefinition.isSetter() && method.getParameters().length != 1) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "the property setter " + method.getName() + ", which does not take exactly one value");

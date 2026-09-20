@@ -18,19 +18,20 @@ package io.micronaut.python.processing.metadata;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Raised while a class is analysed for a model backend when the class needs interception: an intercepted bean, an
- * around or introduction proxy, or a method adapted to an interface, such as an event listener. The proxy class an
- * interception needs is written by the compiler, so the bean definitions of such a class are written by the compiler
- * too, whichever backend is selected. The introspection of the class is still described by its model.
+ * Raised while a class is analysed for a model backend when the class needs a construct the model does not describe
+ * but the compiler's writers do: interception, which needs a proxy class (an intercepted bean, an around or
+ * introduction proxy, or a method adapted to an interface, such as an event listener), or a configuration builder,
+ * which is wired from the configuration as the bean is injected. The bean definitions of such a class are written by
+ * the compiler, whichever backend is selected, while its introspection is still described by its model.
  *
  * @since 5.3.0
  */
 @Internal
-final class PythonInterceptionFallback extends RuntimeException {
+final class PythonCompilerFallback extends RuntimeException {
 
     private final String construct;
 
-    PythonInterceptionFallback(String construct) {
+    PythonCompilerFallback(String construct) {
         super("The class needs " + construct + ", which the compiler writes", null, false, false);
         this.construct = construct;
     }
