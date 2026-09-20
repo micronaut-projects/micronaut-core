@@ -24,6 +24,7 @@ import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ClassValueModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
+import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
@@ -317,6 +318,14 @@ public final class PythonMetadataCodec {
                     argument(beanMethod.returnArgument());
                     annotationMetadata(beanMethod.annotationMetadata());
                 }
+                out.writeBoolean(introspection.enumConstants() != null);
+                if (introspection.enumConstants() != null) {
+                    out.writeInt(introspection.enumConstants().size());
+                    for (EnumConstantModel constant : introspection.enumConstants()) {
+                        string(constant.name());
+                        annotationMetadata(constant.annotationMetadata());
+                    }
+                }
             }
         }
 
@@ -577,8 +586,17 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < beanMethodCount; i++) {
                     beanMethods.add(new BeanMethodModel(method(), argument(), annotationMetadata()));
                 }
+                List<EnumConstantModel> enumConstants = null;
+                if (in.readBoolean()) {
+                    int constantCount = count("enum constant");
+                    enumConstants = new ArrayList<>(constantCount);
+                    for (int i = 0; i < constantCount; i++) {
+                        enumConstants.add(new EnumConstantModel(requiredString("enum constant"), annotationMetadata()));
+                    }
+                    enumConstants = List.copyOf(enumConstants);
+                }
                 introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments,
-                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods));
+                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants);
             }
             return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }

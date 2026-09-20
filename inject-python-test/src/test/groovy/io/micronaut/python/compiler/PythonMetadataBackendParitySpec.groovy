@@ -36,6 +36,7 @@ import java.nio.file.Path
 class PythonMetadataBackendParitySpec extends Specification {
 
     static final String FIXTURE = '''
+from enum import Enum
 from typing import Annotated, Optional
 from jakarta.inject import Singleton, Inject, Named
 from jakarta.annotation import PostConstruct, PreDestroy
@@ -211,6 +212,11 @@ class Feature:
         pass
 
 @Introspected
+class Fuel(Enum):
+    PETROL = "petrol"
+    DIESEL = "diesel"
+
+@Introspected
 class Person:
     name: Annotated[str, NotBlank]
     age: Annotated[int, Min(0)]
@@ -278,7 +284,7 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig|Fuel)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
@@ -286,7 +292,7 @@ class Person:
         metadataClasses(compiler) == metadataClasses(buildTime)
         metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Depot$Definition.class', 'garage/$Engine$Definition.class',
                                              'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Fleet$Definition.class',
-                                             'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class',
+                                             'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class', 'garage/$Fuel$Introspection.class',
                                              'garage/$Garage$Definition.class', 'garage/$GarageConfig$Definition.class', 'garage/$GarageConfig$Introspection.class',
                                              'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
                                              'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class',
@@ -294,15 +300,17 @@ class Person:
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
-        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage', 'garage.GarageConfig',
+        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Fuel', 'garage.Garage', 'garage.GarageConfig',
                                    'garage.GarageController',
                                    'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class of its own and no service entry, and a catalog instead'
-        // The introspection a validated configuration class needs is generated from the Java class of the Python
-        // class, by the ordinary Java pipeline, in every backend: it is not described by the Python model
+        // Two artifacts are generated from Java classes that a visitor adds for a Python class, by the ordinary Java
+        // pipeline in every backend, and are not described by the Python model: the introspection a validated
+        // configuration class needs, and the converter of an introspected enum
         metadataClasses(runtime) == ['garage/$GarageConfig$Introspection.class']
-        services(runtime) == ['META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/garage.$GarageConfig$Introspection']
+        services(runtime) == ['META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/garage.$GarageConfig$Introspection',
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$FuelTypeConverter$Definition']
         runtime.contains('META-INF/micronaut/python/runtime/catalog')
         !buildTime.contains('META-INF/micronaut/python/runtime/catalog')
 
@@ -437,6 +445,9 @@ class Person:
             ['garage.Person', 'garage.Engine'].each { String name ->
                 result[name + '.introspection'] = introspection(introspector.getIntrospection(loader.loadClass(name)))
             }
+            def fuel = introspector.getIntrospection(loader.loadClass('garage.Fuel'))
+            result['fuel'] = introspection(fuel)
+            result['fuel.constants'] = fuel.constants.collect { [it.value.name(), it.annotationMetadata.annotationNames.sort()] }
             result['introspected'] = introspector.findIntrospectedTypes { it.name.startsWith('garage.') }*.name.sort()
             result['introspections.enumerated'] = introspector.findIntrospections { it.name.startsWith('garage.') }*.beanType*.name.sort()
             def person = introspector.getIntrospection(loader.loadClass('garage.Person'))

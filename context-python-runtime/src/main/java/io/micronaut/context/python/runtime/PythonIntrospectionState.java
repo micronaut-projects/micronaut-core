@@ -18,12 +18,14 @@ package io.micronaut.context.python.runtime;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
+import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import org.jspecify.annotations.Nullable;
 
@@ -45,17 +47,20 @@ public final class PythonIntrospectionState {
     private final Argument<?> @Nullable [] constructorArguments;
     private final AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs;
     private final AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs;
+    private final AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs;
 
     private PythonIntrospectionState(AnnotationMetadata annotationMetadata,
                                      AnnotationMetadata constructorAnnotationMetadata,
                                      Argument<?> @Nullable [] constructorArguments,
                                      AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs,
-                                     AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs) {
+                                     AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs,
+                                     AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs) {
         this.annotationMetadata = annotationMetadata;
         this.constructorAnnotationMetadata = constructorAnnotationMetadata;
         this.constructorArguments = constructorArguments;
         this.propertyRefs = propertyRefs;
         this.methodRefs = methodRefs;
+        this.enumConstantRefs = enumConstantRefs;
     }
 
     /**
@@ -108,8 +113,20 @@ public final class PythonIntrospectionState {
                 beanMethod.method().name(), materializer.annotationMetadata(beanMethod.annotationMetadata()),
                 parameters.isEmpty() ? null : materializer.arguments(parameters), index++);
         }
+        AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?>[] enumConstantRefs = null;
+        List<EnumConstantModel> constants = introspection.enumConstants();
+        if (constants != null) {
+            enumConstantRefs = new AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef[constants.size()];
+            for (int i = 0; i < enumConstantRefs.length; i++) {
+                EnumConstantModel constant = constants.get(i);
+                // The writer resolves the constant when the enum has a value lookup method, which every enum has
+                Enum value = Enum.valueOf((Class<Enum>) beanType, constant.name());
+                enumConstantRefs[i] = new AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef(value,
+                    materializer.annotationMetadata(constant.annotationMetadata()));
+            }
+        }
         return new PythonIntrospectionState(annotationMetadata, constructorMetadata, constructorArguments, refs,
-            methodRefs.length == 0 ? null : methodRefs);
+            methodRefs.length == 0 ? null : methodRefs, enumConstantRefs);
     }
 
     /**
@@ -131,6 +148,13 @@ public final class PythonIntrospectionState {
      */
     public Argument<?> @Nullable [] constructorArguments() {
         return constructorArguments;
+    }
+
+    /**
+     * @return The enum constant references, or null when the introspected type is not an enum
+     */
+    public AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs() {
+        return enumConstantRefs;
     }
 
     /**

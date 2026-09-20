@@ -106,7 +106,7 @@ class PythonMetadataClassGeneratorTest {
             List.of(new PropertyIndexModel("jakarta.validation.Constraint", null, 0), new PropertyIndexModel("jakarta.persistence.Column", "name_col", 0),
                 new PropertyIndexModel("jakarta.persistence.Column", "age_col", 1)),
             List.of(new BeanMethodModel(method("initialize", "void"), arg("initialize", "void"), EMPTY),
-                new BeanMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY)));
+                new BeanMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY)), null);
         return new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), introspection);
     }
 

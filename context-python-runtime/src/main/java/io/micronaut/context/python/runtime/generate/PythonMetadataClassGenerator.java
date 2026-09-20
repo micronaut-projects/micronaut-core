@@ -64,6 +64,8 @@ public final class PythonMetadataClassGenerator {
     private static final String INTROSPECTION_STATE = "io/micronaut/context/python/runtime/PythonIntrospectionState";
     private static final String DEFINITION_SUPER = "io/micronaut/context/AbstractInitializableBeanDefinitionAndReference";
     private static final String INTROSPECTION_SUPER = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospectionAndReference";
+    private static final String ENUM_INTROSPECTION_SUPER = "io/micronaut/inject/beans/AbstractEnumBeanIntrospectionAndReference";
+    private static final String ENUM_CONSTANT_REF = "io/micronaut/inject/beans/AbstractEnumBeanIntrospectionAndReference$EnumConstantObjectRef";
     private static final String BEAN_DEFINITION = "io/micronaut/inject/BeanDefinition";
     private static final String BEAN_CONTEXT = "io/micronaut/context/BeanContext";
     private static final String RESOLUTION_CONTEXT = "io/micronaut/context/BeanResolutionContext";
@@ -423,9 +425,11 @@ public final class PythonMetadataClassGenerator {
         }
         Type beanType = ModelTypes.type(model.className());
         String name = introspection.introspectionClassName().replace('.', '/');
+        // An enum introspection exposes its constants, through the base class the writer uses for them
+        String superName = introspection.enumConstants() == null ? INTROSPECTION_SUPER : ENUM_INTROSPECTION_SUPER;
         ClassWriter writer = new GeneratedClassWriter();
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_SYNTHETIC, name,
-            "L" + INTROSPECTION_SUPER + "<" + beanType.getDescriptor() + ">;", INTROSPECTION_SUPER, null);
+            "L" + superName + "<" + beanType.getDescriptor() + ">;", superName, null);
         generatedAnnotation(writer, "io.micronaut.core.beans.BeanIntrospectionReference");
         writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, STATE_FIELD, STATE_DESC_I, null, null).visitEnd();
 
@@ -451,8 +455,15 @@ public final class PythonMetadataClassGenerator {
         } else {
             stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "methodRefs", "()[L" + METHOD_REF + ";");
         }
-        init.visitMethodInsn(Opcodes.INVOKESPECIAL, INTROSPECTION_SUPER, "<init>", "(Ljava/lang/Class;L" + ANNOTATION_METADATA + ";L"
-            + ANNOTATION_METADATA + ";[L" + ARGUMENT + ";[L" + PROPERTY_REF + ";[L" + METHOD_REF + ";)V", false);
+        String superDescriptor = "(Ljava/lang/Class;L" + ANNOTATION_METADATA + ";L" + ANNOTATION_METADATA + ";[L" + ARGUMENT
+            + ";[L" + PROPERTY_REF + ";[L" + METHOD_REF + ";";
+        if (introspection.enumConstants() == null) {
+            superDescriptor += ")V";
+        } else {
+            stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "enumConstantRefs", "()[L" + ENUM_CONSTANT_REF + ";");
+            superDescriptor += "[L" + ENUM_CONSTANT_REF + ";)V";
+        }
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, superName, "<init>", superDescriptor, false);
         init.visitInsn(Opcodes.RETURN);
         init.visitMaxs(0, 0);
         init.visitEnd();
@@ -578,6 +589,14 @@ public final class PythonMetadataClassGenerator {
         }
 
         indexMethods(writer, introspection);
+        if (introspection.enumConstants() != null) {
+            // The constants are the instances of an enum: the introspection neither builds nor constructs one
+            booleanMethod(writer, "hasConstructor", "()Z", false);
+            booleanMethod(writer, "isBuildable", "()Z", false);
+            booleanMethod(writer, "hasBuilder", "()Z", false);
+            writer.visitEnd();
+            return writer.toByteArray();
+        }
         booleanMethod(writer, "hasConstructor", "()Z", true);
         List<ArgumentModel> constructorArguments = introspection.constructorArguments();
         if (constructorArguments.isEmpty()) {

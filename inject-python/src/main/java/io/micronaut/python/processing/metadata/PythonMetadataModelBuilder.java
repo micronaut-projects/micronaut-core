@@ -27,6 +27,7 @@ import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.context.python.runtime.model.PropertyIndexModel;
@@ -42,6 +43,8 @@ import io.micronaut.core.version.VersionUtils;
 import io.micronaut.inject.annotation.PythonAnnotationMetadataModels;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
+import io.micronaut.inject.ast.EnumConstantElement;
+import io.micronaut.inject.ast.EnumElement;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -133,8 +136,13 @@ public final class PythonMetadataModelBuilder {
         if (introspected == null) {
             return null;
         }
-        if (classElement.isEnum()) {
-            throw unsupported(classElement, "an introspected enum");
+        List<EnumConstantModel> enumConstants = null;
+        if (classElement instanceof EnumElement enumElement) {
+            enumConstants = new ArrayList<>();
+            for (EnumConstantElement constant : enumElement.elements()) {
+                enumConstants.add(new EnumConstantModel(constant.getName(), annotationMetadata(classElement, constant.getAnnotationMetadata())));
+            }
+            enumConstants = List.copyOf(enumConstants);
         }
         for (String member : new String[]{"classes", "classNames", "packages", "builder", "targetPackage", "constructors", "members"}) {
             if (introspected.contains(member) && !isDefault(introspected, member)) {
@@ -180,6 +188,12 @@ public final class PythonMetadataModelBuilder {
                 argument(classElement, method.getName(), returnType, returnType.getTypeAnnotationMetadata().getAnnotationMetadata()),
                 annotationMetadata(classElement, method.getAnnotationMetadata())));
         }
+        if (enumConstants != null) {
+            // An enum is never instantiated by the introspection: the constants are the instances
+            String enumIntrospectionName = introspectionName(classElement);
+            return new IntrospectionModel(enumIntrospectionName, AnnotationMetadataModel.EMPTY, List.of(),
+                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants);
+        }
         MethodElement constructor = classElement.getPrimaryConstructor().orElse(null);
         MethodElement defaultConstructor = classElement.getDefaultConstructor().orElse(null);
         MethodElement instantiating = constructor != null && ArrayUtils.isNotEmpty(constructor.getParameters()) ? constructor : defaultConstructor;
@@ -193,13 +207,18 @@ public final class PythonMetadataModelBuilder {
         for (ParameterElement parameter : instantiating.getParameters()) {
             constructorArguments.add(argument(classElement, parameter.getName(), parameter.getGenericType(), parameter.getAnnotationMetadata()));
         }
+        String introspectionName = introspectionName(classElement);
+        return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
+            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null);
+    }
+
+    private String introspectionName(ClassElement classElement) {
         String packageName = classElement.getPackageName();
-        String introspectionName = packageName + ".$" + classElement.getName().substring(packageName.isEmpty() ? 0 : packageName.length() + 1).replace('.', '$') + "$Introspection";
-        if (introspectionName.length() > 240) {
+        String name = packageName + ".$" + classElement.getName().substring(packageName.isEmpty() ? 0 : packageName.length() + 1).replace('.', '$') + "$Introspection";
+        if (name.length() > 240) {
             throw unsupported(classElement, "an introspection name longer than 240 characters");
         }
-        return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
-            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods));
+        return name;
     }
 
     private static boolean isDefault(AnnotationValue<Introspected> introspected, String member) {
