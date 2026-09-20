@@ -93,20 +93,7 @@ public final class PythonMetadataCatalog {
             while (resources.hasMoreElements()) {
                 URL url = resources.nextElement();
                 try (BufferedReader reader = new BufferedReader(new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
-                    String header = reader.readLine();
-                    if (!HEADER.equals(header)) {
-                        throw new IllegalStateException("Unsupported Python runtime catalog " + url + ": " + header);
-                    }
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        if (line.isBlank() || line.startsWith("#")) {
-                            continue;
-                        }
-                        String[] parts = line.split("\t");
-                        if (parts.length != 3) {
-                            throw new IllegalStateException("Malformed Python runtime catalog line in " + url + ": " + line);
-                        }
-                        Entry entry = new Entry(parts[0], parts[1], parts[2].contains("B"), parts[2].contains("I"), url.toString());
+                    for (Entry entry : parse(reader, url.toString())) {
                         Entry existing = merged.putIfAbsent(entry.className(), entry);
                         if (existing != null && !existing.identity().equals(entry.identity())) {
                             throw new IllegalStateException("Conflicting Python runtime models of " + entry.className() + ": "
@@ -120,6 +107,41 @@ public final class PythonMetadataCatalog {
             throw new IllegalStateException("Cannot read the Python runtime catalogs of " + classLoader, e);
         }
         return new PythonMetadataCatalog(List.copyOf(new ArrayList<>(merged.values())));
+    }
+
+    /**
+     * Parses a catalog.
+     *
+     * @param text   The catalog text
+     * @param source Where it was read from, for the diagnostics
+     * @return The entries, in the order they are listed
+     */
+    public static List<Entry> parse(String text, String source) {
+        try (BufferedReader reader = new BufferedReader(new java.io.StringReader(text))) {
+            return parse(reader, source);
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot read the Python runtime catalog " + source, e);
+        }
+    }
+
+    private static List<Entry> parse(BufferedReader reader, String source) throws IOException {
+        String header = reader.readLine();
+        if (!HEADER.equals(header)) {
+            throw new IllegalStateException("Unsupported Python runtime catalog " + source + ": " + header);
+        }
+        List<Entry> entries = new ArrayList<>();
+        String line;
+        while ((line = reader.readLine()) != null) {
+            if (line.isBlank() || line.startsWith("#")) {
+                continue;
+            }
+            String[] parts = line.split("\t");
+            if (parts.length != 3) {
+                throw new IllegalStateException("Malformed Python runtime catalog line in " + source + ": " + line);
+            }
+            entries.add(new Entry(parts[0], parts[1], parts[2].contains("B"), parts[2].contains("I"), source));
+        }
+        return entries;
     }
 
     /**

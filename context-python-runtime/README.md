@@ -145,10 +145,21 @@ else of the metadata.
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
 fallback): evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder, targetPackage)`,
-which all ask for the introspection of another class, and incremental compilation of the model backends. The model
+which all ask for the introspection of another class. The model
 describes one class, and the runtime backend defines a generated class in the package and loader of the class it
 describes, so an introspection of another class or in another package has no model to be described by and no class
 to be defined next to.
+
+## Incremental compilation and switching backends
+
+An incremental compilation processes only the classes its changed sources affect. Each of them writes its own model,
+and the catalog of the runtime backend is merged with the one the previous compilation wrote: the entries of the
+classes that were not processed are kept, as long as their models are still in the output. A full compilation writes
+only what it processed, so the entry of a class that is gone goes with it.
+
+Switching backends without cleaning would leave the metadata classes of the previous one next to the models of the
+new one, and both would be discovered. The runtime backend therefore refuses to describe a class whose metadata
+classes are still in the output, and the compilation stops naming the file to remove.
 
 ## Tests
 
@@ -173,6 +184,6 @@ to be defined next to.
 Changes 5 (complete discovery across mixed build-time / runtime artifacts is done for what is generated; what
 remains is qualification against third-party providers), 6b beyond factory methods (associated beans, configuration binding,
 `EachBean` / `EachProperty`, event adapters), 6c (builders, enums, static creators, described members), the AOP
-part of 6d, 7 (incremental compilation, mode transitions and output cleanup) and 8 (documented opt-in release,
+part of 6d, and 8 (documented opt-in release,
 native-image selection, performance report) of `IMPLEMENTATION_PLAN.md` remain open. 6a and the non-intercepted
 part of 6d are covered, as are the factory methods of 6b.

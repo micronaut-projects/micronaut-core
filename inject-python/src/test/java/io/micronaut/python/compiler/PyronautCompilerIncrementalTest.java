@@ -29,6 +29,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
+import java.io.UncheckedIOException;
 import java.util.List;
 import java.util.Properties;
 import java.util.Set;
@@ -1723,6 +1724,95 @@ final class PyronautCompilerIncrementalTest {
             .incremental(true)
             .incrementalCacheDirectory(cache.toFile())
             .incrementalCompilationPlanCallback(plans::add)
+            .build()
+            .compile();
+    }
+
+    @Test
+    void keepsTheRuntimeMetadataCatalogOfSourcesTheIncrementalCompilationDidNotProcess(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Path cache = directory.resolve("incremental");
+        Path alpha = python.resolve("alpha.py");
+        Files.writeString(alpha, """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+        Files.writeString(python.resolve("beta.py"), """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Beta:
+                value: int = 2
+            """);
+
+        compilePythonWithRuntimeMetadata(python, java, output, cache);
+        Path catalog = findOutput(output, "catalog");
+        assertTrue(Files.readString(catalog).contains("Alpha"), Files.readString(catalog));
+        assertTrue(Files.readString(catalog).contains("Beta"), Files.readString(catalog));
+
+        Files.writeString(alpha, """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                value: int = 3
+            """);
+        compilePythonWithRuntimeMetadata(python, java, output, cache);
+
+        String recompiled = Files.readString(catalog);
+        assertTrue(recompiled.contains("Alpha"), recompiled);
+        assertTrue(recompiled.contains("Beta"), recompiled);
+        assertTrue(hasOutput(output, "Alpha", ".mpym"));
+        assertTrue(hasOutput(output, "Beta", ".mpym"));
+    }
+
+    @Test
+    void refusesToGenerateRuntimeMetadataNextToTheClassesOfAnotherBackend(@TempDir Path directory) throws Exception {
+        Path python = Files.createDirectories(directory.resolve("python"));
+        Path java = Files.createDirectories(directory.resolve("java"));
+        Path output = directory.resolve("classes");
+        Files.writeString(python.resolve("alpha.py"), """
+            from jakarta.inject import Singleton
+            @Singleton
+            class Alpha:
+                value: int = 1
+            """);
+
+        compileFull(python, java, output, List.of());
+        assertTrue(hasOutput(output, "Alpha$Definition", ".class"));
+
+        Exception error = assertThrows(Exception.class,
+            () -> compileFull(python, java, output, List.of("-Amicronaut.python.metadata.backend=model-runtime")));
+        String message = error.getMessage() == null ? "" : error.getMessage();
+        assertTrue(message.contains("another metadata backend"), message);
+        assertTrue(message.contains("Clean the output"), message);
+    }
+
+    private static void compileFull(Path python, Path java, Path output, List<String> options) {
+        try {
+            Files.createDirectories(output);
+        } catch (java.io.IOException e) {
+            throw new UncheckedIOException(e);
+        }
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .options(options)
+            .build()
+            .compile();
+    }
+
+    private static void compilePythonWithRuntimeMetadata(Path python, Path java, Path output, Path cache) {
+        PyronautCompiler.builder()
+            .pythonSrc(python.toString())
+            .javaSrc(java.toString())
+            .targetDir(output.toFile())
+            .incremental(true)
+            .incrementalCacheDirectory(cache.toFile())
+            .options(List.of("-Amicronaut.python.metadata.backend=model-runtime"))
             .build()
             .compile();
     }

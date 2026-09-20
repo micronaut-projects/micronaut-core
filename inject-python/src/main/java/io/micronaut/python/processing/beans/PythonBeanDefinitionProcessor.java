@@ -54,7 +54,7 @@ public final class PythonBeanDefinitionProcessor {
     public void processBeanDefinitions(
         PythonProcessingEnvironment processingEnvironment
     ) {
-        processBeanDefinitions(processingEnvironment, ignored -> true);
+        processBeanDefinitions(processingEnvironment, ignored -> true, false);
     }
 
     /**
@@ -62,15 +62,17 @@ public final class PythonBeanDefinitionProcessor {
      *
      * @param processingEnvironment The processing environment
      * @param sourceFilter The source element filter
+     * @param incremental Whether only the classes affected by the changed sources are processed
      */
     @Internal
     public void processBeanDefinitions(
         PythonProcessingEnvironment processingEnvironment,
-        Predicate<ClassElement> sourceFilter
+        Predicate<ClassElement> sourceFilter,
+        boolean incremental
     ) {
         PythonVisitorContext visitorContext = processingEnvironment.visitorContext();
         PythonMetadataBackend backend = PythonMetadataBackend.of(visitorContext);
-        metadataOutputs = backend.isModel() ? new PythonMetadataOutputs(backend) : null;
+        metadataOutputs = backend.isModel() ? new PythonMetadataOutputs(backend, incremental) : null;
         for (ClassElement classElement : processingEnvironment.classes().values().stream().filter(sourceFilter).toList()) {
             processClassElement(classElement, visitorContext);
         }

@@ -23,7 +23,6 @@ import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
-import io.micronaut.python.processing.metadata.PythonMetadataBackend;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
@@ -554,10 +553,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             ClassLoader effectiveClassLoader = this.classLoader != null
                 ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
             Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
-            if (incrementalSources != null && PythonMetadataBackend.of(processingEnvironment.visitorContext()).isModel()) {
-                throw new ProcessingException(originatingElement, "The Python metadata model backends require a full compilation; "
-                    + "incremental compilation of their outputs is not supported yet");
-            }
             if (processAggregatingVisitors) {
                 try (var _ = CompilationProfiler.span(profiler, "python.visitors.aggregating")) {
                     PythonTypeElementVisitorProcessor aggregatingVisitors =
@@ -586,7 +581,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // Process bean definitions for Python classes
             try (var _ = CompilationProfiler.span(profiler, "python.bean-definitions")) {
                 var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
-                beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
+                beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements, incrementalSources != null);
             }
             if (profiler != null) {
                 profiler.count("python.classes", environment.classes().size());
