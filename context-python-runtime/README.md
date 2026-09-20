@@ -103,23 +103,24 @@ Python + Java symbol analysis + annotation/type/bean visitors      (unchanged)
   zero classes (asserted by the parity harness). Definitions are generated when candidate resolution loads them,
   which may happen during context start for eager beans.
 
-## Supported in this batch
+## Supported
 
 Public top-level Python classes, ordinary class-path class loaders. Bean definitions: constructor injection of
 beans (qualified by `@Named`, `@Any`, qualifier annotations, repeatable qualifiers, interceptor bindings or
-`@Type`), collections and arrays of beans, `Optional` beans, `@Value` placeholders, `BeanContext` and
-`BeanResolutionContext`; `@Inject` method injection (required or not); `@PostConstruct` and `@PreDestroy`;
-every scope and `@Primary`; `@Requires` conditions; exposed types and candidate selection; type arguments of
-generic super types. Introspections: constructors with arguments, readable, writable and read-only properties
-of any type, generics, property annotation metadata, and property indexes.
+`@Type`), collections and arrays of beans, maps and streams of beans, bean registrations, `Optional` beans,
+`@Value` placeholders, `@Property` values, `BeanContext` and `BeanResolutionContext`; `@Inject` method injection
+(required or not); `@PostConstruct` and `@PreDestroy`; every scope and `@Primary`; `@Requires` conditions; exposed
+types and candidate selection; type arguments of generic super types; executable methods without interception
+(`@Executable` and its stereotypes such as `@Controller` routes, `processOnStartup`), generated as the definition's
+`$Exec` companion. Introspections: constructors with arguments, readable, writable and read-only properties of
+any type, generics, property annotation metadata, and property indexes.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
-fallback): factory beans, AOP around or introduction proxies (including `@Validated` constraints on bean
-methods), executable methods (`@Executable`, and therefore every `@Executable` stereotype), configuration
-properties and `@Property` injection, `@Parameter`, maps and streams of beans, bean registrations, evaluated
-expressions, `@InjectScope`, field injection, reflection-requiring members, `@Introspected(classes, classNames,
-packages, builder, targetPackage, constructors, members)`, introspected enums, and incremental compilation of
-the model backends.
+fallback): factory beans, AOP around and introduction proxies (including `@Validated` constraints on bean
+methods), configuration properties, `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
+reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder,
+targetPackage, constructors, members)`, introspected enums, static creators, and incremental compilation of the
+model backends.
 
 ## Tests
 
@@ -130,7 +131,9 @@ the model backends.
   generates from disk and proves the absence of the Python compiler, javac, the AST API, Sourcegen and JavaParser;
   an unsupported construct is a compilation error.
 - `PythonMetadataBackendParitySpec`: the same fixtures compiled by the three backends; inventories, byte-identical
-  generated classes, observable metadata of every definition and introspection, and application behaviour.
+  generated classes (definitions, their `$Exec` companions and introspections), observable metadata of every
+  definition and introspection, and application behaviour, including a controller route served over HTTP,
+  executable method invocation and startup processing.
 - `PythonMetadataClassGeneratorTest`, `PythonMetadataCodecTest` (this module): the generated classes verify
   against real classes; generation is deterministic; the codec round-trips and reports corruption, truncation,
   unknown versions and mismatches.
@@ -139,8 +142,9 @@ the model backends.
 
 ## Remaining plan
 
-Changes 5 (complete discovery across mixed build-time / runtime artifacts is done for what this batch generates;
-what remains is qualification against third-party providers), 6 (factories, associated beans, configuration
-binding, `EachBean` / `EachProperty`, executable methods, AOP, builders, enums, static creators), 7 (incremental
-compilation, mode transitions and output cleanup) and 8 (documented opt-in release, native-image selection,
-performance report) of `IMPLEMENTATION_PLAN.md` are not part of this batch.
+Changes 5 (complete discovery across mixed build-time / runtime artifacts is done for what is generated; what
+remains is qualification against third-party providers), 6b (factories, associated beans, configuration binding,
+`EachBean` / `EachProperty`, event adapters), 6c (builders, enums, static creators, described members), the AOP
+part of 6d, 7 (incremental compilation, mode transitions and output cleanup) and 8 (documented opt-in release,
+native-image selection, performance report) of `IMPLEMENTATION_PLAN.md` remain open. 6a and the non-intercepted
+part of 6d are covered.
