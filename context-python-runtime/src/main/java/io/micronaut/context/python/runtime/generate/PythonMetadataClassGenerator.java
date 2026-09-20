@@ -19,6 +19,7 @@ import io.micronaut.context.python.runtime.ModelTypes;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
@@ -71,6 +72,11 @@ public final class PythonMetadataClassGenerator {
     private static final String PROPERTY_REF = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospection$BeanPropertyRef";
     private static final String METHOD_REF = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospection$BeanMethodRef";
     private static final String GENERATED = "Lio/micronaut/core/annotation/Generated;";
+    private static final String EXEC_SUPER = "io/micronaut/context/AbstractExecutableMethodsDefinition";
+    private static final String EXEC_METHOD_REFERENCE = "io/micronaut/context/AbstractExecutableMethodsDefinition$MethodReference";
+    private static final String INTROSPECTION_BASE = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospection";
+    private static final String EXEC_SUFFIX = "$Exec";
+    private static final String EXEC_FIELD = "$EXEC";
     private static final String STATE_FIELD = "$STATE";
     private static final String OBJECT = "java/lang/Object";
     private static final String OBJECT_DESC = "Ljava/lang/Object;";
@@ -110,12 +116,24 @@ public final class PythonMetadataClassGenerator {
             "L" + DEFINITION_SUPER + "<" + beanType.getDescriptor() + ">;", DEFINITION_SUPER, interfaces.toArray(String[]::new));
         generatedAnnotation(writer, "io.micronaut.inject.BeanDefinitionReference");
         writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, STATE_FIELD, STATE_DESC_D, null, null).visitEnd();
+        boolean executable = !definition.executableMethods().isEmpty();
+        String execName = name + EXEC_SUFFIX;
+        String execDesc = "L" + execName + ";";
+        if (executable) {
+            writer.visitField(Opcodes.ACC_PRIVATE | Opcodes.ACC_STATIC | Opcodes.ACC_FINAL, EXEC_FIELD, execDesc, null, null).visitEnd();
+        }
 
         MethodVisitor clinit = writer.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
         clinit.visitCode();
         clinit.visitLdcInsn(beanType);
         clinit.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "definitionState", "(Ljava/lang/Class;)" + STATE_DESC_D, false);
         clinit.visitFieldInsn(Opcodes.PUTSTATIC, name, STATE_FIELD, STATE_DESC_D);
+        if (executable) {
+            clinit.visitTypeInsn(Opcodes.NEW, execName);
+            clinit.visitInsn(Opcodes.DUP);
+            clinit.visitMethodInsn(Opcodes.INVOKESPECIAL, execName, "<init>", "()V", false);
+            clinit.visitFieldInsn(Opcodes.PUTSTATIC, name, EXEC_FIELD, execDesc);
+        }
         clinit.visitInsn(Opcodes.RETURN);
         clinit.visitMaxs(0, 0);
         clinit.visitEnd();
@@ -129,7 +147,11 @@ public final class PythonMetadataClassGenerator {
         stateCall(init, name, STATE_DESC_D, DEFINITION_STATE, "methodInjection", "()[L" + METHOD_REFERENCE + ";");
         init.visitInsn(Opcodes.ACONST_NULL);
         init.visitInsn(Opcodes.ACONST_NULL);
-        init.visitInsn(Opcodes.ACONST_NULL);
+        if (executable) {
+            init.visitFieldInsn(Opcodes.GETSTATIC, name, EXEC_FIELD, execDesc);
+        } else {
+            init.visitInsn(Opcodes.ACONST_NULL);
+        }
         stateCall(init, name, STATE_DESC_D, DEFINITION_STATE, "typeArguments", "()Ljava/util/Map;");
         stateCall(init, name, STATE_DESC_D, DEFINITION_STATE, "info", "()L" + PRECALCULATED_INFO + ";");
         init.visitInsn(Opcodes.ICONST_0);
@@ -159,6 +181,15 @@ public final class PythonMetadataClassGenerator {
         if (!hasStereotype(model, REQUIRES)) {
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";)Z", true);
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";L" + RESOLUTION_CONTEXT + ";)Z", true);
+        }
+
+        if (definition.executableMethods().stream().anyMatch(ExecutableMethodModel::processOnStartup)) {
+            MethodVisitor indexes = writer.visitMethod(Opcodes.ACC_PROTECTED, "getIndexesOfExecutableMethodsForProcessing", "()[I", null, null);
+            indexes.visitCode();
+            stateCall(indexes, name, STATE_DESC_D, DEFINITION_STATE, "processingIndexes", "()[I");
+            indexes.visitInsn(Opcodes.ARETURN);
+            indexes.visitMaxs(0, 0);
+            indexes.visitEnd();
         }
 
         if (!definition.exposedTypes().isEmpty()) {
@@ -251,6 +282,84 @@ public final class PythonMetadataClassGenerator {
         if (preDestroy) {
             lifecycleMethod(writer, name, beanType, definition, "dispose", "preDestroy", InjectedMethodModel::preDestroy);
         }
+        writer.visitEnd();
+        return writer.toByteArray();
+    }
+
+    /**
+     * Generates the executable methods definition class of a model, the {@code $Exec} companion of its definition.
+     *
+     * @param model The class model, which must have a bean definition with executable methods
+     * @return The class bytes
+     */
+    public static byte[] executableMethods(ClassModel model) {
+        BeanDefinitionModel definition = model.beanDefinition();
+        if (definition == null || definition.executableMethods().isEmpty()) {
+            throw new IllegalArgumentException("The model of " + model.className() + " has no executable methods");
+        }
+        Type beanType = ModelTypes.type(model.className());
+        String name = definition.definitionClassName().replace('.', '/') + EXEC_SUFFIX;
+        ClassWriter writer = new GeneratedClassWriter();
+        writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_SYNTHETIC, name,
+            "L" + EXEC_SUPER + "<" + beanType.getDescriptor() + ">;", EXEC_SUPER, null);
+        generatedAnnotation(writer, "");
+
+        MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        init.visitCode();
+        init.visitVarInsn(Opcodes.ALOAD, 0);
+        init.visitLdcInsn(beanType);
+        init.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "executableMethods", "(Ljava/lang/Class;)[L" + EXEC_METHOD_REFERENCE + ";", false);
+        init.visitMethodInsn(Opcodes.INVOKESPECIAL, EXEC_SUPER, "<init>", "([L" + EXEC_METHOD_REFERENCE + ";)V", false);
+        init.visitInsn(Opcodes.RETURN);
+        init.visitMaxs(0, 0);
+        init.visitEnd();
+
+        List<ExecutableMethodModel> executables = definition.executableMethods();
+        MethodVisitor dispatch = writer.visitMethod(Opcodes.ACC_PROTECTED, "dispatch", "(I" + OBJECT_DESC + "[" + OBJECT_DESC + ")" + OBJECT_DESC, null, null);
+        dispatch.visitCode();
+        Label[] labels = labels(executables.size());
+        Label unknown = new Label();
+        dispatch.visitVarInsn(Opcodes.ILOAD, 1);
+        tableSwitch(dispatch, labels, unknown);
+        for (int i = 0; i < executables.size(); i++) {
+            MethodModel method = executables.get(i).method();
+            dispatch.visitLabel(labels[i]);
+            if (!method.isStatic()) {
+                dispatch.visitVarInsn(Opcodes.ALOAD, 2);
+                dispatch.visitTypeInsn(Opcodes.CHECKCAST, beanType.getInternalName());
+            }
+            for (int p = 0; p < method.parameters().size(); p++) {
+                dispatch.visitVarInsn(Opcodes.ALOAD, 3);
+                pushInt(dispatch, p);
+                dispatch.visitInsn(Opcodes.AALOAD);
+                convert(dispatch, method.parameters().get(p).typeName());
+            }
+            invoke(dispatch, method);
+            box(dispatch, method.returnType().typeName());
+            dispatch.visitInsn(Opcodes.ARETURN);
+        }
+        dispatch.visitLabel(unknown);
+        unknownDispatch(dispatch, EXEC_SUPER);
+        dispatch.visitMaxs(0, 0);
+        dispatch.visitEnd();
+
+        MethodVisitor target = writer.visitMethod(Opcodes.ACC_PROTECTED, "getTargetMethodByIndex", "(I)Ljava/lang/reflect/Method;", null, null);
+        target.visitCode();
+        Label[] targetLabels = labels(executables.size());
+        Label unknownTarget = new Label();
+        target.visitVarInsn(Opcodes.ILOAD, 1);
+        tableSwitch(target, targetLabels, unknownTarget);
+        for (int i = 0; i < executables.size(); i++) {
+            target.visitLabel(targetLabels[i]);
+            requiredMethod(target, executables.get(i).method());
+            target.visitInsn(Opcodes.ARETURN);
+        }
+        target.visitLabel(unknownTarget);
+        unknownDispatch(target, EXEC_SUPER);
+        target.visitMaxs(0, 0);
+        target.visitEnd();
+
+        booleanMethod(writer, "requiresMethodProcessing", "()Z", executables.stream().anyMatch(ExecutableMethodModel::processOnStartup));
         writer.visitEnd();
         return writer.toByteArray();
     }
@@ -353,7 +462,7 @@ public final class PythonMetadataClassGenerator {
             }
         }
         dispatchOne.visitLabel(unknown);
-        unknownDispatch(dispatchOne);
+        unknownDispatch(dispatchOne, INTROSPECTION_BASE);
         dispatchOne.visitMaxs(0, 0);
         dispatchOne.visitEnd();
 
@@ -368,25 +477,14 @@ public final class PythonMetadataClassGenerator {
             target.visitLabel(targetLabels[i]);
             MethodModel method = dispatch.method();
             if (method == null) {
-                unknownDispatch(target);
+                unknownDispatch(target, INTROSPECTION_BASE);
                 continue;
             }
-            target.visitLdcInsn(ModelTypes.type(method.declaringType()));
-            target.visitLdcInsn(method.name());
-            pushInt(target, method.parameters().size());
-            target.visitTypeInsn(Opcodes.ANEWARRAY, "java/lang/Class");
-            for (int p = 0; p < method.parameters().size(); p++) {
-                target.visitInsn(Opcodes.DUP);
-                pushInt(target, p);
-                classConstant(target, method.parameters().get(p).typeName());
-                target.visitInsn(Opcodes.AASTORE);
-            }
-            target.visitMethodInsn(Opcodes.INVOKESTATIC, "io/micronaut/core/reflect/ReflectionUtils", "getRequiredMethod",
-                "(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;", false);
+            requiredMethod(target, method);
             target.visitInsn(Opcodes.ARETURN);
         }
         target.visitLabel(unknownTarget);
-        unknownDispatch(target);
+        unknownDispatch(target, INTROSPECTION_BASE);
         target.visitMaxs(0, 0);
         target.visitEnd();
 
@@ -593,19 +691,26 @@ public final class PythonMetadataClassGenerator {
                 stateIndexed(mv, name, "constructorQualifier", index, -1, "L" + QUALIFIER + ";");
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getBeanForConstructorArgument", CONTEXT_PARAMS + "IL" + QUALIFIER + ";)" + OBJECT_DESC, false);
             }
-            case BEANS, OPTIONAL_BEAN -> {
+            case BEANS, OPTIONAL_BEAN, MAP_OF_BEANS, STREAM_OF_BEANS, BEAN_REGISTRATION, BEAN_REGISTRATIONS -> {
                 contextArguments(mv);
                 pushInt(mv, index);
                 stateIndexed(mv, name, "constructorGenericType", index, -1, "L" + ARGUMENT + ";");
                 stateIndexed(mv, name, "constructorQualifier", index, -1, "L" + QUALIFIER + ";");
-                String helper = point.kind() == InjectionPointModel.Kind.BEANS ? "getBeansOfTypeForConstructorArgumentObject" : "findBeanForConstructorArgumentObject";
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, helper, CONTEXT_PARAMS + "IL" + ARGUMENT + ";L" + QUALIFIER + ";)" + OBJECT_DESC, false);
+                String[] helper = genericHelper(point.kind(), "ConstructorArgument");
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, helper[0], CONTEXT_PARAMS + "IL" + ARGUMENT + ";L" + QUALIFIER + ";)" + helper[1], false);
             }
             case VALUE -> {
                 contextArguments(mv);
                 pushInt(mv, index);
                 mv.visitLdcInsn(point.value());
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getPropertyPlaceholderValueForConstructorArgument", CONTEXT_PARAMS + "ILjava/lang/String;)" + OBJECT_DESC, false);
+            }
+            case PROPERTY -> {
+                contextArguments(mv);
+                pushInt(mv, index);
+                mv.visitLdcInsn(point.propertyPath());
+                mv.visitInsn(Opcodes.ACONST_NULL);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getPropertyValueForConstructorArgument", CONTEXT_PARAMS + "ILjava/lang/String;Ljava/lang/String;)" + OBJECT_DESC, false);
             }
             default -> throw new IllegalStateException("Unsupported constructor injection point: " + point.kind());
         }
@@ -622,14 +727,14 @@ public final class PythonMetadataClassGenerator {
                 stateIndexed(mv, name, "methodQualifier", methodIndex, index, "L" + QUALIFIER + ";");
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getBeanForMethodArgument", CONTEXT_PARAMS + "IIL" + QUALIFIER + ";)" + OBJECT_DESC, false);
             }
-            case BEANS, OPTIONAL_BEAN -> {
+            case BEANS, OPTIONAL_BEAN, MAP_OF_BEANS, STREAM_OF_BEANS, BEAN_REGISTRATION, BEAN_REGISTRATIONS -> {
                 contextArguments(mv);
                 pushInt(mv, methodIndex);
                 pushInt(mv, index);
                 stateIndexed(mv, name, "methodGenericType", methodIndex, index, "L" + ARGUMENT + ";");
                 stateIndexed(mv, name, "methodQualifier", methodIndex, index, "L" + QUALIFIER + ";");
-                String helper = point.kind() == InjectionPointModel.Kind.BEANS ? "getBeansOfTypeForMethodArgumentObject" : "findBeanForMethodArgumentObject";
-                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, helper, CONTEXT_PARAMS + "IIL" + ARGUMENT + ";L" + QUALIFIER + ";)" + OBJECT_DESC, false);
+                String[] helper = genericHelper(point.kind(), "MethodArgument");
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, helper[0], CONTEXT_PARAMS + "IIL" + ARGUMENT + ";L" + QUALIFIER + ";)" + helper[1], false);
             }
             case VALUE -> {
                 contextArguments(mv);
@@ -638,6 +743,14 @@ public final class PythonMetadataClassGenerator {
                 mv.visitLdcInsn(point.value());
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getPropertyPlaceholderValueForMethodArgument", CONTEXT_PARAMS + "IILjava/lang/String;)" + OBJECT_DESC, false);
             }
+            case PROPERTY -> {
+                contextArguments(mv);
+                pushInt(mv, methodIndex);
+                pushInt(mv, index);
+                mv.visitLdcInsn(point.propertyPath());
+                mv.visitInsn(Opcodes.ACONST_NULL);
+                mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getPropertyValueForMethodArgument", CONTEXT_PARAMS + "IILjava/lang/String;Ljava/lang/String;)" + OBJECT_DESC, false);
+            }
             default -> throw new IllegalStateException("Unsupported method injection point: " + point.kind());
         }
     }
@@ -645,6 +758,21 @@ public final class PythonMetadataClassGenerator {
     /**
      * Pushes the receiver and the two context arguments of a resolution helper of the definition.
      */
+    /**
+     * The helper of the definition base class resolving a collection-like injection point, and its return descriptor.
+     */
+    private static String[] genericHelper(InjectionPointModel.Kind kind, String target) {
+        return switch (kind) {
+            case BEANS -> new String[]{"getBeansOfTypeFor" + target + "Object", OBJECT_DESC};
+            case OPTIONAL_BEAN -> new String[]{"findBeanFor" + target + "Object", OBJECT_DESC};
+            case MAP_OF_BEANS -> new String[]{"getMapOfTypeFor" + target + "Object", OBJECT_DESC};
+            case STREAM_OF_BEANS -> new String[]{"getStreamOfTypeFor" + target, "Ljava/util/stream/Stream;"};
+            case BEAN_REGISTRATION -> new String[]{"getBeanRegistrationFor" + target, "Lio/micronaut/context/BeanRegistration;"};
+            case BEAN_REGISTRATIONS -> new String[]{"getBeanRegistrationsFor" + target + "Object", OBJECT_DESC};
+            default -> throw new IllegalStateException(kind.toString());
+        };
+    }
+
     private static void contextArguments(MethodVisitor mv) {
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ALOAD, 1);
@@ -768,12 +896,26 @@ public final class PythonMetadataClassGenerator {
         }
     }
 
-    private static void unknownDispatch(MethodVisitor mv) {
+    private static void unknownDispatch(MethodVisitor mv, String owner) {
         mv.visitVarInsn(Opcodes.ALOAD, 0);
         mv.visitVarInsn(Opcodes.ILOAD, 1);
-        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, "io/micronaut/inject/beans/AbstractInitializableBeanIntrospection", "unknownDispatchAtIndexException",
-            "(I)Ljava/lang/RuntimeException;", false);
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, owner, "unknownDispatchAtIndexException", "(I)Ljava/lang/RuntimeException;", false);
         mv.visitInsn(Opcodes.ATHROW);
+    }
+
+    private static void requiredMethod(MethodVisitor mv, MethodModel method) {
+        mv.visitLdcInsn(ModelTypes.type(method.declaringType()));
+        mv.visitLdcInsn(method.name());
+        pushInt(mv, method.parameters().size());
+        mv.visitTypeInsn(Opcodes.ANEWARRAY, "java/lang/Class");
+        for (int p = 0; p < method.parameters().size(); p++) {
+            mv.visitInsn(Opcodes.DUP);
+            pushInt(mv, p);
+            classConstant(mv, method.parameters().get(p).typeName());
+            mv.visitInsn(Opcodes.AASTORE);
+        }
+        mv.visitMethodInsn(Opcodes.INVOKESTATIC, "io/micronaut/core/reflect/ReflectionUtils", "getRequiredMethod",
+            "(Ljava/lang/Class;Ljava/lang/String;[Ljava/lang/Class;)Ljava/lang/reflect/Method;", false);
     }
 
     private static void booleanMethod(ClassWriter writer, String name, String descriptor, boolean value) {

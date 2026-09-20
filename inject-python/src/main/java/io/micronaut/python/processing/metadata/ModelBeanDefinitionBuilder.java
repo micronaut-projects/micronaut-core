@@ -18,6 +18,7 @@ package io.micronaut.python.processing.metadata;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
@@ -27,13 +28,16 @@ import io.micronaut.context.beans.definition.MethodDefinition;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
+import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
+import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.InjectionPoint;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.FieldElement;
@@ -70,6 +74,8 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
     private final ConstructorDefinition<ClassElement, MethodElement> constructorDefinition;
     private final OriginatingElements originatingElements;
     private final List<InjectedMethodModel> methods = new ArrayList<>();
+    private final List<ExecutableMethodModel> executableMethods = new ArrayList<>();
+    private final Set<String> executableKeys = new LinkedHashSet<>();
 
     ModelBeanDefinitionBuilder(PythonMetadataModelBuilder modelBuilder, ClassElement classElement,
                                ConstructorDefinition<ClassElement, MethodElement> constructorDefinition) {
@@ -89,7 +95,34 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
 
     @Override
     public BeanDefinitionBuilder<ClassElement, MethodElement, FieldElement, List<BeanDefinitionModel>> addExecutableMethod(MethodElement methodElement, boolean requiresReflection) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "an executable method (" + methodElement.getName() + ")");
+        if (requiresReflection || methodElement.isReflectionRequired(classElement)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "the executable method " + methodElement.getName() + ", which requires reflection");
+        }
+        if (methodElement.getSuspendParameters().length != methodElement.getParameters().length) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "the suspending executable method " + methodElement.getName());
+        }
+        MethodModel method = modelBuilder.method(classElement, methodElement);
+        String key = method.declaringType() + "." + method.name() + method.parameters().stream().map(ArgumentModel::typeName).toList();
+        if (!executableKeys.add(key)) {
+            return this;
+        }
+        AnnotationMetadata annotationMetadata = methodElement.getTargetAnnotationMetadata();
+        boolean hierarchy = false;
+        if (annotationMetadata instanceof AnnotationMetadataHierarchy h) {
+            if (h.size() != 2) {
+                throw PythonMetadataModelBuilder.unsupported(classElement, "the annotation metadata hierarchy of " + methodElement.getName());
+            }
+            if (h.getRootMetadata().equals(methodElement.getOwningType())) {
+                hierarchy = true;
+                annotationMetadata = h.getDeclaredMetadata();
+            }
+        }
+        ClassElement returnType = methodElement.getGenericReturnType();
+        executableMethods.add(new ExecutableMethodModel(method,
+            modelBuilder.argument(classElement, methodElement.getName(), returnType, returnType.getTypeAnnotationMetadata().getAnnotationMetadata()),
+            modelBuilder.annotationMetadata(classElement, annotationMetadata), hierarchy,
+            methodElement.isTrue(Executable.class, Executable.MEMBER_PROCESS_ON_STARTUP), methodElement.isAbstract()));
+        return this;
     }
 
     @Override
@@ -171,18 +204,18 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
                 }
                 yield new InjectionPointModel(InjectionPointModel.Kind.VALUE, argument, null, null, null, value.value());
             }
-            case BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the configuration property injected into " + parameter.getName());
+            case BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> property ->
+                new InjectionPointModel(InjectionPointModel.Kind.PROPERTY, argument, null, property.propertyName(), property.propertyPath(), null);
             case BeanDefinitionInjectionPoint.ParameterInjectionPoint<ClassElement> ignored ->
                 throw PythonMetadataModelBuilder.unsupported(classElement, "the @Parameter " + parameter.getName());
-            case BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the map of beans injected into " + parameter.getName());
-            case BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the stream of beans injected into " + parameter.getName());
-            case BeanDefinitionInjectionPoint.BeanRegistrationInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the bean registration injected into " + parameter.getName());
-            case BeanDefinitionInjectionPoint.BeanRegistrationsInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the bean registrations injected into " + parameter.getName());
+            case BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint<ClassElement> map ->
+                new InjectionPointModel(InjectionPointModel.Kind.MAP_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(map.beanType()), null, null, null);
+            case BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint<ClassElement> stream ->
+                new InjectionPointModel(InjectionPointModel.Kind.STREAM_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(stream.beanType()), null, null, null);
+            case BeanDefinitionInjectionPoint.BeanRegistrationInjectionPoint<ClassElement> registration ->
+                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATION, argument, PythonMetadataModelBuilder.typeName(registration.beanType()), null, null, null);
+            case BeanDefinitionInjectionPoint.BeanRegistrationsInjectionPoint<ClassElement> registrations ->
+                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATIONS, argument, PythonMetadataModelBuilder.typeName(registrations.beanType()), null, null, null);
         };
     }
 
@@ -232,7 +265,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             collectExposedTypes(collected, classElement, true, packageName);
             exposedTypes = List.copyOf(collected);
         }
-        return List.of(new BeanDefinitionModel(definitionName, constructorModel, List.copyOf(methods),
+        return List.of(new BeanDefinitionModel(definitionName, constructorModel, List.copyOf(methods), List.copyOf(executableMethods),
             PythonMetadataModelBuilder.precalculatedInfo(classElement), exposedTypes, declaredExposedTypes.length != 0, typeArguments));
     }
 

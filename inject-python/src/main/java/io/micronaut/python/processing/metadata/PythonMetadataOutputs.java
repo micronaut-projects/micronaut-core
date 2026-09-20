@@ -27,6 +27,7 @@ import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -75,6 +76,10 @@ public final class PythonMetadataOutputs {
         origins.add(classElement);
         if (backend == PythonMetadataBackend.MODEL_BUILD_TIME) {
             if (classModel.beanDefinition() != null) {
+                if (!classModel.beanDefinition().executableMethods().isEmpty()) {
+                    writeClass(classElement, classModel.beanDefinition().definitionClassName() + "$Exec", PythonRuntimeMetadata.executableMethodsBytes(classModel),
+                        null, visitorContext);
+                }
                 writeClass(classElement, classModel.beanDefinition().definitionClassName(), PythonRuntimeMetadata.definitionBytes(classModel),
                     BeanDefinitionReference.class, visitorContext);
             }
@@ -107,8 +112,10 @@ public final class PythonMetadataOutputs {
         }
     }
 
-    private static void writeClass(ClassElement classElement, String className, byte[] bytes, Class<?> service, VisitorContext visitorContext) {
-        visitorContext.visitServiceDescriptor(service, className, classElement);
+    private static void writeClass(ClassElement classElement, String className, byte[] bytes, @Nullable Class<?> service, VisitorContext visitorContext) {
+        if (service != null) {
+            visitorContext.visitServiceDescriptor(service, className, classElement);
+        }
         try (OutputStream out = visitorContext.visitClass(className, classElement)) {
             out.write(bytes);
         } catch (IOException e) {

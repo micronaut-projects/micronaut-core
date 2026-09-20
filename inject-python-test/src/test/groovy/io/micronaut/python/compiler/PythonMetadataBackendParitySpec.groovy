@@ -41,7 +41,10 @@ from jakarta.inject import Singleton, Inject, Named
 from jakarta.annotation import PostConstruct, PreDestroy
 from jakarta.validation.constraints import NotBlank, Min
 from micronaut.core.annotation import Introspected
-from micronaut.context.annotation import Value, Requires, Primary, Prototype
+from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable
+from micronaut.http.annotation import Controller, Get, QueryValue
+from micronaut.context import BeanRegistration
+from java.util.stream import Stream
 
 @Singleton
 @Introspected
@@ -81,6 +84,18 @@ class Trip:
         return self.count
 
 @Singleton
+class Garage:
+    def __init__(self, by_name: dict[str, Radio], stream: Stream[Radio], registration: BeanRegistration[Engine], registrations: list[BeanRegistration[Radio]], color: Annotated[str, Property(name="car.color")]):
+        self.by_name = by_name
+        self.stream_count = stream.count()
+        self.registration = registration
+        self.registrations = registrations
+        self.color = color
+
+    def describe(self) -> str:
+        return ",".join(sorted(self.by_name.keySet())) + ":" + str(self.stream_count) + ":" + self.registration.getBeanDefinition().getBeanType().getSimpleName() + ":" + str(len(self.registrations)) + ":" + self.color
+
+@Singleton
 class Car:
     def __init__(self, engine: Engine, radio: Annotated[Radio, Named("backup")], name: Annotated[str, Value("${car.name:unnamed}")], radios: list[Radio], trip: Optional[Trip]):
         self.engine = engine
@@ -108,6 +123,23 @@ class Car:
 
     def current_state(self) -> str:
         return self.state
+
+@Controller("/garage")
+class GarageController:
+    def __init__(self, car: Car):
+        self.car = car
+
+    @Get("/status")
+    def status(self, detail: Annotated[str, QueryValue(defaultValue="none")]) -> str:
+        return "open:" + self.car.name + ":" + detail
+
+    @Executable(processOnStartup=True)
+    def warm(self, times: int) -> int:
+        return times * 2
+
+    @Executable
+    def sleep(self) -> None:
+        pass
 
 @Singleton
 @Requires(property="feature.enabled", value="true")
@@ -175,22 +207,21 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/\$(Engine|Radio|BackupRadio|Trip|Car|Feature|Person)\$(Definition|Introspection)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person)[$](Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
         expect: 'the compiler and the build-time model backend emit the same definitions, introspections and service entries'
         metadataClasses(compiler) == metadataClasses(buildTime)
         metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Engine$Definition.class',
-                                             'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Person$Introspection.class',
-                                             'garage/$Radio$Definition.class', 'garage/$Trip$Definition.class']
+                                             'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Garage$Definition.class',
+                                             'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
+                                             'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$Trip$Definition.class']
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
-        models(runtime).sort() == ['META-INF/micronaut/python/runtime/garage.BackupRadio.mpym', 'META-INF/micronaut/python/runtime/garage.Car.mpym',
-                                   'META-INF/micronaut/python/runtime/garage.Engine.mpym', 'META-INF/micronaut/python/runtime/garage.Feature.mpym',
-                                   'META-INF/micronaut/python/runtime/garage.Person.mpym', 'META-INF/micronaut/python/runtime/garage.Radio.mpym',
-                                   'META-INF/micronaut/python/runtime/garage.Trip.mpym']
+        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Engine', 'garage.Feature', 'garage.Garage', 'garage.GarageController',
+                                   'garage.Person', 'garage.Radio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class and no service entry for them, and a catalog instead'
         metadataClasses(runtime).isEmpty()
@@ -216,6 +247,10 @@ class Person:
             if (model.beanDefinition() != null) {
                 def classFile = new File(outputs['model-build-time'], model.beanDefinition().definitionClassName().replace('.', '/') + '.class')
                 assert classFile.bytes == PythonRuntimeMetadata.definitionBytes(model): classFile
+                if (!model.beanDefinition().executableMethods().isEmpty()) {
+                    def execFile = new File(outputs['model-build-time'], model.beanDefinition().definitionClassName().replace('.', '/') + '$Exec.class')
+                    assert execFile.bytes == PythonRuntimeMetadata.executableMethodsBytes(model): execFile
+                }
             }
             if (model.introspection() != null) {
                 def classFile = new File(outputs['model-build-time'], model.introspection().introspectionClassName().replace('.', '/') + '.class')
@@ -258,14 +293,15 @@ class Person:
         then:
         PythonRuntimeMetadata.generatedClassCount() - before == 5
         ['garage.Car', 'garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.Trip'].every { PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass(it)) }
+        !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.GarageController'))
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.Feature'))
 
         when:
         BeanIntrospector.forClassLoader(loader).getIntrospection(loader.loadClass('garage.Person'))
         context.getAllBeanDefinitions()
 
-        then: 'the introspection, and every remaining definition once all definitions are asked for'
-        PythonRuntimeMetadata.generatedClassCount() - before == 7
+        then: 'the introspection, and every remaining definition (the controller with its executable methods companion) once all definitions are asked for'
+        PythonRuntimeMetadata.generatedClassCount() - before == 10
 
         cleanup:
         context?.close()
@@ -274,7 +310,7 @@ class Person:
 
     private Map observe(String backend) {
         def loader = new URLClassLoader([outputs[backend].toURI().toURL()] as URL[], getClass().classLoader)
-        def context = ApplicationContext.builder().classLoader(loader).properties(['car.name': 'parity', 'feature.enabled': 'true']).start()
+        def context = ApplicationContext.builder().classLoader(loader).properties(['car.name': 'parity', 'car.color': 'red', 'feature.enabled': 'true', 'micronaut.server.port': -1]).start()
         try {
             Map result = [:]
             ['garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.Trip', 'garage.Car', 'garage.Feature'].each { String name ->
@@ -285,6 +321,21 @@ class Person:
             result['car.describe'] = car.describe()
             result['car.describe.again'] = car.describe()
             result['radio.primary'] = context.getBean(loader.loadClass('garage.Radio')).station()
+            result['garage.describe'] = context.getBean(loader.loadClass('garage.Garage')).describe()
+            def controllerDefinition = context.getBeanDefinition(loader.loadClass('garage.GarageController'))
+            result['controller'] = definition(controllerDefinition)
+            result['controller.executables'] = controllerDefinition.executableMethods.collect { [it.name, it.arguments*.name, it.arguments*.type*.name, it.returnType.type.name, it.annotationMetadata.annotationNames.sort(), it.arguments.collect { a -> a.annotationMetadata.annotationNames.sort() }] }
+            result['controller.processing'] = controllerDefinition.executableMethodsForProcessing*.name
+            result['controller.requiresProcessing'] = controllerDefinition.requiresMethodProcessing()
+            def controller = context.getBean(loader.loadClass('garage.GarageController'))
+            result['controller.warm'] = controllerDefinition.findMethod('warm', Integer.TYPE).get().invoke(controller, 21)
+            result['controller.sleep'] = controllerDefinition.findMethod('sleep').get().invoke(controller)
+            def server = context.getBean(io.micronaut.runtime.server.EmbeddedServer).start()
+            def client = context.createBean(io.micronaut.http.client.HttpClient, server.URL)
+            result['controller.http'] = client.toBlocking().retrieve('/garage/status?detail=full')
+            result['controller.http.default'] = client.toBlocking().retrieve('/garage/status')
+            client.close()
+            result['garage.Garage'] = definition(context.getBeanDefinition(loader.loadClass('garage.Garage')))
             result['feature.present'] = context.findBean(loader.loadClass('garage.Feature')).present
             result['trip.prototype'] = !context.getBean(loader.loadClass('garage.Trip')).is(context.getBean(loader.loadClass('garage.Trip')))
             def introspector = BeanIntrospector.forClassLoader(loader)

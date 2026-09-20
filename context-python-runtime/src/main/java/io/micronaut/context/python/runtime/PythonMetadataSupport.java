@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python.runtime;
 
+import io.micronaut.context.AbstractExecutableMethodsDefinition;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 
@@ -38,6 +39,18 @@ public final class PythonMetadataSupport {
      */
     public static PythonDefinitionState definitionState(Class<?> beanType) {
         return PythonRuntimeMetadata.holder(beanType).definitionState();
+    }
+
+    /**
+     * @param beanType The bean type
+     * @return The executable method references of the bean's definition
+     */
+    public static AbstractExecutableMethodsDefinition.MethodReference[] executableMethods(Class<?> beanType) {
+        AbstractExecutableMethodsDefinition.MethodReference[] references = definitionState(beanType).executableMethods();
+        if (references == null) {
+            throw new IllegalStateException("The executable methods of " + beanType.getName() + " could not be materialized");
+        }
+        return references;
     }
 
     /**

@@ -23,6 +23,7 @@ import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ClassValueModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
+import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
@@ -231,6 +232,15 @@ public final class PythonMetadataCodec {
                     out.writeBoolean(method.postConstruct());
                     out.writeBoolean(method.preDestroy());
                     out.writeBoolean(method.required());
+                }
+                out.writeInt(bean.executableMethods().size());
+                for (ExecutableMethodModel executable : bean.executableMethods()) {
+                    method(executable.method());
+                    argument(executable.returnArgument());
+                    annotationMetadata(executable.annotationMetadata());
+                    out.writeBoolean(executable.hierarchy());
+                    out.writeBoolean(executable.processOnStartup());
+                    out.writeBoolean(executable.isAbstract());
                 }
                 PrecalculatedInfoModel info = bean.info();
                 string(info.scope());
@@ -482,6 +492,11 @@ public final class PythonMetadataCodec {
                     methods.add(new InjectedMethodModel(method(), annotationMetadata(), injectionPoints(),
                         in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean()));
                 }
+                int executableCount = count("executable method");
+                List<ExecutableMethodModel> executables = new ArrayList<>(executableCount);
+                for (int i = 0; i < executableCount; i++) {
+                    executables.add(new ExecutableMethodModel(method(), argument(), annotationMetadata(), in.readBoolean(), in.readBoolean(), in.readBoolean()));
+                }
                 PrecalculatedInfoModel info = new PrecalculatedInfoModel(string(), in.readBoolean(), in.readBoolean(), in.readBoolean(),
                     in.readBoolean(), in.readBoolean(), in.readBoolean());
                 List<String> exposedTypes = strings();
@@ -491,7 +506,7 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < typeArgumentCount; i++) {
                     typeArguments.put(requiredString("type"), arguments());
                 }
-                bean = new BeanDefinitionModel(definitionClassName, constructor, List.copyOf(methods), info, exposedTypes, exposedTypesDeclared, typeArguments);
+                bean = new BeanDefinitionModel(definitionClassName, constructor, List.copyOf(methods), List.copyOf(executables), info, exposedTypes, exposedTypesDeclared, typeArguments);
             }
             IntrospectionModel introspection = null;
             if (in.readBoolean()) {

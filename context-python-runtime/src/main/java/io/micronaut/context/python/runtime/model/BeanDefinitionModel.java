@@ -24,6 +24,7 @@ import java.util.Map;
  * @param definitionClassName The name of the generated definition class
  * @param constructor         The constructor
  * @param methods             The injected and lifecycle methods, in invocation order
+ * @param executableMethods   The executable methods, in dispatch order
  * @param info                The precalculated info
  * @param exposedTypes        The exposed type names: the declared ones, or the bean type and its accessible super types
  * @param exposedTypesDeclared Whether the exposed types were declared ({@code @Bean(typed = ...)}), which narrows candidate selection
@@ -31,6 +32,7 @@ import java.util.Map;
  * @since 5.3.0
  */
 public record BeanDefinitionModel(String definitionClassName, ConstructorModel constructor, List<InjectedMethodModel> methods,
+                                  List<ExecutableMethodModel> executableMethods,
                                   PrecalculatedInfoModel info, List<String> exposedTypes, boolean exposedTypesDeclared,
                                   Map<String, List<ArgumentModel>> typeArguments) {
 }

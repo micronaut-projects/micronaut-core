@@ -48,7 +48,15 @@ public record InjectionPointModel(Kind kind, ArgumentModel argument, @Nullable S
         /** The bean context itself. */
         BEAN_CONTEXT(6),
         /** The bean resolution context itself. */
-        RESOLUTION_CONTEXT(7);
+        RESOLUTION_CONTEXT(7),
+        /** A map of beans of the recorded type by name. */
+        MAP_OF_BEANS(8),
+        /** A stream of beans of the recorded type. */
+        STREAM_OF_BEANS(9),
+        /** The registration of a bean of the recorded type. */
+        BEAN_REGISTRATION(10),
+        /** The registrations of the beans of the recorded type. */
+        BEAN_REGISTRATIONS(11);
 
         private final int code;
 

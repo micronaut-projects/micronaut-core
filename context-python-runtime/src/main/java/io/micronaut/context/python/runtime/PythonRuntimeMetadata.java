@@ -173,6 +173,16 @@ public final class PythonRuntimeMetadata {
     }
 
     /**
+     * Generates the bytes of the executable methods definition class of a model, as both backends do.
+     *
+     * @param model The class model, which must have executable methods
+     * @return The class bytes
+     */
+    public static byte[] executableMethodsBytes(ClassModel model) {
+        return PythonMetadataClassGenerator.executableMethods(model);
+    }
+
+    /**
      * Generates the bytes of the introspection class of a model, as both backends do.
      *
      * @param model The class model
@@ -276,6 +286,10 @@ public final class PythonRuntimeMetadata {
                     new IllegalStateException("the model has no bean definition"));
             }
             try {
+                if (!classModel.beanDefinition().executableMethods().isEmpty()) {
+                    // the definition's static initializer instantiates its executable methods companion
+                    define(PythonMetadataClassGenerator.executableMethods(classModel), "executable methods definition");
+                }
                 generated = define(PythonMetadataClassGenerator.beanDefinition(classModel), "definition");
                 definitionClass = generated;
                 return generated;
