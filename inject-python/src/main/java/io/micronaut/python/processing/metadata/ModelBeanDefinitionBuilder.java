@@ -116,7 +116,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         }
         if (constructorDefinition.annotationMetadata().hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)
             || classElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "an intercepted bean");
+            throw new PythonInterceptionFallback("an intercepted bean");
         }
         checkInjectScope(constructorDefinition.constructorElement());
     }
@@ -150,10 +150,10 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces a type variable");
         }
         if (method.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS) || beanTypeElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces an intercepted bean");
+            throw new PythonInterceptionFallback(construct + ", which produces an intercepted bean");
         }
         if (classElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "an intercepted factory");
+            throw new PythonInterceptionFallback("an intercepted factory");
         }
         checkInjectScope(method);
     }

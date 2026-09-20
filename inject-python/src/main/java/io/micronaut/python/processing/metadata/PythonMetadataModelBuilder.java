@@ -85,6 +85,7 @@ public final class PythonMetadataModelBuilder {
     private static final String PREFIX = "Python metadata model backend: ";
 
     private final VisitorContext visitorContext;
+    private boolean compilerDefinitions;
 
     /**
      * @param visitorContext The visitor context
@@ -107,7 +108,15 @@ public final class PythonMetadataModelBuilder {
      * @return The model, or empty when the class needs neither a definition nor an introspection
      */
     public Optional<PythonMetadataModel> build(ClassElement classElement) {
-        List<BeanDefinitionModel> beanDefinitions = beanDefinitions(classElement);
+        compilerDefinitions = false;
+        List<BeanDefinitionModel> beanDefinitions;
+        try {
+            beanDefinitions = beanDefinitions(classElement);
+        } catch (PythonInterceptionFallback fallback) {
+            // The proxy an interception needs is written by the compiler, so its definitions are too
+            compilerDefinitions = true;
+            beanDefinitions = List.of();
+        }
         IntrospectionModel introspection = introspection(classElement);
         if (beanDefinitions.isEmpty() && introspection == null) {
             return Optional.empty();
@@ -115,6 +124,14 @@ public final class PythonMetadataModelBuilder {
         AnnotationMetadataModel annotationMetadata = annotationMetadata(classElement, classElement.getAnnotationMetadata());
         return Optional.of(new PythonMetadataModel(PythonMetadataModel.FORMAT_VERSION, Objects.requireNonNullElse(VersionUtils.MICRONAUT_VERSION, "unknown"), classElement.getName(),
             new ClassModel(classElement.getName(), annotationMetadata, beanDefinitions, introspection)));
+    }
+
+    /**
+     * @return Whether the bean definitions of the class just built are written by the compiler, because the class
+     * needs interception
+     */
+    public boolean writesDefinitionsWithCompiler() {
+        return compilerDefinitions;
     }
 
     /**

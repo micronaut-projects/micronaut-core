@@ -129,14 +129,20 @@ binding through setters, each guarded by the configuration containing the proper
 holds none of them, the command line property of a `cliPrefix` configuration, and the writer's validation decision
 (the definition is validated, and the constructed bean is validated as a whole when it binds configuration).
 
-One artifact of a validated configuration class is not described by the model: the introspection its validation
-needs is added to the Java class generated for the Python class, and is generated from there by the ordinary Java
-pipeline, identically in all three backends. The output of the runtime backend therefore contains that one
-introspection class and its service entry (asserted by the parity harness), and nothing else of the metadata.
+Interception is written by the compiler, in every backend. A class that needs an around proxy, an introduction
+proxy or a method adapted to an interface (an `@EventListener`, for example) has its bean definitions and the proxy
+they need written by the compiler's writers, because the model does not describe a proxy. Its introspection is
+still described by its model. The fallback is per class and silent: such a class compiles and behaves the same
+under every backend, which the parity harness asserts.
+
+Two more artifacts are not described by the model either: the introspection a validated configuration class needs
+and the converter of an introspected enum, both added to Java classes generated for the Python class and written by
+the ordinary Java pipeline. The output of the runtime backend therefore contains those classes, the definitions of
+the classes that need interception, and their service entries (all asserted by the parity harness), and nothing
+else of the metadata.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
-fallback): AOP around and introduction proxies (including `@Validated` constraints on bean
-methods), configuration builders, evaluated expressions, `@InjectScope`, field injection,
+fallback): configuration builders, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder, targetPackage)`,
 which all ask for the introspection of another class, and incremental compilation of the model backends. The model
 describes one class, and the runtime backend defines a generated class in the package and loader of the class it

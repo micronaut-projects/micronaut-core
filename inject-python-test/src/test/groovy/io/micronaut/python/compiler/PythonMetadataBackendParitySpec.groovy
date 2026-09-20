@@ -45,6 +45,8 @@ from micronaut.core.annotation import Introspected, Creator
 from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean, Context, ConfigurationProperties, EachProperty, Parameter
 from micronaut.http.annotation import Controller, Get, QueryValue
 from micronaut.context import BeanRegistration
+from micronaut.context.event import StartupEvent
+from micronaut.runtime.event.annotation import EventListener
 from java.util.stream import Stream
 
 @Singleton
@@ -95,6 +97,27 @@ class Garage:
 
     def describe(self) -> str:
         return ",".join(sorted(self.by_name.keySet())) + ":" + str(self.stream_count) + ":" + self.registration.getBeanDefinition().getBeanType().getSimpleName() + ":" + str(len(self.registrations)) + ":" + self.color
+
+@Singleton
+class Checker:
+    def __init__(self):
+        pass
+
+    @Executable
+    def check(self, name: Annotated[str, NotBlank]) -> str:
+        return "ok:" + name
+
+@Singleton
+class Watcher:
+    def __init__(self):
+        self.seen = 0
+
+    @EventListener
+    def on_start(self, event: StartupEvent):
+        self.seen += 1
+
+    def describe(self) -> str:
+        return "seen:" + str(self.seen)
 
 @Singleton
 class Car:
@@ -309,20 +332,20 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig|Fuel|Ticket|BayConfig)[$](([A-Za-z]+)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig|Fuel|Ticket|BayConfig|Watcher|Checker)[$](([A-Za-z]+)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
         expect: 'the compiler and the build-time model backend emit the same definitions, introspections and service entries'
         metadataClasses(compiler) == metadataClasses(buildTime)
-        metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$BayConfig$Definition.class', 'garage/$Car$Definition.class', 'garage/$Depot$Definition.class', 'garage/$Engine$Definition.class',
+        metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$BayConfig$Definition.class', 'garage/$Car$Definition.class', 'garage/$Checker$Definition$Exec.class', 'garage/$Checker$Definition.class', 'garage/$Depot$Definition.class', 'garage/$Engine$Definition.class',
                                              'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Fleet$Definition.class',
                                              'garage/$Fleet$GetTrailer0$Definition.class', 'garage/$Fleet$Spare3$Definition.class',
                                              'garage/$Fleet$Truck2$Definition.class', 'garage/$Fleet$Van1$Definition.class', 'garage/$Fuel$Introspection.class',
                                              'garage/$Garage$Definition.class', 'garage/$GarageConfig$Definition.class', 'garage/$GarageConfig$Introspection.class',
                                              'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
                                              'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class', 'garage/$Ticket$Introspection.class',
-                                             'garage/$Trip$Definition.class']
+                                             'garage/$Trip$Definition.class', 'garage/$Watcher$Definition$Exec.class', 'garage/$Watcher$Definition.class']
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
@@ -331,12 +354,18 @@ class Person:
                                    'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Ticket', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class of its own and no service entry, and a catalog instead'
-        // Two artifacts are generated from Java classes that a visitor adds for a Python class, by the ordinary Java
-        // pipeline in every backend, and are not described by the Python model: the introspection a validated
-        // configuration class needs, and the converter of an introspected enum
-        metadataClasses(runtime) == ['garage/$GarageConfig$Introspection.class']
+        // What the Python model does not describe, written by the compiler in every backend: the introspection a
+        // validated configuration class needs and the converter of an introspected enum, both generated from Java
+        // classes a visitor adds, and the definitions of a class that needs interception, whose proxy the compiler
+        // writes (the event listener here, adapted to an interface through an introduction proxy)
+        metadataClasses(runtime) == ['garage/$Checker$Definition$Exec.class', 'garage/$Checker$Definition.class', 'garage/$GarageConfig$Introspection.class', 'garage/$Watcher$Definition$Exec.class',
+                                     'garage/$Watcher$Definition.class']
         services(runtime) == ['META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/garage.$GarageConfig$Introspection',
-                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$FuelTypeConverter$Definition']
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$Checker$Definition',
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$Checker$RuntimeProxy$Definition',
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$FuelTypeConverter$Definition',
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$Watcher$ApplicationEventListener$on_start1$Intercepted$Definition',
+                              'META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/garage.$Watcher$Definition']
         runtime.contains('META-INF/micronaut/python/runtime/catalog')
         !buildTime.contains('META-INF/micronaut/python/runtime/catalog')
 
@@ -464,6 +493,15 @@ class Person:
             result['vehicle.truck.parked'] = truck.describe()
             result['feature.present'] = context.findBean(loader.loadClass('garage.Feature')).present
             result['depot.describe'] = context.getBean(loader.loadClass('garage.Depot')).describe()
+            result['watcher.describe'] = context.getBean(loader.loadClass('garage.Watcher')).describe()
+            def checker = context.getBean(loader.loadClass('garage.Checker'))
+            result['checker.ok'] = checker.check('name')
+            try {
+                checker.check('')
+                result['checker.invalid'] = 'no violation'
+            } catch (Exception e) {
+                result['checker.invalid'] = e.class.name
+            }
             def configType = loader.loadClass('garage.GarageConfig')
             result['garage.GarageConfig'] = definition(context.getBeanDefinition(configType))
             result['config.describe'] = context.getBean(configType).describe()

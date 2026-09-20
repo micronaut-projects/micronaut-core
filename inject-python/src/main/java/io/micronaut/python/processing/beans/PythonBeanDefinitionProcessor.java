@@ -90,9 +90,12 @@ public final class PythonBeanDefinitionProcessor {
             }
             if (metadataOutputs != null && PythonMetadataBackend.isSelected(classElement, visitorContext)) {
                 // The model backends: the same analysis, recorded after every visitor ran, instead of emitted
-                new PythonMetadataModelBuilder(visitorContext).build(classElement)
-                    .ifPresent(model -> metadataOutputs.write(classElement, model, visitorContext));
-                return;
+                PythonMetadataModelBuilder modelBuilder = new PythonMetadataModelBuilder(visitorContext);
+                modelBuilder.build(classElement).ifPresent(model -> metadataOutputs.write(classElement, model, visitorContext));
+                if (!modelBuilder.writesDefinitionsWithCompiler()) {
+                    return;
+                }
+                // The class needs interception: the compiler writes its definitions and the proxy they need
             }
 
             DefaultElementBeanDefinitionBuilderFactory beanDefinitionBuilderFactory = new DefaultElementBeanDefinitionBuilderFactory(visitorContext);

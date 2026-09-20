@@ -72,17 +72,17 @@ final class ModelBeanDefinitionBuilderFactory implements ElementBeanDefinitionBu
     @Override
     public ElementProxyBuilder<BeanDefinitionModel> aroundProxy(ClassElement classElement, AnnotationMetadata annotationMetadata,
                                                                 ElementBeanDefinitionBuilder<BeanDefinitionModel> targetBeanDefinitionBuilder) {
-        throw PythonMetadataModelBuilder.unsupported(this.classElement, "an AOP around proxy");
+        throw new PythonInterceptionFallback("an AOP around proxy");
     }
 
     @Override
     public ElementProxyBuilder<BeanDefinitionModel> introductionProxy(ClassElement target) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "an AOP introduction proxy");
+        throw new PythonInterceptionFallback("an AOP introduction proxy");
     }
 
     @Override
     public ElementProxyBuilder<BeanDefinitionModel> introductionProxy(String proxyName, AnnotationMetadata proxyAnnotationMetadata) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "an AOP introduction proxy (" + proxyName + ")");
+        throw new PythonInterceptionFallback("an AOP introduction proxy (" + proxyName + ")");
     }
 
     @Override
