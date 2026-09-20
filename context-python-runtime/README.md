@@ -161,6 +161,20 @@ Switching backends without cleaning would leave the metadata classes of the prev
 new one, and both would be discovered. The runtime backend therefore refuses to describe a class whose metadata
 classes are still in the output, and the compilation stops naming the file to remove.
 
+## Qualification
+
+- **Native image.** The runtime backend defines classes while the application runs, which a native image does not do.
+  Generation fails there with a message naming the build-time model backend, which writes the same classes at compile
+  time and is the backend to build an image with.
+- **Class loaders.** A generated class is defined in the loader of the class it describes, through a private lookup
+  on it. Separate loaders of the same classes stay isolated, which the runtime metadata spec asserts, and a class
+  loader that is not a class-path loader works the same as long as it can read the model resources.
+- **The module path.** A private lookup on a class of a named module requires its package to be open to
+  `io.micronaut.context.python.runtime`. The failure names the package to open and the backend to use instead.
+- **Binary compatibility.** `micronaut-inject-python` is checked against its baseline (`japiCmp`), as are
+  `micronaut-inject` and `micronaut-core-processor`. This module has no baseline: it has never been published.
+- **Documentation.** The user guide page is `src/main/docs/guide/languageSupport/python/metadataBackends.adoc`.
+
 ## Tests
 
 - `PythonRuntimeMetadataSpec` (inject-python-test): a `model-runtime` compilation emits models and a catalog but
@@ -179,11 +193,13 @@ classes are still in the output, and the compilation stops naming the file to re
 - `PythonMetadataBenchmarkSpec`: opt-in measurements (`-Dpython.metadata.benchmark=true`), see
   `PYTHON_METADATA_BENCHMARK.md`.
 
-## Remaining plan
+## What remains
 
-Changes 5 (complete discovery across mixed build-time / runtime artifacts is done for what is generated; what
-remains is qualification against third-party providers), 6b beyond factory methods (associated beans, configuration binding,
-`EachBean` / `EachProperty`, event adapters), 6c (builders, enums, static creators, described members), the AOP
-part of 6d, and 8 (documented opt-in release,
-native-image selection, performance report) of `IMPLEMENTATION_PLAN.md` remain open. 6a and the non-intercepted
-part of 6d are covered, as are the factory methods of 6b.
+Every change of `IMPLEMENTATION_PLAN.md` is covered. What is left is bounded by the design rather than unfinished:
+
+- **The constructs the compiler keeps** (above): interception, configuration builders, and an introspection asked
+  for in another package or for another class. The first two fall back per class; the third is a compilation error.
+- **Evaluated expressions**, `@InjectScope`, field injection, reflection-requiring members and suspending methods,
+  each rejected with a diagnostic naming the construct and the class.
+- **Qualification against third-party bean definition providers**, which compose with this one but are not covered
+  by the harness here.

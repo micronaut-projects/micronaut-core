@@ -1,0 +1,44 @@
+Every Python class that is a bean or is introspected needs bean metadata: a bean definition, an introspection, or both. By default the compiler writes them as class files, next to the generated Java class of the Python class, exactly as it does for Java, Groovy and Kotlin.
+
+Two other backends describe the same metadata as a resolved model, saved next to the class, and build the classes from that model. They are selected with an annotation processor option:
+
+|===
+|Option value |What the compilation emits
+
+|`compiler`
+|The metadata classes, as the compiler has always written them. The default.
+
+|`model-build-time`
+|The saved model, and the metadata classes built from it at compile time.
+
+|`model-runtime`
+|The saved model and a discovery catalog, and no metadata class. The classes are built from the model in the running application, the first time each one is needed.
+|===
+
+[source,bash]
+----
+# Gradle
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs << '-Amicronaut.python.metadata.backend=model-runtime'
+}
+----
+
+`micronaut.python.metadata.types` narrows a model backend to the listed classes (`app.Service`) or packages (`app.*`); without it every Python class of the compilation is described by a model.
+
+== What the runtime backend changes
+
+The application no longer carries a bean definition class or an introspection class for the classes it describes. It carries their models instead, which are smaller, and a catalog listing them. Discovery reads the catalog, which loads no class and reads no model, so a context start generates nothing by itself. A definition is built when a bean is resolved, an introspection when one is asked for, once per class and class loader.
+
+Nothing of the compiler is needed at run time: the application runs with `micronaut-inject`, the Python runtime module and ASM, with no annotation processor, no compiler API and no source generator on its class path.
+
+== What the compiler still writes
+
+A class that needs interception (an around proxy, an introduction proxy, or a method adapted to an interface, such as an `@EventListener`) needs a proxy class, and a class with a `@ConfigurationBuilder` needs the builder wired as the bean is injected. Neither is described by the model, so the compiler writes the bean definitions of such a class, whichever backend is selected. Its introspection is still described by its model. The fallback is per class: the class compiles and behaves the same under every backend.
+
+An introspection asked for in another package or for another class (`@Introspected(classes, classNames, packages, builder, targetPackage)`) is not described by a model: a model describes one class, and the runtime backend defines a generated class in the package and the class loader of the class it describes. Such a construct fails the compilation with a diagnostic naming it, the class, and how to exclude it.
+
+== Switching backends
+
+The metadata classes of one backend and the models of another must not both describe a class, or both would be discovered. Compiling with the runtime backend into an output that still holds metadata classes for a class it describes fails with the file named, so clean the output when switching.
+
+An incremental compilation is supported: each class writes its own model, and the catalog is merged with the one the previous compilation wrote.

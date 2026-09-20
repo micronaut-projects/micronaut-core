@@ -24,6 +24,7 @@ import io.micronaut.context.python.runtime.model.PythonMetadataModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.beans.BeanIntrospection;
+import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.inject.BeanDefinitionReference;
 import org.jspecify.annotations.Nullable;
 
@@ -377,11 +378,21 @@ public final class PythonRuntimeMetadata {
         }
 
         private Class<?> define(byte[] bytes, String what) {
+            if (NativeImageUtils.inImageRuntimeCode()) {
+                // A native image holds the classes decided when it was built, and defines none while it runs
+                throw new PythonMetadataGenerationException(beanType, identity, "defining the " + what
+                    + " class in a native image, which generates no class while it runs; build the image with"
+                    + " micronaut.python.metadata.backend=model-build-time, which writes the same classes at compile time", null);
+            }
             MethodHandles.Lookup lookup;
             try {
                 lookup = MethodHandles.privateLookupIn(beanType, MethodHandles.lookup());
             } catch (IllegalAccessException e) {
-                throw new PythonMetadataGenerationException(beanType, identity, "obtaining a lookup for the " + what, e);
+                // On the module path the package of the class has to be open to this module for a class to be
+                // defined next to it
+                throw new PythonMetadataGenerationException(beanType, identity, "obtaining a lookup for the " + what
+                    + " (open " + beanType.getPackageName() + " to io.micronaut.context.python.runtime, or compile with"
+                    + " micronaut.python.metadata.backend=model-build-time)", e);
             }
             Class<?> generated;
             try {

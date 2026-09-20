@@ -32,8 +32,8 @@ public final class PythonMetadataGenerationException extends RuntimeException {
      * @param operation The failing operation
      * @param cause     The cause
      */
-    public PythonMetadataGenerationException(Class<?> beanType, @Nullable String identity, String operation, Throwable cause) {
+    public PythonMetadataGenerationException(Class<?> beanType, @Nullable String identity, String operation, @Nullable Throwable cause) {
         super("Cannot generate Python metadata for " + beanType.getName() + " (model " + (identity == null ? "unread" : identity)
-            + ", loader " + beanType.getClassLoader() + "): " + operation + " failed: " + cause, cause);
+            + ", loader " + beanType.getClassLoader() + "): " + operation + (cause == null ? "" : " failed: " + cause), cause);
     }
 }
