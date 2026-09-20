@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.python.runtime;
 
+import io.micronaut.context.python.runtime.model.ArgumentModel;
+import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
@@ -42,15 +44,18 @@ public final class PythonIntrospectionState {
     private final AnnotationMetadata constructorAnnotationMetadata;
     private final Argument<?> @Nullable [] constructorArguments;
     private final AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs;
+    private final AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs;
 
     private PythonIntrospectionState(AnnotationMetadata annotationMetadata,
                                      AnnotationMetadata constructorAnnotationMetadata,
                                      Argument<?> @Nullable [] constructorArguments,
-                                     AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs) {
+                                     AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs,
+                                     AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs) {
         this.annotationMetadata = annotationMetadata;
         this.constructorAnnotationMetadata = constructorAnnotationMetadata;
         this.constructorArguments = constructorArguments;
         this.propertyRefs = propertyRefs;
+        this.methodRefs = methodRefs;
     }
 
     /**
@@ -92,7 +97,19 @@ public final class PythonIntrospectionState {
             refs[i] = new AbstractInitializableBeanIntrospection.BeanPropertyRef(argument,
                 read == -1 ? null : argument, write == -1 ? null : argument, read, write, with, property.readOnly(), !property.readOnly());
         }
-        return new PythonIntrospectionState(annotationMetadata, constructorMetadata, constructorArguments, refs);
+        List<BeanMethodModel> beanMethods = introspection.methods();
+        AbstractInitializableBeanIntrospection.BeanMethodRef<Object>[] methodRefs =
+            new AbstractInitializableBeanIntrospection.BeanMethodRef[beanMethods.size()];
+        for (int i = 0; i < methodRefs.length; i++) {
+            BeanMethodModel beanMethod = beanMethods.get(i);
+            List<ArgumentModel> parameters = beanMethod.method().parameters();
+            // The dispatch indices of the methods continue the property indices, as the generated class numbers them
+            methodRefs[i] = new AbstractInitializableBeanIntrospection.BeanMethodRef(materializer.argument(beanMethod.returnArgument()),
+                beanMethod.method().name(), materializer.annotationMetadata(beanMethod.annotationMetadata()),
+                parameters.isEmpty() ? null : materializer.arguments(parameters), index++);
+        }
+        return new PythonIntrospectionState(annotationMetadata, constructorMetadata, constructorArguments, refs,
+            methodRefs.length == 0 ? null : methodRefs);
     }
 
     /**
@@ -114,6 +131,13 @@ public final class PythonIntrospectionState {
      */
     public Argument<?> @Nullable [] constructorArguments() {
         return constructorArguments;
+    }
+
+    /**
+     * @return The method references, or null when the introspection exposes none
+     */
+    public AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs() {
+        return methodRefs;
     }
 
     /**

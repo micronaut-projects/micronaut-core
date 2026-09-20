@@ -19,6 +19,7 @@ import io.micronaut.context.python.runtime.generate.PythonMetadataClassGenerator
 import io.micronaut.context.python.runtime.model.AnnotationMetadataModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
+import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
@@ -103,7 +104,9 @@ class PythonMetadataClassGeneratorTest {
             new PropertyModel("id", arg("id", "long"), method("getId", "long"), null, true));
         IntrospectionModel introspection = new IntrospectionModel("io.micronaut.context.python.runtime.$SampleBean$Introspection", EMPTY, List.of(dependency, value), properties,
             List.of(new PropertyIndexModel("jakarta.validation.Constraint", null, 0), new PropertyIndexModel("jakarta.persistence.Column", "name_col", 0),
-                new PropertyIndexModel("jakarta.persistence.Column", "age_col", 1)));
+                new PropertyIndexModel("jakarta.persistence.Column", "age_col", 1)),
+            List.of(new BeanMethodModel(method("initialize", "void"), arg("initialize", "void"), EMPTY),
+                new BeanMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY)));
         return new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), introspection);
     }
 

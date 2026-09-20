@@ -25,6 +25,7 @@ import io.micronaut.context.annotation.Primary;
 import io.micronaut.context.python.runtime.model.AnnotationMetadataModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
+import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
@@ -169,8 +170,15 @@ public final class PythonMetadataModelBuilder {
             }
             properties.add(new PropertyModel(property.getName(), argument(classElement, property.getName(), type, propertyMetadata), read, write, property.isReadOnly()));
         }
+        List<BeanMethodModel> beanMethods = new ArrayList<>();
         for (MethodElement method : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().annotated(am -> am.hasStereotype(Executable.class)))) {
-            throw unsupported(classElement, "an executable method (" + method.getName() + ") of an introspected class");
+            if (method.getSuspendParameters().length != method.getParameters().length) {
+                throw unsupported(classElement, "the suspending method " + method.getName() + " of an introspected class");
+            }
+            ClassElement returnType = method.getGenericReturnType();
+            beanMethods.add(new BeanMethodModel(method(classElement, classElement, method),
+                argument(classElement, method.getName(), returnType, returnType.getTypeAnnotationMetadata().getAnnotationMetadata()),
+                annotationMetadata(classElement, method.getAnnotationMetadata())));
         }
         MethodElement constructor = classElement.getPrimaryConstructor().orElse(null);
         MethodElement defaultConstructor = classElement.getDefaultConstructor().orElse(null);
@@ -191,7 +199,7 @@ public final class PythonMetadataModelBuilder {
             throw unsupported(classElement, "an introspection name longer than 240 characters");
         }
         return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
-            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes));
+            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods));
     }
 
     private static boolean isDefault(AnnotationValue<Introspected> introspected, String member) {

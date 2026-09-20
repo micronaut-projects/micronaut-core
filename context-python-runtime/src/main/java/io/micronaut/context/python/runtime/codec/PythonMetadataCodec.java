@@ -20,6 +20,7 @@ import io.micronaut.context.python.runtime.model.AnnotationValueModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.ArrayValueModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
+import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ClassValueModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
@@ -310,6 +311,12 @@ public final class PythonMetadataCodec {
                     string(index.value());
                     out.writeInt(index.propertyIndex());
                 }
+                out.writeInt(introspection.methods().size());
+                for (BeanMethodModel beanMethod : introspection.methods()) {
+                    method(beanMethod.method());
+                    argument(beanMethod.returnArgument());
+                    annotationMetadata(beanMethod.annotationMetadata());
+                }
             }
         }
 
@@ -565,7 +572,13 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < indexCount; i++) {
                     indexes.add(new PropertyIndexModel(requiredString("indexed annotation"), string(), in.readInt()));
                 }
-                introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments, List.copyOf(properties), List.copyOf(indexes));
+                int beanMethodCount = count("bean method");
+                List<BeanMethodModel> beanMethods = new ArrayList<>(beanMethodCount);
+                for (int i = 0; i < beanMethodCount; i++) {
+                    beanMethods.add(new BeanMethodModel(method(), argument(), annotationMetadata()));
+                }
+                introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments,
+                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods));
             }
             return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }

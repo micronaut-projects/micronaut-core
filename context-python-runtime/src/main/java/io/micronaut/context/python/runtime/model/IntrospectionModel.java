@@ -25,9 +25,10 @@ import java.util.List;
  * @param constructorArguments          The constructor arguments
  * @param properties                    The properties, in declaration order
  * @param indexes                       The property index entries, in recording order
+ * @param methods                       The executable methods the introspection exposes, in declaration order
  * @since 5.3.0
  */
 public record IntrospectionModel(String introspectionClassName, AnnotationMetadataModel constructorAnnotationMetadata,
                                  List<ArgumentModel> constructorArguments, List<PropertyModel> properties,
-                                 List<PropertyIndexModel> indexes) {
+                                 List<PropertyIndexModel> indexes, List<BeanMethodModel> methods) {
 }

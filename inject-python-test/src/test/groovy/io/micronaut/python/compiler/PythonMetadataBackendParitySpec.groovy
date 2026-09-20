@@ -226,6 +226,14 @@ class Person:
     @property
     def label(self) -> str:
         return self.name + "/" + str(self.age)
+
+    @Executable
+    def greet(self, greeting: str) -> str:
+        return greeting + " " + self.name
+
+    @Executable
+    def touch(self):
+        self.age += 1
 '''
 
     static final Map<String, String> BACKENDS = [
@@ -438,6 +446,10 @@ class Person:
             result['person.readOnly'] = person.getRequiredProperty('label', String).readOnly
             result['person.constraintIndex'] = person.getIndexedProperties(loader.loadClass('jakarta.validation.constraints.NotBlank'))*.name
             result['person.constraintStereotypeIndex'] = person.getIndexedProperties(loader.loadClass('jakarta.validation.Constraint'))*.name
+            result['person.methods'] = person.beanMethods.collect { [it.name, it.returnType.type.name, it.arguments*.name, it.annotationMetadata.annotationNames.sort()] }
+            result['person.greet'] = person.beanMethods.find { it.name == 'greet' }.invoke(instance, 'hello')
+            person.beanMethods.find { it.name == 'touch' }.invoke(instance)
+            result['person.touched'] = person.getRequiredProperty('age', Integer.TYPE).get(instance)
             context.destroyBean(loader.loadClass('garage.Car'))
             result['car.stopped'] = car.current_state()
             return result

@@ -19,6 +19,7 @@ import io.micronaut.context.python.runtime.ModelTypes;
 import io.micronaut.context.python.runtime.model.AnnotationMetadataModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
+import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.FactoryMethodModel;
@@ -445,7 +446,11 @@ public final class PythonMetadataClassGenerator {
         stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "constructorAnnotationMetadata", "()L" + ANNOTATION_METADATA + ";");
         stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "constructorArguments", "()[L" + ARGUMENT + ";");
         stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "propertyRefs", "()[L" + PROPERTY_REF + ";");
-        init.visitInsn(Opcodes.ACONST_NULL);
+        if (introspection.methods().isEmpty()) {
+            init.visitInsn(Opcodes.ACONST_NULL);
+        } else {
+            stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "methodRefs", "()[L" + METHOD_REF + ";");
+        }
         init.visitMethodInsn(Opcodes.INVOKESPECIAL, INTROSPECTION_SUPER, "<init>", "(Ljava/lang/Class;L" + ANNOTATION_METADATA + ";L"
             + ANNOTATION_METADATA + ";[L" + ARGUMENT + ";[L" + PROPERTY_REF + ";[L" + METHOD_REF + ";)V", false);
         init.visitInsn(Opcodes.RETURN);
@@ -532,6 +537,45 @@ public final class PythonMetadataClassGenerator {
         unknownDispatch(target, INTROSPECTION_BASE);
         target.visitMaxs(0, 0);
         target.visitEnd();
+
+        if (!introspection.methods().isEmpty()) {
+            // The methods the introspection exposes are dispatched with their arguments, after the property indices
+            MethodVisitor dispatch = writer.visitMethod(Opcodes.ACC_PROTECTED, "dispatch", "(I" + OBJECT_DESC + "[" + OBJECT_DESC + ")" + OBJECT_DESC, null, null);
+            dispatch.visitCode();
+            List<BeanMethodModel> beanMethods = introspection.methods();
+            Label[] methodLabels = labels(dispatches.size() + beanMethods.size());
+            Label unknownMethod = new Label();
+            dispatch.visitVarInsn(Opcodes.ILOAD, 1);
+            tableSwitch(dispatch, methodLabels, unknownMethod);
+            for (int i = 0; i < dispatches.size(); i++) {
+                dispatch.visitLabel(methodLabels[i]);
+                unknownDispatch(dispatch, INTROSPECTION_BASE);
+            }
+            for (int i = 0; i < beanMethods.size(); i++) {
+                MethodModel method = beanMethods.get(i).method();
+                dispatch.visitLabel(methodLabels[dispatches.size() + i]);
+                dispatch.visitVarInsn(Opcodes.ALOAD, 2);
+                dispatch.visitTypeInsn(Opcodes.CHECKCAST, beanType.getInternalName());
+                List<ArgumentModel> parameters = method.parameters();
+                for (int p = 0; p < parameters.size(); p++) {
+                    dispatch.visitVarInsn(Opcodes.ALOAD, 3);
+                    pushInt(dispatch, p);
+                    dispatch.visitInsn(Opcodes.AALOAD);
+                    convert(dispatch, parameters.get(p).typeName());
+                }
+                invoke(dispatch, method);
+                if ("void".equals(method.returnType().typeName())) {
+                    dispatch.visitInsn(Opcodes.ACONST_NULL);
+                } else {
+                    box(dispatch, method.returnType().typeName());
+                }
+                dispatch.visitInsn(Opcodes.ARETURN);
+            }
+            dispatch.visitLabel(unknownMethod);
+            unknownDispatch(dispatch, INTROSPECTION_BASE);
+            dispatch.visitMaxs(0, 0);
+            dispatch.visitEnd();
+        }
 
         indexMethods(writer, introspection);
         booleanMethod(writer, "hasConstructor", "()Z", true);
