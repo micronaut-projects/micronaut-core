@@ -18,6 +18,7 @@ package io.micronaut.context.python.runtime;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.DeclaredConstructorModel;
 import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
@@ -48,19 +49,22 @@ public final class PythonIntrospectionState {
     private final AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs;
     private final AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs;
     private final AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs;
+    private final AbstractInitializableBeanIntrospection.BeanConstructorRef @Nullable [] constructorRefs;
 
     private PythonIntrospectionState(AnnotationMetadata annotationMetadata,
                                      AnnotationMetadata constructorAnnotationMetadata,
                                      Argument<?> @Nullable [] constructorArguments,
                                      AbstractInitializableBeanIntrospection.BeanPropertyRef<Object>[] propertyRefs,
                                      AbstractInitializableBeanIntrospection.BeanMethodRef<Object> @Nullable [] methodRefs,
-                                     AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs) {
+                                     AbstractEnumBeanIntrospectionAndReference.EnumConstantObjectRef<?> @Nullable [] enumConstantRefs,
+                                     AbstractInitializableBeanIntrospection.BeanConstructorRef @Nullable [] constructorRefs) {
         this.annotationMetadata = annotationMetadata;
         this.constructorAnnotationMetadata = constructorAnnotationMetadata;
         this.constructorArguments = constructorArguments;
         this.propertyRefs = propertyRefs;
         this.methodRefs = methodRefs;
         this.enumConstantRefs = enumConstantRefs;
+        this.constructorRefs = constructorRefs;
     }
 
     /**
@@ -125,8 +129,20 @@ public final class PythonIntrospectionState {
                     materializer.annotationMetadata(constant.annotationMetadata()));
             }
         }
+        List<DeclaredConstructorModel> declared = introspection.declaredConstructors();
+        AbstractInitializableBeanIntrospection.BeanConstructorRef[] constructorRefs = null;
+        if (!declared.isEmpty()) {
+            constructorRefs = new AbstractInitializableBeanIntrospection.BeanConstructorRef[declared.size()];
+            for (int i = 0; i < constructorRefs.length; i++) {
+                DeclaredConstructorModel declaredConstructor = declared.get(i);
+                constructorRefs[i] = new AbstractInitializableBeanIntrospection.BeanConstructorRef(
+                    materializer.annotationMetadata(declaredConstructor.annotationMetadata()),
+                    declaredConstructor.arguments().isEmpty() ? null : materializer.arguments(declaredConstructor.arguments()),
+                    i, declaredConstructor.creator() == null);
+            }
+        }
         return new PythonIntrospectionState(annotationMetadata, constructorMetadata, constructorArguments, refs,
-            methodRefs.length == 0 ? null : methodRefs, enumConstantRefs);
+            methodRefs.length == 0 ? null : methodRefs, enumConstantRefs, constructorRefs);
     }
 
     /**
@@ -148,6 +164,13 @@ public final class PythonIntrospectionState {
      */
     public Argument<?> @Nullable [] constructorArguments() {
         return constructorArguments;
+    }
+
+    /**
+     * @return The declared constructor references, or null when the introspection describes only the instantiating one
+     */
+    public AbstractInitializableBeanIntrospection.BeanConstructorRef @Nullable [] constructorRefs() {
+        return constructorRefs;
     }
 
     /**

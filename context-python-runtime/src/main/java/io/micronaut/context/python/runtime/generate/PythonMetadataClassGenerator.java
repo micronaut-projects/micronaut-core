@@ -21,6 +21,7 @@ import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.DeclaredConstructorModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
@@ -66,6 +67,7 @@ public final class PythonMetadataClassGenerator {
     private static final String INTROSPECTION_SUPER = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospectionAndReference";
     private static final String ENUM_INTROSPECTION_SUPER = "io/micronaut/inject/beans/AbstractEnumBeanIntrospectionAndReference";
     private static final String ENUM_CONSTANT_REF = "io/micronaut/inject/beans/AbstractEnumBeanIntrospectionAndReference$EnumConstantObjectRef";
+    private static final String CONSTRUCTOR_REF = "io/micronaut/inject/beans/AbstractInitializableBeanIntrospection$BeanConstructorRef";
     private static final String BEAN_DEFINITION = "io/micronaut/inject/BeanDefinition";
     private static final String BEAN_CONTEXT = "io/micronaut/context/BeanContext";
     private static final String RESOLUTION_CONTEXT = "io/micronaut/context/BeanResolutionContext";
@@ -457,7 +459,10 @@ public final class PythonMetadataClassGenerator {
         }
         String superDescriptor = "(Ljava/lang/Class;L" + ANNOTATION_METADATA + ";L" + ANNOTATION_METADATA + ";[L" + ARGUMENT
             + ";[L" + PROPERTY_REF + ";[L" + METHOD_REF + ";";
-        if (introspection.enumConstants() == null) {
+        if (!introspection.declaredConstructors().isEmpty()) {
+            stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "constructorRefs", "()[L" + CONSTRUCTOR_REF + ";");
+            superDescriptor += "[L" + CONSTRUCTOR_REF + ";)V";
+        } else if (introspection.enumConstants() == null) {
             superDescriptor += ")V";
         } else {
             stateCall(init, name, STATE_DESC_I, INTROSPECTION_STATE, "enumConstantRefs", "()[L" + ENUM_CONSTANT_REF + ";");
@@ -638,6 +643,42 @@ public final class PythonMetadataClassGenerator {
         internal.visitInsn(Opcodes.ARETURN);
         internal.visitMaxs(0, 0);
         internal.visitEnd();
+        if (!introspection.declaredConstructors().isEmpty()) {
+            // Every described constructor is instantiated by its index, as the references number them
+            List<DeclaredConstructorModel> declared = introspection.declaredConstructors();
+            MethodVisitor byIndex = writer.visitMethod(Opcodes.ACC_PROTECTED, "instantiateConstructorInternal",
+                "(I[" + OBJECT_DESC + ")" + OBJECT_DESC, null, null);
+            byIndex.visitCode();
+            Label[] constructorLabels = labels(declared.size());
+            Label unknownConstructor = new Label();
+            byIndex.visitVarInsn(Opcodes.ILOAD, 1);
+            tableSwitch(byIndex, constructorLabels, unknownConstructor);
+            for (int i = 0; i < declared.size(); i++) {
+                DeclaredConstructorModel declaredConstructor = declared.get(i);
+                byIndex.visitLabel(constructorLabels[i]);
+                if (declaredConstructor.creator() == null) {
+                    byIndex.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
+                    byIndex.visitInsn(Opcodes.DUP);
+                }
+                List<ArgumentModel> arguments = declaredConstructor.arguments();
+                for (int a = 0; a < arguments.size(); a++) {
+                    byIndex.visitVarInsn(Opcodes.ALOAD, 2);
+                    pushInt(byIndex, a);
+                    byIndex.visitInsn(Opcodes.AALOAD);
+                    convert(byIndex, arguments.get(a).typeName());
+                }
+                if (declaredConstructor.creator() == null) {
+                    byIndex.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", descriptor(arguments, "void"), false);
+                } else {
+                    invoke(byIndex, declaredConstructor.creator());
+                }
+                byIndex.visitInsn(Opcodes.ARETURN);
+            }
+            byIndex.visitLabel(unknownConstructor);
+            unknownDispatch(byIndex, INTROSPECTION_BASE);
+            byIndex.visitMaxs(0, 0);
+            byIndex.visitEnd();
+        }
         booleanMethod(writer, "isBuildable", "()Z", true);
         booleanMethod(writer, "hasBuilder", "()Z", false);
         writer.visitEnd();

@@ -211,7 +211,7 @@ class Feature:
     def __init__(self):
         pass
 
-@Introspected
+@Introspected(constructors=True)
 class Ticket:
     code: str
 
@@ -464,6 +464,8 @@ class Person:
             result['ticket'] = introspection(ticket)
             result['ticket.instantiate'] = ticket.instantiate('abc').code
             result['ticket.staticCreator'] = ticket.constructor.arguments*.name
+            result['ticket.constructors'] = ticket.constructors.collect { [it.arguments*.name, it.arguments*.type*.name, it.annotationMetadata.annotationNames.sort()] }
+            result['ticket.constructorInstantiate'] = ticket.constructors.collect { it.instantiate('xyz').code }
             result['introspected'] = introspector.findIntrospectedTypes { it.name.startsWith('garage.') }*.name.sort()
             result['introspections.enumerated'] = introspector.findIntrospections { it.name.startsWith('garage.') }*.beanType*.name.sort()
             def person = introspector.getIntrospection(loader.loadClass('garage.Person'))

@@ -30,10 +30,12 @@ import java.util.List;
  * @param methods                       The executable methods the introspection exposes, in declaration order
  * @param enumConstants                 The constants when the introspected type is an enum, in declaration order, or null when it is not
  * @param creator                       The static method the bean is created by, or null when its constructor creates it
+ * @param declaredConstructors          Every constructor the introspection describes, the instantiating one first, or an empty list when it describes only that one
  * @since 5.3.0
  */
 public record IntrospectionModel(String introspectionClassName, AnnotationMetadataModel constructorAnnotationMetadata,
                                  List<ArgumentModel> constructorArguments, List<PropertyModel> properties,
                                  List<PropertyIndexModel> indexes, List<BeanMethodModel> methods,
-                                 @Nullable List<EnumConstantModel> enumConstants, @Nullable MethodModel creator) {
+                                 @Nullable List<EnumConstantModel> enumConstants, @Nullable MethodModel creator,
+                                 List<DeclaredConstructorModel> declaredConstructors) {
 }

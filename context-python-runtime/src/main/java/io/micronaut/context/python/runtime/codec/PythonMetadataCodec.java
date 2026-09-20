@@ -24,6 +24,7 @@ import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ClassValueModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
+import io.micronaut.context.python.runtime.model.DeclaredConstructorModel;
 import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
 import io.micronaut.context.python.runtime.model.FactoryMethodModel;
@@ -318,6 +319,15 @@ public final class PythonMetadataCodec {
                     argument(beanMethod.returnArgument());
                     annotationMetadata(beanMethod.annotationMetadata());
                 }
+                out.writeInt(introspection.declaredConstructors().size());
+                for (DeclaredConstructorModel declared : introspection.declaredConstructors()) {
+                    annotationMetadata(declared.annotationMetadata());
+                    arguments(declared.arguments());
+                    out.writeBoolean(declared.creator() != null);
+                    if (declared.creator() != null) {
+                        method(declared.creator());
+                    }
+                }
                 out.writeBoolean(introspection.creator() != null);
                 if (introspection.creator() != null) {
                     method(introspection.creator());
@@ -590,6 +600,11 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < beanMethodCount; i++) {
                     beanMethods.add(new BeanMethodModel(method(), argument(), annotationMetadata()));
                 }
+                int declaredCount = count("declared constructor");
+                List<DeclaredConstructorModel> declaredConstructors = new ArrayList<>(declaredCount);
+                for (int i = 0; i < declaredCount; i++) {
+                    declaredConstructors.add(new DeclaredConstructorModel(annotationMetadata(), arguments(), in.readBoolean() ? method() : null));
+                }
                 MethodModel creator = in.readBoolean() ? method() : null;
                 List<EnumConstantModel> enumConstants = null;
                 if (in.readBoolean()) {
@@ -601,7 +616,7 @@ public final class PythonMetadataCodec {
                     enumConstants = List.copyOf(enumConstants);
                 }
                 introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments,
-                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, creator);
+                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, creator, List.copyOf(declaredConstructors));
             }
             return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }

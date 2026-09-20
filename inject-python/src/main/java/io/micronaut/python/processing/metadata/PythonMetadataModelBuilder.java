@@ -27,6 +27,7 @@ import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.BeanMethodModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
+import io.micronaut.context.python.runtime.model.DeclaredConstructorModel;
 import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
@@ -144,7 +145,7 @@ public final class PythonMetadataModelBuilder {
             }
             enumConstants = List.copyOf(enumConstants);
         }
-        for (String member : new String[]{"classes", "classNames", "packages", "builder", "targetPackage", "constructors", "members"}) {
+        for (String member : new String[]{"classes", "classNames", "packages", "builder", "targetPackage", "members"}) {
             if (introspected.contains(member) && !isDefault(introspected, member)) {
                 Object value = introspected.getValues().get(member);
                 String shown = value instanceof Object[] array ? java.util.Arrays.deepToString(array) : String.valueOf(value);
@@ -192,7 +193,7 @@ public final class PythonMetadataModelBuilder {
             // An enum is never instantiated by the introspection: the constants are the instances
             String enumIntrospectionName = introspectionName(classElement);
             return new IntrospectionModel(enumIntrospectionName, AnnotationMetadataModel.EMPTY, List.of(),
-                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, null);
+                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, null, List.of());
         }
         MethodElement constructor = classElement.getPrimaryConstructor().orElse(null);
         MethodElement defaultConstructor = classElement.getDefaultConstructor().orElse(null);
@@ -201,13 +202,32 @@ public final class PythonMetadataModelBuilder {
             throw unsupported(classElement, "an introspected class without a constructor");
         }
         MethodModel creator = instantiating.isStatic() ? method(classElement, classElement, instantiating) : null;
+        List<DeclaredConstructorModel> declaredConstructors = new ArrayList<>();
+        if (introspected.booleanValue("constructors").orElse(false)) {
+            // The writer describes the instantiating constructor first, then the other declared ones
+            List<MethodElement> ordered = new ArrayList<>();
+            ordered.add(instantiating);
+            for (MethodElement declared : classElement.getEnclosedElements(ElementQuery.CONSTRUCTORS)) {
+                if (!declared.equals(instantiating)) {
+                    ordered.add(declared);
+                }
+            }
+            for (MethodElement declared : ordered) {
+                List<ArgumentModel> arguments = new ArrayList<>();
+                for (ParameterElement parameter : declared.getParameters()) {
+                    arguments.add(argument(classElement, parameter.getName(), parameter.getGenericType(), parameter.getAnnotationMetadata()));
+                }
+                declaredConstructors.add(new DeclaredConstructorModel(annotationMetadata(classElement, declared.getAnnotationMetadata()),
+                    List.copyOf(arguments), declared.isStatic() ? method(classElement, classElement, declared) : null));
+            }
+        }
         List<ArgumentModel> constructorArguments = new ArrayList<>();
         for (ParameterElement parameter : instantiating.getParameters()) {
             constructorArguments.add(argument(classElement, parameter.getName(), parameter.getGenericType(), parameter.getAnnotationMetadata()));
         }
         String introspectionName = introspectionName(classElement);
         return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
-            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null, creator);
+            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null, creator, List.copyOf(declaredConstructors));
     }
 
     private String introspectionName(ClassElement classElement) {
