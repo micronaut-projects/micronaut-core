@@ -116,7 +116,9 @@ types and candidate selection; type arguments of generic super types; executable
 it (`$Factory$Method<n>$Definition`), instantiated by looking the factory bean up through the resolution context
 (qualified by the factory class) and invoking the method, with the method's own annotation metadata over the
 factory class's, its parameters as injection points, `@Bean(preDestroy = ...)` lifecycle methods and
-`@Bean(typed = ...)` exposed types. Introspections: constructors with arguments, readable, writable and read-only properties of
+`@Bean(typed = ...)` exposed types. A `@Named` without a value takes its implicit value, as the writer applies it:
+the decapitalized simple name of a class, or the name of a factory method, injected method parameter or
+constructor parameter. Introspections: constructors with arguments, readable, writable and read-only properties of
 any type, generics, property annotation metadata, and property indexes.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent

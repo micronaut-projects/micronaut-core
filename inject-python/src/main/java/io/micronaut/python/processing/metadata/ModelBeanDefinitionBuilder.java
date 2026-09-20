@@ -18,6 +18,8 @@ package io.micronaut.python.processing.metadata;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.EachBean;
+import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.InjectScope;
 import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
@@ -97,6 +99,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         this.factoryMethodDefinition = null;
         this.definitionName = definitionPrefix(classElement) + "$Definition";
         this.originatingElements = OriginatingElements.of(classElement);
+        autoApplyNamedToBeanProducingElement(classElement);
         if (constructorDefinition.requiresReflection()) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "a constructor that requires reflection");
         }
@@ -121,6 +124,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         // The writer's name: $Factory$Method<n>$Definition
         this.definitionName = definitionPrefix(method.getOwningType()) + "$" + NameUtils.capitalize(method.getName()) + uniqueIdentifier + "$Definition";
         this.originatingElements = OriginatingElements.of(method);
+        autoApplyNamedToBeanProducingElement(method);
         String construct = "the factory method " + method.getName();
         if (factoryMethodDefinition.requiresReflection() || method.isReflectionRequired(classElement)) {
             throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which requires reflection");
@@ -222,6 +226,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, "the suspending method " + method.getName());
         }
         checkInjectScope(method);
+        autoApplyNamedToParameters(method);
         List<InjectionPointModel> injectionPoints = new ArrayList<>();
         ParameterElement[] parameters = method.getParameters();
         for (int i = 0; i < parameters.length; i++) {
@@ -274,6 +279,45 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         };
     }
 
+    /**
+     * The writer's implicit qualifier: a {@code @Named} without a value takes the name of what it annotates, the
+     * decapitalized simple name of a class or the name (or property name) of a method, field or parameter. The writer
+     * annotates the element in its constructor, before it reads any metadata; the model backends do the same so that
+     * the exported metadata carries the same value.
+     */
+    private static void autoApplyNamed(Element element) {
+        AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
+        if (!annotationMetadata.hasAnnotation(AnnotationUtil.NAMED) && !annotationMetadata.hasStereotype(AnnotationUtil.NAMED)) {
+            return;
+        }
+        if (element.stringValue(AnnotationUtil.NAMED).isPresent()) {
+            return;
+        }
+        String name;
+        if (element instanceof ClassElement) {
+            name = NameUtils.decapitalize(element.getSimpleName());
+        } else if (element instanceof MethodElement && NameUtils.isGetterName(element.getName())) {
+            name = NameUtils.getPropertyNameForGetter(element.getName());
+        } else {
+            name = element.getName();
+        }
+        element.annotate(AnnotationUtil.NAMED, builder -> builder.value(name));
+    }
+
+    private static void autoApplyNamedToParameters(MethodElement method) {
+        for (ParameterElement parameter : method.getParameters()) {
+            autoApplyNamed(parameter);
+        }
+    }
+
+    private static void autoApplyNamedToBeanProducingElement(Element element) {
+        AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
+        if (annotationMetadata.hasAnnotation(EachProperty.class) || annotationMetadata.hasAnnotation(EachBean.class)) {
+            return;
+        }
+        autoApplyNamed(element);
+    }
+
     private void checkInjectScope(MethodElement method) {
         if (method.hasDeclaredAnnotation(InjectScope.class)) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "@InjectScope on " + method.getName());
@@ -300,6 +344,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             producerInjectionPoints = constructor.injectionPoints();
             producerMetadata = constructor.annotationMetadata();
         }
+        autoApplyNamedToParameters(producer);
         List<ArgumentModel> parameters = new ArrayList<>();
         List<InjectionPointModel> injectionPoints = new ArrayList<>();
         ParameterElement[] producerParameters = producer.getParameters();

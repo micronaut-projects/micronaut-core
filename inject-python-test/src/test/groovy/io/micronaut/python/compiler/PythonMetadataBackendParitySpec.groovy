@@ -167,6 +167,20 @@ class Fleet:
     def truck(self) -> Vehicle:
         return Vehicle("truck")
 
+    @Bean
+    @Named
+    def spare(self) -> Vehicle:
+        return Vehicle("spare")
+
+@Singleton
+@Named
+class SpareRadio(Radio):
+    def __init__(self):
+        pass
+
+    def station(self) -> str:
+        return "spare"
+
 @Singleton
 @Requires(property="feature.enabled", value="true")
 class Feature:
@@ -233,7 +247,7 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle)[$]((Van|Truck)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
@@ -241,14 +255,16 @@ class Person:
         metadataClasses(compiler) == metadataClasses(buildTime)
         metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Engine$Definition.class',
                                              'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Fleet$Definition.class',
-                                             'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class', 'garage/$Garage$Definition.class',
+                                             'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class',
+                                             'garage/$Garage$Definition.class',
                                              'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
-                                             'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$Trip$Definition.class']
+                                             'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class',
+                                             'garage/$Trip$Definition.class']
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
         models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage', 'garage.GarageController',
-                                   'garage.Person', 'garage.Radio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
+                                   'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class and no service entry for them, and a catalog instead'
         metadataClasses(runtime).isEmpty()
@@ -318,8 +334,8 @@ class Person:
         context.getBean(loader.loadClass('garage.Car'))
 
         then:
-        PythonRuntimeMetadata.generatedClassCount() - before == 5
-        ['garage.Car', 'garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.Trip'].every { PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass(it)) }
+        PythonRuntimeMetadata.generatedClassCount() - before == 6
+        ['garage.Car', 'garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.SpareRadio', 'garage.Trip'].every { PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass(it)) }
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.GarageController'))
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.Feature'))
 
@@ -328,7 +344,7 @@ class Person:
         context.getAllBeanDefinitions()
 
         then: 'the introspection, and every remaining definition (the controller with its executable methods companion) once all definitions are asked for'
-        PythonRuntimeMetadata.generatedClassCount() - before == 13
+        PythonRuntimeMetadata.generatedClassCount() - before == 15
 
         cleanup:
         context?.close()
@@ -368,6 +384,9 @@ class Person:
             result['vehicles'] = context.getBeanDefinitions(vehicleType).collect { definition(it) }.sort { it.name }
             def van = context.getBean(vehicleType, io.micronaut.inject.qualifiers.Qualifiers.byName('van'))
             result['vehicle.van'] = van.describe()
+            result['vehicle.spare'] = context.getBean(vehicleType, io.micronaut.inject.qualifiers.Qualifiers.byName('spare')).describe()
+            result['radio.spare'] = context.getBean(loader.loadClass('garage.Radio'), io.micronaut.inject.qualifiers.Qualifiers.byName('spareRadio')).station()
+            result['garage.SpareRadio'] = definition(context.getBeanDefinition(loader.loadClass('garage.SpareRadio')))
             result['vehicles.all'] = context.getBeansOfType(vehicleType)*.describe().sort()
             def truck = context.getBeansOfType(vehicleType).find { it.describe().startsWith('truck') }
             context.destroyBean(truck)
