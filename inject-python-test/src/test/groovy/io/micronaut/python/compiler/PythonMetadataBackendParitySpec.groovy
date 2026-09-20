@@ -290,15 +290,17 @@ class Person:
                                    'garage.GarageController',
                                    'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
-        and: 'the runtime backend emits no metadata class and no service entry for them, and a catalog instead'
-        metadataClasses(runtime).isEmpty()
-        services(runtime).isEmpty()
+        and: 'the runtime backend emits no metadata class of its own and no service entry, and a catalog instead'
+        // The introspection a validated configuration class needs is generated from the Java class of the Python
+        // class, by the ordinary Java pipeline, in every backend: it is not described by the Python model
+        metadataClasses(runtime) == ['garage/$GarageConfig$Introspection.class']
+        services(runtime) == ['META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/garage.$GarageConfig$Introspection']
         runtime.contains('META-INF/micronaut/python/runtime/catalog')
         !buildTime.contains('META-INF/micronaut/python/runtime/catalog')
 
         and: 'everything else (wrappers, Python sources, manifests) is identical across the three'
         def rest = compiler - metadataClasses(compiler) - services(compiler)
-        def runtimeRest = runtime - models(runtime) - ['META-INF/micronaut/python/runtime/catalog']
+        def runtimeRest = runtime - models(runtime) - metadataClasses(runtime) - services(runtime) - ['META-INF/micronaut/python/runtime/catalog']
         def buildTimeRest = buildTime - metadataClasses(buildTime) - services(buildTime) - models(buildTime)
         (rest - runtimeRest) + (runtimeRest - rest) == []
         (rest - buildTimeRest) + (buildTimeRest - rest) == []

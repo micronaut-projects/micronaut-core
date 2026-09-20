@@ -87,9 +87,6 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      * class itself, before the generated class is compiled.
      */
     private static final String ANN_PYTHON_CLASS = "io.micronaut.context.python.annotation.PythonClass";
-    private static final String PYTHON_METADATA_BACKEND_OPTION = "micronaut.python.metadata.backend";
-    private static final String PYTHON_METADATA_TYPES_OPTION = "micronaut.python.metadata.types";
-    private static final String PYTHON_LEGACY_METADATA_OPTION = "micronaut.python.runtimeMetadata";
 
     private final Set<String> processed = new HashSet<>();
     /**
@@ -146,49 +143,7 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
     }
 
     private boolean isIntrospected(VisitorContext context, ClassElement c) {
-        return processed.contains(c.getName())
-            || context.getClassElement(c.getPackageName() + ".$" + c.getSimpleName() + "$Introspection").isPresent()
-            || isPythonMetadataModelClass(context, c.getName());
-    }
-
-    /**
-     * Whether a Python metadata model backend describes the class instead of generating its metadata classes. Such an
-     * introspection is saved in the class's model, and generated from it at build time or at run time, so the Java
-     * class generated for the Python class must not generate a second one. The options are the ones the Python
-     * annotation processor is given ({@code micronaut.python.metadata.backend}, optionally narrowed by
-     * {@code micronaut.python.metadata.types}); they reach every visitor of the compilation.
-     *
-     * @param context   The visitor context
-     * @param className The name of the class, which a Python class and the Java class generated for it share
-     * @return Whether a model backend owns the introspection
-     */
-    private static boolean isPythonMetadataModelClass(VisitorContext context, String className) {
-        Map<String, String> options = context.getOptions();
-        String backend = options.get(PYTHON_METADATA_BACKEND_OPTION);
-        boolean model;
-        if (backend == null || backend.isBlank()) {
-            String legacy = options.get(PYTHON_LEGACY_METADATA_OPTION);
-            model = legacy != null && !legacy.isBlank();
-        } else {
-            model = backend.trim().startsWith("model");
-        }
-        if (!model) {
-            return false;
-        }
-        String selection = options.get(PYTHON_METADATA_TYPES_OPTION);
-        if (selection == null || selection.isBlank()) {
-            selection = options.get(PYTHON_LEGACY_METADATA_OPTION);
-        }
-        if (selection == null || selection.isBlank()) {
-            return true;
-        }
-        for (String selected : selection.split(",")) {
-            String name = selected.trim();
-            if (name.endsWith(".*") ? className.startsWith(name.substring(0, name.length() - 1)) : name.equals(className)) {
-                return true;
-            }
-        }
-        return false;
+        return processed.contains(c.getName()) || context.getClassElement(c.getPackageName() + ".$" + c.getSimpleName() + "$Introspection").isPresent();
     }
 
     /**

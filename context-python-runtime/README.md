@@ -120,11 +120,19 @@ factory class's, its parameters as injection points, `@Bean(preDestroy = ...)` l
 `@Bean(typed = ...)` exposed types. A `@Named` without a value takes its implicit value, as the writer applies it:
 the decapitalized simple name of a class, or the name of a factory method, injected method parameter or
 constructor parameter. Introspections: constructors with arguments, readable, writable and read-only properties of
-any type, generics, property annotation metadata, and property indexes.
+any type, generics, property annotation metadata, and property indexes. `@ConfigurationProperties` beans: property
+binding through setters, each guarded by the configuration containing the property, the whole binding skipped when it
+holds none of them, the command line property of a `cliPrefix` configuration, and the writer's validation decision
+(the definition is validated, and the constructed bean is validated as a whole when it binds configuration).
+
+One artifact of a validated configuration class is not described by the model: the introspection its validation
+needs is added to the Java class generated for the Python class, and is generated from there by the ordinary Java
+pipeline, identically in all three backends. The output of the runtime backend therefore contains that one
+introspection class and its service entry (asserted by the parity harness), and nothing else of the metadata.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
 fallback): factory fields, AOP around and introduction proxies (including `@Validated` constraints on bean
-methods), configuration properties, `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
+methods), configuration builders, `@EachProperty` and `@EachBean`, `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder,
 targetPackage, constructors, members)`, introspected enums, static creators, and incremental compilation of the
 model backends.
