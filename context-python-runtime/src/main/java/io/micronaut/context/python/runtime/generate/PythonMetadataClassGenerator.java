@@ -121,6 +121,9 @@ public final class PythonMetadataClassGenerator {
         if (definition.validated()) {
             interfaces.add("io/micronaut/inject/ValidatedBeanDefinition");
         }
+        if (definition.constructor().injectionPoints().stream().anyMatch(point -> point.kind() == InjectionPointModel.Kind.PARAMETER)) {
+            interfaces.add("io/micronaut/inject/ParametrizedInstantiatableBeanDefinition");
+        }
         ClassWriter writer = new GeneratedClassWriter();
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_SYNTHETIC, name,
             "L" + DEFINITION_SUPER + "<" + beanType.getDescriptor() + ">;", DEFINITION_SUPER, interfaces.toArray(String[]::new));
@@ -255,7 +258,12 @@ public final class PythonMetadataClassGenerator {
             }
         }
 
-        MethodVisitor instantiate = writer.visitMethod(Opcodes.ACC_PUBLIC, "instantiate", CONTEXT_PARAMS + ")" + OBJECT_DESC, null, null);
+        // A bean with a @Parameter argument is instantiated with the values supplied by name
+        boolean parametrized = definition.constructor().injectionPoints().stream()
+            .anyMatch(point -> point.kind() == InjectionPointModel.Kind.PARAMETER);
+        MethodVisitor instantiate = parametrized
+            ? writer.visitMethod(Opcodes.ACC_PUBLIC, "doInstantiate", CONTEXT_PARAMS + "Ljava/util/Map;)" + OBJECT_DESC, null, null)
+            : writer.visitMethod(Opcodes.ACC_PUBLIC, "instantiate", CONTEXT_PARAMS + ")" + OBJECT_DESC, null, null);
         instantiate.visitCode();
         List<ArgumentModel> parameters = definition.constructor().parameters();
         FactoryMethodModel factory = definition.factory();
@@ -908,6 +916,17 @@ public final class PythonMetadataClassGenerator {
         switch (point.kind()) {
             case BEAN_CONTEXT -> mv.visitVarInsn(Opcodes.ALOAD, 2);
             case RESOLUTION_CONTEXT -> mv.visitVarInsn(Opcodes.ALOAD, 1);
+            case CONFIGURATION_PATH -> {
+                mv.visitVarInsn(Opcodes.ALOAD, 1);
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, RESOLUTION_CONTEXT, "getConfigurationPath",
+                    "()Lio/micronaut/context/env/ConfigurationPath;", true);
+            }
+            case PARAMETER -> {
+                // A parametrized definition is instantiated with the values by name
+                mv.visitVarInsn(Opcodes.ALOAD, 3);
+                mv.visitLdcInsn(point.argument().name());
+                mv.visitMethodInsn(Opcodes.INVOKEINTERFACE, "java/util/Map", "get", "(" + OBJECT_DESC + ")" + OBJECT_DESC, true);
+            }
             case BEAN -> {
                 contextArguments(mv);
                 pushInt(mv, index);

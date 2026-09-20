@@ -111,7 +111,9 @@ beans (qualified by `@Named`, `@Any`, qualifier annotations, repeatable qualifie
 `@Type`), collections and arrays of beans, maps and streams of beans, bean registrations, `Optional` beans,
 `@Value` placeholders, `@Property` values, `BeanContext` and `BeanResolutionContext`; `@Inject` method injection
 (required or not); `@PostConstruct` and `@PreDestroy`; every scope and `@Primary`; `@Requires` conditions; exposed
-types and candidate selection; `@Context` eager initialization; type arguments of generic super types; executable methods without interception
+types and candidate selection; `@Context` eager initialization; iterable beans (`@EachProperty`, `@EachBean`), whose values are supplied by name
+when the definition is instantiated and whose configuration path is injected from the resolution context; type
+arguments of generic super types; executable methods without interception
 (`@Executable` and its stereotypes such as `@Controller` routes, `processOnStartup`), generated as the definition's
 `$Exec` companion. `@Factory` classes: each `@Bean` method produces its own definition, named as the compiler names
 it (`$Factory$Method<n>$Definition`), instantiated by looking the factory bean up through the resolution context
@@ -134,7 +136,7 @@ introspection class and its service entry (asserted by the parity harness), and 
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
 fallback): AOP around and introduction proxies (including `@Validated` constraints on bean
-methods), configuration builders, iterable beans (`@EachProperty`, `@EachBean`), `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
+methods), configuration builders, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder, targetPackage)`,
 which all ask for the introspection of another class, and incremental compilation of the model backends. The model
 describes one class, and the runtime backend defines a generated class in the package and loader of the class it

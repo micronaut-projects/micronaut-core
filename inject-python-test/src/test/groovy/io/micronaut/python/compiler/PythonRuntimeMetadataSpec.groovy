@@ -241,9 +241,9 @@ class RuntimePerson:
 
         when:
         PyronautCompiler.builder().pythonCode('''
-from micronaut.context.annotation import EachProperty
+from micronaut.core.annotation import Introspected
 
-@EachProperty("unsupported")
+@Introspected(targetPackage="elsewhere")
 class Unsupported:
     name: str
 
@@ -254,7 +254,7 @@ class Unsupported:
         then:
         def error = thrown(Exception)
         error.message.contains('Python metadata model backend')
-        error.message.contains('an iterable bean (@EachProperty) is not supported yet')
+        error.message.contains('@Introspected(targetPackage = elsewhere) is not supported yet')
         error.message.contains('micronaut.python.metadata.backend=compiler')
 
         cleanup:

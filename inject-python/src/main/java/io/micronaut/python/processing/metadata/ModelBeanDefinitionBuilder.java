@@ -20,10 +20,11 @@ import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.ConfigurationProperties;
 import io.micronaut.context.annotation.ConfigurationReader;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
-import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.env.ConfigurationPath;
 import io.micronaut.context.annotation.Property;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
@@ -110,7 +111,6 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         this.definitionName = definitionPrefix(classElement) + "$Definition";
         this.originatingElements = OriginatingElements.of(classElement);
         autoApplyNamedToBeanProducingElement(classElement);
-        checkNotIterable(classElement.getAnnotationMetadata());
         if (constructorDefinition.requiresReflection()) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "a constructor that requires reflection");
         }
@@ -136,7 +136,6 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         this.definitionName = definitionPrefix(method.getOwningType()) + "$" + NameUtils.capitalize(method.getName()) + uniqueIdentifier + "$Definition";
         this.originatingElements = OriginatingElements.of(method);
         autoApplyNamedToBeanProducingElement(method);
-        checkNotIterable(method.getAnnotationMetadata());
         String construct = "the factory method " + method.getName();
         if (factoryMethodDefinition.requiresReflection() || method.isReflectionRequired(classElement)) {
             throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which requires reflection");
@@ -157,19 +156,6 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, "an intercepted factory");
         }
         checkInjectScope(method);
-    }
-
-    /**
-     * An iterable bean produces one definition per configuration entry or per bean of another type, resolved through
-     * the configuration path of the resolution context. The model does not describe that yet.
-     */
-    private void checkNotIterable(AnnotationMetadata annotationMetadata) {
-        if (annotationMetadata.hasDeclaredStereotype(EachProperty.class)) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "an iterable bean (@EachProperty)");
-        }
-        if (annotationMetadata.hasDeclaredStereotype(EachBean.class)) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "an iterable bean (@EachBean)");
-        }
     }
 
     private static String definitionPrefix(ClassElement classElement) {
@@ -356,8 +342,11 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         if (type.isAssignable(BeanContext.class)) {
             return new InjectionPointModel(InjectionPointModel.Kind.BEAN_CONTEXT, argument, null, null, null, null, null);
         }
-        if (type.getName().equals(ConversionService.class.getName()) || type.isAssignable("io.micronaut.context.ConfigurationPath")) {
+        if (type.getName().equals(ConversionService.class.getName())) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "injecting " + type.getName() + " into " + parameter.getName());
+        }
+        if (type.isAssignable(ConfigurationPath.class)) {
+            return new InjectionPointModel(InjectionPointModel.Kind.CONFIGURATION_PATH, argument, null, null, null, null, null);
         }
         return switch (point) {
             case BeanDefinitionInjectionPoint.BeanInjectionPoint<ClassElement> ignored ->
@@ -375,7 +364,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             case BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> property ->
                 new InjectionPointModel(InjectionPointModel.Kind.PROPERTY, argument, null, property.propertyName(), property.propertyPath(), null, null);
             case BeanDefinitionInjectionPoint.ParameterInjectionPoint<ClassElement> ignored ->
-                throw PythonMetadataModelBuilder.unsupported(classElement, "the @Parameter " + parameter.getName());
+                new InjectionPointModel(InjectionPointModel.Kind.PARAMETER, argument, null, null, null, null, null);
             case BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint<ClassElement> map ->
                 new InjectionPointModel(InjectionPointModel.Kind.MAP_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(map.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint<ClassElement> stream ->
