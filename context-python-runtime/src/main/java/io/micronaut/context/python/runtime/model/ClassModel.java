@@ -47,4 +47,17 @@ public record ClassModel(String className, AnnotationMetadataModel annotationMet
         }
         throw new IllegalArgumentException("The model of " + className + " has no definition " + definitionClassName);
     }
+
+    /**
+     * Whether a definition declares an annotation, read where the writer reads it: from the definition's own metadata
+     * when it has one (a factory method), otherwise from the class's.
+     *
+     * @param definition     The definition
+     * @param annotationName The annotation name
+     * @return Whether it is declared
+     */
+    public boolean declares(BeanDefinitionModel definition, String annotationName) {
+        AnnotationMetadataModel metadata = definition.annotationMetadata() == null ? annotationMetadata : definition.annotationMetadata();
+        return metadata.declaredAnnotations().containsKey(annotationName) || metadata.declaredStereotypes().containsKey(annotationName);
+    }
 }

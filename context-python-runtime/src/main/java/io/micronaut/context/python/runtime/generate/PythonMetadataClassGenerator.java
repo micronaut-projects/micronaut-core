@@ -56,6 +56,7 @@ import java.util.Objects;
 public final class PythonMetadataClassGenerator {
 
     private static final String REQUIRES = "io.micronaut.context.annotation.Requires";
+    private static final String CONTEXT_SCOPE = "io.micronaut.context.annotation.Context";
     private static final String SUPPORT = "io/micronaut/context/python/runtime/PythonMetadataSupport";
     private static final String DEFINITION_STATE = "io/micronaut/context/python/runtime/PythonDefinitionState";
     private static final String INTROSPECTION_STATE = "io/micronaut/context/python/runtime/PythonIntrospectionState";
@@ -182,6 +183,11 @@ public final class PythonMetadataClassGenerator {
         if (!hasStereotype(model, definition, REQUIRES)) {
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";)Z", true);
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";L" + RESOLUTION_CONTEXT + ";)Z", true);
+        }
+
+        if (model.declares(definition, CONTEXT_SCOPE)) {
+            // The writer's eager initialization marker: a @Context bean is created when the context starts
+            booleanMethod(writer, "isContextScope", "()Z", true);
         }
 
         if (definition.executableMethods().stream().anyMatch(ExecutableMethodModel::processOnStartup)) {

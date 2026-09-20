@@ -99,9 +99,10 @@ Python + Java symbol analysis + annotation/type/bean visitors      (unchanged)
 - Catalogs of several class-path entries are merged in class-path order; a class listed twice with the same
   model identity is one class, with different identities a conflict that fails discovery with both sources named.
   A class that has both a build-time definition and a runtime model fails discovery too.
-- Discovery reads no model and generates nothing: a context start with references that no bean needs generates
-  zero classes (asserted by the parity harness). Definitions are generated when candidate resolution loads them,
-  which may happen during context start for eager beans.
+- Discovery reads no model and generates nothing by itself: a context start generates only what an eagerly
+  initialized bean needs, and nothing at all when there is none (asserted by the parity harness). Definitions are
+  generated when candidate resolution loads them. A `@Context` bean loads its definition at startup to evaluate its
+  conditions, whether or not they hold.
 
 ## Supported
 
@@ -110,7 +111,7 @@ beans (qualified by `@Named`, `@Any`, qualifier annotations, repeatable qualifie
 `@Type`), collections and arrays of beans, maps and streams of beans, bean registrations, `Optional` beans,
 `@Value` placeholders, `@Property` values, `BeanContext` and `BeanResolutionContext`; `@Inject` method injection
 (required or not); `@PostConstruct` and `@PreDestroy`; every scope and `@Primary`; `@Requires` conditions; exposed
-types and candidate selection; type arguments of generic super types; executable methods without interception
+types and candidate selection; `@Context` eager initialization; type arguments of generic super types; executable methods without interception
 (`@Executable` and its stereotypes such as `@Controller` routes, `processOnStartup`), generated as the definition's
 `$Exec` companion. `@Factory` classes: each `@Bean` method produces its own definition, named as the compiler names
 it (`$Factory$Method<n>$Definition`), instantiated by looking the factory bean up through the resolution context

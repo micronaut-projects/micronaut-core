@@ -41,7 +41,7 @@ from jakarta.inject import Singleton, Inject, Named
 from jakarta.annotation import PostConstruct, PreDestroy
 from jakarta.validation.constraints import NotBlank, Min
 from micronaut.core.annotation import Introspected
-from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean
+from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean, Context
 from micronaut.http.annotation import Controller, Get, QueryValue
 from micronaut.context import BeanRegistration
 from java.util.stream import Stream
@@ -181,6 +181,15 @@ class SpareRadio(Radio):
     def station(self) -> str:
         return "spare"
 
+@Context
+@Requires(property="feature.enabled", value="true")
+class Depot:
+    def __init__(self, engine: Engine):
+        self.count = engine.start()
+
+    def describe(self) -> str:
+        return "depot:" + str(self.count)
+
 @Singleton
 @Requires(property="feature.enabled", value="true")
 class Feature:
@@ -247,13 +256,13 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
         expect: 'the compiler and the build-time model backend emit the same definitions, introspections and service entries'
         metadataClasses(compiler) == metadataClasses(buildTime)
-        metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Engine$Definition.class',
+        metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Depot$Definition.class', 'garage/$Engine$Definition.class',
                                              'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Fleet$Definition.class',
                                              'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class',
                                              'garage/$Garage$Definition.class',
@@ -263,7 +272,8 @@ class Person:
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
-        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage', 'garage.GarageController',
+        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage',
+                                   'garage.GarageController',
                                    'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
         and: 'the runtime backend emits no metadata class and no service entry for them, and a catalog instead'
@@ -321,12 +331,13 @@ class Person:
         def loader = new URLClassLoader([outputs['model-runtime'].toURI().toURL()] as URL[], getClass().classLoader)
         def before = PythonRuntimeMetadata.generatedClassCount()
 
-        when: 'the context starts: the references answer candidate selection from the models, nothing is generated for this fixture'
+        when: 'the context starts: the references answer candidate selection from the models, and only the eagerly initialized bean is generated'
         def context = ApplicationContext.builder().classLoader(loader).properties(['feature.enabled': 'false']).start()
         def afterStart = PythonRuntimeMetadata.generatedClassCount() - before
 
-        then:
-        afterStart == 0
+        then: 'a @Context bean loads its definition to evaluate its condition, with the definition of the bean it needs; nothing else is generated'
+        afterStart == 2
+        ['garage.Depot', 'garage.Engine'].every { PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass(it)) }
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.Car'))
         !PythonRuntimeMetadata.isIntrospectionGenerated(loader.loadClass('garage.Person'))
 
@@ -334,7 +345,7 @@ class Person:
         context.getBean(loader.loadClass('garage.Car'))
 
         then:
-        PythonRuntimeMetadata.generatedClassCount() - before == 6
+        PythonRuntimeMetadata.generatedClassCount() - before == 7
         ['garage.Car', 'garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.SpareRadio', 'garage.Trip'].every { PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass(it)) }
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.GarageController'))
         !PythonRuntimeMetadata.isDefinitionGenerated(loader.loadClass('garage.Feature'))
@@ -344,7 +355,7 @@ class Person:
         context.getAllBeanDefinitions()
 
         then: 'the introspection, and every remaining definition (the controller with its executable methods companion) once all definitions are asked for'
-        PythonRuntimeMetadata.generatedClassCount() - before == 15
+        PythonRuntimeMetadata.generatedClassCount() - before == 16
 
         cleanup:
         context?.close()
@@ -392,6 +403,7 @@ class Person:
             context.destroyBean(truck)
             result['vehicle.truck.parked'] = truck.describe()
             result['feature.present'] = context.findBean(loader.loadClass('garage.Feature')).present
+            result['depot.describe'] = context.getBean(loader.loadClass('garage.Depot')).describe()
             result['trip.prototype'] = !context.getBean(loader.loadClass('garage.Trip')).is(context.getBean(loader.loadClass('garage.Trip')))
             def introspector = BeanIntrospector.forClassLoader(loader)
             ['garage.Person', 'garage.Engine'].each { String name ->

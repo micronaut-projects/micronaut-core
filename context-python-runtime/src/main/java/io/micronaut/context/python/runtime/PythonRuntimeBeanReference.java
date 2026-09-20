@@ -72,7 +72,8 @@ public final class PythonRuntimeBeanReference implements BeanDefinitionReference
 
     @Override
     public boolean isContextScope() {
-        return "io.micronaut.context.annotation.Context".equals(definition.info().scope());
+        // The writer's rule: a declared @Context, whose own scope stereotype is @Singleton
+        return PythonRuntimeMetadata.declares(owner, definition, "io.micronaut.context.annotation.Context");
     }
 
     @Override

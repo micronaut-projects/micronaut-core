@@ -145,6 +145,18 @@ public final class PythonRuntimeMetadata {
     }
 
     /**
+     * Whether a definition declares an annotation, answered from the saved model without generating anything.
+     *
+     * @param owner          The class the model describes
+     * @param definition     The definition
+     * @param annotationName The annotation name
+     * @return Whether it is declared
+     */
+    public static boolean declares(Class<?> owner, BeanDefinitionModel definition, String annotationName) {
+        return holder(owner).model().classModel().declares(definition, annotationName);
+    }
+
+    /**
      * Generates the introspection class if needed and returns its shared instance.
      *
      * @param beanType The wrapper class
