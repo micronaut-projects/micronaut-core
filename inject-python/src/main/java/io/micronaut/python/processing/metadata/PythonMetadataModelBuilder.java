@@ -33,6 +33,7 @@ import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.context.python.runtime.model.PropertyIndexModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
+import io.micronaut.context.python.runtime.model.PropertyMemberModel;
 import io.micronaut.context.python.runtime.model.PythonMetadataModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -61,7 +62,9 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -145,7 +148,7 @@ public final class PythonMetadataModelBuilder {
             }
             enumConstants = List.copyOf(enumConstants);
         }
-        for (String member : new String[]{"classes", "classNames", "packages", "builder", "targetPackage", "members"}) {
+        for (String member : new String[]{"classes", "classNames", "packages", "targetPackage", "builder"}) {
             if (introspected.contains(member) && !isDefault(introspected, member)) {
                 Object value = introspected.getValues().get(member);
                 String shown = value instanceof Object[] array ? java.util.Arrays.deepToString(array) : String.valueOf(value);
@@ -153,6 +156,7 @@ public final class PythonMetadataModelBuilder {
             }
         }
         boolean metadata = introspected.booleanValue("annotationMetadata").orElse(true);
+        boolean separatesDeclarations = metadata && introspected.booleanValue("members").orElse(false);
         boolean ignoreSettersWithDifferingType = introspected.booleanValue("ignoreSettersWithDifferingType").orElse(true);
         PropertyElementQuery query = PropertyElementQuery.of(classElement).ignoreSettersWithDifferingType(ignoreSettersWithDifferingType);
         AnnotationValue<?>[] indexedAnnotations = introspected.get("indexed", AnnotationValue[].class, new AnnotationValue[0]);
@@ -177,7 +181,8 @@ public final class PythonMetadataModelBuilder {
             if (property.getReadType().filter(t -> !t.equals(type)).isPresent() || property.getWriteType().filter(t -> !t.equals(type)).isPresent()) {
                 throw unsupported(classElement, "the property " + property.getName() + " read or written as another type than it is declared with");
             }
-            properties.add(new PropertyModel(property.getName(), argument(classElement, property.getName(), type, propertyMetadata), read, write, property.isReadOnly()));
+            properties.add(new PropertyModel(property.getName(), argument(classElement, property.getName(), type, propertyMetadata), read, write,
+                property.isReadOnly(), separatesDeclarations ? propertyMembers(classElement, property, metadata) : List.of()));
         }
         List<BeanMethodModel> beanMethods = new ArrayList<>();
         for (MethodElement method : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().annotated(am -> am.hasStereotype(Executable.class)))) {
@@ -193,7 +198,7 @@ public final class PythonMetadataModelBuilder {
             // An enum is never instantiated by the introspection: the constants are the instances
             String enumIntrospectionName = introspectionName(classElement);
             return new IntrospectionModel(enumIntrospectionName, AnnotationMetadataModel.EMPTY, List.of(),
-                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, null, List.of());
+                List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, null, List.of(), separatesDeclarations, false, false);
         }
         MethodElement constructor = classElement.getPrimaryConstructor().orElse(null);
         MethodElement defaultConstructor = classElement.getDefaultConstructor().orElse(null);
@@ -227,7 +232,104 @@ public final class PythonMetadataModelBuilder {
         }
         String introspectionName = introspectionName(classElement);
         return new IntrospectionModel(introspectionName, annotationMetadata(classElement, instantiating.getAnnotationMetadata()),
-            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null, creator, List.copyOf(declaredConstructors));
+            List.copyOf(constructorArguments), List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), null, creator, List.copyOf(declaredConstructors), separatesDeclarations, false, true);
+    }
+
+    /**
+     * The declarations of a property: the accessors the types of the hierarchy declare, each with its own annotation
+     * metadata, the most specific type first, as the introspection visitor collects them.
+     */
+    private List<PropertyMemberModel> propertyMembers(ClassElement classElement, PropertyElement property, boolean metadata) {
+        if (property.getField().isPresent()) {
+            throw unsupported(classElement, "the described members of the field-backed property " + property.getName());
+        }
+        List<PropertyMemberModel> members = new ArrayList<>();
+        property.getReadMethod().filter(method -> !method.isSynthetic()).ifPresent(method -> {
+            for (MethodElement declaration : declarations(classElement, method)) {
+                ClassElement returnType = declaration.getGenericReturnType();
+                members.add(new PropertyMemberModel(declaration.getDeclaringType().getName(), declaration.getName(),
+                    argument(classElement, declaration.getName(), returnType,
+                        memberAnnotationMetadata(metadata ? declaration.getDeclaredMethodAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+                            declaration.getReturnType())), true));
+            }
+        });
+        property.getWriteMethod().filter(method -> !method.isSynthetic() && method.getParameters().length == 1).ifPresent(method -> {
+            for (MethodElement declaration : declarations(classElement, method)) {
+                ParameterElement parameter = declaration.getParameters()[0];
+                members.add(new PropertyMemberModel(declaration.getDeclaringType().getName(), declaration.getName(),
+                    argument(classElement, declaration.getName(), parameter.getGenericType(),
+                        memberAnnotationMetadata(metadata ? declaration.getDeclaredMethodAnnotationMetadata() : AnnotationMetadata.EMPTY_METADATA,
+                            parameter.getType())), false));
+            }
+        });
+        return List.copyOf(members);
+    }
+
+    private static AnnotationMetadata memberAnnotationMetadata(AnnotationMetadata memberAnnotationMetadata, ClassElement type) {
+        AnnotationMetadata typeAnnotationMetadata = type.getTypeAnnotationMetadata();
+        if (typeAnnotationMetadata.isEmpty()) {
+            return merge(memberAnnotationMetadata);
+        }
+        return new io.micronaut.inject.annotation.AnnotationMetadataHierarchy(true, memberAnnotationMetadata, typeAnnotationMetadata).merge();
+    }
+
+    /**
+     * The declarations of an accessor: the method and the ones it overrides, the most specific type first.
+     */
+    private static List<MethodElement> declarations(ClassElement beanType, MethodElement method) {
+        Set<String> declaringTypes = new LinkedHashSet<>();
+        declaringTypes.add(method.getDeclaringType().getName());
+        List<MethodElement> declarations = new ArrayList<>(3);
+        declarations.add(method);
+        List<MethodElement> candidates = new ArrayList<>(method.getOverriddenMethods());
+        candidates.addAll(beanType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().includeOverriddenMethods()
+            .named(method.getName()).filter(candidate -> hasSameParameterTypes(candidate, method))));
+        for (MethodElement declaration : candidates) {
+            if (!declaration.isSynthetic() && declaringTypes.add(declaration.getDeclaringType().getName())) {
+                declarations.add(declaration);
+            }
+        }
+        if (declarations.size() > 1) {
+            List<String> hierarchy = hierarchyOf(beanType);
+            declarations.sort(Comparator.comparingInt(declaration -> {
+                int rank = hierarchy.indexOf(declaration.getDeclaringType().getName());
+                return rank == -1 ? Integer.MAX_VALUE : rank;
+            }));
+        }
+        return declarations;
+    }
+
+    private static boolean hasSameParameterTypes(MethodElement candidate, MethodElement method) {
+        ParameterElement[] candidateParameters = candidate.getParameters();
+        ParameterElement[] parameters = method.getParameters();
+        if (candidateParameters.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            if (!candidateParameters[i].getType().getName().equals(parameters[i].getType().getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static List<String> hierarchyOf(ClassElement type) {
+        List<ClassElement> classes = new ArrayList<>();
+        for (ClassElement current = type; current != null && !current.getName().equals(Object.class.getName()); current = current.getSuperType().orElse(null)) {
+            classes.add(current);
+        }
+        Set<String> hierarchy = new LinkedHashSet<>();
+        classes.forEach(aClass -> hierarchy.add(aClass.getName()));
+        classes.forEach(aClass -> collectInterfaces(aClass, hierarchy));
+        return new ArrayList<>(hierarchy);
+    }
+
+    private static void collectInterfaces(ClassElement type, Set<String> hierarchy) {
+        for (ClassElement anInterface : type.getInterfaces()) {
+            if (hierarchy.add(anInterface.getName())) {
+                collectInterfaces(anInterface, hierarchy);
+            }
+        }
     }
 
     private String introspectionName(ClassElement classElement) {

@@ -120,7 +120,8 @@ factory class's, its parameters as injection points, `@Bean(preDestroy = ...)` l
 `@Bean(typed = ...)` exposed types. A `@Named` without a value takes its implicit value, as the writer applies it:
 the decapitalized simple name of a class, or the name of a factory method, injected method parameter or
 constructor parameter. Introspections: constructors with arguments, readable, writable and read-only properties of
-any type, generics, property annotation metadata, and property indexes. `@ConfigurationProperties` beans: property
+any type, generics, property annotation metadata, property indexes, `@Executable` bean methods, enums with their
+constants, static `@Creator` methods, `@Introspected(constructors = true)` and `@Introspected(members = true)`. `@ConfigurationProperties` beans: property
 binding through setters, each guarded by the configuration containing the property, the whole binding skipped when it
 holds none of them, the command line property of a `cliPrefix` configuration, and the writer's validation decision
 (the definition is validated, and the constructed bean is validated as a whole when it binds configuration).
@@ -133,9 +134,11 @@ introspection class and its service entry (asserted by the parity harness), and 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
 fallback): factory fields, AOP around and introduction proxies (including `@Validated` constraints on bean
 methods), configuration builders, iterable beans (`@EachProperty`, `@EachBean`), `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
-reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder,
-targetPackage, constructors, members)`, introspected enums, static creators, and incremental compilation of the
-model backends.
+reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder, targetPackage)`,
+which all ask for the introspection of another class, and incremental compilation of the model backends. The model
+describes one class, and the runtime backend defines a generated class in the package and loader of the class it
+describes, so an introspection of another class or in another package has no model to be described by and no class
+to be defined next to.
 
 ## Tests
 

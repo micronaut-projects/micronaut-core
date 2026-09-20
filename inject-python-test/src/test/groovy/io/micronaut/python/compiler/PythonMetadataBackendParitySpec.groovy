@@ -228,7 +228,7 @@ class Fuel(Enum):
     PETROL = "petrol"
     DIESEL = "diesel"
 
-@Introspected
+@Introspected(members=True)
 class Person:
     name: Annotated[str, NotBlank]
     age: Annotated[int, Min(0)]
@@ -475,6 +475,8 @@ class Person:
             result['person.readOnly'] = person.getRequiredProperty('label', String).readOnly
             result['person.constraintIndex'] = person.getIndexedProperties(loader.loadClass('jakarta.validation.constraints.NotBlank'))*.name
             result['person.constraintStereotypeIndex'] = person.getIndexedProperties(loader.loadClass('jakarta.validation.Constraint'))*.name
+            result['person.separatesDeclarations'] = person.separatesDeclarations()
+            result['person.members'] = person.beanProperties.collect { p -> [p.name, p.members.collect { [it.name, it.declaringType.name, it.elementType.name(), it.annotationMetadata.annotationNames.sort()] }] }
             result['person.methods'] = person.beanMethods.collect { [it.name, it.returnType.type.name, it.arguments*.name, it.annotationMetadata.annotationNames.sort()] }
             result['person.greet'] = person.beanMethods.find { it.name == 'greet' }.invoke(instance, 'hello')
             person.beanMethods.find { it.name == 'touch' }.invoke(instance)

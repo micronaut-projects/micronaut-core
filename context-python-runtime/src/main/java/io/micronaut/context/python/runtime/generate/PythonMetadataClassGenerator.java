@@ -593,12 +593,23 @@ public final class PythonMetadataClassGenerator {
             dispatch.visitEnd();
         }
 
+        if (introspection.separatesDeclarations()) {
+            booleanMethod(writer, "separatesDeclarations", "()Z", true);
+        }
+
         indexMethods(writer, introspection);
         if (introspection.enumConstants() != null) {
             // The constants are the instances of an enum: the introspection neither builds nor constructs one
             booleanMethod(writer, "hasConstructor", "()Z", false);
             booleanMethod(writer, "isBuildable", "()Z", false);
             booleanMethod(writer, "hasBuilder", "()Z", false);
+            writer.visitEnd();
+            return writer.toByteArray();
+        }
+        if (!introspection.hasConstructor()) {
+            // Only a builder builds this bean: there is no constructor to instantiate it with
+            booleanMethod(writer, "isBuildable", "()Z", introspection.hasBuilder());
+            booleanMethod(writer, "hasBuilder", "()Z", introspection.hasBuilder());
             writer.visitEnd();
             return writer.toByteArray();
         }
@@ -680,7 +691,7 @@ public final class PythonMetadataClassGenerator {
             byIndex.visitEnd();
         }
         booleanMethod(writer, "isBuildable", "()Z", true);
-        booleanMethod(writer, "hasBuilder", "()Z", false);
+        booleanMethod(writer, "hasBuilder", "()Z", introspection.hasBuilder());
         writer.visitEnd();
         return writer.toByteArray();
     }

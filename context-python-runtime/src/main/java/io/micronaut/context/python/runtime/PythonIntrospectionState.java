@@ -21,11 +21,14 @@ import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.DeclaredConstructorModel;
 import io.micronaut.context.python.runtime.model.EnumConstantModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
+import io.micronaut.context.python.runtime.model.PropertyMemberModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
+
+import java.lang.annotation.ElementType;
 import io.micronaut.inject.beans.AbstractEnumBeanIntrospectionAndReference;
 import io.micronaut.inject.beans.AbstractInitializableBeanIntrospection;
 import org.jspecify.annotations.Nullable;
@@ -103,8 +106,19 @@ public final class PythonIntrospectionState {
             } else if (property.readOnly()) {
                 with = index++;
             }
+            AbstractInitializableBeanIntrospection.BeanPropertyMemberRef[] memberRefs = null;
+            if (!property.members().isEmpty()) {
+                memberRefs = new AbstractInitializableBeanIntrospection.BeanPropertyMemberRef[property.members().size()];
+                for (int m = 0; m < memberRefs.length; m++) {
+                    PropertyMemberModel member = property.members().get(m);
+                    // A member is read through the accessor the property reads; a write method is never read
+                    memberRefs[m] = new AbstractInitializableBeanIntrospection.BeanPropertyMemberRef(ElementType.METHOD,
+                        materializer.resolve(member.declaringTypeName()), member.name(), materializer.argument(member.argument()),
+                        member.readable() ? read : -1);
+                }
+            }
             refs[i] = new AbstractInitializableBeanIntrospection.BeanPropertyRef(argument,
-                read == -1 ? null : argument, write == -1 ? null : argument, read, write, with, property.readOnly(), !property.readOnly());
+                read == -1 ? null : argument, write == -1 ? null : argument, read, write, with, property.readOnly(), !property.readOnly(), memberRefs);
         }
         List<BeanMethodModel> beanMethods = introspection.methods();
         AbstractInitializableBeanIntrospection.BeanMethodRef<Object>[] methodRefs =

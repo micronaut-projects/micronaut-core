@@ -99,14 +99,14 @@ class PythonMetadataClassGeneratorTest {
             List.of(new ExecutableMethodModel(method("getName", "java.lang.String"), arg("getName", "java.lang.String"), EMPTY, true, true, false),
                 new ExecutableMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY, true, false, false)));
         List<PropertyModel> properties = List.of(
-            new PropertyModel("name", arg("name", "java.lang.String"), method("getName", "java.lang.String"), method("setName", "void", arg("name", "java.lang.String")), false),
-            new PropertyModel("age", arg("age", "int"), method("getAge", "int"), method("setAge", "void", arg("age", "int")), false),
-            new PropertyModel("id", arg("id", "long"), method("getId", "long"), null, true));
+            new PropertyModel("name", arg("name", "java.lang.String"), method("getName", "java.lang.String"), method("setName", "void", arg("name", "java.lang.String")), false, List.of()),
+            new PropertyModel("age", arg("age", "int"), method("getAge", "int"), method("setAge", "void", arg("age", "int")), false, List.of()),
+            new PropertyModel("id", arg("id", "long"), method("getId", "long"), null, true, List.of()));
         IntrospectionModel introspection = new IntrospectionModel("io.micronaut.context.python.runtime.$SampleBean$Introspection", EMPTY, List.of(dependency, value), properties,
             List.of(new PropertyIndexModel("jakarta.validation.Constraint", null, 0), new PropertyIndexModel("jakarta.persistence.Column", "name_col", 0),
                 new PropertyIndexModel("jakarta.persistence.Column", "age_col", 1)),
             List.of(new BeanMethodModel(method("initialize", "void"), arg("initialize", "void"), EMPTY),
-                new BeanMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY)), null, null, List.of());
+                new BeanMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY)), null, null, List.of(), false, false, true);
         return new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), introspection);
     }
 

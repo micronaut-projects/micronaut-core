@@ -17,6 +17,8 @@ package io.micronaut.context.python.runtime.model;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * A bean property of an introspection.
  *
@@ -25,8 +27,9 @@ import org.jspecify.annotations.Nullable;
  * @param readMethod  The read method, if readable
  * @param writeMethod The write method, if writable
  * @param readOnly    Whether the property is read only
+ * @param members     The declarations of the property, when the introspection separates them, otherwise empty
  * @since 5.3.0
  */
 public record PropertyModel(String name, ArgumentModel argument, @Nullable MethodModel readMethod,
-                            @Nullable MethodModel writeMethod, boolean readOnly) {
+                            @Nullable MethodModel writeMethod, boolean readOnly, List<PropertyMemberModel> members) {
 }

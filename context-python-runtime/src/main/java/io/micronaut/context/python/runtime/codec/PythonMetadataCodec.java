@@ -35,6 +35,7 @@ import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.context.python.runtime.model.PrecalculatedInfoModel;
 import io.micronaut.context.python.runtime.model.PropertyGuardModel;
 import io.micronaut.context.python.runtime.model.PropertyIndexModel;
+import io.micronaut.context.python.runtime.model.PropertyMemberModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
 import io.micronaut.context.python.runtime.model.PythonMetadataModel;
 import io.micronaut.context.python.runtime.model.ValueKind;
@@ -306,6 +307,13 @@ public final class PythonMetadataCodec {
                         method(property.writeMethod());
                     }
                     out.writeBoolean(property.readOnly());
+                    out.writeInt(property.members().size());
+                    for (PropertyMemberModel member : property.members()) {
+                        string(member.declaringTypeName());
+                        string(member.name());
+                        argument(member.argument());
+                        out.writeBoolean(member.readable());
+                    }
                 }
                 out.writeInt(introspection.indexes().size());
                 for (PropertyIndexModel index : introspection.indexes()) {
@@ -319,6 +327,9 @@ public final class PythonMetadataCodec {
                     argument(beanMethod.returnArgument());
                     annotationMetadata(beanMethod.annotationMetadata());
                 }
+                out.writeBoolean(introspection.separatesDeclarations());
+                out.writeBoolean(introspection.hasBuilder());
+                out.writeBoolean(introspection.hasConstructor());
                 out.writeInt(introspection.declaredConstructors().size());
                 for (DeclaredConstructorModel declared : introspection.declaredConstructors()) {
                     annotationMetadata(declared.annotationMetadata());
@@ -588,7 +599,14 @@ public final class PythonMetadataCodec {
                     ArgumentModel argument = argument();
                     MethodModel read = in.readBoolean() ? method() : null;
                     MethodModel write = in.readBoolean() ? method() : null;
-                    properties.add(new PropertyModel(name, argument, read, write, in.readBoolean()));
+                    boolean readOnly = in.readBoolean();
+                    int memberCount = count("property member");
+                    List<PropertyMemberModel> members = new ArrayList<>(memberCount);
+                    for (int m = 0; m < memberCount; m++) {
+                        members.add(new PropertyMemberModel(requiredString("member declaring type"), requiredString("member name"),
+                            argument(), in.readBoolean()));
+                    }
+                    properties.add(new PropertyModel(name, argument, read, write, readOnly, List.copyOf(members)));
                 }
                 int indexCount = count("index");
                 List<PropertyIndexModel> indexes = new ArrayList<>(indexCount);
@@ -600,6 +618,9 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < beanMethodCount; i++) {
                     beanMethods.add(new BeanMethodModel(method(), argument(), annotationMetadata()));
                 }
+                boolean separatesDeclarations = in.readBoolean();
+                boolean hasBuilder = in.readBoolean();
+                boolean hasConstructor = in.readBoolean();
                 int declaredCount = count("declared constructor");
                 List<DeclaredConstructorModel> declaredConstructors = new ArrayList<>(declaredCount);
                 for (int i = 0; i < declaredCount; i++) {
@@ -616,7 +637,7 @@ public final class PythonMetadataCodec {
                     enumConstants = List.copyOf(enumConstants);
                 }
                 introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments,
-                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, creator, List.copyOf(declaredConstructors));
+                    List.copyOf(properties), List.copyOf(indexes), List.copyOf(beanMethods), enumConstants, creator, List.copyOf(declaredConstructors), separatesDeclarations, hasBuilder, hasConstructor);
             }
             return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }
