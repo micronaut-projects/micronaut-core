@@ -132,7 +132,7 @@ introspection class and its service entry (asserted by the parity harness), and 
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
 fallback): factory fields, AOP around and introduction proxies (including `@Validated` constraints on bean
-methods), configuration builders, `@EachProperty` and `@EachBean`, `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
+methods), configuration builders, iterable beans (`@EachProperty`, `@EachBean`), `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder,
 targetPackage, constructors, members)`, introspected enums, static creators, and incremental compilation of the
 model backends.

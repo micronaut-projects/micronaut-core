@@ -241,18 +241,20 @@ class RuntimePerson:
 
         when:
         PyronautCompiler.builder().pythonCode('''
-from typing import Annotated
-from micronaut.context.annotation import ConfigurationProperties
+from micronaut.context.annotation import EachProperty
 
-@ConfigurationProperties("unsupported")
+@EachProperty("unsupported")
 class Unsupported:
     name: str
+
+    def __init__(self):
+        self.name = "none"
 ''').targetDir(target).options(['-Amicronaut.python.metadata.backend=model-runtime']).build().compile()
 
         then:
         def error = thrown(Exception)
         error.message.contains('Python metadata model backend')
-        error.message.contains('is not supported yet')
+        error.message.contains('an iterable bean (@EachProperty) is not supported yet')
         error.message.contains('micronaut.python.metadata.backend=compiler')
 
         cleanup:

@@ -110,6 +110,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         this.definitionName = definitionPrefix(classElement) + "$Definition";
         this.originatingElements = OriginatingElements.of(classElement);
         autoApplyNamedToBeanProducingElement(classElement);
+        checkNotIterable(classElement.getAnnotationMetadata());
         if (constructorDefinition.requiresReflection()) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "a constructor that requires reflection");
         }
@@ -135,6 +136,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         this.definitionName = definitionPrefix(method.getOwningType()) + "$" + NameUtils.capitalize(method.getName()) + uniqueIdentifier + "$Definition";
         this.originatingElements = OriginatingElements.of(method);
         autoApplyNamedToBeanProducingElement(method);
+        checkNotIterable(method.getAnnotationMetadata());
         String construct = "the factory method " + method.getName();
         if (factoryMethodDefinition.requiresReflection() || method.isReflectionRequired(classElement)) {
             throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which requires reflection");
@@ -155,6 +157,19 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             throw PythonMetadataModelBuilder.unsupported(classElement, "an intercepted factory");
         }
         checkInjectScope(method);
+    }
+
+    /**
+     * An iterable bean produces one definition per configuration entry or per bean of another type, resolved through
+     * the configuration path of the resolution context. The model does not describe that yet.
+     */
+    private void checkNotIterable(AnnotationMetadata annotationMetadata) {
+        if (annotationMetadata.hasDeclaredStereotype(EachProperty.class)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "an iterable bean (@EachProperty)");
+        }
+        if (annotationMetadata.hasDeclaredStereotype(EachBean.class)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "an iterable bean (@EachBean)");
+        }
     }
 
     private static String definitionPrefix(ClassElement classElement) {
