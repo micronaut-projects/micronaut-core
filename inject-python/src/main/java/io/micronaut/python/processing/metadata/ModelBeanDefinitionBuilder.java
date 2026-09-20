@@ -18,10 +18,14 @@ package io.micronaut.python.processing.metadata;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.EachBean;
 import io.micronaut.context.annotation.EachProperty;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.InjectScope;
+import io.micronaut.context.annotation.Property;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.context.beans.definition.BeanDefinitionBuilder;
 import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
 import io.micronaut.context.beans.definition.ConstructorDefinition;
@@ -36,9 +40,11 @@ import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
+import io.micronaut.context.python.runtime.model.PropertyGuardModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.InjectionPoint;
@@ -53,8 +59,10 @@ import io.micronaut.inject.writer.OriginatingElements;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -86,6 +94,8 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
     private final List<InjectedMethodModel> methods = new ArrayList<>();
     private final List<ExecutableMethodModel> executableMethods = new ArrayList<>();
     private final Set<String> executableKeys = new LinkedHashSet<>();
+    private boolean validated;
+    private boolean postConstructValidation;
 
     /**
      * A definition instantiated by the constructor of the class.
@@ -219,63 +229,146 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         if (methodDefinition.requiresReflection()) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "the method " + method.getName() + ", which requires reflection");
         }
-        if (methodDefinition.isSetter() || methodDefinition.isOptional() || methodDefinition.booleanInjectionPoint() != null) {
-            throw PythonMetadataModelBuilder.unsupported(classElement, "the property injection method " + method.getName());
+        if (methodDefinition.booleanInjectionPoint() != null) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "the configuration builder property " + method.getName());
+        }
+        if (methodDefinition.isSetter() && method.getParameters().length != 1) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "the property setter " + method.getName() + ", which does not take exactly one value");
         }
         if (method.getSuspendParameters().length != method.getParameters().length) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "the suspending method " + method.getName());
         }
         checkInjectScope(method);
         autoApplyNamedToParameters(method);
+        applyValidation(methodDefinition.annotationMetadata(), methodDefinition.injectionPoints());
         List<InjectionPointModel> injectionPoints = new ArrayList<>();
         ParameterElement[] parameters = method.getParameters();
         for (int i = 0; i < parameters.length; i++) {
-            injectionPoints.add(injectionPoint(methodDefinition.injectionPoints().get(i), parameters[i]));
+            InjectionPointModel point = injectionPoint(methodDefinition.injectionPoints().get(i), parameters[i]);
+            if (methodDefinition.isSetter()) {
+                point = setterPoint(method, point, parameters[i]);
+            }
+            injectionPoints.add(point);
         }
         methods.add(new InjectedMethodModel(modelBuilder.method(classElement, beanTypeElement, method),
             modelBuilder.annotationMetadata(classElement, methodDefinition.annotationMetadata()),
             List.copyOf(injectionPoints), methodDefinition.isOptional(), methodDefinition.isSetter(), postConstruct, preDestroy,
-            InjectionPoint.isInjectionRequired(methodDefinition.annotationMetadata())));
+            InjectionPoint.isInjectionRequired(methodDefinition.annotationMetadata()), guard(methodDefinition)));
         return this;
+    }
+
+    /**
+     * The writer's validation decision for a member: a member that declares validation and has a validated injection
+     * point makes the definition validated, and validates the whole bean once constructed when it binds configuration
+     * or when a bean dependency (which may be injected as null) carries the constraint.
+     */
+    private void applyValidation(AnnotationMetadata annotationMetadata, List<BeanDefinitionInjectionPoint<ClassElement>> injectionPoints) {
+        if (!annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)) {
+            return;
+        }
+        List<BeanDefinitionInjectionPoint<ClassElement>> validatedPoints = injectionPoints.stream().filter(point -> {
+            if (!point.annotationMetadata().hasDeclaredAnnotation(RequiresValidation.class)) {
+                return false;
+            }
+            return !(point instanceof BeanDefinitionInjectionPoint.BeanInjectionPoint<ClassElement>) || point.type().isNullable();
+        }).toList();
+        if (validatedPoints.isEmpty()) {
+            return;
+        }
+        validated = true;
+        boolean configurationProperties = classElement.getAnnotationMetadata().hasStereotype(ConfigurationReader.class);
+        if (configurationProperties || validatedPoints.stream().anyMatch(point ->
+            point instanceof BeanDefinitionInjectionPoint.BeanInjectionPoint<ClassElement>
+                || point instanceof BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint<ClassElement>
+                || !isValueType(point.annotationMetadata()))) {
+            postConstructValidation = true;
+        }
+    }
+
+    private static boolean isValueType(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredStereotype(Value.class) || annotationMetadata.hasDeclaredStereotype(Property.class);
+    }
+
+    /**
+     * A setter resolves its value the same way an ordinary method argument does, with one addition: the writer also
+     * reads the command line property of a configuration that declares a cli prefix.
+     */
+    private InjectionPointModel setterPoint(MethodElement method, InjectionPointModel point, ParameterElement parameter) {
+        return switch (point.kind()) {
+            case PROPERTY -> new InjectionPointModel(point.kind(), point.argument(), point.beanTypeName(), point.propertyName(),
+                point.propertyPath(), point.value(), cliProperty(parameter.getName()));
+            case VALUE -> point;
+            default -> throw PythonMetadataModelBuilder.unsupported(classElement,
+                "the property setter " + method.getName() + ", which injects " + point.kind().name().toLowerCase(Locale.ROOT).replace('_', ' '));
+        };
+    }
+
+    /**
+     * The property an optional injection is guarded by, as the writer computes the check: the {@code @Property} name,
+     * asked for as a prefix when the value holds several values, plus the command line property when one applies.
+     */
+    private @Nullable PropertyGuardModel guard(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
+        if (!methodDefinition.isOptional()) {
+            return null;
+        }
+        MethodElement method = methodDefinition.methodElement();
+        String property = methodDefinition.annotationMetadata().stringValue(Property.class, "name").orElse(null);
+        if (property == null) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "the optional injection method " + method.getName() + ", which has no @Property name");
+        }
+        ClassElement type = method.getParameters()[0].getGenericType();
+        boolean multiValue = type.isAssignable(Map.class) || type.isAssignable(Collection.class) || type.hasStereotype(ConfigurationReader.class);
+        return new PropertyGuardModel(property, multiValue, cliProperty(""));
+    }
+
+    /**
+     * The command line property of a configuration property name, or null when the class declares no cli prefix.
+     */
+    private @Nullable String cliProperty(String propertyName) {
+        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
+        if (!annotationMetadata.hasStereotype(ConfigurationReader.class) || !annotationMetadata.isPresent(ConfigurationProperties.class, "cliPrefix")) {
+            return null;
+        }
+        return annotationMetadata.stringValue(ConfigurationProperties.class, "cliPrefix").map(prefix -> prefix + propertyName).orElse(null);
     }
 
     private InjectionPointModel injectionPoint(BeanDefinitionInjectionPoint<ClassElement> point, ParameterElement parameter) {
         ArgumentModel argument = modelBuilder.argument(classElement, parameter.getName(), parameter.getGenericType(), parameter.getAnnotationMetadata());
         ClassElement type = point.type();
         if (type.isAssignable(BeanResolutionContext.class)) {
-            return new InjectionPointModel(InjectionPointModel.Kind.RESOLUTION_CONTEXT, argument, null, null, null, null);
+            return new InjectionPointModel(InjectionPointModel.Kind.RESOLUTION_CONTEXT, argument, null, null, null, null, null);
         }
         if (type.isAssignable(BeanContext.class)) {
-            return new InjectionPointModel(InjectionPointModel.Kind.BEAN_CONTEXT, argument, null, null, null, null);
+            return new InjectionPointModel(InjectionPointModel.Kind.BEAN_CONTEXT, argument, null, null, null, null, null);
         }
         if (type.getName().equals(ConversionService.class.getName()) || type.isAssignable("io.micronaut.context.ConfigurationPath")) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "injecting " + type.getName() + " into " + parameter.getName());
         }
         return switch (point) {
             case BeanDefinitionInjectionPoint.BeanInjectionPoint<ClassElement> ignored ->
-                new InjectionPointModel(InjectionPointModel.Kind.BEAN, argument, null, null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.BEAN, argument, null, null, null, null, null);
             case BeanDefinitionInjectionPoint.BeansInjectionPoint<ClassElement> beans ->
-                new InjectionPointModel(InjectionPointModel.Kind.BEANS, argument, PythonMetadataModelBuilder.typeName(beans.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.BEANS, argument, PythonMetadataModelBuilder.typeName(beans.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.OptionalBeanInjectionPoint<ClassElement> optional ->
-                new InjectionPointModel(InjectionPointModel.Kind.OPTIONAL_BEAN, argument, PythonMetadataModelBuilder.typeName(optional.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.OPTIONAL_BEAN, argument, PythonMetadataModelBuilder.typeName(optional.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.ValueInjectionPoint<ClassElement> value -> {
                 if (value.hasExpression()) {
                     throw PythonMetadataModelBuilder.unsupported(classElement, "the evaluated expression injected into " + parameter.getName());
                 }
-                yield new InjectionPointModel(InjectionPointModel.Kind.VALUE, argument, null, null, null, value.value());
+                yield new InjectionPointModel(InjectionPointModel.Kind.VALUE, argument, null, null, null, value.value(), null);
             }
             case BeanDefinitionInjectionPoint.PropertyInjectionPoint<ClassElement> property ->
-                new InjectionPointModel(InjectionPointModel.Kind.PROPERTY, argument, null, property.propertyName(), property.propertyPath(), null);
+                new InjectionPointModel(InjectionPointModel.Kind.PROPERTY, argument, null, property.propertyName(), property.propertyPath(), null, null);
             case BeanDefinitionInjectionPoint.ParameterInjectionPoint<ClassElement> ignored ->
                 throw PythonMetadataModelBuilder.unsupported(classElement, "the @Parameter " + parameter.getName());
             case BeanDefinitionInjectionPoint.MapOfBeansInjectionPoint<ClassElement> map ->
-                new InjectionPointModel(InjectionPointModel.Kind.MAP_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(map.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.MAP_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(map.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.StreamOfBeansInjectionPoint<ClassElement> stream ->
-                new InjectionPointModel(InjectionPointModel.Kind.STREAM_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(stream.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.STREAM_OF_BEANS, argument, PythonMetadataModelBuilder.typeName(stream.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.BeanRegistrationInjectionPoint<ClassElement> registration ->
-                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATION, argument, PythonMetadataModelBuilder.typeName(registration.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATION, argument, PythonMetadataModelBuilder.typeName(registration.beanType()), null, null, null, null);
             case BeanDefinitionInjectionPoint.BeanRegistrationsInjectionPoint<ClassElement> registrations ->
-                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATIONS, argument, PythonMetadataModelBuilder.typeName(registrations.beanType()), null, null, null);
+                new InjectionPointModel(InjectionPointModel.Kind.BEAN_REGISTRATIONS, argument, PythonMetadataModelBuilder.typeName(registrations.beanType()), null, null, null, null);
         };
     }
 
@@ -353,6 +446,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
                 producerParameters[i].getAnnotationMetadata()));
             injectionPoints.add(injectionPoint(producerInjectionPoints.get(i), producerParameters[i]));
         }
+        applyValidation(producerMetadata, producerInjectionPoints);
         ConstructorModel constructorModel = new ConstructorModel(modelBuilder.annotationMetadata(classElement, producerMetadata),
             List.copyOf(parameters), List.copyOf(injectionPoints));
         Map<String, List<ArgumentModel>> typeArguments = new LinkedHashMap<>();
@@ -382,7 +476,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         if (factoryMethodDefinition == null) {
             return List.of(new BeanDefinitionModel(definitionName, classElement.getName(), null, null, null, constructorModel, List.copyOf(methods),
                 List.copyOf(executableMethods), PythonMetadataModelBuilder.precalculatedInfo(classElement), exposedTypes,
-                declaredExposedTypes.length != 0, typeArguments));
+                declaredExposedTypes.length != 0, typeArguments, validated, postConstructValidation));
         }
         MethodElement method = factoryMethodDefinition.methodElement();
         // The writer's definition metadata is the method's target metadata: the factory class layer under the method's own
@@ -403,7 +497,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         return List.of(new BeanDefinitionModel(definitionName, PythonMetadataModelBuilder.typeName(beanTypeElement), factory, declaredMetadata, rootMetadata,
             constructorModel, List.copyOf(methods), List.copyOf(executableMethods),
             PythonMetadataModelBuilder.precalculatedInfo(definitionMetadata, method.getDeclaredMetadata(), false, beanTypeElement), exposedTypes,
-            declaredExposedTypes.length != 0, typeArguments));
+            declaredExposedTypes.length != 0, typeArguments, validated, postConstructValidation));
     }
 
     /**

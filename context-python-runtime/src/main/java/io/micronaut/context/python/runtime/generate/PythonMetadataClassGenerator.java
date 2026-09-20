@@ -27,6 +27,7 @@ import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.context.python.runtime.model.PropertyIndexModel;
+import io.micronaut.context.python.runtime.model.PropertyGuardModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
@@ -112,6 +113,9 @@ public final class PythonMetadataClassGenerator {
         if (preDestroy) {
             interfaces.add("io/micronaut/inject/DisposableBeanDefinition");
         }
+        if (definition.validated()) {
+            interfaces.add("io/micronaut/inject/ValidatedBeanDefinition");
+        }
         ClassWriter writer = new GeneratedClassWriter();
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_SYNTHETIC, name,
             "L" + DEFINITION_SUPER + "<" + beanType.getDescriptor() + ">;", DEFINITION_SUPER, interfaces.toArray(String[]::new));
@@ -183,6 +187,18 @@ public final class PythonMetadataClassGenerator {
         if (!hasStereotype(model, definition, REQUIRES)) {
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";)Z", true);
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";L" + RESOLUTION_CONTEXT + ";)Z", true);
+        }
+
+        if (definition.validated() && !definition.postConstructValidation()) {
+            // The writer's rule: injection point constraints are validated as the values resolve, so validating the
+            // constructed bean as well would require an introspection the bean does not need
+            MethodVisitor validate = writer.visitMethod(Opcodes.ACC_PUBLIC, "validate",
+                "(L" + RESOLUTION_CONTEXT + ";" + OBJECT_DESC + ")" + OBJECT_DESC, null, null);
+            validate.visitCode();
+            validate.visitVarInsn(Opcodes.ALOAD, 2);
+            validate.visitInsn(Opcodes.ARETURN);
+            validate.visitMaxs(0, 0);
+            validate.visitEnd();
         }
 
         if (model.declares(definition, CONTEXT_SCOPE)) {
@@ -661,10 +677,25 @@ public final class PythonMetadataClassGenerator {
         mv.visitTypeInsn(Opcodes.CHECKCAST, beanType.getInternalName());
         mv.visitVarInsn(Opcodes.ASTORE, 4);
         List<InjectedMethodModel> methods = definition.methods();
+        // A configuration bean binds nothing at all when the configuration holds none of its properties
+        Label noProperties = null;
+        if (definition.info().isConfigurationProperties() && "inject".equals(methodName) && methods.stream().anyMatch(selector)) {
+            noProperties = new Label();
+            mv.visitVarInsn(Opcodes.ALOAD, 0);
+            mv.visitVarInsn(Opcodes.ALOAD, 1);
+            mv.visitVarInsn(Opcodes.ALOAD, 2);
+            mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "containsProperties", "(L" + RESOLUTION_CONTEXT + ";L" + BEAN_CONTEXT + ";)Z", false);
+            mv.visitJumpInsn(Opcodes.IFEQ, noProperties);
+        }
         for (int methodIndex = 0; methodIndex < methods.size(); methodIndex++) {
             InjectedMethodModel method = methods.get(methodIndex);
             if (!selector.test(method)) {
                 continue;
+            }
+            Label absent = null;
+            if (method.guard() != null) {
+                absent = new Label();
+                propertyGuard(mv, name, method.guard(), absent);
             }
             List<ArgumentModel> parameters = method.method().parameters();
             if (method.required() || parameters.isEmpty()) {
@@ -703,11 +734,44 @@ public final class PythonMetadataClassGenerator {
                 pop(mv, method.method().returnType().typeName());
                 mv.visitLabel(skip);
             }
+            if (absent != null) {
+                mv.visitLabel(absent);
+            }
+        }
+        if (noProperties != null) {
+            mv.visitLabel(noProperties);
         }
         mv.visitVarInsn(Opcodes.ALOAD, 4);
         mv.visitInsn(Opcodes.ARETURN);
         mv.visitMaxs(0, 0);
         mv.visitEnd();
+    }
+
+    /**
+     * The writer's guard of an optional injection: the value is bound only when the configuration contains the
+     * property, or the command line property when the configuration declares a cli prefix.
+     */
+    private static void propertyGuard(MethodVisitor mv, String name, PropertyGuardModel guard, Label absent) {
+        String contains = guard.multiValue() ? "containsPropertiesValue" : "containsPropertyValue";
+        String descriptor = "(L" + RESOLUTION_CONTEXT + ";L" + BEAN_CONTEXT + ";Ljava/lang/String;)Z";
+        Label present = new Label();
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitLdcInsn(guard.propertyPath());
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, contains, descriptor, false);
+        if (guard.cliProperty() == null) {
+            mv.visitJumpInsn(Opcodes.IFEQ, absent);
+            return;
+        }
+        mv.visitJumpInsn(Opcodes.IFNE, present);
+        mv.visitVarInsn(Opcodes.ALOAD, 0);
+        mv.visitVarInsn(Opcodes.ALOAD, 1);
+        mv.visitVarInsn(Opcodes.ALOAD, 2);
+        mv.visitLdcInsn(guard.cliProperty());
+        mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "containsPropertyValue", descriptor, false);
+        mv.visitJumpInsn(Opcodes.IFEQ, absent);
+        mv.visitLabel(present);
     }
 
     private static void constructorArgument(MethodVisitor mv, String name, InjectionPointModel point, int index) {
@@ -777,7 +841,7 @@ public final class PythonMetadataClassGenerator {
                 pushInt(mv, methodIndex);
                 pushInt(mv, index);
                 mv.visitLdcInsn(point.propertyPath());
-                mv.visitInsn(Opcodes.ACONST_NULL);
+                pushStringOrNull(mv, point.cliProperty());
                 mv.visitMethodInsn(Opcodes.INVOKEVIRTUAL, name, "getPropertyValueForMethodArgument", CONTEXT_PARAMS + "IILjava/lang/String;Ljava/lang/String;)" + OBJECT_DESC, false);
             }
             default -> throw new IllegalStateException("Unsupported method injection point: " + point.kind());
@@ -893,6 +957,14 @@ public final class PythonMetadataClassGenerator {
             mv.visitLdcInsn(type);
         } else {
             mv.visitFieldInsn(Opcodes.GETSTATIC, boxedName(type), "TYPE", "Ljava/lang/Class;");
+        }
+    }
+
+    private static void pushStringOrNull(MethodVisitor mv, @Nullable String value) {
+        if (value == null) {
+            mv.visitInsn(Opcodes.ACONST_NULL);
+        } else {
+            mv.visitLdcInsn(value);
         }
     }
 

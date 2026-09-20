@@ -41,7 +41,7 @@ from jakarta.inject import Singleton, Inject, Named
 from jakarta.annotation import PostConstruct, PreDestroy
 from jakarta.validation.constraints import NotBlank, Min
 from micronaut.core.annotation import Introspected
-from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean, Context
+from micronaut.context.annotation import Value, Requires, Primary, Prototype, Property, Executable, Factory, Bean, Context, ConfigurationProperties
 from micronaut.http.annotation import Controller, Get, QueryValue
 from micronaut.context import BeanRegistration
 from java.util.stream import Stream
@@ -181,6 +181,20 @@ class SpareRadio(Radio):
     def station(self) -> str:
         return "spare"
 
+@ConfigurationProperties("garage")
+class GarageConfig:
+    name: Annotated[str, NotBlank]
+    size: int
+    tags: list[str]
+
+    def __init__(self):
+        self.name = "default"
+        self.size = 0
+        self.tags = []
+
+    def describe(self) -> str:
+        return self.name + "/" + str(self.size) + "/" + ",".join(self.tags)
+
 @Context
 @Requires(property="feature.enabled", value="true")
 class Depot:
@@ -256,7 +270,7 @@ class Person:
         def compiler = inventory(outputs.compiler)
         def buildTime = inventory(outputs['model-build-time'])
         def runtime = inventory(outputs['model-runtime'])
-        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
+        def metadataClasses = { List<String> files -> files.findAll { it ==~ /garage\/[$](Engine|Radio|BackupRadio|Trip|Car|Garage|GarageController|Feature|Person|Fleet|Vehicle|SpareRadio|Depot|GarageConfig)[$]((Van|Truck|Spare)[0-9])?[$]?(Definition|Introspection|Definition[$]Exec)\.class/ } }
         def services = { List<String> files -> files.findAll { (it.startsWith('META-INF/micronaut/io.micronaut.inject.BeanDefinitionReference/') || it.startsWith('META-INF/micronaut/io.micronaut.core.beans.BeanIntrospectionReference/')) && !it.contains('TargetTypeMapping') } }
         def models = { List<String> files -> files.findAll { it.endsWith('.mpym') } }
 
@@ -265,14 +279,14 @@ class Person:
         metadataClasses(compiler).sort() == ['garage/$BackupRadio$Definition.class', 'garage/$Car$Definition.class', 'garage/$Depot$Definition.class', 'garage/$Engine$Definition.class',
                                              'garage/$Engine$Introspection.class', 'garage/$Feature$Definition.class', 'garage/$Fleet$Definition.class',
                                              'garage/$Fleet$Spare2$Definition.class', 'garage/$Fleet$Truck1$Definition.class', 'garage/$Fleet$Van0$Definition.class',
-                                             'garage/$Garage$Definition.class',
+                                             'garage/$Garage$Definition.class', 'garage/$GarageConfig$Definition.class', 'garage/$GarageConfig$Introspection.class',
                                              'garage/$GarageController$Definition$Exec.class', 'garage/$GarageController$Definition.class',
                                              'garage/$Person$Introspection.class', 'garage/$Radio$Definition.class', 'garage/$SpareRadio$Definition.class',
                                              'garage/$Trip$Definition.class']
         services(compiler) == services(buildTime)
         models(compiler).isEmpty()
         models(buildTime) == models(runtime)
-        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage',
+        models(runtime).sort() == ['garage.BackupRadio', 'garage.Car', 'garage.Depot', 'garage.Engine', 'garage.Feature', 'garage.Fleet', 'garage.Garage', 'garage.GarageConfig',
                                    'garage.GarageController',
                                    'garage.Person', 'garage.Radio', 'garage.SpareRadio', 'garage.Trip'].collect { "META-INF/micronaut/python/runtime/${it}.mpym".toString() }
 
@@ -355,7 +369,7 @@ class Person:
         context.getAllBeanDefinitions()
 
         then: 'the introspection, and every remaining definition (the controller with its executable methods companion) once all definitions are asked for'
-        PythonRuntimeMetadata.generatedClassCount() - before == 16
+        PythonRuntimeMetadata.generatedClassCount() - before == 17
 
         cleanup:
         context?.close()
@@ -364,7 +378,7 @@ class Person:
 
     private Map observe(String backend) {
         def loader = new URLClassLoader([outputs[backend].toURI().toURL()] as URL[], getClass().classLoader)
-        def context = ApplicationContext.builder().classLoader(loader).properties(['car.name': 'parity', 'car.color': 'red', 'feature.enabled': 'true', 'micronaut.server.port': -1]).start()
+        def context = ApplicationContext.builder().classLoader(loader).properties(['car.name': 'parity', 'car.color': 'red', 'feature.enabled': 'true', 'garage.name': 'central', 'garage.size': 3, 'garage.tags': ['a', 'b'], 'micronaut.server.port': -1]).start()
         try {
             Map result = [:]
             ['garage.Engine', 'garage.Radio', 'garage.BackupRadio', 'garage.Trip', 'garage.Car', 'garage.Feature'].each { String name ->
@@ -404,6 +418,10 @@ class Person:
             result['vehicle.truck.parked'] = truck.describe()
             result['feature.present'] = context.findBean(loader.loadClass('garage.Feature')).present
             result['depot.describe'] = context.getBean(loader.loadClass('garage.Depot')).describe()
+            def configType = loader.loadClass('garage.GarageConfig')
+            result['garage.GarageConfig'] = definition(context.getBeanDefinition(configType))
+            result['config.describe'] = context.getBean(configType).describe()
+            result['config.validated'] = context.getBeanDefinition(configType) instanceof io.micronaut.inject.ValidatedBeanDefinition
             result['trip.prototype'] = !context.getBean(loader.loadClass('garage.Trip')).is(context.getBean(loader.loadClass('garage.Trip')))
             def introspector = BeanIntrospector.forClassLoader(loader)
             ['garage.Person', 'garage.Engine'].each { String name ->

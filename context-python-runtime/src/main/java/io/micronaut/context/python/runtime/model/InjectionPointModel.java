@@ -26,10 +26,12 @@ import org.jspecify.annotations.Nullable;
  * @param propertyName The property name for {@link Kind#PROPERTY}
  * @param propertyPath The property path for {@link Kind#PROPERTY}
  * @param value        The value expression for {@link Kind#VALUE}
+ * @param cliProperty  The command line property name for {@link Kind#PROPERTY}, when the configuration declares a cli prefix
  * @since 5.3.0
  */
 public record InjectionPointModel(Kind kind, ArgumentModel argument, @Nullable String beanTypeName,
-                                  @Nullable String propertyName, @Nullable String propertyPath, @Nullable String value) {
+                                  @Nullable String propertyName, @Nullable String propertyPath, @Nullable String value,
+                                  @Nullable String cliProperty) {
 
     /**
      * The supported injection point kinds.

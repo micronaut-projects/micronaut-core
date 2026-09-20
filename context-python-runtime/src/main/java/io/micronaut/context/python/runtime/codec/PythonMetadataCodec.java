@@ -30,6 +30,7 @@ import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.context.python.runtime.model.PrecalculatedInfoModel;
+import io.micronaut.context.python.runtime.model.PropertyGuardModel;
 import io.micronaut.context.python.runtime.model.PropertyIndexModel;
 import io.micronaut.context.python.runtime.model.PropertyModel;
 import io.micronaut.context.python.runtime.model.PythonMetadataModel;
@@ -249,6 +250,12 @@ public final class PythonMetadataCodec {
                     out.writeBoolean(method.postConstruct());
                     out.writeBoolean(method.preDestroy());
                     out.writeBoolean(method.required());
+                    out.writeBoolean(method.guard() != null);
+                    if (method.guard() != null) {
+                        string(method.guard().propertyPath());
+                        out.writeBoolean(method.guard().multiValue());
+                        string(method.guard().cliProperty());
+                    }
                 }
                 out.writeInt(bean.executableMethods().size());
                 for (ExecutableMethodModel executable : bean.executableMethods()) {
@@ -274,6 +281,8 @@ public final class PythonMetadataCodec {
                     string(entry.getKey());
                     arguments(entry.getValue());
                 }
+                out.writeBoolean(bean.validated());
+                out.writeBoolean(bean.postConstructValidation());
             }
             IntrospectionModel introspection = model.introspection();
             out.writeBoolean(introspection != null);
@@ -319,6 +328,7 @@ public final class PythonMetadataCodec {
                 string(point.propertyName());
                 string(point.propertyPath());
                 string(point.value());
+                string(point.cliProperty());
             }
         }
 
@@ -515,7 +525,7 @@ public final class PythonMetadataCodec {
                 List<InjectedMethodModel> methods = new ArrayList<>(methodCount);
                 for (int i = 0; i < methodCount; i++) {
                     methods.add(new InjectedMethodModel(method(), annotationMetadata(), injectionPoints(),
-                        in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean()));
+                        in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean(), in.readBoolean(), guard()));
                 }
                 int executableCount = count("executable method");
                 List<ExecutableMethodModel> executables = new ArrayList<>(executableCount);
@@ -532,7 +542,8 @@ public final class PythonMetadataCodec {
                     typeArguments.put(requiredString("type"), arguments());
                 }
                 beans.add(new BeanDefinitionModel(definitionClassName, beanTypeName, factory, definitionMetadata, rootMetadata, constructor,
-                    List.copyOf(methods), List.copyOf(executables), info, exposedTypes, exposedTypesDeclared, typeArguments));
+                    List.copyOf(methods), List.copyOf(executables), info, exposedTypes, exposedTypesDeclared, typeArguments,
+                    in.readBoolean(), in.readBoolean()));
             }
             IntrospectionModel introspection = null;
             if (in.readBoolean()) {
@@ -572,9 +583,16 @@ public final class PythonMetadataCodec {
                 if (kind == null) {
                     throw new PythonMetadataFormatException(resource, "unknown injection point kind " + code + " in " + section, null);
                 }
-                points.add(new InjectionPointModel(kind, argument(), string(), string(), string(), string()));
+                points.add(new InjectionPointModel(kind, argument(), string(), string(), string(), string(), string()));
             }
             return List.copyOf(points);
+        }
+
+        private @Nullable PropertyGuardModel guard() throws IOException {
+            if (!in.readBoolean()) {
+                return null;
+            }
+            return new PropertyGuardModel(requiredString("guard property"), in.readBoolean(), string());
         }
 
         private MethodModel method() throws IOException {

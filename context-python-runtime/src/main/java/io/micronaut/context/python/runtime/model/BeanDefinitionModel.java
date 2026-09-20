@@ -37,6 +37,8 @@ import java.util.Map;
  * @param exposedTypes        The exposed type names: the declared ones, or the bean type and its accessible super types
  * @param exposedTypesDeclared Whether the exposed types were declared ({@code @Bean(typed = ...)}), which narrows candidate selection
  * @param typeArguments       The type arguments by generic super type or interface
+ * @param validated           Whether the definition validates its injection points
+ * @param postConstructValidation Whether the whole bean is validated once constructed, rather than only its injection points
  * @since 5.3.0
  */
 public record BeanDefinitionModel(String definitionClassName, String beanTypeName, @Nullable FactoryMethodModel factory,
@@ -44,5 +46,5 @@ public record BeanDefinitionModel(String definitionClassName, String beanTypeNam
                                   ConstructorModel constructor, List<InjectedMethodModel> methods,
                                   List<ExecutableMethodModel> executableMethods,
                                   PrecalculatedInfoModel info, List<String> exposedTypes, boolean exposedTypesDeclared,
-                                  Map<String, List<ArgumentModel>> typeArguments) {
+                                  Map<String, List<ArgumentModel>> typeArguments, boolean validated, boolean postConstructValidation) {
 }

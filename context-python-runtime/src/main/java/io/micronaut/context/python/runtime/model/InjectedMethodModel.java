@@ -15,6 +15,8 @@
  */
 package io.micronaut.context.python.runtime.model;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 
 /**
@@ -28,9 +30,11 @@ import java.util.List;
  * @param postConstruct      Whether the method is a post-construct callback
  * @param preDestroy         Whether the method is a pre-destroy callback
  * @param required           Whether the injection is required, so the method is invoked without checking that every argument resolved
+ * @param guard              The property the injection is guarded by when it is optional, or null
  * @since 5.3.0
  */
 public record InjectedMethodModel(MethodModel method, AnnotationMetadataModel annotationMetadata,
                                   List<InjectionPointModel> injectionPoints, boolean optional, boolean setter,
-                                  boolean postConstruct, boolean preDestroy, boolean required) {
+                                  boolean postConstruct, boolean preDestroy, boolean required,
+                                  @Nullable PropertyGuardModel guard) {
 }

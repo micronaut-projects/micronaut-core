@@ -15,6 +15,7 @@
  */
 package io.micronaut.python.processing.metadata;
 
+import io.micronaut.context.annotation.ConfigurationReader;
 import io.micronaut.context.annotation.Context;
 import io.micronaut.context.annotation.DefaultScope;
 import io.micronaut.context.annotation.EachBean;
@@ -307,8 +308,9 @@ public final class PythonMetadataModelBuilder {
                 .map(t -> t.equals(Singleton.class.getName()) || t.equals(Context.class.getName())).orElse(false);
         }
         boolean iterable = annotationMetadata.hasDeclaredStereotype(EachProperty.class) || annotationMetadata.hasDeclaredStereotype(EachBean.class);
+        boolean configurationProperties = iterable || annotationMetadata.hasStereotype(ConfigurationReader.class);
         return new io.micronaut.context.python.runtime.model.PrecalculatedInfoModel(scope, isAbstract, iterable, singleton,
-            annotationMetadata.hasDeclaredStereotype(Primary.class), false, beanType.isArray() || beanType.isContainerType());
+            annotationMetadata.hasDeclaredStereotype(Primary.class), configurationProperties, beanType.isArray() || beanType.isContainerType());
     }
 
     /**
