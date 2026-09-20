@@ -171,8 +171,11 @@ classes are still in the output, and the compilation stops naming the file to re
   loader that is not a class-path loader works the same as long as it can read the model resources.
 - **The module path.** A private lookup on a class of a named module requires its package to be open to
   `io.micronaut.context.python.runtime`. The failure names the package to open and the backend to use instead.
-- **Binary compatibility.** `micronaut-inject-python` is checked against its baseline (`japiCmp`), as are
-  `micronaut-inject` and `micronaut-core-processor`. This module has no baseline: it has never been published.
+- **Binary compatibility.** `micronaut-inject` and `micronaut-core-processor` pass `japiCmp`. This module has no
+  baseline: it has never been published. `micronaut-inject-python` fails `japiCmp` against 5.2.2 on three changes
+  that predate this work and that it does not touch (`ArgumentDef`, `PythonJavaTypes.isConcreteClass` and
+  `TypeAnnotatedClassElement.equals`); the same failure is there on the commit this branch starts from. What this
+  work adds to that module's public surface is one overload, which the report classes as source compatible.
 - **Documentation.** The user guide page is `src/main/docs/guide/languageSupport/python/metadataBackends.adoc`.
 
 ## Tests

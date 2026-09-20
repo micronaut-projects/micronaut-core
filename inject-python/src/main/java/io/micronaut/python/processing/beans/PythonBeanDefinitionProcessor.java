@@ -58,6 +58,20 @@ public final class PythonBeanDefinitionProcessor {
     }
 
     /**
+     * Processes bean definitions for selected source elements, as a full compilation does.
+     *
+     * @param processingEnvironment The processing environment
+     * @param sourceFilter The source element filter
+     */
+    @Internal
+    public void processBeanDefinitions(
+        PythonProcessingEnvironment processingEnvironment,
+        Predicate<ClassElement> sourceFilter
+    ) {
+        processBeanDefinitions(processingEnvironment, sourceFilter, false);
+    }
+
+    /**
      * Processes bean definitions for selected source elements.
      *
      * @param processingEnvironment The processing environment
