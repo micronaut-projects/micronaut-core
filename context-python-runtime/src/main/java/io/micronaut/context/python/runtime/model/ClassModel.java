@@ -17,6 +17,8 @@ package io.micronaut.context.python.runtime.model;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * The resolved model of one Python class: its JVM wrapper, the annotation metadata after all visitors, and the
  * artifacts the compiler decided it needs. Bean definitions and introspections are independent: a class may have
@@ -24,10 +26,25 @@ import org.jspecify.annotations.Nullable;
  *
  * @param className          The binary name of the JVM wrapper class
  * @param annotationMetadata The class annotation metadata
- * @param beanDefinition     The bean definition, if the class is a bean
+ * @param beanDefinitions    The bean definitions: the class's own if it is a bean, and one per factory method if it is a factory
  * @param introspection      The introspection, if the class is introspected
  * @since 5.3.0
  */
 public record ClassModel(String className, AnnotationMetadataModel annotationMetadata,
-                         @Nullable BeanDefinitionModel beanDefinition, @Nullable IntrospectionModel introspection) {
+                         List<BeanDefinitionModel> beanDefinitions, @Nullable IntrospectionModel introspection) {
+
+    /**
+     * Finds a definition by the name of its generated class.
+     *
+     * @param definitionClassName The definition class name
+     * @return The definition
+     */
+    public BeanDefinitionModel definition(String definitionClassName) {
+        for (BeanDefinitionModel definition : beanDefinitions) {
+            if (definition.definitionClassName().equals(definitionClassName)) {
+                return definition;
+            }
+        }
+        throw new IllegalArgumentException("The model of " + className + " has no definition " + definitionClassName);
+    }
 }

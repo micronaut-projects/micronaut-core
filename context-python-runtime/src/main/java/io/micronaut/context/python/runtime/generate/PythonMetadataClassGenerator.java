@@ -16,10 +16,12 @@
 package io.micronaut.context.python.runtime.generate;
 
 import io.micronaut.context.python.runtime.ModelTypes;
+import io.micronaut.context.python.runtime.model.AnnotationMetadataModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
+import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
@@ -89,17 +91,15 @@ public final class PythonMetadataClassGenerator {
     }
 
     /**
-     * Generates the bean definition class of a model.
+     * Generates a bean definition class of a model.
      *
-     * @param model The class model, which must have a bean definition
+     * @param model      The class model
+     * @param definition The definition, one of the model's
      * @return The class bytes
      */
-    public static byte[] beanDefinition(ClassModel model) {
-        BeanDefinitionModel definition = model.beanDefinition();
-        if (definition == null) {
-            throw new IllegalArgumentException("The model of " + model.className() + " has no bean definition");
-        }
-        Type beanType = ModelTypes.type(model.className());
+    public static byte[] beanDefinition(ClassModel model, BeanDefinitionModel definition) {
+        Type ownerType = ModelTypes.type(model.className());
+        Type beanType = ModelTypes.type(definition.beanTypeName());
         String name = definition.definitionClassName().replace('.', '/');
         boolean postConstruct = definition.methods().stream().anyMatch(InjectedMethodModel::postConstruct);
         boolean preDestroy = definition.methods().stream().anyMatch(InjectedMethodModel::preDestroy);
@@ -125,8 +125,9 @@ public final class PythonMetadataClassGenerator {
 
         MethodVisitor clinit = writer.visitMethod(Opcodes.ACC_STATIC, "<clinit>", "()V", null, null);
         clinit.visitCode();
-        clinit.visitLdcInsn(beanType);
-        clinit.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "definitionState", "(Ljava/lang/Class;)" + STATE_DESC_D, false);
+        clinit.visitLdcInsn(ownerType);
+        clinit.visitLdcInsn(definition.definitionClassName());
+        clinit.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "definitionState", "(Ljava/lang/Class;Ljava/lang/String;)" + STATE_DESC_D, false);
         clinit.visitFieldInsn(Opcodes.PUTSTATIC, name, STATE_FIELD, STATE_DESC_D);
         if (executable) {
             clinit.visitTypeInsn(Opcodes.NEW, execName);
@@ -178,7 +179,7 @@ public final class PythonMetadataClassGenerator {
         load.visitMaxs(0, 0);
         load.visitEnd();
 
-        if (!hasStereotype(model, REQUIRES)) {
+        if (!hasStereotype(model, definition, REQUIRES)) {
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";)Z", true);
             booleanMethod(writer, "isEnabled", "(L" + BEAN_CONTEXT + ";L" + RESOLUTION_CONTEXT + ";)Z", true);
         }
@@ -229,14 +230,34 @@ public final class PythonMetadataClassGenerator {
 
         MethodVisitor instantiate = writer.visitMethod(Opcodes.ACC_PUBLIC, "instantiate", CONTEXT_PARAMS + ")" + OBJECT_DESC, null, null);
         instantiate.visitCode();
-        instantiate.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
-        instantiate.visitInsn(Opcodes.DUP);
         List<ArgumentModel> parameters = definition.constructor().parameters();
+        FactoryMethodModel factory = definition.factory();
+        if (factory == null) {
+            instantiate.visitTypeInsn(Opcodes.NEW, beanType.getInternalName());
+            instantiate.visitInsn(Opcodes.DUP);
+        } else if (!factory.isStatic()) {
+            // The writer's factory lookup: the factory bean through the resolution context, qualified by the factory class
+            Type factoryType = ModelTypes.type(factory.factoryTypeName());
+            instantiate.visitVarInsn(Opcodes.ALOAD, 1);
+            instantiate.visitLdcInsn(factoryType);
+            stateCall(instantiate, name, STATE_DESC_D, DEFINITION_STATE, "factoryQualifier", "()L" + QUALIFIER + ";");
+            instantiate.visitMethodInsn(Opcodes.INVOKEINTERFACE, RESOLUTION_CONTEXT, "getBean", "(Ljava/lang/Class;L" + QUALIFIER + ";)" + OBJECT_DESC, true);
+            instantiate.visitTypeInsn(Opcodes.CHECKCAST, factoryType.getInternalName());
+            instantiate.visitVarInsn(Opcodes.ALOAD, 1);
+            instantiate.visitMethodInsn(Opcodes.INVOKEINTERFACE, RESOLUTION_CONTEXT, "markDependentAsFactory", "()V", true);
+        }
         for (int i = 0; i < parameters.size(); i++) {
             constructorArgument(instantiate, name, definition.constructor().injectionPoints().get(i), i);
             convert(instantiate, parameters.get(i).typeName());
         }
-        instantiate.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", descriptor(parameters, "void"), false);
+        if (factory == null) {
+            instantiate.visitMethodInsn(Opcodes.INVOKESPECIAL, beanType.getInternalName(), "<init>", descriptor(parameters, "void"), false);
+        } else {
+            Type factoryType = ModelTypes.type(factory.factoryTypeName());
+            instantiate.visitMethodInsn(factory.isStatic() ? Opcodes.INVOKESTATIC : Opcodes.INVOKEVIRTUAL, factoryType.getInternalName(),
+                factory.methodName(), descriptor(parameters, factory.returnType().typeName()), false);
+            box(instantiate, factory.returnType().typeName());
+        }
         if (!inject && !postConstruct) {
             instantiate.visitInsn(Opcodes.ARETURN);
         } else {
@@ -287,17 +308,18 @@ public final class PythonMetadataClassGenerator {
     }
 
     /**
-     * Generates the executable methods definition class of a model, the {@code $Exec} companion of its definition.
+     * Generates the executable methods definition class of a definition, its {@code $Exec} companion.
      *
-     * @param model The class model, which must have a bean definition with executable methods
+     * @param model      The class model
+     * @param definition The definition, one of the model's, which must have executable methods
      * @return The class bytes
      */
-    public static byte[] executableMethods(ClassModel model) {
-        BeanDefinitionModel definition = model.beanDefinition();
-        if (definition == null || definition.executableMethods().isEmpty()) {
-            throw new IllegalArgumentException("The model of " + model.className() + " has no executable methods");
+    public static byte[] executableMethods(ClassModel model, BeanDefinitionModel definition) {
+        if (definition.executableMethods().isEmpty()) {
+            throw new IllegalArgumentException("The definition " + definition.definitionClassName() + " has no executable methods");
         }
-        Type beanType = ModelTypes.type(model.className());
+        Type ownerType = ModelTypes.type(model.className());
+        Type beanType = ModelTypes.type(definition.beanTypeName());
         String name = definition.definitionClassName().replace('.', '/') + EXEC_SUFFIX;
         ClassWriter writer = new GeneratedClassWriter();
         writer.visit(Opcodes.V17, Opcodes.ACC_PUBLIC | Opcodes.ACC_FINAL | Opcodes.ACC_SUPER | Opcodes.ACC_SYNTHETIC, name,
@@ -307,8 +329,9 @@ public final class PythonMetadataClassGenerator {
         MethodVisitor init = writer.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
         init.visitCode();
         init.visitVarInsn(Opcodes.ALOAD, 0);
-        init.visitLdcInsn(beanType);
-        init.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "executableMethods", "(Ljava/lang/Class;)[L" + EXEC_METHOD_REFERENCE + ";", false);
+        init.visitLdcInsn(ownerType);
+        init.visitLdcInsn(definition.definitionClassName());
+        init.visitMethodInsn(Opcodes.INVOKESTATIC, SUPPORT, "executableMethods", "(Ljava/lang/Class;Ljava/lang/String;)[L" + EXEC_METHOD_REFERENCE + ";", false);
         init.visitMethodInsn(Opcodes.INVOKESPECIAL, EXEC_SUPER, "<init>", "([L" + EXEC_METHOD_REFERENCE + ";)V", false);
         init.visitInsn(Opcodes.RETURN);
         init.visitMaxs(0, 0);
@@ -933,9 +956,14 @@ public final class PythonMetadataClassGenerator {
         annotation.visitEnd();
     }
 
-    private static boolean hasStereotype(ClassModel model, String annotationName) {
-        return model.annotationMetadata().allStereotypes().containsKey(annotationName)
-            || model.annotationMetadata().allAnnotations().containsKey(annotationName);
+    private static boolean hasStereotype(ClassModel model, BeanDefinitionModel definition, String annotationName) {
+        return has(model.annotationMetadata(), annotationName)
+            || (definition.annotationMetadata() != null && has(definition.annotationMetadata(), annotationName))
+            || (definition.rootAnnotationMetadata() != null && has(definition.rootAnnotationMetadata(), annotationName));
+    }
+
+    private static boolean has(AnnotationMetadataModel metadata, String annotationName) {
+        return metadata.allStereotypes().containsKey(annotationName) || metadata.allAnnotations().containsKey(annotationName);
     }
 
     private record Dispatch(Kind kind, PropertyModel property, @Nullable MethodModel method) {

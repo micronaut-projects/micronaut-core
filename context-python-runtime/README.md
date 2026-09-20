@@ -112,11 +112,15 @@ beans (qualified by `@Named`, `@Any`, qualifier annotations, repeatable qualifie
 (required or not); `@PostConstruct` and `@PreDestroy`; every scope and `@Primary`; `@Requires` conditions; exposed
 types and candidate selection; type arguments of generic super types; executable methods without interception
 (`@Executable` and its stereotypes such as `@Controller` routes, `processOnStartup`), generated as the definition's
-`$Exec` companion. Introspections: constructors with arguments, readable, writable and read-only properties of
+`$Exec` companion. `@Factory` classes: each `@Bean` method produces its own definition, named as the compiler names
+it (`$Factory$Method<n>$Definition`), instantiated by looking the factory bean up through the resolution context
+(qualified by the factory class) and invoking the method, with the method's own annotation metadata over the
+factory class's, its parameters as injection points, `@Bean(preDestroy = ...)` lifecycle methods and
+`@Bean(typed = ...)` exposed types. Introspections: constructors with arguments, readable, writable and read-only properties of
 any type, generics, property annotation metadata, and property indexes.
 
 Not supported yet, and reported at compile time by a diagnostic naming the construct and the class (no silent
-fallback): factory beans, AOP around and introduction proxies (including `@Validated` constraints on bean
+fallback): factory fields, AOP around and introduction proxies (including `@Validated` constraints on bean
 methods), configuration properties, `@Parameter`, evaluated expressions, `@InjectScope`, field injection,
 reflection-requiring members, suspending methods, `@Introspected(classes, classNames, packages, builder,
 targetPackage, constructors, members)`, introspected enums, static creators, and incremental compilation of the
@@ -143,8 +147,8 @@ model backends.
 ## Remaining plan
 
 Changes 5 (complete discovery across mixed build-time / runtime artifacts is done for what is generated; what
-remains is qualification against third-party providers), 6b (factories, associated beans, configuration binding,
+remains is qualification against third-party providers), 6b beyond factory methods (associated beans, configuration binding,
 `EachBean` / `EachProperty`, event adapters), 6c (builders, enums, static creators, described members), the AOP
 part of 6d, 7 (incremental compilation, mode transitions and output cleanup) and 8 (documented opt-in release,
 native-image selection, performance report) of `IMPLEMENTATION_PLAN.md` remain open. 6a and the non-intercepted
-part of 6d are covered.
+part of 6d are covered, as are the factory methods of 6b.

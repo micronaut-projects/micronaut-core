@@ -22,6 +22,7 @@ import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
+import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
@@ -53,6 +54,31 @@ class PythonMetadataClassGeneratorTest {
         return new MethodModel(SampleBean.class.getName(), name, arg(name, returnType), List.of(parameters), EMPTY, false);
     }
 
+    static PrecalculatedInfoModel singleton() {
+        return new PrecalculatedInfoModel("jakarta.inject.Singleton", false, false, true, false, false, false);
+    }
+
+    /**
+     * A definition of {@link SampleBean} instantiated by its constructor.
+     */
+    static BeanDefinitionModel definition(ConstructorModel constructor, List<InjectedMethodModel> methods, List<ExecutableMethodModel> executableMethods) {
+        return new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleBean$Definition", SampleBean.class.getName(), null, null, null,
+            constructor, methods, executableMethods, singleton(), List.of(SampleBean.class.getName()), false, Map.of());
+    }
+
+    /**
+     * A definition of {@link SampleDependency} produced by a method of {@link SampleFactory}.
+     */
+    static BeanDefinitionModel factoryDefinition(String methodName, int index, boolean isStatic, List<ArgumentModel> parameters,
+                                                 List<InjectionPointModel> injectionPoints) {
+        FactoryMethodModel factory = new FactoryMethodModel(SampleFactory.class.getName(), methodName,
+            arg(methodName, SampleDependency.class.getName()), isStatic);
+        return new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleFactory$" + methodName.substring(0, 1).toUpperCase(java.util.Locale.ROOT)
+            + methodName.substring(1) + index + "$Definition", SampleDependency.class.getName(), factory, EMPTY, EMPTY,
+            new ConstructorModel(EMPTY, parameters, injectionPoints), List.of(), List.of(), singleton(),
+            List.of(SampleDependency.class.getName()), false, Map.of());
+    }
+
     static ClassModel sample() {
         ArgumentModel dependency = arg("dependency", SampleDependency.class.getName());
         ArgumentModel value = arg("value", "java.lang.String");
@@ -68,10 +94,9 @@ class PythonMetadataClassGeneratorTest {
                 List.of(new InjectionPointModel(InjectionPointModel.Kind.BEANS, all, SampleDependency.class.getName(), null, null, null)), false, false, false, false, false),
             new InjectedMethodModel(method("initialize", "void"), EMPTY, List.of(), false, false, true, false, true),
             new InjectedMethodModel(method("close", "boolean"), EMPTY, List.of(), false, false, false, true, true));
-        BeanDefinitionModel definition = new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleBean$Definition", constructor, methods,
+        BeanDefinitionModel definition = definition(constructor, methods,
             List.of(new ExecutableMethodModel(method("getName", "java.lang.String"), arg("getName", "java.lang.String"), EMPTY, true, true, false),
-                new ExecutableMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY, true, false, false)),
-            new PrecalculatedInfoModel("jakarta.inject.Singleton", false, false, true, false, false, false), List.of(SampleBean.class.getName()), false, Map.of());
+                new ExecutableMethodModel(method("setAge", "void", arg("age", "int")), arg("setAge", "void"), EMPTY, true, false, false)));
         List<PropertyModel> properties = List.of(
             new PropertyModel("name", arg("name", "java.lang.String"), method("getName", "java.lang.String"), method("setName", "void", arg("name", "java.lang.String")), false),
             new PropertyModel("age", arg("age", "int"), method("getAge", "int"), method("setAge", "void", arg("age", "int")), false),
@@ -79,7 +104,7 @@ class PythonMetadataClassGeneratorTest {
         IntrospectionModel introspection = new IntrospectionModel("io.micronaut.context.python.runtime.$SampleBean$Introspection", EMPTY, List.of(dependency, value), properties,
             List.of(new PropertyIndexModel("jakarta.validation.Constraint", null, 0), new PropertyIndexModel("jakarta.persistence.Column", "name_col", 0),
                 new PropertyIndexModel("jakarta.persistence.Column", "age_col", 1)));
-        return new ClassModel(SampleBean.class.getName(), EMPTY, definition, introspection);
+        return new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), introspection);
     }
 
     static String verify(byte[] bytes, byte[]... companions) {
@@ -104,9 +129,8 @@ class PythonMetadataClassGeneratorTest {
 
     @Test
     void generatesMinimalDefinition() {
-        BeanDefinitionModel definition = new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleBean$Definition", new ConstructorModel(EMPTY, List.of(), List.of()), List.of(), List.of(),
-            new PrecalculatedInfoModel("jakarta.inject.Singleton", false, false, true, false, false, false), List.of(SampleBean.class.getName()), false, Map.of());
-        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, definition, null)));
+        BeanDefinitionModel definition = definition(new ConstructorModel(EMPTY, List.of(), List.of()), List.of(), List.of());
+        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), null), definition));
         assertTrue(report.isEmpty(), report);
     }
 
@@ -115,9 +139,8 @@ class PythonMetadataClassGeneratorTest {
         ArgumentModel dependency = arg("dependency", SampleDependency.class.getName());
         ConstructorModel constructor = new ConstructorModel(EMPTY, List.of(dependency), List.of(
             new InjectionPointModel(InjectionPointModel.Kind.BEAN, dependency, null, null, null, null)));
-        BeanDefinitionModel definition = new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleBean$Definition", constructor, List.of(), List.of(),
-            new PrecalculatedInfoModel("jakarta.inject.Singleton", false, false, true, false, false, false), List.of(SampleBean.class.getName()), false, Map.of());
-        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, definition, null)));
+        BeanDefinitionModel definition = definition(constructor, List.of(), List.of());
+        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), null), definition));
         assertTrue(report.isEmpty(), report);
     }
 
@@ -127,18 +150,18 @@ class PythonMetadataClassGeneratorTest {
         List<InjectedMethodModel> methods = List.of(
             new InjectedMethodModel(method("setOther", "void", other), EMPTY,
                 List.of(new InjectionPointModel(InjectionPointModel.Kind.BEAN, other, null, null, null, null)), false, false, false, false, true));
-        BeanDefinitionModel definition = new BeanDefinitionModel("io.micronaut.context.python.runtime.$SampleBean$Definition", new ConstructorModel(EMPTY, List.of(), List.of()), methods, List.of(),
-            new PrecalculatedInfoModel("jakarta.inject.Singleton", false, false, true, false, false, false), List.of(SampleBean.class.getName()), false, Map.of());
-        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, definition, null)));
+        BeanDefinitionModel definition = definition(new ConstructorModel(EMPTY, List.of(), List.of()), methods, List.of());
+        String report = verify(PythonMetadataClassGenerator.beanDefinition(new ClassModel(SampleBean.class.getName(), EMPTY, List.of(definition), null), definition));
         assertTrue(report.isEmpty(), report);
     }
 
     @Test
     void generatesVerifiableDefinitionAndIntrospection() {
         ClassModel model = sample();
-        byte[] definition = PythonMetadataClassGenerator.beanDefinition(model);
+        BeanDefinitionModel definitionModel = model.beanDefinitions().getFirst();
+        byte[] definition = PythonMetadataClassGenerator.beanDefinition(model, definitionModel);
         byte[] introspection = PythonMetadataClassGenerator.introspection(model);
-        byte[] executable = PythonMetadataClassGenerator.executableMethods(model);
+        byte[] executable = PythonMetadataClassGenerator.executableMethods(model, definitionModel);
         String definitionReport = verify(definition, executable);
         String introspectionReport = verify(introspection);
         String executableReport = verify(executable);
@@ -148,8 +171,22 @@ class PythonMetadataClassGeneratorTest {
     }
 
     @Test
+    void generatesFactoryDefinitions() {
+        ArgumentModel value = arg("value", "java.lang.String");
+        BeanDefinitionModel instanceMade = factoryDefinition("instanceMade", 0, false, List.of(value),
+            List.of(new InjectionPointModel(InjectionPointModel.Kind.VALUE, value, null, null, null, "${sample.value:x}")));
+        BeanDefinitionModel staticMade = factoryDefinition("staticMade", 1, true, List.of(), List.of());
+        ClassModel model = new ClassModel(SampleFactory.class.getName(), EMPTY, List.of(instanceMade, staticMade), null);
+        String instanceReport = verify(PythonMetadataClassGenerator.beanDefinition(model, instanceMade));
+        String staticReport = verify(PythonMetadataClassGenerator.beanDefinition(model, staticMade));
+        assertTrue(instanceReport.isEmpty(), instanceReport);
+        assertTrue(staticReport.isEmpty(), staticReport);
+    }
+
+    @Test
     void generationIsDeterministic() {
-        assertArrayEquals(PythonMetadataClassGenerator.beanDefinition(sample()), PythonMetadataClassGenerator.beanDefinition(sample()));
+        assertArrayEquals(PythonMetadataClassGenerator.beanDefinition(sample(), sample().beanDefinitions().getFirst()),
+            PythonMetadataClassGenerator.beanDefinition(sample(), sample().beanDefinitions().getFirst()));
         assertArrayEquals(PythonMetadataClassGenerator.introspection(sample()), PythonMetadataClassGenerator.introspection(sample()));
     }
 }

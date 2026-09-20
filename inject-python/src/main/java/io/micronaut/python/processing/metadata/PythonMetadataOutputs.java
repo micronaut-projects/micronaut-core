@@ -18,6 +18,7 @@ package io.micronaut.python.processing.metadata;
 import io.micronaut.context.python.runtime.PythonMetadataCatalog;
 import io.micronaut.context.python.runtime.PythonRuntimeMetadata;
 import io.micronaut.context.python.runtime.codec.PythonMetadataCodec;
+import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.PythonMetadataModel;
 import io.micronaut.core.annotation.Internal;
@@ -75,12 +76,12 @@ public final class PythonMetadataOutputs {
         }
         origins.add(classElement);
         if (backend == PythonMetadataBackend.MODEL_BUILD_TIME) {
-            if (classModel.beanDefinition() != null) {
-                if (!classModel.beanDefinition().executableMethods().isEmpty()) {
-                    writeClass(classElement, classModel.beanDefinition().definitionClassName() + "$Exec", PythonRuntimeMetadata.executableMethodsBytes(classModel),
+            for (BeanDefinitionModel definition : classModel.beanDefinitions()) {
+                if (!definition.executableMethods().isEmpty()) {
+                    writeClass(classElement, definition.definitionClassName() + "$Exec", PythonRuntimeMetadata.executableMethodsBytes(classModel, definition),
                         null, visitorContext);
                 }
-                writeClass(classElement, classModel.beanDefinition().definitionClassName(), PythonRuntimeMetadata.definitionBytes(classModel),
+                writeClass(classElement, definition.definitionClassName(), PythonRuntimeMetadata.definitionBytes(classModel, definition),
                     BeanDefinitionReference.class, visitorContext);
             }
             if (classModel.introspection() != null) {
@@ -88,7 +89,7 @@ public final class PythonMetadataOutputs {
                     BeanIntrospectionReference.class, visitorContext);
             }
         } else {
-            catalog.add(new PythonMetadataCatalog.Entry(classModel.className(), identity, classModel.beanDefinition() != null,
+            catalog.add(new PythonMetadataCatalog.Entry(classModel.className(), identity, !classModel.beanDefinitions().isEmpty(),
                 classModel.introspection() != null, ""));
         }
     }

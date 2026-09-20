@@ -81,16 +81,25 @@ public final class PythonRuntimeBeanDefinitionsProvider implements BeanDefinitio
                 throw new IllegalStateException("The Python runtime catalog " + entry.source() + " lists " + entry.className()
                     + " but the class is not on the class path", e);
             }
-            BeanDefinitionModel definition = PythonRuntimeMetadata.model(beanType).classModel().beanDefinition();
-            if (definition == null) {
+            List<BeanDefinitionModel> definitions = PythonRuntimeMetadata.model(beanType).classModel().beanDefinitions();
+            if (definitions.isEmpty()) {
                 throw new IllegalStateException("The Python runtime catalog " + entry.source() + " lists a bean definition for "
                     + entry.className() + " but its model has none");
             }
-            if (!names.add(definition.definitionClassName())) {
-                throw new IllegalStateException("Both a build-time bean definition and a runtime model exist for " + entry.className()
-                    + " (" + definition.definitionClassName() + "); recompile the Python sources with one metadata backend");
+            for (BeanDefinitionModel definition : definitions) {
+                if (!names.add(definition.definitionClassName())) {
+                    throw new IllegalStateException("Both a build-time bean definition and a runtime model exist for " + entry.className()
+                        + " (" + definition.definitionClassName() + "); recompile the Python sources with one metadata backend");
+                }
+                Class<?> producedType;
+                try {
+                    producedType = ModelTypes.resolve(definition.beanTypeName(), classLoader);
+                } catch (ClassNotFoundException e) {
+                    throw new IllegalStateException("The bean type " + definition.beanTypeName() + " of " + definition.definitionClassName()
+                        + " is not on the class path", e);
+                }
+                references.add(new PythonRuntimeBeanReference(beanType, producedType, definition));
             }
-            references.add(new PythonRuntimeBeanReference(beanType, definition));
         }
         return references;
     }

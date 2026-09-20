@@ -24,6 +24,7 @@ import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ClassValueModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
+import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.IntrospectionModel;
@@ -217,10 +218,26 @@ public final class PythonMetadataCodec {
         private void classModel(ClassModel model) throws IOException {
             string(model.className());
             annotationMetadata(model.annotationMetadata());
-            BeanDefinitionModel bean = model.beanDefinition();
-            out.writeBoolean(bean != null);
-            if (bean != null) {
+            out.writeInt(model.beanDefinitions().size());
+            for (BeanDefinitionModel bean : model.beanDefinitions()) {
                 string(bean.definitionClassName());
+                string(bean.beanTypeName());
+                FactoryMethodModel factory = bean.factory();
+                out.writeBoolean(factory != null);
+                if (factory != null) {
+                    string(factory.factoryTypeName());
+                    string(factory.methodName());
+                    argument(factory.returnType());
+                    out.writeBoolean(factory.isStatic());
+                }
+                out.writeBoolean(bean.annotationMetadata() != null);
+                if (bean.annotationMetadata() != null) {
+                    annotationMetadata(bean.annotationMetadata());
+                }
+                out.writeBoolean(bean.rootAnnotationMetadata() != null);
+                if (bean.rootAnnotationMetadata() != null) {
+                    annotationMetadata(bean.rootAnnotationMetadata());
+                }
                 constructor(bean.constructor());
                 out.writeInt(bean.methods().size());
                 for (InjectedMethodModel method : bean.methods()) {
@@ -481,10 +498,18 @@ public final class PythonMetadataCodec {
             section = "class";
             String className = requiredString("className");
             AnnotationMetadataModel annotationMetadata = annotationMetadata();
-            BeanDefinitionModel bean = null;
-            if (in.readBoolean()) {
+            int definitionCount = count("bean definition");
+            List<BeanDefinitionModel> beans = new ArrayList<>(definitionCount);
+            for (int d = 0; d < definitionCount; d++) {
                 section = "bean definition of " + className;
                 String definitionClassName = requiredString("definitionClassName");
+                String beanTypeName = requiredString("beanTypeName");
+                FactoryMethodModel factory = null;
+                if (in.readBoolean()) {
+                    factory = new FactoryMethodModel(requiredString("factoryTypeName"), requiredString("factory method"), argument(), in.readBoolean());
+                }
+                AnnotationMetadataModel definitionMetadata = in.readBoolean() ? annotationMetadata() : null;
+                AnnotationMetadataModel rootMetadata = in.readBoolean() ? annotationMetadata() : null;
                 ConstructorModel constructor = constructor();
                 int methodCount = count("method");
                 List<InjectedMethodModel> methods = new ArrayList<>(methodCount);
@@ -506,7 +531,8 @@ public final class PythonMetadataCodec {
                 for (int i = 0; i < typeArgumentCount; i++) {
                     typeArguments.put(requiredString("type"), arguments());
                 }
-                bean = new BeanDefinitionModel(definitionClassName, constructor, List.copyOf(methods), List.copyOf(executables), info, exposedTypes, exposedTypesDeclared, typeArguments);
+                beans.add(new BeanDefinitionModel(definitionClassName, beanTypeName, factory, definitionMetadata, rootMetadata, constructor,
+                    List.copyOf(methods), List.copyOf(executables), info, exposedTypes, exposedTypesDeclared, typeArguments));
             }
             IntrospectionModel introspection = null;
             if (in.readBoolean()) {
@@ -530,7 +556,7 @@ public final class PythonMetadataCodec {
                 }
                 introspection = new IntrospectionModel(introspectionClassName, constructorMetadata, constructorArguments, List.copyOf(properties), List.copyOf(indexes));
             }
-            return new ClassModel(className, annotationMetadata, bean, introspection);
+            return new ClassModel(className, annotationMetadata, List.copyOf(beans), introspection);
         }
 
         private ConstructorModel constructor() throws IOException {

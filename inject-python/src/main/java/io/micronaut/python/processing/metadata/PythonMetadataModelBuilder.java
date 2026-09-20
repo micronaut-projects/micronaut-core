@@ -55,10 +55,12 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Captures the resolved model of a Python class once every visitor has contributed to it. Bean definitions are
@@ -96,26 +98,29 @@ public final class PythonMetadataModelBuilder {
      * @return The model, or empty when the class needs neither a definition nor an introspection
      */
     public Optional<PythonMetadataModel> build(ClassElement classElement) {
-        BeanDefinitionModel beanDefinition = beanDefinition(classElement);
+        List<BeanDefinitionModel> beanDefinitions = beanDefinitions(classElement);
         IntrospectionModel introspection = introspection(classElement);
-        if (beanDefinition == null && introspection == null) {
+        if (beanDefinitions.isEmpty() && introspection == null) {
             return Optional.empty();
         }
         AnnotationMetadataModel annotationMetadata = annotationMetadata(classElement, classElement.getAnnotationMetadata());
         return Optional.of(new PythonMetadataModel(PythonMetadataModel.FORMAT_VERSION, Objects.requireNonNullElse(VersionUtils.MICRONAUT_VERSION, "unknown"), classElement.getName(),
-            new ClassModel(classElement.getName(), annotationMetadata, beanDefinition, introspection)));
+            new ClassModel(classElement.getName(), annotationMetadata, beanDefinitions, introspection)));
     }
 
-    private @Nullable BeanDefinitionModel beanDefinition(ClassElement classElement) {
+    /**
+     * The definitions the shared analysis produces for a class: its own, when it is a bean, and one per factory method.
+     */
+    private List<BeanDefinitionModel> beanDefinitions(ClassElement classElement) {
         ModelBeanDefinitionBuilderFactory factory = new ModelBeanDefinitionBuilderFactory(this, classElement);
         List<BeanDefinitionModel> definitions = BeanDefinitionCreatorFactory.produce(classElement, factory, visitorContext);
-        if (definitions.isEmpty()) {
-            return null;
+        Set<String> names = new HashSet<>();
+        for (BeanDefinitionModel definition : definitions) {
+            if (!names.add(definition.definitionClassName())) {
+                throw unsupported(classElement, "two bean definitions named " + definition.definitionClassName());
+            }
         }
-        if (definitions.size() > 1) {
-            throw unsupported(classElement, "a class producing several bean definitions");
-        }
-        return definitions.getFirst();
+        return List.copyOf(definitions);
     }
 
     private @Nullable IntrospectionModel introspection(ClassElement classElement) {
@@ -224,7 +229,7 @@ public final class PythonMetadataModelBuilder {
         if (!(member instanceof MethodElement method)) {
             throw unsupported(classElement, "the field-backed property " + property.getName());
         }
-        return method(classElement, method);
+        return method(classElement, classElement, method);
     }
 
     /**
@@ -234,8 +239,8 @@ public final class PythonMetadataModelBuilder {
      * @param method       The method
      * @return The model
      */
-    MethodModel method(ClassElement classElement, MethodElement method) {
-        if (method.isReflectionRequired(classElement)) {
+    MethodModel method(ClassElement classElement, ClassElement beanType, MethodElement method) {
+        if (method.isReflectionRequired(beanType)) {
             throw unsupported(classElement, "the method " + method.getName() + ", which is not accessible without reflection");
         }
         List<ArgumentModel> parameters = new ArrayList<>();
@@ -278,18 +283,32 @@ public final class PythonMetadataModelBuilder {
      * @return The scope, singleton, primary and container decisions
      */
     static io.micronaut.context.python.runtime.model.PrecalculatedInfoModel precalculatedInfo(ClassElement classElement) {
-        AnnotationMetadata annotationMetadata = classElement.getAnnotationMetadata();
+        return precalculatedInfo(classElement.getAnnotationMetadata(), classElement.getAnnotationMetadata(), classElement.isAbstract(), classElement);
+    }
+
+    /**
+     * The precalculated info of a definition, as the writer computes it.
+     *
+     * @param annotationMetadata The definition's annotation metadata
+     * @param defaultScopeSource The metadata the default scope is read from: the class's, or the factory method's declared metadata
+     * @param isAbstract         Whether the bean is abstract
+     * @param beanType           The bean type
+     * @return The info
+     */
+    static io.micronaut.context.python.runtime.model.PrecalculatedInfoModel precalculatedInfo(AnnotationMetadata annotationMetadata,
+                                                                                            AnnotationMetadata defaultScopeSource,
+                                                                                            boolean isAbstract, ClassElement beanType) {
         String scope = annotationMetadata.getAnnotationNameByStereotype(AnnotationUtil.SCOPE).orElse(null);
         boolean singleton;
         if (scope != null) {
             singleton = scope.equals(Singleton.class.getName()) || scope.equals(Context.class.getName());
         } else {
-            singleton = annotationMetadata.stringValue(DefaultScope.class)
+            singleton = defaultScopeSource.stringValue(DefaultScope.class)
                 .map(t -> t.equals(Singleton.class.getName()) || t.equals(Context.class.getName())).orElse(false);
         }
         boolean iterable = annotationMetadata.hasDeclaredStereotype(EachProperty.class) || annotationMetadata.hasDeclaredStereotype(EachBean.class);
-        return new io.micronaut.context.python.runtime.model.PrecalculatedInfoModel(scope, classElement.isAbstract(), iterable, singleton,
-            annotationMetadata.hasDeclaredStereotype(Primary.class), false, classElement.isArray() || classElement.isContainerType());
+        return new io.micronaut.context.python.runtime.model.PrecalculatedInfoModel(scope, isAbstract, iterable, singleton,
+            annotationMetadata.hasDeclaredStereotype(Primary.class), false, beanType.isArray() || beanType.isContainerType());
     }
 
     /**

@@ -18,6 +18,7 @@ package io.micronaut.context.python.runtime;
 import io.micronaut.context.python.runtime.codec.PythonMetadataCodec;
 import io.micronaut.context.python.runtime.codec.PythonMetadataFormatException;
 import io.micronaut.context.python.runtime.generate.PythonMetadataClassGenerator;
+import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.PythonMetadataModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
@@ -31,8 +32,10 @@ import java.io.InputStream;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 import java.net.URL;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -112,21 +115,33 @@ public final class PythonRuntimeMetadata {
     }
 
     /**
-     * Generates the definition class if needed and returns a new definition, as the reference of the class would.
+     * Generates a definition class if needed and returns a new definition, as the reference of the class would.
      *
-     * @param beanType The wrapper class
+     * @param owner               The class the model describes: the bean, or the factory producing it
+     * @param definitionClassName The definition class name
      * @return A new definition
      */
     @SuppressWarnings("unchecked")
-    public static BeanDefinitionReference<Object> definition(Class<?> beanType) {
-        Holder holder = holder(beanType);
-        Class<?> definitionClass = holder.definitionClass();
+    public static BeanDefinitionReference<Object> definition(Class<?> owner, String definitionClassName) {
+        Holder holder = holder(owner);
+        Class<?> definitionClass = holder.definitionClass(definitionClassName);
         try {
-            return (BeanDefinitionReference<Object>) MethodHandles.privateLookupIn(beanType, MethodHandles.lookup())
+            return (BeanDefinitionReference<Object>) MethodHandles.privateLookupIn(owner, MethodHandles.lookup())
                 .findConstructor(definitionClass, MethodType.methodType(void.class)).invoke();
         } catch (Throwable e) {
-            throw new PythonMetadataGenerationException(beanType, holder.identity(), "instantiating " + definitionClass.getName(), e);
+            throw new PythonMetadataGenerationException(owner, holder.identity(), "instantiating " + definitionClass.getName(), e);
         }
+    }
+
+    /**
+     * The annotation metadata of a definition, materialized from the model without generating anything.
+     *
+     * @param owner      The class the model describes
+     * @param definition The definition
+     * @return The annotation metadata
+     */
+    public static AnnotationMetadata definitionAnnotationMetadata(Class<?> owner, BeanDefinitionModel definition) {
+        return holder(owner).definitionAnnotationMetadata(definition);
     }
 
     /**
@@ -141,10 +156,16 @@ public final class PythonRuntimeMetadata {
 
     /**
      * @param beanType The wrapper class
-     * @return Whether the definition class of the wrapper has been generated
+     * @return Whether the definition class of the wrapper itself (not of the beans it may produce) has been generated
      */
     public static boolean isDefinitionGenerated(Class<?> beanType) {
-        return holder(beanType).definitionClass != null;
+        Holder holder = holder(beanType);
+        for (Holder.Definition definition : holder.definitions.values()) {
+            if (definition.definitionClass != null && definition.model.factory() == null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -163,23 +184,25 @@ public final class PythonRuntimeMetadata {
     }
 
     /**
-     * Generates the bytes of the definition class of a model, as both backends do.
+     * Generates the bytes of a definition class of a model, as both backends do.
      *
-     * @param model The class model
+     * @param model      The class model
+     * @param definition The definition, one of the model's
      * @return The class bytes
      */
-    public static byte[] definitionBytes(ClassModel model) {
-        return PythonMetadataClassGenerator.beanDefinition(model);
+    public static byte[] definitionBytes(ClassModel model, BeanDefinitionModel definition) {
+        return PythonMetadataClassGenerator.beanDefinition(model, definition);
     }
 
     /**
-     * Generates the bytes of the executable methods definition class of a model, as both backends do.
+     * Generates the bytes of the executable methods definition class of a definition, as both backends do.
      *
-     * @param model The class model, which must have executable methods
+     * @param model      The class model
+     * @param definition The definition, one of the model's, which must have executable methods
      * @return The class bytes
      */
-    public static byte[] executableMethodsBytes(ClassModel model) {
-        return PythonMetadataClassGenerator.executableMethods(model);
+    public static byte[] executableMethodsBytes(ClassModel model, BeanDefinitionModel definition) {
+        return PythonMetadataClassGenerator.executableMethods(model, definition);
     }
 
     /**
@@ -197,10 +220,8 @@ public final class PythonRuntimeMetadata {
         private volatile @Nullable PythonMetadataModel model;
         private volatile @Nullable String identity;
         private volatile @Nullable AnnotationMetadata annotationMetadata;
-        private volatile @Nullable PythonDefinitionState definitionState;
+        private final Map<String, Definition> definitions = new ConcurrentHashMap<>();
         private volatile @Nullable PythonIntrospectionState introspectionState;
-        private volatile @Nullable Class<?> definitionClass;
-        private volatile @Nullable Throwable definitionFailure;
         private volatile @Nullable BeanIntrospection<Object> introspection;
         private volatile @Nullable Throwable introspectionFailure;
 
@@ -250,13 +271,29 @@ public final class PythonRuntimeMetadata {
             return current;
         }
 
-        synchronized PythonDefinitionState definitionState() {
-            PythonDefinitionState state = definitionState;
+        private Definition definition(String definitionClassName) {
+            return definitions.computeIfAbsent(definitionClassName, name -> new Definition(model().classModel().definition(name)));
+        }
+
+        synchronized PythonDefinitionState definitionState(String definitionClassName) {
+            Definition definition = definition(definitionClassName);
+            PythonDefinitionState state = definition.state;
             if (state == null) {
-                state = PythonDefinitionState.of(beanType, model().classModel());
-                definitionState = state;
+                state = PythonDefinitionState.of(beanType, model().classModel(), definition.model);
+                definition.state = state;
             }
             return state;
+        }
+
+        synchronized AnnotationMetadata definitionAnnotationMetadata(BeanDefinitionModel definitionModel) {
+            Definition definition = definition(definitionModel.definitionClassName());
+            AnnotationMetadata current = definition.annotationMetadata;
+            if (current == null) {
+                current = definitionModel.annotationMetadata() == null ? annotationMetadata()
+                    : PythonDefinitionState.annotationMetadata(new ModelMaterializer(beanType.getClassLoader()), annotationMetadata(), definitionModel);
+                definition.annotationMetadata = current;
+            }
+            return current;
         }
 
         synchronized PythonIntrospectionState introspectionState() {
@@ -272,29 +309,26 @@ public final class PythonRuntimeMetadata {
             return state;
         }
 
-        synchronized Class<?> definitionClass() {
-            Class<?> generated = definitionClass;
+        synchronized Class<?> definitionClass(String definitionClassName) {
+            Definition definition = definition(definitionClassName);
+            Class<?> generated = definition.definitionClass;
             if (generated != null) {
                 return generated;
             }
-            if (definitionFailure != null) {
-                throw new PythonMetadataGenerationException(beanType, identity, "an earlier definition generation", definitionFailure);
+            if (definition.failure != null) {
+                throw new PythonMetadataGenerationException(beanType, identity, "an earlier generation of " + definitionClassName, definition.failure);
             }
             ClassModel classModel = model().classModel();
-            if (classModel.beanDefinition() == null) {
-                throw new PythonMetadataGenerationException(beanType, identity, "generating the definition",
-                    new IllegalStateException("the model has no bean definition"));
-            }
             try {
-                if (!classModel.beanDefinition().executableMethods().isEmpty()) {
+                if (!definition.model.executableMethods().isEmpty()) {
                     // the definition's static initializer instantiates its executable methods companion
-                    define(PythonMetadataClassGenerator.executableMethods(classModel), "executable methods definition");
+                    define(PythonMetadataClassGenerator.executableMethods(classModel, definition.model), "executable methods definition " + definitionClassName);
                 }
-                generated = define(PythonMetadataClassGenerator.beanDefinition(classModel), "definition");
-                definitionClass = generated;
+                generated = define(PythonMetadataClassGenerator.beanDefinition(classModel, definition.model), "definition " + definitionClassName);
+                definition.definitionClass = generated;
                 return generated;
             } catch (RuntimeException | Error e) {
-                definitionFailure = e;
+                definition.failure = e;
                 throw e;
             }
         }
@@ -351,6 +385,21 @@ public final class PythonRuntimeMetadata {
                 throw new PythonMetadataGenerationException(beanType, identity, "initializing " + generated.getName(), e);
             }
             return generated;
+        }
+
+        /**
+         * One definition of the class: its state, its generated class, or the failure that stopped its generation.
+         */
+        static final class Definition {
+            private final BeanDefinitionModel model;
+            private volatile @Nullable AnnotationMetadata annotationMetadata;
+            private volatile @Nullable PythonDefinitionState state;
+            private volatile @Nullable Class<?> definitionClass;
+            private volatile @Nullable Throwable failure;
+
+            private Definition(BeanDefinitionModel model) {
+                this.model = model;
+            }
         }
     }
 }

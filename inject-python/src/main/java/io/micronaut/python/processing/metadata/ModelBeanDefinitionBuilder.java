@@ -25,16 +25,19 @@ import io.micronaut.context.beans.definition.BeanDefinitionInjectionPoint;
 import io.micronaut.context.beans.definition.ConstructorDefinition;
 import io.micronaut.context.beans.definition.FieldDefinition;
 import io.micronaut.context.beans.definition.MethodDefinition;
+import io.micronaut.context.python.runtime.model.AnnotationMetadataModel;
 import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ConstructorModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
+import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.MethodModel;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.inject.InjectionPoint;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -45,12 +48,14 @@ import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.processing.definition.ElementBeanDefinitionBuilder;
 import io.micronaut.inject.writer.OriginatingElements;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -71,17 +76,26 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
 
     private final PythonMetadataModelBuilder modelBuilder;
     private final ClassElement classElement;
-    private final ConstructorDefinition<ClassElement, MethodElement> constructorDefinition;
+    private final ClassElement beanTypeElement;
+    private final @Nullable ConstructorDefinition<ClassElement, MethodElement> constructorDefinition;
+    private final @Nullable MethodDefinition<ClassElement, MethodElement> factoryMethodDefinition;
+    private final String definitionName;
     private final OriginatingElements originatingElements;
     private final List<InjectedMethodModel> methods = new ArrayList<>();
     private final List<ExecutableMethodModel> executableMethods = new ArrayList<>();
     private final Set<String> executableKeys = new LinkedHashSet<>();
 
+    /**
+     * A definition instantiated by the constructor of the class.
+     */
     ModelBeanDefinitionBuilder(PythonMetadataModelBuilder modelBuilder, ClassElement classElement,
                                ConstructorDefinition<ClassElement, MethodElement> constructorDefinition) {
         this.modelBuilder = modelBuilder;
         this.classElement = classElement;
+        this.beanTypeElement = classElement;
         this.constructorDefinition = constructorDefinition;
+        this.factoryMethodDefinition = null;
+        this.definitionName = definitionPrefix(classElement) + "$Definition";
         this.originatingElements = OriginatingElements.of(classElement);
         if (constructorDefinition.requiresReflection()) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "a constructor that requires reflection");
@@ -93,15 +107,56 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         checkInjectScope(constructorDefinition.constructorElement());
     }
 
+    /**
+     * A definition instantiated by invoking a factory method of the class on the factory bean.
+     */
+    ModelBeanDefinitionBuilder(PythonMetadataModelBuilder modelBuilder, ClassElement classElement,
+                               MethodDefinition<ClassElement, MethodElement> factoryMethodDefinition, int uniqueIdentifier) {
+        this.modelBuilder = modelBuilder;
+        this.classElement = classElement;
+        this.constructorDefinition = null;
+        this.factoryMethodDefinition = factoryMethodDefinition;
+        MethodElement method = factoryMethodDefinition.methodElement();
+        this.beanTypeElement = method.getGenericReturnType();
+        // The writer's name: $Factory$Method<n>$Definition
+        this.definitionName = definitionPrefix(method.getOwningType()) + "$" + NameUtils.capitalize(method.getName()) + uniqueIdentifier + "$Definition";
+        this.originatingElements = OriginatingElements.of(method);
+        String construct = "the factory method " + method.getName();
+        if (factoryMethodDefinition.requiresReflection() || method.isReflectionRequired(classElement)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which requires reflection");
+        }
+        if (method.getSuspendParameters().length != method.getParameters().length) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which suspends");
+        }
+        if (beanTypeElement.isPrimitive() || beanTypeElement.isArray() || beanTypeElement.isContainerType()) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces a primitive, array or container type");
+        }
+        if (beanTypeElement.isTypeVariable() || beanTypeElement.isGenericPlaceholder()) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces a type variable");
+        }
+        if (method.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS) || beanTypeElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, construct + ", which produces an intercepted bean");
+        }
+        if (classElement.hasStereotype(AnnotationUtil.ANN_INTERCEPTOR_BINDINGS)) {
+            throw PythonMetadataModelBuilder.unsupported(classElement, "an intercepted factory");
+        }
+        checkInjectScope(method);
+    }
+
+    private static String definitionPrefix(ClassElement classElement) {
+        String packageName = classElement.getPackageName();
+        return packageName + ".$" + classElement.getName().substring(packageName.isEmpty() ? 0 : packageName.length() + 1).replace('.', '$');
+    }
+
     @Override
     public BeanDefinitionBuilder<ClassElement, MethodElement, FieldElement, List<BeanDefinitionModel>> addExecutableMethod(MethodElement methodElement, boolean requiresReflection) {
-        if (requiresReflection || methodElement.isReflectionRequired(classElement)) {
+        if (requiresReflection || methodElement.isReflectionRequired(beanTypeElement)) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "the executable method " + methodElement.getName() + ", which requires reflection");
         }
         if (methodElement.getSuspendParameters().length != methodElement.getParameters().length) {
             throw PythonMetadataModelBuilder.unsupported(classElement, "the suspending executable method " + methodElement.getName());
         }
-        MethodModel method = modelBuilder.method(classElement, methodElement);
+        MethodModel method = modelBuilder.method(classElement, beanTypeElement, methodElement);
         String key = method.declaringType() + "." + method.name() + method.parameters().stream().map(ArgumentModel::typeName).toList();
         if (!executableKeys.add(key)) {
             return this;
@@ -172,7 +227,7 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
         for (int i = 0; i < parameters.length; i++) {
             injectionPoints.add(injectionPoint(methodDefinition.injectionPoints().get(i), parameters[i]));
         }
-        methods.add(new InjectedMethodModel(modelBuilder.method(classElement, method),
+        methods.add(new InjectedMethodModel(modelBuilder.method(classElement, beanTypeElement, method),
             modelBuilder.annotationMetadata(classElement, methodDefinition.annotationMetadata()),
             List.copyOf(injectionPoints), methodDefinition.isOptional(), methodDefinition.isSetter(), postConstruct, preDestroy,
             InjectionPoint.isInjectionRequired(methodDefinition.annotationMetadata())));
@@ -232,19 +287,31 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
 
     @Override
     public List<BeanDefinitionModel> build() {
-        MethodElement constructor = constructorDefinition.constructorElement();
+        MethodElement producer;
+        List<BeanDefinitionInjectionPoint<ClassElement>> producerInjectionPoints;
+        AnnotationMetadata producerMetadata;
+        if (factoryMethodDefinition != null) {
+            producer = factoryMethodDefinition.methodElement();
+            producerInjectionPoints = factoryMethodDefinition.injectionPoints();
+            producerMetadata = factoryMethodDefinition.annotationMetadata();
+        } else {
+            ConstructorDefinition<ClassElement, MethodElement> constructor = Objects.requireNonNull(constructorDefinition);
+            producer = constructor.constructorElement();
+            producerInjectionPoints = constructor.injectionPoints();
+            producerMetadata = constructor.annotationMetadata();
+        }
         List<ArgumentModel> parameters = new ArrayList<>();
         List<InjectionPointModel> injectionPoints = new ArrayList<>();
-        ParameterElement[] constructorParameters = constructor.getParameters();
-        for (int i = 0; i < constructorParameters.length; i++) {
-            parameters.add(modelBuilder.argument(classElement, constructorParameters[i].getName(), constructorParameters[i].getGenericType(),
-                constructorParameters[i].getAnnotationMetadata()));
-            injectionPoints.add(injectionPoint(constructorDefinition.injectionPoints().get(i), constructorParameters[i]));
+        ParameterElement[] producerParameters = producer.getParameters();
+        for (int i = 0; i < producerParameters.length; i++) {
+            parameters.add(modelBuilder.argument(classElement, producerParameters[i].getName(), producerParameters[i].getGenericType(),
+                producerParameters[i].getAnnotationMetadata()));
+            injectionPoints.add(injectionPoint(producerInjectionPoints.get(i), producerParameters[i]));
         }
-        ConstructorModel constructorModel = new ConstructorModel(modelBuilder.annotationMetadata(classElement, constructorDefinition.annotationMetadata()),
+        ConstructorModel constructorModel = new ConstructorModel(modelBuilder.annotationMetadata(classElement, producerMetadata),
             List.copyOf(parameters), List.copyOf(injectionPoints));
         Map<String, List<ArgumentModel>> typeArguments = new LinkedHashMap<>();
-        for (Map.Entry<String, Map<String, ClassElement>> entry : classElement.getAllTypeArguments().entrySet()) {
+        for (Map.Entry<String, Map<String, ClassElement>> entry : beanTypeElement.getAllTypeArguments().entrySet()) {
             if (entry.getValue().isEmpty()) {
                 continue;
             }
@@ -255,18 +322,43 @@ final class ModelBeanDefinitionBuilder implements ElementBeanDefinitionBuilder<B
             typeArguments.put(entry.getKey(), List.copyOf(arguments));
         }
         String packageName = classElement.getPackageName();
-        String definitionName = packageName + ".$" + classElement.getName().substring(packageName.isEmpty() ? 0 : packageName.length() + 1).replace('.', '$') + "$Definition";
-        String[] declaredExposedTypes = classElement.getAnnotationMetadata().stringValues(Bean.class.getName(), "typed");
+        // The writer reads the declared exposed types from the producing element: the class, or the factory method
+        AnnotationMetadata producingAnnotationMetadata = factoryMethodDefinition != null
+            ? factoryMethodDefinition.methodElement().getMethodAnnotationMetadata() : classElement.getAnnotationMetadata();
+        String[] declaredExposedTypes = producingAnnotationMetadata.stringValues(Bean.class.getName(), "typed");
         List<String> exposedTypes;
         if (declaredExposedTypes.length != 0) {
             exposedTypes = List.of(declaredExposedTypes);
         } else {
             Set<String> collected = new LinkedHashSet<>();
-            collectExposedTypes(collected, classElement, true, packageName);
+            collectExposedTypes(collected, beanTypeElement, true, packageName);
             exposedTypes = List.copyOf(collected);
         }
-        return List.of(new BeanDefinitionModel(definitionName, constructorModel, List.copyOf(methods), List.copyOf(executableMethods),
-            PythonMetadataModelBuilder.precalculatedInfo(classElement), exposedTypes, declaredExposedTypes.length != 0, typeArguments));
+        if (factoryMethodDefinition == null) {
+            return List.of(new BeanDefinitionModel(definitionName, classElement.getName(), null, null, null, constructorModel, List.copyOf(methods),
+                List.copyOf(executableMethods), PythonMetadataModelBuilder.precalculatedInfo(classElement), exposedTypes,
+                declaredExposedTypes.length != 0, typeArguments));
+        }
+        MethodElement method = factoryMethodDefinition.methodElement();
+        // The writer's definition metadata is the method's target metadata: the factory class layer under the method's own
+        AnnotationMetadata definitionMetadata = method.getTargetAnnotationMetadata();
+        AnnotationMetadataModel rootMetadata = null;
+        AnnotationMetadataModel declaredMetadata;
+        if (definitionMetadata instanceof AnnotationMetadataHierarchy hierarchy) {
+            if (hierarchy.size() != 2) {
+                throw PythonMetadataModelBuilder.unsupported(classElement, "the annotation metadata hierarchy of the factory method " + method.getName());
+            }
+            rootMetadata = modelBuilder.annotationMetadata(classElement, hierarchy.getRootMetadata());
+            declaredMetadata = modelBuilder.annotationMetadata(classElement, hierarchy.getDeclaredMetadata());
+        } else {
+            declaredMetadata = modelBuilder.annotationMetadata(classElement, definitionMetadata);
+        }
+        FactoryMethodModel factory = new FactoryMethodModel(method.getOwningType().getName(), method.getName(),
+            modelBuilder.argument(classElement, method.getName(), method.getReturnType(), AnnotationMetadata.EMPTY_METADATA), method.isStatic());
+        return List.of(new BeanDefinitionModel(definitionName, PythonMetadataModelBuilder.typeName(beanTypeElement), factory, declaredMetadata, rootMetadata,
+            constructorModel, List.copyOf(methods), List.copyOf(executableMethods),
+            PythonMetadataModelBuilder.precalculatedInfo(definitionMetadata, method.getDeclaredMetadata(), false, beanTypeElement), exposedTypes,
+            declaredExposedTypes.length != 0, typeArguments));
     }
 
     /**

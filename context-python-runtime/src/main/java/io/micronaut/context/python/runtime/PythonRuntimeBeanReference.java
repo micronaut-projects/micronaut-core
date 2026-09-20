@@ -34,11 +34,13 @@ import org.jspecify.annotations.Nullable;
 @Internal
 public final class PythonRuntimeBeanReference implements BeanDefinitionReference<Object> {
 
+    private final Class<?> owner;
     private final Class<Object> beanType;
     private final BeanDefinitionModel definition;
 
     @SuppressWarnings("unchecked")
-    PythonRuntimeBeanReference(Class<?> beanType, BeanDefinitionModel definition) {
+    PythonRuntimeBeanReference(Class<?> owner, Class<?> beanType, BeanDefinitionModel definition) {
+        this.owner = owner;
         this.beanType = (Class<Object>) beanType;
         this.definition = definition;
     }
@@ -50,12 +52,12 @@ public final class PythonRuntimeBeanReference implements BeanDefinitionReference
 
     @Override
     public BeanDefinition<Object> load() {
-        return PythonRuntimeMetadata.definition(beanType).load();
+        return PythonRuntimeMetadata.definition(owner, definition.definitionClassName()).load();
     }
 
     @Override
     public BeanDefinition<Object> load(BeanContext context) {
-        return PythonRuntimeMetadata.definition(beanType).load(context);
+        return PythonRuntimeMetadata.definition(owner, definition.definitionClassName()).load(context);
     }
 
     @Override
@@ -91,11 +93,11 @@ public final class PythonRuntimeBeanReference implements BeanDefinitionReference
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return PythonRuntimeMetadata.annotationMetadata(beanType);
+        return PythonRuntimeMetadata.definitionAnnotationMetadata(owner, definition);
     }
 
     @Override
     public String toString() {
-        return "PythonRuntimeBeanReference(" + beanType.getName() + ")";
+        return "PythonRuntimeBeanReference(" + definition.definitionClassName() + ")";
     }
 }

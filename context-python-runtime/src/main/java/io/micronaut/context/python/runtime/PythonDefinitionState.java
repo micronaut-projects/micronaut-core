@@ -22,6 +22,7 @@ import io.micronaut.context.python.runtime.model.ArgumentModel;
 import io.micronaut.context.python.runtime.model.BeanDefinitionModel;
 import io.micronaut.context.python.runtime.model.ClassModel;
 import io.micronaut.context.python.runtime.model.ExecutableMethodModel;
+import io.micronaut.context.python.runtime.model.FactoryMethodModel;
 import io.micronaut.context.python.runtime.model.InjectedMethodModel;
 import io.micronaut.context.python.runtime.model.InjectionPointModel;
 import io.micronaut.context.python.runtime.model.PrecalculatedInfoModel;
@@ -60,6 +61,7 @@ public final class PythonDefinitionState {
     private final @Nullable Map<String, Argument<?>[]> typeArguments;
     private final @Nullable Throwable failure;
     private final Set<Class<?>> exposedTypes;
+    private final @Nullable Qualifier<?> factoryQualifier;
     private final AbstractExecutableMethodsDefinition.MethodReference @Nullable [] executableMethods;
     private final int[] processingIndexes;
     private final Injection injection;
@@ -71,6 +73,7 @@ public final class PythonDefinitionState {
                                   @Nullable Map<String, Argument<?>[]> typeArguments,
                                   @Nullable Throwable failure,
                                   Set<Class<?>> exposedTypes,
+                                  @Nullable Qualifier<?> factoryQualifier,
                                   AbstractExecutableMethodsDefinition.MethodReference @Nullable [] executableMethods,
                                   int[] processingIndexes,
                                   Injection injection) {
@@ -81,6 +84,7 @@ public final class PythonDefinitionState {
         this.typeArguments = typeArguments;
         this.failure = failure;
         this.exposedTypes = exposedTypes;
+        this.factoryQualifier = factoryQualifier;
         this.executableMethods = executableMethods;
         this.processingIndexes = processingIndexes;
         this.injection = injection;
@@ -89,17 +93,15 @@ public final class PythonDefinitionState {
     /**
      * Materializes the state of a definition.
      *
-     * @param beanType The bean type
-     * @param model    The class model, which must have a bean definition
+     * @param owner      The class the model describes: the bean, or the factory producing it
+     * @param model      The class model
+     * @param definition The definition of the model to materialize
      * @return The state
      */
-    static PythonDefinitionState of(Class<?> beanType, ClassModel model) {
-        BeanDefinitionModel definition = model.beanDefinition();
-        if (definition == null) {
-            throw new IllegalArgumentException("The model of " + beanType.getName() + " has no bean definition");
-        }
-        ModelMaterializer materializer = new ModelMaterializer(beanType.getClassLoader());
-        AnnotationMetadata annotationMetadata = materializer.annotationMetadata(model.annotationMetadata());
+    static PythonDefinitionState of(Class<?> owner, ClassModel model, BeanDefinitionModel definition) {
+        ModelMaterializer materializer = new ModelMaterializer(owner.getClassLoader());
+        AnnotationMetadata classMetadata = materializer.annotationMetadata(model.annotationMetadata());
+        AnnotationMetadata annotationMetadata = annotationMetadata(materializer, classMetadata, definition);
         PrecalculatedInfoModel infoModel = definition.info();
         List<ExecutableMethodModel> executables = definition.executableMethods();
         int[] processingIndexes = IntStream.range(0, executables.size()).filter(i -> executables.get(i).processOnStartup()).toArray();
@@ -117,13 +119,22 @@ public final class PythonDefinitionState {
         }
         exposedTypes = Collections.unmodifiableSet(exposedTypes);
         try {
+            Class<?> beanType = materializer.resolve(definition.beanTypeName());
             List<ArgumentModel> parameters = definition.constructor().parameters();
             Argument<?>[] constructorArguments = parameters.isEmpty() ? null : materializer.arguments(parameters);
+            FactoryMethodModel factory = definition.factory();
             AbstractInitializableBeanDefinition.MethodReference constructor = new AbstractInitializableBeanDefinition.MethodReference(
-                beanType, "<init>", constructorArguments, materializer.annotationMetadata(definition.constructor().annotationMetadata()), false, false);
+                factory == null ? beanType : materializer.resolve(factory.factoryTypeName()), factory == null ? "<init>" : factory.methodName(),
+                constructorArguments, materializer.annotationMetadata(definition.constructor().annotationMetadata()), false, false);
+            Qualifier<?> factoryQualifier = null;
+            if (factory != null && !factory.isStatic()) {
+                // The writer qualifies the factory lookup with the factory class's own annotations
+                Class<?> factoryType = materializer.resolve(factory.factoryTypeName());
+                factoryQualifier = PythonQualifiers.qualifier(Argument.of(factoryType, "factory", classMetadata), owner.getClassLoader());
+            }
             Qualifier<?>[] constructorQualifiers = new Qualifier[parameters.size()];
             Argument<?>[] constructorGenericTypes = new Argument[parameters.size()];
-            resolveInjection(materializer, beanType, definition.constructor().injectionPoints(), constructorArguments, constructorQualifiers, constructorGenericTypes);
+            resolveInjection(materializer, owner, definition.constructor().injectionPoints(), constructorArguments, constructorQualifiers, constructorGenericTypes);
             List<InjectedMethodModel> methods = definition.methods();
             AbstractInitializableBeanDefinition.MethodReference[] methodInjection = new AbstractInitializableBeanDefinition.MethodReference[methods.size()];
             Qualifier<?>[][] methodQualifiers = new Qualifier[methods.size()][];
@@ -137,7 +148,7 @@ public final class PythonDefinitionState {
                     materializer.annotationMetadata(method.annotationMetadata()), method.postConstruct(), method.preDestroy());
                 methodQualifiers[i] = new Qualifier[methodParameters.size()];
                 methodGenericTypes[i] = new Argument[methodParameters.size()];
-                resolveInjection(materializer, beanType, method.injectionPoints(), arguments, methodQualifiers[i], methodGenericTypes[i]);
+                resolveInjection(materializer, owner, method.injectionPoints(), arguments, methodQualifiers[i], methodGenericTypes[i]);
             }
             AbstractExecutableMethodsDefinition.MethodReference[] executableMethods = new AbstractExecutableMethodsDefinition.MethodReference[executables.size()];
             for (int i = 0; i < executables.size(); i++) {
@@ -161,13 +172,28 @@ public final class PythonDefinitionState {
                 }
             }
             return new PythonDefinitionState(annotationMetadata, info, constructor, methods.isEmpty() ? null : methodInjection, typeArguments, null,
-                exposedTypes, executables.isEmpty() ? null : executableMethods, processingIndexes,
+                exposedTypes, factoryQualifier, executables.isEmpty() ? null : executableMethods, processingIndexes,
                 new Injection(constructorQualifiers, constructorGenericTypes, methodQualifiers, methodGenericTypes));
         } catch (ClassNotFoundException | LinkageError | RuntimeException e) {
             // Like the writer's static initializer: the definition still constructs, and reports the failure when loaded
             return new PythonDefinitionState(annotationMetadata, info, null, null, null, e,
-                exposedTypes, null, processingIndexes, Injection.NONE);
+                exposedTypes, null, null, processingIndexes, Injection.NONE);
         }
+    }
+
+    /**
+     * The annotation metadata of a definition: the class's own, or the definition's, rooted at its own root layer when
+     * it has one, as a factory-produced definition has (the factory class below the produced bean's metadata).
+     */
+    static AnnotationMetadata annotationMetadata(ModelMaterializer materializer, AnnotationMetadata classMetadata, BeanDefinitionModel definition) {
+        if (definition.annotationMetadata() == null) {
+            return classMetadata;
+        }
+        AnnotationMetadata declared = materializer.annotationMetadata(definition.annotationMetadata());
+        if (definition.rootAnnotationMetadata() == null) {
+            return declared;
+        }
+        return new AnnotationMetadataHierarchy(materializer.annotationMetadata(definition.rootAnnotationMetadata()), declared);
     }
 
     private static void resolveInjection(ModelMaterializer materializer,
@@ -227,6 +253,13 @@ public final class PythonDefinitionState {
      */
     public @Nullable Throwable failure() {
         return failure;
+    }
+
+    /**
+     * @return The qualifier of the factory bean lookup, or null
+     */
+    public @Nullable Qualifier<?> factoryQualifier() {
+        return factoryQualifier;
     }
 
     /**

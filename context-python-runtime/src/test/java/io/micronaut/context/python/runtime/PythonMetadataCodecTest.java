@@ -61,7 +61,7 @@ class PythonMetadataCodecTest {
         AnnotationMetadataModel metadata = new AnnotationMetadataModel(declared, Map.of("jakarta.inject.Scope", Map.of()),
             Map.of("jakarta.inject.Scope", Map.of()), declared, Map.of("jakarta.inject.Scope", List.of("jakarta.inject.Singleton")),
             Map.of("test.Custom", Map.of("string", "default"), "test.Marker", Map.of()), Map.of("test.Repeated", "test.Container"), true);
-        ClassModel classModel = new ClassModel(SampleBean.class.getName(), metadata, PythonMetadataClassGeneratorTest.sample().beanDefinition(),
+        ClassModel classModel = new ClassModel(SampleBean.class.getName(), metadata, PythonMetadataClassGeneratorTest.sample().beanDefinitions(),
             PythonMetadataClassGeneratorTest.sample().introspection());
         return new PythonMetadataModel(PythonMetadataModel.FORMAT_VERSION, "5.3.0-test", "app/models.py", classModel);
     }

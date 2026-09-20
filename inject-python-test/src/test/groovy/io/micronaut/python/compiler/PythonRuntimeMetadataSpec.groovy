@@ -241,23 +241,18 @@ class RuntimePerson:
 
         when:
         PyronautCompiler.builder().pythonCode('''
-from jakarta.inject import Singleton
-from micronaut.context.annotation import Factory, Bean
+from typing import Annotated
+from micronaut.context.annotation import ConfigurationProperties
 
-@Factory
+@ConfigurationProperties("unsupported")
 class Unsupported:
-    def __init__(self):
-        pass
-
-    @Bean
-    def make(self) -> str:
-        return "made"
+    name: str
 ''').targetDir(target).options(['-Amicronaut.python.metadata.backend=model-runtime']).build().compile()
 
         then:
         def error = thrown(Exception)
         error.message.contains('Python metadata model backend')
-        error.message.contains('a factory method (make) is not supported yet')
+        error.message.contains('is not supported yet')
         error.message.contains('micronaut.python.metadata.backend=compiler')
 
         cleanup:

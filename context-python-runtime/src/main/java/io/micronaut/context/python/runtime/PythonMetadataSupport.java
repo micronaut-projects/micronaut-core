@@ -34,21 +34,23 @@ public final class PythonMetadataSupport {
     }
 
     /**
-     * @param beanType The bean type
+     * @param owner               The class the model describes: the bean, or the factory producing it
+     * @param definitionClassName The definition class name
      * @return The definition state
      */
-    public static PythonDefinitionState definitionState(Class<?> beanType) {
-        return PythonRuntimeMetadata.holder(beanType).definitionState();
+    public static PythonDefinitionState definitionState(Class<?> owner, String definitionClassName) {
+        return PythonRuntimeMetadata.holder(owner).definitionState(definitionClassName);
     }
 
     /**
-     * @param beanType The bean type
-     * @return The executable method references of the bean's definition
+     * @param owner               The class the model describes: the bean, or the factory producing it
+     * @param definitionClassName The definition class name
+     * @return The executable method references of the definition
      */
-    public static AbstractExecutableMethodsDefinition.MethodReference[] executableMethods(Class<?> beanType) {
-        AbstractExecutableMethodsDefinition.MethodReference[] references = definitionState(beanType).executableMethods();
+    public static AbstractExecutableMethodsDefinition.MethodReference[] executableMethods(Class<?> owner, String definitionClassName) {
+        AbstractExecutableMethodsDefinition.MethodReference[] references = definitionState(owner, definitionClassName).executableMethods();
         if (references == null) {
-            throw new IllegalStateException("The executable methods of " + beanType.getName() + " could not be materialized");
+            throw new IllegalStateException("The executable methods of " + definitionClassName + " could not be materialized");
         }
         return references;
     }

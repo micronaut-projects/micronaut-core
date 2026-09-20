@@ -32,7 +32,7 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The factory the shared bean definition analysis drives when the model backends are selected: it answers with a
- * recording builder for a constructor-instantiated bean, and with a diagnostic for the bean kinds the model cannot
+ * recording builder for a constructor-instantiated bean or a factory method, and with a diagnostic for the bean kinds the model cannot
  * describe yet.
  *
  * @since 5.3.0
@@ -42,6 +42,7 @@ final class ModelBeanDefinitionBuilderFactory implements ElementBeanDefinitionBu
 
     private final PythonMetadataModelBuilder modelBuilder;
     private final ClassElement classElement;
+    private int uniqueIdentifier;
 
     ModelBeanDefinitionBuilderFactory(PythonMetadataModelBuilder modelBuilder, ClassElement classElement) {
         this.modelBuilder = modelBuilder;
@@ -59,7 +60,8 @@ final class ModelBeanDefinitionBuilderFactory implements ElementBeanDefinitionBu
 
     @Override
     public ElementBeanDefinitionBuilder<BeanDefinitionModel> factoryMethod(MethodElement methodElement) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "a factory method (" + methodElement.getName() + ")");
+        return factoryMethod(BeanInjectionUtils.createMethodDefinition(methodElement.getGenericReturnType(), methodElement, methodElement,
+            methodElement.isReflectionRequired(), modelBuilder.visitorContext()));
     }
 
     @Override
@@ -100,7 +102,8 @@ final class ModelBeanDefinitionBuilderFactory implements ElementBeanDefinitionBu
 
     @Override
     public ElementBeanDefinitionBuilder<BeanDefinitionModel> factoryMethod(MethodDefinition<ClassElement, MethodElement> methodDefinition) {
-        throw PythonMetadataModelBuilder.unsupported(classElement, "a factory method (" + methodDefinition.methodElement().getName() + ")");
+        // The writer numbers the definitions of a factory in the order the analysis produces them
+        return new ModelBeanDefinitionBuilder(modelBuilder, classElement, methodDefinition, uniqueIdentifier++);
     }
 
     @Override
