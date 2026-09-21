@@ -17,16 +17,14 @@ package io.micronaut.reflection;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.exception.InvocationException;
+import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
-import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
 
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.Map;
@@ -96,9 +94,8 @@ abstract class AbstractReflectionExecutable<T, R> implements ExecutableMethod<T,
 
     /**
      * Invokes a method the way a generated dispatcher invokes it: the exception the target throws is the one the
-     * caller catches. {@code ReflectionUtils.invokeMethod} wraps it in an {@link InvocationException} instead,
-     * which nothing in the framework unwraps, so a retry policy, an exception handler or the catch block of an
-     * interceptor would never see the exception the bean method threw.
+     * caller catches, a checked one included, as {@link ReflectionUtils#invokeMethodPropagating} does for the
+     * generated dispatch of a method that needs reflection.
      *
      * @param method    The method to invoke
      * @param instance  The instance to invoke it on, {@code null} for a static method
@@ -107,16 +104,7 @@ abstract class AbstractReflectionExecutable<T, R> implements ExecutableMethod<T,
      */
     @Nullable
     static Object invokeTarget(Method method, @Nullable Object instance, @Nullable Object... arguments) {
-        try {
-            return method.invoke(instance, arguments);
-        } catch (InvocationTargetException e) {
-            // a generated dispatcher calls the method itself, so the exception of the target leaves the dispatch
-            // as it is, a checked one included
-            return ExceptionUtils.sneakyThrow(e.getTargetException());
-        } catch (IllegalAccessException e) {
-            // as `ReflectionUtils.invokeMethod` reports it: the method itself never ran
-            throw new InvocationException("Illegal access invoking method [" + method + "]: " + e.getMessage(), e);
-        }
+        return ReflectionUtils.invokeMethodPropagating(instance, method, arguments);
     }
 
     @Override
