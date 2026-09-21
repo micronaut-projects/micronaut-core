@@ -10,12 +10,17 @@
 #  - a change that also edits sources, or a listed package, waits for review
 #  - a change that fails verification opens as a draft
 #  - a change outside the policy opens no pull request
+#  - an update with an open pull request, or whose proposal was closed
+#    unmerged, is not made again; an update that ended with no change, outside
+#    the policy or in an error is retried after retryAfterDays, so the run
+#    limit moves on to later updates
 #
 # Jobs
 #  - plan: reads the dashboard and works out each branch's policy
 #  - update: the Copilot session. It runs build code it may have written, so
 #    it gets no repository token or git credentials and only produces a patch
 #  - publish: a clean runner applies the patch, classifies it and pushes
+#  - record: keeps each update's outcome in the Actions cache for the next plan
 #
 # Secrets
 #  - COPILOT_GITHUB_TOKEN: fine-grained PAT with the "Copilot Requests" permission
@@ -68,10 +73,18 @@ jobs:
           sparse-checkout: .github
           persist-credentials: false
 
+      - name: "♻️ Restore the outcomes of earlier runs"
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .copilot-deps-state
+          key: copilot-deps-state-${{ github.run_id }}
+          restore-keys: copilot-deps-state-
+
       - name: "📋 Read the Dependency Dashboard"
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          STATE_FILE: .copilot-deps-state/state.json
           BASE_BRANCHES: ${{ inputs.branches }}
           ONLY: ${{ inputs.only }}
           MAX_UPDATES: ${{ inputs.max }}
@@ -92,36 +105,18 @@ jobs:
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
     steps:
-      - name: "🔎 Look for an earlier pull request"
-        id: existing
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD: ${{ matrix.head }}
-          TARGET: ${{ matrix.target }}
-        run: |
-          # the same target is already proposed, or a person closed it unmerged
-          same=0
-          if [ -n "$TARGET" ]; then
-            same=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD" --state all --json state,body --limit 20 \
-              | jq --arg m "<!-- copilot-deps target=$TARGET -->" '[.[] | select((.body | contains($m)) and .state != "MERGED")] | length')
-          fi
-          echo "skip=$([ "$same" != 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
       - name: "🗑 Free disk space"
-        if: steps.existing.outputs.skip != 'true'
         run: |
           sudo rm -rf /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /opt/ghc /usr/share/dotnet /usr/local/lib/android
           sudo apt-get clean
 
       - name: "📥 Checkout ${{ matrix.base }}"
-        if: steps.existing.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           ref: ${{ matrix.base }}
           persist-credentials: false
 
       - name: "📥 Checkout workflow tooling"
-        if: steps.existing.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           path: .copilot-deps-tools
@@ -129,7 +124,6 @@ jobs:
           persist-credentials: false
 
       - name: "📌 Record the base"
-        if: steps.existing.outputs.skip != 'true'
         id: base
         run: |
           mv .copilot-deps-tools "$RUNNER_TEMP/tools"
@@ -138,7 +132,6 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: "🔧 Setup GraalVM CE"
-        if: steps.existing.outputs.skip != 'true'
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
           distribution: 'graalvm'
@@ -146,17 +139,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"
-        if: steps.existing.outputs.skip != 'true'
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-read-only: true
 
       - name: "🔧 Install Copilot CLI"
-        if: steps.existing.outputs.skip != 'true'
         run: npm install -g @github/copilot@1
 
       - name: "🤖 Update with Copilot"
-        if: steps.existing.outputs.skip != 'true'
         continue-on-error: true
         timeout-minutes: 120
         env:
@@ -188,7 +178,6 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/out/copilot.log"
 
       - name: "🛠 Verify"
-        if: steps.existing.outputs.skip != 'true'
         id: verify
         continue-on-error: true
         run: |
@@ -196,7 +185,6 @@ jobs:
           ./gradlew $tasks --no-daemon --continue
 
       - name: "📦 Save the change"
-        if: steps.existing.outputs.skip != 'true'
         env:
           BASE_SHA: ${{ steps.base.outputs.sha }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
@@ -208,7 +196,6 @@ jobs:
           git diff --cached --stat "$BASE_SHA"
 
       - name: "📤 Upload the change"
-        if: steps.existing.outputs.skip != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.artifact }}
@@ -225,6 +212,18 @@ jobs:
       max-parallel: 1
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     steps:
+      # first, and outside the workspace: the outcome is recorded even when
+      # the update job left no change, and the base checkout empties the workspace
+      - name: "📥 Checkout workflow tooling"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          path: .copilot-deps-tools
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: "🔒 Move tooling out of the workspace"
+        run: mv .copilot-deps-tools "$RUNNER_TEMP/tools"
+
       - name: "📥 Download the change"
         id: download
         continue-on-error: true
@@ -241,19 +240,10 @@ jobs:
           fetch-depth: 50
           persist-credentials: false
 
-      - name: "📥 Checkout workflow tooling"
-        if: steps.download.outcome == 'success'
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          path: .copilot-deps-tools
-          sparse-checkout: .github
-          persist-credentials: false
-
       - name: "🩹 Apply the change"
         if: steps.download.outcome == 'success'
         id: apply
         run: |
-          mv .copilot-deps-tools "$RUNNER_TEMP/tools"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -s "$RUNNER_TEMP/in/change.patch" ]; then
             git apply --3way --index --binary "$RUNNER_TEMP/in/change.patch"
@@ -263,6 +253,7 @@ jobs:
         if: steps.download.outcome == 'success'
         id: classify
         env:
+          GH_TOKEN: ${{ github.token }}
           BASE_REF: ${{ steps.apply.outputs.sha }}
           TASK: ${{ toJSON(matrix) }}
         run: |
@@ -283,7 +274,7 @@ jobs:
           CHANGES: ${{ steps.classify.outputs.changes }}
           REASONS: ${{ steps.classify.outputs.reasons }}
           DASHBOARD_TITLE: ${{ matrix.title }}
-          TARGET: ${{ matrix.target }}
+          MARKER: ${{ steps.classify.outputs.marker }}
           COMMIT_EMAIL: ${{ vars.DEPENDENCY_UPDATES_EMAIL || 'micronaut-build@users.noreply.github.com' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BODY_FILE: ${{ runner.temp }}/body.md
@@ -292,7 +283,7 @@ jobs:
           EXTRA_LABEL: "type: dependency-upgrade"
         run: |
           {
-            echo "<!-- copilot-deps target=$TARGET -->"
+            echo "$MARKER"
             echo "Dependency update prepared by Copilot from the Renovate Dependency Dashboard entry:"
             echo
             echo "> $DASHBOARD_TITLE"
@@ -311,3 +302,58 @@ jobs:
             echo "[Workflow run]($RUN_URL)"
           } > "$BODY_FILE"
           bash "$RUNNER_TEMP/tools/.github/scripts/copilot-open-pr.sh"
+
+      - name: "📝 Record the outcome"
+        if: always()
+        env:
+          TASK: ${{ toJSON(matrix) }}
+          STATUS: ${{ steps.classify.outputs.status }}
+          OUTCOME_DIR: ${{ runner.temp }}/outcome
+        run: python3 "$RUNNER_TEMP/tools/.github/scripts/copilot-deps.py" outcome
+
+      - name: "📤 Upload the outcome"
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: outcome-${{ matrix.artifact }}
+          path: ${{ runner.temp }}/outcome
+          retention-days: 1
+
+  record:
+    needs: [plan, publish]
+    if: always() && needs.plan.outputs.count != '0' && needs.plan.result == 'success' && !inputs.dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - name: "📥 Checkout workflow tooling"
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: "♻️ Restore the outcomes of earlier runs"
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .copilot-deps-state
+          key: copilot-deps-state-${{ github.run_id }}
+          restore-keys: copilot-deps-state-
+
+      - name: "📥 Download this run's outcomes"
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: outcome-*
+          merge-multiple: true
+          path: ${{ runner.temp }}/outcome
+
+      - name: "📝 Merge"
+        env:
+          STATE_FILE: .copilot-deps-state/state.json
+          OUTCOME_DIR: ${{ runner.temp }}/outcome
+        run: |
+          mkdir -p .copilot-deps-state
+          python3 .github/scripts/copilot-deps.py record
+
+      - name: "💾 Save for the next run"
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
+        with:
+          path: .copilot-deps-state
+          key: copilot-deps-state-${{ github.run_id }}

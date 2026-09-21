@@ -22,6 +22,12 @@
     "settings.gradle.kts"
   ],
   "verifyTasks": "assemble testClasses",
+  "retryAfterDays": {
+    "no-change": 7,
+    "rejected": 7,
+    "declined": 7,
+    "error": 1
+  },
   "sonarProjectKey": "micronaut-projects_micronaut-core",
   "sonarForbiddenFiles": [
     ".github/*",
