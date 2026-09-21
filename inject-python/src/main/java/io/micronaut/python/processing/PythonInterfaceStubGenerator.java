@@ -227,7 +227,7 @@ final class PythonInterfaceStubGenerator {
             PythonReflectionGate.Copy copy = runtimeAnnotationCopy(annotationName, declaration, visitorContext);
             if (annotationValue == null
                 || copy == PythonReflectionGate.Copy.NEVER
-                || (copy == PythonReflectionGate.Copy.REFLECTIVE && !gate.allows(typeName, annotationName, element, visitorContext))) {
+                || (copy == PythonReflectionGate.Copy.REFLECTIVE && !gate.allows(typeName, annotationName, element))) {
                 continue;
             }
             try {

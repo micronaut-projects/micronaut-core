@@ -5,6 +5,7 @@ import io.micronaut.context.ApplicationContextBuilder
 import io.micronaut.context.RuntimeBeanDefinition
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.runtime.server.EmbeddedServer
+import pythontest.introduction.reflective.FakeAiService
 import pythontest.introduction.reflective.Prompt
 import pythontest.introduction.reflective.ReflectiveService
 import pythontest.introduction.reflective.ReflectiveServiceInterceptor
@@ -273,6 +274,47 @@ class UpperTranslator(Translator):
         "other.*"            | false
         "python.Translator"  | true
         "python.*"           | true
+    }
+
+    void "test an annotation mapped to the AllowsReflection hint copies the interface annotations without the option"() {
+        given: "no option; @FakeAiService is mapped to @AllowsReflection by FakeAiServiceMapper"
+        allowReflection = null
+        def context = buildContext('''
+from abc import ABC, abstractmethod
+from typing import Annotated
+from pythontest.introduction.reflective import FakeAiService, Prompt, Var
+
+
+@FakeAiService("friend")
+class Friend(ABC):
+    @Prompt("You are a good friend of mine.")
+    @abstractmethod
+    def chat(self, message: Annotated[str, Var("message")]) -> str:
+        ...
+
+
+class Stranger(ABC):
+    @Prompt("Who are you?")
+    @abstractmethod
+    def chat(self, message: Annotated[str, Var("message")]) -> str:
+        ...
+''')
+        Class<?> friendType = context.classLoader.loadClass("python.Friend")
+        Class<?> strangerType = context.classLoader.loadClass("python.Stranger")
+
+        expect: "the mapped hint applies to the interface, its methods and their parameters"
+        friendType.isInterface()
+        friendType.getAnnotation(FakeAiService).value() == "friend"
+        friendType.getMethod("chat", String).getAnnotation(Prompt).value() == "You are a good friend of mine."
+        friendType.getMethod("chat", String).parameterAnnotations[0].find { it instanceof Var }.value() == "message"
+
+        and: "an interface without the hint keeps its annotations in the metadata only"
+        strangerType.isInterface()
+        strangerType.getMethod("chat", String).getAnnotation(Prompt) == null
+        strangerType.getMethod("chat", String).parameterAnnotations[0].length == 0
+
+        cleanup:
+        context?.close()
     }
 
     void "test introduction with a concrete Python base keeps compiling to a class extending the base"() {

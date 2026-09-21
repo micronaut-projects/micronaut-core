@@ -306,4 +306,76 @@ class Reader:
         "other.*"                       | false | false  | false
         "python.Boo"                    | false | false  | false
     }
+
+    void "the AllowsReflection hint copies the runtime annotations of a class without the option"() {
+        given: "no option; the hint is declared, meta-annotates a Python annotation, or marks one method"
+        allowReflection = null
+        def context = buildContext('''
+from dataclasses import dataclass
+from typing import Annotated
+
+from example.reflective import ReflectiveColumn, ReflectiveMapping, ReflectiveTable
+from micronaut.core.annotation import AllowsReflection, Introspected
+
+
+@AllowsReflection
+def Audited(target):
+    return target
+
+
+@AllowsReflection
+@ReflectiveTable(name="declared")
+@Introspected
+@dataclass
+class Declared:
+    id: Annotated[int | None, ReflectiveColumn("id")] = None
+
+    @ReflectiveMapping(name="summary")
+    def summary(self) -> str:
+        return "declared"
+
+
+@Audited
+@ReflectiveTable(name="audited")
+@Introspected
+@dataclass
+class ThroughPythonAnnotation:
+    id: Annotated[int | None, ReflectiveColumn("id")] = None
+
+
+@ReflectiveTable(name="partial")
+class Partial:
+    @AllowsReflection
+    @ReflectiveMapping(name="hinted")
+    def hinted(self) -> str:
+        return "hinted"
+
+    @ReflectiveMapping(name="plain")
+    def plain(self) -> str:
+        return "plain"
+''')
+        Class<?> declared = context.classLoader.loadClass("python.Declared")
+        Class<?> audited = context.classLoader.loadClass("python.ThroughPythonAnnotation")
+        Class<?> partial = context.classLoader.loadClass("python.Partial")
+
+        expect: "the hint on the class covers the class, its fields and its methods"
+        declared.getAnnotation(ReflectiveTable).name() == "declared"
+        declared.getDeclaredField("id").getAnnotation(ReflectiveColumn).value() == "id"
+        declared.getMethod("summary").getAnnotation(ReflectiveMapping).name() == "summary"
+
+        and: "a Python annotation meta-annotated with the hint carries it to the class"
+        audited.getAnnotation(ReflectiveTable).name() == "audited"
+        audited.getDeclaredField("id").getAnnotation(ReflectiveColumn).value() == "id"
+
+        and: "the hint on a method covers that method only"
+        partial.getAnnotation(ReflectiveTable) == null
+        partial.getMethod("hinted").getAnnotation(ReflectiveMapping).name() == "hinted"
+        partial.getMethod("plain").getAnnotation(ReflectiveMapping) == null
+
+        and: "the hint itself is served by the annotation metadata and is not copied"
+        declared.getAnnotation(io.micronaut.core.annotation.AllowsReflection) == null
+
+        cleanup:
+        context?.close()
+    }
 }

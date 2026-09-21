@@ -15,20 +15,25 @@
  */
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.AllowsReflection;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.annotation.Nullable;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.Element;
+import io.micronaut.inject.ast.MemberElement;
+import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * Decides which generated Java types carry the reflection data of their Python class: the runtime
@@ -37,9 +42,11 @@ import java.util.regex.Pattern;
  *
  * <p>Copying such annotations onto the generated source is off by default: a generated class carrying
  * {@code @Entity} or {@code @JsonProperty} is seen by every annotation processor of the following Java
- * processing rounds as if a Java class had declared them, so the copy is made only for the types an
- * application names. The types are named with the property that allows reflective introspection at run
- * time, {@value #PROPERTY} of {@code io.micronaut.reflection.ReflectionIntrospectionPolicy}, and with its
+ * processing rounds as if a Java class had declared them, so the copy is made only for the types that
+ * ask for it. A type asks for it with the {@link AllowsReflection} hint: declared on the Python class or
+ * member, meta-annotating one of its annotation types (an AI service annotation, a JPA {@code @Entity}),
+ * or added by an annotation mapper of the framework that reads the annotations reflectively. Otherwise
+ * the types are named with the property that allows reflective introspection at run time, {@value #PROPERTY} of {@code io.micronaut.reflection.ReflectionIntrospectionPolicy}, and with its
  * pattern language: a comma-separated list of class names where {@code *} stands for any sequence of
  * characters, matched against the whole name. {@code com.example.model.*} names the classes of a package
  * and of its sub packages, {@code com.example.Order} one class, {@code *.Order} every class of that name
@@ -80,7 +87,7 @@ final class PythonReflectionGate {
 
     private final List<Pattern> patterns;
     private final boolean all;
-    private final Set<String> reportedTypes = new HashSet<>();
+    private final Map<String, GatedType> gatedTypes = new LinkedHashMap<>();
 
     private PythonReflectionGate(List<Pattern> patterns) {
         this.patterns = patterns;
@@ -183,26 +190,67 @@ final class PythonReflectionGate {
     }
 
     /**
-     * Whether a generated type carries the reflection data of its Python class, telling the user once
-     * per type when it does not: the annotation a framework expects to find reflectively is left off the
-     * generated source, and the option that puts it there is named so that the omission can be found.
-     * Bean Validation constraints, which Micronaut reads from the annotation metadata, are left off
-     * without a note.
+     * Whether a generated declaration carries the reflection data of its Python element: when the element
+     * or the type declaring it carries the {@link AllowsReflection} hint, or when the generated type
+     * matches one of the patterns. When it does not, the annotation left off the generated source is
+     * recorded for the {@linkplain #report(VisitorContext) note} that tells the user what a framework
+     * expecting to find it reflectively will miss. Bean Validation constraints, which Micronaut reads from
+     * the annotation metadata, are left off without a note.
      *
      * @param typeName       The fully qualified name of the generated type
      * @param annotationName The annotation that is about to be left off
      * @param element        The annotated Python element
-     * @param visitorContext The visitor context
-     * @return Whether the type matches one of the patterns
+     * @return Whether the declaration carries its reflection data
      */
-    boolean allows(@NonNull String typeName, @NonNull String annotationName, @NonNull Element element, @NonNull VisitorContext visitorContext) {
-        if (allows(typeName)) {
+    boolean allows(@NonNull String typeName, @NonNull String annotationName, @NonNull Element element) {
+        if (allowsReflection(element) || allows(typeName)) {
             return true;
         }
-        if (isReported(annotationName) && reportedTypes.add(typeName)) {
-            visitorContext.info("The runtime annotations of [" + typeName + "] (@" + annotationName + ", ...) are not copied onto the generated"
-                + " Java type, so frameworks reading them reflectively will not see them; name the type in the "
-                + OPTION + " annotation processor option (-A" + OPTION + "=" + typeName + ") to copy them", element);
+        if (isReported(annotationName)) {
+            gatedTypes.computeIfAbsent(typeName, name -> new GatedType(element, new LinkedHashSet<>())).annotations().add(annotationName);
+        }
+        return false;
+    }
+
+    /**
+     * Reports, once per generated type whose reflection data was left off, the annotations that were not
+     * copied and how to have them copied: the {@link AllowsReflection} hint or the option naming the type.
+     * The types reported so far are forgotten.
+     *
+     * @param visitorContext The visitor context
+     */
+    void report(@NonNull VisitorContext visitorContext) {
+        for (Map.Entry<String, GatedType> entry : gatedTypes.entrySet()) {
+            String typeName = entry.getKey();
+            String annotations = entry.getValue().annotations().stream()
+                .map(annotationName -> "@" + annotationName.substring(annotationName.lastIndexOf('.') + 1))
+                .collect(Collectors.joining(", "));
+            visitorContext.info("The runtime annotations of [" + typeName + "] (" + annotations + ") are not copied onto the generated"
+                + " Java type, so frameworks reading them reflectively will not see them; annotate the type with @"
+                + AllowsReflection.class.getName() + " or name it in the " + OPTION + " annotation processor option (-A"
+                + OPTION + "=" + typeName + ") to copy them", entry.getValue().element());
+        }
+        gatedTypes.clear();
+    }
+
+    /**
+     * Whether an element carries the {@link AllowsReflection} hint, as a declared annotation, through
+     * one of its annotations (meta-annotated with the hint, or mapped to it by an annotation mapper), or
+     * on the type declaring it: the hint on a class covers its fields, its methods and their parameters.
+     *
+     * @param element The Python element
+     * @return Whether the element or its declaring type carries the hint
+     */
+    static boolean allowsReflection(@NonNull Element element) {
+        if (element.hasStereotype(AllowsReflection.class)) {
+            return true;
+        }
+        if (element instanceof ParameterElement parameter) {
+            return allowsReflection(parameter.getMethodElement());
+        }
+        if (element instanceof MemberElement member) {
+            return member.getOwningType().hasStereotype(AllowsReflection.class)
+                || member.getDeclaringType().hasStereotype(AllowsReflection.class);
         }
         return false;
     }
@@ -233,5 +281,15 @@ final class PythonReflectionGate {
          * Only when the gate allows the generated type: reflection data of a third-party framework.
          */
         REFLECTIVE
+    }
+
+    /**
+     * A generated type whose reflection data was left off: the Python element to report it on and the
+     * annotations that were not copied.
+     *
+     * @param element     The Python element
+     * @param annotations The names of the annotations left off
+     */
+    private record GatedType(Element element, Set<String> annotations) {
     }
 }

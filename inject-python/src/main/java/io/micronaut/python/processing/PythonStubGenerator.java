@@ -253,6 +253,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finish(VisitorContext visitorContext) {
+        if (reflectionGate != null) {
+            reflectionGate.report(visitorContext);
+        }
         SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
         try {
             if (sourceGenerator != null) {
@@ -3869,7 +3872,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             key -> runtimeAnnotationCopy(annotationName, declaration, visitorContext)
         );
         return copy == PythonReflectionGate.Copy.ALWAYS
-            || (copy == PythonReflectionGate.Copy.REFLECTIVE && reflectionGate(visitorContext).allows(typeName, annotationName, element, visitorContext));
+            || (copy == PythonReflectionGate.Copy.REFLECTIVE && reflectionGate(visitorContext).allows(typeName, annotationName, element));
     }
 
     private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {

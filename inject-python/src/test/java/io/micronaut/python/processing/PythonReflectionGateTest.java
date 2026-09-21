@@ -1,6 +1,8 @@
 package io.micronaut.python.processing;
 
+import io.micronaut.core.annotation.AllowsReflection;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.visitor.VisitorContext;
 import org.junit.jupiter.api.Test;
@@ -97,22 +99,29 @@ final class PythonReflectionGateTest {
     }
 
     @Test
-    void aRefusedTypeIsReportedOnceNamingTheOption() {
+    void aRefusedTypeIsReportedOnceListingItsAnnotationsAndNamingTheOption() {
         List<String> messages = new ArrayList<>();
         VisitorContext context = visitorContext(Map.of(), messages);
         Element element = ClassElement.of(String.class);
         PythonReflectionGate gate = PythonReflectionGate.of("com.example.model.*");
 
-        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element, context));
-        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Table", element, context));
-        assertFalse(gate.allows("com.example.Author", "jakarta.persistence.Entity", element, context));
-        assertTrue(gate.allows("com.example.model.Book", "jakarta.persistence.Entity", element, context));
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element));
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Table", element));
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element));
+        assertFalse(gate.allows("com.example.Author", "jakarta.persistence.Entity", element));
+        assertTrue(gate.allows("com.example.model.Book", "jakarta.persistence.Entity", element));
+        assertTrue(messages.isEmpty());
+
+        gate.report(context);
 
         assertEquals(2, messages.size());
-        assertTrue(messages.get(0).contains("[com.example.Order]"));
-        assertTrue(messages.get(0).contains("@jakarta.persistence.Entity"));
+        assertTrue(messages.get(0).contains("[com.example.Order] (@Entity, @Table) are not copied"));
         assertTrue(messages.get(0).contains("-A" + PythonReflectionGate.OPTION + "=com.example.Order"));
-        assertTrue(messages.get(1).contains("[com.example.Author]"));
+        assertTrue(messages.get(0).contains("@io.micronaut.core.annotation.AllowsReflection"));
+        assertTrue(messages.get(1).contains("[com.example.Author] (@Entity) are not copied"));
+
+        gate.report(context);
+        assertEquals(2, messages.size());
     }
 
     @Test
@@ -122,13 +131,35 @@ final class PythonReflectionGateTest {
         Element element = ClassElement.of(String.class);
         PythonReflectionGate gate = PythonReflectionGate.of("");
 
-        assertFalse(gate.allows("com.example.Person", "jakarta.validation.constraints.NotBlank$List", element, context));
-        assertFalse(gate.allows("com.example.Person", "javax.validation.constraints.NotNull", element, context));
+        assertFalse(gate.allows("com.example.Person", "jakarta.validation.constraints.NotBlank$List", element));
+        assertFalse(gate.allows("com.example.Person", "javax.validation.constraints.NotNull", element));
+        gate.report(context);
         assertTrue(messages.isEmpty());
 
-        assertFalse(gate.allows("com.example.Person", "jakarta.persistence.Entity", element, context));
+        assertFalse(gate.allows("com.example.Person", "jakarta.persistence.Entity", element));
+        gate.report(context);
         assertEquals(1, messages.size());
-        assertTrue(messages.get(0).contains("@jakarta.persistence.Entity"));
+        assertTrue(messages.get(0).contains("[com.example.Person] (@Entity)"));
+    }
+
+    @Test
+    void theHintAllowsTheElementWhateverThePatterns() {
+        List<String> messages = new ArrayList<>();
+        VisitorContext context = visitorContext(Map.of(), messages);
+        PythonReflectionGate gate = PythonReflectionGate.of("");
+        MutableAnnotationMetadata hinted = new MutableAnnotationMetadata();
+        hinted.addDeclaredAnnotation(AllowsReflection.class.getName(), Map.of());
+        ClassElement hintedType = ClassElement.of("com.example.Hinted", false, hinted);
+        ClassElement plainType = ClassElement.of("com.example.Plain", false, new MutableAnnotationMetadata());
+
+        assertTrue(PythonReflectionGate.allowsReflection(hintedType));
+        assertFalse(PythonReflectionGate.allowsReflection(plainType));
+
+        assertTrue(gate.allows("com.example.Hinted", "jakarta.persistence.Entity", hintedType));
+        assertFalse(gate.allows("com.example.Plain", "jakarta.persistence.Entity", plainType));
+        gate.report(context);
+        assertEquals(1, messages.size());
+        assertTrue(messages.get(0).contains("[com.example.Plain]"));
     }
 
     /**
