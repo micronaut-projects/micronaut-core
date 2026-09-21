@@ -720,15 +720,7 @@ public class ConnectionManager {
 
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    switch (logLevel) {
-                        case TRACE -> LogLevel.TRACE;
-                        case DEBUG -> LogLevel.DEBUG;
-                        case INFO -> LogLevel.INFO;
-                        case WARN -> LogLevel.WARN;
-                        case ERROR -> LogLevel.ERROR;
-                        default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
-                    };
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -767,20 +759,28 @@ public class ConnectionManager {
     private void addLogHandler(Channel ch) {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    switch (logLevel) {
-                        case TRACE -> LogLevel.TRACE;
-                        case DEBUG -> LogLevel.DEBUG;
-                        case INFO -> LogLevel.INFO;
-                        case WARN -> LogLevel.WARN;
-                        case ERROR -> LogLevel.ERROR;
-                        default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
-                    };
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
+    }
+
+    /**
+     * @param logLevel The Micronaut log level
+     * @return The Netty log level
+     * @throws IllegalArgumentException If Netty has no such level
+     */
+    static LogLevel toNettyLogLevel(io.micronaut.logging.LogLevel logLevel) {
+        return switch (logLevel) {
+            case TRACE -> LogLevel.TRACE;
+            case DEBUG -> LogLevel.DEBUG;
+            case INFO -> LogLevel.INFO;
+            case WARN -> LogLevel.WARN;
+            case ERROR -> LogLevel.ERROR;
+            default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
+        };
     }
 
     private void insertPcapLoggingHandlerLazy(Channel ch, String qualifier) {

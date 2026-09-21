@@ -32,6 +32,8 @@ import java.util.function.Supplier;
 @Internal
 final class DefaultRetryOperations implements RetryOperations {
 
+    private static final String NAME = "DefaultRetryOperations";
+
     private final RetryPolicy retryPolicy;
     private final DefaultRetryRunner retryRunner;
     private final RetryEventEmitter retryEventEmitter;
@@ -46,17 +48,17 @@ final class DefaultRetryOperations implements RetryOperations {
 
     @Override
     public <T> T execute(Supplier<T> supplier) {
-        return retryRunner.executeSync(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
+        return retryRunner.executeSync(supplier, newRetryState(), NAME, retryEventEmitter);
     }
 
     @Override
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier) {
-        return retryRunner.executeCompletionStage(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
+        return retryRunner.executeCompletionStage(supplier, newRetryState(), NAME, retryEventEmitter);
     }
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
-        return retryRunner.executePublisher(supplier, newRetryState(), "DefaultRetryOperations", retryEventEmitter);
+        return retryRunner.executePublisher(supplier, newRetryState(), NAME, retryEventEmitter);
     }
 
     private MutableRetryState newRetryState() {
