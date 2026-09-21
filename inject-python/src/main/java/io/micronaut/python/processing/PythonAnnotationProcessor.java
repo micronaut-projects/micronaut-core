@@ -422,102 +422,100 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                 environment = parseModel(transformedList, srcDirs, originatingElement);
             }
 
-            String mainPy;
             StringBuilder filesList = new StringBuilder();
             Set<String> initialisedPackages = new HashSet<>();
             boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
-            CompilationProfiler.Span vfsPhase = CompilationProfiler.span(profiler, "python.vfs");
-            if (StringUtils.isNotEmpty(values.code())) {
-                PythonAstParser.TransformResult transformResult = transformedList.get(0);
-                mainPy = transformResult.originalSource().getCharacters().toString();
-                writeApplicationPythonToVfs(
-                    filesList,
-                    APPLICATION_LAUNCHER_PATH,
-                    mainPy,
-                    transformResult,
-                    originatingElement
-                );
-            } else {
-                if (hasSrcDirs) {
-                    // source mode, so we need to write out each source to META-INF
-                    Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
-                    for (PythonAstParser.TransformResult transformResult : transformedList) {
-                        Source source = transformResult.originalSource();
-                        // a source outside every source directory was already rejected by the parser
-                        for (String configuredSrcDir : srcDirs) {
-                            String srcDir = normalizeResourcePath(configuredSrcDir);
-                            String path = normalizeResourcePath(source.getPath());
-                            int i = path.indexOf(srcDir);
-                            if (i == -1) {
-                                continue;
-                            }
-                            if (i > 0) {
-                                path = path.substring(i + srcDir.length() + 1);
-                            }
-
-                            if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
-                                path = path.substring(srcDir.length() + 1);
-                            }
-                            String targetSource = APPLICATION_SRC_PATH + path;
-                            List<String> classNames = importedClassNames(transformResult, environment);
-                            if (processSharedOutputs && !classNames.isEmpty()) {
-                                // has classes
-                                int parentIndex = path.lastIndexOf('/');
-                                if (parentIndex > -1) {
-                                    String parentPath = path.substring(0, parentIndex + 1);
-                                    allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                        .addAll(classNames);
-                                } else {
-                                    allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                        .addAll(classNames);
+            try (var _ = CompilationProfiler.span(profiler, "python.vfs")) {
+                if (StringUtils.isNotEmpty(values.code())) {
+                    PythonAstParser.TransformResult transformResult = transformedList.get(0);
+                    String mainPy = transformResult.originalSource().getCharacters().toString();
+                    writeApplicationPythonToVfs(
+                        filesList,
+                        APPLICATION_LAUNCHER_PATH,
+                        mainPy,
+                        transformResult,
+                        originatingElement
+                    );
+                } else {
+                    if (hasSrcDirs) {
+                        // source mode, so we need to write out each source to META-INF
+                        Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
+                        for (PythonAstParser.TransformResult transformResult : transformedList) {
+                            Source source = transformResult.originalSource();
+                            // a source outside every source directory was already rejected by the parser
+                            for (String configuredSrcDir : srcDirs) {
+                                String srcDir = normalizeResourcePath(configuredSrcDir);
+                                String path = normalizeResourcePath(source.getPath());
+                                int i = path.indexOf(srcDir);
+                                if (i == -1) {
+                                    continue;
                                 }
-                            }
-                            if (isAffectedSource(source)) {
-                                writeApplicationPythonToVfs(
-                                    filesList,
-                                    targetSource,
-                                    source.getCharacters().toString(),
-                                    transformResult,
-                                    originatingElement
-                                );
+                                if (i > 0) {
+                                    path = path.substring(i + srcDir.length() + 1);
+                                }
+
+                                if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
+                                    path = path.substring(srcDir.length() + 1);
+                                }
+                                String targetSource = APPLICATION_SRC_PATH + path;
+                                List<String> classNames = importedClassNames(transformResult, environment);
+                                if (processSharedOutputs && !classNames.isEmpty()) {
+                                    // has classes
+                                    int parentIndex = path.lastIndexOf('/');
+                                    if (parentIndex > -1) {
+                                        String parentPath = path.substring(0, parentIndex + 1);
+                                        allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
+                                            .addAll(classNames);
+                                    } else {
+                                        allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
+                                            .addAll(classNames);
+                                    }
+                                }
+                                if (isAffectedSource(source)) {
+                                    writeApplicationPythonToVfs(
+                                        filesList,
+                                        targetSource,
+                                        source.getCharacters().toString(),
+                                        transformResult,
+                                        originatingElement
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    if (processSharedOutputs) {
-                        TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
-                            .collect(Collectors.toCollection(TreeSet::new));
-                        for (String parent : byParent) {
-                            // the root contributes to the launcher (__main__.py), a package to its initialiser
-                            boolean root = StringUtils.isEmpty(parent);
-                            StringBuilder membersContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            List<String> members = new ArrayList<>();
-                            // the module defining each member, bound before the imports so the package initialiser
-                            // can serve a sibling to a module importing it from the package while this module imports
-                            StringBuilder memberModules = new StringBuilder("__micronaut_member_modules__ = {");
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String moduleName = NameUtils.filename(entry.getKey().filename);
-                                for (String type : types) {
-                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(IMPORT_SEPARATOR).append(type).append('\n');
-                                    if (!members.isEmpty()) {
-                                        memberModules.append(", ");
+                        if (processSharedOutputs) {
+                            TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
+                                .collect(Collectors.toCollection(TreeSet::new));
+                            for (String parent : byParent) {
+                                // the root contributes to the launcher (__main__.py), a package to its initialiser
+                                boolean root = StringUtils.isEmpty(parent);
+                                StringBuilder membersContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                List<String> members = new ArrayList<>();
+                                // the module defining each member, bound before the imports so the package initialiser
+                                // can serve a sibling to a module importing it from the package while this module imports
+                                StringBuilder memberModules = new StringBuilder("__micronaut_member_modules__ = {");
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String moduleName = NameUtils.filename(entry.getKey().filename);
+                                    for (String type : types) {
+                                        membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(IMPORT_SEPARATOR).append(type).append('\n');
+                                        if (!members.isEmpty()) {
+                                            memberModules.append(", ");
+                                        }
+                                        memberModules.append('"').append(type).append("\": \"").append(moduleName).append('"');
+                                        members.add(type);
                                     }
-                                    memberModules.append('"').append(type).append("\": \"").append(moduleName).append('"');
-                                    members.add(type);
                                 }
+                                membersContent.insert(0, memberModules.append("}\n").toString());
+                                writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, new PackageContribution(membersContent, members), initialisedPackages, originatingElement);
                             }
-                            membersContent.insert(0, memberModules.append("}\n").toString());
-                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, new PackageContribution(membersContent, members), initialisedPackages, originatingElement);
                         }
                     }
                 }
             }
-
-            vfsPhase.close();
 
             // Create processing environment and visitor context
             PythonProcessingEnvironment processingEnvironment =

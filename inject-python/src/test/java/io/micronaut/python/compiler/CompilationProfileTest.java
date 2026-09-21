@@ -18,15 +18,20 @@ package io.micronaut.python.compiler;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 
+import static org.junit.jupiter.api.Assertions.assertAll;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -114,6 +119,92 @@ final class CompilationProfileTest {
         // a second compilation appends its profile
         profile(directory, report);
         assertEquals(2, Files.readString(report).split("# Pyronaut compilation profile\n").length - 1);
+    }
+
+    @Test
+    void reportsTheCompilationFailureWhenTheProfileCannotBeWritten(@TempDir Path directory) throws Exception {
+        Path sources = Files.createDirectories(directory.resolve("src"));
+        // the compilation fails on this source, and the report destination is a directory, so writing
+        // the profile fails too: the caller needs the syntax error, not the report failure
+        Files.writeString(sources.resolve("broken.py"), "class Broken(:\n");
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Path report = Files.createDirectories(directory.resolve("report.txt"));
+
+        RuntimeException failure = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+            .pythonSrc(sources.toString())
+            .targetDir(output.toFile())
+            .profileReportFile(report.toFile())
+            .build()
+            .compile());
+
+        String message = String.valueOf(failure.getMessage());
+        assertAll(
+            () -> assertTrue(message.contains("broken.py") || message.contains("SyntaxError"),
+                "the compilation failure is reported, but was: " + message),
+            () -> assertFalse(failure instanceof UncheckedIOException, "the report failure replaced it: " + message),
+            () -> assertTrue(Arrays.stream(failure.getSuppressed()).anyMatch(UncheckedIOException.class::isInstance),
+                "the report failure is attached as suppressed: " + Arrays.toString(failure.getSuppressed()))
+        );
+    }
+
+    @Test
+    void propagatesTheReportFailureWhenTheCompilationSucceeded(@TempDir Path directory) throws Exception {
+        Path sources = Files.createDirectories(directory.resolve("src"));
+        Files.writeString(sources.resolve("greeter.py"), SOURCE);
+        Path output = Files.createDirectories(directory.resolve("classes"));
+        Path report = Files.createDirectories(directory.resolve("report.txt"));
+
+        assertThrows(UncheckedIOException.class, () -> PyronautCompiler.builder()
+            .pythonSrc(sources.toString())
+            .targetDir(output.toFile())
+            .profileReportFile(report.toFile())
+            .build()
+            .compile());
+    }
+
+    @Test
+    void appendsWholeBlocksWhenCompilationsShareAReportFile(@TempDir Path directory) throws Exception {
+        Path report = directory.resolve("reports").resolve("profile.txt");
+        int compilations = 3;
+        CountDownLatch ready = new CountDownLatch(compilations);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Throwable> failures = java.util.Collections.synchronizedList(new ArrayList<>());
+        List<Thread> threads = new ArrayList<>();
+        for (int i = 0; i < compilations; i++) {
+            Path own = Files.createDirectories(directory.resolve("compilation" + i));
+            Thread thread = new Thread(() -> {
+                try {
+                    ready.countDown();
+                    start.await();
+                    profile(own, report);
+                } catch (Throwable e) {
+                    failures.add(e);
+                }
+            });
+            threads.add(thread);
+            thread.start();
+        }
+        ready.await();
+        start.countDown();
+        for (Thread thread : threads) {
+            thread.join();
+        }
+        assertEquals(List.of(), failures);
+
+        String rendered = Files.readString(report);
+        String[] blocks = rendered.split("# Pyronaut compilation profile\n");
+        assertEquals(compilations + 1, blocks.length, "one block per compilation");
+        for (int i = 1; i < blocks.length; i++) {
+            String block = blocks[i];
+            // a block interleaved with another would lose keys or carry a truncated line
+            assertAll(
+                () -> assertTrue(block.contains("phase.compiler.compile.ms="), "complete phases: " + block),
+                () -> assertTrue(block.contains("counter.javac.rounds="), "complete counters: " + block),
+                () -> assertTrue(block.contains("artifact.class.bytes="), "complete inventory: " + block),
+                () -> assertTrue(block.lines().allMatch(line -> line.isEmpty() || line.matches("[\\w.-]+=.*")),
+                    "every line is a whole key=value: " + block)
+            );
+        }
     }
 
     private static CompilationProfile profile(Path directory, Path report) throws Exception {

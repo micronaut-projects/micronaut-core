@@ -26,6 +26,9 @@ import javax.tools.SimpleJavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -59,6 +62,12 @@ public final class PyronautCompiler {
 
     private static final Pattern JAVA_PACKAGE_PATTERN = Pattern.compile("^[a-z][a-zA-Z0-9_]*(\\.[a-z][a-zA-Z0-9_]*)*$");
     private static final String DEFAULT_PACKAGE_NAME = "pyronaut_application";
+
+    /**
+     * Serialises the profile report appends of the compilations running in this JVM (see
+     * {@link #appendProfileReport}).
+     */
+    private static final Object PROFILE_REPORT_LOCK = new Object();
 
     private final String packageName;
     private final String pythonSrc;
@@ -148,12 +157,16 @@ public final class PyronautCompiler {
         if (classElementCallback != null) {
             compiler.setClassElementCallback(classElementCallback);
         }
+        Throwable compilationFailure = null;
         try (var _ = CompilationProfiler.span(profiler, "compiler.build-class-loader")) {
             JavaFileObject[] sources = createJavaSources();
             Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
             return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+        } catch (RuntimeException | Error e) {
+            compilationFailure = e;
+            throw e;
         } finally {
-            finishProfile(profiler);
+            finishProfile(profiler, compilationFailure);
         }
     }
 
@@ -188,10 +201,14 @@ public final class PyronautCompiler {
         }
         CompilationProfiler profiler = createProfiler();
         PyronautJavaCompiler compiler = createCompiler(profiler);
+        Throwable compilationFailure = null;
         try (var _ = CompilationProfiler.span(profiler, "compiler.compile")) {
             compile(compiler);
+        } catch (RuntimeException | Error e) {
+            compilationFailure = e;
+            throw e;
         } finally {
-            finishProfile(profiler);
+            finishProfile(profiler, compilationFailure);
         }
     }
 
@@ -363,10 +380,29 @@ public final class PyronautCompiler {
         return profiler;
     }
 
-    private void finishProfile(@Nullable CompilationProfiler profiler) {
+    /**
+     * Ends the profile of a compilation that failed with the given throwable, or succeeded when it is
+     * null. The profile is diagnostics: a failure to inventory the output, to hand the profile to the
+     * callback or to write the report must not replace the compilation failure the caller needs to
+     * see, so it is attached to it as suppressed and only propagates when the compilation succeeded.
+     */
+    private void finishProfile(@Nullable CompilationProfiler profiler, @Nullable Throwable compilationFailure) {
         if (profiler == null) {
             return;
         }
+        try {
+            finishProfile(profiler);
+        } catch (RuntimeException | Error e) {
+            if (compilationFailure == null) {
+                throw e;
+            }
+            if (compilationFailure != e) {
+                compilationFailure.addSuppressed(e);
+            }
+        }
+    }
+
+    private void finishProfile(CompilationProfiler profiler) {
         if (targetDir != null) {
             try (var _ = profiler.phase("compiler.inventory")) {
                 profiler.inventory(targetDir.toPath());
@@ -377,12 +413,34 @@ public final class PyronautCompiler {
             profileCallback.accept(profile);
         }
         if (profileReportFile != null) {
+            appendProfileReport(profile);
+        }
+    }
+
+    /**
+     * Appends one profile block to the report file as a whole. Gradle runs the Python compile tasks of
+     * several projects concurrently, each in its own worker process, and one absolute report path sends
+     * all of them to this file; the block is therefore written under a lock held for the whole append,
+     * so the blocks of concurrent compilations never interleave. The monitor covers the threads of one
+     * JVM, which the file lock of a channel does not (it is held by the process), and the file lock
+     * covers the worker processes.
+     */
+    private void appendProfileReport(CompilationProfile profile) {
+        byte[] block = (profile.render() + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+        Path report = profileReportFile.toPath().toAbsolutePath();
+        synchronized (PROFILE_REPORT_LOCK) {
             try {
-                Path report = profileReportFile.toPath().toAbsolutePath();
                 if (report.getParent() != null) {
                     Files.createDirectories(report.getParent());
                 }
-                Files.writeString(report, profile.render() + System.lineSeparator(), StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+                try (FileChannel channel = FileChannel.open(report, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                     var _ = channel.lock()) {
+                    channel.position(channel.size());
+                    ByteBuffer buffer = ByteBuffer.wrap(block);
+                    while (buffer.hasRemaining()) {
+                        channel.write(buffer);
+                    }
+                }
             } catch (IOException e) {
                 throw new UncheckedIOException("Failed to write the compilation profile to " + profileReportFile, e);
             }
