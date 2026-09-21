@@ -515,10 +515,14 @@ class TransformerTest(unittest.TestCase):
         transformer.visit(ast.parse(source))
         errors = transformer.validation_errors
         self.assertEqual(4, len(errors), errors)
-        self.assertIn("Cannot resolve Java import [io.swagger.v3.oas.annotations.Operation]", errors[0])
-        self.assertIn("Cannot resolve Java package [io.nosuch.annotations]", errors[1])
-        self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2])
-        self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3])
+        self.assertIn("Cannot resolve Java import [io.swagger.v3.oas.annotations.Operation]", errors[0].message())
+        self.assertEqual((1, 1), (errors[0].span().line(), errors[0].span().column()))
+        self.assertEqual("unresolved-import", errors[0].rule())
+        self.assertIn("Cannot resolve Java package [io.nosuch.annotations]", errors[1].message())
+        self.assertEqual(2, errors[1].span().line())
+        self.assertIn("Cannot resolve Java package [io.nosuch.other]", errors[2].message())
+        self.assertIn("Cannot resolve Java package [io.nosuch.alias]", errors[3].message())
+        self.assertEqual(4, errors[3].span().line())
 
     def test_relative_import_of_an_application_io_package_is_not_a_java_import(self):
         source = "from .io.util import helper\nfrom ..io import util\nfrom . import io\n"
@@ -536,7 +540,7 @@ class TransformerTest(unittest.TestCase):
         self.assertIn(
             "Java package import [import io.swagger.v3.oas.annotations] requires an alias such as "
             "[import io.swagger.v3.oas.annotations as annotations]",
-            errors[0],
+            errors[0].message(),
         )
 
     def test_io_annotation_clashing_with_a_generated_decorator_is_reported_with_an_alias_hint(self):
@@ -550,8 +554,8 @@ class TransformerTest(unittest.TestCase):
             transformer.visit(ast.parse("from io.swagger.v3.oas.annotations.headers import Header\n"))
         errors = transformer.validation_errors
         self.assertEqual(1, len(errors), errors)
-        self.assertIn("Java import [io.swagger.v3.oas.annotations.headers.Header] clashes with the decorator [Header]", errors[0])
-        self.assertIn("[from io.swagger.v3.oas.annotations.headers import Header as SwaggerHeader]", errors[0])
+        self.assertIn("Java import [io.swagger.v3.oas.annotations.headers.Header] clashes with the decorator [Header]", errors[0].message())
+        self.assertIn("[from io.swagger.v3.oas.annotations.headers import Header as SwaggerHeader]", errors[0].message())
 
 
 class RuntimeImportRewriteTest(unittest.TestCase):
@@ -601,9 +605,10 @@ class UnresolvedJavaImportTest(unittest.TestCase):
     def test_missing_name_in_a_reserved_java_namespace_is_an_error(self):
         errors = self._errors("from micronaut.absent.ua import UserAgentProvider\n")
         self.assertEqual(1, len(errors))
-        self.assertIn("UserAgentProvider", errors[0])
-        self.assertIn("micronaut.absent.ua", errors[0])
-        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0])
+        self.assertIn("UserAgentProvider", errors[0].message())
+        self.assertIn("micronaut.absent.ua", errors[0].message())
+        self.assertIn("io.micronaut.absent.ua.UserAgentProvider", errors[0].message())
+        self.assertEqual(1, errors[0].span().line())
         self.assertEqual(1, len(self._errors("from io.lettuce.core.codec import RedisCodec\n")))
         self.assertEqual(1, len(self._errors("from jakarta.absent import Missing\n")))
         # GraalPy's java import hook finds a spec for any java.* name: still not a Python module
