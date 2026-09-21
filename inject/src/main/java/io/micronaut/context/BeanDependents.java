@@ -18,10 +18,9 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -42,9 +41,8 @@ final class BeanDependents {
 
     @Nullable
     private List<BeanRegistration<?>> dependents;
-    @Nullable
-    private Map<Object, Object> state;
-    private boolean destroyed;
+    private volatile StateEntry @Nullable [] state;
+    private volatile boolean destroyed;
     private volatile boolean createdAsInterceptor;
 
     /**
@@ -113,27 +111,77 @@ final class BeanDependents {
      * @return The state
      */
     @SuppressWarnings("unchecked")
-    synchronized <S> S state(Object key, Supplier<S> supplier) {
-        if (destroyed) {
-            // nothing is kept for a bean that is gone
-            return supplier.get();
-        }
-        Map<Object, Object> current = state;
-        if (current != null) {
-            Object existing = current.get(key);
+    <S> S state(Object key, Supplier<S> supplier) {
+        // read without the lock: a state kept already is handed out while something else holds the lock, the bean's
+        // @PreDestroy among them, which may be waiting for the very call asking for it
+        if (!destroyed) {
+            Object existing = find(state, key);
             if (existing != null) {
                 return (S) existing;
             }
         }
-        S computed = supplier.get();
-        if (destroyed) {
+        synchronized (this) {
+            if (destroyed) {
+                // nothing is kept for a bean that is gone
+                return supplier.get();
+            }
+            Object existing = find(state, key);
+            if (existing != null) {
+                return (S) existing;
+            }
+            S computed = supplier.get();
+            if (destroyed) {
+                return computed;
+            }
+            // the supplier may have asked for the same state again
+            existing = find(state, key);
+            if (existing != null) {
+                return (S) existing;
+            }
+            state = with(state, key, computed);
             return computed;
         }
-        if (state == null) {
-            state = new WeakHashMap<>(2);
+    }
+
+    @Nullable
+    private static Object find(StateEntry @Nullable [] entries, Object key) {
+        if (entries != null) {
+            for (StateEntry entry : entries) {
+                if (entry.get() == key) {
+                    return entry.value;
+                }
+            }
         }
-        Object existing = state.putIfAbsent(key, computed);
-        return existing != null ? (S) existing : computed;
+        return null;
+    }
+
+    /**
+     * A copy of the entries with the given one added, leaving out those whose key has been collected.
+     */
+    private static StateEntry[] with(StateEntry @Nullable [] entries, Object key, Object value) {
+        List<StateEntry> kept = new ArrayList<>(entries == null ? 1 : entries.length + 1);
+        if (entries != null) {
+            for (StateEntry entry : entries) {
+                if (entry.get() != null) {
+                    kept.add(entry);
+                }
+            }
+        }
+        kept.add(new StateEntry(key, value));
+        return kept.toArray(StateEntry[]::new);
+    }
+
+    /**
+     * A state kept against the bean, its key held weakly. The value is held strongly, and is expected not to refer to
+     * its key.
+     */
+    private static final class StateEntry extends WeakReference<Object> {
+        private final Object value;
+
+        StateEntry(Object key, Object value) {
+            super(key);
+            this.value = value;
+        }
     }
 
     void markCreatedAsInterceptor() {
