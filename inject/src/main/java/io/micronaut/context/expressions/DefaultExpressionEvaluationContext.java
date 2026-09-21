@@ -107,7 +107,7 @@ public final class DefaultExpressionEvaluationContext implements ConfigurableExp
     @Override
     @Nullable
     public Object getArgument(int index) {
-        if (args == null || args.length == 0 || args.length < index) {
+        if (args == null || index < 0 || index >= args.length) {
             throw new ExpressionEvaluationException(
                 "Can not obtain argument at index [" + index + "] since arguments are not provided");
         }
