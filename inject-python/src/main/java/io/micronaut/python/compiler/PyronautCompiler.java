@@ -16,6 +16,7 @@
 package io.micronaut.python.compiler;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Nullable;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.PythonSourceVisitor;
@@ -24,12 +25,17 @@ import javax.tools.JavaFileObject;
 import javax.tools.SimpleJavaFileObject;
 import java.io.File;
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+import java.nio.charset.StandardCharsets;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,6 +63,12 @@ public final class PyronautCompiler {
     private static final Pattern JAVA_PACKAGE_PATTERN = Pattern.compile("^[a-z][a-zA-Z0-9_]*(\\.[a-z][a-zA-Z0-9_]*)*$");
     private static final String DEFAULT_PACKAGE_NAME = "pyronaut_application";
 
+    /**
+     * Serialises the profile report appends of the compilations running in this JVM (see
+     * {@link #appendProfileReport}).
+     */
+    private static final Object PROFILE_REPORT_LOCK = new Object();
+
     private final String packageName;
     private final String pythonSrc;
     private final String pythonCode;
@@ -80,6 +92,8 @@ public final class PyronautCompiler {
     private final PythonIncrementalMode pythonIncrementalMode;
     private final PythonProcessingSession pythonProcessingSession;
     private final Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
+    private final File profileReportFile;
+    private final Consumer<CompilationProfile> profileCallback;
 
     private PyronautCompiler(Builder builder) {
         this.packageName = builder.packageName;
@@ -105,6 +119,8 @@ public final class PyronautCompiler {
         this.pythonIncrementalMode = builder.pythonIncrementalMode;
         this.pythonProcessingSession = builder.pythonProcessingSession;
         this.incrementalCompilationPlanCallback = builder.incrementalCompilationPlanCallback;
+        this.profileReportFile = builder.profileReportFile;
+        this.profileCallback = builder.profileCallback;
         validateConfiguration();
     }
 
@@ -135,14 +151,24 @@ public final class PyronautCompiler {
      * @return A ClassLoader containing the compiled application classes
      * @throws IllegalStateException if processing fails
      */
+    @SuppressWarnings("java:S1181") // an Error is caught only to keep it as the thrown failure, and is rethrown unchanged
     public ClassLoader buildClassLoader() {
-        PyronautJavaCompiler compiler = createCompiler();
+        CompilationProfiler profiler = createProfiler();
+        PyronautJavaCompiler compiler = createCompiler(profiler);
         if (classElementCallback != null) {
             compiler.setClassElementCallback(classElementCallback);
         }
-        JavaFileObject[] sources = createJavaSources();
-        Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
-        return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+        Throwable compilationFailure = null;
+        try (var _ = CompilationProfiler.span(profiler, "compiler.build-class-loader")) {
+            JavaFileObject[] sources = createJavaSources();
+            Iterable<JavaFileObject> compiledClasses = compiler.compileInMemory(sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
+            return new JavaFileObjectClassLoader(compiledClasses, createRuntimeClassLoader());
+        } catch (RuntimeException | Error e) {
+            compilationFailure = e;
+            throw e;
+        } finally {
+            finishProfile(profiler, compilationFailure);
+        }
     }
 
     private ClassLoader createRuntimeClassLoader() {
@@ -170,12 +196,25 @@ public final class PyronautCompiler {
      *
      * @throws IllegalStateException if targetDir is not set or processing fails
      */
+    @SuppressWarnings("java:S1181") // an Error is caught only to keep it as the thrown failure, and is rethrown unchanged
     public void compile() {
         if (targetDir == null) {
             throw new IllegalStateException("targetDir must be specified for file system processing mode");
         }
+        CompilationProfiler profiler = createProfiler();
+        PyronautJavaCompiler compiler = createCompiler(profiler);
+        Throwable compilationFailure = null;
+        try (var _ = CompilationProfiler.span(profiler, "compiler.compile")) {
+            compile(compiler);
+        } catch (RuntimeException | Error e) {
+            compilationFailure = e;
+            throw e;
+        } finally {
+            finishProfile(profiler, compilationFailure);
+        }
+    }
 
-        PyronautJavaCompiler compiler = createCompiler();
+    private void compile(PyronautJavaCompiler compiler) {
         if (!incremental) {
             JavaFileObject[] sources = createJavaSources();
             compiler.compileToDisk(targetDir, sources, classpath, bootclasspath, annotationProcessorPath, compilerOptions);
@@ -332,13 +371,95 @@ public final class PyronautCompiler {
         return List.copyOf(options);
     }
 
-    private PyronautJavaCompiler createCompiler() {
+    private @Nullable CompilationProfiler createProfiler() {
+        if (profileReportFile == null && profileCallback == null) {
+            return null;
+        }
+        CompilationProfiler profiler = new CompilationProfiler();
+        profiler.attribute("target", targetDir == null ? "memory" : targetDir.getAbsolutePath());
+        profiler.attribute("incremental", Boolean.toString(incremental));
+        profiler.attribute("session", Boolean.toString(pythonProcessingSession != null));
+        return profiler;
+    }
+
+    /**
+     * Ends the profile of a compilation that failed with the given throwable, or succeeded when it is
+     * null. The profile is diagnostics: a failure to inventory the output, to hand the profile to the
+     * callback or to write the report must not replace the compilation failure the caller needs to
+     * see, so it is attached to it as suppressed and only propagates when the compilation succeeded.
+     */
+    @SuppressWarnings("java:S1181") // an Error from the profile must not escape past the compilation failure either
+    private void finishProfile(@Nullable CompilationProfiler profiler, @Nullable Throwable compilationFailure) {
+        if (profiler == null) {
+            return;
+        }
+        try {
+            finishProfile(profiler);
+        } catch (RuntimeException | Error e) {
+            if (compilationFailure == null) {
+                throw e;
+            }
+            if (compilationFailure != e) {
+                compilationFailure.addSuppressed(e);
+            }
+        }
+    }
+
+    private void finishProfile(CompilationProfiler profiler) {
+        if (targetDir != null) {
+            try (var _ = profiler.phase("compiler.inventory")) {
+                profiler.inventory(targetDir.toPath());
+            }
+        }
+        CompilationProfile profile = profiler.finish();
+        if (profileCallback != null) {
+            profileCallback.accept(profile);
+        }
+        if (profileReportFile != null) {
+            appendProfileReport(profile);
+        }
+    }
+
+    /**
+     * Appends one profile block to the report file as a whole. Gradle runs the Python compile tasks of
+     * several projects concurrently, each in its own worker process, and one absolute report path sends
+     * all of them to this file; the block is therefore written under a lock held for the whole append,
+     * so the blocks of concurrent compilations never interleave. The monitor covers the threads of one
+     * JVM, which the file lock of a channel does not (it is held by the process), and the file lock
+     * covers the worker processes.
+     */
+    private void appendProfileReport(CompilationProfile profile) {
+        byte[] block = (profile.render() + System.lineSeparator()).getBytes(StandardCharsets.UTF_8);
+        Path report = profileReportFile.toPath().toAbsolutePath();
+        synchronized (PROFILE_REPORT_LOCK) {
+            try {
+                if (report.getParent() != null) {
+                    Files.createDirectories(report.getParent());
+                }
+                try (FileChannel channel = FileChannel.open(report, StandardOpenOption.CREATE, StandardOpenOption.WRITE);
+                     var _ = channel.lock()) {
+                    channel.position(channel.size());
+                    ByteBuffer buffer = ByteBuffer.wrap(block);
+                    while (buffer.hasRemaining()) {
+                        channel.write(buffer);
+                    }
+                }
+            } catch (IOException e) {
+                throw new UncheckedIOException("Failed to write the compilation profile to " + profileReportFile, e);
+            }
+        }
+    }
+
+    private PyronautJavaCompiler createCompiler(@Nullable CompilationProfiler profiler) {
         PyronautJavaCompiler compiler = new PyronautJavaCompiler();
         compiler.setVerboseErrors(verboseErrors);
         if (errorDumpDirectory != null) {
             compiler.setErrorDumpDirectory(errorDumpDirectory);
         }
-        compiler.setSourceSnapshots(createSourceSnapshots());
+        compiler.setProfiler(profiler);
+        try (var _ = CompilationProfiler.span(profiler, "compiler.source-snapshots")) {
+            compiler.setSourceSnapshots(createSourceSnapshots());
+        }
         compiler.setCompilePythonBytecode(compilePythonBytecode);
         compiler.setAnnotationProcessors(annotationProcessors);
         compiler.setPythonSourceVisitors(pythonSourceVisitors);
@@ -581,6 +702,8 @@ public final class PyronautCompiler {
         private PythonIncrementalMode pythonIncrementalMode = PythonIncrementalMode.CONSERVATIVE;
         private PythonProcessingSession pythonProcessingSession;
         private Consumer<IncrementalCompilationPlan> incrementalCompilationPlanCallback;
+        private File profileReportFile;
+        private Consumer<CompilationProfile> profileCallback;
 
         private Builder() {
         }
@@ -871,6 +994,32 @@ public final class PyronautCompiler {
          */
         public Builder annotationProcessors(List<? extends Processor> annotationProcessors) {
             this.annotationProcessors = List.copyOf(annotationProcessors);
+            return this;
+        }
+
+        /**
+         * Profiles the compilation and appends the profile (phase timings, counters and the inventory of
+         * the output) to the given file, one block of {@code key=value} lines per compilation. Off by
+         * default: the compiler then records nothing.
+         *
+         * @param profileReportFile The file to append the profile to
+         * @return this builder
+         * @since 5.3.0
+         */
+        public Builder profileReportFile(File profileReportFile) {
+            this.profileReportFile = profileReportFile;
+            return this;
+        }
+
+        /**
+         * Profiles the compilation and hands the profile to the callback when it ends.
+         *
+         * @param profileCallback The callback
+         * @return this builder
+         * @since 5.3.0
+         */
+        public Builder profileCallback(Consumer<CompilationProfile> profileCallback) {
+            this.profileCallback = profileCallback;
             return this;
         }
 

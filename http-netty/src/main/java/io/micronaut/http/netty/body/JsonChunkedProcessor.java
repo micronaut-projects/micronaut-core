@@ -118,7 +118,8 @@ final class JsonChunkedProcessor {
         singleBuffer = null;
     }
 
-    private void complete(FluxSink<? super ByteBuffer<?>> out) {
+    private void complete(FluxSink<? super ByteBuffer<?>> out) throws IOException {
+        counter.noMoreInput();
         if (this.singleBuffer != null || this.compositeBuffer != null) {
             flush(out);
         }

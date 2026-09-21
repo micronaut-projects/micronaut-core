@@ -26,6 +26,7 @@ import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor;
+import io.micronaut.python.compiler.CompilationProfiler;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import org.graalvm.polyglot.Source;
 import org.jetbrains.annotations.NotNull;
@@ -233,6 +234,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private boolean processAggregatingVisitors = true;
     private Path outputDirectory;
     private PythonProcessingSession processingSession;
+    private @Nullable CompilationProfiler profiler;
     private final Set<String> writtenVfsPaths = new LinkedHashSet<>();
 
     /**
@@ -294,6 +296,16 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     @Internal
     public void setOutputDirectory(Path outputDirectory) {
         this.outputDirectory = outputDirectory;
+    }
+
+    /**
+     * Sets the profiler of the compilation, or null when it is not profiled.
+     *
+     * @param profiler The profiler
+     */
+    @Internal
+    public void setProfiler(@Nullable CompilationProfiler profiler) {
+        this.profiler = profiler;
     }
 
     /**
@@ -367,9 +379,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private void initializeParser() {
         if (parser == null) {
-            parser = processingSession == null
-                ? new PythonAstParser(classLoader, incrementalSources != null)
-                : processingSession.parser(classLoader, incrementalSources != null);
+            try (var _ = CompilationProfiler.span(profiler, "python.graalpy-context")) {
+                parser = processingSession == null
+                    ? new PythonAstParser(classLoader, incrementalSources != null)
+                    : processingSession.parser(classLoader, incrementalSources != null);
+            }
         }
     }
 
@@ -382,13 +396,18 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             );
             PythonEnvironment environment = null;
             // Transform the code for processing (to detect Micronaut annotations)
-            List<PythonAstParser.TransformResult> transformedList =
-                applyASTTransforms(values, originatingElement);
+            List<PythonAstParser.TransformResult> transformedList;
+            try (var _ = CompilationProfiler.span(profiler, "python.transform")) {
+                transformedList = applyASTTransforms(values, originatingElement);
+            }
+            CompilationProfiler.increment(profiler, "python.transformed-sources", transformedList.size());
             // Extract decorators from the code
             if (transformedList.isEmpty()) {
                 return;
             }
-            processPythonSourceVisitors(transformedList, values);
+            try (var _ = CompilationProfiler.span(profiler, "python.source-visitors")) {
+                processPythonSourceVisitors(transformedList, values);
+            }
             transformedList.stream()
                 .flatMap(transformResult -> transformResult.validationErrors().stream())
                 .findFirst()
@@ -400,110 +419,99 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             String[] srcDirs = values.src();
             boolean hasSrcDirs = srcDirs != null && srcDirs.length != 0;
             if (hasSrcDirs) {
-                try {
-                    List<Source> sourceList = transformedList
-                        .stream()
-                        .map(PythonAstParser.TransformResult::transformedSource)
-                        .toList();
-                    environment = parser.parse(
-                        sourceList,
-                        Arrays.asList(srcDirs),
-                        javaVisitorContext
-                    );
-                } catch (Exception e) {
-                    throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
-                }
+                environment = parseModel(transformedList, srcDirs, originatingElement);
             }
 
-            String mainPy;
             StringBuilder filesList = new StringBuilder();
             Set<String> initialisedPackages = new HashSet<>();
             boolean processSharedOutputs = incrementalSources == null || processAggregatingVisitors;
-            if (StringUtils.isNotEmpty(values.code())) {
-                PythonAstParser.TransformResult transformResult = transformedList.get(0);
-                mainPy = transformResult.originalSource().getCharacters().toString();
-                writeApplicationPythonToVfs(
-                    filesList,
-                    APPLICATION_LAUNCHER_PATH,
-                    mainPy,
-                    transformResult,
-                    originatingElement
-                );
-            } else {
-                if (hasSrcDirs) {
-                    // source mode, so we need to write out each source to META-INF
-                    Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
-                    for (PythonAstParser.TransformResult transformResult : transformedList) {
-                        Source source = transformResult.originalSource();
-                        // a source outside every source directory was already rejected by the parser
-                        for (String configuredSrcDir : srcDirs) {
-                            String srcDir = normalizeResourcePath(configuredSrcDir);
-                            String path = normalizeResourcePath(source.getPath());
-                            int i = path.indexOf(srcDir);
-                            if (i == -1) {
-                                continue;
-                            }
-                            if (i > 0) {
-                                path = path.substring(i + srcDir.length() + 1);
-                            }
-
-                            if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
-                                path = path.substring(srcDir.length() + 1);
-                            }
-                            String targetSource = APPLICATION_SRC_PATH + path;
-                            List<String> classNames = importedClassNames(transformResult, environment);
-                            if (processSharedOutputs && !classNames.isEmpty()) {
-                                // has classes
-                                int parentIndex = path.lastIndexOf('/');
-                                if (parentIndex > -1) {
-                                    String parentPath = path.substring(0, parentIndex + 1);
-                                    allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
-                                        .addAll(classNames);
-                                } else {
-                                    allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
-                                        .addAll(classNames);
+            try (var _ = CompilationProfiler.span(profiler, "python.vfs")) {
+                if (StringUtils.isNotEmpty(values.code())) {
+                    PythonAstParser.TransformResult transformResult = transformedList.get(0);
+                    String mainPy = transformResult.originalSource().getCharacters().toString();
+                    writeApplicationPythonToVfs(
+                        filesList,
+                        APPLICATION_LAUNCHER_PATH,
+                        mainPy,
+                        transformResult,
+                        originatingElement
+                    );
+                } else {
+                    if (hasSrcDirs) {
+                        // source mode, so we need to write out each source to META-INF
+                        Map<PathEntry, List<String>> allModules = new LinkedHashMap<>();
+                        for (PythonAstParser.TransformResult transformResult : transformedList) {
+                            Source source = transformResult.originalSource();
+                            // a source outside every source directory was already rejected by the parser
+                            for (String configuredSrcDir : srcDirs) {
+                                String srcDir = normalizeResourcePath(configuredSrcDir);
+                                String path = normalizeResourcePath(source.getPath());
+                                int i = path.indexOf(srcDir);
+                                if (i == -1) {
+                                    continue;
                                 }
-                            }
-                            if (isAffectedSource(source)) {
-                                writeApplicationPythonToVfs(
-                                    filesList,
-                                    targetSource,
-                                    source.getCharacters().toString(),
-                                    transformResult,
-                                    originatingElement
-                                );
+                                if (i > 0) {
+                                    path = path.substring(i + srcDir.length() + 1);
+                                }
+
+                                if (!srcDir.isEmpty() && path.startsWith(srcDir)) {
+                                    path = path.substring(srcDir.length() + 1);
+                                }
+                                String targetSource = APPLICATION_SRC_PATH + path;
+                                List<String> classNames = importedClassNames(transformResult, environment);
+                                if (processSharedOutputs && !classNames.isEmpty()) {
+                                    // has classes
+                                    int parentIndex = path.lastIndexOf('/');
+                                    if (parentIndex > -1) {
+                                        String parentPath = path.substring(0, parentIndex + 1);
+                                        allModules.computeIfAbsent(new PathEntry(parentPath, path.substring(parentIndex)), k -> new ArrayList<>())
+                                            .addAll(classNames);
+                                    } else {
+                                        allModules.computeIfAbsent(new PathEntry("", path), k -> new ArrayList<>())
+                                            .addAll(classNames);
+                                    }
+                                }
+                                if (isAffectedSource(source)) {
+                                    writeApplicationPythonToVfs(
+                                        filesList,
+                                        targetSource,
+                                        source.getCharacters().toString(),
+                                        transformResult,
+                                        originatingElement
+                                    );
+                                }
                             }
                         }
-                    }
 
-                    if (processSharedOutputs) {
-                        TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
-                            .collect(Collectors.toCollection(TreeSet::new));
-                        for (String parent : byParent) {
-                            // the root contributes to the launcher (__main__.py), a package to its initialiser
-                            boolean root = StringUtils.isEmpty(parent);
-                            StringBuilder membersContent = new StringBuilder();
-                            List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
-                                .filter(entry -> entry.getKey().parent.equals(parent))
-                                .toList();
-                            List<String> members = new ArrayList<>();
-                            // the module defining each member, bound before the imports so the package initialiser
-                            // can serve a sibling to a module importing it from the package while this module imports
-                            StringBuilder memberModules = new StringBuilder("__micronaut_member_modules__ = {");
-                            for (Map.Entry<PathEntry, List<String>> entry : entries) {
-                                List<String> types = entry.getValue();
-                                String moduleName = NameUtils.filename(entry.getKey().filename);
-                                for (String type : types) {
-                                    membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(IMPORT_SEPARATOR).append(type).append('\n');
-                                    if (!members.isEmpty()) {
-                                        memberModules.append(", ");
+                        if (processSharedOutputs) {
+                            TreeSet<String> byParent = allModules.keySet().stream().map(pe -> pe.parent)
+                                .collect(Collectors.toCollection(TreeSet::new));
+                            for (String parent : byParent) {
+                                // the root contributes to the launcher (__main__.py), a package to its initialiser
+                                boolean root = StringUtils.isEmpty(parent);
+                                StringBuilder membersContent = new StringBuilder();
+                                List<Map.Entry<PathEntry, List<String>>> entries = allModules.entrySet().stream()
+                                    .filter(entry -> entry.getKey().parent.equals(parent))
+                                    .toList();
+                                List<String> members = new ArrayList<>();
+                                // the module defining each member, bound before the imports so the package initialiser
+                                // can serve a sibling to a module importing it from the package while this module imports
+                                StringBuilder memberModules = new StringBuilder("__micronaut_member_modules__ = {");
+                                for (Map.Entry<PathEntry, List<String>> entry : entries) {
+                                    List<String> types = entry.getValue();
+                                    String moduleName = NameUtils.filename(entry.getKey().filename);
+                                    for (String type : types) {
+                                        membersContent.append(root ? "from " : RELATIVE_IMPORT_PREFIX).append(moduleName).append(IMPORT_SEPARATOR).append(type).append('\n');
+                                        if (!members.isEmpty()) {
+                                            memberModules.append(", ");
+                                        }
+                                        memberModules.append('"').append(type).append("\": \"").append(moduleName).append('"');
+                                        members.add(type);
                                     }
-                                    memberModules.append('"').append(type).append("\": \"").append(moduleName).append('"');
-                                    members.add(type);
                                 }
+                                membersContent.insert(0, memberModules.append("}\n").toString());
+                                writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, new PackageContribution(membersContent, members), initialisedPackages, originatingElement);
                             }
-                            membersContent.insert(0, memberModules.append("}\n").toString());
-                            writePackageMembers(filesList, APPLICATION_SRC_PATH + parent, root, new PackageContribution(membersContent, members), initialisedPackages, originatingElement);
                         }
                     }
                 }
@@ -518,6 +526,12 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             for (PythonAstParser.TransformResult transformResult : transformedList) {
 
                 Map<String, String> decorators = transformResult.decorators();
+                if (profiler != null) {
+                    // the decorator source every source renders for each imported annotation: the merged
+                    // map below keeps one per annotation
+                    profiler.count("python.decorator-entries", decorators.size());
+                    profiler.count("python.decorator-chars", decorators.values().stream().mapToLong(String::length).sum());
+                }
                 allDecorators.putAll(decorators);
 
                 Map<String, List<Map<String, String>>> javaClassImports = transformResult.javaClassImports();
@@ -528,38 +542,51 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
             }
             if (processSharedOutputs) {
-                writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
-                writeFilesList(filesList, originatingElement);
+                try (var _ = CompilationProfiler.span(profiler, "python.manifest")) {
+                    writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
+                    writeFilesList(filesList, originatingElement);
+                }
             }
+            CompilationProfiler.increment(profiler, "python.unique-decorators", allDecorators.size());
 
             // Run type element visitor processing
             ClassLoader effectiveClassLoader = this.classLoader != null
                 ? this.classLoader : PythonAnnotationProcessor.class.getClassLoader();
             Predicate<ClassElement> affectedElements = affectedElements(transformedList, srcDirs);
             if (processAggregatingVisitors) {
-                PythonTypeElementVisitorProcessor aggregatingVisitors =
-                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
-                aggregatingVisitors.init(processingEnvironment);
-                aggregatingVisitors.process(
+                try (var _ = CompilationProfiler.span(profiler, "python.visitors.aggregating")) {
+                    PythonTypeElementVisitorProcessor aggregatingVisitors =
+                        new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.AGGREGATING);
+                    aggregatingVisitors.init(processingEnvironment);
+                    aggregatingVisitors.process(
+                        processingEnvironment,
+                        element1 -> true,
+                        incrementalSources == null,
+                        false
+                    );
+                }
+            }
+            try (var _ = CompilationProfiler.span(profiler, "python.visitors.isolating")) {
+                PythonTypeElementVisitorProcessor isolatingVisitors =
+                    new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
+                isolatingVisitors.init(processingEnvironment);
+                isolatingVisitors.process(
                     processingEnvironment,
-                    ignored -> true,
-                    incrementalSources == null,
-                    false
+                    affectedElements,
+                    incrementalSources != null,
+                    true
                 );
             }
-            PythonTypeElementVisitorProcessor isolatingVisitors =
-                new PythonTypeElementVisitorProcessor(effectiveClassLoader, io.micronaut.inject.visitor.TypeElementVisitor.VisitorKind.ISOLATING);
-            isolatingVisitors.init(processingEnvironment);
-            isolatingVisitors.process(
-                processingEnvironment,
-                affectedElements,
-                incrementalSources != null,
-                true
-            );
 
             // Process bean definitions for Python classes
-            var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
-            beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
+            try (var _ = CompilationProfiler.span(profiler, "python.bean-definitions")) {
+                var beanDefinitionProcessor = new PythonBeanDefinitionProcessor();
+                beanDefinitionProcessor.processBeanDefinitions(processingEnvironment, affectedElements);
+            }
+            if (profiler != null) {
+                profiler.count("python.classes", environment.classes().size());
+                profiler.count("python.decorators", environment.decorators().size());
+            }
 
             // Invoke callback for each class element if callback is set
             if (classElementCallback != null) {
@@ -646,6 +673,27 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
         }
         return element -> names.contains(element.getName());
+    }
+
+    /**
+     * Builds the model of the transformed sources.
+     */
+    private PythonEnvironment parseModel(List<PythonAstParser.TransformResult> transformedList,
+                                         String[] srcDirs,
+                                         ClassElement originatingElement) {
+        try (var _ = CompilationProfiler.span(profiler, "python.model")) {
+            List<Source> sourceList = transformedList
+                .stream()
+                .map(PythonAstParser.TransformResult::transformedSource)
+                .toList();
+            return parser.parse(
+                sourceList,
+                Arrays.asList(srcDirs),
+                javaVisitorContext
+            );
+        } catch (Exception e) {
+            throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
+        }
     }
 
     private void processPythonSourceVisitors(List<PythonAstParser.TransformResult> transformedList,
@@ -841,7 +889,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!compilePythonBytecode || unchanged) {
             return;
         }
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
             PythonBytecodeCompiler.Result result = bytecodeCompiler().compile(content, filePath);
             writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
         } catch (ProcessingException e) {
@@ -860,7 +908,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
             return;
         }
-        try {
+        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
             PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
                 transformResult,
                 runtimeFilename(filePath)
