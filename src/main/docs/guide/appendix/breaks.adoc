@@ -12,6 +12,15 @@ A construct interceptor that used the injected state of the instance returned by
 `InterceptorKind.POST_CONSTRUCT` instead, where the bean is injected. See <<lifecycleAdvice, Bean Life Cycle Advice>>.
 Beans compiled with an earlier version keep the previous order until they are recompiled.
 
+=== A generated proxy no longer retains its interceptors
+
+A proxy generated since 5.3 keeps no interceptor registrations: the non-singleton interceptors of a bean are the bean's
+own, created as its dependents and destroyed with it. The deprecated `Intercepted.$interceptorRegistrations()` returns
+an empty list for such a proxy. A library that read the interceptors of a bean from it reads them from the bean events
+instead, `BeanEvent.getDependentBeans()`, or from `BeanRegistration.getDependentBeans()`; see
+<<interceptorLifecycle, Interceptor Life Cycle>>. Proxies compiled by an earlier version still return what they
+retained until they are recompiled.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.

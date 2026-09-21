@@ -6,7 +6,8 @@ import java.lang.ref.WeakReference
 /**
  * Regressions found by review of the ownership rule: a prototype proxy the caller holds keeps what it owns for as long
  * as it lives, a runtime creator that reads the methods' own interceptors still destroys them with the proxy, and a
- * lazy runtime proxy leaves its target to the first call.
+ * lazy runtime proxy leaves its target to the first call, the advice of a factory produced bean lives as long as the bean,
+ * and a hot swappable proxy keeps what its target owns.
  */
 class InterceptorLifetimeRegressionSpec extends AbstractTypeElementSpec {
     void 'a live prototype proxy keeps its interceptor for destruction after GC'() {
@@ -152,6 +153,113 @@ class LazyCreator implements RuntimeProxyCreator {
 
         then:
         beans.created == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void 'the advice of a factory produced bean lives until the bean is destroyed'() {
+        given:
+        def context = buildContext('''
+package review.factory;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.annotation.PreDestroy;
+import java.lang.annotation.*;
+import java.util.*;
+@Around
+@InterceptorBinding(kind = InterceptorKind.PRE_DESTROY)
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@interface Tracked {}
+@Prototype
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Tracked.class, kind = InterceptorKind.PRE_DESTROY)
+class Tracking implements MethodInterceptor<Object, Object> {
+    static int next;
+    static final List<String> events = new ArrayList<>();
+    final int id = ++next;
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        events.add(ctx.getKind() + ":" + id);
+        return ctx.proceed();
+    }
+    @PreDestroy void close() { events.add("DESTROYED:" + id); }
+}
+class Disposable {
+    public String use() { return "used"; }
+    public void close() { Tracking.events.add("close"); }
+}
+@Factory
+class Disposables {
+    @Prototype
+    @Tracked
+    @Bean(preDestroy = "close")
+    Disposable disposable() { return new Disposable(); }
+}
+''')
+        def type = context.classLoader.loadClass('review.factory.Disposable')
+        def tracking = context.classLoader.loadClass('review.factory.Tracking')
+
+        when:
+        def bean = context.getBean(type)
+        bean.use()
+        bean.use()
+        context.destroyBean(bean)
+
+        then: 'one instance advises every call and the destruction, and is destroyed after the bean'
+        tracking.events == ['AROUND:1', 'AROUND:1', 'PRE_DESTROY:1', 'close', 'DESTROYED:1']
+
+        cleanup:
+        context.close()
+    }
+
+    void 'a hot swappable proxy keeps the interceptors its target owns across garbage collections'() {
+        given:
+        def context = buildContext('''
+package review.hotswapgc;
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Prototype;
+import java.lang.annotation.*;
+import java.util.*;
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around(proxyTarget = true, hotswap = true)
+@interface Swappable {}
+@Prototype
+@InterceptorBean(Swappable.class)
+class SwapInterceptor implements MethodInterceptor<Object, Object> {
+    static int next;
+    static final List<Integer> calls = new ArrayList<>();
+    final int id = ++next;
+    public Object intercept(MethodInvocationContext<Object, Object> ctx) {
+        calls.add(id);
+        return ctx.proceed();
+    }
+}
+@Prototype @Swappable
+class SwapBean {
+    public String call() { return "ok"; }
+}
+''')
+        def type = context.classLoader.loadClass('review.hotswapgc.SwapBean')
+        def interceptor = context.classLoader.loadClass('review.hotswapgc.SwapInterceptor')
+        def bean = context.getBean(type)
+        bean.call()
+        def registration = new WeakReference(context.findBeanRegistration(bean.interceptedTarget()).get())
+
+        when: 'only the proxy holds the target, and nothing but the proxy can hold its registration'
+        for (int i = 0; i < 20; i++) {
+            System.gc()
+            Thread.sleep(20)
+        }
+        bean.call()
+
+        then: 'the registration survives, and the target is still intercepted by the instance it owns'
+        registration.get() != null
+        interceptor.calls == [1, 1]
+        interceptor.next == 1
 
         cleanup:
         context.close()

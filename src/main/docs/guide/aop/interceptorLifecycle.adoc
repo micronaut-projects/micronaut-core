@@ -156,6 +156,36 @@ NOTE: A api:aop.runtime.RuntimeProxyCreator[] that takes the interceptors of eac
 interceptors of each intercepted method alone, and gets all of them, the non-singleton ones created once for the proxy
 as before.
 
+=== Finding a Bean's Interceptors from Bean Events
+
+A listener finds the non-singleton interceptors of a bean among the dependents every bean event reports,
+`BeanEvent.getDependentBeans()`. The context builds the registration of a bean once the bean is created, so the two
+creation events have none:
+
+[cols="1,1,2"]
+|===
+|Event |`getBeanRegistration()` |`getDependentBeans()`
+
+|api:context.event.BeanInitializingEvent[]
+|`null`
+|the dependents created so far
+
+|api:context.event.BeanCreatedEvent[]
+|`null`
+|the dependents the bean was created with
+
+|api:context.event.BeanPreDestroyEvent[]
+|the registration
+|its dependents, alive
+
+|api:context.event.BeanDestroyedEvent[]
+|the registration the bean was destroyed through
+|the dependents destroyed with it
+|===
+
+For a proxy that fronts a separate target, the events of the target report its interceptors; the proxy holds only the
+singletons.
+
 == Ordering
 
 When several interceptors apply to the same interception point they run in ascending order, and the order is the same

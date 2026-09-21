@@ -32,9 +32,6 @@ import java.util.List;
  */
 public class BeanDestroyedEvent<T> extends BeanEvent<T> {
 
-    private final transient @Nullable BeanRegistration<T> beanRegistration;
-    private final transient List<BeanRegistration<?>> dependentBeans;
-
     /**
      * @param beanContext    The bean context
      * @param beanDefinition The bean definition
@@ -57,34 +54,6 @@ public class BeanDestroyedEvent<T> extends BeanEvent<T> {
                               T bean,
                               @Nullable BeanRegistration<T> beanRegistration,
                               @Nullable List<BeanRegistration<?>> dependentBeans) {
-        super(beanContext, beanDefinition, bean);
-        this.beanRegistration = beanRegistration;
-        this.dependentBeans = dependentBeans == null ? List.of() : List.copyOf(dependentBeans);
-    }
-
-    /**
-     * The registration the bean was destroyed through.
-     *
-     * <p>The bean is destroyed by now, so the registration no longer lists its dependents: they were destroyed with
-     * it and are reported by {@link #getDependentBeans()}.</p>
-     *
-     * @return The registration, or {@code null} when the event was fired without one
-     * @since 5.3.0
-     */
-    public @Nullable BeanRegistration<T> getBeanRegistration() {
-        return beanRegistration;
-    }
-
-    /**
-     * The dependent beans destroyed with the bean, in the order they were created: the beans created for it alone,
-     * among them the non-singleton interceptors that intercepted it. They are destroyed by the time this event is
-     * fired, and are what {@link BeanCreatedEvent#getDependentBeans()} reported as the bean was created, together with
-     * what was created for the bean afterwards.
-     *
-     * @return The destroyed dependent beans, never {@code null}
-     * @since 5.3.0
-     */
-    public List<BeanRegistration<?>> getDependentBeans() {
-        return dependentBeans;
+        super(beanContext, beanDefinition, bean, beanRegistration, dependentBeans);
     }
 }

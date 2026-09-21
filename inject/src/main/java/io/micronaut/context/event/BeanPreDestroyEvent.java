@@ -16,7 +16,11 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * <p>An event fired when a bean is about to be destroyed but before any {@link jakarta.annotation.PreDestroy} methods are invoked..</p>
@@ -35,5 +39,21 @@ public class BeanPreDestroyEvent<T> extends BeanEvent<T> {
      */
     public BeanPreDestroyEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
         super(beanContext, beanDefinition, bean);
+    }
+
+    /**
+     * @param beanContext      The bean context
+     * @param beanDefinition   The bean definition
+     * @param bean             The bean
+     * @param beanRegistration The registration the bean is destroyed through
+     * @param dependentBeans   The dependent beans of the bean, still alive
+     * @since 5.3.0
+     */
+    public BeanPreDestroyEvent(BeanContext beanContext,
+                              BeanDefinition<T> beanDefinition,
+                              T bean,
+                              @Nullable BeanRegistration<T> beanRegistration,
+                              @Nullable List<BeanRegistration<?>> dependentBeans) {
+        super(beanContext, beanDefinition, bean, beanRegistration, dependentBeans);
     }
 }

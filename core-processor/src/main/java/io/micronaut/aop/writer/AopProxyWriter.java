@@ -848,7 +848,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     proxyBuilder.addField(writeLockField);
 
                     proxyBuilder.addMethod(
-                        getSwapMethod(targetField, writeLockField)
+                        getSwapMethod(targetField, writeLockField, Objects.requireNonNull(targetRegistrationField))
                     );
                     interceptedTargetMethod = getHotSwapInterceptedTargetMethod(targetField, readLockField);
                 } else {
@@ -873,7 +873,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     ));
                     if (hotswap) {
                         // the interceptors are selected for the target of each call; selecting them now for the
-                        // initial target is what lets the calls before any swap find it without a lookup
+                        // initial target is what lets the calls before any swap find it without a lookup, and
+                        // holding its registration is what keeps what the target owns while the proxy holds it
+                        statements.add(aThis.field(Objects.requireNonNull(targetRegistrationField)).assign(targetRegistration));
                         statements.add(aThis.field(proxyTargetInterceptorsField).invoke(METHOD_PROXY_TARGET_INTERCEPTORS_RESOLVE, targetRegistration));
                     } else {
                         // the target is fixed: its registration is kept, and selecting now is what lets the calls
@@ -918,6 +920,10 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         FieldDef targetRegistration;
         if (cacheLazyTarget) {
             // assigned with the target on the first call, cleared with it
+            targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE, Modifier.VOLATILE).build();
+        } else if (hotswap) {
+            // the registration of the initial target, held for as long as the proxy holds that target: nothing else
+            // may hold it, and without it the target loses the interceptors it owns; cleared by a swap
             targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE, Modifier.VOLATILE).build();
         } else if (!lazy && !hotswap) {
             targetRegistration = FieldDef.builder(FIELD_TARGET_REGISTRATION, BeanRegistration.class).addModifiers(Modifier.PRIVATE, Modifier.FINAL).build();
@@ -1076,7 +1082,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             .build((aThis, methodParameters) -> aThis.field(beanQualifier).put(methodParameters.get(0)));
     }
 
-    private MethodDef getSwapMethod(FieldDef targetField, FieldDef writeField) {
+    private MethodDef getSwapMethod(FieldDef targetField, FieldDef writeField, FieldDef targetRegistrationField) {
         Objects.requireNonNull(targetField);
         Objects.requireNonNull(writeField);
         return MethodDef.override(SWAP_METHOD)
@@ -1087,6 +1093,9 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     StatementDef.doTry(
                         aThis.field(targetField).newLocal("target", targetVar -> StatementDef.multi(
                             aThis.field(targetField).assign(methodParameters.get(0)),
+                            // the registration was the initial target's; a swapped in target is held by whoever
+                            // handed it over, and the proxy no longer holds the one swapped out
+                            aThis.field(targetRegistrationField).assign(ExpressionDef.nullValue()),
                             targetVar.returning()
                         ))
                     ).doFinally(lock.invoke(UNLOCK_METHOD))
