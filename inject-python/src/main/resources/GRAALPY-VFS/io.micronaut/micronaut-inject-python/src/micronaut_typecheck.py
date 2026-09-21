@@ -504,6 +504,8 @@ BUILTIN_JAVA_TYPES = {"java.lang.String": "str", "java.lang.CharSequence": "str"
                       "int": "int", "long": "int", "short": "int", "byte": "int", "java.lang.Integer": "int", "java.lang.Long": "int",
                       "java.lang.Short": "int", "java.lang.Byte": "int", "double": "float", "float": "float",
                       "java.lang.Double": "float", "java.lang.Float": "float", "void": "none"}
+# the Java types the builtin hints are as type arguments (a list[int] is a List<Integer>)
+BOXED_JAVA_NAMES = {"str": "java.lang.String", "int": "java.lang.Integer", "float": "java.lang.Double", "bool": "java.lang.Boolean"}
 # every Java object has these, whether or not the element model lists them
 OBJECT_METHODS = {"equals", "hashCode", "toString", "getClass", "notify", "notifyAll", "wait"}
 # the members GraalPy adds to host objects and classes
@@ -528,16 +530,18 @@ class Typed:
     an interface or an abstract class): a member the type lacks is not reported on it.
     """
 
-    def __init__(self, kind, name, open=False, nullable=False):
+    def __init__(self, kind, name, open=False, args=(), nullable=False):
         self.kind = kind
         self.name = name
         self.open = open
+        # the type arguments when known (a list[int] hint, a List<Order> return type): Typed or None each
+        self.args = tuple(args)
         # whether the value may be None as well: a hint of X | None or Optional[X]
         self.nullable = nullable
 
     def as_nullable(self):
         """This type, marked as possibly None."""
-        return Typed(self.kind, self.name, self.open, nullable=True)
+        return Typed(self.kind, self.name, self.open, self.args, nullable=True)
 
     def __repr__(self):
         return f"{self.kind}:{self.name}"
@@ -562,11 +566,12 @@ class Typed:
         return None
 
 
-def of_java_type(name):
+def of_java_type(name, args=()):
     """
     The type of a value of a Java type: a Python value for the types the runtime converts, unknown
     for Object, which is what an erased type variable (the value of a Map, the element of a List)
-    reads as and says nothing about the actual value.
+    reads as and says nothing about the actual value. The type arguments, when given, are the
+    qualified names of the arguments of a parameterized type.
     """
     if name in BUILTIN_JAVA_TYPES:
         return Typed(BUILTIN, BUILTIN_JAVA_TYPES[name])
@@ -574,7 +579,7 @@ def of_java_type(name):
         return None
     if name in STANDARD_TYPES:
         return Typed(JAVA, name, open=True)
-    return Typed(JAVA, name)
+    return Typed(JAVA, name, args=[of_java_type(argument) for argument in args])
 
 
 class Bindings:
@@ -628,8 +633,9 @@ class Bindings:
         if name in ("typing.Optional", "Optional") and type_ref.typeArguments():
             typed = self.of_hint(type_ref.typeArguments()[0])
             return typed.as_nullable() if typed is not None else None
+        args = [self.of_hint(argument) for argument in (type_ref.typeArguments() or [])]
         if name in BUILTIN_HINTS:
-            return Typed(BUILTIN, BUILTIN_HINTS[name])
+            return Typed(BUILTIN, BUILTIN_HINTS[name], args=args)
         typed = self.of_name(name, instance=True)
         if typed is not None and typed.kind == JAVA:
             if typed.name in STANDARD_TYPES:
@@ -637,7 +643,8 @@ class Bindings:
             description = self.checker.facts.describe(typed.name)
             if description is not None and (description.anInterface() or description.isAbstract()):
                 # any implementation may be behind the hint, with members of its own
-                return Typed(JAVA, typed.name, open=True)
+                return Typed(JAVA, typed.name, open=True, args=args)
+            return Typed(JAVA, typed.name, args=args)
         return typed
 
     def of_name(self, name, instance=False):
@@ -755,9 +762,12 @@ class JavaReceiverRules:
             self.assignment(node)
             return
         if isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+            iterated = self.expression(node.iter)
             for name in _bound_names(node.target):
                 self.bindings.forget(name)
-            self.expression(node.iter)
+            element = self._element_type(node.iter, iterated)
+            if isinstance(node.target, ast.Name) and element is not None and not isinstance(node, ast.comprehension):
+                self.bindings.assign(node.target.id, element)
             for child in getattr(node, "body", []) + getattr(node, "orelse", []):
                 self.statement(child)
             return
@@ -772,8 +782,12 @@ class JavaReceiverRules:
             return
         if isinstance(node, (ast.Try, ast.TryStar)):
             for handler in node.handlers:
+                caught = self.expression(handler.type) if handler.type is not None else None
                 if handler.name:
-                    self.bindings.forget(handler.name)
+                    if caught is not None and caught.kind == JAVA_REF:
+                        self.bindings.assign(handler.name, Typed(JAVA, caught.name))
+                    else:
+                        self.bindings.forget(handler.name)
             for child in node.body + node.orelse + node.finalbody:
                 self.statement(child)
             for handler in node.handlers:
@@ -815,6 +829,18 @@ class JavaReceiverRules:
             else:
                 for name in _bound_names(target):
                     self.bindings.forget(name)
+
+    def _element_type(self, iterable_node, iterated):
+        """The type of the elements a for loop yields, when known: range() yields ints, a typed collection its element type, a map its keys, a str its characters."""
+        if isinstance(iterable_node, ast.Call) and isinstance(iterable_node.func, ast.Name) and iterable_node.func.id == "range" and self.bindings.lookup("range") is None:
+            return Typed(BUILTIN, "int")
+        if iterated is None or not iterated.args:
+            return Typed(BUILTIN, "str") if iterated is not None and iterated.kind == BUILTIN and iterated.name == "str" else None
+        if iterated.kind == BUILTIN and iterated.name in ("list", "set", "tuple", "dict"):
+            return iterated.args[0]
+        if iterated.kind == JAVA and (self.facts.isAssignable(iterated.name, "java.lang.Iterable") or self.facts.isAssignable(iterated.name, "java.util.Map")):
+            return iterated.args[0]
+        return None
 
     def _hint_type(self, annotation):
         if self.bindings.visitor is None:
@@ -923,8 +949,21 @@ class JavaReceiverRules:
         parts.append(node.id)
         return self.bindings.of_name(".".join(reversed(parts)))
 
-    def _java_member(self, receiver, name, node, calling):
-        description = self.facts.describe(receiver.name)
+    def _described_receiver(self, receiver):
+        """The description of a Java receiver: with its type arguments substituted when all of them are known."""
+        if receiver.args and all(argument is not None for argument in receiver.args):
+            names = []
+            for argument in receiver.args:
+                name = BOXED_JAVA_NAMES.get(argument.name) if argument.kind == BUILTIN else argument.java_name()
+                if name is None:
+                    break
+                names.append(name)
+            if len(names) == len(receiver.args):
+                return self.facts.describe(receiver.name, names)
+        return self.facts.describe(receiver.name)
+
+    def _java_member(self, receiver, name, node, calling, description=None):
+        description = description or self._described_receiver(receiver)
         if description is None:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
@@ -1007,8 +1046,8 @@ class JavaReceiverRules:
         self.expression(function)
         return None
 
-    def _java_call(self, receiver, name, node, argument_types, star_args, kwargs):
-        description = self.facts.describe(receiver.name)
+    def _java_call(self, receiver, name, node, argument_types, star_args, kwargs, description=None):
+        description = description or self._described_receiver(receiver)
         if description is None:
             return None
         member = name[:-1] if name.endswith("_") and keyword.iskeyword(name[:-1]) else name
@@ -1121,7 +1160,22 @@ class JavaReceiverRules:
             return Typed(BUILTIN, "none")
         if name.endswith("[]"):
             return None  # arrays reach Python as sequences; their members are not judged
-        return of_java_type(name)
+        args = list(signatures[0].returnTypeArguments()) if len(signatures) == 1 else []
+        return self._own_class(of_java_type(name, args))
+
+    def _own_class(self, typed):
+        """A Java type that is the generated class of a Python class of the compilation is that class."""
+        if typed is None:
+            return None
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None:
+            return typed
+        args = [self._own_class(argument) for argument in typed.args]
+        if typed.kind == JAVA and "." in typed.name:
+            model = classes.by_qualified.get(typed.name)
+            if model is not None:
+                return Typed(PY, model.class_def, args=args, nullable=typed.nullable)
+        return Typed(typed.kind, typed.name, typed.open, args, nullable=typed.nullable) if args != list(typed.args) else typed
 
     @staticmethod
     def _enum_methods(receiver):
@@ -1303,7 +1357,7 @@ class PythonClassModel:
                 if model is not None:
                     self._bases.append(model)
                     continue
-                description = self.classes.checker.facts.describe(name) if "." in name else None
+                description = self.classes.describe_base(self.module, base) if "." in name else None
                 self._bases.append(description)
         return self._bases
 
@@ -1525,6 +1579,49 @@ class PythonClasses:
     def all(self):
         return self.models
 
+    def describe_base(self, module, base):
+        """
+        The description of a Java base of a class of the module, with its type arguments substituted
+        when every one of them is known (CrudRepository[Owner, int] is a CrudRepository<Owner, Integer>),
+        else the raw type.
+        """
+        facts = self.checker.facts
+        arguments = self.java_type_names(module, base.typeArguments())
+        return facts.describe(base.name(), arguments) if arguments else facts.describe(base.name())
+
+    def java_type_names(self, module, type_refs):
+        """
+        The qualified Java names the hints denote, boxed, as type arguments: a builtin, a class of
+        the compilation (its generated class), or a Java class; None when any of them is unknown.
+        """
+        names = []
+        for type_ref in type_refs or ():
+            if type_ref is None:
+                return None
+            if type_ref.isUnion():
+                members = list(type_ref.nonNoneMembers())
+                if len(members) != 1:
+                    return None
+                type_ref = members[0]
+            name = type_ref.name()
+            if name in BOXED_JAVA_NAMES:
+                names.append(BOXED_JAVA_NAMES[name])
+                continue
+            class_def = module.class_index().get(name)
+            model = self.of(class_def) if class_def is not None else self.by_qualified.get(name)
+            if model is not None:
+                names.append(model.qualified)
+                continue
+            visitor = module.visitor
+            qualified = (visitor.java_type_assignments.get(name) or visitor.imported_types.get(name) or name) if visitor is not None else name
+            if "." not in qualified:
+                return None
+            description = self.checker.facts.describe(qualified)
+            if description is None:
+                return None
+            names.append(description.name())
+        return names
+
     def of(self, class_def):
         model = self.by_def.get(id(class_def))
         if model is None:
@@ -1565,7 +1662,8 @@ class PythonReceiverMixin:
             return model.instance_attribute_type(name, self.bindings)
         if kind == "java":
             description = found[1]
-            return self._java_member(Typed(JAVA if receiver.kind == PY else JAVA_REF, description.name()), name, node, calling)
+            # the base as the class extends it, with its type arguments
+            return self._java_member(Typed(JAVA if receiver.kind == PY else JAVA_REF, description.name()), name, node, calling, description=description)
         return None
 
     def _hinted_return(self, function_def):
@@ -1582,7 +1680,8 @@ class PythonReceiverMixin:
             self._python_member(receiver, name, node, calling=True)
             return None
         if found[0] == "java":
-            return self._java_call(Typed(JAVA if receiver.kind == PY else JAVA_REF, found[1].name()), name, node, argument_types, star_args, bool(node.keywords))
+            # the base as the class extends it, with its type arguments
+            return self._java_call(Typed(JAVA if receiver.kind == PY else JAVA_REF, found[1].name()), name, node, argument_types, star_args, bool(node.keywords), description=found[1])
         if found[0] == "class":
             nested = self.checker.python_classes.by_node.get(id(found[1]))
             return self._python_construction(Typed(PY_REF, nested.class_def), node, argument_types, star_args, keyword_types) if nested is not None else None

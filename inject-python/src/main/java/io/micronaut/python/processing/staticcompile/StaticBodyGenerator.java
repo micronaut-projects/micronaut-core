@@ -21,9 +21,13 @@ import io.micronaut.sourcegen.model.ExpressionDef;
 import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
+import org.jspecify.annotations.Nullable;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,9 +49,16 @@ public final class StaticBodyGenerator {
     private static final TypeDef DOUBLE = TypeDef.Primitive.DOUBLE;
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
 
+    private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
+
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
-    private final Map<String, VariableDef.Local> locals = new LinkedHashMap<>();
+    private final Map<String, VariableDef> locals = new LinkedHashMap<>();
+    // the loops enclosing the statement being generated, innermost last: a break or continue sets the
+    // flag of its loop, and the statements following it in the body are guarded by the flags
+    private final Deque<Loop> loops = new ArrayDeque<>();
+    // every name the body uses: a temporary of the generator takes a name none of them has
+    private final java.util.Set<String> names = new java.util.HashSet<>();
     private int temporaries;
 
     private StaticBodyGenerator(SelfAccess self, List<VariableDef.MethodParameter> methodParameters) {
@@ -79,7 +90,10 @@ public final class StaticBodyGenerator {
      * @return The statements
      */
     public static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace) {
-        StatementDef statements = new StaticBodyGenerator(self, methodParameters).statements(body.body());
+        StaticBodyGenerator generator = new StaticBodyGenerator(self, methodParameters);
+        generator.names.addAll(body.parameterNames());
+        collectNames(body.body(), generator.names);
+        StatementDef statements = generator.statements(body.body());
         if (body.wrapsCheckedExceptions()) {
             // a checked exception of a Java call reaches the caller unchecked, as it would through the bridge
             statements = new StatementDef.Try(statements).doCatch(Exception.class, exception ->
@@ -95,12 +109,124 @@ public final class StaticBodyGenerator {
     }
 
     /**
+     * The names the statements declare or read, recursively.
+     */
+    private static void collectNames(Ir node, java.util.Set<String> names) {
+        switch (node) {
+            case Ir.Body body -> body.statements().forEach(s -> collectNames(s, names));
+            case Ir.Local local -> {
+                names.add(local.name());
+                collectNames(local.value(), names);
+            }
+            case Ir.Assign assign -> {
+                names.add(assign.name());
+                collectNames(assign.value(), names);
+            }
+            case Ir.PutSelf put -> collectNames(put.value(), names);
+            case Ir.If branch -> {
+                collectNames(branch.test(), names);
+                collectNames(branch.then(), names);
+                if (branch.orElse() != null) {
+                    collectNames(branch.orElse(), names);
+                }
+            }
+            case Ir.Return ret -> {
+                if (ret.value() != null) {
+                    collectNames(ret.value(), names);
+                }
+            }
+            case Ir.Eval eval -> collectNames(eval.expression(), names);
+            case Ir.While loop -> {
+                collectNames(loop.test(), names);
+                collectNames(loop.body(), names);
+            }
+            case Ir.ForRange loop -> {
+                names.add(loop.variable());
+                collectNames(loop.start(), names);
+                collectNames(loop.stop(), names);
+                collectNames(loop.step(), names);
+                collectNames(loop.body(), names);
+            }
+            case Ir.ForEach loop -> {
+                names.add(loop.variable());
+                collectNames(loop.iterable(), names);
+                collectNames(loop.body(), names);
+            }
+            case Ir.Throw t -> collectNames(t.exception(), names);
+            case Ir.Try t -> {
+                collectNames(t.body(), names);
+                for (Ir.Catch handler : t.catches()) {
+                    if (handler.variable() != null) {
+                        names.add(handler.variable());
+                    }
+                    collectNames(handler.body(), names);
+                }
+                if (t.finallyBody() != null) {
+                    collectNames(t.finallyBody(), names);
+                }
+            }
+            case Ir.Param param -> names.add(param.name());
+            case Ir.LocalRef ref -> names.add(ref.name());
+            case Ir.InvokeJava call -> {
+                if (call.receiver() != null) {
+                    collectNames(call.receiver(), names);
+                }
+                call.arguments().forEach(a -> collectNames(a, names));
+            }
+            case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
+            case Ir.Field field -> collectNames(field.receiver(), names);
+            case Ir.Binary binary -> {
+                collectNames(binary.left(), names);
+                collectNames(binary.right(), names);
+            }
+            case Ir.Unary unary -> collectNames(unary.operand(), names);
+            case Ir.Compare compare -> {
+                collectNames(compare.left(), names);
+                if (compare.right() != null) {
+                    collectNames(compare.right(), names);
+                }
+            }
+            case Ir.And and -> {
+                collectNames(and.left(), names);
+                collectNames(and.right(), names);
+            }
+            case Ir.Or or -> {
+                collectNames(or.left(), names);
+                collectNames(or.right(), names);
+            }
+            case Ir.Conditional conditional -> {
+                collectNames(conditional.test(), names);
+                collectNames(conditional.then(), names);
+                collectNames(conditional.orElse(), names);
+            }
+            case Ir.Truthy truthy -> collectNames(truthy.operand(), names);
+            case Ir.StrJoin join -> join.parts().forEach(p -> collectNames(p, names));
+            case Ir.Helper helper -> helper.arguments().forEach(a -> collectNames(a, names));
+            case Ir.Cast cast -> collectNames(cast.operand(), names);
+            default -> {
+            }
+        }
+    }
+
+    /**
+     * A name for a temporary of the generator that no local, parameter or earlier temporary has.
+     */
+    private String fresh(String base) {
+        String name = base;
+        while (!names.add(name)) {
+            name = name + "_";
+        }
+        return name;
+    }
+
+    /**
      * @param name A Java type name as the IR spells it
      * @return The SourceGen type
      */
     public static TypeDef type(String name) {
-        // a nested type is spelled with a dot in Java source
-        return Ir.NONE.equals(name) ? TypeDef.OBJECT : TypeDef.of(name.replace('$', '.'));
+        // a nested type is spelled with a dot in Java source; the type arguments the IR carries
+        // for the lowering are not part of the generated declarations
+        return Ir.NONE.equals(name) ? TypeDef.OBJECT : TypeDef.of(erased(name).replace('$', '.'));
     }
 
     /**
@@ -108,17 +234,89 @@ public final class StaticBodyGenerator {
      * @return The SourceGen class type
      */
     public static ClassTypeDef classType(String name) {
-        return ClassTypeDef.of(name.replace('$', '.'));
+        return ClassTypeDef.of(erased(name).replace('$', '.'));
+    }
+
+    /**
+     * @param name A Java type name, possibly with type arguments
+     * @return The name without its type arguments
+     */
+    public static String erased(String name) {
+        int generic = name.indexOf('<');
+        return generic < 0 ? name : name.substring(0, generic);
     }
 
     // ---------------------------------------------------------------- statements
 
     private StatementDef statements(Ir.Body body) {
-        List<StatementDef> statements = new ArrayList<>(body.statements().size());
-        for (Ir.Statement statement : body.statements()) {
+        return statements(body.statements());
+    }
+
+    /**
+     * The statements of a block. Inside a loop, the statements following one that may break or
+     * continue the loop run only when it did not: SourceGen has no break or continue node, so both
+     * are flags the loop condition and the rest of the body consult.
+     */
+    private StatementDef statements(List<Ir.Statement> body) {
+        Loop loop = loops.peekLast();
+        List<StatementDef> statements = new ArrayList<>(body.size());
+        for (int i = 0; i < body.size(); i++) {
+            Ir.Statement statement = body.get(i);
             statements.add(statement(statement));
+            if (loop != null && i < body.size() - 1 && exits(statement, loop.id())) {
+                statements.add(loop.notExited().doIf(statements(body.subList(i + 1, body.size()))));
+                break;
+            }
         }
         return StatementDef.multi(statements);
+    }
+
+    /**
+     * Whether a statement breaks or continues the given loop, anywhere inside it.
+     */
+    private static boolean exits(Ir.Statement statement, int loop) {
+        return switch (statement) {
+            case Ir.Break b -> b.loop() == loop;
+            case Ir.Continue c -> c.loop() == loop;
+            case Ir.Body body -> body.statements().stream().anyMatch(s -> exits(s, loop));
+            case Ir.If branch -> exits(branch.then(), loop) || (branch.orElse() != null && exits(branch.orElse(), loop));
+            case Ir.While w -> exits(w.body(), loop);
+            case Ir.ForRange f -> exits(f.body(), loop);
+            case Ir.ForEach f -> exits(f.body(), loop);
+            case Ir.Try t -> exits(t.body(), loop) || t.catches().stream().anyMatch(c -> exits(c.body(), loop)) || (t.finallyBody() != null && exits(t.finallyBody(), loop));
+            default -> false;
+        };
+    }
+
+    private Loop enterLoop(int id, boolean hasBreak, boolean hasContinue, List<StatementDef> before) {
+        VariableDef.Local broken = null;
+        if (hasBreak) {
+            broken = new VariableDef.Local(fresh("broken" + id), BOOLEAN);
+            before.add(new StatementDef.DefineAndAssign(broken, ExpressionDef.falseValue()));
+        }
+        VariableDef.Local continued = hasContinue ? new VariableDef.Local(fresh("continued" + id), BOOLEAN) : null;
+        Loop loop = new Loop(id, broken, continued);
+        loops.addLast(loop);
+        return loop;
+    }
+
+    /**
+     * The body of a loop: the continue flag reset per iteration, the statements guarded, then the
+     * statements run at the end of every iteration that is not broken (the step of a range).
+     */
+    private StatementDef loopBody(Loop loop, Ir.Body body, List<StatementDef> perIteration) {
+        List<StatementDef> statements = new ArrayList<>();
+        if (loop.continued() != null) {
+            statements.add(new StatementDef.DefineAndAssign(loop.continued(), ExpressionDef.falseValue()));
+        }
+        statements.add(statements(body));
+        statements.addAll(perIteration);
+        loops.removeLast();
+        return StatementDef.multi(statements);
+    }
+
+    private ExpressionDef.ConditionExpressionDef loopCondition(Loop loop, ExpressionDef.ConditionExpressionDef test) {
+        return loop.broken() == null ? test : new ExpressionDef.And(loop.broken().isFalse(), test);
     }
 
     private StatementDef statement(Ir.Statement statement) {
@@ -138,22 +336,92 @@ public final class StaticBodyGenerator {
                     : condition.doIfElse(statements(branch.then()), statements(branch.orElse()));
             }
             case Ir.Return ret -> ret.value() == null ? new StatementDef.Return(null) : expression(ret.value()).returning();
+            case Ir.While loop -> {
+                List<StatementDef> out = new ArrayList<>();
+                Loop context = enterLoop(loop.loop(), loop.hasBreak(), loop.hasContinue(), out);
+                ExpressionDef.ConditionExpressionDef test = loopCondition(context, condition(loop.test()));
+                out.add(test.whileLoop(loopBody(context, loop.body(), List.of())));
+                yield StatementDef.multi(out);
+            }
+            case Ir.ForRange loop -> {
+                List<StatementDef> out = new ArrayList<>();
+                // declared in the enclosing block: a fresh Java name, so a later loop over the same
+                // Python name, or a local of that name assigned after the loop, declares its own
+                VariableDef.Local variable = new VariableDef.Local(fresh(loop.variable()), LONG);
+                VariableDef.Local stop = new VariableDef.Local(fresh("stop" + loop.loop()), LONG);
+                VariableDef.Local step = new VariableDef.Local(fresh("step" + loop.loop()), LONG);
+                locals.put(loop.variable(), variable);
+                out.add(new StatementDef.DefineAndAssign(variable, expression(loop.start())));
+                out.add(new StatementDef.DefineAndAssign(stop, expression(loop.stop())));
+                out.add(new StatementDef.DefineAndAssign(step, PYTHON_STATIC.invokeStatic("step", List.of(LONG), LONG, expression(loop.step()))));
+                Loop context = enterLoop(loop.loop(), loop.hasBreak(), loop.hasContinue(), out);
+                ExpressionDef.ConditionExpressionDef test = loopCondition(context, PYTHON_STATIC.invokeStatic("inRange", List.of(LONG, LONG, LONG), BOOLEAN, variable, stop, step).isTrue());
+                StatementDef advance = variable.assign(PYTHON_STATIC.invokeStatic("advance", List.of(LONG, LONG, LONG), LONG, variable, stop, step));
+                if (context.broken() != null) {
+                    advance = context.broken().isFalse().doIf(advance);
+                }
+                out.add(test.whileLoop(loopBody(context, loop.body(), List.of(advance))));
+                yield StatementDef.multi(out);
+            }
+            case Ir.ForEach loop -> {
+                List<StatementDef> out = new ArrayList<>();
+                VariableDef.Local iterator = new VariableDef.Local(fresh("iterator" + loop.loop()), ITERATOR);
+                out.add(new StatementDef.DefineAndAssign(iterator, expression(loop.iterable()).invoke("iterator", ITERATOR)));
+                Loop context = enterLoop(loop.loop(), loop.hasBreak(), loop.hasContinue(), out);
+                ExpressionDef.ConditionExpressionDef test = loopCondition(context, iterator.invoke("hasNext", BOOLEAN).isTrue());
+                VariableDef.Local variable = new VariableDef.Local(loop.variable(), type(loop.type()));
+                locals.put(loop.variable(), variable);
+                ExpressionDef element = cast(iterator.invoke("next", TypeDef.OBJECT), "java.lang.Object", loop.elementType());
+                StatementDef bind = new StatementDef.DefineAndAssign(variable, cast(element, loop.elementType(), loop.type()));
+                StatementDef body = loopBody(context, loop.body(), List.of());
+                out.add(test.whileLoop(StatementDef.multi(bind, body)));
+                yield StatementDef.multi(out);
+            }
+            case Ir.Break b -> flag(b.loop(), true).assign(ExpressionDef.trueValue());
+            case Ir.Continue c -> flag(c.loop(), false).assign(ExpressionDef.trueValue());
+            case Ir.Throw t -> expression(t.exception()).doThrow();
+            case Ir.Try t -> {
+                StatementDef.Try tried = new StatementDef.Try(statements(t.body()));
+                for (Ir.Catch handler : t.catches()) {
+                    tried = tried.doCatch(classType(handler.type()), exception -> {
+                        if (handler.variable() != null) {
+                            locals.put(handler.variable(), exception);
+                        }
+                        return statements(handler.body());
+                    });
+                }
+                yield t.finallyBody() == null ? tried : tried.doFinally(statements(t.finallyBody()));
+            }
             case Ir.Eval eval -> {
                 ExpressionDef value = expression(eval.expression());
                 if (value instanceof StatementDef asStatement) {
                     yield asStatement;
                 }
-                yield new StatementDef.DefineAndAssign(new VariableDef.Local("unused" + temporaries++, type(eval.expression().type())), value);
+                yield new StatementDef.DefineAndAssign(new VariableDef.Local(fresh("unused" + temporaries++), type(eval.expression().type())), value);
             }
         };
     }
 
-    private VariableDef.Local local(String name) {
-        VariableDef.Local variable = locals.get(name);
+    private VariableDef local(String name) {
+        VariableDef variable = locals.get(name);
         if (variable == null) {
             throw new IllegalStateException("Local [" + name + "] is read before it is declared");
         }
         return variable;
+    }
+
+    private VariableDef.Local flag(int loop, boolean broken) {
+        for (Iterator<Loop> it = loops.descendingIterator(); it.hasNext();) {
+            Loop candidate = it.next();
+            if (candidate.id() == loop) {
+                VariableDef.Local variable = broken ? candidate.broken() : candidate.continued();
+                if (variable == null) {
+                    throw new IllegalStateException("Loop " + loop + " declares no " + (broken ? "break" : "continue"));
+                }
+                return variable;
+            }
+        }
+        throw new IllegalStateException("No enclosing loop " + loop);
     }
 
     // ---------------------------------------------------------------- expressions
@@ -340,8 +608,19 @@ public final class StaticBodyGenerator {
      * integers widen to double, references are cast.
      */
     private static ExpressionDef cast(ExpressionDef value, String from, String to) {
+        from = erased(from);
+        to = erased(to);
         if (from.equals(to)) {
             return value;
+        }
+        if ("java.lang.Object".equals(from)) {
+            // an element of a collection or an iterator: unboxed as the host boundary would convert it
+            return switch (to) {
+                case Ir.LONG -> PYTHON_STATIC.invokeStatic("toLong", List.of(TypeDef.OBJECT), LONG, value);
+                case Ir.DOUBLE -> PYTHON_STATIC.invokeStatic("toDouble", List.of(TypeDef.OBJECT), DOUBLE, value);
+                case Ir.BOOLEAN -> value.cast(ClassTypeDef.of(Boolean.class));
+                default -> value.cast(type(to));
+            };
         }
         return switch (to) {
             case Ir.LONG -> value.cast(LONG);
@@ -384,6 +663,30 @@ public final class StaticBodyGenerator {
             result.add(type(argument.type()));
         }
         return result;
+    }
+
+    /**
+     * A loop being generated: its flags, when its body breaks or continues it.
+     *
+     * @param id        The number of the loop
+     * @param broken    The flag set by a break, or {@code null}
+     * @param continued The flag set by a continue, or {@code null}
+     */
+    private record Loop(int id, VariableDef.@Nullable Local broken, VariableDef.@Nullable Local continued) {
+
+        /**
+         * The condition that the loop was neither broken nor continued.
+         */
+        ExpressionDef.ConditionExpressionDef notExited() {
+            ExpressionDef.ConditionExpressionDef condition = null;
+            if (broken != null) {
+                condition = broken.isFalse();
+            }
+            if (continued != null) {
+                condition = condition == null ? continued.isFalse() : new ExpressionDef.And(condition, continued.isFalse());
+            }
+            return condition == null ? ExpressionDef.trueValue().isTrue() : condition;
+        }
     }
 
     /**
