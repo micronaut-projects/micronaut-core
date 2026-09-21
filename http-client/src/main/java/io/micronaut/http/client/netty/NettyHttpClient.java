@@ -1613,6 +1613,15 @@ final class NettyHttpClient implements
             }
 
             @Override
+            public void allowDiscard() {
+                // the body is abandoned before it ended (e.g. the downstream client of a proxy
+                // disconnected). Draining the rest could take forever for an endless stream, so
+                // close the connection (HTTP/1) or reset the stream (HTTP/2) instead
+                poolHandle.taint();
+                poolHandle.channel().close();
+            }
+
+            @Override
             public BodySizeLimits sizeLimits() {
                 return NettyHttpClient.this.sizeLimits();
             }

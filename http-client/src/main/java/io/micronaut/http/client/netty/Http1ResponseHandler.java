@@ -342,8 +342,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             if (state == this) {
                 transitionToState(streamingContext, this, new DiscardingContent(listener, streaming));
                 disregardBackpressure();
+                listener.allowDiscard();
             }
-            listener.allowDiscard();
         }
 
         @Override
@@ -503,8 +503,8 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         /**
          * Called when the body passed to {@link #complete(HttpResponse, CloseableByteBody)} has
-         * been discarded. We may want to close the connection in that case to avoid having to
-         * receive unnecessary data.
+         * been discarded before it was fully received. We may want to close the connection in
+         * that case to avoid having to receive unnecessary data.
          */
         default void allowDiscard() {
         }
