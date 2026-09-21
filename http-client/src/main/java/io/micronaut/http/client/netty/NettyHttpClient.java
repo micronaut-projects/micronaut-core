@@ -44,6 +44,7 @@ import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
+import io.micronaut.http.MutableByteBodyHttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.MutableHttpResponse;
@@ -70,6 +71,8 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawHttpClientSupport;
+import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.exceptions.ContentLengthExceededException;
 import io.micronaut.http.client.exceptions.HttpClientErrorDecoder;
@@ -216,6 +219,16 @@ final class NettyHttpClient implements
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
+    /**
+     * Request attribute that disables following redirects for one exchange, see
+     * {@link RawRequestOptions#isFollowRedirects()}.
+     */
+    private static final String NO_FOLLOW_REDIRECTS = "micronaut.http.client.raw.no-follow-redirects";
+    /**
+     * Request attribute that disables decompression for one exchange, see
+     * {@link RawRequestOptions#isDecompress()}.
+     */
+    private static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1053,7 +1066,7 @@ final class NettyHttpClient implements
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         return toMono(resolveRequestURI(request)
             .flatMap(requestURI -> {
-                MutableHttpRequest<?> httpRequest = toMutableRequest(request);
+                MutableHttpRequest<?> httpRequest = toProxyRequest(request);
                 if (!options.isRetainHostHeader()) {
                     httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
                 }
@@ -1063,20 +1076,32 @@ final class NettyHttpClient implements
                     null,
                     httpRequest.uri(requestURI),
                     (req, resp) -> {
-                        Publisher<HttpContent> body;
                         if (!hasBody(resp)) {
                             resp.close();
-                            body = Flux.empty();
-                        } else {
-                            body = NettyByteBodyFactory.toByteBufs(resp.byteBody()).map(DefaultHttpContent::new);
+                            return ExecutionFlow.just(MutableByteBodyHttpResponse.of(resp, NettyByteBodyFactory.empty()));
                         }
-
-                        return ExecutionFlow.<HttpResponse<?>>just(toStreamingResponse(resp, body))
-                            .flatMap(r -> handleStreamHttpError(r, false));
+                        // relayed without a length, like the content publisher proxied responses used to be
+                        return ExecutionFlow.just(MutableByteBodyHttpResponse.of(resp, new UnknownLengthByteBody(resp.byteBody().move())));
                     }
                 );
             })
             .map(HttpResponse::toMutableResponse), propagatedContext);
+    }
+
+    /**
+     * The request to send for {@link #proxy}. The body bytes of a server request are relayed as
+     * they are, whichever server received it.
+     *
+     * @param request The request to proxy
+     * @return The request to send
+     */
+    private MutableHttpRequest<?> toProxyRequest(io.micronaut.http.HttpRequest<?> request) {
+        MutableHttpRequest<?> mutableRequest = toMutableRequest(request);
+        CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
+        if (serverBody != null) {
+            return new RawHttpRequestWrapper<>(conversionService, mutableRequest, serverBody);
+        }
+        return mutableRequest;
     }
 
     private void setupConversionService(io.micronaut.http.HttpRequest<?> httpRequest) {
@@ -1369,6 +1394,40 @@ final class NettyHttpClient implements
         return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
     }
 
+    @Override
+    public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
+        Objects.requireNonNull(options, "options");
+        if (requestBody == null) {
+            requestBody = NettyByteBodyFactory.empty();
+        }
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        ExecutionFlow<HttpResponse<?>> flow;
+        try {
+            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            applyOptions(rawRequest, options);
+            flow = RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
+                propagatedContext,
+                blockedThread == null ? null : new BlockHint(blockedThread, null),
+                rawRequest,
+                (req, resp) -> ExecutionFlow.just(resp)
+            ), options.getResponseTimeout());
+        } catch (RuntimeException | Error e) {
+            requestBody.close();
+            throw e;
+        }
+        return toMono(flow.map(response -> RawHttpClientSupport.toMutableResponse(response, options)), propagatedContext)
+            .doOnTerminate(requestBody::close);
+    }
+
+    private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
+        if (!options.isFollowRedirects()) {
+            request.setAttribute(NO_FOLLOW_REDIRECTS, Boolean.TRUE);
+        }
+        if (!options.isDecompress()) {
+            request.setAttribute(NO_DECOMPRESSION, Boolean.TRUE);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
         PropagatedContext propagatedContext,
         @Nullable BlockHint blockHint,
@@ -1482,7 +1541,7 @@ final class NettyHttpClient implements
 
                 int code = byteBodyResponse.code();
                 HttpHeaders nettyHeaders = byteBodyResponse.getHeaders().getNettyHeaders();
-                if (code > 300 && code < 400 && configuration.isFollowRedirects() && nettyHeaders.contains(HttpHeaderNames.LOCATION)) {
+                if (code > 300 && code < 400 && configuration.isFollowRedirects() && request.getAttribute(NO_FOLLOW_REDIRECTS).isEmpty() && nettyHeaders.contains(HttpHeaderNames.LOCATION)) {
                     byteBodyResponse.close();
                     String location = nettyHeaders.get(HttpHeaderNames.LOCATION);
 
@@ -1557,6 +1616,8 @@ final class NettyHttpClient implements
 
         boolean expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
+        poolHandle.channel.attr(MicronautHttpContentDecompressor.SKIP_DECOMPRESSION)
+            .set(request.getAttribute(NO_DECOMPRESSION).isPresent() ? Boolean.TRUE : null);
 
         OptionalLong length = byteBody.expectedLength();
 

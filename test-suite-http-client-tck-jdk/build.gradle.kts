@@ -13,4 +13,7 @@ dependencies {
 tasks.named<Test>("test") {
     useJUnitPlatform()
     // systemProperty("jdk.httpclient.HttpClient.log", "all") // Uncomment to enable logging
+
+    // RawRequestOptionsTest and ProxyHttpClientTest retain the Host header of the request
+    systemProperty("jdk.httpclient.allowRestrictedHeaders", "host")
 }

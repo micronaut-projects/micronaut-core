@@ -63,7 +63,6 @@ import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
@@ -752,7 +751,7 @@ public class ConnectionManager {
             configuration.getMaxHeaderSize(),
             configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new MicronautHttpContentDecompressor());
         }
     }
 
@@ -1779,7 +1778,7 @@ public class ConnectionManager {
                             })
                             .addLast(createFrameToHttpObjectCodec());
                         if (configuration.isDecompressionEnabled()) {
-                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new MicronautHttpContentDecompressor());
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {
