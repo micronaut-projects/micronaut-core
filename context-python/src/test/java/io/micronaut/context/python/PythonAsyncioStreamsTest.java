@@ -270,7 +270,35 @@ final class PythonAsyncioStreamsTest {
     }
 
     @Test
-    void aPublisherEmittingMoreThanRequestedIsCancelledAndFailsTheIteration() throws Exception {
+    void aSecondItemForOneRequestIsRefusedAndCancelsThePublisher() throws Exception {
+        // exactly the demand boundary: one request(1), two items. The second has no demand, so it is
+        // refused rather than delivered or held.
+        Value seen = Value.asValue(consumeOverflowing(2));
+
+        assertEquals(2, seen.getArraySize(), seen.toString());
+        assertEquals("one", seen.getArrayElement(0).asString());
+        assertTrue(seen.getArrayElement(1).asString().contains("without demand"), seen.toString());
+        assertTrue(context.getBindings(PYTHON).getMember("upstream_cancelled").asBoolean());
+    }
+
+    @Test
+    void everyFurtherItemBeyondTheDemandIsRefusedToo() throws Exception {
+        Value seen = Value.asValue(consumeOverflowing(3));
+
+        assertEquals(2, seen.getArraySize(), seen.toString());
+        assertEquals("one", seen.getArrayElement(0).asString());
+        assertTrue(seen.getArrayElement(1).asString().contains("without demand"), seen.toString());
+        assertTrue(context.getBindings(PYTHON).getMember("upstream_cancelled").asBoolean());
+    }
+
+    /**
+     * Consume a publisher that answers its first {@code request(1)} with {@code items} items.
+     *
+     * @param items How many items the publisher emits for the single request
+     * @return The values the iteration saw, the failure message last
+     */
+    private Object consumeOverflowing(int items) throws Exception {
+        String[] names = {"one", "two", "three"};
         Publisher<String> misbehaving = subscriber -> subscriber.onSubscribe(new Subscription() {
             private boolean emitted;
 
@@ -278,9 +306,9 @@ final class PythonAsyncioStreamsTest {
             public void request(long n) {
                 if (!emitted) {
                     emitted = true;
-                    subscriber.onNext("one");
-                    subscriber.onNext("two");
-                    subscriber.onNext("three");
+                    for (int i = 0; i < items; i++) {
+                        subscriber.onNext(names[i]);
+                    }
                 }
             }
 
@@ -290,7 +318,7 @@ final class PythonAsyncioStreamsTest {
             }
         });
         context.getBindings(PYTHON).putMember("source", misbehaving);
-        Object result = run("""
+        return run("""
             from micronaut_asyncio import as_async_iterable
             async def consume():
                 seen = []
@@ -302,11 +330,6 @@ final class PythonAsyncioStreamsTest {
                 return seen
             consume()
             """);
-        Value seen = Value.asValue(result);
-        assertEquals("one", seen.getArrayElement(0).asString());
-        assertEquals("two", seen.getArrayElement(1).asString(), "the one buffered item is drained");
-        assertTrue(seen.getArrayElement(2).asString().contains("more items than were requested"), seen.toString());
-        assertTrue(context.getBindings(PYTHON).getMember("upstream_cancelled").asBoolean());
     }
 
     @Test
@@ -716,6 +739,57 @@ final class PythonAsyncioStreamsTest {
         assertNotNull(items);
         assertEquals(List.of(2, 4, 6, 8, 10), items.stream().map(item -> ((Number) item).intValue()).toList());
         awaitReleased();
+    }
+
+    @Test
+    void aStreamWhoseContextStartsClosingFailsAndReleasesItsLease() throws Exception {
+        ProbeSubscriber probe = pausedGeneratorAfterFirstItem();
+        CountDownLatch idle = new CountDownLatch(1);
+        PythonContextRegistry.closeWhenIdle(context, idle::countDown);
+
+        // the context refuses the frame this demand needs: no Python of the stream can run again
+        probe.subscription.request(1);
+
+        assertTrue(probe.terminated.await(10, TimeUnit.SECONDS), "the stream did not terminate");
+        assertNotNull(probe.error.get());
+        assertTrue(idle.await(10, TimeUnit.SECONDS), "the close-when-idle gate never ran: the lease outlived the stream");
+        assertEquals(0, activeExecutions());
+    }
+
+    @Test
+    void cancellingAStreamWhoseContextIsClosingReleasesItsLease() throws Exception {
+        ProbeSubscriber probe = pausedGeneratorAfterFirstItem();
+        CountDownLatch idle = new CountDownLatch(1);
+        PythonContextRegistry.closeWhenIdle(context, idle::countDown);
+
+        probe.subscription.cancel();
+
+        assertTrue(idle.await(10, TimeUnit.SECONDS), "the close-when-idle gate never ran after a cancellation");
+        assertEquals(0, activeExecutions());
+        assertFalse(probe.completed.get());
+    }
+
+    /**
+     * A subscribed generator that produced one item and is suspended, holding its context's execution.
+     *
+     * @return The probe, subscribed and holding one item
+     */
+    private ProbeSubscriber pausedGeneratorAfterFirstItem() throws Exception {
+        Publisher<?> publisher = publisher("""
+            import asyncio
+            from micronaut_asyncio import as_publisher
+            async def paused():
+                yield "first"
+                await asyncio.sleep(30)
+                yield "never"
+            as_publisher(paused)
+            """);
+        ProbeSubscriber probe = new ProbeSubscriber();
+        publisher.subscribe(probe);
+        probe.subscription.request(1);
+        probe.awaitItems(1);
+        assertEquals(1, activeExecutions(), "an open stream holds an execution of its context");
+        return probe;
     }
 
     // ---- helpers ----

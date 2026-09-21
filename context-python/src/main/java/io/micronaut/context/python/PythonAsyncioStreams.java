@@ -162,6 +162,8 @@ public final class PythonAsyncioStreams {
         private final @Nullable PythonReactiveContext reactiveContext;
         private final AtomicReference<@Nullable Subscription> subscription = new AtomicReference<>();
         private final AtomicLong pendingRequests = new AtomicLong();
+        /** Items requested and not yet delivered: an item arriving while this is zero has no demand. */
+        private final AtomicLong outstandingDemand = new AtomicLong();
         private final AtomicBoolean subscribed = new AtomicBoolean();
         private final AtomicBoolean cancelled = new AtomicBoolean();
         private final AtomicBoolean terminated = new AtomicBoolean();
@@ -181,6 +183,7 @@ public final class PythonAsyncioStreams {
             if (cancelled.get() || terminated.get()) {
                 return;
             }
+            outstandingDemand.incrementAndGet();
             pendingRequests.incrementAndGet();
             if (subscribed.compareAndSet(false, true)) {
                 try {
@@ -243,6 +246,14 @@ public final class PythonAsyncioStreams {
         public void onNext(Object item) {
             Objects.requireNonNull(item, "item");
             if (cancelled.get() || terminated.get()) {
+                return;
+            }
+            if (outstandingDemand.decrementAndGet() < 0) {
+                // Reactive Streams 1.1: an item for which nothing asked. The iteration fails here rather
+                // than buffering the item, so one item per pending __anext__ stays the whole story and
+                // memory cannot grow with a publisher that ignores demand.
+                onError(new IllegalStateException("The publisher emitted an item without demand; as_async_iterable requests one item per iteration"));
+                cancel();
                 return;
             }
             dispatch(eventLoop, context, () -> callbacks.invokeMember("on_next", item), this::cancel);
@@ -331,7 +342,7 @@ public final class PythonAsyncioStreams {
                 return;
             }
             executing.set(true);
-            dispatch(eventLoop, context, this::createDriver, () -> fail(new IllegalStateException("The Python context of the stream is closing")));
+            dispatch(eventLoop, context, this::createDriver, () -> failWithoutPython(new IllegalStateException("The Python context of the stream is closing")));
         }
 
         private void createDriver() {
@@ -339,8 +350,9 @@ public final class PythonAsyncioStreams {
             try {
                 created = start.execute(this);
             } catch (RuntimeException e) {
+                // no driver: no Python code of this stream will run, so the lease ends here
                 startFailed = true;
-                fail(e);
+                failWithoutPython(e);
                 return;
             }
             driver = created;
@@ -377,7 +389,7 @@ public final class PythonAsyncioStreams {
                 } else {
                     driver.invokeMember("request", n);
                 }
-            }, () -> fail(new IllegalStateException("The Python context of the stream is closing")));
+            }, () -> failWithoutPython(new IllegalStateException("The Python context of the stream is closing")));
         }
 
         @Override
@@ -385,7 +397,12 @@ public final class PythonAsyncioStreams {
             if (!cancelled.compareAndSet(false, true)) {
                 return;
             }
-            dispatch(eventLoop, context, this::cancelDriver, this::release);
+            dispatch(eventLoop, context, this::cancelDriver, () -> {
+                // the context is closing: its own teardown disposes the generator, since no Python of
+                // this stream can run any more, and the lease must not outlive that
+                LOG.debug("Cancelling a Python stream whose context is closing: the generator is not closed by this stream");
+                release();
+            });
         }
 
         private void cancelDriver() {
@@ -461,6 +478,10 @@ public final class PythonAsyncioStreams {
             return cancelled.get() || terminated.get();
         }
 
+        /**
+         * Fail the subscriber. The lease stays held: the driver that reported this failure closes its
+         * iterator and reports {@link #released()} once that has happened.
+         */
         private void fail(Throwable throwable) {
             boolean emit = terminated.compareAndSet(false, true) && !cancelled.get();
             if (emit) {
@@ -468,10 +489,16 @@ public final class PythonAsyncioStreams {
             } else {
                 LOG.debug("Dropping a Python stream failure after a terminal signal or cancellation", throwable);
             }
-            if (driver == null) {
-                // nothing runs in Python for this stream: the execution ends here
-                release();
-            }
+        }
+
+        /**
+         * Fail the subscriber when no Python of this stream can run any more: the context is closing, or
+         * the driver was never created. Nothing will report {@link #released()}, so the lease ends here;
+         * a generator left open is disposed by the close of its own context.
+         */
+        private void failWithoutPython(Throwable throwable) {
+            fail(throwable);
+            release();
         }
 
         private void release() {

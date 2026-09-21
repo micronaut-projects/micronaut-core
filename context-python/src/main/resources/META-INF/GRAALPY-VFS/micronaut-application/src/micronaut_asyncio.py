@@ -1286,10 +1286,12 @@ def _dispatch_on(loop, micronaut_loop, callback, *args):
 class MicronautPublisherIterator:
     """An async iterator (and async context manager) over a Java ``Publisher``.
 
-    One outstanding ``request(1)`` per pending ``__anext__``, at most one buffered item, a single
-    lazy subscription started by the first iteration, and one cancellation: leaving the ``async
-    with`` block, ``aclose()``, task cancellation during ``__anext__`` and the consumer's own
-    exit all cancel the subscription exactly once. Overlapping ``__anext__`` calls are refused.
+    One outstanding ``request(1)`` per pending ``__anext__``, nothing buffered, a single lazy
+    subscription started by the first iteration, and one cancellation: leaving the ``async with``
+    block, ``aclose()``, task cancellation during ``__anext__`` and the consumer's own exit all
+    cancel the subscription exactly once. Overlapping ``__anext__`` calls are refused. An item for
+    which no iteration is waiting is a publisher that ignored its demand: it is refused rather than
+    held, so memory cannot grow with what the publisher chooses to emit.
     """
 
     def __init__(self, publisher, loop, reactive_context=None):
@@ -1297,7 +1299,6 @@ class MicronautPublisherIterator:
         self._micronaut_loop = getattr(loop, "_java_loop", None)
         self._java = _AsyncioStreams.iterator(publisher, self._micronaut_loop, self, reactive_context)
         self._waiter = None
-        self._buffered = _COMPLETED  # sentinel for "empty"; None is never a valid element
         self._terminal = None
         self._closed = False
 
@@ -1314,10 +1315,6 @@ class MicronautPublisherIterator:
     async def __anext__(self):
         if self._waiter is not None:
             raise RuntimeError("as_async_iterable: __anext__ called while a previous __anext__ is still pending")
-        if self._buffered is not _COMPLETED:
-            item = self._buffered
-            self._buffered = _COMPLETED
-            return item
         if self._closed:
             raise StopAsyncIteration
         if self._terminal is not None:
@@ -1358,7 +1355,6 @@ class MicronautPublisherIterator:
         if self._closed:
             return
         self._closed = True
-        self._buffered = _COMPLETED
         self._java.cancel()
         waiter = self._waiter
         if waiter is not None and not waiter.done():
@@ -1382,13 +1378,10 @@ class MicronautPublisherIterator:
         if waiter is not None and not waiter.done():
             waiter.set_result(item)
             return
-        if self._buffered is _COMPLETED:
-            self._buffered = item
-            return
-        # more items than requested: bound memory by refusing the publisher, not by growing a queue;
-        # the one buffered item is still delivered before the failure
+        # nothing is waiting for this item, so nothing requested it (the Java subscriber refuses an
+        # item beyond its demand before this point); refuse the publisher rather than hold the item
         self._java.cancel()
-        self._terminal = RuntimeError("as_async_iterable: the publisher emitted more items than were requested")
+        self._terminal = RuntimeError("as_async_iterable: the publisher emitted an item that no iteration requested")
 
     def _deliver_terminal(self, terminal):
         if self._closed or self._terminal is not None:
