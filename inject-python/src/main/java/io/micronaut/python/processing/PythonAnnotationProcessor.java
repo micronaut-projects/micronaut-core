@@ -155,9 +155,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         # than being imported, and the subpackages a members module names (__micronaut_subpackages__)
         # are imported on first access rather than with the package: GraalPy keeps dozens of Java
         # frames per Python frame, so every package level an import nests decides whether a deep
-        # package tree bootstraps within the thread stack. __all__ lists the members and then the
-        # subpackages: a star import binds the direct subpackages, importing them, as it does for any
-        # package whose __all__ names its submodules.
+        # package tree bootstraps within the thread stack. __all__ lists the members of every
+        # contribution and then their subpackages, whichever contribution each comes from: a star import
+        # binds the direct subpackages, importing them, as it does for any package whose __all__ names
+        # its submodules.
         import importlib as __micronaut_importlib
         import os as __micronaut_os
         from importlib.machinery import SourceFileLoader as __micronaut_SourceFileLoader
@@ -171,8 +172,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         ))
         # the namespace of each contribution merged so far, partial while its code runs
         __micronaut_namespaces = {}
-        # the subpackages of the contributions merged so far, imported on first access
-        __micronaut_subpackages = set()
+        # the subpackages of the contributions merged so far, imported on first access; they go to
+        # __all__ after the members of every contribution, so one contribution's subpackage never
+        # precedes another's member there
+        __micronaut_subpackages = []
         __all__ = []
 
 
@@ -184,17 +187,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             # they are merged when its import completes
             for name in namespace.get('__all__', ()):
                 value = namespace[name]
-                # the first module defining a name (or a subpackage) wins, unless it bound a Java class
-                # absent from the class path to a facade and a later one has the class itself
-                if name in __all__ and type(globals().get(name)).__name__ != '_MicronautJavaType':
-                    continue
+                # the first contribution defining a name (as a member or as a subpackage) wins, unless it
+                # bound a Java class absent from the class path to a facade and a later one has the class
+                if name in __all__ or name in __micronaut_subpackages:
+                    if type(globals().get(name)).__name__ != '_MicronautJavaType':
+                        continue
                 globals()[name] = value
                 if name not in __all__:
                     __all__.append(name)
             for name in namespace.get('__micronaut_subpackages__', ()):
-                if name not in __all__:
-                    __micronaut_subpackages.add(name)
-                    __all__.append(name)
+                if name not in __all__ and name not in __micronaut_subpackages:
+                    __micronaut_subpackages.append(name)
 
 
         def __getattr__(name):
@@ -234,6 +237,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             for __micronaut_contribution in __micronaut_contributions:
                 if __micronaut_contribution not in __micronaut_namespaces:
                     __micronaut_merge_members(__micronaut_contribution)
+            __all__.extend(__micronaut_subpackages)
         finally:
             del __micronaut_merge_members, __micronaut_namespaces, __micronaut_contributions
             del __micronaut_os, __micronaut_SourceFileLoader
