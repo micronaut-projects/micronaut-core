@@ -15,7 +15,9 @@ function of the compilation as Java ``StaticCompilationDecision`` values:
 * ``SKIPPED`` with every reason the author can address: a signature without a fixed Java layout
   (``*args``, ``**kwargs``, keyword-only parameters, an unhinted or unresolvable parameter or
   return), a statement or expression kind that has no lowering;
-* ``CANDIDATE`` when every check passes.
+* ``COMPILED`` when every check passes and the body lowers to the IR the Java side generates code
+  from (:mod:`micronaut_lowering`); a body the checker's inference flags, or that uses a construct
+  without a lowering, is ``SKIPPED`` with those reasons.
 
 An explicit ``@CompileStatic`` that cannot be honoured is reported as a warning (an error when the
 planner is strict); mode ``all`` never warns, since skipping is the expected common case there.
@@ -24,7 +26,8 @@ import ast
 
 import java
 
-from micronaut_typecheck import Bindings, CheckUnit, TypeFacts, PythonClasses, _function_node, _switch_value
+from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, _function_node, _switch_value
+from micronaut_lowering import Lowering
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -92,6 +95,7 @@ class StaticPlanner:
         self.scope = CompileScope(mode, annotation_names)
         self.strict = strict
         self.decisions = []
+        self.bodies = []
         self.diagnostics = []
 
     def plan(self, checker, visitor_context=None):
@@ -131,12 +135,30 @@ class StaticPlanner:
         if node is not None:
             statements = len(node.body)
             reasons.extend(self._body_reasons(module, node))
-        outcome = "SKIPPED" if reasons else "CANDIDATE"
-        return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != "MODE")
+        if reasons or node is None or getattr(self.checker, "facts", None) is None:
+            outcome = "SKIPPED" if reasons else "CANDIDATE"
+            return self._record(qualified, span, outcome, scope, reasons, statements, explicit=scope != "MODE")
+        body, reasons = self._lower(module, class_def, function_def, node)
+        if body is None:
+            return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
+        self.bodies.append(body)
+        return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
 
-    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False):
+    def _lower(self, module, class_def, function_def, node):
+        """The compiled body of a candidate, or None with the reasons: what the inference flags, then what the lowering refuses."""
+        unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}", function_def, node, class_def, None, module)
+        rules = JavaReceiverRules(self.checker, unit, silent=True)
+        rules.check()
+        if rules.problems:
+            return None, list(rules.problems)
+        class_model = self.checker.python_classes.of(class_def)
+        lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model)
+        body = lowering.lower()
+        return body, lowering.reasons
+
+    def _record(self, qualified, span, outcome, scope, reasons, statements, explicit=False, stats=None):
         java_reasons = [Reason(rule, message, reason_span) for rule, message, reason_span in reasons]
-        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, Stats(statements, 0, 0, 0))
+        decision = Decision(qualified, span, Outcome.valueOf(outcome), Scope.valueOf(scope), java_reasons, stats or Stats(statements, 0, 0, 0))
         self.decisions.append(decision)
         if explicit and reasons and (self.scope.mode != MODE_ALL or scope == "FUNCTION"):
             rule, message, reason_span = reasons[0]
@@ -159,6 +181,8 @@ class StaticPlanner:
             reasons.append(("class-not-eligible", ineligible, class_def.span() or span))
             return reasons
         name = function_def.name()
+        if function_def.isStatic():
+            reasons.append(("static-method", "a static or class method is bridged as a static Java method; not compiled yet", span))
         if function_def.isAsync():
             reasons.append(("async-function", "an async function runs on the Python event loop", span))
         if function_def.isGenerator() or (node is not None and _yields(node)):
@@ -168,7 +192,62 @@ class StaticPlanner:
             reasons.append(("special-method", what, span))
         if function_def.isAbstract() or function_def.hasPlaceholderBody():
             reasons.append(("abstract-method", "an abstract method has no body to compile; a call of it runs the implementation of the object", span))
+        implemented = self._java_method_implemented(class_def, name)
+        if implemented is not None:
+            reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; not compiled yet", span))
+        advice = self._advice(class_def, function_def)
+        if advice is not None:
+            reasons.append(("intercepted-method", f"the method is advised by [{advice}]; its interceptor chain runs on the Python object; not compiled yet", span))
         return reasons
+
+    def _advice(self, class_def, function_def):
+        """
+        The annotation advising the method, or None: an around or introduction binding on the method
+        or its class, or a validation constraint on a parameter or the return, which validates the
+        call. The chain of an advised method runs on the Python object, which a compiled body would
+        bypass.
+        """
+        facts = getattr(self.checker, "facts", None)
+        if facts is None:
+            return None
+        for decorator in list(function_def.decorators()) + list(class_def.decorators()):
+            description = self._annotation(facts, decorator)
+            if description is not None and description.interceptorBinding():
+                return decorator.annotationName().rsplit(".", 1)[-1]
+        constrained = list(function_def.arguments().arguments())
+        decorators = [d for argument in constrained for d in argument.decorators()]
+        if function_def.returnType() is not None:
+            decorators.extend(function_def.returnType().decorators())
+        for decorator in decorators:
+            description = self._annotation(facts, decorator)
+            if description is not None and description.validationConstraint():
+                return decorator.annotationName().rsplit(".", 1)[-1]
+        return None
+
+    @staticmethod
+    def _annotation(facts, decorator):
+        name = decorator.annotationName()
+        return facts.describeAnnotation(name) if "." in name else None
+
+    def _java_method_implemented(self, class_def, name):
+        """The Java base or interface declaring a method of the name the class implements, or None."""
+        classes = getattr(self.checker, "python_classes", None)
+        model = classes.of(class_def) if classes is not None else None
+        seen = set()
+        stack = [model] if model is not None else []
+        while stack:
+            current = stack.pop()
+            if current is None or current.qualified in seen:
+                continue
+            seen.add(current.qualified)
+            for base in current.bases:
+                if base is None:
+                    continue
+                if isinstance(base, PythonClassModel):
+                    stack.append(base)
+                elif base.methods().containsKey(name):
+                    return f"{base.name()}.{name}"
+        return None
 
     def _class_ineligibility(self, class_def, class_node):
         """Why the class generates no class stub a compiled body could live in, or None."""
