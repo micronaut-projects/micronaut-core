@@ -16,6 +16,7 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
 import org.graalvm.python.embedding.GraalPyResources;
@@ -204,13 +205,67 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
-    void contextOptionsCanBeConfiguredFromMicronautProperties() {
+    void bootstrapContextOptionsOverrideTheInferredLogLevel() {
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try {
+            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () ->
+                GraalPyContextFactory.bootstrapReusableContext(
+                    getClass().getClassLoader(),
+                    Map.of("log.level", "INVALID")
+                )
+            );
+            assertTrue(exception.getMessage().contains("INVALID"), exception.getMessage());
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
+        }
+    }
+
+    @Test
+    void explicitLogLevelWinsRegardlessOfConfigurationOrder() {
+        GraalPyContextConfiguration rootFirst = new GraalPyContextConfiguration();
+        rootFirst.configureRootLogLevel("WARN");
+        rootFirst.setOptions(Map.of("log.level", "FINE"));
+        assertEquals("FINE", rootFirst.polyglotLogLevel());
+
+        GraalPyContextConfiguration optionsFirst = new GraalPyContextConfiguration();
+        optionsFirst.setOptions(Map.of("log.level", "FINE"));
+        optionsFirst.configureRootLogLevel("WARN");
+        assertEquals("FINE", optionsFirst.polyglotLogLevel());
+    }
+
+    @Test
+    void contextLogLevelInheritsMicronautRootLevel() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "logger.levels.root", "WARN"
+        ))) {
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals("WARNING", config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
+        }
+    }
+
+    @Test
+    void contextLogLevelOptionOverridesMicronautRootLevel() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "logger.levels.root", "WARN",
             "graalpy.context.options", Map.of("log.level", "FINE")
         ))) {
-            GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
-            assertTrue(config.getOptions().containsKey("log.level"));
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals("FINE", config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
         }
+    }
+
+    private static void refreshLogging(ApplicationContext applicationContext) {
+        applicationContext.getBeansOfType(LoggingSystem.class).forEach(LoggingSystem::refresh);
     }
 
     @Test

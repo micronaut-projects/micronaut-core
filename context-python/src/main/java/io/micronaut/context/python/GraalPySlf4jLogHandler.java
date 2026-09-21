@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.MessageFormat;
+import java.util.Locale;
 import java.util.Map;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
@@ -34,6 +35,45 @@ import java.util.logging.LogRecord;
 final class GraalPySlf4jLogHandler extends Handler {
     private static final String DEFAULT_LOGGER_NAME = "org.graalvm.polyglot";
     private static final Map<String, Logger> CACHED_LOGGERS = new ConcurrentHashMap<>();
+
+    static String polyglotRootLevel() {
+        return polyglotLevel(LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME));
+    }
+
+    static String polyglotLevel(Logger logger) {
+        if (logger.isTraceEnabled()) {
+            return "FINEST";
+        }
+        if (logger.isDebugEnabled()) {
+            return "FINE";
+        }
+        if (logger.isInfoEnabled()) {
+            return "INFO";
+        }
+        if (logger.isWarnEnabled()) {
+            return "WARNING";
+        }
+        if (logger.isErrorEnabled()) {
+            return "SEVERE";
+        }
+        return "OFF";
+    }
+
+    static @Nullable String polyglotLevel(@Nullable String slf4jLevel) {
+        if (slf4jLevel == null || slf4jLevel.isBlank()) {
+            return null;
+        }
+        return switch (slf4jLevel.toUpperCase(Locale.ENGLISH)) {
+            case "ALL" -> "ALL";
+            case "TRACE" -> "FINEST";
+            case "DEBUG" -> "FINE";
+            case "INFO" -> "INFO";
+            case "WARN" -> "WARNING";
+            case "ERROR" -> "SEVERE";
+            case "OFF", "FALSE" -> "OFF";
+            default -> null;
+        };
+    }
 
     @Override
     public void publish(@Nullable LogRecord record) {

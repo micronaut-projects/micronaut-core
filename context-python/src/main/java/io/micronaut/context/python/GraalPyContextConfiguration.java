@@ -17,9 +17,11 @@ package io.micronaut.context.python;
 
 import io.micronaut.context.annotation.ConfigurationBuilder;
 import io.micronaut.context.annotation.ConfigurationProperties;
+import io.micronaut.context.annotation.Property;
 import io.micronaut.core.convert.format.MapFormat;
 import io.micronaut.core.naming.conventions.StringConvention;
 import io.micronaut.core.util.CollectionUtils;
+import jakarta.inject.Inject;
 import org.graalvm.polyglot.Context;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -66,13 +68,13 @@ public final class GraalPyContextConfiguration {
     );
     private Map<String, String> options = Map.of();
     private List<String> hostClassLookup = List.of();
+    private String polyglotLogLevel = GraalPySlf4jLogHandler.polyglotRootLevel();
 
     GraalPyContextConfiguration() {
         // we use experimental features by default so don't warn about them
         builder.option("python.WarnExperimentalFeatures", "false")
-        // make sure all logging is routed through GraalPyExceptionHandler
-               .option("log.level", "ALL");
-
+            // Avoid creating records that the SLF4J backend will discard.
+            .option("log.level", polyglotLogLevel);
     }
 
     /**
@@ -80,6 +82,19 @@ public final class GraalPyContextConfiguration {
      */
     public Context.Builder getBuilder() {
         return builder;
+    }
+
+    @Inject
+    void configureRootLogLevel(@Property(name = "logger.levels.root") @Nullable String rootLogLevel) {
+        String configuredLevel = GraalPySlf4jLogHandler.polyglotLevel(rootLogLevel);
+        if (configuredLevel != null && !options.containsKey("log.level")) {
+            builder.option("log.level", configuredLevel);
+            polyglotLogLevel = configuredLevel;
+        }
+    }
+
+    String polyglotLogLevel() {
+        return options.getOrDefault("log.level", polyglotLogLevel);
     }
 
     /**
