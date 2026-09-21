@@ -29,6 +29,8 @@ import io.micronaut.python.imports.PythonImportMappings;
 import io.micronaut.python.imports.ResolvedModule;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
+import io.micronaut.python.processing.typecheck.TypeCheckMode;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.VisitorContextClassIndex;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -274,6 +276,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         """;
     private PythonAstParser parser;
     private Consumer<ClassElement> classElementCallback;
+    private Consumer<PythonDiagnostic> diagnosticCallback;
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -293,6 +296,45 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
      */
     public void setClassElementCallback(Consumer<ClassElement> callback) {
         this.classElementCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each problem found in the Python sources, before it is
+     * reported through the messager.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
+        this.diagnosticCallback = callback;
+    }
+
+    @Override
+    public Set<String> getSupportedOptions() {
+        Set<String> options = new HashSet<>(super.getSupportedOptions());
+        options.add(SOURCE_ROOT_OPTION);
+        options.add(TypeCheckMode.OPTION);
+        options.add(TypeCheckMode.ANNOTATIONS_OPTION);
+        return options;
+    }
+
+    /**
+     * The type checking requested through the processor options.
+     */
+    private TypeCheckConfiguration typeCheckConfiguration() {
+        Map<String, String> options = processingEnv.getOptions();
+        TypeCheckMode mode;
+        try {
+            mode = TypeCheckMode.fromOption(options.get(TypeCheckMode.OPTION));
+        } catch (IllegalArgumentException e) {
+            throw new ProcessingException(null, e.getMessage());
+        }
+        String annotations = options.get(TypeCheckMode.ANNOTATIONS_OPTION);
+        List<String> annotationNames = annotations == null ? List.of() : Arrays.stream(annotations.split(","))
+            .map(String::trim)
+            .filter(name -> !name.isEmpty())
+            .toList();
+        return new TypeCheckConfiguration(mode, annotationNames);
     }
 
     /**
@@ -570,6 +612,10 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             PythonProcessingEnvironment processingEnvironment =
                 new PythonProcessingEnvironment(environment, javaVisitorContext, element);
 
+            // Every class of the compilation is modelled and registered: check the Python code against
+            // the Java types it uses, and stop before any stub is generated when the check fails
+            reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
+
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
             Set<String> allFacades = new TreeSet<>();
@@ -742,8 +788,11 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             return parser.parseTransformed(
                 transformedList,
                 Arrays.asList(srcDirs),
-                javaVisitorContext
+                javaVisitorContext,
+                typeCheckConfiguration()
             );
+        } catch (ProcessingException e) {
+            throw e;
         } catch (Exception e) {
             throw new ProcessingException(originatingElement, "Error parsing transformed python code: " + (e.getMessage() != null ? e.getMessage() : e.toString()));
         }
@@ -768,6 +817,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
         int errors = 0;
         for (PythonDiagnostic diagnostic : diagnostics) {
+            if (diagnosticCallback != null) {
+                diagnosticCallback.accept(diagnostic);
+            }
             String rendered = PythonDiagnostics.render(diagnostic, sources::get);
             if (diagnostic.isError()) {
                 errors++;
