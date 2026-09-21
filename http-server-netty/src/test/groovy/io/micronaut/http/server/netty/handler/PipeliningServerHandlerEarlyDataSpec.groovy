@@ -245,6 +245,61 @@ class PipeliningServerHandlerEarlyDataSpec extends Specification {
         ch.finishAndReleaseAll()
     }
 
+    def 'early bytes of a queued response are released when the connection closes'() {
+        given:
+        def firstBody = Sinks.many().unicast().<ByteBuf>onBackpressureBuffer()
+        StreamingNettyByteBody.SharedBuffer secondBuffer = null
+        int requests = 0
+        def early = Unpooled.copiedBuffer("early", StandardCharsets.UTF_8)
+        def more = Unpooled.copiedBuffer("more", StandardCharsets.UTF_8)
+        def late = Unpooled.copiedBuffer("late", StandardCharsets.UTF_8)
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+                if (requests++ == 0) {
+                    outboundAccess.write(response, new NettyByteBodyFactory(ctx.channel()).adaptNetty(firstBody.asFlux()))
+                } else {
+                    secondBuffer = streamingBuffer(ctx)
+                    secondBuffer.add(readBuffer(early))
+                    outboundAccess.write(response, new StreamingNettyByteBody(secondBuffer))
+                }
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        }))
+
+        when:
+        ch.writeOneInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/first"))
+        ch.writeOneInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/second"))
+        ch.flushInbound()
+        // more bytes for the queued response, while the first one is still being written
+        secondBuffer.add(readBuffer(more))
+
+        then:
+        early.refCnt() == 1
+        more.refCnt() == 1
+
+        when:
+        ch.close()
+        ch.runPendingTasks()
+        // bytes that arrive after the response was discarded
+        secondBuffer.add(readBuffer(late))
+        ch.runPendingTasks()
+
+        then:
+        early.refCnt() == 0
+        more.refCnt() == 0
+        late.refCnt() == 0
+
+        cleanup:
+        ch.finishAndReleaseAll()
+    }
+
     private static StreamingNettyByteBody.SharedBuffer streamingBuffer(ChannelHandlerContext ctx) {
         return new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(BodySizeLimits.UNLIMITED, new BufferConsumer.Upstream() {
             @Override
@@ -254,7 +309,11 @@ class PipeliningServerHandlerEarlyDataSpec extends Specification {
     }
 
     private static readBuffer(String s) {
-        return NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(Unpooled.copiedBuffer(s, StandardCharsets.UTF_8))
+        return readBuffer(Unpooled.copiedBuffer(s, StandardCharsets.UTF_8))
+    }
+
+    private static readBuffer(ByteBuf buf) {
+        return NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(buf)
     }
 
     private static List<String> responseBodies(EmbeddedChannel ch) {
