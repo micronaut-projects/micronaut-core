@@ -18,6 +18,9 @@ package io.micronaut.web.router;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Consumes;
+import io.micronaut.http.annotation.Produces;
 import jakarta.inject.Singleton;
 
 import java.util.List;
@@ -29,7 +32,13 @@ import java.util.function.Consumer;
  * routes of the application. Routes target executable bean methods, e.g.
  * {@code routes.GET("/orders/{+path}", OrdersHandler.class, "handle", HttpRequest.class)} or the
  * {@code BeanDefinition}/{@code ExecutableMethod} form, so arguments are bound and the method's
- * annotations (produces, consumes, version, executor) apply as they do for a controller.
+ * annotations apply as they do for a controller: {@code @Consumes} and {@code @Produces} set the
+ * media types of the route (calls on the route in the build callback override them), and
+ * {@code @Version} and the executor apply when the route is matched and executed. Every
+ * {@code GET} route gets an implicit {@code HEAD} route, unless the table has a {@code HEAD}
+ * route for the same URI or the method is annotated {@code @Get(headRoute = false)}.
+ * <p>A table is immutable: changing a route returned by the builder after {@link #build} returned
+ * does not change the table.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -66,8 +75,22 @@ public final class RouteTableFactory {
     public RouteTable build(Consumer<? super RouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
         DefaultRouteBuilder builder = new DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy, conversionService) {
+            @Override
+            void routeCreated(DefaultUriRoute route) {
+                // like a controller method: the media types of the handler method apply, and calls
+                // on the route in the build callback can still change them
+                MediaType[] consumes = MediaType.of(route.targetMethod.stringValues(Consumes.class));
+                if (consumes.length > 0) {
+                    route.consumes(consumes);
+                }
+                MediaType[] produces = MediaType.of(route.targetMethod.stringValues(Produces.class));
+                if (produces.length > 0) {
+                    route.produces(produces);
+                }
+            }
         };
         routes.accept(builder);
+        builder.addImplicitHeadRoutes();
         if (!builder.getFilterRoutes().isEmpty() || !builder.getStatusRoutes().isEmpty() || !builder.getErrorRoutes().isEmpty()) {
             throw new IllegalArgumentException("A route table can only declare URI routes, not filter, status or error routes");
         }
