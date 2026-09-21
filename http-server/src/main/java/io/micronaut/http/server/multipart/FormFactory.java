@@ -288,6 +288,9 @@ public final class FormFactory {
             // check size
             if (total > mc.getMaxFileSize()) {
                 buffer.close();
+                // cancel before failing: this releases the demand on the part so the server can
+                // keep draining the rest of the body instead of stalling the client's write
+                Objects.requireNonNull(subscription).cancel();
                 onError(new ContentLengthExceededException("The part named [" + metadata.name() + "] exceeds the maximum allowed content length [" + mc.getMaxFileSize() + "]"));
                 return;
             }

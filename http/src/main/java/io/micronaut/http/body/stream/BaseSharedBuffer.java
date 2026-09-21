@@ -151,6 +151,9 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         Exception totalSizeException = sizeLimitTrackers.totalSize().add(parsed);
         if (totalSizeException != null) {
             error(totalSizeException);
+            // nobody can use the body anymore, so like the check in add0, let the upstream drop
+            // the rest instead of stalling it on our missing demand
+            rootUpstream.allowDiscard();
         }
         setExpectedLength(parsed);
     }
