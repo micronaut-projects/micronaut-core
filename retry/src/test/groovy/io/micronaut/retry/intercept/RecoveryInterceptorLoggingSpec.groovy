@@ -22,6 +22,7 @@ import ch.qos.logback.core.read.ListAppender
 import io.micronaut.context.ApplicationContext
 import io.micronaut.retry.annotation.Fallback
 import io.micronaut.retry.annotation.Recoverable
+import io.micronaut.retry.exception.FallbackException
 import jakarta.inject.Singleton
 import org.slf4j.LoggerFactory
 import spock.lang.Issue
@@ -59,6 +60,7 @@ class RecoveryInterceptorLoggingSpec extends Specification {
         result == "fallback"
         appender.list.findAll { it.level == Level.ERROR }.isEmpty()
         ILoggingEvent event = appender.list.find { it.level == Level.DEBUG && it.formattedMessage.contains("resolved fallback") }
+        event != null
         event.throwableProxy == null
 
         cleanup:
@@ -76,7 +78,26 @@ class RecoveryInterceptorLoggingSpec extends Specification {
         IllegalStateException exception = thrown()
         exception.message == "unhandled"
         ILoggingEvent event = appender.list.find { it.level == Level.ERROR }
+        event != null
         event.formattedMessage.contains("executed with error: unhandled")
+        event.throwableProxy.className == IllegalStateException.name
+
+        cleanup:
+        context.close()
+    }
+
+    void "a failing fallback still logs the original exception at error"() {
+        given:
+        ApplicationContext context = ApplicationContext.run()
+
+        when:
+        context.getBean(FailingFallbackService).execute()
+
+        then:
+        FallbackException thrownException = thrown()
+        thrownException.suppressed.any { it instanceof IllegalStateException && it.message == "original" }
+        ILoggingEvent event = appender.list.find { it.level == Level.ERROR && it.formattedMessage.contains("executed with error: original") }
+        event != null
         event.throwableProxy.className == IllegalStateException.name
 
         cleanup:
@@ -112,6 +133,30 @@ class RecoveryInterceptorLoggingSpec extends Specification {
 
         String execute() {
             throw new IllegalStateException("unhandled")
+        }
+    }
+
+    static interface FailingFallbackApi {
+        String execute()
+    }
+
+    @Singleton
+    @Recoverable(api = FailingFallbackApi)
+    static class FailingFallbackService implements FailingFallbackApi {
+
+        @Override
+        String execute() {
+            throw new IllegalStateException("original")
+        }
+    }
+
+    @Singleton
+    @Fallback
+    static class ThrowingFallback implements FailingFallbackApi {
+
+        @Override
+        String execute() {
+            throw new UnsupportedOperationException("fallback blew up")
         }
     }
 }
