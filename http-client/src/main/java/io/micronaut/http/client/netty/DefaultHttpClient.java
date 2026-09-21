@@ -35,6 +35,7 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.StreamingHttpClient;
 import io.micronaut.http.client.AsyncHttpClient;
@@ -485,6 +486,11 @@ public class DefaultHttpClient implements
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> parentRequest, @Nullable CloseableByteBody body, @Nullable Thread originatingThread) {
         return nettyHttpClient.exchange(parentRequest, body, originatingThread);
+    }
+
+    @Override
+    public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody body, @Nullable Thread originatingThread, RawRequestOptions options) {
+        return nettyHttpClient.exchange(request, body, originatingThread, options);
     }
 
     /**

@@ -118,10 +118,16 @@ abstract class AbstractJdkHttpClient {
     @Nullable
     protected MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     /**
-     * The client for raw exchanges: it keeps no cookies, because the exchanges a raw client
-     * relays belong to different users. Built on first use.
+     * The client for raw exchanges and for proxying: it follows redirects as configured, and
+     * keeps no cookies, because the exchanges a raw client relays belong to different users.
+     * Built on first use.
      */
     final Supplier<HttpClient> rawClient;
+    /**
+     * Like {@link #rawClient}, but never follows redirects, see
+     * {@link io.micronaut.http.client.RawRequestOptions#isFollowRedirects()}.
+     */
+    final Supplier<HttpClient> rawNoRedirectClient;
 
     protected AbstractJdkHttpClient(AbstractJdkHttpClient prototype) {
         this.loadBalancer = prototype.loadBalancer;
@@ -130,6 +136,7 @@ abstract class AbstractJdkHttpClient {
         this.contextPath = prototype.contextPath;
         this.client = prototype.client;
         this.rawClient = prototype.rawClient;
+        this.rawNoRedirectClient = prototype.rawNoRedirectClient;
         this.cookieManager = prototype.cookieManager;
         this.requestBinderRegistry = prototype.requestBinderRegistry;
         this.clientId = prototype.clientId;
@@ -206,11 +213,14 @@ abstract class AbstractJdkHttpClient {
             this.contextPath = null;
         }
 
-        this.client = buildClient(true);
-        this.rawClient = SupplierUtil.memoized(() -> buildClient(false));
+        HttpClient.Redirect redirect = configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER;
+        this.client = buildClient(redirect, true);
+        Supplier<HttpClient> rawNoRedirect = SupplierUtil.memoized(() -> buildClient(HttpClient.Redirect.NEVER, false));
+        this.rawClient = configuration.isFollowRedirects() ? SupplierUtil.memoized(() -> buildClient(redirect, false)) : rawNoRedirect;
+        this.rawNoRedirectClient = rawNoRedirect;
     }
 
-    private HttpClient buildClient(boolean cookies) {
+    private HttpClient buildClient(HttpClient.Redirect redirect, boolean cookies) {
         HttpClient.Builder builder = HttpClient.newBuilder();
         configuration.getConnectTimeout().ifPresent(builder::connectTimeout);
 
@@ -239,7 +249,7 @@ abstract class AbstractJdkHttpClient {
             builder.version(HttpClient.Version.HTTP_1_1);
         }
 
-        builder.followRedirects(configuration.isFollowRedirects() ? HttpClient.Redirect.NORMAL : HttpClient.Redirect.NEVER);
+        builder.followRedirects(redirect);
         if (cookies) {
             builder.cookieHandler(cookieManager);
         }
