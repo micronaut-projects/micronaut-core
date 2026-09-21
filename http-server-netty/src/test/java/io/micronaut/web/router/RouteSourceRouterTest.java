@@ -24,6 +24,8 @@ import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.BlockingHttpClient;
@@ -128,7 +130,8 @@ class RouteSourceRouterTest {
         assertTrue(router.GET("/dynamic/x").isPresent());
         assertEquals(1, router.find(HttpRequest.GET("/dynamic/x")).count());
         assertEquals(1, router.find(io.micronaut.http.HttpMethod.GET, "/dynamic/x", null).count());
-        assertEquals(1, router.findAny("/dynamic/x", null).count());
+        // GET and its implicit HEAD route, like a controller GET route
+        assertEquals(List.of("GET", "HEAD"), router.findAny("/dynamic/x", null).map(match -> match.getRouteInfo().getHttpMethodName()).sorted().toList());
     }
 
     @Test
@@ -143,7 +146,7 @@ class RouteSourceRouterTest {
             routes.replace(r -> { });
             // the same request still sees the table it started with, a new one sees the new table
             assertNotNull(router.findClosest(request));
-            assertEquals(1, router.findAny(request).size());
+            assertEquals(1, router.findAny(request).stream().filter(match -> match.getHttpMethod() == io.micronaut.http.HttpMethod.GET).count());
             assertNull(router.findClosest(HttpRequest.GET("/snapshot/x")));
         } finally {
             routes.reset();
@@ -155,6 +158,52 @@ class RouteSourceRouterTest {
         RouteTableFactory tables = context.getBean(RouteTableFactory.class);
         assertThrows(IllegalArgumentException.class, () -> tables.build(r -> r.GET("/ported", Handler.class, "handle", HttpRequest.class).exposedPort(9999)));
         assertThrows(IllegalArgumentException.class, () -> tables.build(r -> r.status(HttpStatus.NOT_FOUND, Handler.class, "handle", HttpRequest.class)));
+    }
+
+    @Test
+    void getRoutesOfATableHaveAnImplicitHeadRoute() {
+        RouteTableFactory tables = context.getBean(RouteTableFactory.class);
+        Router router = tableRouter(tables.build(r -> r.GET("/head/{name}", Handler.class, "handle", HttpRequest.class)));
+
+        UriRouteMatch<Object, Object> head = router.findClosest(HttpRequest.HEAD("/head/x"));
+        assertNotNull(head);
+        assertTrue(head.getRouteInfo().isImplicitHead());
+
+        // an explicit HEAD route of the table takes precedence, without a duplicate route
+        Router explicit = tableRouter(tables.build(r -> {
+            r.GET("/head/{name}", Handler.class, "handle", HttpRequest.class);
+            r.HEAD("/head/{name}", Handler.class, "handleV2", HttpRequest.class);
+        }));
+        assertEquals("handleV2", explicit.findClosest(HttpRequest.HEAD("/head/x")).getRouteInfo().getTargetMethod().getMethodName());
+    }
+
+    @Test
+    void theMediaTypesOfTheHandlerMethodApply() {
+        RouteTableFactory tables = context.getBean(RouteTableFactory.class);
+        Router router = tableRouter(tables.build(r -> r.POST("/text", Handler.class, "text", String.class)));
+
+        assertNotNull(router.findClosest(HttpRequest.POST("/text", "hello").contentType(MediaType.TEXT_PLAIN_TYPE)));
+        assertNull(router.findClosest(HttpRequest.POST("/text", "{}").contentType(MediaType.APPLICATION_JSON_TYPE)));
+
+        // the build callback can still change them
+        Router json = tableRouter(tables.build(r -> r.POST("/text", Handler.class, "text", String.class).consumes(MediaType.APPLICATION_JSON_TYPE)));
+        assertNull(json.findClosest(HttpRequest.POST("/text", "hello").contentType(MediaType.TEXT_PLAIN_TYPE)));
+    }
+
+    @Test
+    void aTableDoesNotChangeWithTheRoutesItWasBuiltFrom() {
+        UriRoute[] retained = new UriRoute[1];
+        Router router = tableRouter(context.getBean(RouteTableFactory.class).build(r -> retained[0] = r.GET("/fixed", Handler.class, "handle", HttpRequest.class)));
+        assertNotNull(router.findClosest(HttpRequest.GET("/fixed")));
+
+        retained[0].where(request -> false);
+
+        assertNotNull(router.findClosest(HttpRequest.GET("/fixed")));
+        assertNotNull(router.findClosest(HttpRequest.HEAD("/fixed")));
+    }
+
+    private static Router tableRouter(RouteTable table) {
+        return new RouteSourceRouter(new DefaultRouter(List.of()), () -> List.of(() -> table), List::of);
     }
 
     private static String closestMethod(Router router, HttpRequest<?> request) {
@@ -200,6 +249,12 @@ class RouteSourceRouterTest {
         @Version("2")
         HttpResponse<String> handleV2(HttpRequest<?> request) {
             return HttpResponse.ok("v2 " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+
+        @Executable
+        @Consumes(MediaType.TEXT_PLAIN)
+        String text(@Body String body) {
+            return body;
         }
     }
 

@@ -65,6 +65,15 @@ public class RouteSourceTest {
     }
 
     @Test
+    void headRequestIsHandledByTheDynamicGetRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.HEAD("/dynamic/a"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .build());
+        }
+    }
+
+    @Test
     void controllerRouteTakesPrecedence() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/dynamic/static"), HttpResponseAssertion.builder()
