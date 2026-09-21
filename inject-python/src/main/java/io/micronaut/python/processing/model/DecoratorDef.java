@@ -34,6 +34,7 @@ import java.util.Objects;
  * @param stereotypes Stereotype decorators applied to this decorator
  * @param memberDecorators Decorators applied to annotation members
  * @param memberTypes Resolved annotation member types
+ * @param span The location of the definition in its Python source, or {@code null} for a generated definition
  */
 @Experimental
 public record DecoratorDef(
@@ -43,7 +44,8 @@ public record DecoratorDef(
     @Nullable Map<String, Object> members,
     @Nullable List<DecoratorDef> stereotypes,
     @Nullable Map<String, List<DecoratorDef>> memberDecorators,
-    @Nullable Map<String, TypeRef> memberTypes) {
+    @Nullable Map<String, TypeRef> memberTypes,
+    @Nullable SourceSpan span) {
 
     /**
      * Simplified constructor with just the name.
@@ -52,7 +54,7 @@ public record DecoratorDef(
      * @param annotationName The micronaut annotation name
      */
     public DecoratorDef(String name, String annotationName) {
-        this(name, annotationName, null, Map.of(), List.of(), Map.of(), Map.of());
+        this(name, annotationName, null, Map.of(), List.of(), Map.of(), Map.of(), null);
     }
 
     /**
@@ -63,7 +65,7 @@ public record DecoratorDef(
      * @param members        The members
      */
     public DecoratorDef(String name, String annotationName, Map<String, Object> members) {
-        this(name, annotationName, null, members, List.of(), Map.of(), Map.of());
+        this(name, annotationName, null, members, List.of(), Map.of(), Map.of(), null);
     }
 
     /**
@@ -80,7 +82,7 @@ public record DecoratorDef(
                         @Nullable String repeatedName,
                         @Nullable Map<String, Object> members,
                         @Nullable List<DecoratorDef> stereotypes) {
-        this(name, annotationName, repeatedName, members, stereotypes, Map.of(), Map.of());
+        this(name, annotationName, repeatedName, members, stereotypes, Map.of(), Map.of(), null);
     }
 
     /**
@@ -99,7 +101,7 @@ public record DecoratorDef(
                         @Nullable Map<String, Object> members,
                         @Nullable List<DecoratorDef> stereotypes,
                         @Nullable Map<String, List<DecoratorDef>> memberDecorators) {
-        this(name, annotationName, repeatedName, members, stereotypes, memberDecorators, Map.of());
+        this(name, annotationName, repeatedName, members, stereotypes, memberDecorators, Map.of(), null);
     }
 
     public DecoratorDef {
@@ -128,6 +130,13 @@ public record DecoratorDef(
         }
     }
 
+    /**
+     * Creates a definition without a source position.
+     */
+    public DecoratorDef(String name, String annotationName, @Nullable String repeatedName, @Nullable Map<String, Object> members, @Nullable List<DecoratorDef> stereotypes, @Nullable Map<String, List<DecoratorDef>> memberDecorators, @Nullable Map<String, TypeRef> memberTypes) {
+        this(name, annotationName, repeatedName, members, stereotypes, memberDecorators, memberTypes, null);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) {
@@ -140,5 +149,14 @@ public record DecoratorDef(
     @Override
     public int hashCode() {
         return Objects.hash(name, annotationName);
+    }
+
+    /**
+     * @param span The location of the definition in its Python source
+     * @return A copy of this definition located at the given span
+     * @since 5.3.0
+     */
+    public DecoratorDef withSpan(@Nullable SourceSpan span) {
+        return new DecoratorDef(name, annotationName, repeatedName, members, stereotypes, memberDecorators, memberTypes, span);
     }
 }
