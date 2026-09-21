@@ -239,6 +239,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> diagnosticCallback;
     private Consumer<StaticCompilationDecision> staticDecisionCallback;
+    // the sources whose bytecode is compiled once the static compilation plan has rewritten their runtime trees
+    private final List<PendingBytecode> pendingBytecode = new ArrayList<>();
     private List<PythonSourceVisitor> pythonSourceVisitors = List.of();
     private ClassLoader classLoader;
     private boolean compilePythonBytecode;
@@ -291,6 +293,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         options.add(StaticCompilationMode.REPORT_OPTION);
         options.add(StaticCompilationMode.STRICT_OPTION);
         options.add(StaticCompilationMode.ANNOTATIONS_OPTION);
+        options.add(StaticCompilationMode.TRACE_OPTION);
         return options;
     }
 
@@ -311,7 +314,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             mode,
             report == null || report.isBlank() ? null : Path.of(report.trim()),
             strict,
-            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION))
+            optionList(options.get(StaticCompilationMode.ANNOTATIONS_OPTION)),
+            Boolean.parseBoolean(options.get(StaticCompilationMode.TRACE_OPTION))
         );
     }
 
@@ -483,6 +487,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
     private void processAnnotation(TypeElement element, PythonApplicationValues values) {
         writtenVfsPaths.clear();
+        pendingBytecode.clear();
         try {
             ClassElement originatingElement = javaVisitorContext.getRequiredClassElement(
                 element.getQualifiedName().toString(),
@@ -620,6 +625,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             // the Java types it uses, and stop before any stub is generated when the check fails
             reportDiagnostics(parser.typeCheck(processingEnvironment.visitorContext()), transformedList, element, originatingElement);
             planStaticCompilation(processingEnvironment, transformedList, element, originatingElement);
+            compilePendingBytecode(processingEnvironment, originatingElement);
 
             Map<String, String> allDecorators = new LinkedHashMap<>();
             Map<String, List<Map<String, String>>> allImports = new LinkedHashMap<>();
@@ -809,9 +815,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                        List<PythonAstParser.TransformResult> transformedList,
                                        TypeElement element,
                                        ClassElement originatingElement) {
-        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext());
-        processingEnvironment.staticCompilationPlan().set(plan);
         StaticCompilationConfiguration configuration = staticCompilationConfiguration();
+        StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext()).withTrace(configuration.trace());
+        processingEnvironment.staticCompilationPlan().set(plan);
         boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
         if (!planned && plan.diagnostics().isEmpty()) {
             return;
@@ -1083,20 +1089,37 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                              PythonAstParser.TransformResult transformResult,
                                              ClassElement originatingElement) {
         writePythonSourceToVfs(filesList, filePath, content, originatingElement);
-        if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(transformResult)) {
-            return;
+        // the bytecode is compiled from the runtime tree once the static compilation plan has
+        // rewritten the compiled functions of the tree to delegate to their Java bodies
+        pendingBytecode.add(new PendingBytecode(filesList, filePath, transformResult));
+    }
+
+    /**
+     * Rewrites the compiled functions of every runtime tree to delegate to their Java bodies, then
+     * compiles the bytecode of the sources that need it.
+     */
+    private void compilePendingBytecode(PythonProcessingEnvironment processingEnvironment, ClassElement originatingElement) {
+        StaticCompilationPlan plan = processingEnvironment.staticCompilationPlan().get();
+        for (PendingBytecode pending : pendingBytecode) {
+            if (plan != null && !plan.bodies().isEmpty()) {
+                parser.applyStaticDelegation(pending.transformResult(), plan);
+            }
+            if (!compilePythonBytecode && !parser.requiresRuntimeBytecode(pending.transformResult())) {
+                continue;
+            }
+            try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
+                PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
+                    pending.transformResult(),
+                    runtimeFilename(pending.filePath())
+                );
+                writePythonBytecodeToVfs(pending.filesList(), pending.filePath(), result, originatingElement);
+            } catch (ProcessingException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + pending.filePath() + "]: " + e.getMessage(), e);
+            }
         }
-        try (var _ = CompilationProfiler.span(profiler, "python.bytecode")) {
-            PythonBytecodeCompiler.Result result = parser.compileRuntimeBytecode(
-                transformResult,
-                runtimeFilename(filePath)
-            );
-            writePythonBytecodeToVfs(filesList, filePath, result, originatingElement);
-        } catch (ProcessingException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new ProcessingException(originatingElement, "Failed to compile mapped Python bytecode for [" + filePath + "]: " + e.getMessage(), e);
-        }
+        pendingBytecode.clear();
     }
 
     private boolean writePythonSourceToVfs(StringBuilder filesList,
@@ -1495,4 +1518,13 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     private record PythonApplicationValues(String code, String[] src) {
     }
 
+    /**
+     * A source written to the VFS whose bytecode is still to be compiled.
+     *
+     * @param filesList       The VFS file list the bytecode entry is added to
+     * @param filePath        The VFS path of the source
+     * @param transformResult The transformed source
+     */
+    private record PendingBytecode(StringBuilder filesList, String filePath, PythonAstParser.TransformResult transformResult) {
+    }
 }

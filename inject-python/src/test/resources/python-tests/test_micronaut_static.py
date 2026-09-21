@@ -175,6 +175,12 @@ class Plain:
         squares = [value * value for value in values]
         return len(squares)
 
+    def new(self) -> str:
+        return "new"
+
+    def priced(self, default: int) -> int:
+        return default
+
 
 @Singleton
 @CompileStatic(False)
@@ -282,6 +288,8 @@ class ClassificationTest(unittest.TestCase):
         self.assertEqual(["varargs-signature"], rules(decisions["Plain.keyword_only"]))
         # an unhinted return is the Object the stub declares: no longer a reason
         self.assertNotIn("unhinted-return", rules(decisions["Plain.unhinted_return"]))
+        self.assertEqual(["java-reserved-name"], rules(decisions["Plain.new"]))
+        self.assertEqual(["java-reserved-name"], rules(decisions["Plain.priced"]))
 
     def test_unsupported_statements_and_expressions_are_each_a_reason(self):
         decisions, _ = plan(SOURCE, MODE_ALL)
@@ -443,6 +451,10 @@ class Pricing:
 
     def maybe(self, n: int) -> Optional[int]:
         return n
+
+    def switched(self, n: int) -> int:
+        switch = n
+        return switch
 '''
 
 
@@ -519,6 +531,7 @@ class LoweringTest(unittest.TestCase):
             "maybe_unbound": "unsupported-statement",
             "via_property": "sibling-call",
             "maybe": "unsupported-expression",
+            "switched": "java-reserved-name",
         }
         for name, rule in expectations.items():
             decision = self.decisions[f"Pricing.{name}"]
@@ -538,6 +551,59 @@ class LoweringTest(unittest.TestCase):
         statements = list(guarded.body().statements())
         self.assertEqual("assertion", statements[0].expression().name())
         self.assertEqual(">", list(statements[0].expression().arguments())[0].op())
+
+
+class DelegationTest(unittest.TestCase):
+    def test_compiled_functions_delegate_to_the_bound_java_object(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    """The calculator."""
+
+    def label(self, count: int, name: str = "x") -> str:
+        """Labels."""
+        return f"{count} x {name}"
+
+    def other(self) -> int:
+        return 1
+
+    class Inner:
+        def run(self, n: int) -> int:
+            return n
+''')
+        self.assertEqual(2, apply_delegation(tree, ["Calc#label", "Calc$Inner#run", "Missing#nothing"]))
+        self.assertEqual(0, apply_delegation(tree, ["Calc#label"]))  # already rewritten
+        source = ast.unparse(tree)
+        self.assertIn("__mn_java = self.__dict__.get('__micronaut_compiled__')", source)
+        self.assertIn("return __mn_java.label(count, name)", source)
+        self.assertIn("return __mn_java.run(n)", source)
+        label = tree.body[0].body[1]
+        self.assertIsInstance(label.body[0], ast.Expr)  # the docstring stays first
+        self.assertIsInstance(label.body[1], ast.Assign)
+        self.assertIsInstance(label.body[2], ast.If)
+        self.assertEqual(label.lineno, label.body[1].lineno)
+        other = tree.body[0].body[2]
+        self.assertIsInstance(other.body[0], ast.Return)
+        compile(tree, "delegated.py", "exec")
+
+    def test_the_temporary_of_the_rewrite_never_shadows_a_name_of_the_function(self):
+        from micronaut_static import apply_delegation
+        tree = ast.parse('''
+class Calc:
+    def echo(self, __mn_java: str) -> str:
+        return __mn_java
+
+    def marked(self) -> int:
+        __mn_java = 1
+        return __mn_java
+''')
+        self.assertEqual(2, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
+        self.assertEqual(0, apply_delegation(tree, ["Calc#echo", "Calc#marked"]))
+        source = ast.unparse(tree)
+        self.assertIn("__mn_java_1 = self.__dict__.get('__micronaut_compiled__')", source)
+        self.assertIn("return __mn_java_1.echo(__mn_java)", source)
+        self.assertIn("return __mn_java_1.marked()", source)
+        compile(tree, "delegated.py", "exec")
 
 
 if __name__ == "__main__":

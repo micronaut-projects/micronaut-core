@@ -27,7 +27,7 @@ import ast
 import java
 
 from micronaut_typecheck import Bindings, CheckUnit, JavaReceiverRules, TypeFacts, PythonClasses, PythonClassModel, _function_node, _switch_value
-from micronaut_lowering import Lowering
+from micronaut_lowering import JAVA_RESERVED_NAMES, Lowering
 
 PythonDiagnostic = java.type("io.micronaut.python.processing.diagnostic.PythonDiagnostic")
 Decision = java.type("io.micronaut.python.processing.staticcompile.StaticCompilationDecision")
@@ -275,11 +275,15 @@ class StaticPlanner:
         """Why the signature has no fixed Java layout, and which hints resolve to no type."""
         reasons = []
         bindings = None
+        if function_def.name() in JAVA_RESERVED_NAMES:
+            reasons.append(("java-reserved-name", f"method name [{function_def.name()}] cannot be declared in Java", span))
         if getattr(self.checker, "facts", None) is not None and node is not None:
             unit = CheckUnit(module.source_path, function_def.name(), function_def, node, class_def, None, module)
             bindings = Bindings(self.checker, unit)
         for argument in function_def.arguments().arguments():
             argument_span = argument.span() or span
+            if argument.name() in JAVA_RESERVED_NAMES:
+                reasons.append(("java-reserved-name", f"parameter [{argument.name()}] cannot be declared in Java", argument_span))
             if argument.variadic():
                 if node is None:
                     reasons.append(("varargs-signature", f"parameter [{argument.name()}] collects a variable number of arguments", argument_span))
@@ -381,4 +385,108 @@ def _decorator_name(decorator):
     return None
 
 
-__all__ = ["StaticPlanner", "CompileScope", "MODE_OFF", "MODE_ANNOTATED", "MODE_ALL", "MODES", "RULE"]
+# the attribute holding the delegate of the stub on its Python object (PythonStatic.COMPILED_MEMBER)
+JAVA_INSTANCE_MEMBER = "__micronaut_compiled__"
+
+
+def apply_delegation(tree, targets):
+    """
+    Rewrite the compiled functions of a runtime module tree so that, on an object bound to its
+    Java stub, the Java body runs instead of the Python one::
+
+        def total(self, quantity, unit_price):
+            __mn_java = self.__dict__.get('__micronaut_compiled__')
+            if __mn_java is not None:
+                return __mn_java.total(quantity, unit_price)
+            ...the original body, for objects created in Python...
+
+    ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``. Returns how many
+    functions were rewritten.
+    """
+    wanted = {}
+    for target in targets:
+        class_name, _, method = target.partition("#")
+        wanted.setdefault(class_name, set()).add(method)
+    count = 0
+    for class_node, path in _classes(tree):
+        methods = wanted.get("$".join(path))
+        if not methods:
+            continue
+        for statement in class_node.body:
+            if isinstance(statement, ast.FunctionDef) and statement.name in methods and not _delegates(statement):
+                statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement)
+                ast.fix_missing_locations(statement)
+                count += 1
+    return count
+
+
+def _classes(tree, path=()):
+    for node in getattr(tree, "body", ()):
+        if isinstance(node, ast.ClassDef):
+            here = path + (node.name,)
+            yield node, here
+            yield from _classes(node, here)
+
+
+def _docstring_offset(function):
+    body = function.body
+    return 1 if body and isinstance(body[0], ast.Expr) and isinstance(body[0].value, ast.Constant) and isinstance(body[0].value.value, str) else 0
+
+
+DELEGATE_LOCAL = "__mn_java"
+
+
+def _delegates(function):
+    """Whether the function is already rewritten: its first statement reads the delegate of the object."""
+    body = function.body
+    first = body[_docstring_offset(function)] if len(body) > _docstring_offset(function) else None
+    return (isinstance(first, ast.Assign) and isinstance(first.value, ast.Call) and isinstance(first.value.func, ast.Attribute)
+            and first.value.func.attr == "get" and len(first.value.args) == 1
+            and isinstance(first.value.args[0], ast.Constant) and first.value.args[0].value == JAVA_INSTANCE_MEMBER)
+
+
+def _temporary(function):
+    """A name for the delegate that no parameter or name of the function uses."""
+    used = {node.arg for node in ast.walk(function.args) if isinstance(node, ast.arg)}
+    used |= {node.id for node in ast.walk(function) if isinstance(node, ast.Name)}
+    name = DELEGATE_LOCAL
+    suffix = 0
+    while name in used:
+        suffix += 1
+        name = f"{DELEGATE_LOCAL}_{suffix}"
+    return name
+
+
+def _delegation(function):
+    args = function.args
+    receiver = (list(args.posonlyargs) + list(args.args))[0].arg
+    names = [argument.arg for argument in list(args.posonlyargs) + list(args.args)][1:]
+    line, column = function.lineno, function.col_offset
+    temporary = _temporary(function)
+    lookup = ast.Assign(
+        targets=[ast.Name(id=temporary, ctx=ast.Store())],
+        value=ast.Call(
+            func=ast.Attribute(value=ast.Attribute(value=ast.Name(id=receiver, ctx=ast.Load()), attr="__dict__", ctx=ast.Load()), attr="get", ctx=ast.Load()),
+            args=[ast.Constant(value=JAVA_INSTANCE_MEMBER)],
+            keywords=[],
+        ),
+    )
+    call = ast.Return(value=ast.Call(
+        func=ast.Attribute(value=ast.Name(id=temporary, ctx=ast.Load()), attr=function.name, ctx=ast.Load()),
+        args=[ast.Name(id=name, ctx=ast.Load()) for name in names],
+        keywords=[],
+    ))
+    guard = ast.If(
+        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[call],
+        orelse=[],
+    )
+    statements = [lookup, guard]
+    for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
+        if isinstance(statement, (ast.stmt, ast.expr)):
+            statement.lineno = statement.end_lineno = line
+            statement.col_offset = statement.end_col_offset = column
+    return statements
+
+
+__all__ = ["StaticPlanner", "CompileScope", "MODE_OFF", "MODE_ANNOTATED", "MODE_ALL", "MODES", "RULE", "apply_delegation"]

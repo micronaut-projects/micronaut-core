@@ -66,13 +66,32 @@ public final class StaticBodyGenerator {
      * @return The statements
      */
     public static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self) {
+        return generate(body, methodParameters, self, false);
+    }
+
+    /**
+     * Generates the statements of a compiled body, counting its entries when tracing.
+     *
+     * @param body             The body
+     * @param methodParameters The parameters of the stub method, in order
+     * @param self             How the properties of {@code self} are reached
+     * @param trace            Whether the body counts its entries in {@code PythonStatic.entries()}
+     * @return The statements
+     */
+    public static StatementDef generate(Ir.CompiledBody body, List<VariableDef.MethodParameter> methodParameters, SelfAccess self, boolean trace) {
         StatementDef statements = new StaticBodyGenerator(self, methodParameters).statements(body.body());
         if (body.wrapsCheckedExceptions()) {
             // a checked exception of a Java call reaches the caller unchecked, as it would through the bridge
             statements = new StatementDef.Try(statements).doCatch(Exception.class, exception ->
                 PYTHON_STATIC.invokeStatic("unchecked", List.of(ClassTypeDef.of(Exception.class)), ClassTypeDef.of(RuntimeException.class), exception).doThrow());
         }
-        return statements;
+        if (!trace) {
+            return statements;
+        }
+        return StatementDef.multi(
+            (StatementDef) PYTHON_STATIC.invokeStatic("entered", List.of(ClassTypeDef.STRING), TypeDef.VOID, ExpressionDef.constant(body.key())),
+            statements
+        );
     }
 
     /**
@@ -193,11 +212,24 @@ public final class StaticBodyGenerator {
         return expression(call.receiver()).invoke(call.name(), parameterTypes, returnType, arguments);
     }
 
+    /**
+     * An operand of an operator. A conditional expression is grouped through {@code PythonStatic.group}:
+     * the source generator renders it without parentheses, and Java's conditional binds weaker than
+     * every operator around it, so {@code (a ? b : c) + d} would otherwise come out as {@code a ? b : c + d}.
+     */
+    private static ExpressionDef operand(ExpressionDef value) {
+        if (value instanceof ExpressionDef.IfElse) {
+            TypeDef type = value.type();
+            return PYTHON_STATIC.invokeStatic("group", List.of(type), type, value);
+        }
+        return value;
+    }
+
     private ExpressionDef negation(Ir.Unary unary) {
         if ("not".equals(unary.op())) {
             return condition(unary.operand()).isFalse();
         }
-        ExpressionDef operand = expression(unary.operand());
+        ExpressionDef operand = operand(expression(unary.operand()));
         // exact: negating Long.MIN_VALUE raises where Python would promote
         return Ir.LONG.equals(unary.type())
             ? MATH.invokeStatic("negateExact", List.of(LONG), LONG, operand)
@@ -205,8 +237,8 @@ public final class StaticBodyGenerator {
     }
 
     private ExpressionDef binary(Ir.Binary binary) {
-        ExpressionDef left = expression(binary.left());
-        ExpressionDef right = expression(binary.right());
+        ExpressionDef left = operand(expression(binary.left()));
+        ExpressionDef right = operand(expression(binary.right()));
         if ("concat".equals(binary.op())) {
             return left.stringConcat(right);
         }
@@ -234,7 +266,7 @@ public final class StaticBodyGenerator {
     }
 
     private ExpressionDef compare(Ir.Compare compare) {
-        ExpressionDef left = expression(compare.left());
+        ExpressionDef left = operand(expression(compare.left()));
         if ("is None".equals(compare.op())) {
             return left.isNull();
         }
@@ -245,7 +277,7 @@ public final class StaticBodyGenerator {
         if (rightOperand == null) {
             throw new IllegalStateException("The comparison " + compare.op() + " needs a right operand");
         }
-        ExpressionDef right = expression(rightOperand);
+        ExpressionDef right = operand(expression(rightOperand));
         return switch (compare.op()) {
             case "equals" -> left.equalsStructurally(right);
             case "!equals" -> left.notEqualsStructurally(right);
@@ -262,7 +294,7 @@ public final class StaticBodyGenerator {
     }
 
     private ExpressionDef truthy(Ir.Expression operand) {
-        ExpressionDef value = expression(operand);
+        ExpressionDef value = operand(expression(operand));
         return switch (operand.type()) {
             case Ir.BOOLEAN -> value;
             case Ir.LONG -> value.compare(ExpressionDef.ComparisonOperation.OpType.NOT_EQUAL_TO, ExpressionDef.constant(0L));
@@ -275,7 +307,7 @@ public final class StaticBodyGenerator {
     private ExpressionDef join(Ir.StrJoin join) {
         ExpressionDef result = null;
         for (Ir.Expression part : join.parts()) {
-            ExpressionDef rendered = str(part);
+            ExpressionDef rendered = operand(str(part));
             result = result == null ? rendered : result.stringConcat(rendered);
         }
         return result == null ? ExpressionDef.constant("") : result;
@@ -300,7 +332,7 @@ public final class StaticBodyGenerator {
 
     private ExpressionDef.ConditionExpressionDef condition(Ir.Expression test) {
         ExpressionDef value = expression(test);
-        return value instanceof ExpressionDef.ConditionExpressionDef condition ? condition : value.isTrue();
+        return value instanceof ExpressionDef.ConditionExpressionDef condition ? condition : operand(value).isTrue();
     }
 
     /**

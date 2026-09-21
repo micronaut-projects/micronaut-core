@@ -23,6 +23,8 @@ import org.jspecify.annotations.Nullable;
 import java.math.BigDecimal;
 import java.util.Collection;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.atomic.LongAdder;
 
 /**
  * The Python semantics a statically compiled function body needs where Java's differ: the string
@@ -36,7 +38,41 @@ import java.util.Map;
 @UsedByGeneratedCode
 public final class PythonStatic {
 
+    /**
+     * The attribute of a Python object holding the delegate through which the Python side of a
+     * compiled method calls its Java body.
+     */
+    public static final String COMPILED_MEMBER = "__micronaut_compiled__";
+
+    private static final ConcurrentHashMap<String, LongAdder> ENTRIES = new ConcurrentHashMap<>();
+
     private PythonStatic() {
+    }
+
+    /**
+     * Counts an entry into a compiled body; emitted at the start of every compiled body when the
+     * compilation traces, see {@code micronaut.python.compile.static.trace}.
+     *
+     * @param key The compiled body, as {@code class#method}
+     */
+    public static void entered(String key) {
+        ENTRIES.computeIfAbsent(key, k -> new LongAdder()).increment();
+    }
+
+    /**
+     * @param key The compiled body, as {@code class#method}
+     * @return How many times the compiled body ran since the last reset
+     */
+    public static long entries(String key) {
+        LongAdder adder = ENTRIES.get(key);
+        return adder == null ? 0 : adder.sum();
+    }
+
+    /**
+     * Forgets every counted entry.
+     */
+    public static void resetEntries() {
+        ENTRIES.clear();
     }
 
     /**
@@ -271,6 +307,52 @@ public final class PythonStatic {
             }
         }
         return result;
+    }
+
+    /**
+     * Binds a Python object to the delegate of its stub: the compiled methods of the object run as
+     * Java from then on, see {@code apply_delegation}.
+     *
+     * @param pythonObject The Python object of a stub
+     * @param delegate     The delegate, a plain Java object calling the stub's compiled methods
+     */
+    public static void bindCompiled(org.graalvm.polyglot.Value pythonObject, Object delegate) {
+        PythonContextRuntime.helper(pythonObject.getContext(), "__micronaut_set_instance_property")
+            .execute(pythonObject, COMPILED_MEMBER, delegate);
+    }
+
+    /**
+     * @param value A conditional expression used as an operand
+     * @return The value: the call groups the expression, which the source generator would otherwise
+     * render without the parentheses Java needs around a conditional operand
+     */
+    public static long group(long value) {
+        return value;
+    }
+
+    /**
+     * @param value A conditional expression used as an operand
+     * @return The value, grouped
+     */
+    public static double group(double value) {
+        return value;
+    }
+
+    /**
+     * @param value A conditional expression used as an operand
+     * @return The value, grouped
+     */
+    public static boolean group(boolean value) {
+        return value;
+    }
+
+    /**
+     * @param value A conditional expression used as an operand
+     * @param <T>   The type of the value
+     * @return The value, grouped
+     */
+    public static <T> T group(T value) {
+        return value;
     }
 
     /**
