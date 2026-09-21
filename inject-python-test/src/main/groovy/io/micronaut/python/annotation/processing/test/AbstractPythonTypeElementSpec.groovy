@@ -37,6 +37,7 @@ import io.micronaut.inject.writer.BeanDefinitionWriter
 import io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider
 import io.micronaut.python.compiler.PyronautCompiler
 import io.micronaut.python.processing.element.AbstractPythonClassElement
+import io.micronaut.python.processing.typecheck.TypeCheckMode
 import org.intellij.lang.annotations.Language
 import spock.lang.Specification
 
@@ -108,7 +109,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         def packageName = NameUtils.getPackageName(className)
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def compiler = PyronautCompiler.builder()
+        def compiler = newCompilerBuilder()
                 .pythonCode(pythonCode)
                 .build()
 
@@ -125,7 +126,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def compiler = PyronautCompiler.builder()
+        def compiler = newCompilerBuilder()
                 .pythonCode(pythonCode)
                 .build()
 
@@ -142,7 +143,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
         def beanDefName= (className.startsWith('$') ? '' : '$') + className + BeanDefinitionWriter.CLASS_SUFFIX
         String beanFullName = "${packageName}.${beanDefName}"
 
-        def compiler = PyronautCompiler.builder()
+        def compiler = newCompilerBuilder()
                 .pythonCode(pythonCode)
                 .build()
 
@@ -159,7 +160,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
     <T> T buildClassElement(@Language("python") String pythonCode, Closure<T> closure) {
         def localClosure = closure
         T result
-        def compiler = PyronautCompiler.builder()
+        def compiler = newCompilerBuilder()
             .pythonCode(pythonCode)
             .classElementCallback { ClassElement classElement ->
                 if (localClosure != null) {
@@ -183,7 +184,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
     <T> T buildClassElement(@Language("python") String pythonCode, String simpleName, Closure<T> closure) {
         def localClosure = closure
         T result
-        def compiler = PyronautCompiler.builder()
+        def compiler = newCompilerBuilder()
                 .pythonCode(pythonCode)
                 .classElementCallback { ClassElement classElement ->
                     if (localClosure != null && classElement.simpleName == simpleName) {
@@ -213,7 +214,7 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
 
         // Process Python code and generate Java classes
         List<ClassElement> capturedElements = []
-        def compilerBuilder = PyronautCompiler.builder()
+        def compilerBuilder = newCompilerBuilder()
             .pythonCode(pythonCode)
             .classElementCallback { ClassElement classElement ->
                 capturedElements.add(classElement)
@@ -263,6 +264,21 @@ abstract class AbstractPythonTypeElementSpec extends Specification {
      * @param contextBuilder The context builder
      */
     protected void configureContext(ApplicationContextBuilder contextBuilder) {
+    }
+
+    /**
+     * A compiler builder for the sources of a test. Setting the system property
+     * {@code micronaut.python.typecheck} to a mode runs every test with that type-check mode, which is
+     * how the corpus of these tests gates the checker against false positives.
+     * @return The builder
+     */
+    protected static PyronautCompiler.Builder newCompilerBuilder() {
+        def builder = PyronautCompiler.builder()
+        String mode = System.getProperty(TypeCheckMode.OPTION)
+        if (mode) {
+            builder.typeCheck(TypeCheckMode.fromOption(mode))
+        }
+        return builder
     }
 
     /**
