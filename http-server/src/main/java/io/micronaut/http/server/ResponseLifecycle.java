@@ -25,12 +25,14 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -217,6 +219,11 @@ public abstract class ResponseLifecycle {
         if (byteBodyResponse.getBody().isPresent()) {
             // an object body replaced the bytes, see MutableByteBodyHttpResponse
             return null;
+        }
+        if (response.getHeaders() instanceof MutableHttpHeaders headers) {
+            // the transfer coding of the connection the bytes were received on (e.g. from an
+            // upstream server) does not apply to this one, whose framing the server decides
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
         }
         if (request.getMethod() == HttpMethod.HEAD) {
             byteBodyResponse.close();
