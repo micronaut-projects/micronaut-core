@@ -17,18 +17,24 @@ package io.micronaut.context.router
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
+import io.micronaut.core.convert.ConversionService
 import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpRequestWrapper
 import io.micronaut.http.annotation.Controller
 import io.micronaut.http.annotation.CustomHttpMethod
 import io.micronaut.http.annotation.Get
+import io.micronaut.http.body.MessageBodyHandlerRegistry
+import io.micronaut.scheduling.executor.ExecutorSelector
+import io.micronaut.web.router.DefaultUrlRouteInfo
 import io.micronaut.web.router.Router
 import io.micronaut.web.router.UriRouteInfo
 import io.micronaut.web.router.UriRouteMatch
 import spock.lang.AutoCleanup
 import spock.lang.Shared
 import spock.lang.Specification
+
+import java.nio.charset.StandardCharsets
 
 /**
  * A route declared with {@link CustomHttpMethod} is registered under its custom method name, and the
@@ -82,6 +88,34 @@ class CustomHttpMethodRouteInfoSpec extends Specification {
 
         then:
         route.httpMethodName == 'GET'
+    }
+
+    void "a route info built without a method name reports the name of its HTTP method"() {
+        given:
+        UriRouteInfo<Object, Object> declared = router.uriRoutes()
+                .filter { it.uriMatchTemplate.toPathString() == '/custom-method-route-info/standard' && it.httpMethod == HttpMethod.GET }
+                .findFirst()
+                .orElseThrow()
+
+        when:
+        UriRouteInfo<Object, Object> route = new DefaultUrlRouteInfo<Object, Object>(
+                HttpMethod.GET,
+                declared.uriMatchTemplate,
+                StandardCharsets.UTF_8,
+                declared.targetMethod,
+                null,
+                null,
+                [],
+                [],
+                [],
+                null,
+                context.getBean(ConversionService),
+                context.getBean(ExecutorSelector),
+                context.getBean(MessageBodyHandlerRegistry))
+
+        then:
+        route.httpMethodName == 'GET'
+        !route.implicitHead
     }
 
     @Requires(property = 'spec.name', value = 'CustomHttpMethodRouteInfoSpec')
