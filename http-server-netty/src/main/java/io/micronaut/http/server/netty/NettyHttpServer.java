@@ -766,9 +766,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                 || !portTaken.test(address.getPort())) {
                 return future;
             }
-            if (LOG.isDebugEnabled()) {
-                LOG.debug("Random port {} is already used by another listener on a loopback address, binding again", address.getPort());
-            }
+            LOG.debug("Random port {} is already used by another listener on a loopback address, binding again", address.getPort());
             future.channel().close().syncUninterruptibly();
         }
     }
@@ -793,11 +791,10 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             probe.setOption(StandardSocketOptions.SO_REUSEADDR, true);
             probe.bind(address);
             return false;
-        } catch (BindException e) {
-            return true;
         } catch (IOException | UnsupportedOperationException e) {
-            // e.g. the protocol family is not available
-            return false;
+            // anything but a bind failure, e.g. the protocol family is not available, does not
+            // mean the port is taken
+            return e instanceof BindException;
         }
     }
 
