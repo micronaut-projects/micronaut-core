@@ -81,6 +81,7 @@ noReflection {
     allowIn("io.micronaut.annotation.processing.PackageLoadedVisitor", "GENERIC_SIGNATURES")
     allowIn("io.micronaut.annotation.processing.TypeElementVisitorProcessor", "ANNOTATIONS", "CLASS_NAMES", "SERVICE_LOADING")
     allowIn("io.micronaut.annotation.processing.visitor.AbstractJavaElement", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.annotation.processing.visitor.JavaAnnotationElement", "ENUM_CONSTANTS")
     allowIn("io.micronaut.annotation.processing.visitor.JavaClassElement", "ENUM_CONSTANTS")
     allowIn("io.micronaut.annotation.processing.visitor.JavaVisitorContext", "REFLECTION_UTILS")
 }

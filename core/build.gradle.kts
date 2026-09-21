@@ -68,6 +68,7 @@ noReflection {
     allowIn("io.micronaut.core.beans.BeanConstructor", "CLASS_NAMES")
     allowIn("io.micronaut.core.beans.DefaultBeanIntrospectionsProvider", "SERVICE_LOADING")
     allowIn("io.micronaut.core.beans.DefaultBeanIntrospector", "CLASS_LOADING", "SERVICE_LOADING")
+    allowIn("io.micronaut.core.beans.TargetConstructorCache", "REFLECTION_UTILS")
     allowIn("io.micronaut.core.convert.CharSequenceToEnumConverter", "ENUM_CONSTANTS")
     allowIn("io.micronaut.core.convert.ConversionContext", "ANNOTATION_SYNTHESIS")
     allowIn("io.micronaut.core.convert.DefaultMutableConversionService", "CLASS_LOADING", "INTERFACES", "REFLECTIVE_ACCESS", "SERVICE_LOADING")

@@ -33,7 +33,7 @@ noReflection {
     allowIn("io.micronaut.web.router.AbstractRouteMatch", "TARGET_MEMBERS")
     allowIn("io.micronaut.web.router.DefaultErrorRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.DefaultRouteBuilder", "CLASS_NAMES")
-    allowIn("io.micronaut.web.router.DefaultRouter", "CLASS_NAMES", "ENUM_CONSTANTS", "INTERFACES")
+    allowIn("io.micronaut.web.router.DefaultRouter", "CLASS_NAMES", "INTERFACES")
     allowIn("io.micronaut.web.router.DefaultStatusRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.DefaultUrlRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.RouteBuilder", "ANNOTATIONS", "CLASS_NAMES")
