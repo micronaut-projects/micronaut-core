@@ -143,6 +143,14 @@ class Probe:
         import micronaut.core.beans as core_beans
         result['package_only_import'] = core_beans.BeanIntrospector.SHARED is not None
 
+        # a resolved member is bound on the package: java.type runs once and the value keeps its identity
+        result['member_binds'] = 'ConversionService' in vars(convert) and convert.ConversionService is convert.ConversionService
+        # the same for a recorded class the class path lacks, which the generated packages bound to one facade
+        micronaut_java_imports._micronaut_java_imports().members['micronaut.core.convert']['Missing'] = ('missing.Type', 'class')
+        missing = convert.Missing
+        result['missing_class_binds'] = 'Missing' in vars(convert) and missing is convert.Missing
+        result['missing_class_facade'] = type(missing).__name__ == '_MicronautJavaType'
+
         core = sys.modules['micronaut.core']
         result['missing'] = hasattr(core, 'no_such_subpackage')
         try:
@@ -270,6 +278,11 @@ class Probe:
 
         and: "a package imported as a module without a class import resolves its classes"
         report.package_only_import == "True"
+
+        and: "a resolved member is bound on the package, a class the class path lacks keeping the identity of its facade"
+        report.member_binds == "True"
+        report.missing_class_binds == "True"
+        report.missing_class_facade == "True"
 
         and: "a name that is no member, and a package the sources do not import, stay missing"
         report.missing == "False"

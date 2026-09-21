@@ -66,10 +66,18 @@ class Helper:
         exec('from micronaut.context import *', namespace)
         import micronaut.context.ApplicationContext
         import micronaut.context as pkg
+        # a Java member the initializer serves is bound on the package, so it resolves once; a class the
+        # class path lacks keeps the identity of its facade, as the generated package bindings did
+        import micronaut_java_imports
+        micronaut_java_imports._micronaut_java_imports().members['micronaut.context']['Missing'] = ('missing.Type', 'class')
+        missing = pkg.Missing
         return ';'.join([
             'star_java=' + str('ApplicationContext' in namespace and 'annotation' in namespace),
             'star_python=' + str('Helper' in namespace),
             'type_module_keeps_class=' + str(not isinstance(pkg.ApplicationContext, type(sys)) and getattr(pkg.ApplicationContext, 'class').getName() == 'io.micronaut.context.ApplicationContext'),
+            'member_binds=' + str('ApplicationContext' in vars(pkg)),
+            'missing_class_binds=' + str('Missing' in vars(pkg) and missing is pkg.Missing),
+            'missing_class_facade=' + str(type(missing).__name__ == '_MicronautJavaType'),
         ])
 ''')
 
@@ -82,7 +90,7 @@ class Helper:
         members.contains("from .helper import Helper")
         !members.contains("ApplicationContext")
         vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_merge_members")
-        vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_java_package_member")
+        vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_java_package_attribute")
         vfsFile("micronaut/context/helper.py").exists()
         !vfsFile("micronaut/context/annotation").exists()
         manifest.packages["micronaut.context"] == "io.micronaut.context"
@@ -98,8 +106,8 @@ class Helper:
         then:
         helper.value() == "ok"
 
-        and: "a star import binds the Java members and sub-packages next to the Python members, and importing a type's module keeps the type on the package"
-        helper.probes() == "star_java=True;star_python=True;type_module_keeps_class=True"
+        and: "a star import binds the Java members and sub-packages next to the Python members, importing a type's module keeps the type on the package, and a resolved member (a facade of an absent class included) is bound on the package"
+        helper.probes() == "star_java=True;star_python=True;type_module_keeps_class=True;member_binds=True;missing_class_binds=True;missing_class_facade=True"
 
         cleanup:
         context?.close()

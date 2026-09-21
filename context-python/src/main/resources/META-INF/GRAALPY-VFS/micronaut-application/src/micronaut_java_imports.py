@@ -251,6 +251,9 @@ class _MicronautJavaImports:
 
 _micronaut_java_imports_cache = None
 _micronaut_java_imports_lock = _micronaut_threading.Lock()
+# binds the first resolution of a member on its package module, so concurrent first accesses share it
+_micronaut_java_member_lock = _micronaut_threading.Lock()
+_MICRONAUT_UNBOUND = object()
 
 
 def _micronaut_java_imports():
@@ -317,7 +320,7 @@ class _MicronautJavaPackage(_MicronautJavaAwareModule):
             return self._micronaut_all()
         if name.startswith('__'):
             raise AttributeError(name)
-        value = _micronaut_java_package_member(self.__name__, name)
+        value = _micronaut_java_package_attribute(self, name)
         if value is None:
             raise AttributeError(f"module '{self.__name__}' has no attribute '{name}'")
         return value
@@ -355,6 +358,25 @@ def __micronaut_java_package_initialised(module):
             exported.append(name)
     if not isinstance(module, _MicronautJavaAwareModule):
         module.__class__ = _MicronautJavaAwareModule
+
+
+def _micronaut_java_package_attribute(module, name):
+    """
+    A member of a Java package module, or of an application package that shares its name with one, bound
+    on the module: the host class of a member resolves through ``java.type`` once, and the facade of a
+    class absent from the class path keeps the identity the generated packages gave it. The first binding
+    wins, so concurrent first accesses of a name share one value.
+    """
+    value = _micronaut_java_package_member(module.__name__, name)
+    if value is None:
+        return None
+    with _micronaut_java_member_lock:
+        bound = module.__dict__.get(name, _MICRONAUT_UNBOUND)
+        if bound is not _MICRONAUT_UNBOUND:
+            return bound
+        setattr(module, name, value)
+        # the module of a Java type binds as the type itself (_MicronautJavaAwareModule.__setattr__)
+        return module.__dict__.get(name, value)
 
 
 def _micronaut_java_package_member(module_name, name):
@@ -463,6 +485,7 @@ __micronaut_install_java_import_finder()
 
 # the helpers the Java side and the generated package initialisers look up by name
 __micronaut_java_package_member = _micronaut_java_package_member
+__micronaut_java_package_attribute = _micronaut_java_package_attribute
 __micronaut_java_package_names = _micronaut_java_package_names
 __micronaut_java_annotation = _micronaut_java_annotation
 __micronaut_java_imports = _micronaut_java_imports

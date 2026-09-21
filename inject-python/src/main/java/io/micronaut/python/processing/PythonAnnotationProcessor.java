@@ -179,8 +179,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     if name in __all__:
                         return globals()[name]
             if not name.startswith('__'):
-                # a Java class, annotation or sub-package of the Java package of the same name
-                value = __micronaut_java_imports.__micronaut_java_package_member(__name__, name)
+                # a Java class, annotation or sub-package of the Java package of the same name, bound on
+                # this package so it resolves once and keeps its identity
+                value = __micronaut_java_imports.__micronaut_java_package_attribute(__micronaut_sys.modules[__name__], name)
                 if value is not None:
                     return value
             raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
@@ -197,7 +198,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         # a package of the same name as a Java package exports the Java members too (from pkg import *,
         # dir()) and keeps a Java type on its name when the type's module is imported
         __micronaut_java_imports.__micronaut_java_package_initialised(__micronaut_sys.modules[__name__])
-        del __micronaut_sys
+        # __micronaut_sys and __micronaut_java_imports outlive the initialiser: __getattr__ binds a Java
+        # member on this module through them
 
 
         def __dir__():
