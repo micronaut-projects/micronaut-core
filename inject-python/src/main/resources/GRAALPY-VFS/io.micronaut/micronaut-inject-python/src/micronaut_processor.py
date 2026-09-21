@@ -223,8 +223,10 @@ def is_abc_type_name(type_name):
 class MicronautAstVisitor(ast.NodeVisitor):
 
     def __init__(self, callback, package_name="", file_name = "Script.py", visitor_context=None, source_root="",
-                 source_path=None, source_text=None):
+                 source_path=None, source_text=None, type_checker=None):
         self.callback = callback
+        # The type checker collecting the definitions of the compilation, or None when nothing is checked
+        self.type_checker = type_checker
         self.package_name = package_name
         self.visitor_context = visitor_context
         self.source_root = source_root or ""
@@ -536,6 +538,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                             else:
                                 self.current_class = self.current_class.withFunction(func_def)
                         elif self.current_class is None and not was_in_function and node.name != 'micronaut_annotation':
+                            if self.type_checker is not None:
+                                self.type_checker.add_function(self.source_path, func_def, node)
                             if self._is_script_function(node):
                                 self._handle_script_function(func_def)
                             else:
@@ -665,6 +669,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                     stmt.name for stmt in node.body if isinstance(stmt, ast.ClassDef)
                 )
                 result = super().visit(node)
+                if self.type_checker is not None:
+                    self.type_checker.add_module(self.source_path, self.current_script_decorators)
 
                 # A MicronautTest module owns all of its top-level functions. Other
                 # scripts retain the existing decorated-function-only behavior.
@@ -856,6 +862,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
 
                 completed_class = self.current_class
                 self.callback.apply(completed_class)
+                if self.type_checker is not None:
+                    self.type_checker.add_class(self.source_path, completed_class, node)
                 if previous_class is not None:
                     # Keep Python nesting in the AST model. Micronaut's bean definition writer
                     # discovers nested configuration readers through enclosed ClassElement
