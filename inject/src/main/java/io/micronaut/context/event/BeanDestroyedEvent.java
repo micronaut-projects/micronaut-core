@@ -17,6 +17,7 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
@@ -49,6 +50,7 @@ public class BeanDestroyedEvent<T> extends BeanEvent<T> {
      * @param dependentBeans   The dependent beans that were destroyed with the bean
      * @since 5.3.0
      */
+    @Internal
     public BeanDestroyedEvent(BeanContext beanContext,
                               BeanDefinition<T> beanDefinition,
                               T bean,

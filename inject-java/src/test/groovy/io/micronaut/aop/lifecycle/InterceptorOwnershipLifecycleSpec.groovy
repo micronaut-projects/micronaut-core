@@ -114,7 +114,7 @@ class MyBean {
         interceptorType.events == ['INTERCEPTOR_DESTROYED']
 
         when: 'something still resolves for the destroyed bean'
-        def resolved = registration.getInterceptorRegistrations(Interceptor.ARGUMENT, binding)
+        def resolved = io.micronaut.context.RegisteredBeanInterceptors.getInterceptorRegistrations(registration, Interceptor.ARGUMENT, binding)
 
         then: 'it gets a working instance that is neither destroyed on the spot nor handed to the bean'
         resolved*.bean*.getClass() == [interceptorType]

@@ -1074,6 +1074,6 @@ class BeanB {
             def definition = context.getBeanDefinition(bean.getClass())
             BeanRegistration.of(context, BeanIdentifier.of(definition.name), definition, bean)
         }
-        new ArrayList<>(registration.getInterceptorRegistrations(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(registration.beanDefinition.annotationMetadata)))
+        new ArrayList<>(io.micronaut.context.RegisteredBeanInterceptors.getInterceptorRegistrations(registration, Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(registration.beanDefinition.annotationMetadata)))
     }
 }

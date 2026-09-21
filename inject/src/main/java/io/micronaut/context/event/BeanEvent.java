@@ -17,6 +17,7 @@ package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import org.jspecify.annotations.Nullable;
 
@@ -69,6 +70,7 @@ public abstract class BeanEvent<T> extends BeanContextEvent {
      * @param dependentBeans   The dependent beans of the bean, see {@link #getDependentBeans()}
      * @since 5.3.0
      */
+    @Internal
     protected BeanEvent(BeanContext beanContext,
                         BeanDefinition<T> beanDefinition,
                         T bean,

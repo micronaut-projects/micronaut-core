@@ -16,7 +16,6 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
-import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.type.Argument;
@@ -27,10 +26,8 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
  * <p>A bean registration is an association between a {@link BeanDefinition} and a created bean, typically a
@@ -173,51 +170,6 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     }
 
     /**
-     * Obtains the registrations of the interceptors bound to this bean, as
-     * {@link BeanResolutionContext#getInterceptorRegistrations(Argument, Qualifier)} does for a bean being created:
-     * a singleton or a custom-scoped interceptor from its scope, any other the instance this bean owns among its
-     * dependents, or one created for it now that joins them and is destroyed with it.
-     *
-     * <p>This is how a proxy that fronts this bean as a separate target selects the interceptors of its methods,
-     * and how the bean's pre-destroy interception finds the instances its creation used.</p>
-     *
-     * @param interceptorType The interceptor type
-     * @param binding         The interceptor binding qualifier
-     * @param <I>             The interceptor type
-     * @return The registrations
-     * @throws UnsupportedOperationException If the registration was not created by the bean context
-     * @since 5.3.0
-     */
-    public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
-        // serialised with everything else that creates for this bean or destroys it, so that two callers resolving
-        // at once do not each create the interceptor the other is creating, and the disposal of the bean resolves
-        // from the dependents it has
-        synchronized (dependents) {
-            try (BeanResolutionContext resolutionContext = newResolutionContext()) {
-                return resolutionContext.getInterceptorRegistrations(interceptorType, binding);
-            }
-        }
-    }
-
-    /**
-     * Obtains the registration of one interceptor bound to this bean, this bean's own instance of it, as
-     * {@link #getInterceptorRegistrations(Argument, Qualifier)} would list it.
-     *
-     * @param interceptor The interceptor definition
-     * @param <I>         The interceptor type
-     * @return The registration
-     * @throws UnsupportedOperationException If the registration was not created by the bean context
-     * @since 5.3.0
-     */
-    public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
-        synchronized (dependents) {
-            try (BeanResolutionContext resolutionContext = newResolutionContext()) {
-                return resolutionContext.getInterceptorRegistration(interceptor);
-            }
-        }
-    }
-
-    /**
      * Opens a resolution context for this bean, which exists already: its dependents are the bean's, as they were of
      * the context that created it, and whatever is created through it joins them when it is closed, to be destroyed
      * with the bean. The context must be opened and closed under the lock of {@link #dependents}.
@@ -237,26 +189,6 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
             return new DefaultBeanResolutionContext(beanContext, beanDefinition);
         }
         return new ExistingBeanResolutionContext(beanContext, this);
-    }
-
-    /**
-     * Returns state another component keeps against this registration, computing it once.
-     *
-     * <p>A proxy fronting this bean keeps the interceptors it selected for the methods of this bean here, keyed by
-     * its selector, so that it selects once per target and the selection lives no longer than this bean. The key is
-     * held weakly: a selector belongs to one proxy, and a proxy that is gone must not keep its selection on a bean
-     * that outlives it.</p>
-     *
-     * @param key      The key, compared as it defines equality and held weakly
-     * @param supplier Computes the state when absent
-     * @param <S>      The state type
-     * @return The state
-     * @since 5.3.0
-     */
-    @Internal
-    public <S> S dependentState(Object key, Supplier<S> supplier) {
-        // under the one lock of the bean, which the supplier takes again to resolve for the bean
-        return dependents.state(key, supplier);
     }
 
     /**

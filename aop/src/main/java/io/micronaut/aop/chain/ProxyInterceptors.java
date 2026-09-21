@@ -21,6 +21,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.Qualifier;
+import io.micronaut.context.RegisteredBeanInterceptors;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.inject.BeanDefinition;
@@ -285,7 +286,7 @@ public final class ProxyInterceptors {
         try {
             // the singletons, and for each non-singleton the instance the target owns, or one created for it that
             // joins its dependents
-            return target.dependentState(this, () -> selectionOf(new ArrayList<>(target.getInterceptorRegistrations(Interceptor.ARGUMENT, binding))));
+            return RegisteredBeanInterceptors.getState(target, this, () -> selectionOf(new ArrayList<>(RegisteredBeanInterceptors.getInterceptorRegistrations(target, Interceptor.ARGUMENT, binding))));
         } catch (UnsupportedOperationException e) {
             // a registration a custom scope built by hand, which the context did not create and owns nothing through
             return unowned();
@@ -327,7 +328,7 @@ public final class ProxyInterceptors {
         for (BeanRegistration<?> registration : registrations) {
             BeanDefinition definition = registration.getBeanDefinition();
             if (scoped.contains(definition)) {
-                current.add(owned && target != null ? target.getInterceptorRegistration(definition) : beanContext.getBeanRegistration(definition));
+                current.add(owned && target != null ? RegisteredBeanInterceptors.getInterceptorRegistration(target, definition) : beanContext.getBeanRegistration(definition));
             } else {
                 current.add(registration);
             }
