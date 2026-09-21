@@ -102,6 +102,7 @@ import io.micronaut.inject.ReplacesDefinition;
 import io.micronaut.inject.UnsafeExecutionHandle;
 import io.micronaut.inject.ValidatedBeanDefinition;
 import io.micronaut.inject.provider.AbstractProviderDefinition;
+import io.micronaut.inject.proxy.InterceptedBean;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.AnyQualifier;
 import io.micronaut.inject.qualifiers.FilteringQualifier;
@@ -630,7 +631,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (scoped.isPresent()) {
             return scoped;
         }
-        // a bean created for no scope is held by whoever asked for it; the index keeps the way back to it
+        // a bean created for no scope is held by whoever asked for it; a proxy that is the bean holds its registration
+        // itself, and for any other bean the index keeps the way back to it
+        if (bean instanceof InterceptedBean intercepted && intercepted.$beanRegistration() != null) {
+            return Optional.of((BeanRegistration<T>) intercepted.$beanRegistration());
+        }
         return Optional.ofNullable((BeanRegistration<T>) unscopedRegistrations.get(bean));
     }
 
@@ -1137,7 +1142,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
         List<BeanRegistration<?>> dependents = resolutionContext.getAndResetDependentBeans();
         if (!dependents.isEmpty()) {
-            unscopedRegistrations.put(BeanRegistration.of(this, new BeanKey<>(beanType, qualifier), definition, bean, dependents));
+            remember(BeanRegistration.of(this, new BeanKey<>(beanType, qualifier), definition, bean, dependents));
         }
     }
 
@@ -1149,7 +1154,18 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
      */
     private void rememberUnscoped(BeanRegistration<?> registration) {
         if (registration.bean != null && BeanScopes.isUnscoped(registration.beanDefinition, customScopeRegistry)) {
-            unscopedRegistrations.put(registration);
+            remember(registration);
+        }
+    }
+
+    /**
+     * Keeps the way from a bean held by whoever asked for it back to its registration: weakly in the index, and in
+     * the bean itself when it is a proxy that can keep it, which the garbage collector cannot separate from it.
+     */
+    private void remember(BeanRegistration<?> registration) {
+        unscopedRegistrations.put(registration);
+        if (registration.bean instanceof InterceptedBean intercepted && intercepted.$beanRegistration() == null) {
+            intercepted.$beanRegistration(registration);
         }
     }
 
@@ -1282,6 +1298,10 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         if (beanToDestroy != null) {
             purgeCacheForBeanInstance(beanToDestroy);
             unscopedRegistrations.remove(beanToDestroy);
+            if (beanToDestroy instanceof InterceptedBean intercepted && intercepted.$beanRegistration() != null) {
+                // destroyed: the instance no longer leads to what it owned
+                intercepted.$beanRegistration(null);
+            }
             if (definition.isSingleton()) {
                 singletonScope.purgeCacheForBeanInstance(definition, beanToDestroy);
             }

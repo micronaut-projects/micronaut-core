@@ -47,6 +47,7 @@ import io.micronaut.inject.annotation.AnnotationMetadataReference;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.proxy.InterceptedBean;
 import io.micronaut.inject.proxy.InterceptedBeanProxy;
 import io.micronaut.inject.qualifiers.Qualified;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -250,6 +251,16 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
         InterceptedBeanProxy.class,
         "interceptedTargetRegistration"
     );
+    private static final Method METHOD_GET_BEAN_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
+        InterceptedBean.class,
+        "$beanRegistration"
+    );
+    private static final Method METHOD_SET_BEAN_REGISTRATION = ReflectionUtils.getRequiredInternalMethod(
+        InterceptedBean.class,
+        "$beanRegistration",
+        BeanRegistration.class
+    );
+    private static final String FIELD_BEAN_REGISTRATION = "$beanRegistration";
     private static final String FIELD_BEAN_LOCATOR = "$beanLocator";
     private static final String FIELD_BEAN_QUALIFIER = "$beanQualifier";
     private static final String FIELD_PROXY_METHODS = "$proxyMethods";
@@ -588,6 +599,15 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                 .addModifiers(Modifier.PRIVATE, Modifier.FINAL)
                 .build();
             proxyBuilder.addField(interceptorsField);
+            // the proxy is the bean: it keeps the registration that carries what it owns, for as long as it lives
+            FieldDef beanRegistrationField = FieldDef.builder(FIELD_BEAN_REGISTRATION, BeanRegistration.class)
+                .addModifiers(Modifier.PRIVATE, Modifier.VOLATILE)
+                .build();
+            proxyBuilder.addField(beanRegistrationField);
+            proxyBuilder.addMethod(MethodDef.override(METHOD_GET_BEAN_REGISTRATION)
+                .build((aThis, methodParameters) -> aThis.field(beanRegistrationField).returning()));
+            proxyBuilder.addMethod(MethodDef.override(METHOD_SET_BEAN_REGISTRATION)
+                .build((aThis, methodParameters) -> aThis.field(beanRegistrationField).assign(methodParameters.getFirst())));
         }
 
         if (proxyBeanDefinitionWriter.hasInterceptedLifecycle()) {

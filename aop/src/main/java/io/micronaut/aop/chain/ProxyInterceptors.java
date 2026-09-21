@@ -169,16 +169,6 @@ public final class ProxyInterceptors {
     }
 
     /**
-     * The interceptors of every method for no target in particular, the non-singleton ones among them created once
-     * and owned by no target: what a proxy compiled against 5.2 was given, for a creator that cannot ask per target.
-     *
-     * @return The interceptors, by method
-     */
-    public Interceptor<?, ?>[][] detached() {
-        return resolve((BeanRegistration<?>) null);
-    }
-
-    /**
      * Whether an interceptor of a custom scope is bound to the methods, so that the interceptors of a call are
      * obtained for the call, the instance of that interceptor being its scope's at the time.
      *

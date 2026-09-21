@@ -15,6 +15,7 @@
  */
 package io.micronaut.aop.runtime;
 
+import io.micronaut.aop.Around;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.chain.ProxyInterceptors;
 import io.micronaut.context.BeanContext;
@@ -151,7 +152,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         ExecutableMethod<T, ?>[] methods = targetDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
         ProxyInterceptors selection = new ProxyInterceptors(resolutionContext, methods, false);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
-        if (targetDefinition.isSingleton() && (!perTarget || !selection.hasScopedInterceptors())) {
+        // a lazy proxy leaves the target to the first call, so even a singleton one is not resolved here
+        boolean lazy = proxyBeanDefinition.getAnnotationMetadata().isTrue(Around.class, "lazy");
+        if (targetDefinition.isSingleton() && !lazy && (!perTarget || !selection.hasScopedInterceptors())) {
             BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);
             Interceptor<?, ?>[][] interceptors = selection.resolve(target);
             for (int i = 0; i < methods.length; i++) {
@@ -163,8 +166,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         }
         // each intercepted method lists the interceptors that do not depend on the target, which is all of them when
         // no non-singleton is bound, and a creator that asks per target gets the target's own on top; a creator
-        // that reads the methods alone gets them all, owned by no target, rather than losing the non-singletons
-        Interceptor<?, ?>[][] shared = perTarget ? selection.shared() : selection.detached();
+        // that reads the methods alone gets them all, resolved as the proxy's own and destroyed with it, as in 5.2,
+        // rather than losing the non-singletons
+        Interceptor<?, ?>[][] shared = perTarget ? selection.shared() : ProxyInterceptors.resolve(resolutionContext, methods, false);
         Map<ExecutableMethod<?, ?>, Integer> indexes = new IdentityHashMap<>();
         for (int i = 0; i < methods.length; i++) {
             if (shared[i].length > 0 || selection.intercepted(i)) {
