@@ -42,4 +42,9 @@ public interface PythonCompileParameters extends WorkParameters {
      * compiler cannot fall back to it the way it does under {@code javaexec}.
      */
     ConfigurableFileCollection getClasspath();
+
+    /**
+     * The extra compiler arguments of the task, appended after the options the plugin sets itself.
+     */
+    ListProperty<String> getCompilerArgs();
 }

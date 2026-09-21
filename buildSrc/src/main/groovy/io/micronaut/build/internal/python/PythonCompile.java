@@ -84,6 +84,17 @@ public abstract class PythonCompile extends DefaultTask {
     @Optional
     public abstract MapProperty<String, String> getEnvironmentVariables();
 
+    /**
+     * Extra arguments of the Python compiler, typically the {@code -Akey=value} annotation processor
+     * options a module relies on with {@code JavaCompile}'s {@code options.compilerArgs}: for example
+     * {@code -Amicronaut.introspection.allowReflection=com.example.model.*} for the Python classes
+     * whose generated Java class has to carry the runtime annotations reflection-based frameworks
+     * (JPA) read. They are appended after the options the plugin sets itself.
+     */
+    @Input
+    @Optional
+    public abstract ListProperty<String> getCompilerArgs();
+
     @Internal
     @Option(option = "debug-python-compiler", description = "Debug the Pyronaut compiler")
     public abstract Property<Boolean> getDebugCompiler();
@@ -158,6 +169,7 @@ public abstract class PythonCompile extends DefaultTask {
             parameters.getSourceRoot().set(projectDir.toString());
             parameters.getDestinationDir().set(destDir);
             parameters.getClasspath().from(getCompilerClasspath(), getClasspath());
+            parameters.getCompilerArgs().set(getCompilerArgs().getOrElse(List.of()));
         });
         queue.await();
     }

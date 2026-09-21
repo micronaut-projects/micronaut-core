@@ -47,10 +47,26 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
         // one compiler run over every root: each run writes the launcher, the VFS file list and the
         // package initialisers for the whole output, so a run per root would keep only the last
         // root's files and drop the others
-        compile(String.join(",", getParameters().getSourceDirs().get()), getParameters().getSourceRoot().get(), destinationDir, classpath);
+        List<String> options = compilerOptions(getParameters().getSourceRoot().get(), getParameters().getCompilerArgs().getOrElse(List.of()));
+        compile(String.join(",", getParameters().getSourceDirs().get()), options, destinationDir, classpath);
     }
 
-    private void compile(String sourceDirs, String sourceRoot, String destinationDir, List<File> classpath) {
+    /**
+     * The options of the compiler: the source root option first, so that the extra arguments of the
+     * task cannot override it, then the arguments configured on the task.
+     *
+     * @param sourceRoot   the directory relative source directories are resolved against
+     * @param compilerArgs the extra compiler arguments configured on the task
+     * @return the options
+     */
+    static List<String> compilerOptions(String sourceRoot, List<String> compilerArgs) {
+        List<String> options = new ArrayList<>(compilerArgs.size() + 1);
+        options.add("-A" + SOURCE_ROOT_OPTION + "=" + sourceRoot);
+        options.addAll(compilerArgs);
+        return options;
+    }
+
+    private void compile(String sourceDirs, List<String> options, String destinationDir, List<File> classpath) {
         try {
             Class<?> compiler = Class.forName(PYRONAUT_COMPILER_MAIN_CLASS, true, getClass().getClassLoader());
             Object builder = compiler.getMethod("builder").invoke(null);
@@ -59,7 +75,7 @@ public abstract class PythonCompileWorkAction implements WorkAction<PythonCompil
             builderType.getMethod("targetDir", File.class).invoke(builder, new File(destinationDir));
             builderType.getMethod("classpath", List.class).invoke(builder, classpath);
             builderType.getMethod("annotationProcessorPath", List.class).invoke(builder, classpath);
-            builderType.getMethod("options", List.class).invoke(builder, List.of("-A" + SOURCE_ROOT_OPTION + "=" + sourceRoot));
+            builderType.getMethod("options", List.class).invoke(builder, options);
             Object instance = builderType.getMethod("build").invoke(builder);
             instance.getClass().getMethod("compile").invoke(instance);
         } catch (InvocationTargetException e) {

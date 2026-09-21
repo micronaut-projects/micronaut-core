@@ -70,4 +70,7 @@ tasks.withType<Test>().configureEach {
 tasks.named<PythonCompile>("compileTestPython") {
     dependsOn(tasks.named("classes"))
     classpath.from(sourceSets.main.get().output)
+    // Hibernate reads @Entity, @Id, ... reflectively from the generated Java classes of the JPA examples:
+    // the compiler copies runtime annotations only onto the generated classes this option names.
+    compilerArgs.add("-Amicronaut.introspection.allowReflection=micronaut.docs.hibernate.*")
 }

@@ -72,7 +72,8 @@ import static io.micronaut.python.processing.PythonStubGenerator.sourceSignature
  * ({@link java.lang.reflect.Proxy}, {@link java.lang.reflect.Method#getAnnotation(Class)}) see them.
  * Micronaut annotations are served by the annotation metadata of the Python element and stay off the source,
  * where the Java annotation processors would otherwise process the interface a second time, unless their
- * annotation type declares with {@link ReflectiveAccess} that it is read reflectively. The interface is
+ * annotation type declares with {@link ReflectiveAccess} that it is read reflectively. The annotations of
+ * other libraries are copied only for the interfaces the {@link PythonReflectionGate} allows. The interface is
  * {@link Vetoed} so that the bean definition processor leaves the copied annotations alone: the introduction
  * proxy is generated from the Python element.</p>
  *
@@ -83,6 +84,7 @@ final class PythonInterfaceStubGenerator {
 
     private static final String MICRONAUT_PACKAGE_PREFIX = "io.micronaut.";
     private static final String JAVA_LANG_PACKAGE_PREFIX = "java.lang.";
+    private static final String JUNIT_PACKAGE_PREFIX = "org.junit.";
 
     private PythonInterfaceStubGenerator() {
     }
@@ -94,6 +96,7 @@ final class PythonInterfaceStubGenerator {
      * @param typeName     The Java type name
      * @param interfaces   The super interfaces
      * @param allClasses   All compiled Python classes
+     * @param gate         The gate deciding whether the interface carries the reflection data of its class
      * @param context      The visitor context
      * @return The interface definition
      */
@@ -101,6 +104,7 @@ final class PythonInterfaceStubGenerator {
                                           String typeName,
                                           Collection<ClassElement> interfaces,
                                           Map<String, ClassElement> allClasses,
+                                          PythonReflectionGate gate,
                                           VisitorContext context) {
         InterfaceDef.InterfaceDefBuilder interfaceBuilder = InterfaceDef.builder(typeName)
             .addModifiers(Modifier.PUBLIC)
@@ -118,7 +122,7 @@ final class PythonInterfaceStubGenerator {
         for (ClassElement anInterface : interfaces) {
             interfaceBuilder.addSuperinterface(parameterizedTypeDef(anInterface));
         }
-        copyRuntimeAnnotations(classElement, interfaceBuilder, ElementType.TYPE, context);
+        copyRuntimeAnnotations(classElement, interfaceBuilder, ElementType.TYPE, typeName, gate, context);
         Set<String> addedMethodNames = new LinkedHashSet<>();
         for (MethodElement methodElement : declaredInstanceMethods(classElement)) {
             if (!addedMethodNames.add(bridgeMethodKey(methodElement))) {
@@ -128,9 +132,9 @@ final class PythonInterfaceStubGenerator {
                 .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
                 .returns(sourceMethodReturnType(methodElement, false));
             addMethodTypeVariables(methodElement, methodBuilder);
-            copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, context);
+            copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, typeName, gate, context);
             for (ParameterElement parameter : methodElement.getParameters()) {
-                methodBuilder.addParameter(parameterDef(parameter, context));
+                methodBuilder.addParameter(parameterDef(parameter, typeName, gate, context));
             }
             interfaceBuilder.addMethod(methodBuilder.build());
         }
@@ -139,7 +143,7 @@ final class PythonInterfaceStubGenerator {
                 if (methodElement.isAbstract() || !addedMethodNames.add(bridgeMethodKey(methodElement))) {
                     continue;
                 }
-                addStaticBridgeMethod(classElement, methodElement, interfaceBuilder, allClasses, context);
+                addStaticBridgeMethod(classElement, typeName, methodElement, interfaceBuilder, allClasses, gate, context);
             }
         }
         return interfaceBuilder.build();
@@ -167,18 +171,20 @@ final class PythonInterfaceStubGenerator {
      * framework that reads the interface reflectively finds them on the Java interface.
      */
     private static void addStaticBridgeMethod(AbstractPythonClassElement classElement,
+                                              String typeName,
                                               MethodElement methodElement,
                                               InterfaceDef.InterfaceDefBuilder interfaceBuilder,
                                               Map<String, ClassElement> allClasses,
+                                              PythonReflectionGate gate,
                                               VisitorContext context) {
         String functionName = methodElement.getName();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(functionName)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
             .returns(methodReturnType(methodElement, false));
         addMethodTypeVariables(methodElement, methodBuilder);
-        copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, context);
+        copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, typeName, gate, context);
         for (ParameterElement parameter : methodElement.getParameters()) {
-            methodBuilder.addParameter(parameterDef(parameter, context));
+            methodBuilder.addParameter(parameterDef(parameter, typeName, gate, context));
         }
         ClassElement returnType = methodElement.getGenericReturnType();
         interfaceBuilder.addMethod(methodBuilder.build((aThis, methodParameters) -> {
@@ -191,9 +197,9 @@ final class PythonInterfaceStubGenerator {
         }));
     }
 
-    private static ParameterDef parameterDef(ParameterElement parameter, VisitorContext context) {
+    private static ParameterDef parameterDef(ParameterElement parameter, String typeName, PythonReflectionGate gate, VisitorContext context) {
         ParameterDef.ParameterDefBuilder parameterBuilder = ParameterDef.builder(parameter.getName(), sourceSignatureType(parameter.getGenericType()));
-        copyRuntimeAnnotations(parameter, parameterBuilder, ElementType.PARAMETER, context);
+        copyRuntimeAnnotations(parameter, parameterBuilder, ElementType.PARAMETER, typeName, gate, context);
         return parameterBuilder.build();
     }
 
@@ -204,18 +210,24 @@ final class PythonInterfaceStubGenerator {
      * {@code java.lang} annotations that constrain a declaration ({@code @FunctionalInterface},
      * {@code @SafeVarargs}) are never copied; Micronaut annotations only when their type is annotated
      * with {@link ReflectiveAccess}, the declaration that a framework reads them reflectively (an AI
-     * service, for example) rather than through the annotation metadata.
+     * service, for example) rather than through the annotation metadata. The annotations of other
+     * libraries are the reflection data of the generated interface, copied only when the gate allows it.
      *
      * @param element        The Python element
      * @param builder        The builder of the generated declaration
      * @param declaration    The kind of the generated declaration
+     * @param typeName       The name of the generated interface
+     * @param gate           The gate deciding whether the interface carries reflection data
      * @param visitorContext The visitor context
      */
-    static void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, VisitorContext visitorContext) {
+    static void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, String typeName, PythonReflectionGate gate, VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
             AnnotationValue<Annotation> annotationValue = annotationMetadata.getAnnotation(annotationName);
-            if (!isRuntimeAnnotationOf(annotationName, declaration, visitorContext) || annotationValue == null) {
+            PythonReflectionGate.Copy copy = runtimeAnnotationCopy(annotationName, declaration, visitorContext);
+            if (annotationValue == null
+                || copy == PythonReflectionGate.Copy.NEVER
+                || (copy == PythonReflectionGate.Copy.REFLECTIVE && !gate.allows(typeName, annotationName, element, visitorContext))) {
                 continue;
             }
             try {
@@ -227,20 +239,26 @@ final class PythonInterfaceStubGenerator {
         }
     }
 
-    private static boolean isRuntimeAnnotationOf(String annotationName, ElementType declaration, VisitorContext visitorContext) {
+    private static PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(JAVA_LANG_PACKAGE_PREFIX) || TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)) {
-            return false;
+            return PythonReflectionGate.Copy.NEVER;
         }
         ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
         if (annotationType == null
             || annotationType instanceof AbstractPythonClassElement
-            || !PythonAnnotationTypes.isAnnotationType(annotationType)) {
-            return false;
+            || !PythonAnnotationTypes.isAnnotationType(annotationType)
+            || PythonAnnotationTypes.retentionPolicy(annotationType) != RetentionPolicy.RUNTIME
+            || !PythonAnnotationTypes.targetsDeclaration(annotationType, declaration)) {
+            return PythonReflectionGate.Copy.NEVER;
         }
-        if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX) && !annotationType.hasAnnotation(ReflectiveAccess.class)) {
-            return false;
+        if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
+            // a Micronaut annotation declared @ReflectiveAccess is read reflectively by the module that
+            // declares it: that is Micronaut's own contract with the generated type, not third-party data
+            return annotationType.hasAnnotation(ReflectiveAccess.class) ? PythonReflectionGate.Copy.ALWAYS : PythonReflectionGate.Copy.NEVER;
         }
-        return PythonAnnotationTypes.retentionPolicy(annotationType) == RetentionPolicy.RUNTIME
-            && PythonAnnotationTypes.targetsDeclaration(annotationType, declaration);
+        if (annotationName.startsWith(JUNIT_PACKAGE_PREFIX)) {
+            return PythonReflectionGate.Copy.ALWAYS;
+        }
+        return PythonReflectionGate.Copy.REFLECTIVE;
     }
 }
