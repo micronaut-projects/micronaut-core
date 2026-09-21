@@ -17,99 +17,37 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.web.router.exceptions.DuplicateRouteException;
-import org.jspecify.annotations.Nullable;
-
-import java.util.List;
-import java.util.Objects;
-import java.util.function.Supplier;
 
 /**
- * A source of routes that are resolved at runtime, next to the routes the application {@link Router}
- * was built with. Implement it as a bean: when the application router matches no route for a
- * request, the route sources are consulted in {@link Ordered order}, and the first match is used.
- * <p>A match from a route source is a real route match: server filters, security, CORS and error
- * handling apply to it as they apply to controller routes, and a source's routes that match the
- * path but not the method make the server respond {@code 405 Method Not Allowed}.
- * <p>The routes of a source can change at any time, e.g. on a refresh event, without rebuilding the
- * application router. A simple way to implement a source is a {@link DefaultRouter} built from a
- * {@link DefaultRouteBuilder} whose routes point to an executable method of a bean, replaced when
- * the routes change, see {@link #of(Supplier)}.
+ * A source of routes that change at runtime, e.g. routes read from configuration that is
+ * refreshed. Implement it as a bean that publishes an immutable {@link RouteTable}, built with the
+ * {@link RouteTableFactory}, and replaces it when the routes change.
+ * <p>Micronaut matches the tables with the same rules as the routes of the application: ports,
+ * conditions, consumed and produced media types, versions, specificity and implicit HEAD routes. A
+ * match is a real route match, so server filters, security, CORS and error handling apply to it,
+ * and a route that matches the path but not the method is answered with
+ * {@code 405 Method Not Allowed}.
+ * <p>Precedence: a route of the application that fully matches the request (after every rule,
+ * including route filters such as versioning) takes precedence. Otherwise the route sources are
+ * consulted in {@link Ordered order}, and the first table with a matching route wins. A controller
+ * that does not accept the request, e.g. because it does not consume its content type, does not
+ * own its URI: the request can still match a route of a source.
+ * <p>Each request uses one snapshot of every source: {@link #snapshot()} is called at most once per
+ * request, so matching, CORS and error handling of a request see the same tables even if a source
+ * publishes a new table meanwhile.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
+@FunctionalInterface
 public interface RouteSource extends Ordered {
 
     /**
-     * Find the routes that match the request (method, path and conditions) most closely, like
-     * {@link Router#findAllClosest(HttpRequest)}.
+     * The current routes. Called at most once per request, so it should return a table that was
+     * built before, not build one.
      *
-     * @param request The request
-     * @param <T>     The target type
-     * @param <R>     The return type
-     * @return The closest matches, or an empty list
+     * @return The current route table, or {@link RouteTable#empty()}
      */
-    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request);
-
-    /**
-     * Find the routes that match the path of the request, with any method, like
-     * {@link Router#findAny(HttpRequest)}.
-     *
-     * @param request The request
-     * @param <T>     The target type
-     * @param <R>     The return type
-     * @return The matches, or an empty list
-     */
-    <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request);
-
-    /**
-     * Find the route that matches the request most closely, like
-     * {@link Router#findClosest(HttpRequest)}.
-     *
-     * @param request The request
-     * @param <T>     The target type
-     * @param <R>     The return type
-     * @return The match, or {@code null}
-     * @throws DuplicateRouteException if several routes match equally closely
-     */
-    default <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
-        List<UriRouteMatch<T, R>> uriRoutes = findAllClosest(request);
-        if (uriRoutes.size() > 1) {
-            uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
-        }
-        if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(request.getPath(), (List) uriRoutes);
-        }
-        return uriRoutes.isEmpty() ? null : uriRoutes.get(0);
-    }
-
-    /**
-     * A route source backed by a router that may be replaced at any time, e.g. a
-     * {@link DefaultRouter} rebuilt when the routes change.
-     *
-     * @param router Supplies the current router
-     * @return The route source
-     */
-    static RouteSource of(Supplier<? extends Router> router) {
-        Objects.requireNonNull(router, "router");
-        return new RouteSource() {
-            @Override
-            public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-                return router.get().findAllClosest(request);
-            }
-
-            @Override
-            public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-                return router.get().findAny(request);
-            }
-
-            @Override
-            public <T, R> @Nullable UriRouteMatch<T, R> findClosest(HttpRequest<?> request) {
-                return router.get().findClosest(request);
-            }
-        };
-    }
+    RouteTable snapshot();
 }
