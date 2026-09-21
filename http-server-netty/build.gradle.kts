@@ -143,3 +143,10 @@ tasks.withType<Test>().configureEach {
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
 //compileJava.options.fork = true
 //compileJava.options.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+noReflection {
+    allowIn("io.micronaut.http.server.netty.RoutingInBoundHandler", "CLASS_NAMES")
+    allowIn("io.micronaut.http.server.netty.handler.Compressor", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.AccessLogFormatParser", "SERVICE_LOADING")
+    allowIn("io.micronaut.http.server.netty.handler.accesslog.element.ConnectionMetadataImpl", "CLASS_LOADING")
+}

@@ -14,3 +14,7 @@ dependencies {
 
     testImplementation(libs.managed.reactor)
 }
+
+noReflection {
+    allowIn("io.micronaut.core.async.publisher.Publishers", "CLASS_LOADING")
+}

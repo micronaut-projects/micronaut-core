@@ -19,3 +19,7 @@ dependencies {
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautDiscoveryCore)
 }
+
+noReflection {
+    allowIn("io.micronaut.retry.intercept.AnnotationRetryStateBuilder", "REFLECTIVE_ACCESS")
+}

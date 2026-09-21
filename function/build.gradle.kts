@@ -14,3 +14,7 @@ dependencies {
         exclude(group = "io.micronaut")
     }
 }
+
+noReflection {
+    allowIn("io.micronaut.function.DefaultLocalFunctionRegistry", "CLASS_NAMES")
+}

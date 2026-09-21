@@ -17,3 +17,7 @@ dependencies {
     testImplementation(projects.micronautInjectJavaTest)
     testImplementation(projects.micronautInjectGroovy)
 }
+
+noReflection {
+    allowIn("io.micronaut.jackson.core.parser.JacksonCoreParserFactory", "CLASS_LOADING")
+}

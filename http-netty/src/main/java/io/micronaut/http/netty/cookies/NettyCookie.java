@@ -120,7 +120,11 @@ public class NettyCookie implements Cookie {
         if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie cookie) {
             io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite sameSite = cookie.sameSite();
             if (sameSite != null) {
-                return Optional.of(SameSite.valueOf(sameSite.name()));
+                return Optional.of(switch (sameSite) {
+                    case Lax -> SameSite.Lax;
+                    case Strict -> SameSite.Strict;
+                    case None -> SameSite.None;
+                });
             }
         }
         return Optional.empty();
@@ -129,7 +133,11 @@ public class NettyCookie implements Cookie {
     @Override
     public Cookie sameSite(@Nullable SameSite sameSite) {
         if (nettyCookie instanceof io.netty.handler.codec.http.cookie.DefaultCookie cookie) {
-            cookie.setSameSite(sameSite == null ? null : io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.valueOf(sameSite.name()));
+            cookie.setSameSite(sameSite == null ? null : switch (sameSite) {
+                case Lax -> io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.Lax;
+                case Strict -> io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.Strict;
+                case None -> io.netty.handler.codec.http.cookie.CookieHeaderNames.SameSite.None;
+            });
         }
         return this;
     }

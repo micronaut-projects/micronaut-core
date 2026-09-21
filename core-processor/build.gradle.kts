@@ -16,3 +16,6 @@ dependencies {
     compileOnly(libs.managed.kotlin.stdlib.jdk8)
 }
 
+noReflection {
+    checkedSourceSets = emptySet()
+}
