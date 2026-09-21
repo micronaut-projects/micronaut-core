@@ -530,6 +530,7 @@ final class PyronautJavaCompiler {
      *
      * @param diagnosticCollector The diagnostics of the compilation
      */
+    @SuppressWarnings("java:S106") // the compiler reports its diagnostics on the console, as javac does
     private static void reportProcessorMessages(DiagnosticCollector<JavaFileObject> diagnosticCollector) {
         for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics(diagnosticCollector)) {
             if (PROCESSOR_MESSAGE_CODES.contains(diagnostic.getCode())) {
