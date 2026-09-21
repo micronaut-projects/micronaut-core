@@ -100,6 +100,7 @@ public final class PythonAstParser {
         """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
     private static final Source STATIC_PLAN_SOURCE = Source.newBuilder(PYTHON, """
         static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
+        static_bodies = [] if static_planner is None else list(static_planner.bodies)
         static_diagnostics = [] if static_planner is None else list(static_planner.diagnostics)
         """, "micronaut-static-plan-driver.py").cached(true).buildLiteral();
     private final Context context;
@@ -429,9 +430,11 @@ public final class PythonAstParser {
         bindings.putMember("visitor_context", visitorContext);
         context.eval(STATIC_PLAN_SOURCE);
         Value decisions = bindings.getMember("static_decisions");
+        Value bodies = bindings.getMember("static_bodies");
         Value diagnostics = bindings.getMember("static_diagnostics");
         return new StaticCompilationPlan(
             decisions == null ? List.of() : List.copyOf(decisions.as(List.class)),
+            bodies == null ? Map.of() : StaticCompilationPlan.byKey(List.copyOf(bodies.as(List.class))),
             diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class))
         );
     }

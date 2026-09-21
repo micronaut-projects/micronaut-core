@@ -810,6 +810,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                                        TypeElement element,
                                        ClassElement originatingElement) {
         StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext());
+        processingEnvironment.staticCompilationPlan().set(plan);
         StaticCompilationConfiguration configuration = staticCompilationConfiguration();
         boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
         if (!planned && plan.diagnostics().isEmpty()) {

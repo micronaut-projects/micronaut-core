@@ -16,11 +16,28 @@ class Callback:
         return item
 
 
-def plan(source, mode, strict=False, path="module.py"):
+class FakeFacts:
+    """The facts of a compilation without Java types: nothing is described, and a type fits itself."""
+
+    def describe(self, name):
+        return None
+
+    def describeAnnotation(self, name):
+        return None
+
+    def isAssignable(self, source, target):
+        return source == target
+
+
+def plan(source, mode, strict=False, path="module.py", facts=None):
     """The decisions by qualified name and the planner, for a source modelled without a Java context."""
     checker = TypeChecker("off", [])
     visitor = MicronautAstVisitor(Callback(), "pkg", path, None, None, source_path=path, source_text=source, type_checker=checker)
     visitor.visit(ast.parse(source))
+    if facts is not None:
+        from micronaut_typecheck import PythonClasses
+        checker.facts = facts
+        checker.python_classes = PythonClasses(checker)
     planner = StaticPlanner(mode, NAMES, strict)
     decisions = planner.plan(checker)
     return {decision.qualifiedName(): decision for decision in decisions}, planner
@@ -33,13 +50,29 @@ def rules(decision):
 
 CORPUS = '''
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 from jakarta.inject import Singleton
+
+
+@dataclass
+class Form:
+    name: str = ""
+    count: int = 0
+    tags: list[str] = field(default_factory=list)
 
 
 @Singleton
 class Finder:
+    form: Form | None = None
+
     def named(self, flag: bool) -> str | None:
         return "x" if flag else None
+
+    def pick(self, fallback: Form) -> Form:
+        return self.form or fallback
+
+    def unhinted(self, flag: bool):
+        return "x" if flag else "y"
 
     def counted(self, n: int) -> int | None:
         return n if n > 0 else None
@@ -66,13 +99,37 @@ class CorpusFindingsTest(unittest.TestCase):
     """What running the compiler on real projects found: see the corpus closure plan."""
 
     def setUp(self):
-        self.decisions, self.planner = plan(CORPUS, MODE_ALL)
+        self.decisions, self.planner = plan(CORPUS, MODE_ALL, facts=FakeFacts())
+        self.bodies = {body.methodName(): body for body in self.planner.bodies}
+
+    def test_a_number_that_may_be_none_is_boxed(self):
+        self.assertEqual("COMPILED", self.decisions["Finder.counted"].outcome().name(), rules(self.decisions["Finder.counted"]))
+        self.assertEqual("java.lang.Integer", self.bodies["counted"].returnType())
+        returned = list(self.bodies["counted"].body().statements())[0].value()
+        self.assertEqual("Conditional", returned.getClass().getSimpleName())
+        self.assertEqual("java.lang.Integer", returned.type())
 
     def test_an_abstract_method_is_not_a_candidate(self):
         for name in ("to_thing", "described"):
             decision = self.decisions[f"Mapper.{name}"]
             self.assertEqual("NOT_CANDIDATE", decision.outcome().name(), name)
             self.assertEqual(["abstract-method"], rules(decision), name)
+
+    def _compiled(self, name):
+        decision = self.decisions[f"Finder.{name}"]
+        self.assertEqual("COMPILED", decision.outcome().name(), [(r.rule(), r.message()) for r in decision.reasons()])
+        return self.bodies[name]
+
+    def _returned(self, name):
+        return list(self._compiled(name).body().statements())[-1].value()
+
+    def test_or_on_an_attribute_of_an_object_yields_the_fallback_when_none(self):
+        returned = self._returned("pick")
+        self.assertEqual("Conditional", returned.getClass().getSimpleName())
+        self.assertEqual("Compare", returned.test().getClass().getSimpleName())
+
+    def test_an_unhinted_return_compiles_as_object(self):
+        self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
 
 
 SOURCE = '''
@@ -298,6 +355,189 @@ class WarningTest(unittest.TestCase):
         _, planner = plan(SOURCE, MODE_ALL)
         self.assertEqual(["[Legacy.slow] cannot be compiled statically: [varargs-signature] parameter [*values] collects the positional arguments"],
                          [diagnostic.message() for diagnostic in planner.diagnostics])
+
+
+LOWERED = '''
+from typing import Optional
+from jakarta.inject import Singleton
+
+
+@Singleton
+class Pricing:
+    def __init__(self, rate: float):
+        self.rate = rate
+
+    def total(self, quantity: int, unit_price: float) -> float:
+        subtotal = quantity * unit_price
+        if subtotal > 100:
+            subtotal = subtotal - 5
+        return subtotal
+
+    def label(self, count: int, name: str) -> str:
+        return f"{count} x {name}: {count * 2}"
+
+    def ratio(self, a: int, b: int) -> float:
+        return a / b
+
+    def parity(self, n: int) -> str:
+        return "even" if n % 2 == 0 else "odd"
+
+    def truncate(self, n: int) -> int:
+        remainder = n % 3
+        return n // 3 + remainder
+
+    def branches(self, flag: bool, n: int) -> int:
+        if flag:
+            result = n
+        else:
+            result = -n
+        return result
+
+    def with_rate(self, amount: float) -> float:
+        return amount * self.rate
+
+    def loops(self, n: int) -> int:
+        total = 0
+        while n > 0:
+            total += n
+            n -= 1
+        return total
+
+    def sibling(self, n: int) -> int:
+        return self.truncate(n)
+
+    def builtin(self, name: str) -> int:
+        return len(name)
+
+    def power(self, base: int, exponent: int) -> int:
+        return base ** exponent
+
+    def retyped(self, n: int) -> str:
+        value = n
+        value = "x"
+        return value
+
+    def falls_through(self, flag: bool) -> int:
+        if flag:
+            return 1
+
+    def maybe_unbound(self, flag: bool) -> int:
+        if flag:
+            result = 1
+        return result
+
+    def guarded(self, n: int) -> int:
+        assert n > 0, "positive"
+        return n
+
+    @staticmethod
+    def helper(n: int) -> int:
+        return n
+
+    @property
+    def doubled(self) -> float:
+        return self.rate * 2
+
+    def via_property(self) -> float:
+        return self.doubled + 1
+
+    def maybe(self, n: int) -> Optional[int]:
+        return n
+'''
+
+
+class LoweringTest(unittest.TestCase):
+    def setUp(self):
+        self.decisions, self.planner = plan(LOWERED, MODE_ALL, facts=FakeFacts())
+        self.bodies = {body.methodName(): body for body in self.planner.bodies}
+
+    def test_bodies_over_builtin_values_are_compiled(self):
+        for name in ("total", "label", "ratio", "parity", "truncate", "branches", "with_rate"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), name)
+            self.assertIn(name, self.bodies)
+        total = self.bodies["total"]
+        self.assertEqual(["quantity", "unit_price"], list(total.parameterNames()))
+        self.assertEqual(["int", "double"], list(total.parameterTypes()))
+        self.assertEqual("double", total.returnType())
+        statements = list(total.body().statements())
+        self.assertEqual(3, len(statements))
+        local = statements[0]
+        self.assertEqual("subtotal", local.name())
+        self.assertEqual("double", local.type())
+        product = local.value()
+        self.assertEqual("*", product.op())
+        self.assertEqual("double", product.type())
+        # the int parameter is used as a long and widened to a double for the product
+        self.assertEqual("long", product.left().operand().type())
+        self.assertEqual("int", product.left().operand().parameterType())
+        self.assertEqual(3, total.stats().statements())
+
+    def test_integer_arithmetic_and_strings_lower_to_helpers(self):
+        truncate = self.bodies["truncate"]
+        self.assertEqual("int", truncate.returnType())
+        statements = list(truncate.body().statements())
+        self.assertEqual("%", statements[0].value().op())
+        self.assertEqual("long", statements[0].value().type())
+        returned = statements[1].value()
+        self.assertEqual("int", returned.type())  # narrowed exactly to the declared int
+        self.assertEqual("+", returned.operand().op())
+        self.assertEqual("//", returned.operand().left().op())
+        label = self.bodies["label"]
+        parts = list(list(label.body().statements())[0].value().parts())
+        self.assertEqual(5, len(parts))
+        self.assertEqual("long", parts[0].type())
+        self.assertEqual("java.lang.String", parts[1].type())
+        self.assertEqual("*", parts[4].op())
+        self.assertEqual("double", list(self.bodies["ratio"].body().statements())[0].value().type())
+        parity = list(self.bodies["parity"].body().statements())[0].value()
+        self.assertEqual("==", parity.test().op())
+        self.assertEqual("java.lang.String", parity.type())
+
+    def test_locals_assigned_in_branches_are_declared_once_at_the_top(self):
+        statements = list(self.bodies["branches"].body().statements())
+        self.assertEqual("result", statements[0].name())
+        self.assertEqual("long", statements[0].type())
+        branch = statements[1]
+        self.assertEqual("result", list(branch.then().statements())[0].name())
+        self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
+
+    def test_self_properties_are_read_through_the_stub(self):
+        with_rate = self.bodies["with_rate"]
+        product = list(with_rate.body().statements())[0].value()
+        self.assertEqual("rate", product.right().property())
+        self.assertEqual("double", product.right().type())
+        self.assertEqual(1, with_rate.stats().bridgeCalls())
+
+    def test_constructs_without_a_lowering_are_skipped_with_their_reason(self):
+        expectations = {
+            "loops": "unsupported-statement",
+            "sibling": "sibling-call",
+            "builtin": "python-builtin-not-lowered",
+            "power": "unbounded-integer-op",
+            "retyped": "unknown-type",
+            "falls_through": "unknown-type",
+            "maybe_unbound": "unsupported-statement",
+            "via_property": "sibling-call",
+            "maybe": "unsupported-expression",
+        }
+        for name, rule in expectations.items():
+            decision = self.decisions[f"Pricing.{name}"]
+            self.assertEqual("SKIPPED", decision.outcome().name(), name)
+            self.assertEqual(rule, decision.reasons()[0].rule(), f"{name}: {[(r.rule(), r.message()) for r in decision.reasons()]}")
+            self.assertIsNotNone(decision.reasons()[0].span(), name)
+        self.assertEqual("local [value] is a [long] and then a [java.lang.String]", self.decisions["Pricing.retyped"].reasons()[0].message())
+        self.assertEqual("the function does not return a value on every path", self.decisions["Pricing.falls_through"].reasons()[0].message())
+
+    def test_static_methods_are_not_candidates_yet(self):
+        decision = self.decisions["Pricing.helper"]
+        self.assertEqual("NOT_CANDIDATE", decision.outcome().name())
+        self.assertEqual(["static-method"], rules(decision))
+
+    def test_assertions_raise_through_the_helper(self):
+        guarded = self.bodies["guarded"]
+        statements = list(guarded.body().statements())
+        self.assertEqual("assertion", statements[0].expression().name())
+        self.assertEqual(">", list(statements[0].expression().arguments())[0].op())
 
 
 if __name__ == "__main__":
