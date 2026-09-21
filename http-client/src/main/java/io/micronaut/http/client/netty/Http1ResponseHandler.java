@@ -212,13 +212,18 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private void devolveToStreaming(ChannelHandlerContext ctx) {
             assert ctx.executor().inEventLoop();
 
-            UnbufferedContent unbufferedContent = new UnbufferedContent(listener, ctx, response);
+            UnbufferedContent unbufferedContent = new UnbufferedContent(listener, ctx);
+            transitionToState(ctx, this, unbufferedContent);
+            // only now: if the Content-Length already exceeds the limit, this discards the body,
+            // which needs the streaming state to be current
+            if (!listener.isHeadResponse()) {
+                unbufferedContent.streaming.setExpectedLengthFrom(response.headers());
+            }
             if (buffered != null) {
                 for (ByteBuf buf : buffered) {
                     unbufferedContent.add(NettyReadBufferFactory.of(ctx.alloc()).adapt(buf));
                 }
             }
-            transitionToState(ctx, this, unbufferedContent);
             complete(new StreamingNettyByteBody(unbufferedContent.streaming));
         }
 
@@ -238,12 +243,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         private final boolean wasAutoRead;
         private long demand;
 
-        UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx, HttpResponse response) {
+        UnbufferedContent(ResponseListener listener, ChannelHandlerContext ctx) {
             this.listener = listener;
             streaming = new NettyByteBodyFactory(ctx.channel()).createStreamingBuffer(listener.sizeLimits(), this);
-            if (!listener.isHeadResponse()) {
-                streaming.setExpectedLengthFrom(response.headers());
-            }
             streamingContext = ctx;
             wasAutoRead = ctx.channel().config().isAutoRead();
             ctx.channel().config().setAutoRead(false);
