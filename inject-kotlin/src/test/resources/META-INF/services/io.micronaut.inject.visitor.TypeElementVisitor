@@ -19,3 +19,5 @@ io.micronaut.kotlin.processing.annotations.InheritedPropertyAnnotationMutationSp
 io.micronaut.kotlin.processing.ast.visitor.KotlinDeclaredGenericPlaceholdersSpec$PlaceholdersVisitor
 io.micronaut.kotlin.processing.ast.visitor.AnnotatedPrimitiveElementSpec$PrimitiveVisitor
 io.micronaut.kotlin.processing.ast.visitor.KotlinAnnotationElementSpec$DeclarationVisitor
+io.micronaut.kotlin.processing.annotations.AnnotationMemberDefaultsSpec$DefaultsRecordingVisitor
+io.micronaut.kotlin.processing.annotations.NestedAnnotationDefaultsSpec$NestedDefaultsRecordingVisitor

@@ -161,6 +161,10 @@ internal class KotlinVisitorContext(
         val declaration = enclosingDeclaration(decl)
         val mappedName = mapQualifiedNameToJava(declaration)
         if (mappedName != null) {
+            if (declaration is KSClassDeclaration && declaration.parentDeclaration is KSClassDeclaration) {
+                // The mapped name is canonical (for example java.util.Map.Entry), but bytecode needs the binary name.
+                return computeClassBinaryName(declaration) ?: mappedName
+            }
             return mappedName
         }
         if (declaration.qualifiedName == null) {

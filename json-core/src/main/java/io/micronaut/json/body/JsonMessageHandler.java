@@ -23,10 +23,13 @@ import io.micronaut.core.io.buffer.ReferenceCounted;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Headers;
 import io.micronaut.core.type.MutableHeaders;
+import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -71,6 +74,16 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
      * The JSON handler should be preferred if for any type.
      */
     public static final int ORDER = -10;
+
+    /**
+     * Starting capacity of the buffer a whole JSON response is serialised into. Jackson's
+     * generator writes through an 8000 byte encoding buffer, so a response of up to that size
+     * arrives in one write; with the allocator's 256 byte default that first write already forced
+     * the buffer to grow. Only used for a complete body, not for the elements of a streamed
+     * response: those are written to the channel uncopied, and a hint this large would hold 8 KiB
+     * of capacity for every small element the client has not read yet.
+     */
+    private static final int WRITE_BUFFER_SIZE = 8192;
 
     private final JsonMapper jsonMapper;
 
@@ -146,6 +159,16 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
             jsonMapper.writeValue(outputStream, type, object);
         } catch (IOException e) {
             throw decorateWrite(object, e);
+        }
+    }
+
+    @Override
+    public ByteBodyHttpResponse<?> write(ByteBodyFactory bodyFactory, HttpRequest<?> request, MutableHttpResponse<T> httpResponse, Argument<T> type, MediaType mediaType, T object) throws CodecException {
+        httpResponse.getHeaders().contentTypeIfMissing(mediaType);
+        try {
+            return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> jsonMapper.writeValue(s, object)));
+        } catch (IOException e) {
+            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
         }
     }
 

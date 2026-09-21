@@ -46,6 +46,8 @@ public final class Http2AccessLogManager {
 
     @Nullable
     AccessLog logForReuse;
+    @Nullable
+    private ConnectionMetadata connectionMetadata;
 
     public Http2AccessLogManager(Factory factory, Http2Connection connection) {
         this.connection = connection;
@@ -71,7 +73,13 @@ public final class Http2AccessLogManager {
             accessLog = formatParser.newAccessLogger();
         }
         connection.stream(streamId).setProperty(accessLogKey, accessLog);
-        accessLog.onRequestHeaders(ConnectionMetadata.ofNettyChannel(ctx.channel()), request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
+        ConnectionMetadata metadata = connectionMetadata;
+        if (metadata == null) {
+            // this manager is connection-scoped, and the metadata only wraps the channel
+            metadata = ConnectionMetadata.ofNettyChannel(ctx.channel());
+            connectionMetadata = metadata;
+        }
+        accessLog.onRequestHeaders(metadata, request.method().name(), request.headers(), request.uri(), HttpAccessLogHandler.H2_PROTOCOL_NAME);
     }
 
     /**

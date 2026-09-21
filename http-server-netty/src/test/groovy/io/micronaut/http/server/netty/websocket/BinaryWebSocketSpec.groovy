@@ -46,11 +46,18 @@ class BinaryWebSocketSpec extends Specification {
     void "test binary websocket exchange"() {
         given:
         EmbeddedServer embeddedServer = ApplicationContext.builder('spec.name': 'BinaryWebSocketSpec', 'micronaut.server.netty.log-level':'TRACE').run(EmbeddedServer)
+        BinaryChatServerWebSocket serverWebSocket = embeddedServer.applicationContext.getBean(BinaryChatServerWebSocket)
         PollingConditions conditions = new PollingConditions(timeout: 15, delay: 0.5)
 
         when: "a websocket connection is established"
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient, embeddedServer.getURI())
         BinaryChatClientWebSocket fred = Flux.from(wsClient.connect(BinaryChatClientWebSocket, "/binary/chat/stuff/fred")).blockFirst()
+        // The server's @OnOpen is a blocking handler and runs on the executor, so connect() returning does not
+        // mean it has run yet. If bob connects before fred's @OnOpen executes, fred's handler sees bob in
+        // getOpenSessions() and bob receives a "[fred] Joined!" message, which breaks the exact reply counts below.
+        conditions.eventually {
+            serverWebSocket.openedUsernames.contains('fred')
+        }
         BinaryChatClientWebSocket bob = Flux.from(wsClient.connect(BinaryChatClientWebSocket, [topic:"stuff",username:"bob"])).blockFirst()
 
         then:"The connection is valid"

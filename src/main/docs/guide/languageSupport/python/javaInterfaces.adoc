@@ -1,0 +1,27 @@
+A Python class implements a Java interface by listing it among its bases. The generated Java class implements the interface, so the bean can be injected wherever the interface is expected and Java callers reach the Python methods through it:
+
+[source,python]
+----
+from jakarta.inject import Singleton
+import java
+
+Describable = java.type("com.example.Describable")  # <1>
+
+
+@Singleton
+class PythonDescribable(Describable):
+
+    def name(self) -> str:  # <2>
+        return "python"
+
+    def describe(self) -> str:  # <3>
+        return "python:" + self.name()
+----
+
+<1> The Java interface, declared as `interface Describable { String name(); default String describe() { ... } }`
+<2> The abstract methods of the interface must be defined by the Python class
+<3> A default method of the interface may be overridden; the override is bridged to Java with the inherited signature, whether or not it is annotated with `@Executable`
+
+On the Python side the instance is a plain Python object: `isinstance`, `==` and `is` behave as for any Python class, whether the object is injected into another Python bean, looked up with `ApplicationContext.getBean` or created with the class itself. The default methods of the interface (and of the interfaces it extends) that the class does not override are available on it all the same. Calling one runs the Java default implementation on the Java view of the object, so the calls a default implementation makes to other interface methods reach the Python definitions.
+
+Only interfaces can be implemented this way: a Python class cannot extend a concrete Java class.

@@ -36,9 +36,12 @@ dependencies {
     compileOnlyApi(projects.micronautHttp)
     // the pythonpool management endpoint; the bean is skipped when management is absent
     compileOnly(projects.micronautManagement)
+    // Mono/Flux return types of bridged methods; only used when Reactor is present at runtime
+    compileOnly(libs.managed.reactor)
     compileOnly(libs.jetbrains.annotations)
     testImplementation(projects.micronautAop)
     testImplementation(projects.micronautHttp)
+    testImplementation(libs.managed.reactor)
     testImplementation("com.graphql-java:java-dataloader:6.0.0")
 }
 

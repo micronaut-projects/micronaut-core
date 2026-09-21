@@ -3,7 +3,6 @@ package io.micronaut.websocket
 import io.micronaut.context.annotation.Property
 import io.micronaut.context.annotation.Requires
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.annotation.ExecuteOn
 import io.micronaut.test.extensions.spock.annotation.MicronautTest
@@ -47,7 +46,7 @@ class WebsocketExecuteOnSpec extends Specification {
     void "#type websocket server methods can run outside of the event loop with ExecuteOn"() {
         given:
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient.class, embeddedServer.getURL())
-        String threadName = (LoomSupport.isSupported() ? "virtual" : TaskExecutors.IO) + "-executor"
+        String threadName = "virtual-executor"
         String expectedJoined = "joined on thread " + threadName
         String expectedEcho = "Hello from thread " + threadName
 
@@ -85,7 +84,7 @@ class WebsocketExecuteOnSpec extends Specification {
     void "#type websocket server handler can handle errors with ExecuteOn"() {
         given:
         WebSocketClient wsClient = embeddedServer.applicationContext.createBean(WebSocketClient.class, embeddedServer.getURL())
-        String threadName = (LoomSupport.isSupported() ? "virtual" : TaskExecutors.IO) + "-executor"
+        String threadName = "virtual-executor"
         String expectedJoined = "joined on thread " + threadName
         String expectedError = "error handled on thread " + threadName
         String expectedEcho = "Hello from thread " + threadName

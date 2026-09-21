@@ -19,17 +19,16 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Source;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -54,13 +53,13 @@ public final class PythonAsyncioRuntime {
     private static final String SCHEDULER_NAME = "__micronaut_asyncio_to_completion_stage";
     private static final String AWAITABLE_FACTORY_NAME = "__micronaut_completion_stage_awaitable";
     private static final String AWAITABLE_COMPLETER_NAME = "__micronaut_complete_completion_stage_awaitable";
+    private static final String JAVA_STAGE_MEMBER = "_micronaut_java_stage";
     private static final AtomicReference<RuntimeState> STATE = new AtomicReference<>(new RuntimeState(true, List.of(), null, null, 0, ConcurrentHashMap.newKeySet(), ConcurrentHashMap.newKeySet()));
     private static final ExecutorAdapter EXECUTOR_ADAPTER = new ExecutorAdapter();
     private static final String ASYNCIO_MODULE_NAME = "micronaut_asyncio";
     private static final String ASYNCIO_MODULE_BINDING = "__micronaut_asyncio_module";
     private static final String ASYNCIO_MODULE_SOURCE = "META-INF/GRAALPY-VFS/micronaut-application/src/micronaut_asyncio.py";
     private static final ExceptionCompleter EXCEPTION_COMPLETER = new ExceptionCompleter();
-    private static final String ASYNCIO_FALLBACK_LOADER_NAME = "__micronaut_load_asyncio_module";
     private static final AtomicReference<@Nullable String> ASYNCIO_FALLBACK_SOURCE = new AtomicReference<>();
     private static final Source IMPORT_ASYNCIO_MODULE_SOURCE = Source.newBuilder(
         PythonContextRuntime.PYTHON,
@@ -72,17 +71,6 @@ public final class PythonAsyncioRuntime {
         "micronaut-import-asyncio-runtime.py"
     ).cached(true).buildLiteral();
 
-    private static final Source ASYNCIO_FALLBACK_LOADER_SOURCE = Source.newBuilder(PythonContextRuntime.PYTHON, """
-        import sys as __micronaut_sys
-        import types as __micronaut_types
-
-        def __micronaut_load_asyncio_module(source):
-            module = __micronaut_types.ModuleType('micronaut_asyncio')
-            __micronaut_sys.modules['micronaut_asyncio'] = module
-            exec(source, module.__dict__)
-            return module
-        """, "micronaut-load-asyncio-runtime.py").cached(true).buildLiteral();
-
     private PythonAsyncioRuntime() {
     }
 
@@ -92,9 +80,48 @@ public final class PythonAsyncioRuntime {
      * @param value The Python result value.
      * @return A stage that completes when the Python awaitable completes.
      */
-    @SuppressWarnings({"rawtypes", "FutureReturnValueIgnored"})
+    @SuppressWarnings("rawtypes")
     @UsedByGeneratedCode
     public static CompletionStage toCompletionStage(Value value) {
+        return toCompletionStage(value, null);
+    }
+
+    /**
+     * Convert a Python coroutine into a publisher that starts the coroutine when it is first
+     * subscribed, in the reactive context of that subscriber: the publishers the coroutine awaits
+     * are subscribed with the Reactor context (a reactive transaction status, for instance) and
+     * the propagated context of the subscriber. A {@link CompletionStage} is eager; a bridged
+     * {@code async def} declared to return a publisher uses this deferred form instead.
+     * <p>
+     * Consequences of the deferred form: the coroutine never runs when nobody subscribes (Python
+     * then warns that the coroutine was never awaited), the event loop is the one of the
+     * subscribing thread, so a {@code subscribeOn} decides which loop runs the coroutine, and the
+     * result of the first subscription is shared with later subscribers, a cancelled subscription
+     * leaving the coroutine running for them.
+     *
+     * @param value The Python coroutine or awaitable value.
+     * @return A publisher of the coroutine's result, empty when the coroutine returns {@code None}.
+     */
+    @UsedByGeneratedCode
+    public static Publisher<Object> toPublisher(Value value) {
+        return PythonPublishers.deferred(reactiveContext -> {
+            return reactiveContext.propagatedContext().propagate(
+                () -> toCompletionStage(value, reactiveContext).toCompletableFuture()
+            );
+        });
+    }
+
+    /**
+     * Convert a Python coroutine or awaitable value into a Java {@link CompletionStage}, running
+     * the coroutine within a reactive context.
+     *
+     * @param value The Python result value.
+     * @param reactiveContext The reactive context the publishers awaited by the coroutine are
+     *                        subscribed in, or {@code null} for the propagated context of the caller
+     * @return A stage that completes when the Python awaitable completes.
+     */
+    @SuppressWarnings("FutureReturnValueIgnored")
+    static CompletionStage<Object> toCompletionStage(Value value, @Nullable PythonReactiveContext reactiveContext) {
         RuntimeState runtimeState = state();
         if (!runtimeState.enabled()) {
             throw new IllegalStateException("Python asyncio support is disabled. Set micronaut.python.asyncio.enabled=true to enable async Python bridge methods.");
@@ -104,18 +131,23 @@ public final class PythonAsyncioRuntime {
             future.complete(null);
             return future;
         }
+        CompletionStage<Object> javaStage = javaStage(value);
+        if (javaStage != null) {
+            return javaStage;
+        }
         Context context = value.getContext();
         PythonCompletableFuture future = new PythonCompletableFuture();
         PythonContextRegistry.enterExecution(context);
         future.whenComplete((ignored, ignoredThrowable) -> PythonContextRegistry.exitExecution(context));
         PythonEventLoop eventLoop = currentEventLoop(runtimeState);
-        Runnable scheduler = () -> schedule(context, value, future, eventLoop);
+        PythonReactiveContext taskContext = reactiveContext != null ? reactiveContext : callerContext();
+        Runnable scheduler = () -> schedule(context, value, future, eventLoop, taskContext);
         if (eventLoop != null) {
             if (eventLoop.inEventLoop()) {
                 scheduler.run();
             } else {
                 try {
-                    eventLoop.execute(scheduler);
+                    eventLoop.execute(PropagatedContext.wrapCurrent(scheduler));
                 } catch (Throwable e) {
                     future.completeExceptionally(e);
                 }
@@ -124,6 +156,24 @@ public final class PythonAsyncioRuntime {
             scheduler.run();
         }
         return future;
+    }
+
+    /**
+     * The Java stage an awaitable carries, or {@code null} for a Python awaitable. An intercepted
+     * {@code async def} of a proxied bean hands its {@link CompletionStage} to Python callers as an
+     * awaitable that remembers the stage under {@code _micronaut_java_stage}: a Java caller of the
+     * bridge gets that stage back as it is, without a loop driving it on the calling thread.
+     */
+    @SuppressWarnings("unchecked")
+    private static @Nullable CompletionStage<Object> javaStage(Value value) {
+        if (!value.hasMember(JAVA_STAGE_MEMBER)) {
+            return null;
+        }
+        Value member = value.getMember(JAVA_STAGE_MEMBER);
+        if (member != null && member.isHostObject() && member.asHostObject() instanceof CompletionStage<?> stage) {
+            return (CompletionStage<Object>) stage;
+        }
+        return null;
     }
 
     /**
@@ -145,6 +195,8 @@ public final class PythonAsyncioRuntime {
         scheduler(context);
         future = awaitableFactory(context).execute(eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, stage.toCompletableFuture());
         stage.whenComplete((result, throwable) -> {
+            // no context is captured from the completing thread (a Reactor scheduler, a client loop): the
+            // task the completion wakes up restores its own propagated context from its contextvars
             Runnable completion = () -> completeAwaitable(context, future, result, throwable);
             if (eventLoop != null) {
                 try {
@@ -274,9 +326,19 @@ public final class PythonAsyncioRuntime {
         return currentEventLoop(state());
     }
 
-    private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop) {
+    /**
+     * The context of an eager coroutine: the propagated context of the caller, kept by the task so
+     * its steps run in it whichever thread resumes them, or none when the caller has no context.
+     */
+    private static @Nullable PythonReactiveContext callerContext() {
+        return PropagatedContext.find()
+            .map(propagatedContext -> new PythonReactiveContext(null, propagatedContext))
+            .orElse(null);
+    }
+
+    private static void schedule(Context context, Value value, PythonCompletableFuture future, @Nullable PythonEventLoop eventLoop, @Nullable PythonReactiveContext reactiveContext) {
         try {
-            scheduler(context).executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER);
+            scheduler(context).executeVoid(value, future, EXCEPTION_COMPLETER, eventLoop, TimeUnit.NANOSECONDS, EXECUTOR_ADAPTER, reactiveContext);
         } catch (Throwable e) {
             future.completeExceptionally(e);
         }
@@ -330,42 +392,27 @@ public final class PythonAsyncioRuntime {
     private static Value asyncioModule(Context context) {
         Value bindings = context.getBindings(PythonContextRuntime.PYTHON);
         if (!bindings.hasMember(ASYNCIO_MODULE_BINDING)) {
-            importAsyncioModule(context, bindings);
+            importAsyncioModule(context);
         }
         return bindings.getMember(ASYNCIO_MODULE_BINDING);
     }
 
-    private static void importAsyncioModule(Context context, Value bindings) {
+    private static void importAsyncioModule(Context context) {
         try {
             context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
         } catch (PolyglotException e) {
-            String message = e.getMessage();
-            if (message == null || !message.contains("ModuleNotFoundError")) {
+            if (!PythonContextRuntime.isModuleNotFound(e)) {
                 throw e;
             }
-            loadAsyncioModuleSource(context, bindings);
+            loadAsyncioModuleSource(context);
         }
     }
 
-    private static void loadAsyncioModuleSource(Context context, Value bindings) {
-        try (InputStream inputStream = PythonAsyncioRuntime.class.getClassLoader().getResourceAsStream(ASYNCIO_MODULE_SOURCE)) {
-            String source = ASYNCIO_FALLBACK_SOURCE.get();
-            if (source == null) {
-                if (inputStream == null) {
-                    throw new IllegalStateException("Missing Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE);
-                }
-                String created = new String(inputStream.readAllBytes(), StandardCharsets.UTF_8);
-                if (!ASYNCIO_FALLBACK_SOURCE.compareAndSet(null, created)) {
-                    source = ASYNCIO_FALLBACK_SOURCE.get();
-                } else {
-                    source = created;
-                }
-            }
-            Value module = PythonContextRuntime.helper(context, ASYNCIO_FALLBACK_LOADER_NAME, ASYNCIO_FALLBACK_LOADER_SOURCE).execute(source);
-            bindings.putMember(ASYNCIO_MODULE_BINDING, module);
-        } catch (IOException e) {
-            throw new IllegalStateException("Cannot load Micronaut asyncio Python runtime resource: " + ASYNCIO_MODULE_SOURCE, e);
-        }
+    private static void loadAsyncioModuleSource(Context context) {
+        // the virtual file system of the context does not carry the module: serve it from the classpath
+        // resource and import it again, so concurrent first imports wait for the complete module
+        PythonContextRuntime.installRuntimeModuleFinder(context, ASYNCIO_MODULE_NAME, ASYNCIO_MODULE_SOURCE, ASYNCIO_FALLBACK_SOURCE);
+        context.eval(IMPORT_ASYNCIO_MODULE_SOURCE);
     }
 
     private static void completeAwaitable(Context context, Value future, @Nullable Object result, @Nullable Throwable throwable) {

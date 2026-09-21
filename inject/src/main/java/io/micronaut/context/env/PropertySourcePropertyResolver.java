@@ -95,10 +95,11 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     private ResolverState writeState = state;
     /**
-     * Whether {@link #refresh(Runnable)} is building a replacement state. Guarded by
-     * {@link #catalogLock}.
+     * The thread {@link #refresh(Runnable)} is building a replacement state on, or {@code null}
+     * outside a refresh. Written under {@link #catalogLock}, read without it by every lookup.
      */
-    private boolean refreshing;
+    @SuppressWarnings("java:S3077") // a thread reference, not a mutable object
+    private volatile Thread refreshingThread;
     private final EnvironmentProperties environmentProperties = EnvironmentProperties.fork(CURRENT_ENV);
 
     /**
@@ -158,10 +159,27 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         synchronized (catalogLock) {
             ResolverState empty = new ResolverState();
             writeState = empty;
-            if (!refreshing) {
+            if (refreshingThread == null) {
                 state = empty;
             }
         }
+    }
+
+    /**
+     * The state a lookup reads from. Outside a refresh that is the published state. On the thread
+     * that is rebuilding the catalogs it is the replacement being built, so the rebuild sees the
+     * properties it has contributed so far: a {@link PropertySource} whose keys depend on what the
+     * resolver already holds (micronaut-test-resources contributes only the keys the environment
+     * cannot resolve) must be answered from the catalog being built, not from the one the rebuild
+     * is replacing. Every other thread keeps reading the published state until the rebuild is
+     * published in one step.
+     *
+     * @return The state to read the catalogs and the caches from
+     */
+    private ResolverState readState() {
+        // Only the refreshing thread takes the `writeState` branch, and it holds `catalogLock` for
+        // the whole rebuild, so it reads a field that no other thread can be writing.
+        return refreshingThread == Thread.currentThread() ? writeState : state;
     }
 
     /**
@@ -176,17 +194,17 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      */
     void refresh(Runnable rebuild) {
         synchronized (catalogLock) {
-            if (refreshing) {
+            if (refreshingThread != null) {
                 // Already inside a refresh, its outermost call publishes.
                 rebuild.run();
                 return;
             }
-            refreshing = true;
+            refreshingThread = Thread.currentThread();
             try {
                 rebuild.run();
                 state = writeState;
             } finally {
-                refreshing = false;
+                refreshingThread = null;
                 writeState = state;
             }
         }
@@ -315,7 +333,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         if (StringUtils.isEmpty(name)) {
             return false;
         }
-        ResolverState currentState = state;
+        ResolverState currentState = readState();
         Boolean result = currentState.containsCache.get(name);
         if (result == null) {
             for (PropertyCatalog convention : CONVENTIONS) {
@@ -478,7 +496,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         ConversionCacheKey cacheKey = new ConversionCacheKey(name, requiredType);
         // A single read of the state, so the catalogs and the caches this lookup consults cannot be
         // replaced underneath it by a concurrent refresh.
-        ResolverState currentState = state;
+        ResolverState currentState = readState();
         Object cached = cacheableType ? currentState.resolvedValueCache.get(cacheKey) : null;
         if (cached != null) {
             return cached == NO_VALUE ? Optional.empty() : Optional.of((T) cached);
@@ -624,7 +642,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
         Map<String, Object> map = new HashMap<>();
         boolean isNested = transformation == MapFormat.MapTransformation.NESTED;
         Arrays
-            .stream(getCatalog(state, keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
+            .stream(getCatalog(readState(), keyConvention == StringConvention.RAW ? PropertyCatalog.RAW : PropertyCatalog.GENERATED))
             .filter(Objects::nonNull)
             .map(Map::entrySet)
             .flatMap(Collection::stream)
@@ -1092,7 +1110,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
                 return resolveEntriesForKey(writeState, name, true, propertyCatalog);
             }
         }
-        return resolveEntriesForKey(state, name, propertyCatalog);
+        return resolveEntriesForKey(readState(), name, propertyCatalog);
     }
 
     @Nullable
@@ -1141,7 +1159,7 @@ public class PropertySourcePropertyResolver implements PropertyResolver, AutoClo
      * Subclasses can override to reset caches.
      */
     protected void resetCaches() {
-        ResolverState currentState = state;
+        ResolverState currentState = readState();
         currentState.containsCache.clear();
         currentState.resolvedValueCache.clear();
         currentState.placeholderResolutionCache.clear();

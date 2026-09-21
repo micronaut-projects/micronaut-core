@@ -22,6 +22,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
+import io.micronaut.http.server.netty.handler.Http2ConnectionWindow;
 import io.micronaut.http.server.netty.handler.Http2ServerHandler;
 import io.micronaut.http.server.netty.handler.PipeliningServerHandler;
 import io.micronaut.http.server.netty.handler.RequestHandler;
@@ -44,6 +45,7 @@ import io.netty.channel.ChannelOutboundHandler;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.handler.codec.http.FullHttpRequest;
+import io.netty.handler.codec.http.HttpDecoderConfig;
 import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
@@ -98,6 +100,7 @@ import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Function;
@@ -420,10 +423,13 @@ final class HttpPipelineBuilder {
         private void insertIdleStateHandler() {
             final Duration idleTime = server.getServerConfiguration().getIdleTimeout();
             if (idleTime != null && !idleTime.isNegative()) {
+                // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
+                // which IdleStateHandler treats as "disabled"
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
-                        (int) server.getServerConfiguration().getReadIdleTimeout().getSeconds(),
-                        (int) server.getServerConfiguration().getWriteIdleTimeout().getSeconds(),
-                        (int) idleTime.getSeconds()));
+                        server.getServerConfiguration().getReadIdleTimeout().toMillis(),
+                        server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
+                        idleTime.toMillis(),
+                        TimeUnit.MILLISECONDS));
             }
         }
 
@@ -453,6 +459,7 @@ final class HttpPipelineBuilder {
                 Http2FrameCodec http2FrameCodec = createHttp2FrameCodec();
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, http2FrameCodec);
                 specificGracefulShutdown = new Http2GracefulShutdown(pipeline.lastContext(), http2FrameCodec);
+                pipeline.addLast(createHttp2ConnectionWindow(http2FrameCodec));
                 pipeline.addLast(makeHttp2Handler());
             } else {
                 Http2ConnectionHandler http2ServerHandler = createHttp2ServerHandler(true);
@@ -477,14 +484,25 @@ final class HttpPipelineBuilder {
             return builder.build();
         }
 
+        /**
+         * The {@link Http2FrameCodec} raises the connection window only from the stream window.
+         * This handler applies an explicitly configured connection window on top of that.
+         */
+        private Http2ConnectionWindow createHttp2ConnectionWindow(Http2FrameCodec http2FrameCodec) {
+            NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
+            return new Http2ConnectionWindow(http2FrameCodec, Http2ConnectionWindow.effectiveWindowSize(http2.http2Settings(), http2.getInitialConnectionWindowSize()));
+        }
+
         private Http2ConnectionHandler createHttp2ServerHandler(boolean ssl) {
+            NettyHttpServerConfiguration.Http2Settings http2 = server.getServerConfiguration().getHttp2();
             Http2ServerHandler.ConnectionHandlerBuilder builder = new Http2ServerHandler.ConnectionHandlerBuilder(makeRequestHandler(embeddedServices.getWebSocketUpgradeHandler(server), ssl))
                 .decompress(server.getServerConfiguration().isRequestDecompressionEnabled())
                 .compressor(embeddedServices.getHttpCompressionStrategy())
                 .bodySizeLimits(bodySizeLimits())
                 .accessLogManagerFactory(accessLogManagerFactory)
                 .validateHeaders(server.getServerConfiguration().isValidateHeaders())
-                .initialSettings(server.getServerConfiguration().getHttp2().http2Settings());
+                .initialSettings(http2.http2Settings())
+                .initialConnectionWindowSize(http2.getInitialConnectionWindowSize());
             server.getServerConfiguration().getLogLevel().ifPresent(logLevel ->
                 builder.frameLogger(new Http2FrameLogger(logLevel, NettyHttpServer.class)));
             return builder.build();
@@ -507,15 +525,11 @@ final class HttpPipelineBuilder {
 
                 @Override
                 public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
-                    if (evt instanceof SslHandshakeCompletionEvent event) {
-                        if (!event.isSuccess()) {
-                            final Throwable cause = event.cause();
-                            if (!(cause instanceof ClosedChannelException)) {
-                                super.userEventTriggered(ctx, evt);
-                            } else {
-                                return;
-                            }
-                        }
+                    if (evt instanceof SslHandshakeCompletionEvent event &&
+                        !event.isSuccess() &&
+                        event.cause() instanceof ClosedChannelException) {
+                        // the peer went away before the handshake completed, nothing to report
+                        return;
                     }
                     super.userEventTriggered(ctx, evt);
                 }
@@ -580,16 +594,14 @@ final class HttpPipelineBuilder {
                         public void upgradeTo(ChannelHandlerContext ctx, FullHttpRequest upgradeRequest) {
                             super.upgradeTo(ctx, upgradeRequest);
                             pipeline.remove(fallbackHandlerName);
-                            new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
-                            specificGracefulShutdown = new Http2GracefulShutdown(ctx.pipeline().context(connectionHandler), connectionHandler);
-                            onRequestPipelineBuilt();
+                            afterH2cEstablished(connectionHandler);
                         }
                     }
 
                     if (frameCodec == null || multiplexHandler == null) {
                         return new Http2ServerUpgradeCodecImpl(connectionHandler);
                     } else {
-                        return new Http2ServerUpgradeCodecImpl(frameCodec, multiplexHandler);
+                        return new Http2ServerUpgradeCodecImpl(frameCodec, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
                     }
                 } else {
                     return null;
@@ -605,7 +617,7 @@ final class HttpPipelineBuilder {
             ChannelHandler priorKnowledgeHandler = frameCodec == null ? connectionHandler : new ChannelInitializer<>() {
                 @Override
                 protected void initChannel(Channel ch) {
-                    ch.pipeline().addLast(connectionHandler, multiplexHandler);
+                    ch.pipeline().addLast(connectionHandler, createHttp2ConnectionWindow(frameCodec), multiplexHandler);
                 }
             };
             final CleartextHttp2ServerUpgradeHandler cleartextHttp2ServerUpgradeHandler =
@@ -613,6 +625,18 @@ final class HttpPipelineBuilder {
 
             pipeline.addLast(cleartextHttp2ServerUpgradeHandler);
             pipeline.addLast(fallbackHandlerName, new SimpleChannelInboundHandler<HttpMessage>() {
+                @Override
+                public void userEventTriggered(ChannelHandlerContext ctx, Object evt) throws Exception {
+                    if (evt instanceof CleartextHttp2ServerUpgradeHandler.PriorKnowledgeUpgradeEvent) {
+                        // the client spoke HTTP/2 straight away, so this fallback is not needed.
+                        // The connection handler is already in the pipeline, but the rest of the
+                        // set-up still has to run, same as for the h2c upgrade above.
+                        ctx.pipeline().remove(this);
+                        afterH2cEstablished(connectionHandler);
+                    }
+                    super.userEventTriggered(ctx, evt);
+                }
+
                 @Override
                 protected void channelRead0(ChannelHandlerContext ctx, HttpMessage msg) {
                     // If this handler is hit then no upgrade has been attempted and the client is just talking HTTP.
@@ -640,6 +664,18 @@ final class HttpPipelineBuilder {
             connectionCustomizer.onInitialPipelineBuilt();
         }
 
+        /**
+         * Complete the pipeline set-up for an established h2c connection. Called both for the
+         * HTTP/1.1 upgrade path and for prior-knowledge connections.
+         *
+         * @param connectionHandler The HTTP/2 connection handler that is now in the pipeline
+         */
+        private void afterH2cEstablished(Http2ConnectionHandler connectionHandler) {
+            new StreamPipeline(channel, sslHandler, connectionCustomizer).afterHttp2ServerHandlerSetUp();
+            specificGracefulShutdown = new Http2GracefulShutdown(pipeline.context(connectionHandler), connectionHandler);
+            onRequestPipelineBuilt();
+        }
+
         private Http2MultiplexHandler makeHttp2Handler() {
             return new Http2MultiplexHandler(new ChannelInitializer<Channel>() {
                 @Override
@@ -652,12 +688,14 @@ final class HttpPipelineBuilder {
         }
 
         private HttpServerCodec createServerCodec() {
-            return new HttpServerCodec(
-                    server.getServerConfiguration().getMaxInitialLineLength(),
-                    server.getServerConfiguration().getMaxHeaderSize(),
-                    server.getServerConfiguration().getMaxChunkSize(),
-                    server.getServerConfiguration().isValidateHeaders(),
-                    server.getServerConfiguration().getInitialBufferSize()
+            NettyHttpServerConfiguration configuration = server.getServerConfiguration();
+            return new HttpServerCodec(new HttpDecoderConfig()
+                    .setMaxInitialLineLength(configuration.getMaxInitialLineLength())
+                    .setMaxHeaderSize(configuration.getMaxHeaderSize())
+                    .setMaxChunkSize(configuration.getMaxChunkSize())
+                    .setValidateHeaders(configuration.isValidateHeaders())
+                    .setInitialBufferSize(configuration.getInitialBufferSize())
+                    .setChunkedSupported(configuration.isChunkedSupported())
             );
         }
 
@@ -683,6 +721,12 @@ final class HttpPipelineBuilder {
 
     final class StreamPipeline {
         HttpVersion httpVersion = HttpVersion.HTTP_1_1;
+        /**
+         * Whether this pipeline carries the {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER}
+         * handler, see {@link #hasAccessLogHandler()}. {@code null} until first needed.
+         */
+        @Nullable
+        private Boolean hasAccessLogHandler;
         private final Channel channel;
         private final ChannelPipeline pipeline;
         @Nullable
@@ -695,6 +739,27 @@ final class HttpPipelineBuilder {
             this.pipeline = channel.pipeline();
             this.sslHandler = sslHandler;
             this.streamCustomizer = streamCustomizer;
+        }
+
+        /**
+         * Whether this pipeline carries the {@value ChannelPipelineCustomizer#HANDLER_ACCESS_LOGGER}
+         * handler, which is where the {@link RoutingInBoundHandler} stores the current request in
+         * a channel attribute for the access log. HTTP/1 pipelines and the per-stream pipelines of
+         * the legacy HTTP/2 handlers carry it; the connection pipeline of the default HTTP/2
+         * handler logs through the {@link Http2AccessLogManager} instead and does not (a single
+         * channel attribute could not tell concurrent streams apart). The pipeline is inspected
+         * once, on the first request, so that customizers that add or remove the handler while
+         * the pipeline is built are taken into account.
+         *
+         * @return Whether the access log handler is in this pipeline
+         */
+        boolean hasAccessLogHandler() {
+            Boolean has = hasAccessLogHandler;
+            if (has == null) {
+                has = pipeline.get(ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER) != null;
+                hasAccessLogHandler = has;
+            }
+            return has;
         }
 
         void initializeChildPipelineForPushPromise(Channel childChannel) {
@@ -756,7 +821,7 @@ final class HttpPipelineBuilder {
             }
 
             RequestHandler requestHandler = makeRequestHandler(webSocketUpgradeHandler, sslHandler != null);
-            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler);
+            PipeliningServerHandler pipeliningServerHandler = new PipeliningServerHandler(requestHandler, quic);
             pipeliningServerHandler.setCompressionStrategy(embeddedServices.getHttpCompressionStrategy());
             pipeliningServerHandler.setBodySizeLimits(bodySizeLimits());
             pipeliningServerHandler.setRequestDecompressionEnabled(server.getServerConfiguration().isRequestDecompressionEnabled());

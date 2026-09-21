@@ -4,6 +4,7 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.ApplicationEventListener
 import io.micronaut.context.event.ShutdownEvent
 import io.micronaut.context.event.StartupEvent
+import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.python.annotation.processing.test.AbstractPythonTypeElementSpec
 import org.graalvm.polyglot.Value
 import spock.util.concurrent.PollingConditions
@@ -177,10 +178,13 @@ class DisabledSampleEventListener:
         self.invocation_count += 1
 ''')
         def listenerType = context.classLoader.loadClass("python.DisabledSampleEventListener")
+        def eventType = context.classLoader.loadClass("python.SampleEvent")
 
         expect:
         !context.containsBean(listenerType)
-        context.getBeansOfType(ApplicationEventListener).isEmpty()
+        context.getBeansOfType(ApplicationEventListener, Qualifiers.byTypeArguments(eventType)).isEmpty()
+        // the runtime registers its own (shutdown) listener; no Python listener may be present
+        context.getBeansOfType(ApplicationEventListener).every { !listenerType.isInstance(it) }
 
         cleanup:
         context?.close()

@@ -16,9 +16,10 @@
 package io.micronaut.python.processing.element;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.Introduction;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
@@ -37,6 +39,9 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.context.annotation.Bean;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Nullable;
+import io.micronaut.python.processing.model.ArgumentDef;
+import io.micronaut.python.processing.model.ArgumentsDef;
 import io.micronaut.python.processing.model.AttributeDef;
 import io.micronaut.python.processing.model.ClassDef;
 import io.micronaut.python.processing.model.DecoratorDef;
@@ -47,11 +52,14 @@ import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.python.processing.model.TypeVar;
 import io.micronaut.python.processing.util.AnnotationNames;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.inject.ast.ConstructorElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.GenericPlaceholderElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.beans.BeanElementBuilder;
+import io.micronaut.inject.ast.TypeVariableBinder;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
+import io.micronaut.inject.writer.MethodGenUtils;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
 
 /**
@@ -60,9 +68,14 @@ import io.micronaut.python.processing.PythonProcessingEnvironment;
 @Experimental
 public sealed class PythonClassElement extends AbstractPythonClassElement permits PythonAnnotationElement {
     private static final String MEMBER_KEYS_PROPERTY = "memberKeys";
+    private static final String JUNIT_NESTED = "org.junit.jupiter.api.Nested";
+    private static final String CONTEXT_POOLED = "io.micronaut.context.python.scope.ContextPooled";
     private static final String INTRODUCTION_INTERFACE_MARKER = "java.io.Serializable";
+    private static final String DATACLASS_DECORATOR = "dataclass";
 
     private Map<String, ClassElement> resolvedTypeArguments;
+    private FunctionDef constructor;
+    private List<PythonClassElement> inheritedPythonClasses;
     private final List<ClassElement> introductionInterfaces = new ArrayList<>();
 
     public PythonClassElement(ClassDef classDef, PythonProcessingEnvironment environment) {
@@ -84,11 +97,36 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                        boolean initializeClassMetadata) {
         super(classDef, environment, arrayDimensions);
         this.resolvedTypeArguments = resolvedTypeArguments;
-        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
         if (initializeClassMetadata) {
-            markPropertyInjectionBeanCandidate();
-            moveIntroductionInterfacesToImplementedInterfaces();
+            initializeClassMetadata();
         }
+    }
+
+    /**
+     * Creates the element of a Python class for the class registry of the processing environment without
+     * deriving its class level metadata yet: {@link #initializeClassMetadata()} runs annotation mappers, which
+     * may look other Python classes up through the visitor context, so it is applied once every class of the
+     * environment is registered.
+     *
+     * @param classDef    The class definition
+     * @param environment The processing environment
+     * @return The element
+     */
+    @Internal
+    public static PythonClassElement registered(ClassDef classDef, PythonProcessingEnvironment environment) {
+        return new PythonClassElement(classDef, environment, 0, null, false);
+    }
+
+    /**
+     * Derives the class level metadata that depends on the annotations of the class definition: the introspection
+     * excludes, the bean stereotype of a class with property injection points and the interfaces introduced by an
+     * introduction advice. Building that metadata runs the annotation mappers of the class annotations.
+     */
+    @Internal
+    public void initializeClassMetadata() {
+        excludeIntrospectedProperties(MEMBER_KEYS_PROPERTY);
+        markPropertyInjectionBeanCandidate();
+        moveIntroductionInterfacesToImplementedInterfaces();
     }
 
     @Override
@@ -126,7 +164,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         if (BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata())) {
             return;
         }
-        if (isAbstract()) {
+        // isAbstract() resolves the bases of an introduction type with placeholder bodies through the class
+        // elements, which are still being built here: the declaration alone decides (an interceptor carrying
+        // the introduction stereotype is a declared bean and returned above)
+        if (hasAbstractDeclaration() || (hasPlaceholderBodies() && hasStereotype(Introduction.class))) {
             return;
         }
         if (hasPropertyInjectionPoint()) {
@@ -179,7 +220,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public boolean isStatic() {
-        return isInner();
+        // A Python class has no enclosing instance, so a nested class is a static member type of the
+        // generated class of its enclosing class; a JUnit @Nested test class is the exception, JUnit
+        // requires an inner class and constructs it with the instance of the enclosing test.
+        return isInner() && !hasDeclaredAnnotation(JUNIT_NESTED);
     }
 
     @Override
@@ -196,6 +240,40 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return Optional.ofNullable(environment.classes().get(qualifiedEnclosingName));
     }
 
+    /**
+     * Whether the Java class generated for this class is a member type of the Java class generated for
+     * the enclosing Python class.
+     * <p>
+     * A class nested in a Python class compiles to a member type of the generated class of its enclosing
+     * class (binary name {@code Outer$Inner}, as before), so that Java sees the nesting: JUnit runs a
+     * {@code @Nested} test class with the context of the enclosing {@code @MicronautTest}. Enums,
+     * interfaces and pooled classes are generated as top-level types named {@code Outer$Inner}, whether
+     * they are nested or enclose other classes.
+     *
+     * @return {@code true} when the generated class is a member type of the enclosing generated class
+     */
+    public boolean isMemberOfEnclosingType() {
+        return isInner()
+            && isMemberCandidate(this)
+            && getEnclosingType().filter(enclosing -> enclosing instanceof PythonClassElement && isMemberCandidate(enclosing)).isPresent();
+    }
+
+    private static boolean isMemberCandidate(ClassElement element) {
+        return !element.isEnum()
+            && !element.isInterface()
+            && !element.hasStereotype(CONTEXT_POOLED);
+    }
+
+    @Override
+    public String getCanonicalName() {
+        if (isMemberOfEnclosingType()) {
+            ClassElement enclosing = getEnclosingType().orElseThrow();
+            String name = getNativeType().name();
+            return enclosing.getCanonicalName() + "." + name.substring(name.lastIndexOf('$') + 1);
+        }
+        return getName();
+    }
+
     @Override
     protected ClassElement createWithArrayDimensions(int arrayDimensions) {
         return new PythonClassElement(getNativeType(), environment, arrayDimensions);
@@ -208,21 +286,61 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Optional<MethodElement> getDefaultConstructor() {
-        Optional<MethodElement> primaryConstructor = getPrimaryConstructor();
-        if (primaryConstructor.isEmpty()) {
-            if (!hasDeclaredAnnotation("dataclass")) {
+        if (findCreatorFunction().isEmpty()) {
+            Optional<MethodElement> defaultConstructor = findConstructor();
+            if (defaultConstructor.isEmpty() && !hasDeclaredAnnotation(DATACLASS_DECORATOR)) {
                 // python class with no explicit constructor return default
-                return Optional.of(new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory()));
+                return Optional.of(implicitConstructor());
+            } else if (defaultConstructor.isPresent() && defaultConstructor.get().getParameters().length == 0) {
+                // a no-arg __init__, declared or inherited
+                return defaultConstructor;
+            } else if (defaultConstructor.isPresent() && isCallableWithoutArguments(defaultConstructor.get())
+                && !MethodGenUtils.hasAllDefaultsParameters(Arrays.asList(defaultConstructor.get().getParameters()))) {
+                // every parameter of __init__ has a default (a dataclass whose fields all have defaults) but not
+                // all of them are literals the introspection can pass itself: the generated Java class offers a
+                // no-arg constructor that creates the object through the Python constructor, which applies them
+                return Optional.of(implicitConstructor());
             }
         }
         return super.getDefaultConstructor();
     }
 
+    /**
+     * Whether the given {@code __init__} takes parameters that all have a default value, so the Python
+     * class can be instantiated without arguments.
+     *
+     * @param constructor The constructor
+     * @return True if it is a constructor whose parameters all have defaults
+     */
+    public static boolean isCallableWithoutArguments(MethodElement constructor) {
+        if (!(constructor instanceof ConstructorElement) || !(constructor.getNativeType() instanceof FunctionDef functionDef)) {
+            return false;
+        }
+        List<ArgumentDef> arguments = functionDef.arguments() == null ? List.of() : functionDef.arguments().arguments();
+        return !arguments.isEmpty() && arguments.stream().allMatch(ArgumentDef::hasDefaultValue);
+    }
+
     @Override
     public Optional<MethodElement> getPrimaryConstructor() {
         // First check for @Creator methods (static factory methods)
-        List<FunctionDef> functions = getNativeType().functions();
-        for (FunctionDef function : functions) {
+        Optional<MethodElement> creator = findCreatorFunction();
+        if (creator.isPresent()) {
+            return creator;
+        }
+
+        // Fall back to regular constructor
+        Optional<MethodElement> primaryConstructor = findConstructor();
+        if (primaryConstructor.isPresent()) {
+            return primaryConstructor;
+        }
+        // A class that neither declares nor inherits __init__ is constructed without arguments. Report that
+        // implicit constructor like the Java model reports the implicit default constructor of a Java class, so
+        // that visitors resolving the primary constructor (associated beans, module imports) can use it.
+        return Optional.of(implicitConstructor());
+    }
+
+    private Optional<MethodElement> findCreatorFunction() {
+        for (FunctionDef function : getNativeType().functions()) {
             if (function.isStatic()) {
                 // Check if this static method has @Creator annotation
                 for (DecoratorDef decorator : function.decorators()) {
@@ -233,13 +351,262 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                 }
             }
         }
+        return Optional.empty();
+    }
 
-        // Fall back to regular constructor
-        FunctionDef constructor = getNativeType().constructor();
-        if (constructor != null) {
-            return Optional.of(new PythonConstructorElement(constructor, environment, this, this, environment.metadataFactory()));
+    /**
+     * Finds the {@code __init__} of this class: the declared one (including the constructor derived from the
+     * fields of a dataclass), otherwise the one inherited from the first Python base class in the method
+     * resolution order that declares one, which Python calls when the subclass is instantiated.
+     *
+     * @return The constructor, if the class declares or inherits one
+     */
+    private Optional<MethodElement> findConstructor() {
+        FunctionDef declaredConstructor = declaredConstructor();
+        if (declaredConstructor != null) {
+            return Optional.of(new PythonConstructorElement(declaredConstructor, environment, this, this, environment.metadataFactory()));
+        }
+        for (PythonClassElement pythonSuperType : inheritedPythonClasses()) {
+            FunctionDef inheritedConstructor = pythonSuperType.declaredConstructor();
+            if (inheritedConstructor != null) {
+                return Optional.of(new PythonConstructorElement(inheritedConstructor, environment, pythonSuperType, this, environment.metadataFactory()));
+            }
         }
         return Optional.empty();
+    }
+
+    /**
+     * The Python classes this class inherits from, in Python's method resolution order (the C3 linearization
+     * of the compiled Python bases), without this class: the order in which Python looks up an inherited
+     * member such as {@code __init__}. For {@code class C(Mixin, Base)} the mixin comes before the base and
+     * both before the bases of the mixin.
+     *
+     * @return The inherited Python classes in method resolution order
+     */
+    private List<PythonClassElement> inheritedPythonClasses() {
+        if (inheritedPythonClasses == null) {
+            List<PythonClassElement> linearization = linearize(new LinkedHashSet<>());
+            inheritedPythonClasses = List.copyOf(linearization.subList(1, linearization.size()));
+        }
+        return inheritedPythonClasses;
+    }
+
+    private List<PythonClassElement> linearize(Set<String> inProgress) {
+        List<PythonClassElement> linearization = new ArrayList<>();
+        linearization.add(this);
+        if (!inProgress.add(getName())) {
+            // a cyclic hierarchy, which Python rejects: stop here
+            return linearization;
+        }
+        List<PythonClassElement> bases = new ArrayList<>();
+        for (TypeRef basis : getNativeType().bases()) {
+            if (findPythonClass(basis) instanceof PythonClassElement pythonBase
+                && bases.stream().noneMatch(base -> base.getName().equals(pythonBase.getName()))) {
+                bases.add(pythonBase);
+            }
+        }
+        List<List<PythonClassElement>> sequences = new ArrayList<>(bases.size() + 1);
+        for (PythonClassElement base : bases) {
+            sequences.add(new ArrayList<>(base.linearize(inProgress)));
+        }
+        sequences.add(bases);
+        merge(sequences, linearization);
+        inProgress.remove(getName());
+        return linearization;
+    }
+
+    /**
+     * The C3 merge: repeatedly takes the head of the first sequence that does not appear in the tail of any
+     * other sequence. A hierarchy without such a head is inconsistent (Python refuses to create the class);
+     * the first remaining head is taken then so that every base is still visited.
+     */
+    private static void merge(List<List<PythonClassElement>> sequences, List<PythonClassElement> linearization) {
+        while (true) {
+            sequences.removeIf(List::isEmpty);
+            if (sequences.isEmpty()) {
+                return;
+            }
+            PythonClassElement next = sequences.stream()
+                .map(List::getFirst)
+                .filter(head -> sequences.stream().noneMatch(sequence -> indexOf(sequence, head) > 0))
+                .findFirst()
+                .orElseGet(() -> sequences.getFirst().getFirst());
+            linearization.add(next);
+            for (List<PythonClassElement> sequence : sequences) {
+                if (!sequence.isEmpty() && sequence.getFirst().getName().equals(next.getName())) {
+                    sequence.removeFirst();
+                }
+            }
+        }
+    }
+
+    private static int indexOf(List<PythonClassElement> sequence, PythonClassElement element) {
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i).getName().equals(element.getName())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * Whether this class is decorated with {@code @dataclass}.
+     *
+     * @return {@code true} for a Python dataclass
+     */
+    public boolean isDataclass() {
+        return hasDataclassDecorator(getNativeType().decorators());
+    }
+
+    /**
+     * Completes the {@code __init__} the processor derived from the fields of a dataclass with the fields of its
+     * dataclass bases. Python collects the fields of every dataclass in the method resolution order, walked from
+     * the most distant base to the class itself, plain classes in between contributing nothing: the fields of the
+     * bases come first and a field declared again keeps the position of its first declaration. An explicit
+     * {@code __init__} is used as declared, as in Python.
+     *
+     * @param constructor The constructor of the class definition, may be {@code null}
+     * @return The constructor to use, may be {@code null}
+     */
+    private @Nullable FunctionDef withInheritedDataclassFields(@Nullable FunctionDef constructor) {
+        if (!isDataclass() || (constructor != null && !hasDataclassDecorator(constructor.decorators()))) {
+            return constructor;
+        }
+        Map<String, ArgumentDef> fields = new LinkedHashMap<>();
+        List<PythonClassElement> mro = pythonMro();
+        for (int i = mro.size() - 1; i >= 0; i--) {
+            PythonClassElement base = mro.get(i);
+            if (!base.isDataclass()) {
+                continue;
+            }
+            List<ArgumentDef> inheritedFields = base.getPrimaryConstructor()
+                .filter(PythonConstructorElement.class::isInstance)
+                .map(superConstructor -> ((PythonConstructorElement) superConstructor).getNativeType().arguments().arguments())
+                .orElse(List.of());
+            for (ArgumentDef inheritedField : inheritedFields) {
+                fields.put(inheritedField.name(), inheritedField);
+            }
+        }
+        if (fields.isEmpty()) {
+            return constructor;
+        }
+        if (constructor != null) {
+            for (ArgumentDef field : constructor.arguments().arguments()) {
+                fields.put(field.name(), field);
+            }
+        }
+        FunctionDef template = constructor != null ? constructor : new FunctionDef(FunctionDef.CONSTRUCTOR_NAME, dataclassConstructorDecorators());
+        return new FunctionDef(
+            template.name(),
+            ArgumentsDef.of(List.copyOf(fields.values())),
+            template.decorators(),
+            template.returnType(),
+            template.typeComment(),
+            template.typeParams(),
+            template.documentation(),
+            template.isAbstract(),
+            template.isStatic(),
+            template.isAsync(),
+            template.hasReturnValue(),
+            template.hasPlaceholderBody(),
+            null,
+            template.superArguments()
+        ).withClassDef(getNativeType());
+    }
+
+    /**
+     * The Python bases of the class in method resolution order (the C3 linearization Python uses), the class
+     * itself excluded. Bases that are not Python classes (Java types) carry no dataclass fields and are left out.
+     *
+     * @return The linearized Python bases
+     */
+    private List<PythonClassElement> pythonMro() {
+        List<PythonClassElement> bases = new ArrayList<>();
+        for (TypeRef base : getNativeType().bases()) {
+            if (findPythonClass(base) instanceof PythonClassElement pythonBase && !pythonBase.getName().equals(getName())) {
+                bases.add(pythonBase);
+            }
+        }
+        List<List<PythonClassElement>> sequences = new ArrayList<>(bases.size() + 1);
+        for (PythonClassElement base : bases) {
+            List<PythonClassElement> baseMro = new ArrayList<>();
+            baseMro.add(base);
+            baseMro.addAll(base.pythonMro());
+            sequences.add(baseMro);
+        }
+        sequences.add(new ArrayList<>(bases));
+        return c3Merge(sequences);
+    }
+
+    /**
+     * Merges the linearizations of the bases: the next class is the first head that appears in no tail. Python
+     * rejects a hierarchy without such a head; here the first head is taken so that a constructor is still derived.
+     */
+    private static List<PythonClassElement> c3Merge(List<List<PythonClassElement>> sequences) {
+        List<PythonClassElement> result = new ArrayList<>();
+        while (true) {
+            sequences.removeIf(List::isEmpty);
+            if (sequences.isEmpty()) {
+                return result;
+            }
+            PythonClassElement next = null;
+            for (List<PythonClassElement> sequence : sequences) {
+                PythonClassElement head = sequence.getFirst();
+                if (sequences.stream().noneMatch(other -> indexOfClass(other, head) > 0)) {
+                    next = head;
+                    break;
+                }
+            }
+            if (next == null) {
+                next = sequences.getFirst().getFirst();
+            }
+            result.add(next);
+            for (List<PythonClassElement> sequence : sequences) {
+                if (indexOfClass(sequence, next) == 0) {
+                    sequence.removeFirst();
+                }
+            }
+        }
+    }
+
+    private static int indexOfClass(List<PythonClassElement> sequence, PythonClassElement classElement) {
+        for (int i = 0; i < sequence.size(); i++) {
+            if (sequence.get(i).getName().equals(classElement.getName())) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private static List<DecoratorDef> dataclassConstructorDecorators() {
+        return List.of(new DecoratorDef(DATACLASS_DECORATOR, DATACLASS_DECORATOR));
+    }
+
+    private static boolean hasDataclassDecorator(List<DecoratorDef> decorators) {
+        return decorators.stream().anyMatch(decorator -> DATACLASS_DECORATOR.equals(decorator.name()) || "dataclasses.dataclass".equals(decorator.name()));
+    }
+
+    /**
+     * Whether the class declares or inherits an {@code __init__}, or declares a {@code @Creator} function: a
+     * class constructed with arguments is never an interface.
+     */
+    private boolean hasConstructorOrCreator() {
+        return findConstructor().isPresent() || findCreatorFunction().isPresent();
+    }
+
+    /**
+     * The {@code __init__} this class declares, completed with the fields of its dataclass bases for a dataclass;
+     * {@code null} when the class declares none.
+     */
+    private @Nullable FunctionDef declaredConstructor() {
+        if (constructor == null) {
+            constructor = withInheritedDataclassFields(getNativeType().constructor());
+        }
+        return constructor;
+    }
+
+    private PythonConstructorElement implicitConstructor() {
+        return new PythonConstructorElement(new FunctionDef(FunctionDef.CONSTRUCTOR_NAME), environment, this, this, environment.metadataFactory());
     }
 
     @Override
@@ -259,6 +626,22 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
         for (ClassElement anInterface : getInterfaces()) {
             if (anInterface.isAssignable(type)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether the interface is implemented through an {@code @Introduction} of the class rather than
+     * declared as a base of the Python class. The proxy of the class implements its methods.
+     *
+     * @param anInterface The interface
+     * @return Whether it is an introduction interface
+     */
+    public boolean isIntroductionInterface(ClassElement anInterface) {
+        for (ClassElement introductionInterface : introductionInterfaces) {
+            if (introductionInterface.getName().equals(anInterface.getName())) {
                 return true;
             }
         }
@@ -285,24 +668,85 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         return interfaces;
     }
 
+    /**
+     * Whether the class compiles to a Java interface. A class is an interface when it has no state
+     * (no constructor, attributes or properties) and only declares abstract methods, in one of two shapes:
+     * <ul>
+     *     <li>a plain abstract class or {@code Protocol} without a bean or interceptor stereotype, the
+     *     Python spelling of a Java interface;</li>
+     *     <li>an {@link #isIntroductionInterface() introduction interface}: a class decorated with an
+     *     {@link Introduction} stereotype ({@code @Client}, an AI service, ...) that has no class base and whose
+     *     instance methods are all abstract, none of which declares a {@code *args} parameter. Micronaut
+     *     implements such a type with an introduction proxy, and frameworks that build the implementation
+     *     reflectively need the Java interface, not a class wrapping a Python object.</li>
+     * </ul>
+     *
+     * @return True if the class compiles to an interface
+     */
     @Override
     public boolean isInterface() {
-        boolean hasInterfaceBase = hasInterfaceBase();
-        if ((!hasInterfaceBase && BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata()))
-            || hasStereotype(InterceptorBinding.class)
-            || hasStereotype(Introspected.class)
-            || getPrimaryConstructor().isPresent()
+        // Whether a Python class compiles to a Java interface is a property of the class declaration.
+        // A copy of the element carrying other annotation metadata (the produced type of a factory
+        // method merges the method's annotations, a scope or around advice among them) must answer the
+        // same as the element the stub was generated from, or a proxy of the type extends an interface.
+        if (presetAnnotationMetadata != null
+            && environment.classes().get(getName()) instanceof PythonClassElement declaredElement
+            && declaredElement != this
+            && declaredElement.presetAnnotationMetadata == null) {
+            return declaredElement.isInterface();
+        }
+        if (hasStereotype(Introspected.class)
+            || hasConstructorOrCreator()
             || !getNativeType().attributes().isEmpty()
             || !getNativeType().properties().isEmpty()) {
+            return false;
+        }
+        boolean hasInterfaceBase = hasInterfaceBase();
+        boolean isIntroduction = hasIntroductionStereotype();
+        if (!isIntroduction
+            && ((!hasInterfaceBase && BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(getAnnotationMetadata()))
+                || hasStereotype(InterceptorBinding.class))) {
             return false;
         }
         List<MethodElement> declaredMethods = getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared());
         if (declaredMethods.isEmpty()) {
             return hasInterfaceBase;
         }
-        return !declaredMethods.isEmpty()
-            && declaredMethods.stream().allMatch(MethodElement::isAbstract)
+        if (isIntroduction) {
+            // static functions become static interface methods bridged to Python; the instance
+            // methods are all implemented by the introduction advice. A method with a `*args` parameter
+            // keeps the type a class served by the runtime proxy, which collects the positional arguments
+            // Python passes into the trailing array: the generated interface would declare a plain array
+            // parameter (not a Java varargs one) that a Python caller could not spread into through host interop.
+            // A class base (a Python class that is not an interface, or a Java class) keeps the type a class
+            // too: an interface cannot extend it, and the behaviour and state the base brings need the Python
+            // object behind the bean.
+            return declaredMethods.stream().allMatch(method -> method.isAbstract() || method.isStatic())
+                && declaredMethods.stream().anyMatch(MethodElement::isAbstract)
+                && declaredMethods.stream().noneMatch(PythonClassElement::isDeclaredBeanMethod)
+                && declaredMethods.stream().noneMatch(MethodElement::isVarArgs)
+                && getSuperType().isEmpty();
+        }
+        return declaredMethods.stream().allMatch(MethodElement::isAbstract)
             && declaredMethods.stream().noneMatch(PythonClassElement::isIntroductionFactoryMethod);
+    }
+
+    /**
+     * Whether this class is an interface implemented by an introduction proxy: it is decorated with an
+     * {@link Introduction} stereotype and {@link #isInterface() compiles to a Java interface}.
+     *
+     * @return True if the class is an introduction interface
+     */
+    public boolean isIntroductionInterface() {
+        return hasIntroductionStereotype() && isInterface();
+    }
+
+    private boolean hasIntroductionStereotype() {
+        return hasStereotype(Introduction.class) && !isAssignable(Interceptor.class);
+    }
+
+    private static boolean isDeclaredBeanMethod(MethodElement method) {
+        return method.hasDeclaredAnnotation(Bean.class) || method.hasDeclaredStereotype(Bean.class);
     }
 
     private boolean hasInterfaceBase() {
@@ -445,8 +889,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
         List<? extends GenericPlaceholderElement> declaredGenericPlaceholders = baseElement.getDeclaredGenericPlaceholders();
         List<TypeRef> typeArguments = base.typeArguments();
         if (!typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty() && typeArguments.size() == declaredGenericPlaceholders.size()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
-            Map<String, ClassElement> boundGenerics = new HashMap<>(getTypeArguments());
+            // The map is keyed in the order the base declares its variables: a bean introspection and a bean
+            // definition report the arguments of a type as a list, in that order
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> boundGenerics = typeVariableBindings();
             for (int i = 0; i < declaredGenericPlaceholders.size(); i++) {
                 GenericPlaceholderElement placeHolder = declaredGenericPlaceholders.get(i);
                 TypeRef typeRef = typeArguments.get(i);
@@ -457,7 +903,7 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
             return baseElement.withTypeArguments(resolvedTypeArguments);
         }
         if (typeArguments.isEmpty() && declaredGenericPlaceholders != null && !declaredGenericPlaceholders.isEmpty()) {
-            Map<String, ClassElement> resolvedTypeArguments = new HashMap<>(declaredGenericPlaceholders.size());
+            Map<String, ClassElement> resolvedTypeArguments = new LinkedHashMap<>(declaredGenericPlaceholders.size());
             for (GenericPlaceholderElement placeholder : declaredGenericPlaceholders) {
                 resolvedTypeArguments.put(placeholder.getVariableName(), GenericBindings.firstBound(placeholder));
             }
@@ -467,12 +913,20 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     }
 
     private Optional<ClassElement> toJavaType(TypeRef typeRef) {
-        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, Map.of()
-        );
+        ClassElement baseType = environment.visitorContext().getTypeResolver().resolve(typeRef, typeVariableBindings());
         if (baseType != null && !baseType.getName().equals(Object.class.getName())) {
             return Optional.of(baseType);
         }
         return Optional.empty();
+    }
+
+    private Map<String, ClassElement> typeVariableBindings() {
+        if (resolvedTypeArguments == null) {
+            // Bases of an open generic type must retain its variables so recursive supertype
+            // arguments can subsequently be bound through each level of the hierarchy.
+            return GenericBindings.declared(this, true);
+        }
+        return new LinkedHashMap<>(resolvedTypeArguments);
     }
 
     @Override
@@ -493,14 +947,28 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
 
     @Override
     public Map<String, Map<String, ClassElement>> getAllTypeArguments() {
+        // Python can have multiple concrete bases, so the traversal stays on the native bases instead of
+        // the super type and interfaces ClassElement's default implementation walks.
         Map<String, Map<String, ClassElement>> result = new LinkedHashMap<>();
         for (TypeRef base : getNativeType().bases()) {
             ClassElement baseElement = findPythonClass(base);
-            if (baseElement != null) {
-                result.putAll(resolveTypeArguments(baseElement, base).getAllTypeArguments());
-            } else {
-                toJavaType(base).ifPresent(javaType -> result.putAll(javaType.getAllTypeArguments()));
+            ClassElement resolvedBase = baseElement == null
+                ? toJavaType(base).orElse(null)
+                : resolveTypeArguments(baseElement, base);
+            if (resolvedBase == null) {
+                continue;
             }
+            // The arguments of the base are written in this type's variables, while the types above it are read
+            // from the base as it declares them, in its own variables, and bound through what this type gives it.
+            // Reading them from the resolved base instead would bind them a second time, because resolving a base
+            // substitutes this type's arguments all the way up
+            ClassElement declaredBase = baseElement == null ? resolvedBase.getRawClassElement() : baseElement;
+            Map<String, ClassElement> baseTypeArguments = resolvedBase.getTypeArguments();
+            String baseName = resolvedBase.getName();
+            declaredBase.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(baseName) ? baseTypeArguments : TypeVariableBinder.bind(typeArguments, baseTypeArguments)
+            ));
         }
         result.put(getName(), getTypeArguments());
         return result;

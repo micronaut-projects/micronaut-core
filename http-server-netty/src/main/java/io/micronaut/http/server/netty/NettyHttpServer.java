@@ -68,6 +68,7 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.IoEventLoopGroup;
 import io.netty.channel.ServerChannel;
@@ -80,6 +81,7 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
@@ -95,6 +97,7 @@ import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.UnixDomainSocketAddress;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -135,6 +138,11 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
     @SuppressWarnings("WeakerAccess")
     public static final String OUTBOUND_KEY = "-outbound-";
+
+    /**
+     * The default number of threads of a server-owned acceptor ("parent") event loop group.
+     */
+    private static final int DEFAULT_PARENT_THREADS = 1;
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private final NettyEmbeddedServices nettyEmbeddedServices;
@@ -496,6 +504,14 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     }
 
     /**
+     * @return The acceptor ("parent") event loop group in use, or {@code null} if the server has not been started
+     */
+    @Nullable
+    EventLoopGroup getParentGroup() {
+        return parentGroup;
+    }
+
+    /**
      * @return The parent event loop group
      */
     @SuppressWarnings("WeakerAccess")
@@ -504,10 +520,42 @@ public class NettyHttpServer implements NettyEmbeddedServer {
         return nettyEmbeddedServices.getEventLoopGroupRegistry()
                 .getEventLoopGroup(parent != null ? parent.getName() : NettyHttpServerConfiguration.Parent.NAME)
                 .orElseGet(() -> {
-                    final EventLoopGroup newGroup = newEventLoopGroup(parent);
+                    final EventLoopGroup newGroup = newEventLoopGroup(acceptorConfiguration(parent));
                     shutdownParent = true;
                     return newGroup;
                 });
+    }
+
+    /**
+     * Build the configuration for an acceptor ("parent") event loop group that is created and owned
+     * by this server. The acceptor group only accepts incoming connections and hands them to the
+     * worker group, so unless a thread count is configured explicitly it is sized to
+     * {@value #DEFAULT_PARENT_THREADS} thread rather than to the worker group default of
+     * {@link EventLoopGroupConfiguration#getThreadCoreRatio()} threads per core.
+     *
+     * @param parent The configured parent event loop group settings, if any
+     * @return The configuration to create the acceptor group from
+     */
+    private static EventLoopGroupConfiguration acceptorConfiguration(NettyHttpServerConfiguration.@Nullable Parent parent) {
+        EventLoopGroupConfiguration source = parent == null ? new DefaultEventLoopGroupConfiguration() : parent;
+        if (source.getNumThreads() != 0) {
+            // explicitly configured, honour it as-is
+            return source;
+        }
+        return new DefaultEventLoopGroupConfiguration(
+            // keep a name the user configured; only the implicit acceptor group is called "parent"
+            parent == null ? NettyHttpServerConfiguration.Parent.NAME : source.getName(),
+            DEFAULT_PARENT_THREADS,
+            source.getThreadCoreRatio(),
+            source.getIoRatio().orElse(null),
+            // the transport list below already reflects the (deprecated) native preference
+            false,
+            source.getTransport(),
+            source.getExecutorName().orElse(null),
+            source.getShutdownQuietPeriod(),
+            source.getShutdownTimeout(),
+            source.isLoomCarrier()
+        );
     }
 
     /**
@@ -742,6 +790,26 @@ public class NettyHttpServer implements NettyEmbeddedServer {
     private void stopInternal(boolean stopServerOnly) {
         List<Future<?>> futures = new ArrayList<>(2);
         try {
+            // Close the listening channels first, so that the addresses they are bound to are
+            // released by the time this method returns. This has to happen independently of the
+            // event loop groups: those are only shut down here if this server created them, and
+            // even then the listening channel would otherwise stay open for the duration of the
+            // shutdown quiet period.
+            List<Listener> listenersToClose = this.activeListeners;
+            if (listenersToClose != null) {
+                for (Listener listener : listenersToClose) {
+                    listener.closeServerChannel();
+                }
+                // Closing the listening channels only stops new connections from being accepted.
+                // The connections that were accepted before still have a fully functional pipeline
+                // on the worker group, which is normally shared and therefore not shut down here at
+                // all, so a client holding a keep-alive connection could dispatch a brand new
+                // request after this method returned. Close those connections too, so that the
+                // server is quiescent once stop()/stopServerOnly() returns.
+                for (Listener listener : listenersToClose) {
+                    listener.closeConnections();
+                }
+            }
             if (shutdownParent) {
                 Objects.requireNonNull(parentGroup);
                 EventLoopGroupConfiguration parent = serverConfiguration.getParent();
@@ -1025,6 +1093,105 @@ public class NettyHttpServer implements NettyEmbeddedServer {
 
         void clean() {
             contextWrapper.clear();
+        }
+
+        /**
+         * Close the channel this listener accepts connections on and wait for the close to
+         * complete, so that the address it is bound to is free again once this method returns.
+         */
+        void closeServerChannel() {
+            Channel channel = serverChannel;
+            if (channel == null) {
+                return;
+            }
+            ChannelFuture closeFuture = channel.close()
+                .addListener(NettyHttpServer.this::logShutdownErrorIfNecessary);
+            EventLoop eventLoop = channel.eventLoop();
+            if (eventLoop.inEventLoop()) {
+                // waiting on the event loop of the channel itself would deadlock
+                return;
+            }
+            long timeout = closeWaitMillis();
+            if (!closeFuture.awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                LOG.warn("Listener channel {} did not close within {}ms, continuing shutdown", channel, timeout);
+                return;
+            }
+            // Completing the close future is not the last step: the event loop still has to
+            // deregister the channel from its selector before the socket is given up. Wait for a
+            // round trip through the event loop so that this has happened before the caller (or
+            // the event loop group shutdown that follows) moves on.
+            if (!eventLoop.isShuttingDown() && !eventLoop.submit(() -> { }).awaitUninterruptibly(timeout, TimeUnit.MILLISECONDS)) {
+                LOG.warn("Event loop {} did not deregister listener channel {} within {}ms, continuing shutdown", eventLoop, channel, timeout);
+            }
+        }
+
+        /**
+         * Close the connections this listener has accepted and wait for them to be closed, so
+         * that no further request can be dispatched on any of them once this method returns.
+         * <p>This is the abrupt counterpart of {@link #shutdownGracefully()}: a caller that wants
+         * in-flight requests to complete first triggers the graceful shutdown and waits for it
+         * before stopping the server, in which case there is nothing left for this method to
+         * close.
+         */
+        void closeConnections() {
+            // One deadline for everything below, since it all proceeds concurrently on the loops.
+            long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(closeWaitMillis());
+            // A connection accepted just before the listener channel was closed may still be queued
+            // for registration with its worker event loop. Its initChannel has not run then, so it
+            // is not in activeConnections yet, and it would come up after this pass and stay usable
+            // when the worker group is shared and therefore not shut down. A round trip through
+            // every worker loop runs those queued registrations first.
+            EventLoopGroup workers = workerGroup;
+            if (workers != null) {
+                List<Future<?>> roundTrips = new ArrayList<>();
+                for (EventExecutor loop : workers) {
+                    // the current loop would deadlock, and a loop that is going away has nothing queued for us
+                    if (!loop.inEventLoop() && !loop.isShuttingDown()) {
+                        roundTrips.add(loop.submit(() -> { }));
+                    }
+                }
+                for (Future<?> roundTrip : roundTrips) {
+                    if (!awaitUntil(roundTrip, deadline)) {
+                        LOG.warn("Worker event loop did not run queued connection registrations within {}ms, continuing shutdown", closeWaitMillis());
+                        break;
+                    }
+                }
+            }
+            List<ChannelFuture> closeFutures = new ArrayList<>();
+            for (HttpPipelineBuilder.ConnectionPipeline connection : activeConnections) {
+                Channel channel = connection.channel;
+                ChannelFuture closeFuture = channel.close()
+                    .addListener(NettyHttpServer.this::logShutdownErrorIfNecessary);
+                // waiting on the event loop of the channel itself would deadlock
+                if (!channel.eventLoop().inEventLoop()) {
+                    closeFutures.add(closeFuture);
+                }
+            }
+            for (ChannelFuture closeFuture : closeFutures) {
+                if (!awaitUntil(closeFuture, deadline)) {
+                    LOG.warn("Connection {} did not close within {}ms, continuing shutdown", closeFuture.channel(), closeWaitMillis());
+                    break;
+                }
+            }
+        }
+
+        private static boolean awaitUntil(Future<?> future, long deadlineNanos) {
+            long remaining = deadlineNanos - System.nanoTime();
+            return remaining > 0 && future.awaitUninterruptibly(remaining, TimeUnit.NANOSECONDS);
+        }
+
+        /**
+         * How long {@link #closeServerChannel()} and {@link #closeConnections()} wait for a close
+         * to complete. Stopping the server must never block indefinitely on a channel that does
+         * not close, for example because its event loop is busy or blocked; after this long the
+         * shutdown continues and the event loop group shutdown that follows closes whatever is
+         * left. Uses the acceptor event loop group's shutdown timeout, which is what bounds the
+         * rest of the shutdown too.
+         */
+        private long closeWaitMillis() {
+            EventLoopGroupConfiguration parent = serverConfiguration.getParent();
+            Duration timeout = parent != null ? parent.getShutdownTimeout() : Duration.ofSeconds(EventLoopGroupConfiguration.DEFAULT_SHUTDOWN_TIMEOUT);
+            return Math.max(1, timeout.toMillis());
         }
 
         void refresh() {

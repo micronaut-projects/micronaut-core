@@ -838,7 +838,13 @@ public final class PyronautCompiler {
         /**
          * Set the directory used for full compiler error dump files.
          *
-         * @param errorDumpDirectory The dump directory
+         * <p>When not set, dumps are written to a {@code processor-error-dumps} directory next to
+         * the target directory (for example {@code build/processor-error-dumps} for a target
+         * directory of {@code build/classes}). In-memory compilation (no target directory) writes
+         * to a freshly created private temporary directory. Dumps are never written under the
+         * user's home directory.</p>
+         *
+         * @param errorDumpDirectory The dump directory, or {@code null} to use the default
          * @return this builder
          */
         public Builder errorDumpDirectory(File errorDumpDirectory) {

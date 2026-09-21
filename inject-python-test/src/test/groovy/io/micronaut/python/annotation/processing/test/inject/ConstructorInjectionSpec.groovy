@@ -714,4 +714,125 @@ class PaymentService:
         cleanup:
         context?.close()
     }
+
+    void "test constructor injection through an inherited __init__"() {
+        given: "a bean without __init__ whose base class declares the injected constructor"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class Dependency:
+    def name(self) -> str:
+        return "dependency"
+
+class BaseService:
+    def __init__(self, dependency: Dependency):
+        self.dependency = dependency
+
+@Singleton
+class ChildService(BaseService):
+
+    @Executable
+    def describe(self) -> str:
+        return "child with " + self.dependency.name()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ChildService")
+        def bean = getBean(context, "python.ChildService")
+
+        then: "the inherited __init__ is the injection point of the subclass"
+        definition.constructor.arguments*.name == ["dependency"]
+        definition.constructor.arguments[0].type.name == "python.Dependency"
+        bean.describe() == "child with dependency"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor injection through the __init__ of the base after a mixin without one"() {
+        given: "a bean whose first base is a mixin without __init__ and whose second base declares the constructor"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class Dependency:
+    def name(self) -> str:
+        return "dependency"
+
+class Mixin:
+    def prefix(self) -> str:
+        return "mixed"
+
+class BaseService:
+    def __init__(self, dependency: Dependency):
+        self.dependency = dependency
+
+@Singleton
+class ChildService(Mixin, BaseService):
+
+    @Executable
+    def describe(self) -> str:
+        return self.prefix() + " child with " + self.dependency.name()
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.ChildService")
+        def bean = getBean(context, "python.ChildService")
+
+        then: "the __init__ Python resolves through the MRO is the injection point of the subclass"
+        definition.constructor.arguments*.name == ["dependency"]
+        definition.constructor.arguments[0].type.name == "python.Dependency"
+        bean.describe() == "mixed child with dependency"
+
+        cleanup:
+        context?.close()
+    }
+
+    void "test constructor injection follows the C3 method resolution order of a diamond"() {
+        given: "a diamond where the __init__ of the right branch comes before the one of the shared base"
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Executable
+
+@Singleton
+class Dependency:
+    def name(self) -> str:
+        return "dependency"
+
+class Root:
+    def __init__(self):
+        self.origin = "root"
+
+class Left(Root):
+    pass
+
+class Right(Root):
+    def __init__(self, dependency: Dependency):
+        self.origin = "right with " + dependency.name()
+
+@Singleton
+class Diamond(Left, Right):
+
+    @Executable
+    def describe(self) -> str:
+        return self.origin
+'''
+
+        when:
+        def context = buildContext(pythonCode)
+        def definition = getBeanDefinition(context, "python.Diamond")
+        def bean = getBean(context, "python.Diamond")
+
+        then: "Right.__init__ is the constructor, as the MRO is Diamond, Left, Right, Root"
+        definition.constructor.arguments*.name == ["dependency"]
+        bean.describe() == "right with dependency"
+
+        cleanup:
+        context?.close()
+    }
 }

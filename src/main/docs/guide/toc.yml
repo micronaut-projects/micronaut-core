@@ -346,9 +346,22 @@ languageSupport:
     title: Micronaut for Python
     pythonRuntime: Runtime Requirements
     pythonThreading: Python Threading
+    decorators: Annotations as Decorators
+    sourceRoots: Main and Test Sources
     typeOrdering: Type Ordering and Forward References
+    interfaces: Interfaces and Introduction Advice
     standardTypes: Standard Library Type Conversions
+    javaCollections: Java Collections and Serialization
+    runtimeTypes: Python Classes and Objects at Run Time
+    javaImports: Importing Java Types
     keywords: Python Keywords in Java APIs
+    nestedTypes: Nested Java Types
+    pythonExceptions: Python Exceptions Extending Java Exceptions
+    functionalInterfaces: Python Callables as Functional Interfaces
+    javaInterfaces: Implementing Java Interfaces
+    generatedClasses: Generated Java Classes
+    aopProxies: AOP Proxies
+    extendingJavaClasses: Extending Java Classes
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests

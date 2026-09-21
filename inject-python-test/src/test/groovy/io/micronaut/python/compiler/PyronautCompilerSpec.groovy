@@ -709,7 +709,7 @@ class MyNestedRepeatableService:
 
         def packageInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/__init__.py")
         packageInit.exists()
-        packageInit.text.contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
+        packageMembers(packageInit.parentFile).contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
 
         cleanup:
         tempDir.deleteDir()
@@ -791,16 +791,16 @@ class AsyncImportService:
 
         def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
         propagationInit.exists()
-        propagationInit.text.contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
+        packageMembers(propagationInit.parentFile).contains("ReactorPropagation = _micronaut_java_type('io.micronaut.core.async.propagation.ReactorPropagation')")
 
         def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
-        coreInit.text.contains("from . import async_")
+        packageMembers(coreInit.parentFile).contains("from . import async_")
 
         cleanup:
         tempDir.deleteDir()
     }
 
-    def "test imported Java keyword methods use generated facades and direct aliases use mapped bytecode"() {
+    def "test imported Java keyword methods and direct aliases use mapped bytecode"() {
         given:
         def pythonCode = '''
 from java.lang import Thread
@@ -850,15 +850,94 @@ class KeywordMethodService:
         def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
         sourceFile.exists()
         sourceFile.text == pythonCode
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang/__init__.py")
-            .text.contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher/__init__.py")
-            .text.contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
+        packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang"))
+            .contains("Thread = _micronaut_java_type('java.lang.Thread')")
+        packageMembers(new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher"))
+            .contains("Mono = _micronaut_java_type('reactor.core.publisher.Mono')")
         new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
             .listFiles().any { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
         pythonContext.eval("python", "KeywordMethodService().imported_reactor(ImportedMono.just('imported')).block()").asString() == 'imported'
         pythonContext.eval("python", "KeywordMethodService().assigned_reactor(ImportedMono.just('assigned')).blockFirst()").asString() == 'assigned'
         pythonContext.eval("python", "KeywordMethodService().python_method()").asString() == 'python'
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+        tempDir.deleteDir()
+    }
+
+    def "test Python keyword aliases resolve on Java objects returned at runtime"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.python.compiler import KeywordMessage, KeywordSpecification
+
+
+@Singleton
+class KeywordAliasService:
+    def message(self):
+        return KeywordMessage.builder().from_("sender@example.com").to("john@example.com").build()
+
+    def sender(self, message):
+        return message.from_()
+
+    def combined(self):
+        a = KeywordSpecification.named("a")
+        b = KeywordSpecification.named("b")
+        return a.and_(b).or_(b.not_()).name()
+
+    def same(self):
+        a = KeywordSpecification.named("a")
+        return a.is_(KeywordSpecification.named("a")) and a.in_(["a", "b"]) and not a.is_(a.not_())
+
+    def missing(self, message):
+        return message.missing_()
+
+    def missing_keyword(self, message):
+        return message.while_()
+'''
+        def tempDir = File.createTempDir("python-test-keyword-alias", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        def message = pythonContext.eval("python", "KeywordAliasService().message()").asHostObject()
+
+        then: "the alias is resolved at runtime, not rewritten by the compiler"
+        !pythonContext.eval("python", "'getattr' in KeywordAliasService.sender.__code__.co_names or 'getattr' in KeywordAliasService.message.__code__.co_names").asBoolean()
+        message instanceof KeywordMessage
+        message.from() == 'sender@example.com'
+        message.to() == 'john@example.com'
+        pythonContext.eval("python", "KeywordAliasService().sender(KeywordMessage.builder().from_('x@y').build())").asString() == 'x@y'
+        pythonContext.eval("python", "KeywordAliasService().combined()").asString() == '((a and b) or not b)'
+        pythonContext.eval("python", "KeywordAliasService().same()").asBoolean()
+
+        and: "the explicit spelling and the alias agree"
+        pythonContext.eval("python", "getattr(KeywordMessage.builder().from_('x@y').build(), 'from')()").asString() == 'x@y'
+        pythonContext.eval("python", "m = KeywordMessage.builder(); hasattr(m, 'from_') and hasattr(m, 'from') and not hasattr(m, 'nope_') and not hasattr(m, 'nope')").asBoolean()
+
+        when: "a member that exists under neither spelling"
+        pythonContext.eval("python", "KeywordAliasService().missing(KeywordMessage.builder().build())")
+
+        then:
+        def error = thrown(PolyglotException)
+        error.message.contains("foreign object has no attribute 'missing_'")
+
+        when: "a keyword alias whose stripped member does not exist either"
+        pythonContext.eval("python", "KeywordAliasService().missing_keyword(KeywordMessage.builder().build())")
+
+        then: "the error names the alias the caller used"
+        def keywordError = thrown(PolyglotException)
+        keywordError.message.contains("foreign object has no attribute 'while_'")
 
         cleanup:
         context?.close()
@@ -1749,8 +1828,8 @@ class PhoneRepository(CrudRepository[PhoneEntity, int]):
         when:
         compiler.compile()
         def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
-        def contactDefinition = classLoader.loadClass('python.$ContactRepository$RuntimeProxy$Definition').newInstance()
-        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$RuntimeProxy$Definition').newInstance()
+        def contactDefinition = classLoader.loadClass('python.$ContactRepository$Intercepted$Definition').newInstance()
+        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$Intercepted$Definition').newInstance()
         def contactSave = contactDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
         def phoneSave = phoneDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
 
@@ -1995,5 +2074,18 @@ class NotNullExample:
         cleanup:
         context.close()
         tempSrcDir.deleteDir()
+    }
+
+    /**
+     * The members contributed to a package by the given number of contributions (the application
+     * modules of the package and the Java shims imported from it are contributed separately), written
+     * to members modules next to the package initialiser that merges them.
+     */
+    private static String packageMembers(File packageDirectory, int contributions = 1) {
+        def modules = packageDirectory.listFiles()
+            .findAll { it.name.startsWith(PythonAnnotationProcessor.PACKAGE_MEMBERS_MODULE_PREFIX) }
+            .sort { it.name }
+        assert modules.size() == contributions : "${contributions} members module(s) expected in ${packageDirectory}: ${modules*.name}"
+        modules*.text.join('\n')
     }
 }

@@ -27,6 +27,7 @@ import org.slf4j.helpers.NOPLogger;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.JarURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -44,6 +45,8 @@ import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.jar.JarEntry;
+import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -150,7 +153,9 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
         if (startsWithBase(url)) {
             try {
                 URI uri = url.toURI();
-                if (uri.getScheme().equals("jar")) {
+                if (uri.getScheme().equals("jar") && isEntryOfJarFile(uri)) {
+                    return readJarEntry(url);
+                } else if (uri.getScheme().equals("jar")) {
                     synchronized (DefaultClassPathResourceLoader.class) {
                         FileSystem fileSystem = null;
                         try {
@@ -214,6 +219,45 @@ public class DefaultClassPathResourceLoader implements ClassPathResourceLoader {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether the URI names an entry of a jar file, {@code jar:file:/app.jar!/entry}, rather than an entry of a
+     * jar nested in another one or of a jar that is not on the file system.
+     *
+     * @param uri The jar URI
+     * @return True if the URI names an entry of a jar file
+     */
+    private static boolean isEntryOfJarFile(URI uri) {
+        String spec = uri.getRawSchemeSpecificPart();
+        int sep = spec.indexOf("!/");
+        return sep != -1 && spec.indexOf("!/", sep + 2) == -1 && spec.startsWith("file:");
+    }
+
+    /**
+     * Reads an entry of a jar file through the jar the class loader has already opened. Opening the jar as a zip file
+     * system instead reads and indexes its whole central directory again, on every call.
+     *
+     * @param url The URL of the entry
+     * @return The content of the entry, or empty if it is a directory
+     * @throws IOException If the entry cannot be read
+     */
+    private static Optional<InputStream> readJarEntry(URL url) throws IOException {
+        JarURLConnection connection = (JarURLConnection) url.openConnection();
+        // do not keep the jar open in the cache of the jar protocol handler, closing the stream closes the jar
+        connection.setUseCaches(false);
+        JarFile jarFile = connection.getJarFile();
+        try {
+            JarEntry entry = connection.getJarEntry();
+            if (entry == null || entry.isDirectory()) {
+                return Optional.empty();
+            }
+            try (InputStream input = jarFile.getInputStream(entry)) {
+                return Optional.of(new ByteArrayInputStream(input.readAllBytes()));
+            }
+        } finally {
+            jarFile.close();
+        }
     }
 
     private boolean startsWithBase(URL url) {

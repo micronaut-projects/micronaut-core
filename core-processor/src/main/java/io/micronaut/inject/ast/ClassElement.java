@@ -699,6 +699,10 @@ public interface ClassElement extends TypedElement {
      * Builds a map of all the type parameters for a class, its super classes and interfaces.
      * The resulting map contains the name of the class to the map of the resolved generic types.
      *
+     * <p>The arguments of every super type are expressed in the type arguments of this class: a {@code Reversed}
+     * that extends {@code HashMap} with its own two variables swapped answers with those two variables, in that
+     * swapped order, for {@code HashMap} and for {@code Map} alike.</p>
+     *
      * @return The type arguments for this class element
      */
     default Map<String, Map<String, ClassElement>> getAllTypeArguments() {
@@ -706,7 +710,16 @@ public interface ClassElement extends TypedElement {
         Stream.concat(
                 getInterfaces().stream(),
                 getSuperType().stream()
-        ).map(ClassElement::getAllTypeArguments).forEach(result::putAll);
+        ).forEach(superType -> {
+            // The arguments of a direct super type are written in this type's variables, while those of the
+            // types above it are written in the variables of the super type, which this type binds
+            Map<String, ClassElement> superTypeArguments = superType.getTypeArguments();
+            String superTypeName = superType.getName();
+            superType.getAllTypeArguments().forEach((typeName, typeArguments) -> result.put(
+                typeName,
+                typeName.equals(superTypeName) ? typeArguments : TypeVariableBinder.bind(typeArguments, superTypeArguments)
+            ));
+        });
         result.put(getName(), getTypeArguments());
         return result;
     }

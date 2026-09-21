@@ -28,7 +28,6 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -106,6 +105,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean finished;
         private boolean reset;
+        private boolean closed;
         private Compressor. @Nullable Session compressionSession;
 
         MultiplexedStream(int streamId) {
@@ -165,7 +165,10 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            if (streamer == null) {
+            if (streamer == null && closed) {
+                // no request will be accepted for this stream anymore
+                data.release();
+            } else if (streamer == null) {
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
                 }
@@ -176,12 +179,11 @@ abstract class MultiplexedServerHandler {
                     if (bufferedContent == null) {
                         fullBody = data;
                     } else {
-                        CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
-                        for (ByteBuf c : bufferedContent) {
-                            composite.addComponent(true, c);
-                        }
-                        composite.addComponent(true, data);
-                        fullBody = composite;
+                        bufferedContent.add(data);
+                        List<ByteBuf> pieces = bufferedContent;
+                        // composeBody takes ownership of the pieces even when it fails
+                        bufferedContent = null;
+                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                     }
                     bufferedContent = null;
 
@@ -208,7 +210,7 @@ abstract class MultiplexedServerHandler {
          * on buffering data in hopes of reading it all in one go.
          */
         final void devolveToStreaming() {
-            if (requestAccepted || streamer != null || request == null) {
+            if (closed || requestAccepted || streamer != null || request == null) {
                 return;
             }
             streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
@@ -243,6 +245,23 @@ abstract class MultiplexedServerHandler {
                 streamer.error(e);
             }
             disposeWriteSide();
+        }
+
+        /**
+         * Called when the stream is closed, or when no more of it will be read. Request data
+         * that is still buffered for the next read complete is released, and no request is
+         * accepted for the stream afterwards. The released bytes are not reported to
+         * {@link #notifyDataConsumed(int)}: the flow control window of a closed stream is settled
+         * by the transport.
+         */
+        final void discardBufferedContent() {
+            closed = true;
+            if (bufferedContent != null) {
+                for (ByteBuf buf : bufferedContent) {
+                    buf.release();
+                }
+                bufferedContent = null;
+            }
         }
 
         private void disposeWriteSide() {

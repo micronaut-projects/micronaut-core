@@ -27,11 +27,14 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
@@ -102,7 +105,9 @@ final class PythonContextRegistry {
      * @param context The GraalPy context being tracked
      */
     static void registerContext(Context context) {
-        state(context).enterable.set(context);
+        ContextState state = state(context);
+        state.enterable.set(context);
+        state.registered = true;
     }
 
     /**
@@ -127,6 +132,26 @@ final class PythonContextRegistry {
             }
         }
         runNoActiveExecutionsListeners(listeners);
+    }
+
+    /**
+     * Drop the Python scoped proxies created in a context for the beans of an application that shuts
+     * down while the context lives on (a reused context): the proxies, and the bean context they
+     * resolve their targets through, are then no longer reachable from the context state. A proxy of
+     * an application still running gets a new Python scoped proxy on its next use.
+     *
+     * @param context The context the application used
+     */
+    static void forgetScopedProxies(Context context) {
+        ContextState state;
+        synchronized (LOCK) {
+            state = CONTEXT_STATES.get(context);
+        }
+        if (state != null) {
+            synchronized (state.scopedProxies) {
+                state.scopedProxies.clear();
+            }
+        }
     }
 
     /**
@@ -385,9 +410,13 @@ final class PythonContextRegistry {
      */
     static int forgetClosedContexts() {
         // the probe is a context operation: never under the registry lock
-        Map<Context, ContextState> snapshot;
+        Map<Context, ContextState> snapshot = new HashMap<>();
         synchronized (LOCK) {
-            snapshot = new HashMap<>(CONTEXT_STATES);
+            CONTEXT_STATES.forEach((context, state) -> {
+                if (isProbeable(state)) {
+                    snapshot.put(context, state);
+                }
+            });
         }
         List<Context> closed = new ArrayList<>();
         for (Context context : snapshot.keySet()) {
@@ -411,9 +440,24 @@ final class PythonContextRegistry {
         return dropped;
     }
 
+    /**
+     * Whether the sweep may probe the context of a state. The probe enters the context on the
+     * sweeping thread, which is not the thread that owns it, and entering a context that is closing
+     * fails its close. Registered contexts are released by {@link #unregisterContext(Context)} and
+     * are never probed; neither are states with executions or a close in progress.
+     *
+     * @param state The state, read under the registry lock
+     * @return Whether the context of the state may be probed
+     */
+    private static boolean isProbeable(ContextState state) {
+        return !state.registered && !state.closing && state.activeExecutions == 0;
+    }
+
     private static boolean isClosed(Context context) {
         try {
-            context.getBindings(PythonContextRuntime.PYTHON);
+            // not getBindings: that initializes Python in a context its owner may be initializing,
+            // and the owner's evaluations then miss the main module the bindings expose
+            context.getPolyglotBindings();
             return false;
         } catch (IllegalStateException e) {
             // "The Context is already closed"; a context in use from another thread is not closed
@@ -700,20 +744,45 @@ final class PythonContextRegistry {
     /**
      * The runtime state of one GraalPy context.
      */
+    /**
+     * The event-loop instance of a startup-context object.
+     *
+     * @param target The event-loop instance
+     * @param constructorMembers The members its own {@code __init__} set
+     */
+    record AsyncInstance(Value target, Set<String> constructorMembers) {
+    }
+
     static final class ContextState {
         final Object lock = new Object();
         /** The enterable creator instance of this context, when known. */
         final AtomicReference<@Nullable Context> enterable = new AtomicReference<>();
+        /** Whether the runtime created the context and unregisters it when closing it. */
+        volatile boolean registered;
         /** Whether entering was probed on an instance that cannot be entered. */
         volatile boolean enterUnsupported;
         /** Host members assigned to startup-context objects, mirrored into event-loop contexts. */
         final IdentityHashMap<Value, Map<String, Object>> asyncMembers = new IdentityHashMap<>();
+        /**
+         * Host constructor arguments of startup-context objects, replayed into event-loop contexts. Weak: an object
+         * created per request is forgotten with its wrapper, which holds the key.
+         */
+        final WeakHashMap<Value, Object[]> asyncConstructorArguments = new WeakHashMap<>();
+        /**
+         * Event-loop instances of startup-context objects, in an event-loop context. Weak: the startup object's
+         * wrapper holds the key.
+         */
+        final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
+        /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
+        final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
         final AtomicReference<@Nullable Value> runtimeModule = new AtomicReference<>();
         /** Python classes resolved in this context, keyed by their qualified name. */
         final Map<String, Value> classes = new ConcurrentHashMap<>();
+        /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
+        final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -722,9 +791,14 @@ final class PythonContextRegistry {
 
         private void clear() {
             asyncMembers.clear();
+            asyncConstructorArguments.clear();
+            asyncInstances.clear();
+            coroutineClasses.clear();
             helpers.clear();
             classes.clear();
+            scopedProxies.clear();
             runtimeModule.set(null);
+            registered = false;
             noActiveExecutionsListeners.clear();
             noContextListeners.clear();
             activeExecutions = 0;

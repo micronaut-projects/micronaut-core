@@ -215,6 +215,30 @@ abstract class AbstractReadBufferTest {
     }
 
     @Test
+    public void bufferWithExpectedSize() throws IOException {
+        // exact hint, smaller hint (the buffer must grow), zero hint, larger hint
+        for (int expectedSize : new int[]{3, 1, 0, 8192}) {
+            try (ReadBuffer rb = factory.buffer(expectedSize, os -> os.write(new byte[]{1, 2, 3}))) {
+                assertArrayEquals(new byte[]{1, 2, 3}, rb.toArray(), "expectedSize=" + expectedSize);
+            }
+        }
+        byte[] large = new byte[100_000];
+        for (int i = 0; i < large.length; i++) {
+            large[i] = (byte) i;
+        }
+        try (ReadBuffer rb = factory.buffer(8192, os -> {
+            for (int i = 0; i < large.length; i += 7919) {
+                os.write(large, i, Math.min(7919, large.length - i));
+            }
+        })) {
+            assertArrayEquals(large, rb.toArray());
+        }
+        try (ReadBuffer rb = factory.buffer(8192, os -> { })) {
+            assertEquals(0, rb.readable());
+        }
+    }
+
+    @Test
     public void outputStreamBuffer() throws IOException {
         ReadBuffer body;
         try (ReadBufferFactory.BufferingOutputStream bos = factory.outputStreamBuffer()) {

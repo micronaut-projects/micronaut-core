@@ -20,7 +20,6 @@ import io.micronaut.context.annotation.Replaces;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.scheduling.LoomSupport;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.executor.ExecutorConfiguration;
 import io.micronaut.scheduling.executor.ExecutorFactory;
@@ -40,7 +39,6 @@ import java.util.concurrent.ThreadFactory;
 @Internal
 @Experimental
 @Factory
-@Requires(condition = LoomSupport.LoomCondition.class)
 @Requires(condition = PrivateLoomSupport.PrivateLoomCondition.class)
 final class EventLoopLoomFactory {
     final FastThreadLocal<ThreadFactory> targetScheduler = new FastThreadLocal<>();
@@ -53,7 +51,7 @@ final class EventLoopLoomFactory {
             throw new IllegalStateException("Virtual executor should be virtual");
         }
 
-        ThreadFactory delegate = LoomSupport.newVirtualThreadFactory("virtual-executor-");
+        ThreadFactory delegate = Thread.ofVirtual().name("virtual-executor-", 1L).factory();
         return r -> {
             ThreadFactory targetScheduler = EventLoopLoomFactory.this.targetScheduler.get();
             if (targetScheduler == null) {

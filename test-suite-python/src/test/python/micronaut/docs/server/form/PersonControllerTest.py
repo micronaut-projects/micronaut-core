@@ -1,6 +1,5 @@
 from typing import Annotated
 
-import java
 from jakarta.inject import Inject
 from micronaut.context.annotation import Property
 from micronaut.http import HttpRequest, MediaType
@@ -9,7 +8,7 @@ from micronaut.http.client.annotation import Client
 from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
-Person = java.type("micronaut.docs.server.form.Person")
+from .Person import Person
 
 
 @Property(name="spec.name", value="PersonControllerFormTest")

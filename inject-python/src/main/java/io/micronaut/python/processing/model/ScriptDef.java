@@ -109,13 +109,19 @@ public record ScriptDef(
     }
 
     public String qualifiedName() {
-        String n = name;
-        if (n.endsWith(".py")) {
-            n = toJavaClassName(name.substring(0, name.length() - 3));
-        } else if (name.equals("Unnamed")) {
-            n = "Script";
+        return packageName + "." + javaSimpleName();
+    }
+
+    /**
+     * The simple name of the Java class generated for the script.
+     *
+     * @return The simple name
+     */
+    public String javaSimpleName() {
+        if (name.endsWith(".py")) {
+            return toJavaClassName(name.substring(0, name.length() - 3));
         }
-        return packageName + "." + n;
+        return name.equals("Unnamed") ? "Script" : name;
     }
 
     /**
