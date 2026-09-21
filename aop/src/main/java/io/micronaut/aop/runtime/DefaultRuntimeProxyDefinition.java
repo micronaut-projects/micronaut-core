@@ -88,8 +88,37 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                               BeanDefinition<T> proxyBeanDefinition,
                                                               boolean isProxyTarget,
                                                               Object[] constructorValues) {
+        // the creator is not known to a definition compiled before 5.3, so it is taken to read the methods alone
+        return around(resolutionContext, proxyBeanDefinition, isProxyTarget, constructorValues, false);
+    }
+
+    /**
+     * Creates a new instance for around advice, for the creator that makes the proxy.
+     *
+     * @param resolutionContext   The resolution context
+     * @param proxyBeanDefinition The proxy bean definition
+     * @param isProxyTarget       Is proxy target bean
+     * @param constructorValues   The constructor values
+     * @param creator             The creator the definition is for
+     * @param <T>                 The proxy type
+     * @return The definition
+     * @since 5.3.0
+     */
+    public static <T> DefaultRuntimeProxyDefinition<T> around(BeanResolutionContext resolutionContext,
+                                                              BeanDefinition<T> proxyBeanDefinition,
+                                                              boolean isProxyTarget,
+                                                              Object[] constructorValues,
+                                                              RuntimeProxyCreator creator) {
+        return around(resolutionContext, proxyBeanDefinition, isProxyTarget, constructorValues, creator.selectsInterceptorsPerTarget());
+    }
+
+    private static <T> DefaultRuntimeProxyDefinition<T> around(BeanResolutionContext resolutionContext,
+                                                               BeanDefinition<T> proxyBeanDefinition,
+                                                               boolean isProxyTarget,
+                                                               Object[] constructorValues,
+                                                               boolean perTarget) {
         if (isProxyTarget) {
-            return aroundTarget(resolutionContext, proxyBeanDefinition, constructorValues);
+            return aroundTarget(resolutionContext, proxyBeanDefinition, constructorValues, perTarget);
         }
         // the proxy is the bean: its interceptors are the bean's own, resolved through the context creating it
         return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods(proxyBeanDefinition, resolutionContext, false), false, false, constructorValues);
@@ -101,15 +130,20 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
      * <p>The proxy holds the singleton interceptors bound to the target's methods only. The non-singleton
      * interceptors of a target are the target's own, created with it as dependents of its registration, and the
      * interceptors of a method are selected from the target's registration. A singleton target is one to one with
-     * the proxy, so it is resolved now and the selection is made once. Any other target is resolved by each call,
+     * the proxy, so it is resolved now and the selection is made once, unless an interceptor of a custom scope is
+     * bound, whose instance is its scope's at the time of each call. Any other target is resolved by each call,
      * through {@link #targetBean()}, so the selection is made for the target of the call, through
      * {@link #interceptors(InterceptedMethod, Object)}; the intercepted methods then list the methods an interceptor
-     * is bound to, with no interceptors of their own.</p>
+     * is bound to, with the interceptors that do not depend on the target.</p>
+     *
+     * <p>For a creator that reads the intercepted methods alone, they list every interceptor, the non-singleton ones
+     * created once for the proxy and owned by no target, as before 5.3.</p>
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <T> DefaultRuntimeProxyDefinition<T> aroundTarget(BeanResolutionContext resolutionContext,
                                                                      BeanDefinition<T> proxyBeanDefinition,
-                                                                     Object[] constructorValues) {
+                                                                     Object[] constructorValues,
+                                                                     boolean perTarget) {
         BeanContext beanContext = resolutionContext.getContext();
         Argument<T> argument = Argument.of(proxyBeanDefinition.getBeanType());
         Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
@@ -117,7 +151,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         ExecutableMethod<T, ?>[] methods = targetDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
         ProxyInterceptors selection = new ProxyInterceptors(resolutionContext, methods, false);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
-        if (targetDefinition.isSingleton()) {
+        if (targetDefinition.isSingleton() && (!perTarget || !selection.hasScopedInterceptors())) {
             BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);
             Interceptor<?, ?>[][] interceptors = selection.resolve(target);
             for (int i = 0; i < methods.length; i++) {
@@ -128,9 +162,9 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
             return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues);
         }
         // each intercepted method lists the interceptors that do not depend on the target, which is all of them when
-        // no non-singleton is bound, so that a creator compiled against 5.2, which reads the method's own, still
-        // applies them; a creator that asks per target gets the target's own on top
-        Interceptor<?, ?>[][] shared = selection.shared();
+        // no non-singleton is bound, and a creator that asks per target gets the target's own on top; a creator
+        // that reads the methods alone gets them all, owned by no target, rather than losing the non-singletons
+        Interceptor<?, ?>[][] shared = perTarget ? selection.shared() : selection.detached();
         Map<ExecutableMethod<?, ?>, Integer> indexes = new IdentityHashMap<>();
         for (int i = 0; i < methods.length; i++) {
             if (shared[i].length > 0 || selection.intercepted(i)) {

@@ -26,13 +26,18 @@ import java.util.concurrent.ConcurrentHashMap;
 /**
  * Finds the registration of a bean the context created but no scope can hand back, by the identity of the bean.
  *
- * <p>A singleton is found through the singleton scope and a scoped bean through its scope, but a prototype is held
- * by whoever asked for it. Two things still need the way from such a bean back to its registration: destroying the
- * bean through {@code destroyBean(Object)}, which destroys the beans created for it only through the registration
- * that carries them, and a hot-swappable proxy handed a prototype created as the target of another proxy, which
- * intercepts it with its own interceptors only through the registration. This index keeps that
- * way, weakly on both sides: it retains neither the bean nor the registration, and forgets an entry once the bean
- * is unreachable.</p>
+ * <p>A singleton is found through the singleton scope, but a prototype, or a bean created through
+ * {@code createBean} whatever its scope, is held by whoever asked for it, and a custom scope may hand back only the
+ * bean it holds. Several things still need the way from such a bean back to its registration: destroying the bean
+ * through {@code destroyBean(Object)}, which destroys the beans created for it only through the registration that
+ * carries them, and a proxy fronting the bean, which intercepts it with the bean's own interceptors. This index keeps
+ * that way, weakly on both sides: it retains neither the bean nor the registration, and forgets an entry once the
+ * bean is unreachable.</p>
+ *
+ * <p>Holding the registration strongly would keep the bean alive whenever one of its dependents refers back to it,
+ * as an interceptor that remembers its target does. So a registration nothing else holds, such as the one of a bean
+ * created through {@code createBean}, can be collected while the bean lives on, and the bean is then destroyed on
+ * its own. A proxy fronting the bean holds the registration, as a scope that stores what it created does.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

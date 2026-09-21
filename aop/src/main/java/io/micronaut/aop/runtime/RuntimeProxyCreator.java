@@ -37,4 +37,21 @@ public interface RuntimeProxyCreator {
      */
     <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition);
 
+    /**
+     * Whether the proxies this creator makes obtain the interceptors of each call of a proxy fronting a target
+     * through {@link RuntimeProxyDefinition#interceptors(RuntimeProxyDefinition.InterceptedMethod, Object)}, with the
+     * target of the call, so that the non-singleton interceptors of a target are the target's own.
+     *
+     * <p>A creator that does not, such as one written before 5.3, reads
+     * {@link RuntimeProxyDefinition.InterceptedMethod#interceptors()} alone. For it the intercepted methods of a
+     * proxy fronting a target carry every interceptor, the non-singleton ones created once for the proxy and owned
+     * by no target, as they were before 5.3.</p>
+     *
+     * @return Whether the creator asks per target
+     * @since 5.3.0
+     */
+    default boolean selectsInterceptorsPerTarget() {
+        return false;
+    }
+
 }

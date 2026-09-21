@@ -99,6 +99,11 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     @Override
+    public boolean selectsInterceptorsPerTarget() {
+        return true;
+    }
+
+    @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         if (proxyDefinition.introduction()) {
             return createIntroductionProxy(proxyDefinition);

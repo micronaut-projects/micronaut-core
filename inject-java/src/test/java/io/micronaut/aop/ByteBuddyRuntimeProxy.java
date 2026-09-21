@@ -29,6 +29,11 @@ import java.util.Arrays;
 public class ByteBuddyRuntimeProxy implements RuntimeProxyCreator {
 
     @Override
+    public boolean selectsInterceptorsPerTarget() {
+        return true;
+    }
+
+    @Override
     public <T> T createProxy(RuntimeProxyDefinition<T> proxyDefinition) {
         Class<T> targetType = proxyDefinition.proxyBeanDefinition().getBeanType();
 

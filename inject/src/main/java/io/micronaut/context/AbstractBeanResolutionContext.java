@@ -517,11 +517,28 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
-     * @return Whether what is being created through this context is being created as an interceptor of the bean it
-     * is resolved for
+     * Takes the mark of an interceptor lookup for the bean about to be created through this context, which is then
+     * the candidate the lookup asked for, created as an interceptor of the bean the context resolves for. The mark
+     * is cleared, so that the beans created as dependencies of that candidate are ordinary dependents, and is given
+     * back with {@link #restoreResolvingInterceptors(boolean)} once the candidate is created, for the next one.
+     *
+     * @return Whether the bean about to be created is an interceptor the lookup asked for
      */
-    boolean isResolvingInterceptors() {
-        return resolvingInterceptors;
+    boolean takeResolvingInterceptors() {
+        boolean taken = resolvingInterceptors;
+        resolvingInterceptors = false;
+        return taken;
+    }
+
+    /**
+     * Gives back the mark {@link #takeResolvingInterceptors()} took.
+     *
+     * @param taken What it returned
+     */
+    void restoreResolvingInterceptors(boolean taken) {
+        if (taken) {
+            resolvingInterceptors = true;
+        }
     }
 
     @Override
@@ -549,8 +566,8 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
-    public <I> boolean hasScopedInterceptors(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
-        return context.hasScopedInterceptors(interceptorType, binding);
+    public boolean isScopedInterceptor(BeanDefinition<?> interceptor) {
+        return context.isScopedInterceptor(interceptor);
     }
 
     @Override

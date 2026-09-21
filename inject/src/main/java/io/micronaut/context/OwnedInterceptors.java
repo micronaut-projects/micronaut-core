@@ -15,6 +15,7 @@
  */
 package io.micronaut.context;
 
+import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.DelegatingBeanDefinition;
@@ -29,8 +30,13 @@ import org.jspecify.annotations.Nullable;
  * an interceptor created after a miss joins them as every dependent does,
  * {@linkplain BeanRegistration#markCreatedAsInterceptor() marked} as created for interception. An interceptor a bean
  * injects as an ordinary dependency is a dependent as well but carries no mark, so it is not the instance that
- * intercepts the bean. Only an interceptor with no scope, or a prototype, is owned; a singleton belongs to the
- * singleton scope and an interceptor of a custom scope to that scope.</p>
+ * intercepts the bean. The mark is set by the creation of the interceptor itself, before it is published to the bean,
+ * and only on the interceptor the lookup creates: a bean created as a dependency of that interceptor is an ordinary
+ * dependent.</p>
+ *
+ * <p>Only an interceptor no scope holds, a prototype, one with no scope or one of a scope nothing implements, is
+ * owned; a singleton belongs to the singleton scope and an interceptor of a registered custom scope to that
+ * scope.</p>
  *
  * @author Denis Stepanov
  * @see BeanResolutionContext#getInterceptorRegistrations(io.micronaut.core.type.Argument, Qualifier)
@@ -46,10 +52,11 @@ final class OwnedInterceptors {
      * Whether an interceptor of the given definition is owned by the bean it is resolved for.
      *
      * @param definition The definition
-     * @return {@code true} for a prototype or an interceptor with no scope
+     * @param scopes     The registered scopes
+     * @return {@code true} for an interceptor no scope holds
      */
-    static boolean owned(BeanDefinition<?> definition) {
-        return BeanScopes.isUnscoped(definition);
+    static boolean owned(BeanDefinition<?> definition, CustomScopeRegistry scopes) {
+        return BeanScopes.isUnscoped(definition, scopes);
     }
 
     /**
@@ -57,10 +64,11 @@ final class OwnedInterceptors {
      * intercepts nor a proxy fronting it may keep the instance: the scope decides when it is replaced.
      *
      * @param definition The definition
-     * @return {@code true} for an interceptor of a custom scope
+     * @param scopes     The registered scopes
+     * @return {@code true} for an interceptor of a registered custom scope
      */
-    static boolean scoped(BeanDefinition<?> definition) {
-        return BeanScopes.isCustomScoped(definition);
+    static boolean scoped(BeanDefinition<?> definition, CustomScopeRegistry scopes) {
+        return BeanScopes.isCustomScoped(definition, scopes);
     }
 
     /**
@@ -68,14 +76,15 @@ final class OwnedInterceptors {
      *
      * @param resolutionContext The resolution context, whose dependents are the bean's
      * @param definition        The definition
+     * @param scopes            The registered scopes
      * @param <T>               The interceptor type
      * @return The registration among the dependents, or {@code null} when the bean owns none of the definition or
      * the definition is not one the bean can own
      */
     @SuppressWarnings("unchecked")
     @Nullable
-    static <T> BeanRegistration<T> find(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<T> definition) {
-        if (resolutionContext == null || !owned(definition)) {
+    static <T> BeanRegistration<T> find(@Nullable BeanResolutionContext resolutionContext, BeanDefinition<T> definition, CustomScopeRegistry scopes) {
+        if (resolutionContext == null || !owned(definition, scopes)) {
             return null;
         }
         for (BeanRegistration<?> dependent : resolutionContext.getDependentBeans()) {
@@ -84,20 +93,6 @@ final class OwnedInterceptors {
             }
         }
         return null;
-    }
-
-    /**
-     * Marks an interceptor just created for a bean, after a miss, as the bean's own.
-     *
-     * @param registration The registration of the created interceptor
-     * @param <T>          The interceptor type
-     * @return The same registration
-     */
-    static <T> BeanRegistration<T> created(BeanRegistration<T> registration) {
-        if (owned(registration.beanDefinition)) {
-            registration.markCreatedAsInterceptor();
-        }
-        return registration;
     }
 
     /**

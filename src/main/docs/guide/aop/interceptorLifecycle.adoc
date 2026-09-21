@@ -138,8 +138,9 @@ use, is two beans to the container: the proxy and the target. The interceptors b
 interceptor bound to the target is created with the target, as a dependent of the target's registration, and the
 proxy takes the interceptors of every call from that registration: once, for a proxy that holds one target for its
 life, or on each call for a proxy whose target changes, such as a scoped proxy that fronts one target per request or
-per thread. Two targets never share an instance, and each instance is destroyed with its target. The proxy itself is
-holds the singleton interceptors only.
+per thread. Two targets never share an instance, and each instance is destroyed with its target. The proxy itself
+holds the singleton interceptors only. An interceptor of a custom scope is obtained from its scope on every call, so a
+call never reaches an instance whose scope has ended.
 
 An interceptor bound for `AROUND` alone is not resolved while the target is created; the proxy resolves it as the
 target's own the first time it selects for that target, which creates it as a dependent of the target, so it is
@@ -148,6 +149,12 @@ destroyed with the target as well.
 NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted with its own instances when the context
 created it, whether as a singleton, in a scope, or as the target of another proxy. An object the context did not
 create is intercepted with instances the proxy creates once and keeps.
+
+NOTE: A api:aop.runtime.RuntimeProxyCreator[] that takes the interceptors of each call from
+`RuntimeProxyDefinition.interceptors(method, target)` declares so by returning `true` from
+`selectsInterceptorsPerTarget()`. A creator that does not, such as one written for an earlier version, reads the
+interceptors of each intercepted method alone, and gets all of them, the non-singleton ones created once for the proxy
+as before.
 
 == Ordering
 

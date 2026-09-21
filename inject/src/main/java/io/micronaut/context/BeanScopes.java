@@ -16,11 +16,14 @@
 package io.micronaut.context;
 
 import io.micronaut.context.annotation.Prototype;
+import io.micronaut.context.scope.CustomScopeRegistry;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 
 /**
- * Questions about the scope of a definition that more than one part of the context asks.
+ * Questions about the scope of a definition that more than one part of the context asks, answered as the context
+ * resolves the definition: a scope the definition declares but no implementation of is registered for is no scope,
+ * the bean being created for whoever asked for it.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -33,17 +36,18 @@ final class BeanScopes {
 
     /**
      * Whether a bean of the given definition is created for no scope, and so held by whoever asked for it: a
-     * prototype, or a bean with no scope at all.
+     * prototype, a bean with no scope at all, or one of a scope nothing implements.
      *
      * @param definition The definition
-     * @return {@code true} for a prototype or a bean with no scope
+     * @param scopes     The registered scopes
+     * @return {@code true} for a bean no scope holds
      */
-    static boolean isUnscoped(BeanDefinition<?> definition) {
+    static boolean isUnscoped(BeanDefinition<?> definition, CustomScopeRegistry scopes) {
         if (definition.isSingleton()) {
             return false;
         }
         String scope = definition.getScopeName().orElse(null);
-        return scope == null || Prototype.class.getName().equals(scope);
+        return scope == null || Prototype.class.getName().equals(scope) || scopes.findDeclaredScope(definition).isEmpty();
     }
 
     /**
@@ -51,9 +55,10 @@ final class BeanScopes {
      * when it is replaced: neither a singleton nor a bean held by whoever asked for it.
      *
      * @param definition The definition
-     * @return {@code true} for a bean of a custom scope
+     * @param scopes     The registered scopes
+     * @return {@code true} for a bean of a registered custom scope
      */
-    static boolean isCustomScoped(BeanDefinition<?> definition) {
-        return !definition.isSingleton() && !isUnscoped(definition);
+    static boolean isCustomScoped(BeanDefinition<?> definition, CustomScopeRegistry scopes) {
+        return !definition.isSingleton() && !isUnscoped(definition, scopes);
     }
 }

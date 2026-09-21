@@ -27,12 +27,9 @@ import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
-import java.util.WeakHashMap;
 import java.util.function.Supplier;
 
 /**
@@ -50,13 +47,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     // the context that created this registration, or null for one built by hand
     @Nullable
     final BeanContext beanContext;
+    // what the bean owns, and the one lock of everything that creates for the bean, selects for it or destroys it
+    final BeanDependents dependents;
     private final int order;
-    @Nullable
-    private List<BeanRegistration<?>> dependents;
-    @Nullable
-    private volatile Map<Object, Object> dependentState;
-    private volatile boolean createdAsInterceptor;
-    private boolean destroying;
 
     /**
      * @param identifier     The bean identifier
@@ -79,7 +72,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
-        this.dependents = dependents;
+        this.dependents = new BeanDependents(dependents);
         if (bean == null) {
             this.order = beanDefinition == null ? 0 : beanDefinition.getOrder();
         } else {
@@ -175,8 +168,8 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @return The dependent beans, never {@code null}
      * @since 5.3.0
      */
-    public synchronized List<BeanRegistration<?>> getDependentBeans() {
-        return dependents == null ? List.of() : List.copyOf(dependents);
+    public List<BeanRegistration<?>> getDependentBeans() {
+        return dependents.list();
     }
 
     /**
@@ -196,9 +189,10 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @since 5.3.0
      */
     public <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
-        // serialised, so that two callers resolving for this bean at once do not each create the interceptor the
-        // other is creating, and so that nothing is created for a bean already being destroyed
-        synchronized (this) {
+        // serialised with everything else that creates for this bean or destroys it, so that two callers resolving
+        // at once do not each create the interceptor the other is creating, and the disposal of the bean resolves
+        // from the dependents it has
+        synchronized (dependents) {
             try (BeanResolutionContext resolutionContext = newResolutionContext()) {
                 return resolutionContext.getInterceptorRegistrations(interceptorType, binding);
             }
@@ -216,7 +210,7 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @since 5.3.0
      */
     public <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
-        synchronized (this) {
+        synchronized (dependents) {
             try (BeanResolutionContext resolutionContext = newResolutionContext()) {
                 return resolutionContext.getInterceptorRegistration(interceptor);
             }
@@ -226,7 +220,11 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     /**
      * Opens a resolution context for this bean, which exists already: its dependents are the bean's, as they were of
      * the context that created it, and whatever is created through it joins them when it is closed, to be destroyed
-     * with the bean. The context must be closed.
+     * with the bean. The context must be opened and closed under the lock of {@link #dependents}.
+     *
+     * <p>For a bean that is destroyed already the context is a plain one, carrying nothing: what is created through
+     * it belongs to nothing, as it did for every bean before 5.3, rather than being destroyed as it is created and
+     * handed over destroyed.</p>
      *
      * @return The resolution context
      * @throws UnsupportedOperationException If the registration was not created by the bean context
@@ -234,6 +232,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     BeanResolutionContext newResolutionContext() {
         if (beanContext == null) {
             throw new UnsupportedOperationException("The registration of " + bean + " was not created by the bean context");
+        }
+        if (dependents.isDestroyed()) {
+            return new DefaultBeanResolutionContext(beanContext, beanDefinition);
         }
         return new ExistingBeanResolutionContext(beanContext, this);
     }
@@ -253,19 +254,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @since 5.3.0
      */
     @Internal
-    @SuppressWarnings("unchecked")
     public <S> S dependentState(Object key, Supplier<S> supplier) {
-        Map<Object, Object> state;
-        synchronized (this) {
-            state = dependentState;
-            if (state == null) {
-                state = new WeakHashMap<>(2);
-                dependentState = state;
-            }
-        }
-        synchronized (state) {
-            return (S) state.computeIfAbsent(key, ignored -> supplier.get());
-        }
+        // under the one lock of the bean, which the supplier takes again to resolve for the bean
+        return dependents.state(key, supplier);
     }
 
     /**
@@ -273,22 +264,12 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      *
      * @param registration The registration of the dependent bean
      */
-    synchronized void addDependentBean(BeanRegistration<?> registration) {
-        if (destroying) {
-            // created for a bean whose destruction has begun, so it is not one of the dependents that destruction
-            // will walk: it is destroyed here instead of outliving the bean it was created for
-            if (beanContext != null) {
-                beanContext.destroyBean(registration);
-            }
-            return;
+    void addDependentBean(BeanRegistration<?> registration) {
+        if (!dependents.add(registration) && beanContext != null) {
+            // created for a bean that is destroyed already, so it is not one of the dependents its destruction
+            // walked: it is destroyed here instead of outliving the bean it was created for
+            beanContext.destroyBean(registration);
         }
-        if (dependents == null) {
-            dependents = new ArrayList<>(2);
-        } else if (!(dependents instanceof ArrayList)) {
-            // the list created with the bean is unmodifiable; a late dependent needs one of this registration's own
-            dependents = new ArrayList<>(dependents);
-        }
-        dependents.add(registration);
     }
 
     /**
@@ -297,28 +278,15 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * definition that bean is intercepted with. A dependency injected into the bean is a dependent too, but carries
      * no mark: an interceptor injected into a bean is not the instance that intercepts it.
      */
-    /**
-     * Takes the dependents of this bean for destruction and marks it as being destroyed, so that a bean created for
-     * it after this point is destroyed as it is created rather than attached to a bean that is going away.
-     *
-     * @return The dependent beans to destroy, in creation order
-     */
-    synchronized List<BeanRegistration<?>> beginDestruction() {
-        destroying = true;
-        List<BeanRegistration<?>> destroyed = dependents == null ? List.of() : List.copyOf(dependents);
-        dependents = null;
-        return destroyed;
-    }
-
     void markCreatedAsInterceptor() {
-        createdAsInterceptor = true;
+        dependents.markCreatedAsInterceptor();
     }
 
     /**
      * @return Whether this bean was created for the interception of the bean it is a dependent of
      */
     boolean isCreatedAsInterceptor() {
-        return createdAsInterceptor;
+        return dependents.isCreatedAsInterceptor();
     }
 
     @Override
