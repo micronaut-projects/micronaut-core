@@ -42,7 +42,7 @@ class CompilerSilentFailureSpec extends Specification {
         targetDir.deleteDir()
     }
 
-    def "a Python package coinciding with an imported Java package shares the generated package initializer"() {
+    def "a Python package coinciding with an imported Java package serves the Java members from its initializer"() {
         given: "a module in the package micronaut.context, which is also imported as a Java package with a sub-package"
         writeSource("micronaut/context/helper.py", '''
 from jakarta.inject import Singleton
@@ -58,19 +58,45 @@ class Helper:
     @Executable
     def value(self) -> str:
         return "ok" if self.context is not None else "missing"
+
+    @Executable
+    def probes(self) -> str:
+        import sys
+        namespace = {}
+        exec('from micronaut.context import *', namespace)
+        import micronaut.context.ApplicationContext
+        import micronaut.context as pkg
+        # a Java member the initializer serves is bound on the package, so it resolves once; a class the
+        # class path lacks keeps the identity of its facade, as the generated package bindings did
+        import micronaut_java_imports
+        micronaut_java_imports._micronaut_java_imports().members['micronaut.context']['Missing'] = ('missing.Type', 'class')
+        missing = pkg.Missing
+        return ';'.join([
+            'star_java=' + str('ApplicationContext' in namespace and 'annotation' in namespace),
+            'star_python=' + str('Helper' in namespace),
+            'type_module_keeps_class=' + str(not isinstance(pkg.ApplicationContext, type(sys)) and getattr(pkg.ApplicationContext, 'class').getName() == 'io.micronaut.context.ApplicationContext'),
+            'member_binds=' + str('ApplicationContext' in vars(pkg)),
+            'missing_class_binds=' + str('Missing' in vars(pkg) and missing is pkg.Missing),
+            'missing_class_facade=' + str(type(missing).__name__ == '_MicronautJavaType'),
+        ])
 ''')
 
         when:
         compile()
-        def members = packageMembers(vfsFile("micronaut/context"), 2)
+        def members = packageMembers(vfsFile("micronaut/context"))
+        def manifest = JavaImportsManifest.read(targetDir)
 
-        then: "the Java shims and the application module are contributed to the same package, whose initializer merges them (a module importing a Java type from its own package while it initializes is served by the merger)"
-        members.contains("ApplicationContext = _micronaut_java_type('io.micronaut.context.ApplicationContext', True)")
-        members.contains("__micronaut_subpackages__ = [\"annotation\"]")
+        then: "the application module is the package's only contribution; the Java members are recorded for the runtime, which the initializer falls back to (a module importing a Java type from its own package while it initializes is served that way too)"
         members.contains("from .helper import Helper")
+        !members.contains("ApplicationContext")
         vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_merge_members")
+        vfsFile("micronaut/context/__init__.py").text.contains("__micronaut_java_package_attribute")
         vfsFile("micronaut/context/helper.py").exists()
-        vfsFile("micronaut/context/annotation/Executable.py").exists()
+        !vfsFile("micronaut/context/annotation").exists()
+        manifest.packages["micronaut.context"] == "io.micronaut.context"
+        manifest.packages["micronaut.context.annotation"] == "io.micronaut.context.annotation"
+        manifest.member("micronaut.context", "ApplicationContext") == ["io.micronaut.context.ApplicationContext", "interface"]
+        manifest.member("micronaut.context.annotation", "Executable") == ["io.micronaut.context.annotation.Executable", "annotation"]
 
         when: "the application starts"
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
@@ -80,12 +106,15 @@ class Helper:
         then:
         helper.value() == "ok"
 
+        and: "a star import binds the Java members and sub-packages next to the Python members, importing a type's module keeps the type on the package, and a resolved member (a facade of an absent class included) is bound on the package"
+        helper.probes() == "star_java=True;star_python=True;type_module_keeps_class=True;member_binds=True;missing_class_binds=True;missing_class_facade=True"
+
         cleanup:
         context?.close()
         classLoader?.close()
     }
 
-    def "a module directly inside an imported Java package path is compiled next to the generated shims"() {
+    def "a module directly inside an imported Java package path is compiled and its package serves the Java members"() {
         given: "a module in the package jakarta.inject, which is imported for its annotations"
         writeSource("jakarta/inject/registry.py", '''
 from jakarta.inject import Singleton
@@ -101,12 +130,13 @@ class Registry:
 
         when:
         compile()
-        def members = packageMembers(vfsFile("jakarta/inject"), 2)
+        def members = packageMembers(vfsFile("jakarta/inject"))
 
         then:
-        members.contains("from .Singleton import Singleton")
+        !members.contains("Singleton")
         members.contains("from .registry import Registry")
         vfsFile("jakarta/inject/__init__.py").text.contains("__micronaut_merge_members")
+        JavaImportsManifest.read(targetDir).member("jakarta.inject", "Singleton") == ["jakarta.inject.Singleton", "annotation"]
 
         when:
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
@@ -121,7 +151,7 @@ class Registry:
         classLoader?.close()
     }
 
-    def "a module named like a generated Java annotation module is reported instead of failing on the reopened output"() {
+    def "a module named like a Java type imported from its package is reported"() {
         given:
         writeSource("jakarta/inject/Singleton.py", '''
 from jakarta.inject import Singleton
@@ -137,8 +167,7 @@ class Registry:
 
         then:
         def e = thrown(RuntimeException)
-        e.message.contains("Python source [jakarta/inject/Singleton.py] is written twice")
-        !e.message.contains("Output stream or writer has already been opened")
+        e.message.contains("Python source [jakarta/inject/Singleton.py] is named like the Java type [jakarta.inject.Singleton] imported from its package")
     }
 
     def "importing a Java class outside the Micronaut packages compiles the module and its bean"() {
@@ -164,7 +193,8 @@ class LoggingService:
 
         then:
         new File(targetDir, "app/LoggingService.class").exists()
-        packageMembers(vfsFile("org/slf4j")).contains("LoggerFactory = _micronaut_java_type('org.slf4j.LoggerFactory')")
+        JavaImportsManifest.read(targetDir).member("org.slf4j", "LoggerFactory") == ["org.slf4j.LoggerFactory", "class"]
+        !vfsFile("org").exists()
 
         when:
         def classLoader = new URLClassLoader(targetDir.toURI().toURL())
@@ -428,9 +458,8 @@ class Service:
     }
 
     /**
-     * The members contributed to a package by the given number of contributions (the application modules of the
-     * package and the Java shims imported from it are contributed separately), written to members modules next to
-     * the initializer that merges them.
+     * The members contributed to a package by the given number of compilations, written to members modules next
+     * to the initializer that merges them.
      */
     private static String packageMembers(File packageDirectory, int contributions = 1) {
         def modules = packageDirectory.listFiles()

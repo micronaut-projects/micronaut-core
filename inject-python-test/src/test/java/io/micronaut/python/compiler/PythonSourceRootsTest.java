@@ -86,8 +86,9 @@ class PythonSourceRootsTest {
             .build()
             .compile();
 
-        assertTrue(new File(testOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
-        assertTrue(new File(mainOutput, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "jakarta/inject/__init__.py").isFile());
+        // each root records the Java packages it imports in a manifest of its own; the runtime merges them
+        assertTrue(hasJavaImportsManifest(testOutput));
+        assertTrue(hasJavaImportsManifest(mainOutput));
 
         try (URLClassLoader classLoader = new URLClassLoader(new URL[]{mainOutput.toURI().toURL(), testOutput.toURI().toURL()})) {
             Class<?> service = classLoader.loadClass("example.GreetingService");
@@ -255,12 +256,13 @@ class PythonSourceRootsTest {
             }
         }
     }
+
     /**
-     * The shim package of a Java package both roots import from: its {@code __all__} lists the members of
+     * A Java package both roots import from: its {@code __all__} lists the members of
      * both contributions before the subpackages of either, whichever way the members modules sort by name.
      */
     @Test
-    void theSharedShimPackageListsTheMembersOfBothRootsBeforeTheirSubpackages() throws Exception {
+    void theSharedJavaPackageListsTheMembersOfBothRootsBeforeTheirSubpackages() throws Exception {
         Path mainSources = Files.createDirectories(temporaryDirectory.resolve("src/main/python/example"));
         // the main root contributes the subpackage micronaut.core.convert.value
         Files.writeString(mainSources.resolve("values_service.py"), """
@@ -315,5 +317,11 @@ class PythonSourceRootsTest {
                     """).asBoolean());
             }
         }
+    }
+
+    private static boolean hasJavaImportsManifest(File output) {
+        File[] files = new File(output, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH).listFiles();
+        return files != null && java.util.Arrays.stream(files)
+            .anyMatch(file -> file.getName().startsWith(PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX));
     }
 }
