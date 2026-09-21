@@ -28,7 +28,9 @@ import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import org.jspecify.annotations.Nullable;
 
@@ -142,7 +144,8 @@ public final class RawHttpClientSupport {
 
     /**
      * Fail the given response flow with a {@link ReadTimeoutException} if it does not complete in
-     * time. A response that arrives after the timeout is closed.
+     * time. A response that arrives after the timeout, or after the returned flow was cancelled,
+     * is closed. Cancelling the returned flow cancels the given one.
      *
      * @param flow    The response flow
      * @param timeout The timeout, or {@code null} for none
@@ -167,6 +170,12 @@ public final class RawHttpClientSupport {
                 byteBodyResponse.close();
             }
         });
+        // forward a cancel from downstream, and close a response that arrives after it
+        result.onCancel(() -> {
+            if (done.compareAndSet(false, true)) {
+                flow.cancel();
+            }
+        });
         return result;
     }
 
@@ -182,14 +191,24 @@ public final class RawHttpClientSupport {
     public static @Nullable CloseableByteBody claimServerRequestBody(HttpRequest<?> request) {
         Object body = request.getBody().orElse(null);
         HttpRequest<?> current = request;
+        // a wrapper that replaced the body hides the bytes of the request it wraps
+        boolean direct = true;
         while (true) {
+            if (current instanceof DirectByteBodyAccess directAccess) {
+                // e.g. a request mutated from a Netty server request, which is no wrapper
+                ByteBody bytes = direct ? directAccess.byteBodyDirect() : null;
+                if (bytes != null || !(current instanceof ServerHttpRequest<?>)) {
+                    return bytes == null ? null : bytes.move();
+                }
+            }
             if (current instanceof ServerHttpRequest<?> serverRequest) {
-                if (body != null && body != serverRequest.getBody().orElse(null)) {
+                if (!direct || body != null && body != serverRequest.getBody().orElse(null)) {
                     return null;
                 }
                 return serverRequest.byteBody().move();
             }
             if (current instanceof HttpRequestWrapper<?> wrapper) {
+                direct &= wrapper.getBody().equals(wrapper.getDelegate().getBody());
                 current = wrapper.getDelegate();
             } else {
                 return null;

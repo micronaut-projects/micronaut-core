@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.body.ByteBody;
+import io.micronaut.http.body.DirectByteBodyAccess;
 import io.micronaut.http.netty.stream.StreamedHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.FullHttpRequest;
@@ -35,7 +36,7 @@ import java.util.Optional;
  * @since 2.0.0
  */
 @Internal
-public interface NettyHttpRequestBuilder {
+public interface NettyHttpRequestBuilder extends DirectByteBodyAccess {
     /**
      * Converts this object to a full http request.
      *
@@ -85,6 +86,7 @@ public interface NettyHttpRequestBuilder {
      *
      * @return The body
      */
+    @Override
     @Nullable
     default ByteBody byteBodyDirect() {
         return null;
