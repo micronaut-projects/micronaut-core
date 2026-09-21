@@ -68,7 +68,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
     @Nullable
-    private Set<Integer> ports;
+    private volatile Set<Integer> ports;
     private final List<FilterRoute> alwaysMatchesFilterRoutes;
     private final List<FilterRoute> preconditionFilterRoutes;
     private final List<FilterRoute> preMatchingAlwaysMatchesFilterRoutes;

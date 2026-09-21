@@ -22,6 +22,7 @@ import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.web.router.filter.RouteMatchFilter;
 import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
@@ -39,9 +40,11 @@ import java.util.List;
 final class RouteSourceRouterListener implements BeanCreatedEventListener<Router> {
 
     private final BeanProvider<RouteSource> routeSources;
+    private final BeanProvider<RouteMatchFilter> routeMatchFilters;
 
-    RouteSourceRouterListener(BeanProvider<RouteSource> routeSources) {
+    RouteSourceRouterListener(BeanProvider<RouteSource> routeSources, BeanProvider<RouteMatchFilter> routeMatchFilters) {
         this.routeSources = routeSources;
+        this.routeMatchFilters = routeMatchFilters;
     }
 
     @Override
@@ -51,6 +54,6 @@ final class RouteSourceRouterListener implements BeanCreatedEventListener<Router
             List<RouteSource> sources = new ArrayList<>(routeSources.stream().toList());
             OrderUtil.sort(sources);
             return List.copyOf(sources);
-        }));
+        }), SupplierUtil.memoized(() -> routeMatchFilters.stream().toList()));
     }
 }

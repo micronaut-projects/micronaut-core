@@ -15,7 +15,6 @@
  */
 package io.micronaut.http.server.tck.tests.routing;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpRequest;
@@ -31,23 +30,20 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
-import io.micronaut.web.router.DefaultRouteBuilder;
-import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteSource;
-import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.RouteTable;
+import io.micronaut.web.router.RouteTableFactory;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Routes resolved at runtime by a {@link RouteSource} are real routes: filters apply to them,
- * controllers take precedence, a wrong method is answered with 405, and they can change while the
- * server runs.
+ * Routes published at runtime by a {@link RouteSource} are real routes: filters apply to them,
+ * fully matching controller routes take precedence, a wrong method is answered with 405, and they
+ * can change while the server runs.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -119,34 +115,29 @@ public class RouteSourceTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class DynamicRoutes implements RouteSource {
-        private final ApplicationContext applicationContext;
-        private final DynamicHandler handler;
-        private final AtomicReference<Router> router = new AtomicReference<>();
-        private final RouteSource delegate = RouteSource.of(router::get);
+        private final RouteTableFactory tables;
+        private volatile RouteTable current;
 
-        DynamicRoutes(ApplicationContext applicationContext, DynamicHandler handler) {
-            this.applicationContext = applicationContext;
-            this.handler = handler;
-            setUris(List.of("/dynamic/{+path}"));
+        DynamicRoutes(RouteTableFactory tables) {
+            this.tables = tables;
+            this.current = build(List.of("/dynamic/{+path}"));
         }
 
         void setUris(List<String> uris) {
-            DefaultRouteBuilder builder = new DefaultRouteBuilder(applicationContext) {
-            };
-            for (String uri : uris) {
-                builder.GET(uri, handler, "handle", HttpRequest.class);
-            }
-            router.set(new DefaultRouter(builder));
+            current = build(uris);
+        }
+
+        private RouteTable build(List<String> uris) {
+            return tables.build(routes -> {
+                for (String uri : uris) {
+                    routes.GET(uri, DynamicHandler.class, "handle", HttpRequest.class);
+                }
+            });
         }
 
         @Override
-        public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-            return delegate.findAllClosest(request);
-        }
-
-        @Override
-        public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-            return delegate.findAny(request);
+        public RouteTable snapshot() {
+            return current;
         }
     }
 
