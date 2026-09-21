@@ -2,6 +2,7 @@ package io.micronaut.http.server.netty.handler
 
 import io.micronaut.http.body.ByteBody
 import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.ConcatenatingSubscriber
 import io.micronaut.http.body.InternalByteBody
 import io.micronaut.http.body.stream.InputStreamByteBody
 import io.micronaut.http.netty.body.NettyByteBodyFactory
@@ -49,6 +50,7 @@ import org.junit.jupiter.api.Assertions
 import org.reactivestreams.Publisher
 import org.reactivestreams.Subscriber
 import org.reactivestreams.Subscription
+import reactor.core.publisher.Flux
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
@@ -58,10 +60,13 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadLocalRandom
 
+
 class Http2ServerHandlerSpec extends Specification {
     private static class DuplexHandler extends Http2ChannelDuplexHandler {
         Http2FrameCodec frameCodec
         CompositeByteBuf received
+        /** Each data frame as [content, endStream], in order. */
+        final List<List<Object>> dataFrames = []
 
         @Override
         protected void handlerAdded0(ChannelHandlerContext ctx) throws Exception {
@@ -77,6 +82,7 @@ class Http2ServerHandlerSpec extends Specification {
         @Override
         void channelRead(@NonNull ChannelHandlerContext ctx, @NonNull Object msg) throws Exception {
             if (msg instanceof Http2DataFrame) {
+                dataFrames.add([msg.content().toString(StandardCharsets.UTF_8), msg.isEndStream()])
                 received.addComponent(true, msg.content())
             } else {
                 ctx.fireChannelRead(msg)
@@ -236,6 +242,53 @@ class Http2ServerHandlerSpec extends Specification {
         received.release()
         data1.release()
         data2.release()
+        client.checkException()
+        server.checkException()
+        client.finishAndReleaseAll()
+        server.finishAndReleaseAll()
+        EmbeddedTestUtil.advance(client, server)
+    }
+
+    /**
+     * HTTP/2 needs no counterpart to the HTTP/1 handler's combined add-and-complete: netty's
+     * encoder merges DATA frames queued in the same event loop tick, including the empty
+     * END_STREAM frame that follows the trailing bytes, so the stream already ends with the frame
+     * that carries them.
+     */
+    def "a concatenated response ends the stream with the frame carrying its trailing bytes"() {
+        given:
+        def (server, client, duplexHandler) = configure(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                def bbf = new NettyByteBodyFactory(ctx.channel())
+                def elements = Flux.just(bbf.adapt(Unpooled.copiedBuffer("1", StandardCharsets.UTF_8)), bbf.adapt(Unpooled.copiedBuffer("2", StandardCharsets.UTF_8)))
+                outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK), ConcatenatingSubscriber.concatenate(bbf, elements, ConcatenatingSubscriber.Separators.JDK_JSON))
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                cause.printStackTrace()
+            }
+        })
+
+        when:
+        def stream1 = duplexHandler.newStream()
+        def req1 = new DefaultHttp2Headers()
+        req1.method(HttpMethod.GET.asciiName())
+        req1.scheme("http")
+        req1.authority("yawk.at")
+        req1.path("/")
+        client.writeOutbound(new DefaultHttp2HeadersFrame(req1, true).stream(stream1))
+        EmbeddedTestUtil.advance(server, client)
+
+        then: "the closing bracket travels in the end-of-stream frame, there is no empty terminating frame"
+        client.readInbound() instanceof Http2SettingsFrame
+        client.readInbound() instanceof Http2SettingsAckFrame
+        client.readInbound() instanceof Http2HeadersFrame
+        duplexHandler.dataFrames == [['[1', false], [',2]', true]]
+
+        cleanup:
         client.checkException()
         server.checkException()
         client.finishAndReleaseAll()
