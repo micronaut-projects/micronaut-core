@@ -499,3 +499,9 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
     if getattr(_MicronautScopedProxy, "__abstractmethods__", None):
         _MicronautScopedProxy.__abstractmethods__ = frozenset()
     return _MicronautScopedProxy(target_supplier, java_proxy_reference)
+
+
+# the Java packages, types and annotations the application imports, served without generated modules
+from micronaut_java_imports import _MicronautJavaType, __micronaut_java_annotation, __micronaut_java_imports, \
+    __micronaut_java_package_member, __micronaut_java_package_attribute, __micronaut_java_package_initialised, \
+    __micronaut_reset_java_imports, __micronaut_install_java_import_finder

@@ -1,6 +1,6 @@
 plugins {
     id("io.micronaut.build.internal.convention-base")
-    id("io.micronaut.build.internal.python")
+    id("io.micronaut.build.internal.convention-python")
     id("me.champeau.jmh") version "0.7.3"
 }
 
