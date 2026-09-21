@@ -4,13 +4,6 @@ plugins {
     id("me.champeau.jmh") version "0.7.3"
 }
 
-micronautBuild {
-    python {
-        // the benchmark tests are part of the regular CI, not of the Python CI
-        testsEnabled = true
-    }
-}
-
 dependencies {
     annotationProcessor(projects.micronautInjectJava)
     jmhAnnotationProcessor(projects.micronautInjectJava)
