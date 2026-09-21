@@ -32,6 +32,7 @@ import io.micronaut.python.processing.PythonAnnotationProcessor;
 import io.micronaut.python.processing.PythonProcessingSession;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostics;
+import io.micronaut.python.processing.staticcompile.StaticCompilationDecision;
 import org.jspecify.annotations.NonNull;
 
 import javax.annotation.processing.Processor;
@@ -102,6 +103,7 @@ final class PyronautJavaCompiler {
     private final JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
     private Consumer<ClassElement> classElementCallback;
     private Consumer<PythonDiagnostic> pythonDiagnosticCallback;
+    private Consumer<StaticCompilationDecision> staticCompilationDecisionCallback;
     private boolean verboseErrors;
     private File errorDumpDirectory;
     private List<SourceSnapshot> sourceSnapshots = List.of();
@@ -140,6 +142,16 @@ final class PyronautJavaCompiler {
      */
     public void setPythonDiagnosticCallback(Consumer<PythonDiagnostic> callback) {
         this.pythonDiagnosticCallback = callback;
+    }
+
+    /**
+     * Set the callback to be invoked for each static compilation decision.
+     *
+     * @param callback The callback function
+     * @since 5.3.0
+     */
+    public void setStaticCompilationDecisionCallback(Consumer<StaticCompilationDecision> callback) {
+        this.staticCompilationDecisionCallback = callback;
     }
 
     /**
@@ -1080,6 +1092,9 @@ final class PyronautJavaCompiler {
         }
         if (pythonDiagnosticCallback != null) {
             pythonProcessor.setDiagnosticCallback(pythonDiagnosticCallback);
+        }
+        if (staticCompilationDecisionCallback != null) {
+            pythonProcessor.setStaticCompilationDecisionCallback(staticCompilationDecisionCallback);
         }
         // Enable testing mode to ensure proper cleanup of GraalVM contexts
         // This prevents memory leaks in test environments
