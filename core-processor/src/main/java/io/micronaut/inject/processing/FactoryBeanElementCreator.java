@@ -55,6 +55,10 @@ import java.util.Optional;
 final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    /**
+     * The exception the Java processor throws when an element references a type missing from the classpath.
+     */
+    private static final String JAVA_POSTPONE_EXCEPTION = "io.micronaut.annotation.processing.PostponeToNextRoundException";
 
     FactoryBeanElementCreator(ClassElement classElement, VisitorContext visitorContext, boolean isAopProxy, ElementBeanDefinitionBuilderFactory<R> beanDefinitionBuilder) {
         super(classElement, visitorContext, isAopProxy, beanDefinitionBuilder);
@@ -312,7 +316,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
      * managed instance whose lifecycle Micronaut drives; this is also what the Jakarta CDI specification says about
      * the return value of a producer method. The documented way to give a produced bean a destroy callback is
      * {@link Bean#preDestroy()} on the producing element, and there is no equivalent for construction because the
-     * factory method can initialise the instance itself. That the callbacks are silently skipped is the surprising
+     * factory method can initialize the instance itself. That the callbacks are silently skipped is the surprising
      * part, so it is reported once per produced bean, pointing at the producing element the user owns.</p>
      *
      * @param producedType         The produced type
@@ -335,10 +339,14 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
                 .distinct()
                 .toList();
         } catch (RuntimeException e) {
-            // The warning is best effort: building the methods of a produced type fails when one of them references a
-            // class missing from the classpath, which must not fail or postpone the produced bean itself. The
-            // pre-destroy lookup avoids the same failure by filtering on the method name before building elements.
-            return;
+            // The warning is best effort: the Java processor fails building the methods of a produced type when one of
+            // them references a class missing from the classpath, which must not fail or postpone the produced bean
+            // itself. The pre-destroy lookup avoids the same failure by filtering on the method name before building
+            // elements. Any other failure is a processor bug and is not hidden.
+            if (JAVA_POSTPONE_EXCEPTION.equals(e.getClass().getName())) {
+                return;
+            }
+            throw e;
         }
         if (callbacks.isEmpty()) {
             return;
