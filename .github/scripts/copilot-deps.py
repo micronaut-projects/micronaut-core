@@ -19,7 +19,7 @@ import sys
 # Resolved next to this script, so a run can read the policy and prompt from
 # a pristine copy that the Copilot session cannot edit.
 GITHUB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-POLICY_FILE = os.path.join(GITHUB_DIR, "copilot-dependency-policy.json")
+POLICY_FILE = os.path.join(GITHUB_DIR, "copilot-policy.json")
 PROMPT_FILE = os.path.join(GITHUB_DIR, "prompts", "copilot-dependency-update.md")
 
 # Dashboard sections that name an update we should make. "recreate" (ignored

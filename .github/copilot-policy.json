@@ -1,0 +1,36 @@
+{
+  "_comment": "Policy for the Copilot workflows. Dependency updates (copilot-dependency-updates.yml): a branch whose minor is released (tag vX.Y.0 exists) takes patch updates only, an unreleased minor takes minor and patch updates, majors are never proposed. Sonar fixes (copilot-sonar-fix.yml): only a failing quality gate is acted on, fixes may not touch sonarForbiddenFiles and always wait for review.",
+  "dashboardAuthor": "app/renovate",
+  "dashboardTitle": "Dependency Dashboard",
+  "maxUpdatesPerRun": 10,
+  "previousBranches": 1,
+  "skipBranches": [
+    "renovate/github-actions-*",
+    "renovate/major-*"
+  ],
+  "skipPackages": [],
+  "manualReviewPackages": [
+    "org.jetbrains.kotlin*",
+    "com.google.devtools.ksp*",
+    "org.apache.groovy*",
+    "io.micronaut*"
+  ],
+  "versionFiles": [
+    "gradle/libs.versions.toml",
+    "gradle.properties",
+    "settings.gradle",
+    "settings.gradle.kts"
+  ],
+  "verifyTasks": "assemble testClasses",
+  "sonarProjectKey": "micronaut-projects_micronaut-core",
+  "sonarForbiddenFiles": [
+    ".github/*",
+    "gradle/*",
+    "gradlew*",
+    "*.gradle",
+    "*.gradle.kts",
+    "gradle.properties",
+    "buildSrc/*",
+    "sonar-project.properties"
+  ]
+}

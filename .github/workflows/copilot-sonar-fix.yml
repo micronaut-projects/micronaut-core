@@ -1,61 +1,48 @@
-# Replaces Renovate's pull requests: reads the Renovate Dependency Dashboard,
-# lets a Copilot CLI session make and verify each update, and opens a pull
-# request that follows the branch policy in .github/copilot-policy.json.
+# Nightly: when the last commit of a maintained branch fails the SonarCloud
+# quality gate, a Copilot CLI session fixes what the gate's failed conditions
+# point at, and a pull request is opened for review.
 #
-# Policy
-#  - a branch whose minor is released (tag vX.Y.0 exists) takes patch updates
-#    only; an unreleased minor takes minor and patch updates; never majors
-#  - a change that only moves versions, passes verification and is not on the
-#    manual review list is auto-merged once the required checks pass
-#  - a change that also edits sources, or a listed package, waits for review
-#  - a change that fails verification opens as a draft
-#  - a change outside the policy opens no pull request
+#  - a passing gate is left alone, however many issues the new code holds
+#  - only the issues and files behind the failed conditions are handed over;
+#    conditions a person must handle (security hotspots) are only reported
+#  - a fix may not touch build files, Gradle settings or .github/, and may not
+#    delete files; it is never auto-merged
+#  - no new pull request while one from this workflow is open for the branch,
+#    or after one for the same findings was closed unmerged
 #
-# Jobs
-#  - plan: reads the dashboard and works out each branch's policy
-#  - update: the Copilot session. It runs build code it may have written, so
-#    it gets no repository token or git credentials and only produces a patch
-#  - publish: a clean runner applies the patch, classifies it and pushes
+# Jobs, split as in copilot-dependency-updates.yml
+#  - check: reads the gate of each branch's last commit
+#  - fix: the Copilot session; no repository token, only produces a patch
+#  - publish: a clean runner applies the patch, checks it and opens the PR
 #
-# Secrets
-#  - COPILOT_GITHUB_TOKEN: fine-grained PAT with the "Copilot Requests" permission
-#  - DEPENDENCY_UPDATES_TOKEN: token that pushes branches and opens pull
-#    requests (contents, pull requests and issues write). GITHUB_TOKEN cannot be
-#    used: its pushes do not trigger the Java CI checks auto-merge waits on.
-name: Copilot dependency updates
+# Secrets: COPILOT_GITHUB_TOKEN and DEPENDENCY_UPDATES_TOKEN, as in
+# copilot-dependency-updates.yml, and SONAR_TOKEN, the token Java CI analyses
+# with. Only the check job gets SONAR_TOKEN; the Copilot session never does.
+name: Copilot Sonar fix
 on:
   schedule:
-    - cron: '0 21 * * *'
+    - cron: '0 4 * * *'
   workflow_dispatch:
     inputs:
       branches:
-        description: 'Comma separated base branches (default: the default branch and newer X.Y.x branches)'
-        required: false
-      only:
-        description: 'Regex over the Renovate branch and title, e.g. slf4j|logback'
-        required: false
-      max:
-        description: 'Maximum updates in this run (default from the policy)'
-        required: false
-      dashboard:
-        description: 'Dependency Dashboard issue number (default: found by title)'
+        description: 'Comma separated branches (default: the default branch, newer X.Y.x branches and the previous release line)'
         required: false
       model:
         description: 'Copilot model (default: the CLI default)'
         required: false
       dry-run:
-        description: 'Make, verify and classify the updates, but push nothing'
+        description: 'Fix, verify and check, but push nothing'
         type: boolean
         default: false
 permissions:
   contents: read
-  issues: read
+  checks: read
   pull-requests: read
 concurrency:
   group: ${{ github.workflow }}
   cancel-in-progress: false
 jobs:
-  plan:
+  check:
     if: github.repository_owner == 'micronaut-projects'
     runs-on: ubuntu-latest
     outputs:
@@ -68,77 +55,52 @@ jobs:
           sparse-checkout: .github
           persist-credentials: false
 
-      - name: "📋 Read the Dependency Dashboard"
+      - name: "🔎 Read the quality gate of each branch"
         id: plan
         env:
           GH_TOKEN: ${{ github.token }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           BASE_BRANCHES: ${{ inputs.branches }}
-          ONLY: ${{ inputs.only }}
-          MAX_UPDATES: ${{ inputs.max }}
-          DASHBOARD_ISSUE: ${{ inputs.dashboard }}
-        run: python3 .github/scripts/copilot-deps.py plan
+        run: python3 .github/scripts/copilot-sonar.py plan
 
-  update:
-    name: "update ${{ matrix.id }}"
-    needs: plan
-    if: needs.plan.outputs.count != '0'
+  fix:
+    name: "fix ${{ matrix.id }}"
+    needs: check
+    if: needs.check.outputs.count != '0'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     strategy:
       fail-fast: false
-      # the organisation shares one pool of hosted runners
       max-parallel: 2
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
     steps:
-      - name: "🔎 Look for an earlier pull request"
-        id: existing
-        env:
-          GH_TOKEN: ${{ github.token }}
-          HEAD: ${{ matrix.head }}
-          TARGET: ${{ matrix.target }}
-        run: |
-          # the same target is already proposed, or a person closed it unmerged
-          same=0
-          if [ -n "$TARGET" ]; then
-            same=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$HEAD" --state all --json state,body --limit 20 \
-              | jq --arg m "<!-- copilot-deps target=$TARGET -->" '[.[] | select((.body | contains($m)) and .state != "MERGED")] | length')
-          fi
-          echo "skip=$([ "$same" != 0 ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
       - name: "🗑 Free disk space"
-        if: steps.existing.outputs.skip != 'true'
         run: |
           sudo rm -rf /usr/local/share/boost "$AGENT_TOOLSDIRECTORY" /opt/ghc /usr/share/dotnet /usr/local/lib/android
           sudo apt-get clean
 
-      - name: "📥 Checkout ${{ matrix.base }}"
-        if: steps.existing.outputs.skip != 'true'
+      # the commit the gate failed on, not whatever the branch has moved to
+      - name: "📥 Checkout ${{ matrix.base }}@${{ matrix.sha }}"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: ${{ matrix.base }}
+          ref: ${{ matrix.sha }}
           persist-credentials: false
 
       - name: "📥 Checkout workflow tooling"
-        if: steps.existing.outputs.skip != 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          path: .copilot-deps-tools
+          path: .copilot-tools
           sparse-checkout: .github
           persist-credentials: false
 
-      - name: "📌 Record the base"
-        if: steps.existing.outputs.skip != 'true'
-        id: base
+      - name: "📌 Prepare"
         run: |
-          mv .copilot-deps-tools "$RUNNER_TEMP/tools"
-          mkdir -p "$RUNNER_TEMP/out" build/copilot-deps
-          git rev-parse HEAD > "$RUNNER_TEMP/out/base-sha"
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          mv .copilot-tools "$RUNNER_TEMP/tools"
+          mkdir -p "$RUNNER_TEMP/out" build/copilot-sonar
 
       - name: "🔧 Setup GraalVM CE"
-        if: steps.existing.outputs.skip != 'true'
         uses: graalvm/setup-graalvm@0426e2e191540e8514dff98dc52a5f5146a2a276 # v1
         with:
           distribution: 'graalvm'
@@ -146,17 +108,14 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: "🔧 Setup Gradle"
-        if: steps.existing.outputs.skip != 'true'
         uses: gradle/actions/setup-gradle@9c971963bec38e04b3d30dcc455b5382be2fdbfb # v6
         with:
           cache-read-only: true
 
       - name: "🔧 Install Copilot CLI"
-        if: steps.existing.outputs.skip != 'true'
         run: npm install -g @github/copilot@1
 
-      - name: "🤖 Update with Copilot"
-        if: steps.existing.outputs.skip != 'true'
+      - name: "🤖 Fix with Copilot"
         continue-on-error: true
         timeout-minutes: 120
         env:
@@ -164,16 +123,15 @@ jobs:
           TASK: ${{ toJSON(matrix) }}
           MODEL: ${{ inputs.model }}
           # inside the workspace, where Copilot may write; build/ is ignored by git
-          REPORT: build/copilot-deps/report.md
+          REPORT: build/copilot-sonar/report.md
         run: |
-          python3 "$RUNNER_TEMP/tools/.github/scripts/copilot-deps.py" prompt > "$RUNNER_TEMP/out/prompt.md"
+          python3 "$RUNNER_TEMP/tools/.github/scripts/copilot-sonar.py" prompt > "$RUNNER_TEMP/out/prompt.md"
           copilot -p "$(cat "$RUNNER_TEMP/out/prompt.md")" \
             ${MODEL:+--model "$MODEL"} \
             --no-ask-user \
             --share "$RUNNER_TEMP/out/session.md" \
             --allow-tool=write \
             --allow-tool='shell(./gradlew:*)' \
-            --allow-tool='shell(python3:*)' \
             --allow-tool='shell(grep:*)' \
             --allow-tool='shell(find:*)' \
             --allow-tool='shell(ls:*)' \
@@ -188,7 +146,6 @@ jobs:
             2>&1 | tee "$RUNNER_TEMP/out/copilot.log"
 
       - name: "🛠 Verify"
-        if: steps.existing.outputs.skip != 'true'
         id: verify
         continue-on-error: true
         run: |
@@ -196,19 +153,17 @@ jobs:
           ./gradlew $tasks --no-daemon --continue
 
       - name: "📦 Save the change"
-        if: steps.existing.outputs.skip != 'true'
         env:
-          BASE_SHA: ${{ steps.base.outputs.sha }}
+          BASE_SHA: ${{ matrix.sha }}
           VERIFY_OUTCOME: ${{ steps.verify.outcome }}
         run: |
-          cp build/copilot-deps/report.md "$RUNNER_TEMP/out/report.md" 2>/dev/null || true
+          cp build/copilot-sonar/report.md "$RUNNER_TEMP/out/report.md" 2>/dev/null || true
           echo "$VERIFY_OUTCOME" > "$RUNNER_TEMP/out/verify"
           git add -A
           git diff --cached --binary "$BASE_SHA" > "$RUNNER_TEMP/out/change.patch"
           git diff --cached --stat "$BASE_SHA"
 
       - name: "📤 Upload the change"
-        if: steps.existing.outputs.skip != 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ${{ matrix.artifact }}
@@ -217,13 +172,13 @@ jobs:
 
   publish:
     name: "publish ${{ matrix.id }}"
-    needs: [plan, update]
-    if: always() && needs.plan.outputs.count != '0' && needs.plan.result == 'success'
+    needs: [check, fix]
+    if: always() && needs.check.outputs.count != '0' && needs.check.result == 'success'
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 1
-      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+      matrix: ${{ fromJSON(needs.check.outputs.matrix) }}
     steps:
       - name: "📥 Download the change"
         id: download
@@ -245,7 +200,7 @@ jobs:
         if: steps.download.outcome == 'success'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          path: .copilot-deps-tools
+          path: .copilot-tools
           sparse-checkout: .github
           persist-credentials: false
 
@@ -253,13 +208,13 @@ jobs:
         if: steps.download.outcome == 'success'
         id: apply
         run: |
-          mv .copilot-deps-tools "$RUNNER_TEMP/tools"
+          mv .copilot-tools "$RUNNER_TEMP/tools"
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -s "$RUNNER_TEMP/in/change.patch" ]; then
             git apply --3way --index --binary "$RUNNER_TEMP/in/change.patch"
           fi
 
-      - name: "⚖️ Classify against the policy"
+      - name: "⚖️ Check the fix"
         if: steps.download.outcome == 'success'
         id: classify
         env:
@@ -267,37 +222,36 @@ jobs:
           TASK: ${{ toJSON(matrix) }}
         run: |
           export VERIFY_OUTCOME=$(cat "$RUNNER_TEMP/in/verify" 2>/dev/null || echo failure)
-          python3 "$RUNNER_TEMP/tools/.github/scripts/copilot-deps.py" classify
+          python3 "$RUNNER_TEMP/tools/.github/scripts/copilot-sonar.py" classify
 
       - name: "📤 Push and open the pull request"
         if: >-
           steps.download.outcome == 'success' && !inputs.dry-run &&
-          contains(fromJSON('["automerge","review","failed"]'), steps.classify.outputs.status)
+          contains(fromJSON('["review","failed"]'), steps.classify.outputs.status)
         env:
           GH_TOKEN: ${{ secrets.DEPENDENCY_UPDATES_TOKEN }}
           BASE: ${{ matrix.base }}
           HEAD: ${{ matrix.head }}
           STATUS: ${{ steps.classify.outputs.status }}
-          UPDATE_TYPE: ${{ steps.classify.outputs.update_type }}
           TITLE: ${{ steps.classify.outputs.title }}
           CHANGES: ${{ steps.classify.outputs.changes }}
           REASONS: ${{ steps.classify.outputs.reasons }}
-          DASHBOARD_TITLE: ${{ matrix.title }}
-          TARGET: ${{ matrix.target }}
+          CONDITIONS: ${{ join(matrix.conditions, '; ') }}
+          MANUAL: ${{ join(matrix.manual, ', ') }}
+          SHA: ${{ matrix.sha }}
+          DASHBOARD: ${{ matrix.dashboard }}
+          FINGERPRINT: ${{ matrix.fingerprint }}
           COMMIT_EMAIL: ${{ vars.DEPENDENCY_UPDATES_EMAIL || 'micronaut-build@users.noreply.github.com' }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           BODY_FILE: ${{ runner.temp }}/body.md
-          COMMIT_BODY: ${{ matrix.title }}
-          LABEL_PREFIX: copilot-deps
-          EXTRA_LABEL: "type: dependency-upgrade"
+          COMMIT_BODY: "SonarCloud quality gate failed on ${{ matrix.sha }}: ${{ join(matrix.conditions, '; ') }}"
+          LABEL_PREFIX: copilot-sonar
         run: |
           {
-            echo "<!-- copilot-deps target=$TARGET -->"
-            echo "Dependency update prepared by Copilot from the Renovate Dependency Dashboard entry:"
-            echo
-            echo "> $DASHBOARD_TITLE"
-            echo
-            echo "**Policy:** \`$STATUS\` ($UPDATE_TYPE update on \`$BASE\`)"
+            echo "<!-- copilot-sonar fingerprint=$FINGERPRINT -->"
+            echo "The [SonarCloud quality gate]($DASHBOARD) fails on \`$SHA\`: $CONDITIONS."
+            echo "Copilot prepared this fix; it always needs review."
+            [ -n "$MANUAL" ] && echo && echo "Left for a person: $MANUAL."
             echo
             echo "$REASONS"
             echo
