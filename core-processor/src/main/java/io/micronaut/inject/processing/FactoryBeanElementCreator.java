@@ -43,6 +43,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.function.Predicate;
 
 /**
  * Factory bean builder.
@@ -208,9 +209,19 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
         // as a lifecycle method before any around advice is applied to it.
         String preDestroyMethodName = resolvePreDestroyMethodName(producedType, producedAnnotationMetadata);
 
-        warnAboutUninvokedLifecycleCallbacks(producedType, producingElement, preDestroyMethodName);
+        List<MethodElement> producedMethods = producedType.isPrimitive() || producedType.isArray() ? List.of() : listProducedMethods(producedType);
+        warnAboutUninvokedLifecycleCallbacks(producedMethods, producingElement, preDestroyMethodName);
 
-        if (InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !producedType.isAssignable("io.micronaut.aop.Interceptor")) {
+        boolean isInterceptor = !producedType.isPrimitive() && !producedType.isArray() && producedType.isAssignable("io.micronaut.aop.Interceptor");
+        // Advice declared by the producing element or the produced type applies to every advisable method, and
+        // advice a method of the produced type declares itself applies to that method, so it requires a proxy as well
+        boolean typeAdvice = InterceptedMethodUtil.hasAroundStereotype(producedAnnotationMetadata) && !isInterceptor;
+        boolean methodAdvice = !typeAdvice && !isInterceptor
+            && producedMethods.stream().anyMatch(this::isMethodDeclaringAdvice)
+            && isProxyableForMethodAdvice(originalProducedType, producedType, producingElement);
+        Predicate<MethodElement> advisedMethod = typeAdvice ? this::isAdvisableProducedMethod : this::isMethodDeclaringAdvice;
+
+        if (typeAdvice || methodAdvice) {
             if (producedType.isArray()) {
                 throw new ProcessingException(producingElement, "Cannot apply AOP advice to arrays");
             }
@@ -222,7 +233,8 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
             MethodElement constructorElement = producedType.getPrimaryConstructor().orElse(null);
             MethodElement defaultConstructor = producedType.getDefaultConstructor().orElse(null);
-            if (!producedType.isInterface() && constructorElement != null && defaultConstructor == null) {
+            // Method-level advice only reaches this point when the type can be proxied without constructor arguments
+            if (typeAdvice && !producedType.isInterface() && constructorElement != null && defaultConstructor == null) {
                 final String proxyTargetMode = producedAnnotationMetadata.stringValue(AnnotationUtil.ANN_AROUND, "proxyTargetMode").orElse("ERROR");
                 switch (proxyTargetMode) {
                     case "ALLOW":
@@ -248,7 +260,7 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
 
             List<MethodElement> methodElements = producedType.getEnclosedElements(ElementQuery.ALL_METHODS)
                 .stream()
-                .filter(this::isAdvisableProducedMethod)
+                .filter(advisedMethod)
                 .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
                 .toList();
             methodElements
@@ -256,13 +268,13 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             List<PropertyElement> syntheticBeanProperties = producedType.getSyntheticBeanProperties();
             for (PropertyElement syntheticBeanProperty : syntheticBeanProperties) {
                 syntheticBeanProperty.getReadMethod().ifPresent(m -> {
-                        if (isAdvisableProducedMethod(m) && !isPreDestroyCallback(m, preDestroyMethodName)) {
+                        if (advisedMethod.test(m) && !isPreDestroyCallback(m, preDestroyMethodName)) {
                             visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
                 );
                 syntheticBeanProperty.getWriteMethod().ifPresent(m -> {
-                        if (isAdvisableProducedMethod(m)) {
+                        if (advisedMethod.test(m)) {
                             visitAroundMethod(proxyBuilder, m.getDeclaringType(), m);
                         }
                     }
@@ -319,35 +331,19 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
      * factory method can initialize the instance itself. That the callbacks are silently skipped is the surprising
      * part, so it is reported once per produced bean, pointing at the producing element the user owns.</p>
      *
-     * @param producedType         The produced type
+     * @param producedMethods      The methods of the produced type
      * @param producingElement     The producing method or field
      * @param preDestroyMethodName The pre-destroy callback named by {@link Bean#preDestroy()}, which is invoked
      */
-    private void warnAboutUninvokedLifecycleCallbacks(ClassElement producedType,
+    private void warnAboutUninvokedLifecycleCallbacks(List<MethodElement> producedMethods,
                                                       MemberElement producingElement,
                                                       @Nullable String preDestroyMethodName) {
-        if (producedType.isPrimitive() || producedType.isArray()) {
-            return;
-        }
-        List<String> callbacks;
-        try {
-            callbacks = producedType.getEnclosedElements(ElementQuery.ALL_METHODS
-                    .annotated(metadata -> metadata.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) || metadata.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY)))
-                .stream()
-                .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
-                .map(m -> m.getDeclaringType().getSimpleName() + "." + m.getName() + "()")
-                .distinct()
-                .toList();
-        } catch (RuntimeException e) {
-            // The warning is best effort: the Java processor fails building the methods of a produced type when one of
-            // them references a class missing from the classpath, which must not fail or postpone the produced bean
-            // itself. The pre-destroy lookup avoids the same failure by filtering on the method name before building
-            // elements. Any other failure is a processor bug and is not hidden.
-            if (JAVA_POSTPONE_EXCEPTION.equals(e.getClass().getName())) {
-                return;
-            }
-            throw e;
-        }
+        List<String> callbacks = producedMethods.stream()
+            .filter(m -> m.hasDeclaredAnnotation(AnnotationUtil.POST_CONSTRUCT) || m.hasDeclaredAnnotation(AnnotationUtil.PRE_DESTROY))
+            .filter(m -> !isPreDestroyCallback(m, preDestroyMethodName))
+            .map(m -> m.getDeclaringType().getSimpleName() + "." + m.getName() + "()")
+            .distinct()
+            .toList();
         if (callbacks.isEmpty()) {
             return;
         }
@@ -355,6 +351,72 @@ final class FactoryBeanElementCreator<R> extends DeclaredBeanElementCreator<R> {
             + ", which are not invoked for a bean produced from a @Factory: the instance is constructed by the factory and is not "
             + "a managed instance of the produced type. Initialize the instance in the producing element, and name a destroy "
             + "method with @Bean(preDestroy = \"...\").", producingElement);
+    }
+
+    /**
+     * The methods of a produced type, for the checks that inspect every method of it before deciding how to build the
+     * produced bean.
+     *
+     * <p>The Java processor fails building the methods of a type when one of them references a class missing from the
+     * classpath. That must not fail or postpone the produced bean, which the processors have always built without
+     * looking at those methods, so no methods are returned instead; the pre-destroy lookup avoids the same failure by
+     * filtering on the method name before building elements. Any other failure is a processor bug and is not hidden.</p>
+     *
+     * @param producedType The produced type
+     * @return The methods, or none when they cannot be built
+     */
+    private List<MethodElement> listProducedMethods(ClassElement producedType) {
+        try {
+            return producedType.getEnclosedElements(ElementQuery.ALL_METHODS);
+        } catch (RuntimeException e) {
+            if (JAVA_POSTPONE_EXCEPTION.equals(e.getClass().getName())) {
+                return List.of();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Whether a method of a produced type declares around advice itself and can carry it.
+     *
+     * @param methodElement The method
+     * @return true if the method is advised when neither the producing element nor the produced type declares advice
+     */
+    private boolean isMethodDeclaringAdvice(MethodElement methodElement) {
+        return isAdvisableProducedMethod(methodElement)
+            && InterceptedMethodUtil.hasDeclaredAroundAdvice(methodElement.getMethodAnnotationMetadata());
+    }
+
+    /**
+     * Whether a produced type whose only advice is declared by its methods can be proxied.
+     *
+     * <p>Advice declared by the producing element or the produced type is an explicit request for a proxy, so a type
+     * that cannot be proxied fails the compilation. A type that only has advice on its methods compiled without a
+     * proxy before those methods were honoured, and is often a third-party type, so it keeps compiling without one
+     * and the unapplied advice is reported instead.</p>
+     *
+     * @param originalProducedType The produced type, with its own annotation metadata
+     * @param producedType         The produced type
+     * @param producingElement     The producing element
+     * @return true if the produced bean can be proxied
+     */
+    private boolean isProxyableForMethodAdvice(ClassElement originalProducedType, ClassElement producedType, MemberElement producingElement) {
+        String reason = null;
+        if (originalProducedType.isFinal()) {
+            reason = "the type is final";
+        } else if (originalProducedType.isSealed()) {
+            reason = "the type is sealed";
+        } else if (!producedType.isInterface()
+            && producedType.getPrimaryConstructor().isPresent()
+            && producedType.getDefaultConstructor().isEmpty()) {
+            reason = "the type has no accessible no arguments constructor";
+        }
+        if (reason == null) {
+            return true;
+        }
+        visitorContext.warn("Methods of the type produced by this element declare AOP advice, which is not applied because "
+            + reason + ", so the produced bean cannot be proxied.", producingElement);
+        return false;
     }
 
     /**
