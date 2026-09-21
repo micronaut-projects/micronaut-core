@@ -1495,7 +1495,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             outboundHandler = null;
             writeCompressing(new DefaultLastHttpContent(NettyReadBufferFactory.toByteBuf(buf)), true, true);
             writtenLast = true;
-            requestHandler.responseWritten(outboundAccess.attachment);
+            markResponseWritten();
             PipeliningServerHandler.this.writeSome();
         }
 
