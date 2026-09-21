@@ -238,7 +238,8 @@ class _MicronautAsyncioHandle:
     def __init__(self, callback, args, context=None):
         self._callback = callback
         self._args = args
-        # as asyncio: a callback runs in the context of the code that scheduled it
+        # as asyncio: a callback runs in the context of the code that scheduled it (a task passes its
+        # own context, so the steps of a coroutine share one)
         self._context = contextvars.copy_context() if context is None else context
         self._cancelled = False
 
@@ -251,7 +252,21 @@ class _MicronautAsyncioHandle:
     def _run(self):
         if self._cancelled:
             return
-        self._context.run(self._callback, *self._args)
+        self._context.run(self._run_in_context)
+
+    def _run_in_context(self):
+        # the Java PropagatedContext of the task that owns this callback lives in its contextvars: it
+        # is restored around the callback on the loop thread, so a coroutine step resumed by the
+        # loop sees the context of its own task and not the context of whoever scheduled the step (a
+        # task setting a shared Event, a Java thread completing an awaited stage)
+        reactive_context = _micronaut_reactive_context.get()
+        if reactive_context is None:
+            self._callback(*self._args)
+        else:
+            reactive_context.run(self._invoke)
+
+    def _invoke(self):
+        self._callback(*self._args)
 
 class _MicronautAsyncioTimerHandle(_MicronautAsyncioHandle):
     """Timer variant that can cancel the backing Java scheduled future.
@@ -1038,7 +1053,21 @@ def _new_fallback_loop():
         return _MicronautFallbackLoop()
 
 
-def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None):
+# The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
+# subscriber, or the propagated context of the caller of an eager coroutine) a Java bridge hands the
+# coroutine it schedules. asyncio copies the variable into the task, so every ``await`` of the coroutine,
+# and of the tasks it spawns, subscribes within that context, and every callback of the task restores
+# its propagated context (``_MicronautAsyncioHandle._run_in_context``).
+_micronaut_reactive_context = contextvars.ContextVar("micronaut_reactive_context", default=None)
+
+
+def __micronaut_current_reactive_context():
+    """The reactive context of the running coroutine, or ``None`` outside a Java-scheduled coroutine."""
+
+    return _micronaut_reactive_context.get()
+
+
+def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None, reactive_context=None):
     """Drive a Python awaitable and complete the Java bridge future.
 
     This is the main Java entry point used by ``PythonAsyncioRuntime``. It
@@ -1052,11 +1081,32 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     Python task cancellation, and Python task cancellation cancels the Java
     future. Exceptions are routed through Java's ``ExceptionCompleter`` so the
     bridge keeps existing exception wrapping semantics.
+
+    ``reactive_context`` is the reactive context of the subscriber (or the
+    propagated context of the caller) that started the coroutine; the task
+    copies it, the awaits of the coroutine subscribe within it and its steps run
+    in its propagated context. Started from within a task, a coroutine without
+    a Reactor context of its own inherits the one of that task (a nested
+    coroutine started eagerly by a Java method awaited in a transaction).
     """
 
     if not inspect.isawaitable(awaitable):
         java_future.complete(awaitable)
         return java_future
+    if reactive_context is None:
+        # the task copies the current context, the enclosing task's if any
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    enclosing = _micronaut_reactive_context.get()
+    if enclosing is not None:
+        reactive_context = reactive_context.inheriting(enclosing)
+    token = _micronaut_reactive_context.set(reactive_context)
+    try:
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    finally:
+        _micronaut_reactive_context.reset(token)
+
+
+def _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter):
     if java_loop is not None:
         loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
         with _CurrentLoopForCall(loop):
@@ -1148,8 +1198,40 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
     return future
 
 def __micronaut_complete_completion_stage_awaitable(future, value, throwable):
-    """Complete a Python future from a Java ``CompletionStage`` callback."""
+    """Complete a Python future from a Java ``CompletionStage`` callback.
 
+    A future belongs to the thread running its loop. A stage completing on another thread while a
+    Python loop drives the awaiting coroutine on the calling thread (a Java caller without a Micronaut
+    event loop) hands the completion to that loop, which wakes it up; completing the future directly
+    would leave the loop waiting.
+    """
+
+    loop = future.get_loop()
+    thread_id = _micronaut_loop_thread_id(loop)
+    if thread_id is not None and thread_id != threading.get_ident() and not loop.is_closed():
+        try:
+            loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
+            return
+        except RuntimeError:
+            # the loop closed between the check and the hand-off (shutdown): complete the future
+            # directly rather than leave it pending
+            pass
+    _micronaut_complete_future(future, value, throwable)
+
+
+def _micronaut_loop_thread_id(loop):
+    """The id of the thread running a standard asyncio loop, or ``None`` when no hand-off is needed.
+
+    ``BaseEventLoop`` records its thread while ``run_forever`` runs (there is no public accessor);
+    the Micronaut loop has no thread of its own and its ``call_soon`` queues every callback on the
+    Netty event loop already, so a future of it is completed directly.
+    """
+    if isinstance(loop, _MicronautAsyncioEventLoop):
+        return None
+    return getattr(loop, "_thread_id", None)
+
+
+def _micronaut_complete_future(future, value, throwable):
     if future.cancelled():
         return
     if throwable is None:

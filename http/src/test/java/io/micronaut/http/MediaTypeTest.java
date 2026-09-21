@@ -2,6 +2,7 @@ package io.micronaut.http;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 
 import java.nio.charset.Charset;
@@ -199,15 +200,15 @@ class MediaTypeTest {
         assertEquals(Charset.forName(expectedCharsetName), mediaType.getCharset().orElseThrow());
     }
 
-    private static Stream<org.junit.jupiter.params.provider.Arguments> parsesCharsetFromStandardizedContentTypeFormats() {
+    private static Stream<Arguments> parsesCharsetFromStandardizedContentTypeFormats() {
         return Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of("text/plain;charset=utf-8", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=utf-8", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; foo=bar; charset=utf-8", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=\"utf-8\"", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; foo=bar ; charset=\"utf-8\"", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=\"UTF-8\"", "UTF-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=\"utf\\-8\"", "utf-8")
+            Arguments.of("text/plain;charset=utf-8", "utf-8"),
+            Arguments.of("text/plain; charset=utf-8", "utf-8"),
+            Arguments.of("text/plain; foo=bar; charset=utf-8", "utf-8"),
+            Arguments.of("text/plain; charset=\"utf-8\"", "utf-8"),
+            Arguments.of("text/plain; foo=bar ; charset=\"utf-8\"", "utf-8"),
+            Arguments.of("text/plain; charset=\"UTF-8\"", "UTF-8"),
+            Arguments.of("text/plain; charset=\"utf\\-8\"", "utf-8")
         );
     }
 
@@ -234,10 +235,10 @@ class MediaTypeTest {
         assertEquals(expectedParameterValue, mediaType.getParametersMap().get(MediaType.CHARSET_PARAMETER));
     }
 
-    private static Stream<org.junit.jupiter.params.provider.Arguments> parsesQuotedCharsetParameterValues() {
+    private static Stream<Arguments> parsesQuotedCharsetParameterValues() {
         return Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=\"utf-8\"", "utf-8"),
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; charset=\"utf-8;version=2\"", "utf-8;version=2")
+            Arguments.of("text/plain; charset=\"utf-8\"", "utf-8"),
+            Arguments.of("text/plain; charset=\"utf-8;version=2\"", "utf-8;version=2")
         );
     }
 
@@ -249,9 +250,48 @@ class MediaTypeTest {
         assertEquals(expectedParameterValue, mediaType.getParametersMap().get(parameterName));
     }
 
-    private static Stream<org.junit.jupiter.params.provider.Arguments> parsesQuotedNonCharsetParameterValues() {
+    private static Stream<Arguments> parsesQuotedNonCharsetParameterValues() {
         return Stream.of(
-            org.junit.jupiter.params.provider.Arguments.of("text/plain; foo=\"a;b\"; charset=utf-8", "foo", "a;b")
+            Arguments.of("text/plain; foo=\"a;b\"; charset=utf-8", "foo", "a;b")
+        );
+    }
+
+    /**
+     * The text-based check was a set of regular expressions; the string checks that replaced
+     * them must give the same answers, including the case handling: the name checks are
+     * case-sensitive, the subtype checks are not.
+     */
+    @ParameterizedTest
+    @MethodSource
+    void isTextBasedMatchesThePreviousRules(String contentType, boolean expected) {
+        MediaType mediaType = new MediaType(contentType);
+        assertEquals(expected, mediaType.isTextBased());
+        // cached answer
+        assertEquals(expected, mediaType.isTextBased());
+        assertEquals(expected, MediaType.isTextBased(contentType));
+    }
+
+    private static Stream<Arguments> isTextBasedMatchesThePreviousRules() {
+        return Stream.of(
+            Arguments.of("text/plain", true),
+            Arguments.of("text/anything-at-all", true),
+            Arguments.of("TEXT/plain", false),
+            Arguments.of("application/vnd.api+json", true),
+            Arguments.of("application/vnd.api+JSON", false),
+            Arguments.of("application/foo+text", true),
+            Arguments.of("application/foo+xml", true),
+            Arguments.of("application/foo+xmlx", false),
+            Arguments.of("application/javascript", true),
+            Arguments.of("application/Javascript", false),
+            Arguments.of("application/javascript2", false),
+            Arguments.of("application/JSON", true),
+            Arguments.of("application/XML", true),
+            Arguments.of("application/x-cue", true),
+            Arguments.of("application/jsonx", false),
+            Arguments.of("application/octet-stream", false),
+            Arguments.of("image/svg+xml", true),
+            Arguments.of("image/png", false),
+            Arguments.of("text/html; charset=utf-8", true)
         );
     }
 

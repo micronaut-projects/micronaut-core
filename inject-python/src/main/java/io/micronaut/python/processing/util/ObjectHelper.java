@@ -18,6 +18,7 @@ package io.micronaut.python.processing.util;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.ast.ClassElement;
+import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.sourcegen.model.ClassDef;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
@@ -72,9 +73,31 @@ public final class ObjectHelper {
         List<PropertyElement> toStringProps = readableProps.stream()
             .filter(ObjectHelper::isToStringSafe)
             .toList();
+        // A bidirectional association (Book.reviews <-> Review.book) makes a hash over every property recurse
+        // without end, unlike equals(), which stops at the identical object; hashing the plain values only keeps
+        // the hash consistent with equals() (a Python dataclass with such fields is not hashable at all). A Python
+        // enum is a plain value: it cannot refer back and stays in the hash.
+        List<PropertyElement> hashCodeProps = readableProps.stream()
+            .filter(p -> !referencesPythonClass(p.getGenericType()))
+            .toList();
         createToStringMethod(classDefBuilder, selfType, toStringProps, propertyFields);
         createEqualsMethod(classDefBuilder, selfType, readableProps, propertyFields);
-        createHashCodeMethod(classDefBuilder, selfType, readableProps, propertyFields);
+        createHashCodeMethod(classDefBuilder, selfType, hashCodeProps, propertyFields);
+    }
+
+    private static boolean referencesPythonClass(ClassElement type) {
+        if (type instanceof AbstractPythonClassElement) {
+            return !type.isEnum();
+        }
+        if (type.isArray()) {
+            return referencesPythonClass(type.fromArray());
+        }
+        for (ClassElement typeArgument : type.getTypeArguments().values()) {
+            if (referencesPythonClass(typeArgument)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isToStringSafe(PropertyElement property) {

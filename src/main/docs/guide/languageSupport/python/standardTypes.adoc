@@ -43,3 +43,20 @@ class EventService:
 Calling `reschedule` from Java with a `UUID`, `LocalDateTime`, and `Duration` passes native Python `UUID`, `datetime`, and `timedelta` objects to the method. A Python result is converted back to the declared Java type.
 
 `time` and `datetime` use naive Java representations. Values with `tzinfo` are rejected rather than having their time-zone information discarded. `timezone` conversion supports fixed offsets representable by `ZoneOffset`; custom `tzinfo` implementations are not supported.
+
+=== Class attributes without a type annotation
+
+A class attribute assigned a literal without a type annotation gets its Java type from the literal: `int`, `float`, `str`, `bool`, `bytes`, `list`, `dict` or `set`. An attribute assigned `None` or an expression that is not a literal is typed `Object`. The literal picks the narrowest type, so `ratio = 0` becomes an `int` property and `ratio = 0.0` a `double` one; annotate the attribute (`ratio: float = 0`) when a wider type is meant. An `int` literal the Java `int` cannot hold (`big = 10_000_000_000`) is typed `Object`:
+
+[source,python]
+----
+from jakarta.inject import Singleton
+
+@Singleton
+class Customizer:
+    CONNECTION_TIMEOUT = 25000  # int
+    RATIO = 0.5                 # double
+    NAME = "customizer"         # String
+    TAGS = ["a", "b"]           # List
+    NOTHING = None              # Object
+----

@@ -45,7 +45,6 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReferenceArray;
-import java.util.regex.Pattern;
 
 /**
  * Represents a media type.
@@ -860,8 +859,6 @@ public class MediaType implements CharSequence {
     // when the load fails, assigned once under the double checked lock in getMediaTypeFileExtensions.
     @SuppressWarnings("java:S3077")
     private static volatile @Nullable Map<String, String> mediaTypeFileExtensions;
-    @SuppressWarnings("ConstantName")
-    private static final List<Pattern> textTypePatterns = new ArrayList<>(4);
 
     protected final String name;
     protected final String subtype;
@@ -879,14 +876,12 @@ public class MediaType implements CharSequence {
     private BigDecimal qualityNumberField;
 
     private boolean valid;
-
-    static {
-        textTypePatterns.add(Pattern.compile("^text/.*$"));
-        textTypePatterns.add(Pattern.compile("^.*\\+json$"));
-        textTypePatterns.add(Pattern.compile("^.*\\+text$"));
-        textTypePatterns.add(Pattern.compile("^.*\\+xml$"));
-        textTypePatterns.add(Pattern.compile("^application/javascript$"));
-    }
+    /**
+     * Cached {@link #isTextBased()} answer, {@code null} until first asked. The value only
+     * depends on final fields, so a racy write of the same value from two threads is harmless.
+     */
+    @Nullable
+    private Boolean textBased;
 
     /**
      * Constructs a new media type for the given string.
@@ -1256,18 +1251,28 @@ public class MediaType implements CharSequence {
      * @return Whether the media type is text based
      */
     public boolean isTextBased() {
-        boolean matches = textTypePatterns.stream().anyMatch(p -> p.matcher(name).matches());
-        if (!matches) {
-            matches = subtype.equalsIgnoreCase("json")
-                    || subtype.equalsIgnoreCase("xml")
-                    || subtype.equalsIgnoreCase("yaml")
-                    || subtype.equalsIgnoreCase("graphql")
-                    || subtype.equalsIgnoreCase("yang")
-                    || subtype.equalsIgnoreCase("toml")
-                    || subtype.equalsIgnoreCase("x-cue")
-            ;
+        Boolean cached = textBased;
+        if (cached == null) {
+            cached = computeTextBased();
+            textBased = cached;
         }
-        return matches;
+        return cached;
+    }
+
+    private boolean computeTextBased() {
+        // name checks are case-sensitive, subtype checks case-insensitive, as before
+        return name.startsWith("text/")
+            || name.endsWith("+json")
+            || name.endsWith("+text")
+            || name.endsWith("+xml")
+            || name.equals("application/javascript")
+            || subtype.equalsIgnoreCase("json")
+            || subtype.equalsIgnoreCase("xml")
+            || subtype.equalsIgnoreCase("yaml")
+            || subtype.equalsIgnoreCase("graphql")
+            || subtype.equalsIgnoreCase("yang")
+            || subtype.equalsIgnoreCase("toml")
+            || subtype.equalsIgnoreCase("x-cue");
     }
 
     /**

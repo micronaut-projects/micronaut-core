@@ -27,7 +27,9 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
+import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorBinding;
+import io.micronaut.aop.Introduction;
 import io.micronaut.annotation.processing.visitor.ElementProvider;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationUtil;
@@ -83,9 +85,15 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
+    // The signature this method adopts from the Java method it overrides (see withInheritedSignature). Held in
+    // fields rather than in a subclass so that copies made by withAnnotationMetadata keep it and so that a
+    // copy still equals the method it was made from.
+    private ParameterElement @Nullable [] signatureParameters;
+    private @Nullable ClassElement signatureReturnType;
     private ElementAnnotationMetadata resolvedMergedMethodAnnotationMetadata;
     private AnnotationMetadata resolvedInheritedMethodAnnotationMetadata;
     private Collection<MethodElement> resolvedOverriddenMethods;
+    private Boolean resolvedParameterTypeRequired;
     private ParameterElement[] resolvedParameters;
 
     /**
@@ -159,8 +167,32 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     @Override
+    protected void copyValues(AbstractPythonElement element) {
+        super.copyValues(element);
+        if (element instanceof PythonMethodElement methodElement) {
+            methodElement.signatureParameters = signatureParameters;
+            methodElement.signatureReturnType = signatureReturnType;
+        }
+    }
+
+    /**
+     * Whether the method is abstract. A function decorated with {@code @abstractmethod}, declared by a
+     * {@code Protocol}, or declared by an {@code ABC} with the {@code ...} placeholder body is abstract. A
+     * placeholder body is also abstract in an {@link Introduction introduction} type ({@code @Client}, a
+     * repository, an AI service), whose methods are implemented by the introduction advice; in a concrete
+     * class it is a method returning {@code None}.
+     *
+     * @return True if the method is abstract
+     */
+    @Override
     public boolean isAbstract() {
-        return getNativeType().isAbstract();
+        FunctionDef functionDef = getNativeType();
+        return functionDef.isAbstract()
+            || (functionDef.hasPlaceholderBody() && isIntroductionType(owningType));
+    }
+
+    static boolean isIntroductionType(ClassElement classElement) {
+        return classElement.hasStereotype(Introduction.class) && !classElement.isAssignable(Interceptor.class);
     }
 
     /**
@@ -357,7 +389,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ClassElement getReturnType() {
-        return returnType;
+        return signatureReturnType != null ? signatureReturnType : returnType;
     }
 
     @Override
@@ -386,6 +418,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ParameterElement[] getParameters() {
+        if (signatureParameters != null) {
+            return signatureParameters.clone();
+        }
         if (resolvedParameters == null) {
             resolvedParameters = resolveParameters();
         }
@@ -394,20 +429,24 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withParameters(ParameterElement... newParameters) {
-        // Since PythonMethodElement is based on parsed Python code,
-        // we create a synthetic MethodElement with the new parameters
-        return new PythonMethodElement(
-            getNativeType(),
-            environment,
-            declaringType,
-            owningType,
-            elementAnnotationMetadataFactory
-        ) {
-            @Override
-            public ParameterElement[] getParameters() {
-                return newParameters;
-            }
-        };
+        return withInheritedSignature(newParameters, null);
+    }
+
+    /**
+     * Returns a copy of this method that reports the given signature instead of the one derived from the
+     * Python type hints. A Python method that overrides a Java method adopts the Java signature this way: the
+     * hints are lossy ({@code int} for a boxed {@code Integer} id, {@code list[T]} for {@code Iterable<T>}) while
+     * the generated stub implements the Java signature, and the bean definition has to dispatch to that one.
+     *
+     * @param newParameters The parameters
+     * @param newReturnType The return type, or {@code null} to keep the declared one
+     * @return The copy
+     */
+    public MethodElement withInheritedSignature(ParameterElement[] newParameters, @Nullable ClassElement newReturnType) {
+        PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
+        methodElement.signatureParameters = newParameters.clone();
+        methodElement.signatureReturnType = newReturnType;
+        return methodElement;
     }
 
     @Override
@@ -432,10 +471,17 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     final boolean requiresResolvedParameterType() {
-        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods need
-        // resolved parameter signatures so proxy override detection does not drop the introduced method.
-        return !declaringType.equals(owningType)
-            && owningType.hasStereotype(InterceptorBinding.class);
+        // Keep ordinary getType() erased like Java/Groovy, but inherited generic AOP methods of a class need
+        // resolved parameter signatures so proxy override detection does not drop the introduced method. The
+        // proxy of an interface is generated from the erased signatures, as for a Java interface. The answer
+        // is cached: every parameter of such a method asks, and isInterface() of a Python owning type
+        // enumerates its declared methods each time.
+        if (resolvedParameterTypeRequired == null) {
+            resolvedParameterTypeRequired = !declaringType.equals(owningType)
+                && owningType.hasStereotype(InterceptorBinding.class)
+                && !owningType.isInterface();
+        }
+        return resolvedParameterTypeRequired;
     }
 
     @Override
@@ -448,6 +494,9 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public ClassElement getGenericReturnType() {
+        if (signatureReturnType != null) {
+            return signatureReturnType;
+        }
         return resolveGenericReturnType(getNativeType());
     }
 
@@ -592,7 +641,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (awaitedType.isVoid()) {
             return ClassElement.of(Void.class);
         }
-        if (!awaitedType.isPrimitive()) {
+        if (!awaitedType.isPrimitive() || awaitedType.isArray()) {
             return awaitedType;
         }
         return switch (awaitedType.getName()) {
@@ -623,7 +672,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         AnnotationMetadata returnAnnotationMetadata = typeAnnotationMetadata.isEmpty()
             ? annotationMetadata
             : new AnnotationMetadataHierarchy(true, typeAnnotationMetadata, annotationMetadata);
-        return new TypeAnnotatedClassElement(
+        return TypeAnnotatedClassElement.of(
             baseType,
             elementAnnotationMetadataFactory.buildMutable(returnAnnotationMetadata)
         );
@@ -646,6 +695,12 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         }
 
         return created.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+    }
+
+    @Override
+    public boolean isVarArgs() {
+        List<ArgumentDef> arguments = getNativeType().arguments().arguments();
+        return !arguments.isEmpty() && arguments.getLast().variadic();
     }
 
     private static boolean isReceiverArgument(ArgumentDef argument) {
@@ -671,19 +726,18 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         if (this == o) {
             return true;
         }
-        if (o == null || getClass() != o.getClass()) {
+        // As for Java elements, two views of one declared function are the same method: the anonymous
+        // subclass withParameters answers and the copies owned by a subtype must stay equal to the element
+        // they were made from, or MethodElement.overrides takes the method for an override of itself.
+        if (!(o instanceof PythonMethodElement that)) {
             return false;
         }
-        PythonMethodElement that = (PythonMethodElement) o;
-
-        return that.getNativeType().name().equals(getNativeType().name()) &&
-            declaringType.equals(that.declaringType) &&
-            owningType.equals(that.owningType);
+        return getNativeType().equals(that.getNativeType()) && declaringType.equals(that.declaringType);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getNativeType().name(), declaringType, owningType);
+        return Objects.hash(getNativeType().name(), declaringType);
     }
 
     @Override
@@ -699,13 +753,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
     @Override
     public MethodElement withAnnotationMetadata(AnnotationMetadata annotationMetadata) {
-        PythonMethodElement methodElement = new PythonMethodElement(
-            getNativeType(),
-            environment,
-            declaringType,
-            owningType,
-            getElementAnnotationMetadataFactory()
-        );
+        PythonMethodElement methodElement = (PythonMethodElement) makeCopy();
         methodElement.presetAnnotationMetadata = annotationMetadata;
         return methodElement;
     }

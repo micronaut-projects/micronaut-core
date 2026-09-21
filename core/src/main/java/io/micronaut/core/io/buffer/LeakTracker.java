@@ -82,17 +82,36 @@ public interface LeakTracker<T> {
          * @see io.netty.util.LeakPresenceDetector#staticInitializer(Supplier)
          */
         static <R> R staticInitializer(Supplier<R> supplier) {
+            if (LeakTrackerFactoryHolder.nettyAvailable && !LeakTrackerFactoryHolder.checkNettyAvailable()) {
+                // netty is not on the class path. forClass(Class) discovers the same thing, but
+                // whichever of the two runs first has to survive it.
+                LeakTrackerFactoryHolder.nettyAvailable = false;
+            }
             if (LeakTrackerFactoryHolder.nettyAvailable) {
                 return LeakPresenceDetector.staticInitializer(supplier);
-            } else {
-                return supplier.get();
             }
+            return supplier.get();
         }
     }
 }
 
 class LeakTrackerFactoryHolder {
     static boolean nettyAvailable = true;
+
+    /**
+     * Whether the netty type used by {@link LeakTracker.Factory#staticInitializer} resolves. The
+     * check is separate from running the supplier so that a {@link LinkageError} raised by the
+     * supplier itself is not mistaken for a missing netty, and the supplier never runs twice.
+     *
+     * @return {@code true} if netty is on the class path
+     */
+    static boolean checkNettyAvailable() {
+        try {
+            return LeakPresenceDetector.class.getName() != null;
+        } catch (LinkageError err) {
+            return false;
+        }
+    }
 }
 
 @SuppressWarnings({"ReturnValueIgnored", "ResultOfMethodCallIgnored"})

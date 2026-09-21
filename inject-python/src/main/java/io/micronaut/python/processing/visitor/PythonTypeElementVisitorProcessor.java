@@ -20,10 +20,12 @@ import io.micronaut.annotation.processing.visitor.JavaVisitorContext;
 import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.runtime.RuntimeProxy;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Mixin;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.visitor.VisitorUtils;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.Generated;
@@ -43,16 +45,20 @@ import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MemberElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.PropertyElement;
+import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.processing.definition.DefaultElementBeanDefinitionBuilderFactory;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.TypeElementQuery;
+import io.micronaut.inject.validation.RequiresValidation;
 import io.micronaut.inject.writer.AbstractBeanDefinitionBuilder;
 import io.micronaut.inject.writer.ByteCodeWriterUtils;
 import io.micronaut.inject.writer.OriginatingElements;
 import io.micronaut.python.processing.PythonProcessingEnvironment;
+import io.micronaut.python.processing.PythonStubGenerator;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
+import io.micronaut.python.processing.element.PythonMethodElement;
 import io.micronaut.sourcegen.model.ObjectDef;
 
 import java.io.IOException;
@@ -75,6 +81,9 @@ import java.util.stream.Collectors;
  */
 @Experimental
 public final class PythonTypeElementVisitorProcessor {
+    private static final String ANN_VALIDATED = "io.micronaut.validation.Validated";
+    private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
+
     private final ClassLoader classLoader;
     private final TypeElementVisitor.VisitorKind visitorKind;
 
@@ -180,15 +189,68 @@ public final class PythonTypeElementVisitorProcessor {
             }
         }
 
+        // The stubs are written when the stub generator finishes, so it finishes after every other visitor:
+        // the producer methods of the associated beans a visitor registers in visitClass or in its own finish
+        // are bridged into the stubs before they are written
+        LoadedVisitor stubGeneratorVisitor = findStubGeneratorVisitor();
         for (LoadedVisitor loadedVisitor : loadedVisitors) {
-            try {
-                loadedVisitor.getVisitor().finish(pythonVisitorContext);
-            } catch (Throwable e) {
-                failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+            if (loadedVisitor != stubGeneratorVisitor) {
+                finishVisitor(loadedVisitor, pythonVisitorContext);
             }
         }
+        List<AbstractBeanDefinitionBuilder> associatedBeanBuilders = new ArrayList<>();
         if (writeAssociatedBeans) {
-            writeAssociatedBeanDefinitions(pythonVisitorContext);
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            if (stubGeneratorVisitor != null) {
+                bridgeProducerMethods((PythonStubGenerator) stubGeneratorVisitor.getVisitor(), associatedBeanBuilders, pythonVisitorContext);
+            }
+        }
+        if (stubGeneratorVisitor != null) {
+            finishVisitor(stubGeneratorVisitor, pythonVisitorContext);
+        }
+        if (writeAssociatedBeans) {
+            associatedBeanBuilders.addAll(takeAssociatedBeanBuilders(pythonVisitorContext));
+            writeAssociatedBeanDefinitions(pythonVisitorContext, associatedBeanBuilders);
+        }
+    }
+
+    private void finishVisitor(LoadedVisitor loadedVisitor, PythonVisitorContext pythonVisitorContext) {
+        try {
+            loadedVisitor.getVisitor().finish(pythonVisitorContext);
+        } catch (Throwable e) {
+            failVisitor(pythonVisitorContext, loadedVisitor, "finish", e);
+        }
+    }
+
+    private @Nullable LoadedVisitor findStubGeneratorVisitor() {
+        for (LoadedVisitor loadedVisitor : loadedVisitors) {
+            if (loadedVisitor.getVisitor() instanceof PythonStubGenerator) {
+                return loadedVisitor;
+            }
+        }
+        return null;
+    }
+
+    private static List<AbstractBeanDefinitionBuilder> takeAssociatedBeanBuilders(PythonVisitorContext pythonVisitorContext) {
+        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
+        if (javaVisitorContext == null) {
+            return List.of();
+        }
+        return javaVisitorContext.getBeanElementBuilders();
+    }
+
+    /**
+     * A child bean produced with {@code BeanElementBuilder.produceBeans(...)} invokes its producer method on the
+     * bean type, which for a Python class is the generated Java stub. The stub only bridges the Python methods
+     * Micronaut needs to see, so the producer methods of the associated beans are bridged explicitly.
+     */
+    private static void bridgeProducerMethods(PythonStubGenerator stubGenerator, List<AbstractBeanDefinitionBuilder> beanElementBuilders, PythonVisitorContext pythonVisitorContext) {
+        for (AbstractBeanDefinitionBuilder beanElementBuilder : beanElementBuilders) {
+            for (AbstractBeanDefinitionBuilder childBean : beanElementBuilder.getChildBeans()) {
+                if (childBean.getProducingElement() instanceof PythonMethodElement producerMethod) {
+                    stubGenerator.bridgeProducerMethod(producerMethod, pythonVisitorContext);
+                }
+            }
         }
     }
 
@@ -302,7 +364,16 @@ public final class PythonTypeElementVisitorProcessor {
     }
 
     private void annotatePythonAopProxy(ClassElement element) {
-        if (!(element instanceof AbstractPythonClassElement) || !isAopProxy(element)) {
+        if (!(element instanceof AbstractPythonClassElement)) {
+            return;
+        }
+        adviseConstrainedMethods(element);
+        if (!isAopProxy(element)) {
+            return;
+        }
+        if (element.isInterface()) {
+            // An interface has no Python state or behaviour to proxy: Micronaut compiles the
+            // introduction proxy for the generated Java interface as it does for a Java one.
             return;
         }
         if (element.hasStereotype(Around.class)) {
@@ -314,12 +385,42 @@ public final class PythonTypeElementVisitorProcessor {
         );
     }
 
-    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext) {
-        JavaVisitorContext javaVisitorContext = pythonVisitorContext.getJavaVisitorContext();
-        if (javaVisitorContext == null) {
+    /**
+     * Applies the validation advice a Java bean receives while its definition is written: every method
+     * that declares {@link RequiresValidation} (a constrained parameter or return value) is annotated
+     * with {@code Validated}, which is around advice. A Python bean decides whether it is proxied at
+     * runtime, and which methods its generated stub bridges, before the definition is written, so the
+     * advice has to be applied here for the bean to be proxied the way a Java bean is. Configuration
+     * beans are validated after construction and get no advice; the synthetic accessors of a
+     * constrained attribute keep the advice the bean definition gives them.
+     *
+     * @param element The Python class
+     */
+    private void adviseConstrainedMethods(ClassElement element) {
+        if (element.hasStereotype(ANN_CONFIGURATION_READER) || !isBeanCandidate(element)) {
             return;
         }
-        List<AbstractBeanDefinitionBuilder> beanElementBuilders = javaVisitorContext.getBeanElementBuilders();
+        List<MethodElement> constrainedMethods = element.getEnclosedElements(
+            ElementQuery.ALL_METHODS
+                .onlyInstance()
+                .onlyAccessible()
+                .filter(PythonMethodElement.class::isInstance)
+                .annotated(annotationMetadata -> annotationMetadata.hasDeclaredAnnotation(RequiresValidation.class)
+                    && !annotationMetadata.hasDeclaredAnnotation(ANN_VALIDATED))
+        );
+        for (MethodElement constrainedMethod : constrainedMethods) {
+            constrainedMethod.annotate(ANN_VALIDATED);
+        }
+    }
+
+    private static boolean isBeanCandidate(ClassElement element) {
+        return BeanDefinitionCreatorFactory.isDeclaredBeanInMetadata(element)
+            || element.hasStereotype(Executable.class)
+            || element.hasStereotype(AnnotationUtil.QUALIFIER)
+            || element.hasStereotype(InterceptorBinding.class);
+    }
+
+    private void writeAssociatedBeanDefinitions(PythonVisitorContext pythonVisitorContext, List<AbstractBeanDefinitionBuilder> beanElementBuilders) {
         if (beanElementBuilders.isEmpty()) {
             return;
         }

@@ -341,6 +341,26 @@ class PythonConversionTest {
     }
 
     @Test
+    void testCoerceMapCoercesKeysAndValues() {
+        Value pythonKey = context.eval("python", "object()");
+        Value pythonValue = context.eval("python", "object()");
+        ValueCoercible key = () -> pythonKey;
+        ValueCoercible value = () -> pythonValue;
+        Map<Object, Object> keyed = new java.util.LinkedHashMap<>();
+        keyed.put(1, "one");
+        keyed.put(key, value);
+        keyed.put("none", null);
+
+        Map<Object, Object> coerced = PythonCoercion.coerceMap(keyed);
+
+        assertEquals(3, coerced.size());
+        assertEquals("one", coerced.get(1));
+        assertSame(pythonValue, coerced.get(pythonKey));
+        assertTrue(coerced.containsKey("none"));
+        assertNull(coerced.get("none"));
+    }
+
+    @Test
     void testConvertListPythonNone() {
         // Test conversion with Python None value
         Value none = context.eval("python", "lambda: None").execute();

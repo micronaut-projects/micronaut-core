@@ -124,6 +124,86 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
+    void javaObjectsAnswerToKeywordSafeMemberAliases() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            "micronaut.python.pool.enabled", true,
+            "micronaut.python.pool.size", 1,
+            // the registration needs java.lang.Object even when host class lookup is narrowed
+            "graalpy.context.host-class-lookup", List.of("io.micronaut.context.python")
+        ))) {
+            Context context = applicationContext.getBean(Context.class);
+            context.getBindings(PYTHON).putMember("factory", new KeywordFactory());
+            // a builder returned from Java, never seen by the compiler
+            assertEquals("from=x@y", context.eval(PYTHON, "factory.builder().from_('x@y').build()").asString());
+            assertEquals("a&b", context.eval(PYTHON, "factory.spec('a').and_(factory.spec('b')).is_()").asString());
+            assertEquals("from=null", context.eval(PYTHON, "factory.builder().build()").asString(), "regular members are untouched");
+            assertTrue(context.eval(PYTHON, "b = factory.builder(); hasattr(b, 'from_') and hasattr(b, 'from') and not hasattr(b, 'nope_')").asBoolean());
+            assertEquals("from=explicit", context.eval(PYTHON, "getattr(factory.builder(), 'from')('explicit').build()").asString(), "the explicit spelling keeps working");
+            assertEquals("really from_", context.eval(PYTHON, "factory.literal().from_").asString(), "a member really called from_ wins");
+            assertEquals("really from", context.eval(PYTHON, "getattr(factory.literal(), 'from')").asString());
+            PolyglotException missing = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.builder().missing_()"));
+            assertTrue(missing.getMessage().contains("foreign object has no attribute 'missing_'"), missing.getMessage());
+            PolyglotException missingKeyword = assertThrows(PolyglotException.class, () -> context.eval(PYTHON, "factory.spec('a').while_()"));
+            assertTrue(missingKeyword.getMessage().contains("foreign object has no attribute 'while_'"), "the alias the caller used is reported: " + missingKeyword.getMessage());
+
+            // pooled contexts are bootstrapped the same way
+            String pooled = applicationContext.getBean(PythonContextExecutor.class).withContext(pooledContext -> {
+                pooledContext.getBindings(PYTHON).putMember("factory", new KeywordFactory());
+                return pooledContext.eval(PYTHON, "factory.spec('p').or_(factory.spec('q')).is_()").asString();
+            });
+            assertEquals("p|q", pooled);
+        }
+    }
+
+    public static final class KeywordFactory {
+        public KeywordBuilder builder() {
+            return new KeywordBuilder();
+        }
+
+        public KeywordSpec spec(String name) {
+            return new KeywordSpec(name);
+        }
+
+        public KeywordLiteral literal() {
+            return new KeywordLiteral();
+        }
+    }
+
+    public static final class KeywordLiteral {
+        public final String from = "really from";
+        // Deliberately keeps the keyword-suffixed name to verify that a real member wins over the alias.
+        @SuppressWarnings("java:S116")
+        public final String from_ = "really from_";
+    }
+
+    public static final class KeywordBuilder {
+        private String from;
+
+        public KeywordBuilder from(String from) {
+            this.from = from;
+            return this;
+        }
+
+        public String build() {
+            return "from=" + from;
+        }
+    }
+
+    public record KeywordSpec(String name) {
+        public KeywordSpec and(KeywordSpec other) {
+            return new KeywordSpec(name + "&" + other.name);
+        }
+
+        public KeywordSpec or(KeywordSpec other) {
+            return new KeywordSpec(name + "|" + other.name);
+        }
+
+        public String is() {
+            return name;
+        }
+    }
+
+    @Test
     void contextOptionsCanBeConfiguredFromMicronautProperties() {
         try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
             "graalpy.context.options", Map.of("log.level", "FINE")

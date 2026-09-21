@@ -1,0 +1,45 @@
+A Python callable (a lambda, a function, a bound method) passed to a Java method whose parameter is a functional interface is converted to an implementation of that interface. The Java side receives a proxy, and the proxy becomes the original Python callable again when it is returned to Python: a listener registered from Python and read back is the same object as (`is`) the lambda that was registered, and it can still be called.
+
+[source,python]
+----
+from java.util import ArrayList
+
+names = ArrayList()
+names.add("b")
+names.add("a")
+names.sort(lambda left, right: (left > right) - (left < right))  # <1>
+----
+
+<1> `sort` takes a `Comparator`; the lambda becomes the `compare` implementation.
+
+=== Overloaded Functional Parameters
+
+Some Java methods are overloaded on functional interfaces of different arities, for example `exitCondition(Predicate<Scope>)` and `exitCondition(BiPredicate<Scope, Integer>)`. A Python callable does not declare which interface it implements, so Micronaut selects the overload by the number of positional parameters of the callable:
+
+* A callable that declares exactly as many positional parameters as the interface method selects that overload: a lambda with two parameters selects `BiPredicate`, a lambda with one selects `Predicate`. A bound method does not count `self`.
+* When a value-returning interface and a `void` interface both match, the value-returning one wins: a zero-argument lambda passed to a method overloaded on `Runnable` and `Supplier` selects `Supplier`, like a Java lambda expression does.
+* Default values count only when no overload matches the declared parameters exactly: `lambda a, b="x": ...` declares two parameters and selects `BiFunction`; passed to a method overloaded on `BiPredicate` and a three-argument interface, `lambda a, b, c=1: ...` selects `BiPredicate`. `*args` does not make a callable fit further arities: `lambda a, *rest: ...` declares one parameter and selects `Predicate`.
+* A callable whose signature cannot be inspected (a `functools.partial`, a builtin, a class), or that only fits an arity through `*args`, is converted as it was before, by the default conversion of the host interop: a `Function` parameter accepts it ahead of any other interface, and overloads on other interfaces are ambiguous.
+
+[source,python]
+----
+builder.exitCondition(lambda scope, index: index == 3)  # <1>
+----
+
+<1> Selects `exitCondition(BiPredicate<AgenticScope, Integer>)`.
+
+This rule covers every interface of `java.util.function` plus `Runnable`, `java.util.concurrent.Callable` and `java.util.Comparator`.
+
+=== Adapting a Callable Explicitly
+
+For overloads on custom functional interfaces, or on interfaces of the same arity, adapt the callable to the interface with api:context.python.PythonInterop[PythonInterop] before passing it:
+
+[source,python]
+----
+from java.util.function import BiPredicate
+from micronaut.context.python import PythonInterop
+
+builder.exitCondition(PythonInterop.fn(BiPredicate, lambda scope, index: index == 3))
+----
+
+`PythonInterop.fn` returns a Java object that implements the interface and invokes the callable. Unlike an automatically converted callable, it keeps its Java class when it is returned to Python, so it also serves code that needs to identify the implementation on the Java side, for example through `getClass()`.

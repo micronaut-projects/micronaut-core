@@ -1,4 +1,4 @@
-from micronaut.core.annotation import Primary
+from micronaut.context.annotation import Primary
 from jakarta.inject import Singleton
 from .ColorPicker import ColorPicker
 

@@ -23,6 +23,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Vetoed;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.inject.processing.definition.OutputObjectDef;
@@ -52,7 +53,6 @@ import java.lang.annotation.Annotation;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -82,6 +82,11 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
      */
     public static final int POSITION = -100;
     private static final String ANN_LOMBOK_BUILDER = "lombok.Builder";
+    /**
+     * Marks the Java class generated for a Python class. Its introspection is generated from the Python
+     * class itself, before the generated class is compiled.
+     */
+    private static final String ANN_PYTHON_CLASS = "io.micronaut.context.python.annotation.PythonClass";
 
     private final Set<String> processed = new HashSet<>();
     /**
@@ -110,9 +115,31 @@ public class IntrospectedTypeElementVisitor implements TypeElementVisitor<Object
         if (element.hasStereotype(Introspected.class)) {
             final AnnotationValue<Introspected> introspected = element.getAnnotation(Introspected.class);
             if (introspected != null && !processed.contains(element.getName())) {
+                if (isPythonClassWithIntrospection(element, context)) {
+                    processed.add(element.getName());
+                    return;
+                }
                 processIntrospected(element, context, introspected);
             }
         }
+    }
+
+    /**
+     * Whether the element is the vetoed Java class generated for a Python class whose introspection was
+     * already generated from the Python class, earlier in the same compilation. The generated class carries
+     * the runtime annotations of the Python class ({@code @Entity}, ...) for reflection-based frameworks, and
+     * such an annotation may carry the {@link Introspected} stereotype: the introspection is not generated a
+     * second time from the Java class. A Java class is never skipped, so that a class recompiled next to a
+     * stale introspection of it on the classpath gets a fresh one.
+     *
+     * @param element The class element
+     * @param context The visitor context
+     * @return Whether the introspection of a Python class is already present
+     */
+    private boolean isPythonClassWithIntrospection(ClassElement element, VisitorContext context) {
+        return element.hasDeclaredAnnotation(Vetoed.class)
+            && element.hasDeclaredAnnotation(ANN_PYTHON_CLASS)
+            && isIntrospected(context, element);
     }
 
     private boolean isIntrospected(VisitorContext context, ClassElement c) {
