@@ -91,6 +91,19 @@ class ProxyHttpClientTest {
         }
     }
 
+    @Test
+    void proxyDoesNotCarryCookiesBetweenRequests() throws Exception {
+        try (ServerUnderTest server = server()) {
+            ProxyHttpClient client = server.getApplicationContext().getBean(ProxyHttpClient.class);
+            try (ByteBodyHttpResponse<?> response = proxy(client, HttpRequest.GET(server.getURL().get() + "/proxy-client/set-cookie"), ProxyRequestOptions.getDefault())) {
+                Assertions.assertEquals("session=user-a; Path=/", response.getHeaders().get(HttpHeaders.SET_COOKIE));
+            }
+            try (ByteBodyHttpResponse<?> response = proxy(client, HttpRequest.GET(server.getURL().get() + "/proxy-client/cookie"), ProxyRequestOptions.getDefault())) {
+                Assertions.assertEquals("none", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -117,6 +130,17 @@ class ProxyHttpClientTest {
         @Get(value = "/redirect-to", produces = MediaType.TEXT_PLAIN)
         String redirectTo() {
             return "redirect successful";
+        }
+
+        @Get("/set-cookie")
+        HttpResponse<?> setCookie() {
+            return HttpResponse.ok().header(HttpHeaders.SET_COOKIE, "session=user-a; Path=/");
+        }
+
+        @Get(value = "/cookie", produces = MediaType.TEXT_PLAIN)
+        String cookie(io.micronaut.http.HttpRequest<?> request) {
+            String cookie = request.getHeaders().get(HttpHeaders.COOKIE);
+            return cookie == null ? "none" : cookie;
         }
 
         @Get(value = "/host", produces = MediaType.TEXT_PLAIN)
