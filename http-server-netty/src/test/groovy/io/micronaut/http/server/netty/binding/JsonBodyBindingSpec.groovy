@@ -276,6 +276,13 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.BAD_REQUEST
 
+        and: "the streaming response reports it through the error response processor, like a buffered body would"
+        e.response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
+        def result = new JsonSlurper().parseText(e.response.getBody(String).get())
+        result['_links'].self.href == '/json/publisher-object'
+        result.message == 'Invalid JSON'
+        result._embedded.errors[0].message.startsWith('Invalid JSON: ')
+
         where:
         json << ['[', '[ ']
     }
@@ -289,6 +296,12 @@ class JsonBodyBindingSpec extends AbstractMicronautSpec {
         then: "a framing error in the array is a client error"
         def e = thrown(HttpClientResponseException)
         e.response.status == HttpStatus.BAD_REQUEST
+
+        and: "the route had not answered yet, so the controller's @Error handler formats the body"
+        e.response.headers.get(HttpHeaders.CONTENT_TYPE) == io.micronaut.http.MediaType.APPLICATION_JSON
+        def result = new JsonSlurper().parseText(e.response.getBody(String).get())
+        result['_links'].self.href == '/json/publisher-collect'
+        result.message.startsWith('Invalid JSON: ')
 
         where:
         json << ['[{"name":"Fred","age":10}{"name":"Fred","age":10}]', '[{"name":"Fred","age":10},,{"name":"Fred","age":10}]']

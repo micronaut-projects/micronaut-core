@@ -234,18 +234,19 @@ public final class JsonCounter {
             // if we are unwrapping a top-level array, the elements must be separated by commas
             if (unwrappingArray) {
                 i = skipWs(buf, i, end);
-                if (i < end) {
+                if (i < end && expectUnwrappingArrayComma) {
                     byte b = buf.getByte(i);
-                    if (expectUnwrappingArrayComma) {
-                        if (b == ',') {
-                            expectUnwrappingArrayComma = false;
-                            i++;
-                        } else if (b != ']') {
-                            failMissingComma();
-                        }
-                    } else if (b == ',') {
-                        failUnexpectedComma();
+                    if (b == ',') {
+                        expectUnwrappingArrayComma = false;
+                        i = skipWs(buf, i + 1, end);
+                    } else if (b != ']') {
+                        failMissingComma();
                     }
+                }
+                // also checked right after a comma consumed above, so that a stray comma is
+                // rejected the same way whether or not it arrives in the same buffer
+                if (i < end && !expectUnwrappingArrayComma && buf.getByte(i) == ',') {
+                    failUnexpectedComma();
                 }
             }
             i = skipWs(buf, i, end);

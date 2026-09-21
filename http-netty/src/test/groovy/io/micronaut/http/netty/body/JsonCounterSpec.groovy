@@ -264,6 +264,8 @@ class JsonCounterSpec extends Specification {
                 '["foo""bar"]',
                 // stray element separator
                 '[1,,2]',
+                '[1 , ,2]',
+                '[{} , ,{}]',
                 '[,1]',
                 // unterminated array
                 '[',

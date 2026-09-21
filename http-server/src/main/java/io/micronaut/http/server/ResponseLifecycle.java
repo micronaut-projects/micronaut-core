@@ -29,6 +29,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
@@ -42,6 +43,8 @@ import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.exceptions.response.Error;
+import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -53,6 +56,7 @@ import reactor.core.publisher.Flux;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
@@ -319,9 +323,10 @@ public abstract class ResponseLifecycle {
             t = jse;
         }
         if (t instanceof JsonSyntaxException) {
-            // a syntax error in a streamed request body is the client's fault, not the server's,
-            // the same way RequestLifecycle answers it for a fully buffered body
-            errorResponse = HttpResponse.badRequest().body(t.getMessage());
+            // a syntax error in a streamed request body is the client's fault, not the server's.
+            // Answer it the way JsonExceptionHandler does for a fully buffered body, so the error
+            // body has the same shape whether or not the body was streamed
+            errorResponse = createJsonSyntaxErrorResponse(request, t);
         } else if (t instanceof HttpStatusException hse) {
             errorResponse = HttpResponse.status(hse.getStatus());
             if (hse.getBody().isPresent()) {
@@ -336,6 +341,33 @@ public abstract class ResponseLifecycle {
             request,
             errorResponse
         );
+    }
+
+    private MutableHttpResponse<?> createJsonSyntaxErrorResponse(HttpRequest<?> request, Throwable t) {
+        MutableHttpResponse<?> response = HttpResponse.status(HttpStatus.BAD_REQUEST, "Invalid JSON");
+        try {
+            response = routeExecutor.getErrorResponseProcessor().processResponse(
+                ErrorContext.builder(request)
+                    .cause(t)
+                    .error(new Error() {
+                        @Override
+                        public String getMessage() {
+                            return "Invalid JSON: " + t.getMessage();
+                        }
+
+                        @Override
+                        public Optional<String> getTitle() {
+                            return Optional.of("Invalid JSON");
+                        }
+                    })
+                    .build(), response);
+        } catch (Exception e) {
+            routeExecutor.logException(e);
+        }
+        if (response.getContentType().isEmpty() && request.getMethod() != HttpMethod.HEAD) {
+            response.contentType(MediaType.APPLICATION_JSON_TYPE);
+        }
+        return response;
     }
 
     private <T> ExecutionFlow<CloseableByteBody> writePieceAsync(MessageBodyWriter<T> messageBodyWriter,
