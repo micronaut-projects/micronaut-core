@@ -64,14 +64,27 @@ with libgraal, and a JVM that lives fifteen seconds pays that warmup without ear
 size of the gaps between the backends are the same on both JDKs, so the backend comparison does not depend on the
 JVM it was taken on.
 
-**The finished implementation against the batch 1-4 one (`604b891a`), both on Temurin.** Two effects are the
-implementation, both small and both expected of a model that now carries factories, configuration binding, iterable
-beans, enums, described members and validation flags: the saved model grew 2.6% (3.6 KB over 40 modules, 131 KB to
-135 KB) and the generated definition classes 1.6% (248 KB to 252 KB), while the generated introspections are
-unchanged. The first introspection of the runtime backend went from 6.0 ms to 8.5 ms, decoding a richer model.
-Everything else (context start +11% to +15%, first bean +10% to +22%, JVM wall about +10%) moved by the same amount
-in the control, so it is the machine rather than the code. The output inventory is otherwise unchanged: the runtime
-backend still emits no definition and no introspection class.
+**The two model backends against the compiler backend**, the baseline being what the Python compiler writes today,
+taken from the same run so that the machine cancels out, and repeated one JDK over so that an effect can be told
+from noise. Four results hold on GraalVM and on Temurin alike, and are the backends:
+
+| metric | build-time (GraalVM / Temurin) | runtime (GraalVM / Temurin) |
+|---|---:|---:|
+| metadata bytes shipped | -20.7% / -20.7% | -77.6% / -77.6% |
+| first introspection | +63.1% / +25.5% | -42.8% / -63.1% |
+| all 40 introspections | -15.6% / -29.2% | +94.5% / +119.9% |
+| heap after GC | +0.8 MB / +0.9 MB | +1.3 MB / +1.0 MB |
+| loaded classes | +45 / +49 | +83 / +85 |
+
+The compiler's 644 KB of definition and introspection classes become 510 KB of smaller classes plus models at build
+time, or 144 KB of models and a catalog with no metadata class at all at run time. The runtime backend resolves the
+first introspection in about half the time, materializing one model instead of initializing a metadata-heavy class,
+and resolves all forty in about twice the time, around 1.6 ms of generation each. It keeps about a megabyte more
+heap and 83 more loaded classes, which are the runtime module and ASM.
+
+Everything else is noise: context start, beans, warm restart and wall time all land within a few per cent and change
+sign between the two JDKs. The build-time backend's `+36.4%` compilation figure on Temurin is its own outlier, the
+same backend being `+5.2%` on GraalVM with a spread on both runs that covers the difference.
 
 No startup or memory benefit is claimed from these runs; the benefits established are the smaller packaged
 output and the removal of the metadata classes from the build, at no measurable cost. The plan's other
