@@ -2,6 +2,7 @@ dist/
 .DS_Store
 target/
 .gradle/
+.kotlin/
 .idea/
 build/
 !build-logic/src/main/java/io/micronaut/build
