@@ -19,6 +19,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
@@ -98,6 +99,15 @@ public class RawProxyTest {
             assertEquals(HttpStatus.OK, response.getStatus());
             assertEquals(MediaType.APPLICATION_OCTET_STREAM, response.getContentType().map(MediaType::toString).orElse(null));
             assertArrayEquals(content(0, LARGE_SIZE), response.body());
+        }
+    }
+
+    @Test
+    void wrappedRawResponseKeepsBody() throws IOException {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<byte[]> response = server.exchange(HttpRequest.GET("/raw-proxy/wrapped"), byte[].class);
+            assertEquals(HttpStatus.OK, response.getStatus());
+            assertArrayEquals(content(0, 1024 * 1024), response.body());
         }
     }
 
@@ -385,6 +395,14 @@ public class RawProxyTest {
         @Get("/stream")
         Mono<HttpResponse<?>> stream(ServerHttpRequest<?> request, @QueryValue long size) {
             return relay(request, "/raw-upstream/stream?size=" + size);
+        }
+
+        @Get("/wrapped")
+        @SuppressWarnings("unchecked")
+        Mono<HttpResponse<?>> wrapped(ServerHttpRequest<?> request) {
+            // a wrapper around the raw response, e.g. from a library that decorates responses
+            return relay(request, "/raw-upstream/stream?size=" + (1024 * 1024))
+                .map(response -> new HttpResponseWrapper<>((HttpResponse<Object>) response));
         }
 
         @Get("/filtered")

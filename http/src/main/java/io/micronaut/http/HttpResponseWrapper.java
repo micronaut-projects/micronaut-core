@@ -40,6 +40,41 @@ public class HttpResponseWrapper<B> extends HttpMessageWrapper<B> implements Htt
         return getDelegate().reason();
     }
 
+    /**
+     * Returns a mutable response with the status and headers of this response. If this response is,
+     * or wraps, a {@link ByteBodyHttpResponse} whose bytes were not replaced by an object body, the
+     * mutable response is a {@link MutableByteBodyHttpResponse} that takes over those bytes.
+     *
+     * @return The mutable response
+     */
+    @Override
+    public MutableHttpResponse<?> toMutableResponse() {
+        if (this instanceof MutableHttpResponse<?> mutable) {
+            return mutable;
+        }
+        if (this instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+            return MutableByteBodyHttpResponse.of(byteBodyResponse);
+        }
+        if (getBody().isEmpty()) {
+            HttpResponse<?> current = getDelegate();
+            while (true) {
+                if (current instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                    if (byteBodyResponse.getBody().isEmpty()) {
+                        // the status and headers of this wrapper, the bytes of the wrapped response
+                        return MutableByteBodyHttpResponse.of(this, byteBodyResponse.byteBody().move());
+                    }
+                    break;
+                }
+                if (current instanceof HttpResponseWrapper<?> wrapper) {
+                    current = wrapper.getDelegate();
+                } else {
+                    break;
+                }
+            }
+        }
+        return HttpResponse.super.toMutableResponse();
+    }
+
     @Override
     public HttpResponse<B> getDelegate() {
         HttpMessage<B> delegate = super.getDelegate();
