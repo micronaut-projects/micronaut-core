@@ -42,6 +42,21 @@ public interface BufferConsumer {
     void complete();
 
     /**
+     * Send a final buffer to this consumer and signal normal completion of the stream, in one
+     * operation. Ownership of the buffer transfers to the consumer.
+     * <p>This is semantically identical to {@link #add(ReadBuffer)} followed by
+     * {@link #complete()}. Implementations may override it to combine the two into a single
+     * downstream message, e.g. to write the trailing bytes of a response as part of the message
+     * that terminates it.
+     *
+     * @param rb The final buffer
+     */
+    default void addAndComplete(ReadBuffer rb) {
+        add(rb);
+        complete();
+    }
+
+    /**
      * Signal that the upstream has discarded the remaining data, as requested by {@link Upstream#allowDiscard()}.
      */
     default void discard() {
