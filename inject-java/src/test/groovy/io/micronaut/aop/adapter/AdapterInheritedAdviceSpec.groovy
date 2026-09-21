@@ -99,4 +99,66 @@ interface TracedListener {
         container != null
         definition.getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null) == ['advicekept.Traced']
     }
+
+    void 'advice composed into an annotation on the adapted interface is kept when the declaring class shares it'() {
+        when:
+        BeanDefinition definition = buildBeanDefinition('advicecomposed.LoggedBean$ComposedListener$onEvent1$Intercepted', '''
+package advicecomposed;
+
+import io.micronaut.aop.Adapter;
+import io.micronaut.aop.Around;
+import io.micronaut.core.annotation.Indexed;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+
+@Singleton
+@Logged
+@Timed
+class LoggedBean {
+    @ComposedListenerMethod
+    void onEvent(String event) {
+    }
+}
+
+@Composed
+interface ComposedListener {
+    void handle(String event);
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Adapter(ComposedListener.class)
+@Indexed(ComposedListener.class)
+@interface ComposedListenerMethod {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD, ElementType.ANNOTATION_TYPE})
+@Around
+@interface Logged {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Logged
+@interface Composed {
+}
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@Around
+@interface Timed {
+}
+''')
+
+        then: 'the composed advice of the interface keeps its stereotype and binding'
+        definition != null
+        definition.hasAnnotation('advicecomposed.Composed')
+        definition.hasStereotype('advicecomposed.Logged')
+        definition.hasStereotype(AnnotationUtil.ANN_AROUND)
+        definition.getAnnotationValuesByType(InterceptorBinding)*.stringValue()*.orElse(null) == ['advicecomposed.Logged']
+
+        and: 'advice only the declaring class carries is still removed'
+        !definition.hasAnnotation('advicecomposed.Timed')
+    }
 }

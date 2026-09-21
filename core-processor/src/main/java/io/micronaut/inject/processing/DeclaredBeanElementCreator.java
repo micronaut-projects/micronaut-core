@@ -763,8 +763,11 @@ sealed class DeclaredBeanElementCreator<R> extends AbstractBeanElementCreator<R>
         for (String stereotype : ADVICE_STEREOTYPES) {
             adviceFromDeclaringClass.addAll(proxyAnnotationMetadata.getAnnotationNamesByStereotype(stereotype));
         }
-        // Anything the adapted interface declares itself describes the adapter and is kept
-        adviceFromDeclaringClass.removeAll(interfaceToAdapt.getAnnotationMetadata().getAnnotationNames());
+        // Anything the adapted interface contributes describes the adapter and is kept, including the advice that
+        // a composed annotation on the interface is meta-annotated with, which the declaring class may share
+        AnnotationMetadata interfaceMetadata = interfaceToAdapt.getAnnotationMetadata();
+        adviceFromDeclaringClass.removeAll(interfaceMetadata.getAnnotationNames());
+        adviceFromDeclaringClass.removeAll(interfaceMetadata.getStereotypeAnnotationNames());
         if (adviceFromDeclaringClass.isEmpty()) {
             return;
         }
