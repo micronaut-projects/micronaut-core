@@ -108,7 +108,7 @@ noReflection {
 }
 ```
 
-Prefer code that does without: the compile-time metadata, `Class.getName`, `values()` instead of `valueOf`. Where reflection is the point, allow the class and its category in the module's build file, or suppress a single call with `@SuppressWarnings("NoReflection")` on the variable that holds its result. Remove what is no longer needed: `./gradlew compileJava -PnoReflection.record` prints, for every module, the `noReflection` block that allows exactly what its code uses.
+Prefer code that does without: the compile-time metadata, `Class.getName`, `values()` instead of `valueOf`. Where reflection is the point, allow the class and its category in the module's build file, or suppress a single call with `@SuppressWarnings("NoReflection")` on the variable that holds its result.
 
 ## Building on Windows 10
 
