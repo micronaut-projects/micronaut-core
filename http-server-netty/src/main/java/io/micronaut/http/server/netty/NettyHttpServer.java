@@ -122,6 +122,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
+import java.util.function.IntPredicate;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
@@ -663,7 +664,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                             }
                             if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
-                                    future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap) : listenerBootstrap.bind(port);
+                                    future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap, CHECK_LOOPBACK_PORT_SHADOWING ? NettyHttpServer::isLoopbackPortTaken : p -> false) : listenerBootstrap.bind(port);
                                 } else {
                                     future = listenerBootstrap.bind(cfg.getHost(), port);
                                 }
@@ -754,15 +755,15 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * that happens, the listener is bound again to get a different port.
      *
      * @param bootstrap The listener bootstrap
+     * @param portTaken Whether another listener shadows the given port
      * @return The bind future, already completed
      */
-    private static ChannelFuture bindRandomWildcardPort(ServerBootstrap bootstrap) {
+    static ChannelFuture bindRandomWildcardPort(ServerBootstrap bootstrap, IntPredicate portTaken) {
         for (int attempt = 1; ; attempt++) {
             ChannelFuture future = bootstrap.bind(0).syncUninterruptibly();
             if (attempt >= MAX_RANDOM_PORT_BIND_ATTEMPTS
-                || !CHECK_LOOPBACK_PORT_SHADOWING
                 || !(future.channel().localAddress() instanceof InetSocketAddress address)
-                || !isLoopbackPortTaken(address.getPort())) {
+                || !portTaken.test(address.getPort())) {
                 return future;
             }
             if (LOG.isDebugEnabled()) {
@@ -782,7 +783,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * @param port The port
      * @return {@code true} if the port is taken at {@code 127.0.0.1} or {@code ::1}
      */
-    private static boolean isLoopbackPortTaken(int port) {
+    static boolean isLoopbackPortTaken(int port) {
         return isPortTaken(StandardProtocolFamily.INET, new InetSocketAddress(NetUtil.LOCALHOST4, port))
             || isPortTaken(StandardProtocolFamily.INET6, new InetSocketAddress(NetUtil.LOCALHOST6, port));
     }
