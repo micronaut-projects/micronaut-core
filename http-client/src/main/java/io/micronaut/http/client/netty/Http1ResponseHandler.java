@@ -56,7 +56,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
      * A response body that is abandoned before it ended is drained so that the connection can be
      * reused. Beyond this many bytes, the rest of the body is not drained.
      */
-    private static final long DISCARD_BYTE_LIMIT = 64 * 1024;
+    private static final long DISCARD_BYTE_LIMIT = 64L * 1024;
     /**
      * A response body that is abandoned before it ended is drained for at most this long.
      */

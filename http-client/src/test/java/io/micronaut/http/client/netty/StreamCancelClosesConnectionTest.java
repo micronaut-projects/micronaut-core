@@ -17,6 +17,7 @@ package io.micronaut.http.client.netty;
 
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -58,7 +59,7 @@ class StreamCancelClosesConnectionTest {
              StreamingHttpClient client = ctx.createBean(StreamingHttpClient.class, server.getURI())) {
 
             byte[] first = Flux.from(client.dataStream(HttpRequest.GET("/endless")))
-                .map(buffer -> buffer.toByteArray())
+                .map(ByteBuffer::toByteArray)
                 .blockFirst();
             Assertions.assertNotNull(first);
 
@@ -84,7 +85,7 @@ class StreamCancelClosesConnectionTest {
              StreamingHttpClient client = ctx.createBean(StreamingHttpClient.class, server.getURI())) {
 
             byte[] first = Flux.from(client.dataStream(HttpRequest.GET("/slow-endless")))
-                .map(buffer -> buffer.toByteArray())
+                .map(ByteBuffer::toByteArray)
                 .blockFirst();
             Assertions.assertNotNull(first);
 
