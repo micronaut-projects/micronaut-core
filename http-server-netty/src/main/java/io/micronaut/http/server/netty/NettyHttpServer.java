@@ -81,18 +81,23 @@ import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.unix.DomainSocketAddress;
 import io.netty.handler.codec.quic.QuicSslContext;
 import io.netty.handler.ssl.SslContext;
+import io.netty.util.NetUtil;
 import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.Future;
 import io.netty.util.concurrent.GenericFutureListener;
 import io.netty.util.concurrent.GlobalEventExecutor;
+import io.netty.util.internal.PlatformDependent;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.SocketAddress;
+import java.net.StandardProtocolFamily;
+import java.net.StandardSocketOptions;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
@@ -103,6 +108,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -143,6 +149,19 @@ public class NettyHttpServer implements NettyEmbeddedServer {
      * The default number of threads of a server-owned acceptor ("parent") event loop group.
      */
     private static final int DEFAULT_PARENT_THREADS = 1;
+
+    /**
+     * How often {@link #bindRandomWildcardPort} binds again before it keeps a random port that
+     * is shadowed by a loopback listener.
+     */
+    private static final int MAX_RANDOM_PORT_BIND_ATTEMPTS = 10;
+
+    /**
+     * Whether random wildcard ports may be shadowed by loopback listeners, see
+     * {@link #bindRandomWildcardPort}.
+     */
+    private static final boolean CHECK_LOOPBACK_PORT_SHADOWING = PlatformDependent.isOsx()
+        || System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("bsd");
 
     private static final Logger LOG = LoggerFactory.getLogger(NettyHttpServer.class);
     private final NettyEmbeddedServices nettyEmbeddedServices;
@@ -644,7 +663,7 @@ public class NettyHttpServer implements NettyEmbeddedServer {
                             }
                             if (cfg.isBind()) {
                                 if (cfg.getHost() == null) {
-                                    future = listenerBootstrap.bind(port);
+                                    future = port == 0 && fd == null ? bindRandomWildcardPort(listenerBootstrap) : listenerBootstrap.bind(port);
                                 } else {
                                     future = listenerBootstrap.bind(cfg.getHost(), port);
                                 }
@@ -721,6 +740,63 @@ public class NettyHttpServer implements NettyEmbeddedServer {
             }
             stopInternal(false);
             throw new ServerStartupException("Unable to start Micronaut server on " + displayAddress(cfg), e);
+        }
+    }
+
+    /**
+     * Bind a listener to a random port on the wildcard address.
+     * <p>
+     * On macOS (and the BSDs), a dual-stack wildcard socket that binds port 0 can be assigned a
+     * port that another socket already listens on at a loopback address, for example a Gradle
+     * worker or another JVM's server bound to {@code 127.0.0.1}. Connections to
+     * {@code localhost} then reach that more specific listener instead of this server, and the
+     * client sees the connection closed or reset without the server ever accepting it. When
+     * that happens, the listener is bound again to get a different port.
+     *
+     * @param bootstrap The listener bootstrap
+     * @return The bind future, already completed
+     */
+    private static ChannelFuture bindRandomWildcardPort(ServerBootstrap bootstrap) {
+        for (int attempt = 1; ; attempt++) {
+            ChannelFuture future = bootstrap.bind(0).syncUninterruptibly();
+            if (attempt >= MAX_RANDOM_PORT_BIND_ATTEMPTS
+                || !CHECK_LOOPBACK_PORT_SHADOWING
+                || !(future.channel().localAddress() instanceof InetSocketAddress address)
+                || !isLoopbackPortTaken(address.getPort())) {
+                return future;
+            }
+            if (LOG.isDebugEnabled()) {
+                LOG.debug("Random port {} is already used by another listener on a loopback address, binding again", address.getPort());
+            }
+            future.channel().close().syncUninterruptibly();
+        }
+    }
+
+    /**
+     * Check whether another socket listens on the given port at a loopback address. The probe
+     * socket sets {@code SO_REUSEADDR}, so on the BSD socket layer it only conflicts with a
+     * socket bound to exactly that address, and not with our own wildcard listener. This does
+     * not hold on Linux, where our own listener conflicts with the probe, but Linux never assigns
+     * a random port that is shadowed like this in the first place.
+     *
+     * @param port The port
+     * @return {@code true} if the port is taken at {@code 127.0.0.1} or {@code ::1}
+     */
+    private static boolean isLoopbackPortTaken(int port) {
+        return isPortTaken(StandardProtocolFamily.INET, new InetSocketAddress(NetUtil.LOCALHOST4, port))
+            || isPortTaken(StandardProtocolFamily.INET6, new InetSocketAddress(NetUtil.LOCALHOST6, port));
+    }
+
+    private static boolean isPortTaken(StandardProtocolFamily family, InetSocketAddress address) {
+        try (java.nio.channels.ServerSocketChannel probe = java.nio.channels.ServerSocketChannel.open(family)) {
+            probe.setOption(StandardSocketOptions.SO_REUSEADDR, true);
+            probe.bind(address);
+            return false;
+        } catch (BindException e) {
+            return true;
+        } catch (IOException | UnsupportedOperationException e) {
+            // e.g. the protocol family is not available
+            return false;
         }
     }
 
