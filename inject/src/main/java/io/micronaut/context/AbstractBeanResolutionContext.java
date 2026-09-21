@@ -531,6 +531,16 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     /**
+     * Whether an interceptor lookup is under way through this context and has not yet taken its candidate, see
+     * {@link #takeResolvingInterceptors()}.
+     *
+     * @return Whether the bean being resolved is an interceptor a lookup asked for
+     */
+    boolean isResolvingInterceptors() {
+        return resolvingInterceptors;
+    }
+
+    /**
      * Gives back the mark {@link #takeResolvingInterceptors()} took.
      *
      * @param taken What it returned

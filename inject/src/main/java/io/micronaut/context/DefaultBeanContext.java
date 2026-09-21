@@ -67,6 +67,7 @@ import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
 import io.micronaut.core.io.service.MicronautMetaServiceLoaderUtils;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.naming.NameResolver;
 import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.naming.Named;
@@ -88,6 +89,7 @@ import io.micronaut.inject.BeanConfiguration;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.BeanIdentifier;
+import io.micronaut.inject.DelegatingBeanDefinition;
 import io.micronaut.inject.DisposableBeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.InitializingBeanDefinition;
@@ -256,6 +258,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanCreatedEventListener>>> beanCreationEventListeners;
     private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanPreDestroyEventListener>>> beanPreDestroyEventListeners;
     private @Nullable List<Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>>> beanDestroyedEventListeners;
+    // loaded once, on the first proxy target created; a race loads them twice to the same effect
+    private volatile @Nullable List<ProxyTargetInterceptorResolver> proxyTargetInterceptorResolvers;
 
     private final boolean eventsEnabled;
     private final boolean eagerBeansEnabled;
@@ -2512,6 +2516,14 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                   T bean) {
         Qualifier<T> finalQualifier = qualifier != null ? qualifier : beanDefinition.getDeclaredQualifier();
 
+        if (bean != null && isProxyTarget(beanDefinition)) {
+            // the interceptors of the proxy's methods are the target's own: created now, with it, rather than on the
+            // proxy's first selection, so that its creation event reports them
+            for (ProxyTargetInterceptorResolver resolver : proxyTargetInterceptorResolvers()) {
+                resolver.resolveInterceptors(resolutionContext, beanDefinition);
+            }
+        }
+
         bean = triggerBeanCreatedEventListener(resolutionContext, beanDefinition, bean, beanType, finalQualifier);
 
         if (beanDefinition instanceof ValidatedBeanDefinition<T> validatedBeanDefinition) {
@@ -2521,6 +2533,28 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             LOG_LIFECYCLE.debug("Created bean [{}] from definition [{}] with qualifier [{}]", bean, beanDefinition, finalQualifier);
         }
         return bean;
+    }
+
+    /**
+     * Whether a definition is the target a proxy is created around.
+     */
+    private static boolean isProxyTarget(BeanDefinition<?> definition) {
+        BeanDefinition<?> target = definition;
+        while (target instanceof DelegatingBeanDefinition<?> delegating) {
+            target = delegating.getTarget();
+        }
+        return target instanceof BeanDefinitionReference<?> reference && reference.isProxyTarget();
+    }
+
+    private List<ProxyTargetInterceptorResolver> proxyTargetInterceptorResolvers() {
+        List<ProxyTargetInterceptorResolver> resolvers = proxyTargetInterceptorResolvers;
+        if (resolvers == null) {
+            List<ProxyTargetInterceptorResolver> loaded = new ArrayList<>(1);
+            SoftServiceLoader.load(ProxyTargetInterceptorResolver.class, classLoader).collectAll(loaded);
+            resolvers = List.copyOf(loaded);
+            proxyTargetInterceptorResolvers = resolvers;
+        }
+        return resolvers;
     }
 
     private <T> T triggerBeanCreatedEventListener(BeanResolutionContext resolutionContext,
@@ -3403,6 +3437,11 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     @Nullable
     private CustomScope<?> findInjectionPointDeclaredScope(@Nullable BeanResolutionContext resolutionContext,
                                                            @Nullable BeanDefinition<?> definition) {
+        if (resolutionContext instanceof AbstractBeanResolutionContext abstractContext && abstractContext.isResolvingInterceptors()) {
+            // an interceptor is resolved for the bean it intercepts rather than injected at a point of it, so a scope
+            // declared on the current segment, which may be that of the bean itself, is not the interceptor's
+            return null;
+        }
         if (resolutionContext != null) {
             BeanResolutionContext.Segment<?, ?> currentSegment = resolutionContext
                 .getPath()

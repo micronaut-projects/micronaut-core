@@ -47,9 +47,10 @@ import java.util.Set;
  * <p>A proxy that fronts a separate target, generated for {@code @Around(proxyTarget = true)} and so every scoped
  * proxy and every advised bean a factory produces, keeps an instance of this class. It holds the singleton
  * interceptors bound to its methods only. The non-singleton interceptors of a target are the target's own: they were
- * created with the target, as dependents of its registration, when its construction or lifecycle was intercepted,
- * and they are destroyed with it. This class finds them there, by definition, and creates as a further dependent of
- * the target any that the target has not got yet, which is the case for an interceptor bound only for {@code AROUND}.
+ * created with the target, as dependents of its registration, when its construction or lifecycle was intercepted
+ * or, for one bound only for {@code AROUND}, by {@link io.micronaut.aop.internal.AroundInterceptorsOfTarget} before
+ * its creation event, and they are destroyed with it. This class finds them there, by definition, and creates as a
+ * further dependent of the target any that the target has not got yet.
  * The selection for the methods is then kept on the target's registration, so that it lives exactly as long as the
  * target does and a proxy selects once per target.</p>
  *
