@@ -111,6 +111,19 @@ class RawRequestOptionsTest {
     }
 
     @Test
+    void redirectedResponseIsNotDecompressed() throws Exception {
+        try (ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
+             ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(server.getURL().get() + "/raw-options/redirect-to-gzip"),
+                 RawRequestOptions.proxy().toBuilder().followRedirects(true).build())) {
+
+            Assertions.assertEquals(200, response.code());
+            Assertions.assertEquals("gzip", response.getHeaders().get(HttpHeaders.CONTENT_ENCODING));
+            Assertions.assertArrayEquals(GZIPPED, response.byteBody().buffer().get().toByteArray());
+        }
+    }
+
+    @Test
     void hostHeaderIsComputedFromTheUri() throws Exception {
         URI uri;
         try (ServerUnderTest server = server();
@@ -204,6 +217,11 @@ class RawRequestOptionsTest {
                 .header("X-End-To-End", "kept")
                 .header(HttpHeaders.PROXY_AUTHENTICATE, "Basic")
                 .header("Keep-Alive", "timeout=5");
+        }
+
+        @Get("/redirect-to-gzip")
+        HttpResponse<?> redirectToGzip() {
+            return HttpResponse.seeOther(URI.create("/raw-options/gzip"));
         }
 
         @Get("/gzip")

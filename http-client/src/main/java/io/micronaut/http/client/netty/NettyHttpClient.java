@@ -1560,6 +1560,8 @@ final class NettyHttpClient implements
                         return ExecutionFlow.error(decorate(new HttpClientException("Maximum number of redirects exceeded at redirect count: " + redirectCount)));
                     }
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
+                    // the per-exchange options apply to the whole exchange, redirects included
+                    request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> {
                             setRedirectHeaders(request, redirectRequest.uri(uri), preserveBody);
