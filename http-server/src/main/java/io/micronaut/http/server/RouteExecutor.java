@@ -585,7 +585,7 @@ public final class RouteExecutor {
         }
         RouteAttributes.setRouteInfo(response, routeInfo);
         MessageBodyWriter messageBodyWriter = routeInfo.getMessageBodyWriter();
-        if (messageBodyWriter != null) {
+        if (messageBodyWriter != null && response.getBodyWriter().isEmpty()) {
             response.bodyWriter(messageBodyWriter);
         }
         return response;
