@@ -4,14 +4,14 @@ import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
 
 /**
- * A library built against 5.2 finds the interceptors of a bean from the bean events by reading
- * {@code Intercepted.$interceptorRegistrations()} off the proxy: micronaut-jakarta-interceptors creates the interceptor
- * instances of an object as the object is created (section 2.3 of the Interceptors specification) from a
+ * A library finds the interceptors of a bean from the bean events: micronaut-jakarta-interceptors creates the
+ * interceptor instances of an object as the object is created (section 2.3 of the Interceptors specification) from a
  * {@code BeanCreatedEventListener}, and destroys what is left of them from a {@code BeanDestroyedEventListener}.
- * A proxy generated since 5.3 retains nothing, so both listeners find no interceptor at all and the library silently
- * stops doing either.
+ * Before 5.3 it read {@code Intercepted.$interceptorRegistrations()} off the proxy for both. A proxy retains nothing
+ * since 5.3, and the non-singleton interceptors of a bean are its dependents instead, so both events report the
+ * dependents of the bean: the ones it was created with, and the ones destroyed with it.
  */
-class InterceptorRegistrationsFromBeanEventsSpec extends AbstractTypeElementSpec {
+class InterceptorsFromBeanEventsSpec extends AbstractTypeElementSpec {
 
     private static final String SOURCE = '''
 package eventregs;
@@ -53,20 +53,7 @@ class TrackedBean {
 }
 
 @Singleton
-class RetainedOnCreate implements BeanCreatedEventListener<TrackedBean> {
-    static final List<Object> FOUND = new ArrayList<>();
-    @Override
-    @SuppressWarnings("removal")
-    public TrackedBean onCreated(BeanCreatedEvent<TrackedBean> event) {
-        for (BeanRegistration<Interceptor<?, ?>> registration : ((Intercepted) event.getBean()).$interceptorRegistrations()) {
-            FOUND.add(registration.getBean());
-        }
-        return event.getBean();
-    }
-}
-
-@Singleton
-class DependentsOnCreate implements BeanCreatedEventListener<TrackedBean> {
+class OnCreate implements BeanCreatedEventListener<TrackedBean> {
     static final List<Object> FOUND = new ArrayList<>();
     @Override
     public TrackedBean onCreated(BeanCreatedEvent<TrackedBean> event) {
@@ -80,19 +67,24 @@ class DependentsOnCreate implements BeanCreatedEventListener<TrackedBean> {
 }
 
 @Singleton
-class RetainedOnDestroy implements BeanDestroyedEventListener<TrackedBean> {
+class OnDestroy implements BeanDestroyedEventListener<TrackedBean> {
     static final List<Object> FOUND = new ArrayList<>();
+    static final List<Object> REGISTERED = new ArrayList<>();
     @Override
-    @SuppressWarnings("removal")
     public void onDestroyed(BeanDestroyedEvent<TrackedBean> event) {
-        for (BeanRegistration<Interceptor<?, ?>> registration : ((Intercepted) event.getBean()).$interceptorRegistrations()) {
-            FOUND.add(registration.getBean());
+        for (BeanRegistration<?> registration : event.getDependentBeans()) {
+            if (registration.getBean() instanceof TrackingInterceptor) {
+                FOUND.add(registration.getBean());
+            }
+        }
+        if (event.getBeanRegistration() != null) {
+            REGISTERED.add(event.getBeanRegistration().getBean());
         }
     }
 }
 '''
 
-    void 'test a BeanCreatedEventListener finds the interceptor of the bean through $interceptorRegistrations()'() {
+    void 'test a BeanCreatedEventListener finds the interceptor of the bean among the dependents of the event'() {
         given:
         ApplicationContext context = buildContext(SOURCE)
         def bean = context.getBean(context.classLoader.loadClass('eventregs.TrackedBean'))
@@ -100,7 +92,7 @@ class RetainedOnDestroy implements BeanDestroyedEventListener<TrackedBean> {
         when:
         bean.work()
         def interceptedWith = context.classLoader.loadClass('eventregs.TrackingInterceptor').INTERCEPTED_WITH
-        def found = context.classLoader.loadClass('eventregs.RetainedOnCreate').FOUND
+        def found = context.classLoader.loadClass('eventregs.OnCreate').FOUND
 
         then: 'one interceptor instance intercepted the bean'
         !interceptedWith.isEmpty()
@@ -114,13 +106,14 @@ class RetainedOnDestroy implements BeanDestroyedEventListener<TrackedBean> {
         context.close()
     }
 
-    void 'test a BeanDestroyedEventListener finds the interceptor of the bean through $interceptorRegistrations()'() {
+    void 'test a BeanDestroyedEventListener finds the interceptor of the bean among the dependents of the event'() {
         given:
         ApplicationContext context = buildContext(SOURCE)
         def bean = context.getBean(context.classLoader.loadClass('eventregs.TrackedBean'))
         bean.work()
         def interceptedWith = context.classLoader.loadClass('eventregs.TrackingInterceptor').INTERCEPTED_WITH
-        def found = context.classLoader.loadClass('eventregs.RetainedOnDestroy').FOUND
+        def found = context.classLoader.loadClass('eventregs.OnDestroy').FOUND
+        def registered = context.classLoader.loadClass('eventregs.OnDestroy').REGISTERED
 
         when:
         context.destroyBean(bean)
@@ -130,23 +123,9 @@ class RetainedOnDestroy implements BeanDestroyedEventListener<TrackedBean> {
         found.size() == 1
         found[0].is(interceptedWith[0])
 
-        cleanup:
-        context.close()
-    }
-
-    void 'test a BeanCreatedEventListener finds the interceptor of the bean among the dependents of the event'() {
-        given:
-        ApplicationContext context = buildContext(SOURCE)
-        def bean = context.getBean(context.classLoader.loadClass('eventregs.TrackedBean'))
-
-        when:
-        bean.work()
-        def interceptedWith = context.classLoader.loadClass('eventregs.TrackingInterceptor').INTERCEPTED_WITH
-        def found = context.classLoader.loadClass('eventregs.DependentsOnCreate').FOUND
-
-        then: 'the route that needs no retained list still works'
-        found.size() == 1
-        found[0].is(interceptedWith[0])
+        and: 'and the registration the bean was destroyed through'
+        registered.size() == 1
+        registered[0].is(bean)
 
         cleanup:
         context.close()

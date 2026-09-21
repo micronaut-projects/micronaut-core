@@ -1338,7 +1338,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
             }
         }
 
-        triggerBeanDestroyedListeners(definition, beanToDestroy);
+        triggerBeanDestroyedListeners(definition, beanToDestroy, registration, dependents);
     }
 
     /**
@@ -1489,12 +1489,15 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         }
     }
 
-    private <T> void triggerBeanDestroyedListeners(BeanDefinition<T> beanDefinition, T bean) {
+    private <T> void triggerBeanDestroyedListeners(BeanDefinition<T> beanDefinition,
+                                                   T bean,
+                                                   BeanRegistration<T> registration,
+                                                   List<BeanRegistration<?>> dependents) {
         if (beanDestroyedEventListeners == null) {
             beanDestroyedEventListeners = loadBeanEventListeners(BeanDestroyedEventListener.class);
         }
         if (!beanDestroyedEventListeners.isEmpty()) {
-            BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, beanDefinition, bean);
+            BeanDestroyedEvent<T> event = new BeanDestroyedEvent<>(this, beanDefinition, bean, registration, dependents);
             Class<T> beanType = getBeanType(beanDefinition);
             List<ListenersSupplier.ListenerAndOrder<BeanDestroyedEventListener>> listeners = new ArrayList<>();
             for (Map.Entry<Class<?>, ListenersSupplier<BeanDestroyedEventListener>> entry : beanDestroyedEventListeners) {
