@@ -8,9 +8,8 @@ import io.micronaut.context.ApplicationContext
  * A library finds the interceptors of a bean from the bean events: micronaut-jakarta-interceptors creates the
  * interceptor instances of an object as the object is created (section 2.3 of the Interceptors specification) from a
  * {@code BeanCreatedEventListener}, and destroys what is left of them from a {@code BeanDestroyedEventListener}.
- * Before 5.3 it read {@code Intercepted.$interceptorRegistrations()} off the proxy for both. A proxy retains nothing
- * since 5.3, and the non-singleton interceptors of a bean are its dependents instead, so both events report the
- * dependents of the bean: the ones it was created with, and the ones destroyed with it.
+ * The non-singleton interceptors of a bean are its dependents, so both events report the dependents of the bean: the
+ * ones it was created with, and the ones destroyed with it.
  */
 class InterceptorsFromBeanEventsSpec extends AbstractTypeElementSpec {
 
