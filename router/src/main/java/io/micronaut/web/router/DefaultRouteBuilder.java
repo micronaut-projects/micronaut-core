@@ -30,6 +30,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterOrder;
@@ -448,7 +449,41 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         this.uriRoutes.add(route);
+        routeCreated(route);
         return route;
+    }
+
+    /**
+     * Called for every URI route when it is created, before any further configuration of it.
+     *
+     * @param route The route
+     */
+    void routeCreated(DefaultUriRoute route) {
+    }
+
+    /**
+     * Add an implicit {@code HEAD} route for every {@code GET} route that has no {@code HEAD} route
+     * for the same URI, like {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods.
+     * Each {@code HEAD} route is a copy of the finished {@code GET} route.
+     */
+    void addImplicitHeadRoutes() {
+        List<DefaultUriRoute> getRoutes = new ArrayList<>();
+        Set<UriMatchTemplate> headTemplates = new HashSet<>();
+        for (UriRoute route : uriRoutes) {
+            if (route instanceof DefaultUriRoute defaultUriRoute) {
+                if (defaultUriRoute.httpMethod == HttpMethod.GET) {
+                    getRoutes.add(defaultUriRoute);
+                } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
+                    headTemplates.add(defaultUriRoute.uriMatchTemplate);
+                }
+            }
+        }
+        for (DefaultUriRoute getRoute : getRoutes) {
+            if (!headTemplates.contains(getRoute.uriMatchTemplate)
+                && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
+                uriRoutes.add(getRoute.implicitHeadCopy());
+            }
+        }
     }
 
     private UriRoute buildBeanRoute(HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -899,13 +934,31 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 bodyArgument,
                 consumesMediaTypes,
                 producesMediaTypes,
-                conditions,
+                // a copy: the route info must not change with the route it was built from
+                List.copyOf(conditions),
                 port,
                 conversionService,
                 executorSelector,
                 messageBodyHandlerRegistry,
                 implicitHead
             );
+        }
+
+        /**
+         * A {@code HEAD} copy of this finished route, marked as implicit.
+         *
+         * @return The copy
+         */
+        DefaultUriRoute implicitHeadCopy() {
+            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, uriMatchTemplate, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
+            head.conditions.clear();
+            head.conditions.addAll(conditions);
+            head.producesMediaTypes = producesMediaTypes;
+            head.bodyArgumentName = bodyArgumentName;
+            head.bodyArgument = bodyArgument;
+            head.port = port;
+            head.implicitHead = true;
+            return head;
         }
 
         /**
