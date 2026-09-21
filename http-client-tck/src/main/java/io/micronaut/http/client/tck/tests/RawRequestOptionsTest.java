@@ -144,6 +144,20 @@ class RawRequestOptionsTest {
         }
     }
 
+    @Test
+    void cookiesAreNotCarriedBetweenExchanges() throws Exception {
+        try (ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(server.getURL().get() + "/raw-options/set-cookie"), RawRequestOptions.proxy())) {
+                Assertions.assertEquals("session=user-a; Path=/", response.getHeaders().get(HttpHeaders.SET_COOKIE));
+            }
+            // a proxy relays exchanges of different users, so it must not keep the cookies an upstream sets
+            try (ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(server.getURL().get() + "/raw-options/cookie"), RawRequestOptions.proxy())) {
+                Assertions.assertEquals("none", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));
+            }
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -202,6 +216,17 @@ class RawRequestOptionsTest {
         @Get(value = "/host", produces = MediaType.TEXT_PLAIN)
         String host(@Header(HttpHeaders.HOST) String host) {
             return host;
+        }
+
+        @Get("/set-cookie")
+        HttpResponse<?> setCookie() {
+            return HttpResponse.ok().header(HttpHeaders.SET_COOKIE, "session=user-a; Path=/");
+        }
+
+        @Get(value = "/cookie", produces = MediaType.TEXT_PLAIN)
+        String cookie(HttpRequest<?> request) {
+            String cookie = request.getHeaders().get(HttpHeaders.COOKIE);
+            return cookie == null ? "none" : cookie;
         }
 
         @Get(value = "/slow", produces = MediaType.TEXT_PLAIN)
