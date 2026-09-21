@@ -30,13 +30,15 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
+import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 /**
- * A streamed response body that is abandoned before it ends must not be drained: the upstream
- * may never end, so the connection is closed (HTTP/1) or the stream reset (HTTP/2).
+ * A streamed response body that is abandoned before it ends is drained only up to a limit: the
+ * upstream may never end, so beyond the limit the connection is closed (HTTP/1) or the stream
+ * reset (HTTP/2).
  */
 class StreamCancelClosesConnectionTest {
     @ParameterizedTest
@@ -65,10 +67,38 @@ class StreamCancelClosesConnectionTest {
         }
     }
 
+    @ParameterizedTest
+    @ValueSource(ints = {1, 2})
+    void cancellingASlowEndlessStreamCancelsTheServerPublisher(int version) throws InterruptedException {
+        boolean h2 = version == 2;
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of(
+            "spec.name", "StreamCancelClosesConnectionTest",
+            "micronaut.http.client.ssl.insecure-trust-all-certificates", h2,
+            "micronaut.http.client.alpn-modes", h2 ? "h2" : "http/1.1",
+            "micronaut.server.http-version", h2 ? "2.0" : "1.1",
+            "micronaut.server.ssl.enabled", h2,
+            "micronaut.server.ssl.build-self-signed", true,
+            "micronaut.server.ssl.port", -1
+        ));
+             EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+             StreamingHttpClient client = ctx.createBean(StreamingHttpClient.class, server.getURI())) {
+
+            byte[] first = Flux.from(client.dataStream(HttpRequest.GET("/slow-endless")))
+                .map(buffer -> buffer.toByteArray())
+                .blockFirst();
+            Assertions.assertNotNull(first);
+
+            // a few bytes at a time never reach the byte limit, the time limit stops the draining
+            Assertions.assertTrue(ctx.getBean(Events.class).slowCancelled.await(20, TimeUnit.SECONDS),
+                "The server publisher was not cancelled, the client kept reading the abandoned response");
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = "StreamCancelClosesConnectionTest")
     static class Events {
         final CountDownLatch cancelled = new CountDownLatch(1);
+        final CountDownLatch slowCancelled = new CountDownLatch(1);
     }
 
     @Controller
@@ -78,6 +108,13 @@ class StreamCancelClosesConnectionTest {
 
         Ctrl(Events events) {
             this.events = events;
+        }
+
+        @Get(value = "/slow-endless", produces = MediaType.APPLICATION_OCTET_STREAM)
+        Publisher<byte[]> slowEndless() {
+            return Flux.interval(Duration.ofMillis(100))
+                .map(i -> new byte[16])
+                .doOnCancel(events.slowCancelled::countDown);
         }
 
         @Get(value = "/endless", produces = MediaType.APPLICATION_OCTET_STREAM)
