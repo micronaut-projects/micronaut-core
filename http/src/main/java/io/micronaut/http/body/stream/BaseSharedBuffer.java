@@ -377,15 +377,28 @@ public abstract class BaseSharedBuffer implements BufferConsumer {
         // to find the final bytes in the buffer and a completed state, or it would miss them and
         // then wait for a completion that is never delivered.
         List<ReadBuffer> deferred = addGuarded(rb, true);
-        complete0(deferred == null);
-        if (deferred != null) {
+        if (deferred == null) {
+            complete0(true);
+            return;
+        }
+        // the copies not yet delivered are closed if complete0 or a delivery throws, so that a
+        // caller with an expected length, or a subscriber callback that fails, cannot leak them
+        int delivered = 0;
+        try {
+            complete0(false);
             // only the subscribers deferred was built for: complete0 above may have run a
             // buffering subscriber's callback which subscribed another split reentrantly. That
             // subscriber has already received the buffered bytes and its completion from
             // subscribe0, since the buffer is complete by now.
             List<BufferConsumer> targets = new ArrayList<>(Objects.requireNonNull(subscribers).subList(0, deferred.size()));
-            for (int i = 0; i < targets.size(); i++) {
-                targets.get(i).addAndComplete(deferred.get(i));
+            for (BufferConsumer target : targets) {
+                // ownership of the copy passes to the consumer with the call, even if it throws
+                ReadBuffer copy = deferred.get(delivered++);
+                target.addAndComplete(copy);
+            }
+        } finally {
+            for (int i = delivered; i < deferred.size(); i++) {
+                deferred.get(i).close();
             }
         }
     }
