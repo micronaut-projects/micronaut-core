@@ -42,4 +42,16 @@ public interface ByteBodyHttpResponse<B> extends HttpResponse<B>, Closeable {
      */
     @Override
     void close();
+
+    /**
+     * Returns a mutable response that keeps the {@link #byteBody() body bytes} of this response.
+     * The returned response takes over the ownership of this response: closing it closes this one.
+     *
+     * @return The mutable response
+     * @since 5.3.0
+     */
+    @Override
+    default MutableHttpResponse<?> toMutableResponse() {
+        return MutableByteBodyHttpResponse.of(this);
+    }
 }

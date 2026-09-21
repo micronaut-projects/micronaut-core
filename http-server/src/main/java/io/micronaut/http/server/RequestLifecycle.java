@@ -24,6 +24,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.BasicHttpAttributes;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
@@ -460,6 +461,10 @@ public class RequestLifecycle {
         if (response.code() >= 400 && routeInfo != null && !routeInfo.isErrorRoute()) {
             RouteMatch<Object> statusRoute = routeExecutor.findStatusRoute(request, response.code(), routeInfo);
             if (statusRoute != null) {
+                if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
+                    // the status route replaces the response and its bytes
+                    byteBodyResponse.close();
+                }
                 return executeRoute(request, propagatedContext, statusRoute);
             }
         }

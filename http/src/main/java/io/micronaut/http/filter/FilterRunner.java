@@ -23,7 +23,10 @@ import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpResponseWrapper;
+import io.micronaut.http.body.ByteBody;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -322,6 +325,7 @@ public class FilterRunner {
                 // Imperative flow: Unwrap the context and continue the loop
                 if (context != flowContext) {
                     // Response modified by the filter
+                    closeReplacedResponse(context.response(), flowContext.response());
                     flow = processResponse(flowContext.request(), Objects.requireNonNull(flowContext.response()), flowContext.propagatedContext()).map(flowContext::withResponse);
                     exception = null;
                     flowContext = flow.tryCompleteValue();
@@ -340,11 +344,15 @@ public class FilterRunner {
                 .flatMap(newContext -> {
                     if (finalContext != newContext) {
                         // Response modified by the filter
+                        closeReplacedResponse(finalContext.response(), newContext.response());
                         return processResponse(newContext.request(), Objects.requireNonNull(newContext.response()), newContext.propagatedContext()).map(newContext::withResponse);
                     }
                     return ExecutionFlow.just(newContext);
                 })
-                .onErrorResume(throwable -> processFailurePropagateException(throwable, finalContext))
+                .onErrorResume(throwable -> {
+                    closeReplacedResponse(finalContext.response(), null);
+                    return processFailurePropagateException(throwable, finalContext);
+                })
                 .flatMap(newContext -> filterResponse(newContext, iterator, newContext.response() == null ? finalException : null));
         }
         if (context.response() != null) {
@@ -356,6 +364,29 @@ public class FilterRunner {
             return ExecutionFlow.error(exception);
         }
         return ExecutionFlow.error(new IllegalStateException("No response after response filters completed!"));
+    }
+
+    /**
+     * Close a response that carries body bytes when a filter drops it, i.e. when the response
+     * replacing it does not carry the same bytes.
+     *
+     * @param previous The previous response
+     * @param next     The response replacing it, or {@code null} if it was replaced by a failure
+     */
+    private static void closeReplacedResponse(@Nullable HttpResponse<?> previous, @Nullable HttpResponse<?> next) {
+        if (previous instanceof ByteBodyHttpResponse<?> byteBodyResponse && previous != next && !carriesBytes(next, byteBodyResponse.byteBody())) {
+            byteBodyResponse.close();
+        }
+    }
+
+    private static boolean carriesBytes(@Nullable HttpResponse<?> response, ByteBody bytes) {
+        while (response != null) {
+            if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse && byteBodyResponse.byteBody() == bytes) {
+                return true;
+            }
+            response = response instanceof HttpResponseWrapper<?> wrapper ? wrapper.getDelegate() : null;
+        }
+        return false;
     }
 
     private ExecutionFlow<FilterContext> processFailurePropagateException(Throwable throwable, FilterContext context) {

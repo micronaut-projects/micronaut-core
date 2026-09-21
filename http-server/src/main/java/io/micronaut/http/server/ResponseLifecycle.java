@@ -134,6 +134,10 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse) {
+        ExecutionFlow<? extends ByteBodyHttpResponse<?>> byteBodyResponse = encodeByteBodyResponse(nettyRequest, httpResponse);
+        if (byteBodyResponse != null) {
+            return byteBodyResponse;
+        }
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
@@ -189,6 +193,39 @@ public abstract class ResponseLifecycle {
 
             return encodeNoBody(response);
         }
+    }
+
+    /**
+     * Pass through a response that already carries its body bytes, e.g. a response of the raw HTTP
+     * client returned by a route. The response may be wrapped in {@link HttpResponseWrapper}s, in
+     * which case the outermost wrapper provides the status and headers.
+     *
+     * @param request  The request
+     * @param response The response
+     * @return The encoded response, or {@code null} if the response does not carry body bytes
+     */
+    private @Nullable ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeByteBodyResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        HttpResponse<?> current = response;
+        while (!(current instanceof ByteBodyHttpResponse<?>)) {
+            if (current instanceof HttpResponseWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return null;
+            }
+        }
+        ByteBodyHttpResponse<?> byteBodyResponse = (ByteBodyHttpResponse<?>) current;
+        if (byteBodyResponse.getBody().isPresent()) {
+            // an object body replaced the bytes, see MutableByteBodyHttpResponse
+            return null;
+        }
+        if (request.getMethod() == HttpMethod.HEAD) {
+            byteBodyResponse.close();
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyFactory.createEmpty()));
+        }
+        if (byteBodyResponse == response) {
+            return ExecutionFlow.just(byteBodyResponse);
+        }
+        return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyResponse.byteBody().move()));
     }
 
     /**
