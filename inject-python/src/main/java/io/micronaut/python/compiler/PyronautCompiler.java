@@ -151,6 +151,7 @@ public final class PyronautCompiler {
      * @return A ClassLoader containing the compiled application classes
      * @throws IllegalStateException if processing fails
      */
+    @SuppressWarnings("java:S1181") // an Error is caught only to keep it as the thrown failure, and is rethrown unchanged
     public ClassLoader buildClassLoader() {
         CompilationProfiler profiler = createProfiler();
         PyronautJavaCompiler compiler = createCompiler(profiler);
@@ -195,6 +196,7 @@ public final class PyronautCompiler {
      *
      * @throws IllegalStateException if targetDir is not set or processing fails
      */
+    @SuppressWarnings("java:S1181") // an Error is caught only to keep it as the thrown failure, and is rethrown unchanged
     public void compile() {
         if (targetDir == null) {
             throw new IllegalStateException("targetDir must be specified for file system processing mode");
@@ -386,6 +388,7 @@ public final class PyronautCompiler {
      * callback or to write the report must not replace the compilation failure the caller needs to
      * see, so it is attached to it as suppressed and only propagates when the compilation succeeded.
      */
+    @SuppressWarnings("java:S1181") // an Error from the profile must not escape past the compilation failure either
     private void finishProfile(@Nullable CompilationProfiler profiler, @Nullable Throwable compilationFailure) {
         if (profiler == null) {
             return;

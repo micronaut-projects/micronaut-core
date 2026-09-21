@@ -130,12 +130,13 @@ final class CompilationProfileTest {
         Path output = Files.createDirectories(directory.resolve("classes"));
         Path report = Files.createDirectories(directory.resolve("report.txt"));
 
-        RuntimeException failure = assertThrows(RuntimeException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonSrc(sources.toString())
             .targetDir(output.toFile())
             .profileReportFile(report.toFile())
-            .build()
-            .compile());
+            .build();
+
+        RuntimeException failure = assertThrows(RuntimeException.class, compiler::compile);
 
         String message = String.valueOf(failure.getMessage());
         assertAll(
@@ -154,12 +155,13 @@ final class CompilationProfileTest {
         Path output = Files.createDirectories(directory.resolve("classes"));
         Path report = Files.createDirectories(directory.resolve("report.txt"));
 
-        assertThrows(UncheckedIOException.class, () -> PyronautCompiler.builder()
+        PyronautCompiler compiler = PyronautCompiler.builder()
             .pythonSrc(sources.toString())
             .targetDir(output.toFile())
             .profileReportFile(report.toFile())
-            .build()
-            .compile());
+            .build();
+
+        assertThrows(UncheckedIOException.class, compiler::compile);
     }
 
     @Test
