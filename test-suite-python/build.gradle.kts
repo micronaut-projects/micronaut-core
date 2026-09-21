@@ -1,8 +1,8 @@
-import io.micronaut.build.internal.python.PythonCompile
+import io.micronaut.build.python.PythonCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-test-library")
-    id("io.micronaut.build.internal.python")
+    id("io.micronaut.build.internal.convention-python")
 }
 
 dependencies {
@@ -70,4 +70,9 @@ tasks.withType<Test>().configureEach {
 tasks.named<PythonCompile>("compileTestPython") {
     dependsOn(tasks.named("classes"))
     classpath.from(sourceSets.main.get().output)
+    // Hibernate reads @Entity, @Id, ... reflectively from the generated Java classes of the JPA examples:
+    // the compiler copies runtime annotations only onto the generated classes this property names
+    // (the compiler reads it from the -A option or, as here, from a system property of its JVM;
+    // micronaut-build 8.1.2 adds compilerArgs for the -A form).
+    systemProperties.put("micronaut.introspection.allow-reflection", "micronaut.docs.hibernate.*")
 }

@@ -80,6 +80,13 @@ import java.util.stream.Stream;
 final class PyronautJavaCompiler {
 
     private static final Object COMPILATION_LOCK = new Object();
+    /**
+     * The codes javac gives the diagnostics an annotation processor reports through its {@code Messager}.
+     */
+    private static final Set<String> PROCESSOR_MESSAGE_CODES = Set.of(
+        "compiler.note.proc.messager",
+        "compiler.warn.proc.messager"
+    );
     private static final String MICRONAUT_INTROSPECTIONS_USE_CONTEXT_CLASSLOADER = "micronaut.introspections.use.context.classloader";
     private static final String ISOLATING_PROCESSOR = "org.gradle.annotation.processing.isolating";
     private static final Pattern SOURCE_IN_MESSAGE = Pattern.compile("Python source \\[([^]]+)]");
@@ -463,6 +470,9 @@ final class PyronautJavaCompiler {
                 task.setProcessors(taskProcessors);
             }
             success = task.call();
+            if (success) {
+                reportProcessorMessages(diagnosticCollector);
+            }
             if (success && compilationTracker != null) {
                 Map<String, Set<String>> outputs = new LinkedHashMap<>();
                 if (fileManager instanceof TrackingJavaFileManager trackingFileManager) {
@@ -508,6 +518,25 @@ final class PyronautJavaCompiler {
             throw processingFailure(diagnosticCollector, null, outputDirectory);
         }
         return IncrementalCompilationTrace.empty();
+    }
+
+    /**
+     * Prints the notes and warnings the annotation processors reported through the {@code Messager}
+     * of a successful compilation. The diagnostics of a compilation are collected rather than printed
+     * as javac would, and were only reported when the compilation failed: a note such as the one naming
+     * the option that copies the runtime annotations of a class, or a warning about an annotation that
+     * could not be copied, was never seen. Javac's own notes and warnings (unchecked operations,
+     * deprecation) are still left out.
+     *
+     * @param diagnosticCollector The diagnostics of the compilation
+     */
+    @SuppressWarnings("java:S106") // the compiler reports its diagnostics on the console, as javac does
+    private static void reportProcessorMessages(DiagnosticCollector<JavaFileObject> diagnosticCollector) {
+        for (Diagnostic<? extends JavaFileObject> diagnostic : diagnostics(diagnosticCollector)) {
+            if (PROCESSOR_MESSAGE_CODES.contains(diagnostic.getCode())) {
+                System.err.println(formatDiagnostic(diagnostic));
+            }
+        }
     }
 
     private static Map<String, String> snapshotSystemProperties() {

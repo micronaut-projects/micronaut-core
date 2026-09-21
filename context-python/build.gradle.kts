@@ -1,4 +1,5 @@
-import io.micronaut.build.internal.python.PythonVfsBytecodeCompile
+import io.micronaut.build.python.PythonVfsBytecodeCompile
+import java.time.Duration
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
@@ -55,6 +56,8 @@ tasks.withType<Test>().configureEach {
     useJUnitPlatform()
     // several GraalPy contexts live at once in the lifecycle tests; the default worker heap runs out
     maxHeapSize = "2G"
+    // a test worker stuck inside GraalPy must fail the build, not hold it until the job's limit
+    timeout.set(Duration.ofMinutes(30))
 }
 
 val compileVfsPythonBytecode = tasks.register<PythonVfsBytecodeCompile>("compileVfsPythonBytecode") {

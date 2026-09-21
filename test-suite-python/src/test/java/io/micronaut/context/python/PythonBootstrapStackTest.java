@@ -26,13 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * The generated launcher and package initialisers keep the import chain of the bootstrap shallow.
  * <p>
  * GraalPy runs interpreted on a stock JDK and keeps dozens of Java frames per Python frame, and it
- * reports the Java {@code StackOverflowError} as a Python {@code RecursionError}. The shim packages of
- * this test suite import their subpackages eagerly, so the deepest import chain of the launcher nests
- * twelve package levels ({@code micronaut.test.extensions.junit5.annotation} through
+ * reports the Java {@code StackOverflowError} as a Python {@code RecursionError}. While the shim
+ * packages of this test suite imported their subpackages eagerly, the deepest import chain of the
+ * launcher nested twelve package levels ({@code micronaut.test.extensions.junit5.annotation} through
  * {@code org.junit.jupiter.api} to {@code org.junit.platform.commons.annotation}), and every Python
- * frame a package initialiser adds per level is multiplied by twelve. Initialisers importing their
+ * frame a package initialiser adds per level was multiplied by twelve. Initialisers importing their
  * members modules through {@code importlib.import_module} from nested functions needed a 640 KB stack
- * on macOS arm64 and failed intermittently at the 1 MB default of Linux x64.
+ * on macOS arm64 and failed intermittently at the 1 MB default of Linux x64; initialisers running the
+ * members modules at their own level reached an import from 167 Python frames, and packages importing
+ * their subpackages on first access from 55. The Java packages are now served by the import finder of
+ * {@code micronaut_java_imports} without generated modules, so importing one nests no package
+ * initialiser at all, and the deepest import of the launcher is reached from 23 frames.
  * <p>
  * The stack a frame takes depends on the platform, the number of Python frames does not: the test
  * re-runs the launcher with an import hook that records the deepest Python frame chain an import is
@@ -41,10 +45,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class PythonBootstrapStackTest {
 
     /**
-     * Above the deepest import chain of the initialisers that run the members modules at their own
-     * level, below the one of the initialisers that imported them from nested functions.
+     * Above the deepest import chain now that the Java packages are served by the import finder without
+     * generated modules (23 frames, reaching {@code micronaut.test}), below the one of the generated
+     * initialisers that imported their subpackages on first access (55 frames).
      */
-    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 200);
+    private static final int MAX_IMPORT_DEPTH = Integer.getInteger("micronaut.test.python.max-import-depth", 40);
 
     private static final String RERUN_LAUNCHER_WITH_DEPTH_RECORDER = """
         def __micronaut_rerun_launcher():
@@ -65,9 +70,11 @@ class PythonBootstrapStackTest {
                         deepest[1] = name
                     return None
 
-            # the generated modules import again, from the launcher down
+            # the generated modules and the file-less Java package modules import again, from the launcher down
             for name, module in list(sys.modules.items()):
-                if (getattr(module, '__file__', None) or '').startswith('/graalpy_vfs/src/'):
+                file = getattr(module, '__file__', None) or ''
+                origin = getattr(getattr(module, '__spec__', None), 'origin', None) or ''
+                if file.startswith('/graalpy_vfs/src/') or origin.startswith('java:'):
                     del sys.modules[name]
             recorder = DepthRecorder()
             sys.meta_path.insert(0, recorder)

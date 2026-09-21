@@ -2,9 +2,9 @@ package io.micronaut.python.compiler
 
 class InterfaceStubSourceSpec extends GeneratedJavaSourceSpec {
 
-    void "introduction interface is generated as a vetoed Java interface with its runtime annotations"() {
-        given:
-        def pythonCode = '''
+    private static final List<String> ALLOW_REFLECTION = ["-Amicronaut.introspection.allowReflection=python.*"]
+
+    private static final String ASSISTANT = '''
 from abc import ABC, abstractmethod
 from typing import Annotated
 from pythontest.introduction.reflective import Prompt, ReflectiveService, Var
@@ -24,8 +24,9 @@ class Assistant(ABC):
         return first + second
 '''
 
+    void "introduction interface is generated as a vetoed Java interface with its runtime annotations"() {
         expect:
-        assertGeneratedSourceEquals(pythonCode, '''
+        assertGeneratedSourceEquals(ASSISTANT, '''
 package python;
 
 import io.micronaut.context.python.PythonContextRuntime;
@@ -54,6 +55,36 @@ public interface Assistant {
   String chat(@Var("msg") String message);
 
   @Prompt("Join.")
+  static String join(String first, String second) {
+    Value pythonResult = PythonContextRuntime.invokeStaticMethod(new io.micronaut.context.python.PythonContextRuntime.PythonClassReference("python", "Assistant", new String[]{}, "Assistant", "class-instance:python.Assistant"), "join", first, second);
+    return PythonConversion.isNone(pythonResult) ? null : pythonResult.asString();
+  }
+}
+''', "python.Assistant", ALLOW_REFLECTION)
+    }
+
+    void "the runtime annotations stay off the generated interface without the allowReflection option"() {
+        expect:
+        assertGeneratedSourceEquals(ASSISTANT, '''
+package python;
+
+import io.micronaut.context.python.PythonContextRuntime;
+import io.micronaut.context.python.PythonConversion;
+import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.core.annotation.Vetoed;
+import java.lang.String;
+import org.graalvm.polyglot.Value;
+
+@Vetoed
+@PythonClass(
+    packageName = "python",
+    rootName = "Assistant",
+    displayName = "Assistant",
+    cacheKey = "class-instance:python.Assistant"
+)
+public interface Assistant {
+  String chat(String message);
+
   static String join(String first, String second) {
     Value pythonResult = PythonContextRuntime.invokeStaticMethod(new io.micronaut.context.python.PythonContextRuntime.PythonClassReference("python", "Assistant", new String[]{}, "Assistant", "class-instance:python.Assistant"), "join", first, second);
     return PythonConversion.isNone(pythonResult) ? null : pythonResult.asString();

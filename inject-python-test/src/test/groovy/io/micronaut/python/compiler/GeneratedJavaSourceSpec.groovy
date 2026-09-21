@@ -34,8 +34,8 @@ abstract class GeneratedJavaSourceSpec extends Specification {
                 sources.collect { it.toUri().toString() + "\n-----------\n" + it.getCharContent(true).toString() + '----------' }.join('\n'))
     }
 
-    protected void assertGeneratedSourceEquals(String pythonCode, String expectedFull, String fqcn = null) {
-        def outputs = compile(pythonCode)
+    protected void assertGeneratedSourceEquals(String pythonCode, String expectedFull, String fqcn = null, List<String> compilerOptions = null) {
+        def outputs = compile(pythonCode, compilerOptions)
         def sources = outputs.findAll { it.toUri().toString().contains("/SOURCE_OUTPUT/") && it.getKind() == JavaFileObject.Kind.SOURCE }
         assert !sources.isEmpty()
         def expected = expectedFull.stripIndent().replace('\r\n','\n').replace('\r','\n').trim()
@@ -60,7 +60,7 @@ abstract class GeneratedJavaSourceSpec extends Specification {
         }
     }
 
-    protected static Iterable<JavaFileObject> compile(String pythonCode) {
+    protected static Iterable<JavaFileObject> compile(String pythonCode, List<String> compilerOptions = null) {
         String source = """
 package pyronaut_application;
 import io.micronaut.context.python.annotation.PythonApplication;
@@ -76,7 +76,7 @@ class PyronautMain { }
             }
         }
         def jc = new PyronautJavaCompiler()
-        return jc.compileInMemory([main] as JavaFileObject[], null, null, null, null)
+        return jc.compileInMemory([main] as JavaFileObject[], null, null, null, compilerOptions)
     }
 
     protected static String escape(String s) {

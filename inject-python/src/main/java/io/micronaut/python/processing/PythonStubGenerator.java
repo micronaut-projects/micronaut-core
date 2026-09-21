@@ -182,7 +182,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String PYTHON_CLASS_REFERENCE_PARAMETER = "pythonClassReference";
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
-    private static final String PUBLISHER = "org.reactivestreams.Publisher";
+    static final String PUBLISHER = "org.reactivestreams.Publisher";
+    private static final String CONVERT_PUBLISHER = "convertPublisher";
     private static final String GET_MEMBER = "getMember";
     private static final String MAP_OF = "mapOf";
     private static final String ENUM_VALUE = "enumValue";
@@ -227,7 +228,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         "org.jspecify.annotations.NonNull",
         "org.jspecify.annotations.Nullable"
     );
-    private final Map<String, Boolean> copiedRuntimeAnnotations = new HashMap<>();
+    private final Map<String, PythonReflectionGate.Copy> copiedRuntimeAnnotations = new HashMap<>();
+    private PythonReflectionGate reflectionGate;
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
@@ -240,6 +242,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String JUNIT_EXTENSIONS = "org.junit.jupiter.api.extension.Extensions";
     private static final String JUNIT_TEST_TEMPLATE = "org.junit.jupiter.api.TestTemplate";
     private static final String JUNIT_TEST_FACTORY = "org.junit.jupiter.api.TestFactory";
+    private static final String JUNIT_PACKAGE_PREFIX = "org.junit.";
     private static final String ANN_MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
@@ -251,6 +254,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finish(VisitorContext visitorContext) {
+        if (reflectionGate != null) {
+            reflectionGate.report(visitorContext);
+        }
         SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
         try {
             if (sourceGenerator != null) {
@@ -361,6 +367,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void start(VisitorContext visitorContext) {
+        this.reflectionGate = PythonReflectionGate.of(visitorContext);
         if (visitorContext instanceof PythonVisitorContext pythonVisitorContext) {
             this.allClasses = pythonVisitorContext.getProcessingEnvironment().classes();
             pythonVisitorContext
@@ -430,7 +437,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (interfaceDefs.containsKey(classElement.getName())) {
                             return;
                         }
-                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(PythonInterfaceStubGenerator.buildInterfaceDef(classElement, typeName, interfaces, allClasses, context), classElement));
+                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(PythonInterfaceStubGenerator.buildInterfaceDef(classElement, typeName, interfaces, allClasses, reflectionGate(context), context), classElement));
                         return;
                     }
 
@@ -447,7 +454,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     builder.addAnnotation(Vetoed.class);
                     builder.addAnnotation(pythonClassAnnotation(classElement));
 
-                    copyRuntimeAnnotations(element, builder, ElementType.TYPE, context);
+                    copyRuntimeAnnotations(element, builder, ElementType.TYPE, typeName, context);
                     ClassElement superType = element.getSuperType().orElse(null);
                     boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
                     boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(PythonStubGenerator::isJunit5TestMethod)).isPresent();
@@ -677,7 +684,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .addModifiers(Modifier.PUBLIC);
                 // A declared attribute is the field of the generated class: its runtime annotations
                 // (@Id, @Column, @XmlElement, ...) go with it so that field access finds them.
-                attributeField(beanProperty).ifPresent(pythonField -> copyRuntimeAnnotations(pythonField, fieldBuilder, ElementType.FIELD, context));
+                attributeField(beanProperty).ifPresent(pythonField -> copyRuntimeAnnotations(pythonField, fieldBuilder, ElementType.FIELD, element.getName(), context));
                 FieldDef field = fieldBuilder.build();
                 builder.addField(field);
                 propertyFields.put(beanProperty.getName(), field);
@@ -2863,7 +2870,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addMember("packageName", scriptElement.getPackageName())
                 .build());
             builder.addAnnotation(Vetoed.class);
-            copyRuntimeAnnotations(scriptElement, builder, ElementType.TYPE, context);
+            copyRuntimeAnnotations(scriptElement, builder, ElementType.TYPE, typeName, context);
             builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
             boolean isJunit5TestModule = scriptElement.hasAnnotation(ANN_MICRONAUT_TEST);
 
@@ -3606,9 +3613,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * (JPA property access) looks for them. Synthetic accessors carry the field's annotations, which
      * belong on the generated field instead.
      */
-    private void copyAccessorAnnotations(Optional<MethodElement> accessor, MethodDef.MethodDefBuilder builder, VisitorContext visitorContext) {
+    private void copyAccessorAnnotations(PropertyElement beanProperty, Optional<MethodElement> accessor, MethodDef.MethodDefBuilder builder, VisitorContext visitorContext) {
         accessor.filter(method -> !method.isSynthetic())
-            .ifPresent(method -> copyRuntimeAnnotations(method, builder, ElementType.METHOD, visitorContext));
+            .ifPresent(method -> copyRuntimeAnnotations(method, builder, ElementType.METHOD, beanProperty.getOwningType().getName(), visitorContext));
     }
 
     /**
@@ -3620,7 +3627,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (ClassElement base = superType; base instanceof AbstractPythonClassElement; base = base.getSuperType().orElse(null)) {
             AnnotationMetadata annotationMetadata = base.getAnnotationMetadata();
             for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
-                if (declared.add(annotationName) && isCopiedRuntimeAnnotation(annotationName, ElementType.TYPE, visitorContext)) {
+                if (declared.add(annotationName) && isCopiedRuntimeAnnotation(annotationName, ElementType.TYPE, element.getName(), base, visitorContext)) {
                     AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
                     if (av != null) {
                         try {
@@ -3644,15 +3651,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Python-defined annotations and the {@code java.lang} annotations that constrain the declaration
      * ({@code @FunctionalInterface}, {@code @SafeVarargs}) are never copied.
      *
+     * <p>The JUnit annotations and the test annotations registering a JUnit extension are always copied,
+     * as the test framework reads the generated test class; every other annotation is reflection data of
+     * the generated type and is copied only when the {@link PythonReflectionGate} allows the type.</p>
+     *
      * @param element        The Python element
      * @param builder        The builder of the generated declaration
      * @param declaration    The kind of the generated declaration
+     * @param typeName       The name of the generated type that carries the declaration
      * @param visitorContext The visitor context
      */
-    private void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, VisitorContext visitorContext) {
+    private void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, String typeName, VisitorContext visitorContext) {
         AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
         for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
-            if (!isCopiedRuntimeAnnotation(annotationName, declaration, visitorContext)) {
+            if (!isCopiedRuntimeAnnotation(annotationName, declaration, typeName, element, visitorContext)) {
                 continue;
             }
             AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
@@ -3837,35 +3849,63 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "member '" + memberName + "' of @" + annotationName;
     }
 
-    private boolean isCopiedRuntimeAnnotation(String annotationName, ElementType declaration, VisitorContext visitorContext) {
-        return copiedRuntimeAnnotations.computeIfAbsent(
-            annotationName + '#' + declaration,
-            key -> isRuntimeAnnotationOf(annotationName, declaration, visitorContext)
-        );
+    private PythonReflectionGate reflectionGate(VisitorContext visitorContext) {
+        if (reflectionGate == null) {
+            reflectionGate = PythonReflectionGate.of(visitorContext);
+        }
+        return reflectionGate;
     }
 
-    private boolean isRuntimeAnnotationOf(String annotationName, ElementType declaration, VisitorContext visitorContext) {
+    /**
+     * Whether an annotation is copied onto a generated declaration: never, always, or when the
+     * {@link PythonReflectionGate} allows the generated type to carry reflection data.
+     *
+     * @param annotationName The annotation
+     * @param declaration    The kind of the generated declaration
+     * @param typeName       The name of the generated type that carries the declaration
+     * @param element        The annotated Python element
+     * @param visitorContext The visitor context
+     * @return Whether the annotation is copied
+     */
+    private boolean isCopiedRuntimeAnnotation(String annotationName, ElementType declaration, String typeName, Element element, VisitorContext visitorContext) {
+        PythonReflectionGate.Copy copy = copiedRuntimeAnnotations.computeIfAbsent(
+            annotationName + '#' + declaration,
+            key -> runtimeAnnotationCopy(annotationName, declaration, visitorContext)
+        );
+        return copy == PythonReflectionGate.Copy.ALWAYS
+            || (copy == PythonReflectionGate.Copy.REFLECTIVE && reflectionGate(visitorContext).allows(typeName, annotationName, element));
+    }
+
+    private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
             // Micronaut annotations are served by the annotation metadata, except the ones JUnit reads
             // reflectively on the test class: @MicronautTest and the module test annotations that
             // register their own extension through @ExtendWith
-            return MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
+            boolean copied = MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
                 || MICRONAUT_ANNOTATION_PACKAGES_TO_COPY.stream().anyMatch(annotationName::startsWith)
                 || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext));
+            return copied ? PythonReflectionGate.Copy.ALWAYS : PythonReflectionGate.Copy.NEVER;
         }
         if (annotationName.startsWith(JAVA_LANG_PACKAGE_PREFIX)
             || TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)
             || INJECTION_ANNOTATION_PACKAGE_PREFIXES.stream().anyMatch(annotationName::startsWith)) {
-            return false;
+            return PythonReflectionGate.Copy.NEVER;
         }
         ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
         if (annotationType == null
             || annotationType instanceof AbstractPythonClassElement
-            || !PythonAnnotationTypes.isAnnotationType(annotationType)) {
-            return false;
+            || !PythonAnnotationTypes.isAnnotationType(annotationType)
+            || PythonAnnotationTypes.retentionPolicy(annotationType) != RetentionPolicy.RUNTIME
+            || !PythonAnnotationTypes.targetsDeclaration(annotationType, declaration)) {
+            return PythonReflectionGate.Copy.NEVER;
         }
-        return PythonAnnotationTypes.retentionPolicy(annotationType) == RetentionPolicy.RUNTIME
-            && PythonAnnotationTypes.targetsDeclaration(annotationType, declaration);
+        // the test framework reads the generated test class: JUnit's own annotations and the test
+        // annotations of other libraries that register a JUnit extension are not reflection data of the type
+        if (annotationName.startsWith(JUNIT_PACKAGE_PREFIX)
+            || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext))) {
+            return PythonReflectionGate.Copy.ALWAYS;
+        }
+        return PythonReflectionGate.Copy.REFLECTIVE;
     }
 
     /**
@@ -3901,7 +3941,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addAnnotation(pythonClassAnnotation(classElement))
             .addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
         enumBuilder.addField(pythonClassReference);
-        copyRuntimeAnnotations(classElement, enumBuilder, ElementType.TYPE, context);
+        copyRuntimeAnnotations(classElement, enumBuilder, ElementType.TYPE, classElement.getName(), context);
         List<String> enumConstants = classElement instanceof EnumElement enumElement ? enumElement.values() : List.of();
         for (String enumConstant : enumConstants) {
             enumBuilder.addEnumConstant(enumConstant);
@@ -4138,7 +4178,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         methodTypeVariables.forEach(methodBuilder::addTypeVariable);
 
-        copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, visitorContext);
+        copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, bridgeOwner.getName(), visitorContext);
         if (isJunit5Test && !isJunit5TestMethod(methodElement)) {
             methodBuilder.addAnnotation(JUNIT_TEST);
         }
@@ -4231,6 +4271,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     if (effectiveReturnType.isVoid()) {
                         return (StatementDef) invokedValue;
+                    } else if (isAsyncGeneratorPythonMethod(methodElement)) {
+                        return invokedValue.newLocal("pythonAsyncGenerator", pythonAsyncGenerator ->
+                            convertedElementPublisher(allClasses, effectiveReturnType, PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                                "generatorToPublisher",
+                                ClassTypeDef.of(PUBLISHER),
+                                pythonAsyncGenerator
+                            )).returning()
+                        );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
                             coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
@@ -5071,7 +5119,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
         if (visitorContext != null) {
-            copyAccessorAnnotations(beanProperty.getReadMethod(), getterBuilder, visitorContext);
+            copyAccessorAnnotations(beanProperty, beanProperty.getReadMethod(), getterBuilder, visitorContext);
         }
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> aThis.field(field).returning())));
@@ -5102,7 +5150,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        copyAccessorAnnotations(wm, propertySetter, visitorContext);
+        copyAccessorAnnotations(beanProperty, wm, propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -5169,7 +5217,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
         if (visitorContext != null) {
-            copyAccessorAnnotations(beanProperty.getReadMethod(), getterBuilder, visitorContext);
+            copyAccessorAnnotations(beanProperty, beanProperty.getReadMethod(), getterBuilder, visitorContext);
         }
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
@@ -5201,7 +5249,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        copyAccessorAnnotations(beanProperty.getWriteMethod(), propertySetter, visitorContext);
+        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -5247,7 +5295,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        copyAccessorAnnotations(beanProperty.getWriteMethod(), propertySetter, visitorContext);
+        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -5508,7 +5556,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ExpressionDef converted;
         if (PUBLISHER.equals(targetType.getName())) {
             converted = PYTHON_HTTP_CONVERSION.invokeStatic(
-                "convertPublisher",
+                CONVERT_PUBLISHER,
                 List.of(POLYGLOT_VALUE, itemConversionType),
                 ClassTypeDef.of(PUBLISHER),
                 invokedValue,
@@ -5516,7 +5564,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             );
         } else {
             converted = PYTHON_HTTP_CONVERSION.invokeStatic(
-                "convertPublisher",
+                CONVERT_PUBLISHER,
                 List.of(POLYGLOT_VALUE, itemConversionType, TypeDef.CLASS),
                 TypeDef.OBJECT,
                 invokedValue,
@@ -6127,6 +6175,45 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 + producerMethod.getOwningType().getName() + "] is declared by [" + declaringTypeName
                 + "], which is not compiled in this round: the method is not bridged into the generated Java class", producerMethod);
         }
+    }
+
+    /**
+     * Convert the elements of a publisher backed by a Python async generator the way the elements of
+     * a returned {@code Publisher} are converted: a generated wrapper element type keeps its wrapper,
+     * any other declared element type goes through the runtime conversion.
+     *
+     * @param allClasses The generated classes
+     * @param returnType The declared {@code Publisher<T>} return type
+     * @param publisher The raw publisher expression
+     * @return The converted publisher expression
+     */
+    static ExpressionDef convertedElementPublisher(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef publisher) {
+        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+        ExpressionDef converted;
+        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(ClassTypeDef.of(PUBLISHER), POLYGLOT_VALUE_CONVERTER),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                generatedWrapperConverter(componentType)
+            );
+        } else {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(ClassTypeDef.of(PUBLISHER), TypeDef.CLASS),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                toClassExpression(componentType)
+            );
+        }
+        // an element type with type arguments of its own (Event[Tick]) cannot be cast from the raw
+        // publisher directly
+        return uncheckedCast(converted, returnType);
+    }
+
+    static boolean isAsyncGeneratorPythonMethod(MethodElement methodElement) {
+        return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsyncGenerator();
     }
 
     @Override
