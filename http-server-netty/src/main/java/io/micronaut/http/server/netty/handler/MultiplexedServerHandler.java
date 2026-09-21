@@ -214,6 +214,11 @@ abstract class MultiplexedServerHandler {
                 return;
             }
             streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
+            // set the expected length before replaying the buffered frames, like the HTTP/1 path:
+            // the declared Content-Length is charged to the size limit in full, and frames that
+            // arrive without a known length are charged individually, so the buffered frames
+            // would be counted twice if they were added first
+            streamer.dest.setExpectedLengthFrom(request.headers());
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
@@ -221,7 +226,6 @@ abstract class MultiplexedServerHandler {
                 bufferedContent = null;
             }
             requestAccepted = true;
-            streamer.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
