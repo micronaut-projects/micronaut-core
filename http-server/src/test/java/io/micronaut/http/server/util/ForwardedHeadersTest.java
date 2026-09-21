@@ -102,6 +102,32 @@ class ForwardedHeadersTest {
     }
 
     @Test
+    void trustedValuesAreReadBeforeSharedHeadersChange() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https",
+            ForwardedHeaders.X_FORWARDED_HOST, "shop.example",
+            ForwardedHeaders.X_FORWARDED_PORT, "443",
+            ForwardedHeaders.X_FORWARDED_PREFIX, "/shop",
+            HttpHeaders.FORWARDED, "for=203.0.113.7;proto=https;host=shop.example");
+        // the outbound request shares the headers of the inbound one, like a mutated Netty server request
+        MutableHttpRequest<?> outbound = (MutableHttpRequest<?>) ((HttpRequestWrapper<?>) inbound).getDelegate();
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build()
+            .write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("203.0.113.7, 10.0.0.2", headers.get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("https", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("shop.example", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+        assertEquals("443", headers.get(ForwardedHeaders.X_FORWARDED_PORT));
+        assertEquals("/shop", headers.get(ForwardedHeaders.X_FORWARDED_PREFIX));
+        assertEquals("for=203.0.113.7;proto=https;host=shop.example, for=10.0.0.2;proto=http;host=gateway.internal", headers.get(HttpHeaders.FORWARDED));
+    }
+
+    @Test
     void ipv6ClientIsQuotedInForwarded() {
         HttpRequest<?> inbound = inbound("2001:db8::17", false, "gateway.example");
         MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");

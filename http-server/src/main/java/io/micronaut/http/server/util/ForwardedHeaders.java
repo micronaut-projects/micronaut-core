@@ -135,6 +135,15 @@ public final class ForwardedHeaders {
             }
         }
 
+        // read the inbound values before the outbound headers change: the two requests can share
+        // their headers, e.g. for a request mutated from a Netty server request
+        String inboundFor = trusted ? join(in.getAll(X_FORWARDED_FOR)) : null;
+        String inboundProto = trusted ? in.get(X_FORWARDED_PROTO) : null;
+        String inboundHost = trusted ? in.get(X_FORWARDED_HOST) : null;
+        String inboundPort = trusted ? in.get(X_FORWARDED_PORT) : null;
+        String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
+        String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
+
         for (String name : X_FORWARDED_HEADERS) {
             out.remove(name);
         }
@@ -142,19 +151,14 @@ public final class ForwardedHeaders {
 
         if (xForwarded) {
             String forwardedFor = clientAddress == null ? "unknown" : clientAddress;
-            String inboundFor = trusted ? join(in.getAll(X_FORWARDED_FOR)) : null;
             out.set(X_FORWARDED_FOR, inboundFor == null ? forwardedFor : inboundFor + ", " + forwardedFor);
-            String inboundProto = trusted ? in.get(X_FORWARDED_PROTO) : null;
             out.set(X_FORWARDED_PROTO, inboundProto == null ? proto : inboundProto);
-            String inboundHost = trusted ? in.get(X_FORWARDED_HOST) : null;
             if (inboundHost != null) {
                 out.set(X_FORWARDED_HOST, inboundHost);
             } else if (host != null) {
                 out.set(X_FORWARDED_HOST, host);
             }
-            String inboundPort = trusted ? in.get(X_FORWARDED_PORT) : null;
             out.set(X_FORWARDED_PORT, inboundPort == null ? String.valueOf(port) : inboundPort);
-            String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
             String forwardedPrefix = inboundPrefix == null ? prefix : prefix == null ? inboundPrefix : inboundPrefix + prefix;
             if (forwardedPrefix != null) {
                 out.set(X_FORWARDED_PREFIX, forwardedPrefix);
@@ -165,7 +169,6 @@ public final class ForwardedHeaders {
             if (hostHeader != null) {
                 element.append(";host=").append(quoteIfNeeded(hostHeader));
             }
-            String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
             out.set(HttpHeaders.FORWARDED, inboundForwarded == null ? element.toString() : inboundForwarded + ", " + element);
         }
     }
