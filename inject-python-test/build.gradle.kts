@@ -63,6 +63,8 @@ tasks {
 }
 
 // Run the whole corpus of tests at a type-check mode: ./gradlew :micronaut-inject-python-test:test -Ppython-ci -Dmicronaut.python.typecheck=error
+// or at a static compilation mode: -Dmicronaut.python.compile.static=all
 tasks.withType<Test>().configureEach {
     System.getProperty("micronaut.python.typecheck")?.let { systemProperty("micronaut.python.typecheck", it) }
+    System.getProperty("micronaut.python.compile.static")?.let { systemProperty("micronaut.python.compile.static", it) }
 }
