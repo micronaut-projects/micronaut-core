@@ -50,6 +50,29 @@ would make the differences between the backends more visible, not less.
 - Retained heap after GC differs by about 1 MB (42.9 MB against 41.6 MB) with 120 generated classes, and the
   loaded-class count by about 85 classes (the runtime module and ASM).
 
+## Comparisons
+
+Two comparisons are available from the recorded sets in git history: the same implementation on two JDKs, and the
+finished implementation against the first one on the same JDK. Both are three rounds on a four-CPU machine, so
+anything under about 15% is noise; the compiler backend, which this work does not touch, is the control.
+
+**Oracle GraalVM 25.0.4 against Temurin 25.0.4.1, same commit.** Truffle is interpreted on both, so this compares
+two HotSpots rather than two Python runtimes. GraalVM is slower for this workload across every backend: context
+start +2% to +5%, first bean +22% to +35%, all beans +22% to +32%, warm restart +50% to +64%, JVM wall +24% to
++31%, with about 160 more loaded classes and a few tenths of a megabyte more heap. Its JIT compiles the Java code
+with libgraal, and a JVM that lives fifteen seconds pays that warmup without earning it back. The ordering and the
+size of the gaps between the backends are the same on both JDKs, so the backend comparison does not depend on the
+JVM it was taken on.
+
+**The finished implementation against the batch 1-4 one (`604b891a`), both on Temurin.** Two effects are the
+implementation, both small and both expected of a model that now carries factories, configuration binding, iterable
+beans, enums, described members and validation flags: the saved model grew 2.6% (3.6 KB over 40 modules, 131 KB to
+135 KB) and the generated definition classes 1.6% (248 KB to 252 KB), while the generated introspections are
+unchanged. The first introspection of the runtime backend went from 6.0 ms to 8.5 ms, decoding a richer model.
+Everything else (context start +11% to +15%, first bean +10% to +22%, JVM wall about +10%) moved by the same amount
+in the control, so it is the machine rather than the code. The output inventory is otherwise unchanged: the runtime
+backend still emits no definition and no introspection class.
+
 No startup or memory benefit is claimed from these runs; the benefits established are the smaller packaged
 output and the removal of the metadata classes from the build, at no measurable cost. The plan's other
 performance workstreams (Python transformation, wrapper reduction, target-type mapping consolidation) are where
