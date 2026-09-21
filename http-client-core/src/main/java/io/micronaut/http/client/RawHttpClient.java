@@ -55,6 +55,38 @@ public interface RawHttpClient extends Closeable {
     Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread);
 
     /**
+     * Send a raw request with the given per-exchange options, e.g.
+     * {@link RawRequestOptions#proxy()} to relay a request to an upstream server.
+     * <p>This overload takes the blocked thread as well, so that calls passing {@code null} for
+     * the last argument of {@link #exchange(HttpRequest, CloseableByteBody, Thread)} stay
+     * unambiguous.
+     *
+     * @param request       The request metadata (method, URI, headers). The
+     *                      {@link HttpRequest#getBody() body} of this object is ignored, and the
+     *                      request is not modified
+     * @param requestBody   The request body bytes. {@code null} is equivalent to an empty body.
+     *                      The ownership of the body immediately transfers to the client, like
+     *                      for {@link #exchange(HttpRequest, CloseableByteBody, Thread)}
+     * @param blockedThread The thread that is blocked waiting for this request. This is used for
+     *                      deadlock detection. Optional parameter.
+     * @param options       The options for this exchange
+     * @return A mono that will contain the response to this request. A response that carries body
+     * bytes is a {@link io.micronaut.http.MutableByteBodyHttpResponse}, so that it can be changed
+     * before it is relayed
+     * @since 5.3.0
+     */
+    @SingleResult
+    default Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
+        if (options.equals(RawRequestOptions.getDefault())) {
+            return exchange(request, requestBody, blockedThread);
+        }
+        if (requestBody != null) {
+            requestBody.close();
+        }
+        throw new UnsupportedOperationException("Raw request options are not supported by " + getClass().getName());
+    }
+
+    /**
      * Create a new {@link RawHttpClient}.
      * Note that this method should only be used outside the context of a Micronaut application.
      * The returned {@link RawHttpClient} is not subject to dependency injection.
