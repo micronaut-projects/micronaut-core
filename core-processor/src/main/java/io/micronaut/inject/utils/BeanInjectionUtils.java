@@ -416,8 +416,61 @@ public class BeanInjectionUtils {
 
             Map<String, ClassElement> typeArgs = genericType.getTypeArguments();
             if (typeArgs.size() == 2) {
-                ClassElement k = typeArgs.get("K");
-                return k != null && k.isAssignable(CharSequence.class);
+                return isKeyedByBeanName(typeArgs.get("K"), typeArgs.get("V"));
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Beans are collected into a map by their bean name, so the key type has to be resolvable from that
+     * name. A {@link CharSequence} always is.
+     *
+     * <p>An enum is too, but only for an iterable bean type - one that exists once per configuration key
+     * or per parent bean - because those names form the closed set an enum can model. That keeps an
+     * enum-keyed map of any other bean type resolving as the single bean it resolves as today. Whether a
+     * bean of the map type exists is not decided here: a map that is supplied directly still takes
+     * precedence, which is resolved at runtime where that is actually known.</p>
+     *
+     * <p>Iterability is read off the value type's own annotations, so a bean declared iterable by the
+     * {@link io.micronaut.context.annotation.Factory} method that produces it - the annotation is on the
+     * method, not on the returned class, which may not even be compiled here - is not recognised, and an
+     * enum-keyed map of it keeps resolving as a single bean. A {@link CharSequence}-keyed map of the same
+     * beans collects them, because that path never inspects the value type.</p>
+     *
+     * @param keyType  The map key type
+     * @param beanType The map value type
+     * @return Whether the map can be collected by bean name
+     */
+    private static boolean isKeyedByBeanName(@Nullable ClassElement keyType, @Nullable ClassElement beanType) {
+        if (keyType == null) {
+            return false;
+        }
+        if (keyType.isAssignable(CharSequence.class)) {
+            return true;
+        }
+        return keyType.isEnum() && beanType != null && isIterable(beanType) && !isNamedAfterParentBean(beanType);
+    }
+
+    /**
+     * Whether the beans of a type are named after the bean they belong to rather than by their own
+     * configuration key alone.
+     *
+     * <p>An iterable type nested in another iterable one exists once per parent bean as well as once per
+     * key of its own, and is named for both: the zones of a region are named {@code france-north} and
+     * {@code france-south}, not {@code north} and {@code south}. Those names are not the closed set an
+     * enum models, so a map of them keeps resolving as the single bean it resolves as today rather than
+     * being collected and failing to convert.</p>
+     *
+     * @param beanType The map value type
+     * @return Whether the bean names carry the name of a parent bean
+     */
+    private static boolean isNamedAfterParentBean(ClassElement beanType) {
+        for (ClassElement enclosing = beanType.getEnclosingType().orElse(null);
+             enclosing != null;
+             enclosing = enclosing.getEnclosingType().orElse(null)) {
+            if (isIterable(enclosing)) {
+                return true;
             }
         }
         return false;
