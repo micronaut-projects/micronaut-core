@@ -33,6 +33,51 @@ An instance of a generated class created through its no-argument constructor, fo
 
 A class is resolved through the module named after it before its package is imported, so a class instantiated on another thread while its package is being imported (a service the parallel service loader creates for a call made at import time) does not wait for the import of the package.
 
+== Runtime Annotations and Reflection Data
+
+Micronaut reads the annotations of a Python class from the annotation metadata the compiler builds for it, so the decorators of a Python bean, controller or configuration class need not appear on the generated Java class. Frameworks that read annotations reflectively from the Java class, with `Class.getAnnotation` or `Method.getAnnotation`, are different: Hibernate looks for `@Entity`, `@Id` and the other `jakarta.persistence` annotations on the class it maps, and finds nothing on the generated class unless the compiler copies them there.
+
+The compiler copies such annotations - every annotation of a Java annotation type with `RUNTIME` retention that may be placed on the declaration, from the class onto the generated class, from an attribute onto its field, from a `@property` accessor or a method onto the generated accessor or bridge method, and from an interface, its methods and their parameters onto the generated interface - only for the types that ask for it. It is off otherwise: a generated class carrying `@Entity` is seen by the annotation processors of the following Java compilation rounds exactly as a Java entity class would be, so the copy is made only where a reflection-based framework needs it.
+
+=== The @AllowsReflection Hint
+
+A type asks for its reflection data with the ann:core.annotation.AllowsReflection[] hint. It is a stereotype: it applies to a Python class or method that declares it, to every class annotated with an annotation type that is itself annotated with it, and to a class whose annotation an annotation mapper maps to it. This is the preferred way, as it needs no configuration:
+
+snippet::micronaut.docs.reflection.AuditedRecord[tags="imports,class", indent=0, title="Reflection data of a generated class"]
+
+<1> The hint marks the class as one whose annotations a library reads reflectively
+<2> `@Audited` is copied onto the generated `AuditedRecord` class
+<3> The annotation of an attribute is copied onto the generated field
+
+A framework integration whose annotations are read reflectively declares the hint once, on its annotation type or in its annotation mapper, so that its users need nothing: an AI service annotation such as `@AiService` in the LangChain4j module, whose implementation `java.lang.reflect.Proxy` builds from the interface, or the JPA `@Entity` that Micronaut Data's annotation mappers process. Until a module does so, its users declare the hint on their classes or use the option below.
+
+The hint itself is served through the annotation metadata and is not copied onto the generated type.
+
+=== The allow-reflection Option
+
+Types that cannot be annotated are named with the `micronaut.introspection.allow-reflection` property, the property that allows reflective introspection at run time in the <<reflection, reflection module>>. The pattern language is that of the runtime property: a comma-separated list of class names where `*` stands for any sequence of characters, matched against the whole name of the generated class. `com.example.model.*` names the classes of a package and its sub packages, `com.example.Order` one class and `*` every class.
+
+The compiler reads the property as an annotation processor option (`-A`) or as a system property of the compiler JVM. The key of a javac option must be a dot-separated sequence of identifiers, so the option is spelled in camel case, `-Amicronaut.introspection.allowReflection=...`, the same Micronaut property under the framework's property name normalization. With the Micronaut Gradle build plugins (`micronaut-build` 8.1.2 or later) it is set for every Python compile task of a project through `micronautBuild.python.compilerArgs`, or for one task through its `compilerArgs` property:
+
+[source,groovy]
+----
+micronautBuild {
+    python {
+        compilerArgs.add("-Amicronaut.introspection.allowReflection=com.example.model.*")
+    }
+}
+
+tasks.named("compileTestPython") {
+    compilerArgs.add("-Amicronaut.introspection.allowReflection=com.example.model.*")
+}
+----
+
+A JPA or Hibernate entity written in Python needs the hint or the option: without them the class is found by the entity scan, which reads the annotation metadata, but Hibernate rejects the generated class as not annotated with `@Entity`. The same holds for any library that reads annotations from the class reflectively, such as JAXB or Jackson used without the Micronaut introspection module. Each class whose annotations are left off the generated source because neither names it is reported once as a compiler note naming the option; Bean Validation constraints, which Micronaut Validation reads from the annotation metadata, are left off without a note.
+
+=== What Is Always Copied
+
+What Micronaut and the test frameworks read from the generated class themselves is copied regardless of the hint and the option: the JUnit 5 annotations of a test class and its test methods, `@MicronautTest` and the other test annotations that register a JUnit extension through `@ExtendWith`, and the `@PropertySource` container of `@Property`. Micronaut annotations other than these, the `jakarta.inject`, `jakarta.annotation` and `javax` injection annotations, Python-defined annotations and the `java.lang` annotations that constrain a declaration, such as `@FunctionalInterface`, are never copied. An annotation whose member values cannot be written to Java source is reported as a compilation warning and left out.
+
 == Scoped Proxies
 
 A factory method producing a Python class with a proxied scope, such as `@Refreshable` or the `@MockBean` of Micronaut Test, is served through a generated proxy, as for a Java class. The proxy has no Python object of its own: Java callers reach the bean the scope currently holds through the intercepted methods, and Python code receiving the proxy gets a Python scoped proxy of the same class that forwards every attribute read, write and method call to that bean, so a refreshed bean or a mock replaced between tests is seen by Python callers as well. A factory method returning a Python abstract base class produces a proxy implementing the generated interface.
