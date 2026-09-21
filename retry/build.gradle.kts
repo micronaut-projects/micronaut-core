@@ -18,4 +18,5 @@ dependencies {
 
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautDiscoveryCore)
+    testImplementation(libs.logback.classic)
 }
