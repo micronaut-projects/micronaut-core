@@ -1,14 +1,14 @@
 # Python compiler baseline and the property hook cleanup
 
-Branch `claude/python-compiler-baseline-ef4sxf`, stacked on the head of #13250 (`claude/kind-euler-2nyv6v`).
+Branch `claude/python-compiler-baseline-ef4sxf`, on top of #13250, now merged into `5.2.x`.
 
 ## Summary
 
 - **What changed.** (1) The compiler can profile a compilation
-  (`PyronautCompiler.Builder.profileReportFile`, or `-Dmicronaut.python.compiler.profile=<file>` on a
-  Gradle build): inclusive phase times, javac rounds, the Python model counts and an inventory of
-  the output. (2) Generated classes declare `micronautValueCoercibleSetMember` /
-  `micronautValueCoerciblePutMember` only when the bodies do more than the interface defaults.
+  (`PyronautCompiler.Builder.profileReportFile` / `profileCallback`): inclusive phase times, javac
+  rounds, the Python model counts and an inventory of the output. (2) Generated classes declare
+  `micronautValueCoercibleSetMember` / `micronautValueCoerciblePutMember` only when the bodies do
+  more than the interface defaults.
   (3) An end-to-end test of a mixed Python/Java package and of a class-valued annotation that is
   absent at run time, whose fixes #13250 carries.
 - **Why.** The work plan for reducing Python compilation time starts from a corrected baseline
@@ -29,7 +29,8 @@ Branch `claude/python-compiler-baseline-ef4sxf`, stacked on the head of #13250 (
 ## Corrected baseline
 
 The compilation of the `test-suite-python` test sources, profiled by the compiler itself
-(`:test-suite-python:compileTestPython -Dmicronaut.python.compiler.profile=...`). Temurin 25.0.4.1 on
+(`:test-suite-python:compileTestPython`, the worker started with the profile system property).
+Temurin 25.0.4.1 on
 Linux x64, 4 CPUs, the Gradle worker at its default 2 GB heap, GraalPy 25.3.4.1 on the Truffle fallback
 interpreter (no JIT for Python). Every compilation ran in a fresh worker JVM: Gradle started a new
 process-isolated worker for every build (JVM uptime at compile start 0.5-0.6 s in all 22
@@ -120,21 +121,26 @@ with byte-identical inventories (2,013,911 -> 1,972,903 bytes of generated Java,
 The three regressions reproduced before this work (a star import of an application package sharing
 a Java package's name bound no Java members; importing a Java type's module through such a package
 replaced the class bound on it with the module; a class-valued argument of an annotation absent at
-run time failed as a bare application) are fixed on #13250, which this branch is stacked on, with
-tests in `JavaImportFinderSpec` and `CompilerSilentFailureSpec`. `MixedPackageJavaImportsSpec` here
+run time failed as a bare application) are fixed by #13250, now merged, with tests in
+`JavaImportFinderSpec` and `CompilerSilentFailureSpec`. `MixedPackageJavaImportsSpec` here
 adds the end-to-end case: an annotation compiled into a directory the run time class loader does
 not see, applied with a class argument at module import, next to a mixed package whose star
 import, `__all__` order, `dir()` and type-module import are checked at run time.
 
 ## Reproducing
 
-    ./gradlew :test-suite-python:compileTestPython -Ppython-ci -Dmicronaut.python.compiler.profile=build/profile.txt
+`PyronautCompiler.Builder` enables the profile through `profileReportFile(File)`, which appends one
+block of `key=value` lines per compilation (attributes, `phase.<name>.ms`, `counter.<name>`,
+`artifact.<kind>.count` and `.bytes`) to the file, and `profileCallback(Consumer)`, which hands the
+`CompilationProfile` to the caller. `CompilationProfileTest` drives both.
 
-appends one block of `key=value` lines per compilation (attributes, `phase.<name>.ms`,
-`counter.<name>`, `artifact.<kind>.count` and `.bytes`) to `build/profile.txt`. Delete
-`test-suite-python/build/classes/python/test` and pass `--no-build-cache` to compile again. The
-`jvm.uptime.ms` attribute tells a fresh worker from a reused one. `PyronautCompiler.Builder`
-offers the same through `profileReportFile(File)` and `profileCallback(Consumer)`.
+The measurements above were taken by profiling `:test-suite-python:compileTestPython`. The Python
+compile task's worker was given the report path at the time; the Gradle plugin that forwarded it
+(`-Dmicronaut.python.compiler.profile=<file>`) has since moved out of this repository into
+micronaut-build's shared `io.micronaut.build.internal.python` plugin (#13198), so forwarding the
+property from a Gradle build is a follow-up there. Profiling from the builder API is unaffected.
+
+The `jvm.uptime.ms` attribute tells a fresh worker from a reused one.
 
 ## Follow-ups (the plan's next steps)
 
