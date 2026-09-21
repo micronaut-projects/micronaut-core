@@ -40,20 +40,25 @@ import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.Sinks;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.net.Socket;
 import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -81,8 +86,10 @@ public class RawProxyTest {
     private static final Map<String, Object> CONFIGURATION = Map.of(
         "micronaut.http.client.max-content-length", 64 * 1024 * 1024,
         "micronaut.http.client.read-timeout", "30s",
-        "micronaut.server.max-request-size", 64 * 1024 * 1024
+        "micronaut.server.max-request-size", 128 * 1024 * 1024
     );
+    private static final int BACKPRESSURE_UPLOAD_SIZE = 64 * 1024 * 1024;
+    private static final int BACKPRESSURE_BOUND = 32 * 1024 * 1024;
 
     @Test
     void largeStreamedBodyIsRelayedIntact() throws IOException {
@@ -135,6 +142,56 @@ public class RawProxyTest {
             assertEquals(HttpStatus.OK, response.getStatus());
             assertEquals(UPLOAD_SIZE + ":" + crc(upload), response.body());
         }
+    }
+
+    @Test
+    void slowUpstreamStallsUpload() throws Exception {
+        try (ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            UpstreamEvents events = server.getApplicationContext().getBean(UpstreamEvents.class);
+            OutputStream out = socket.getOutputStream();
+            AtomicLong sent = new AtomicLong();
+            CompletableFuture<Void> upload = CompletableFuture.runAsync(() -> {
+                try {
+                    out.write(("POST /raw-proxy/slow-upload HTTP/1.1\r\nHost: localhost\r\n" +
+                        "Content-Type: application/octet-stream\r\n" +
+                        "Content-Length: " + BACKPRESSURE_UPLOAD_SIZE + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                    byte[] chunk = new byte[64 * 1024];
+                    for (int i = 0; i < BACKPRESSURE_UPLOAD_SIZE / chunk.length; i++) {
+                        out.write(chunk);
+                        sent.addAndGet(chunk.length);
+                    }
+                    out.flush();
+                } catch (IOException e) {
+                    throw new UncheckedIOException(e);
+                }
+            });
+            assertTrue(events.firstUploadChunk.await(20, TimeUnit.SECONDS), "The upstream did not receive the upload");
+            // the upstream holds on to the first chunk. Give the sender time to fill every buffer on the way
+            Thread.sleep(2000);
+            long sentWhileStalled = sent.get();
+            assertTrue(sentWhileStalled < BACKPRESSURE_BOUND,
+                "The upload was not stalled by the slow upstream, " + sentWhileStalled + " bytes were accepted");
+
+            events.releaseUpload.tryEmitEmpty();
+            upload.get(60, TimeUnit.SECONDS);
+            String response = readResponse(socket.getInputStream(), String.valueOf(BACKPRESSURE_UPLOAD_SIZE));
+            assertTrue(response.startsWith("HTTP/1.1 200"), response);
+            assertTrue(response.endsWith(String.valueOf(BACKPRESSURE_UPLOAD_SIZE)), response);
+        }
+    }
+
+    private static String readResponse(InputStream in, String expectedEnd) throws IOException {
+        ByteArrayOutputStream received = new ByteArrayOutputStream();
+        byte[] buffer = new byte[1024];
+        while (!received.toString(StandardCharsets.ISO_8859_1).contains(expectedEnd)) {
+            int n = in.read(buffer);
+            if (n == -1) {
+                break;
+            }
+            received.write(buffer, 0, n);
+        }
+        return received.toString(StandardCharsets.ISO_8859_1);
     }
 
     @Test
@@ -219,6 +276,8 @@ public class RawProxyTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class UpstreamEvents {
+        final CountDownLatch firstUploadChunk = new CountDownLatch(1);
+        final Sinks.Empty<Void> releaseUpload = Sinks.empty();
         private final Map<String, CountDownLatch> cancelled = new ConcurrentHashMap<>();
 
         CountDownLatch cancelled(String key) {
@@ -261,6 +320,22 @@ public class RawProxyTest {
                 .concatWith(Mono.delay(Duration.ofMillis(200)).then(Mono.error(new IllegalStateException("Upstream failure"))));
         }
 
+        @Post(value = "/slow-upload", consumes = MediaType.APPLICATION_OCTET_STREAM, produces = MediaType.TEXT_PLAIN)
+        Mono<String> slowUpload(@Body Publisher<byte[]> body) {
+            AtomicBoolean first = new AtomicBoolean(true);
+            return Flux.from(body)
+                .concatMap(bytes -> {
+                    if (first.getAndSet(false)) {
+                        // hold on to the first chunk until the test releases the upload
+                        events.firstUploadChunk.countDown();
+                        return events.releaseUpload.asMono().thenReturn((long) bytes.length);
+                    }
+                    return Mono.just((long) bytes.length);
+                }, 1)
+                .reduce(0L, Long::sum)
+                .map(String::valueOf);
+        }
+
         @Post(value = "/upload", consumes = MediaType.APPLICATION_OCTET_STREAM, produces = MediaType.TEXT_PLAIN)
         Mono<String> upload(@Body Publisher<byte[]> body) {
             return Flux.from(body)
@@ -300,6 +375,11 @@ public class RawProxyTest {
         Proxy(RawHttpClient client, EmbeddedServer embeddedServer) {
             this.client = client;
             this.embeddedServer = embeddedServer;
+        }
+
+        @Post(value = "/slow-upload", consumes = MediaType.ALL)
+        Mono<HttpResponse<?>> slowUpload(ServerHttpRequest<?> request) {
+            return relay(request, "/raw-upstream/slow-upload");
         }
 
         @Get("/stream")
