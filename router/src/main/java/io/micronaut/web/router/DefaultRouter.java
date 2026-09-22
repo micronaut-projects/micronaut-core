@@ -52,6 +52,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -195,7 +196,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             indexes.put(e.getKey(), indexRoutes(e.getValue()));
         }
         this.indexesByMethod = indexes;
-        this.compiledRoutes = compiled.values().toArray(CompiledRoutes[]::new);
+        this.compiledRoutes = compiled.isEmpty() ? new CompiledRoutes[0] : withExclusivity(compiled.values());
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
@@ -749,11 +750,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     /**
-     * Match the request with the generated URL parsers: the answered ordinal selects the bound
-     * route directly, and the match is built from the captured path variables.
+     * Match the request with the generated URL parsers. A route the parser answers is returned
+     * directly only when no other route of its method can match the same paths: then the normal
+     * selection could not choose another route, and the match is built from the captured path
+     * variables. Otherwise the router selects among all candidates as usual, so specificity,
+     * media types, ambiguity and explicit {@code HEAD} routes decide, and the order of the
+     * parsers does not.
      *
      * @param request The request
-     * @return The match, or {@code null} if no parser answers a bound route the request is acceptable for
+     * @return The match, or {@code null} to select among the candidates
      */
     @SuppressWarnings("unchecked")
     private <T, R> @Nullable UriRouteMatch<T, R> findCompiled(HttpRequest<?> request) {
@@ -765,18 +770,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (CompiledRoutes compiled : compiledRoutes) {
             String[] captured = new String[compiled.matcher.maxVariables()];
             UriRouteInfo<Object, Object> route = null;
+            boolean exclusive = false;
             int ordinal = compiled.matcher.match(method, path, captured);
             if (ordinal >= 0 && ordinal < compiled.byOrdinal.length) {
                 route = compiled.byOrdinal[ordinal];
+                exclusive = compiled.exclusive[ordinal];
             } else if (method == HttpMethod.HEAD) {
                 // the implicit HEAD route of a GET route
                 ordinal = compiled.matcher.match(HttpMethod.GET, path, captured);
                 if (ordinal >= 0 && ordinal < compiled.headByOrdinal.length) {
                     route = compiled.headByOrdinal[ordinal];
+                    exclusive = compiled.headExclusive[ordinal];
                 }
             }
-            if (route == null || !isAcceptable(request, route)) {
+            if (route == null) {
+                // not a bound route of this parser: another parser, or the router, may have one
                 continue;
+            }
+            if (!exclusive || !isAcceptable(request, route)) {
+                return null;
             }
             UriRouteInfo<Object, Object> built = route instanceof LazyUriRouteInfo lazy ? lazy.delegate() : route;
             if (built instanceof DefaultUrlRouteInfo<?, ?> defaultRoute) {
@@ -785,6 +797,99 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return (UriRouteMatch<T, R>) built.tryMatch(request.getPath());
         }
         return null;
+    }
+
+    /**
+     * Mark the compiled routes that no other route of the same method can compete with.
+     *
+     * @param compiled The routes bound to the generated URL parsers
+     * @return The routes with their exclusivity
+     */
+    private CompiledRoutes[] withExclusivity(Collection<CompiledRoutes> compiled) {
+        Map<UriRouteInfo<Object, Object>, String[]> segments = new IdentityHashMap<>();
+        CompiledRoutes[] result = new CompiledRoutes[compiled.size()];
+        int i = 0;
+        for (CompiledRoutes routes : compiled) {
+            boolean[] exclusive = new boolean[routes.byOrdinal.length];
+            boolean[] headExclusive = new boolean[routes.headByOrdinal.length];
+            for (int ordinal = 0; ordinal < exclusive.length; ordinal++) {
+                exclusive[ordinal] = isExclusive(routes.byOrdinal[ordinal], segments);
+            }
+            for (int ordinal = 0; ordinal < headExclusive.length; ordinal++) {
+                headExclusive[ordinal] = isExclusive(routes.headByOrdinal[ordinal], segments);
+            }
+            result[i++] = new CompiledRoutes(routes.matcher, routes.byOrdinal, routes.headByOrdinal, exclusive, headExclusive);
+        }
+        return result;
+    }
+
+    private boolean isExclusive(@Nullable UriRouteInfo<Object, Object> route, Map<UriRouteInfo<Object, Object>, String[]> segments) {
+        if (!(route instanceof LazyUriRouteInfo lazy)) {
+            return false;
+        }
+        String[] own = segments.computeIfAbsent(route, DefaultRouter::templateSegments);
+        for (UriRouteInfo<Object, Object> other : allRoutesByMethod.getOrDefault(lazy.methodKey(), EMPTY)) {
+            if (other != route && mayOverlap(own, segments.computeIfAbsent(other, DefaultRouter::templateSegments))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static final String VARIABLE_SEGMENT = "{}";
+    private static final String ANY_SEGMENTS = "{*}";
+    private static final Pattern SIMPLE_VARIABLE = Pattern.compile("\\{\\w[\\w-]*}");
+
+    /**
+     * The path segments of a route's template: a literal, {@link #VARIABLE_SEGMENT} for a
+     * variable that is a whole segment, or {@link #ANY_SEGMENTS} for anything else, which may
+     * match any number of segments, e.g. {@code {+path}}, {@code {/id}} or a regular expression.
+     */
+    private static String[] templateSegments(UriRouteInfo<Object, Object> route) {
+        String template = route instanceof LazyUriRouteInfo lazy ? lazy.uriTemplate() : route.getUriMatchTemplate().toString();
+        int query = template.indexOf("{?");
+        if (query >= 0) {
+            template = template.substring(0, query);
+        }
+        List<String> result = new ArrayList<>();
+        for (String segment : template.split("/")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            if (segment.indexOf('{') < 0) {
+                result.add(segment);
+            } else if (SIMPLE_VARIABLE.matcher(segment).matches()) {
+                result.add(VARIABLE_SEGMENT);
+            } else {
+                result.add(ANY_SEGMENTS);
+            }
+        }
+        return result.toArray(String[]::new);
+    }
+
+    /**
+     * Whether two templates may match the same path. Only {@code false} is certain.
+     */
+    private static boolean mayOverlap(String[] a, String[] b) {
+        int common = Math.min(a.length, b.length);
+        for (int i = 0; i < common; i++) {
+            String x = a[i];
+            String y = b[i];
+            if (ANY_SEGMENTS.equals(x) || ANY_SEGMENTS.equals(y)) {
+                return true;
+            }
+            if (!VARIABLE_SEGMENT.equals(x) && !VARIABLE_SEGMENT.equals(y) && !x.equals(y)) {
+                return false;
+            }
+        }
+        // the longer template matches the same paths only if its remaining segments can be empty
+        String[] longer = a.length > b.length ? a : b;
+        for (int i = common; i < longer.length; i++) {
+            if (!ANY_SEGMENTS.equals(longer[i])) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -989,9 +1094,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * @param matcher       The parser
      * @param byOrdinal     The bound routes, by the ordinal of their declarations
      * @param headByOrdinal The implicit {@code HEAD} routes of the bound {@code GET} routes, by ordinal
+     * @param exclusive     Whether the route of an ordinal is the only route that can match its paths
+     * @param headExclusive Whether the implicit {@code HEAD} route of an ordinal is the only route that can match its paths
      */
     private record CompiledRoutes(CompiledRouteMatcher matcher,
                                   UriRouteInfo<Object, Object>[] byOrdinal,
-                                  UriRouteInfo<Object, Object>[] headByOrdinal) {
+                                  UriRouteInfo<Object, Object>[] headByOrdinal,
+                                  boolean[] exclusive,
+                                  boolean[] headExclusive) {
+
+        CompiledRoutes(CompiledRouteMatcher matcher, UriRouteInfo<Object, Object>[] byOrdinal, UriRouteInfo<Object, Object>[] headByOrdinal) {
+            this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length]);
+        }
     }
 }
