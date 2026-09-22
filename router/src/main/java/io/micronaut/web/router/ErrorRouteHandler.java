@@ -27,7 +27,7 @@ import io.micronaut.http.HttpResponse;
  * @param <E> The type of the exception
  * @author Denis Stepanov
  * @since 5.3.0
- * @see RouteBuilder#error(Class, ErrorRouteHandler)
+ * @see io.micronaut.web.router.builder.RouteBuilder#error(Class, ErrorRouteHandler)
  */
 @Experimental
 @FunctionalInterface

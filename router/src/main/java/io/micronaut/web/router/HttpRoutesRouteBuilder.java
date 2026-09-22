@@ -57,10 +57,11 @@ final class HttpRoutesRouteBuilder extends DefaultRouteBuilder {
                            @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
         this.contextPath = contextPath;
+        DefaultHandlerRouteBuilder handlers = new DefaultHandlerRouteBuilder(this);
         List<HttpRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
         for (HttpRoutes httpRoutes : ordered) {
-            httpRoutes.routes(this);
+            httpRoutes.routes(handlers);
         }
         addImplicitHeadRoutes();
     }

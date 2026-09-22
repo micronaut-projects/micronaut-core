@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.web.router.builder.RouteBuilder;
 
 /**
  * Routes declared in code. Every bean of this type adds its routes to the application routes

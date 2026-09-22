@@ -386,76 +386,63 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildBeanRoute(HttpMethod.TRACE, uri, beanDefinition, method);
     }
 
-    @Override
-    public UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
+    HandlerUriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
     }
 
-    @Override
-    public <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    <B> HandlerUriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         // the body argument is annotated @Body
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
     }
 
-    @Override
-    public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
+    HandlerUriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    @Override
-    public UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
+    HandlerUriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    @Override
-    public UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
+    HandlerUriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    @Override
-    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+    <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
         DefaultErrorRoute errorRoute = new DefaultErrorRoute(type, handlerHandle(HandlerMethod.of(type, handler)), conversionService);
         this.errorRoutes.add(errorRoute);
         return errorRoute;
     }
 
-    @Override
-    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+    StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
         DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, handlerHandle(HandlerMethod.of(handler)), conversionService);
         this.statusRoutes.add(statusRoute);
         return statusRoute;
     }
 
-    @Override
-    public UriRoute handle(RouteDeclaration route, RequestHandler handler) {
+    HandlerUriRoute handle(RouteDeclaration route, RequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
     }
 
-    @Override
-    public <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    <B> HandlerUriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return declare(route, HandlerMethod.of(bodyType, handler), null);
     }
 
-    @Override
-    public UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+    HandlerUriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
     }
 
-    @Override
-    public UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+    HandlerUriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
-    @Override
-    public UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+    HandlerUriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
-    @Override
-    public UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+    HandlerUriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
@@ -467,14 +454,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param consumes    The media types the route consumes, or {@code null} for the default
      * @return The route
      */
-    private UriRoute declare(RouteDeclaration declaration, HandlerMethod<?> method, MediaType @Nullable [] consumes) {
+    private HandlerUriRoute declare(RouteDeclaration declaration, HandlerMethod<?> method, MediaType @Nullable [] consumes) {
         HttpMethod httpMethod = declaration.httpMethod();
         String uri = declaration.uriTemplate();
         MethodExecutionHandle<Object, Object> handle = handlerHandle(method);
         if (currentParentRoute != null || !routeUri(uri).equals(uri)) {
             // nested, or under a context path: the keys of the declaration do not describe the route
-            UriRoute route = buildRoute(httpMethod.name(), httpMethod, uri, handle);
-            return consumes == null ? route : route.consumes(consumes);
+            HandlerUriRoute route = (HandlerUriRoute) buildRoute(httpMethod.name(), httpMethod, uri, handle);
+            return consumes == null ? route : (HandlerUriRoute) route.consumes(consumes);
         }
         DeclaredUriRoute route = new DeclaredUriRoute(
             declaration,
@@ -510,9 +497,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return infos;
     }
 
-    @Override
-    public UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
+    HandlerUriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
     }
 
     @SuppressWarnings("unchecked")
@@ -1006,7 +992,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * The default route impl.
      */
-    final class DefaultUriRoute extends AbstractRoute implements UriRoute {
+    final class DefaultUriRoute extends AbstractRoute implements HandlerUriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
@@ -1188,47 +1174,47 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute executeOn(String executorName) {
+        public HandlerUriRoute executeOn(String executorName) {
             this.executeOn = Objects.requireNonNull(executorName, "executorName");
             this.nonBlocking = false;
             return this;
         }
 
         @Override
-        public UriRoute before(RouteRequestFilter filter) {
+        public HandlerUriRoute before(RouteRequestFilter filter) {
             return addRequestFilter(filter, null);
         }
 
         @Override
-        public UriRoute before(String executorName, RouteRequestFilter filter) {
+        public HandlerUriRoute before(String executorName, RouteRequestFilter filter) {
             return addRequestFilter(filter, executor(executorName));
         }
 
         @Override
-        public UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+        public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
             Objects.requireNonNull(filter, "filter");
             requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
             return this;
         }
 
         @Override
-        public UriRoute after(RouteResponseFilter filter) {
+        public HandlerUriRoute after(RouteResponseFilter filter) {
             return addResponseFilter(filter, null);
         }
 
         @Override
-        public UriRoute after(String executorName, RouteResponseFilter filter) {
+        public HandlerUriRoute after(String executorName, RouteResponseFilter filter) {
             return addResponseFilter(filter, executor(executorName));
         }
 
         @Override
-        public UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+        public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
             Objects.requireNonNull(filter, "filter");
             responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
             return this;
         }
 
-        private UriRoute addRequestFilter(RouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
+        private HandlerUriRoute addRequestFilter(RouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
             requestFilters.add(GenericHttpFilter.createRouteRequestFilter(request -> {
                 try {
@@ -1240,7 +1226,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return this;
         }
 
-        private UriRoute addResponseFilter(RouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
+        private HandlerUriRoute addResponseFilter(RouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
             responseFilters.add(GenericHttpFilter.createRouteResponseFilter((request, response) -> {
                 try {
@@ -1286,7 +1272,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute nonBlocking() {
+        public HandlerUriRoute nonBlocking() {
             this.nonBlocking = true;
             this.executeOn = null;
             return this;

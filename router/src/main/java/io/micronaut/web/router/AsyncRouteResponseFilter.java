@@ -23,7 +23,7 @@ import java.util.concurrent.CompletionStage;
 
 /**
  * An asynchronous filter of one route's responses, declared with
- * {@link UriRoute#afterAsync(AsyncRouteResponseFilter)}. The filter chain continues when the
+ * {@link io.micronaut.web.router.builder.UriRoute#afterAsync(AsyncRouteResponseFilter)}. The filter chain continues when the
  * returned stage completes, so the filter must not block.
  *
  * @author Denis Stepanov

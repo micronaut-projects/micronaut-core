@@ -41,12 +41,12 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-final class DeclaredUriRoute implements UriRoute {
+final class DeclaredUriRoute implements HandlerUriRoute {
     private final RouteDeclaration declaration;
     private final IntConsumer exposedPorts;
-    private final List<Consumer<UriRoute>> configuration = new ArrayList<>();
+    private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<DefaultRouteBuilder.DefaultUriRoute> route;
-    private @Nullable List<Consumer<UriRoute>> fixedConfiguration;
+    private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
     private @Nullable Integer port;
 
     /**
@@ -59,8 +59,8 @@ final class DeclaredUriRoute implements UriRoute {
         this.exposedPorts = exposedPorts;
         this.route = SupplierUtil.memoized(() -> {
             DefaultRouteBuilder.DefaultUriRoute built = factory.get();
-            List<Consumer<UriRoute>> steps = fixedConfiguration != null ? fixedConfiguration : configuration;
-            for (Consumer<UriRoute> step : steps) {
+            List<Consumer<HandlerUriRoute>> steps = fixedConfiguration != null ? fixedConfiguration : configuration;
+            for (Consumer<HandlerUriRoute> step : steps) {
                 step.accept(built);
             }
             return built;
@@ -90,7 +90,7 @@ final class DeclaredUriRoute implements UriRoute {
         return route.get().implicitHeadCopy().toRouteInfo();
     }
 
-    private UriRoute configure(Consumer<UriRoute> step) {
+    private HandlerUriRoute configure(Consumer<HandlerUriRoute> step) {
         configuration.add(step);
         return this;
     }
@@ -127,7 +127,7 @@ final class DeclaredUriRoute implements UriRoute {
 
     @Override
     public UriRoute consumesAll() {
-        return configure(UriRoute::consumesAll);
+        return configure(HandlerUriRoute::consumesAll);
     }
 
     @Override
@@ -159,42 +159,42 @@ final class DeclaredUriRoute implements UriRoute {
     }
 
     @Override
-    public UriRoute executeOn(String executorName) {
+    public HandlerUriRoute executeOn(String executorName) {
         return configure(r -> r.executeOn(executorName));
     }
 
     @Override
-    public UriRoute nonBlocking() {
-        return configure(UriRoute::nonBlocking);
+    public HandlerUriRoute nonBlocking() {
+        return configure(HandlerUriRoute::nonBlocking);
     }
 
     @Override
-    public UriRoute before(RouteRequestFilter filter) {
+    public HandlerUriRoute before(RouteRequestFilter filter) {
         return configure(r -> r.before(filter));
     }
 
     @Override
-    public UriRoute after(RouteResponseFilter filter) {
+    public HandlerUriRoute after(RouteResponseFilter filter) {
         return configure(r -> r.after(filter));
     }
 
     @Override
-    public UriRoute before(String executorName, RouteRequestFilter filter) {
+    public HandlerUriRoute before(String executorName, RouteRequestFilter filter) {
         return configure(r -> r.before(executorName, filter));
     }
 
     @Override
-    public UriRoute after(String executorName, RouteResponseFilter filter) {
+    public HandlerUriRoute after(String executorName, RouteResponseFilter filter) {
         return configure(r -> r.after(executorName, filter));
     }
 
     @Override
-    public UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+    public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
         return configure(r -> r.beforeAsync(filter));
     }
 
     @Override
-    public UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+    public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
         return configure(r -> r.afterAsync(filter));
     }
 

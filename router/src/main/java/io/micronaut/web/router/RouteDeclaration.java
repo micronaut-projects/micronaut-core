@@ -24,7 +24,7 @@ import org.jspecify.annotations.Nullable;
 /**
  * The declaration of a route: its HTTP method and URI template, with the keys the router indexes
  * and orders routes by. A handler function is bound to it with
- * {@link RouteBuilder#handle(RouteDeclaration, RequestHandler)} and the other {@code handle}
+ * {@link io.micronaut.web.router.builder.RouteBuilder#handle(RouteDeclaration, RequestHandler)} and the other {@code handle}
  * methods taking a declaration.
  *
  * <p>Declarations are meant to be generated at compile time, typically as the constants of an
