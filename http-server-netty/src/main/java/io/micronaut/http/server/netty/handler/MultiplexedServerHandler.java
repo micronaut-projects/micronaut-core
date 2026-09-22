@@ -318,7 +318,21 @@ abstract class MultiplexedServerHandler {
                 var consumer = new BufferConsumer() {
                     @Nullable
                     Upstream upstream;
+                    // data written before the upstream was attached: primary() can deliver it
+                    long consumedBeforeAttach;
+                    boolean discardOnAttach;
                     final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
+
+                    // on the event loop, in the order of the flow
+                    void attach(Upstream attached) {
+                        upstream = attached;
+                        if (discardOnAttach) {
+                            attached.allowDiscard();
+                        } else if (consumedBeforeAttach > 0) {
+                            attached.onBytesConsumed(consumedBeforeAttach);
+                        }
+                        startStreaming(attached);
+                    }
 
                     @Override
                     public void add(ReadBuffer buf) {
@@ -328,14 +342,28 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void add0(ReadBuffer buf) {
+                        if (finished || reset) {
+                            // the stream is gone: the upstream is told to discard in startStreaming
+                            buf.close();
+                            return;
+                        }
                         int n = buf.readable();
                         writeData(NettyReadBufferFactory.toByteBuf(buf), false, requiredCtx().newPromise()
                             .addListener((ChannelFutureListener) future -> {
+                                Upstream attached = upstream;
                                 if (future.isSuccess()) {
-                                    Objects.requireNonNull(upstream).onBytesConsumed(n);
+                                    if (attached == null) {
+                                        consumedBeforeAttach += n;
+                                    } else {
+                                        attached.onBytesConsumed(n);
+                                    }
                                 } else {
                                     logStreamWriteFailure(future.cause());
-                                    Objects.requireNonNull(upstream).allowDiscard();
+                                    if (attached == null) {
+                                        discardOnAttach = true;
+                                    } else {
+                                        attached.allowDiscard();
+                                    }
                                 }
                             }));
                         flush();
@@ -376,17 +404,30 @@ abstract class MultiplexedServerHandler {
                         flush();
                     }
                 };
-                consumer.upstream = snbb.primary(consumer);
-                writeStreaming(response, consumer.upstream, snbb.expectedLength().orElse(-1));
+                long contentLength = snbb.expectedLength().orElse(-1);
+                // the headers go first: a body with data already available (e.g. a relayed client
+                // response) delivers it from primary(), and HTTP/2 must not send DATA before the
+                // HEADERS of the stream. The flow runs its tasks in order on the event loop.
+                if (consumer.flow.executeNow(() -> writeStreamingHeaders(response, contentLength))) {
+                    writeStreamingHeaders(response, contentLength);
+                }
+                BufferConsumer.Upstream upstream = snbb.primary(consumer);
+                if (consumer.flow.executeNow(() -> consumer.attach(upstream))) {
+                    consumer.attach(upstream);
+                }
             }
         }
 
-        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream, long contentLength) {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(() -> writeStreaming(response, upstream, contentLength));
+        private void writeStreamingHeaders(HttpResponse response, long contentLength) {
+            if (finished || reset) {
+                // startStreaming discards the body
                 return;
             }
+            prepareCompression(response, contentLength);
+            writeHeaders(response, false, requiredCtx().voidPromise());
+        }
 
+        private void startStreaming(BufferConsumer.Upstream upstream) {
             if (finished) {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
@@ -400,10 +441,6 @@ abstract class MultiplexedServerHandler {
             }
 
             writerUpstream = upstream;
-
-            prepareCompression(response, contentLength);
-
-            writeHeaders(response, false, requiredCtx().voidPromise());
             upstream.start();
         }
 

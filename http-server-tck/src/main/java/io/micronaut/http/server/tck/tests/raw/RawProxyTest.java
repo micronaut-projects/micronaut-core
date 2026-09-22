@@ -52,6 +52,8 @@ import java.net.Socket;
 import java.net.URI;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
+import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
@@ -61,6 +63,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.zip.CRC32;
+
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -258,9 +264,40 @@ public class RawProxyTest {
     }
 
     private static Socket connect(ServerUnderTest server) throws IOException {
-        Socket socket = new Socket("localhost", server.getPort().orElseThrow());
+        int port = server.getPort().orElseThrow();
+        Socket socket;
+        if (server.getApplicationContext().getProperty("micronaut.server.ssl.enabled", Boolean.class).orElse(false)) {
+            // HTTP/1.1 over TLS: without ALPN, a server that also speaks HTTP/2 falls back to HTTP/1.1
+            socket = trustAll().getSocketFactory().createSocket("localhost", port);
+        } else {
+            socket = new Socket("localhost", port);
+        }
         socket.setSoTimeout(20_000);
         return socket;
+    }
+
+    private static SSLContext trustAll() throws IOException {
+        try {
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, new TrustManager[]{new X509TrustManager() {
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType) {
+                }
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType) {
+                    // the self-signed certificate of the server under test
+                }
+
+                @Override
+                public X509Certificate[] getAcceptedIssuers() {
+                    return new X509Certificate[0];
+                }
+            }}, null);
+            return context;
+        } catch (GeneralSecurityException e) {
+            throw new IOException(e);
+        }
     }
 
     private static void assertUpstreamCancelled(ServerUnderTest server, String key) throws InterruptedException {
