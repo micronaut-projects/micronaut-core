@@ -280,6 +280,40 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void streamingFormHandlerReadsOneFieldAndDiscardsTheRest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-part/age", Map.of("name", "Fred", "age", "42", "city", "Prague"))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("age=42")
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-part/missing", Map.of("name", "Fred"))
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .body("no part missing")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void streamingFormHandlerReadsOneFileAndDiscardsTheRest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("name", "Fred")
+                .addPart("document", "cv.txt", MediaType.TEXT_PLAIN_TYPE, "not read".getBytes(StandardCharsets.UTF_8))
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .addPart("avatar", "second.txt", MediaType.TEXT_PLAIN_TYPE, "second".getBytes(StandardCharsets.UTF_8))
+                .addPart("age", "42")
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-part/avatar", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("avatar.txt=picture")
+                .build());
+        }
+    }
+
+    @Test
     void handlerIsBoundToADeclaredRoute() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/5"), HttpResponseAssertion.builder()
@@ -474,6 +508,18 @@ public class HandlerRoutesTest {
                         }
                         return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
                     }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-part/{name}", (request, pathVariables, parts) -> {
+                    StringBuilder result = new StringBuilder();
+                    return parts.part(pathVariables.getString("name"), part -> {
+                        if (part.isFile()) {
+                            Path file = temporaryFile();
+                            return part.transferTo(file).thenAccept(done -> result.append(part.fileName()).append('=').append(read(file)));
+                        }
+                        return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value));
+                    }).thenApply(found -> found
+                        ? HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE)
+                        : HttpResponse.badRequest("no part " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
                 routes.asyncGET("/fn/async-get", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async get").contentType(MediaType.TEXT_PLAIN_TYPE)));
