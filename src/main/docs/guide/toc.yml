@@ -363,6 +363,7 @@ languageSupport:
     aopProxies: AOP Proxies
     extendingJavaClasses: Extending Java Classes
     typeChecking: Type Checking
+    staticCompilation: Static Compilation
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
