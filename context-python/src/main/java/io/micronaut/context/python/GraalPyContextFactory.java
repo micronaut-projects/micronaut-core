@@ -206,6 +206,15 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
 
         try {
             var classLoader = applicationContext.getClassLoader();
+            PythonApplicationRuntime adopted = PythonApplicationRuntime.adoptStandalone(classLoader);
+            if (adopted != null) {
+                // a platform entry point (a TestPropertyProvider, a contextBuilder, a reflectively
+                // instantiated bean) already created Python objects in a context bootstrapped for it:
+                // adopt that context instead of building a second one the earlier objects do not live in
+                LOG.debug("Adopting the GraalPy context bootstrapped before the application context");
+                runtime.set(adopted);
+                return adopted.context();
+            }
             LOG.debug("Building Primary GraalPy context");
             long now = System.currentTimeMillis();
             var context = buildContext(hostAccess, engine, classLoader, contextConfiguration);
@@ -277,7 +286,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         return context;
     }
 
-    private static void closeQuietly(Engine engine) {
+    static void closeQuietly(Engine engine) {
         try {
             engine.close(true);
         } catch (RuntimeException e) {
@@ -469,7 +478,14 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             return;
         }
         PythonApplicationRuntime.uninstall(installedRuntime);
-        PythonContextRegistry.closeWhenIdleAfterCurrentFrame(ctx, () -> closeContext(ctx));
+        PythonContextRegistry.closeWhenIdleAfterCurrentFrame(ctx, () -> {
+            try {
+                closeContext(ctx);
+            } finally {
+                // an adopted context was bootstrapped with an engine of its own, which nothing else closes
+                installedRuntime.closeOwnedEngine();
+            }
+        });
     }
 
     static void closeContext(Context ctx) {

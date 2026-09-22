@@ -143,6 +143,33 @@ final class PythonApplicationRuntimeTest {
     }
 
     /**
+     * A platform entry point can reach generated Python code before any application context exists:
+     * {@code TestPropertyProvider.getProperties()}, the {@code contextBuilder} of {@code @MicronautTest}
+     * and a reflective no-arg instantiation all run before the application starts. The runtime
+     * bootstraps a default context for them, and the application that starts next adopts it, so the
+     * Python objects created before it are the ones the application sees.
+     */
+    @Test
+    void anEntryPointOutsideAnApplicationBootstrapsAContextTheApplicationAdopts() {
+        assertNull(PythonApplicationRuntime.current(), "no application is running");
+        Context bootstrapped = PythonContextRuntime.getContext();
+        try {
+            assertTrue(PythonContextRuntime.isInitialized(), "the default context is installed");
+            assertEquals(3, bootstrapped.eval(PYTHON, "1 + 2").asInt(), "the default context runs Python");
+            try (ApplicationContext applicationContext = ApplicationContext.run()) {
+                assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)),
+                    "the application adopts the context bootstrapped before it started");
+                assertSame(bootstrapped, PythonContextRuntime.getContext());
+                assertTrue(applicationContext.getBean(PythonApplicationRuntime.class).owns(bootstrapped));
+            }
+            assertNull(PythonApplicationRuntime.current(), "closing the application uninstalls the adopted runtime");
+            assertClosed(bootstrapped, "the application closes the context it adopted");
+        } finally {
+            PythonContextRuntime.resetContext();
+        }
+    }
+
+    /**
      * A context closed with cancellation reports its closure as a cancelled polyglot exception; one
      * closed without does as an illegal state.
      */

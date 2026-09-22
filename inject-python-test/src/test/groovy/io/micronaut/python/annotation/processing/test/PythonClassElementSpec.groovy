@@ -346,11 +346,16 @@ class TestService:
         then: "PythonContextRuntime should be reset"
         !PythonContextRuntime.isInitialized()
 
-        and: "Accessing context after cleanup should throw exception"
+        and: "Accessing the context afterwards bootstraps a default one, as it does for a platform entry point"
         when:
-        PythonContextRuntime.getContext()
+        def bootstrapped = PythonContextRuntime.getContext()
         then:
-        thrown(IllegalStateException)
+        bootstrapped != null
+        PythonContextRuntime.isInitialized()
+
+        cleanup:
+        PythonContextRuntime.resetContext()
+        bootstrapped?.close()
     }
 
     def "test a numeric char array member is rejected"() {

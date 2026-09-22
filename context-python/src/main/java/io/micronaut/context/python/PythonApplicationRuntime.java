@@ -21,8 +21,10 @@ import io.micronaut.context.exceptions.NoSuchBeanException;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.List;
@@ -61,6 +63,12 @@ import java.util.function.Supplier;
  * runtime, that record is JVM-wide and the last writer wins: when two application contexts start in
  * parallel, an early Python bean of one may build the GraalPy context of the other, exactly as it
  * would have resolved the other's installed runtime.
+ * <p>
+ * Generated code is also reached by platform entry points that run before any application context
+ * exists at all ({@code TestPropertyProvider.getProperties()}, the {@code contextBuilder} of
+ * {@code @MicronautTest}, a reflective no-arg instantiation). {@link #require()} then builds a
+ * default context for them, and the application that starts next adopts it instead of building a
+ * second one, so the Python objects created before the application are the ones it sees.
  *
  * @author Micronaut Team
  * @since 5.2.0
@@ -76,9 +84,16 @@ final class PythonApplicationRuntime {
     /** The installed runtimes, the one generated code resolves last; guarded by itself. */
     private static final List<PythonApplicationRuntime> INSTALLED = new ArrayList<>();
     private static final AtomicBoolean REUSE_CONTEXT = new AtomicBoolean();
+    /**
+     * The runtime bootstrapped outside an application, until the application that starts next adopts
+     * it; guarded by {@link #INSTALLED}.
+     */
+    private static @Nullable PythonApplicationRuntime standalone;
 
     private final Context context;
     private final @Nullable ClassLoader classLoader;
+    /** The engine created for a context bootstrapped outside an application, which nothing else closes. */
+    private final AtomicReference<@Nullable Engine> ownedEngine = new AtomicReference<>();
     private final AtomicReference<@Nullable PythonPool> pool = new AtomicReference<>();
     private final AtomicReference<@Nullable BeanProvider<ExecutorService>> pooledExecutorServiceProvider = new AtomicReference<>();
 
@@ -118,7 +133,7 @@ final class PythonApplicationRuntime {
      * executable methods) then finds the same primary context the rest of the application uses.
      *
      * @return The installed runtime
-     * @throws IllegalStateException When no runtime is installed and no application context can provide one
+     * @throws IllegalStateException When no runtime is installed and none can be bootstrapped
      */
     static PythonApplicationRuntime require() {
         PythonApplicationRuntime runtime = CURRENT.get();
@@ -156,19 +171,26 @@ final class PythonApplicationRuntime {
     }
 
     /**
-     * Install the runtime by creating the GraalPy context bean of the recorded application context.
+     * Install the runtime by creating the GraalPy context bean of the recorded application context,
+     * or, when no application context is recorded, by building a default context for the platform
+     * entry point that reached Python before any application.
      *
-     * @return The installed runtime, or {@code null} when no application context is recorded
+     * @return The installed runtime, or {@code null} when a primary context is already being built
+     * on this thread
      */
     private static @Nullable PythonApplicationRuntime bootstrap() {
-        WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
-        BeanContext beanContext = recorded == null ? null : recorded.get();
-        // generated code reached while the context bean is being built (main.py) cannot build a second one
-        if (beanContext == null || BOOTSTRAPPING.get()) {
+        // generated code reached while a primary context is being built (main.py) cannot build a second one
+        if (BOOTSTRAPPING.get()) {
             return null;
         }
+        WeakReference<BeanContext> recorded = BOOTSTRAP_CONTEXT.get();
+        BeanContext beanContext = recorded == null ? null : recorded.get();
         BOOTSTRAPPING.set(true);
         try {
+            if (beanContext == null) {
+                // a platform entry point running before any application context exists
+                return bootstrapStandalone();
+            }
             // creating the primary context bean installs the runtime (GraalPyContextFactory)
             beanContext.getBean(Context.class, Qualifiers.byName(PythonContextRuntime.PYTHON));
         } catch (NoSuchBeanException e) {
@@ -179,6 +201,94 @@ final class PythonApplicationRuntime {
             BOOTSTRAPPING.remove();
         }
         return CURRENT.get();
+    }
+
+    /**
+     * Build the primary context of a JVM that reaches generated Python code before any application
+     * context exists. {@code TestPropertyProvider.getProperties()}, the {@code contextBuilder} of
+     * {@code @MicronautTest} and the reflective no-arg instantiation of a platform entry point all run
+     * before the application starts, and a generated constructor reached from one of them has no bean
+     * context to build the primary context from.
+     * <p>
+     * The context is built with the default configuration, exactly like
+     * {@link GraalPyContextFactory#bootstrapReusableContext(ClassLoader)} but without making context
+     * reuse the JVM-wide policy, and stays installed until {@link #adoptStandalone(ClassLoader)} hands
+     * it to the application that starts next: the Python objects a platform entry point created are
+     * then the ones the application sees, and the application closes the context when it shuts down.
+     *
+     * @return The installed runtime
+     */
+    private static PythonApplicationRuntime bootstrapStandalone() {
+        synchronized (INSTALLED) {
+            PythonApplicationRuntime installed = CURRENT.get();
+            if (installed != null) {
+                return installed;
+            }
+            ClassLoader classLoader = standaloneClassLoader();
+            Engine engine = GraalPyEngineFactory.buildPythonEngine();
+            PythonApplicationRuntime runtime;
+            try {
+                Context context = GraalPyContextFactory.buildContext(
+                    GraalPyContextFactory.bootstrapHostAccess(classLoader), engine, classLoader);
+                runtime = PythonContextRuntime.setContext(context, classLoader);
+            } catch (IOException | RuntimeException e) {
+                // the engine was created for this context alone
+                GraalPyContextFactory.closeQuietly(engine);
+                throw new IllegalStateException("Failed to initialize the default GraalPy context: " + e.getMessage(), e);
+            }
+            runtime.ownedEngine.set(engine);
+            standalone = runtime;
+            return runtime;
+        }
+    }
+
+    /**
+     * The class loader a context bootstrapped outside an application is built with: the one of the
+     * thread that reached Python, so the application that adopts the context can be started from the
+     * same class loader.
+     *
+     * @return The class loader
+     */
+    private static ClassLoader standaloneClassLoader() {
+        ClassLoader threadClassLoader = Thread.currentThread().getContextClassLoader();
+        if (threadClassLoader != null) {
+            return threadClassLoader;
+        }
+        ClassLoader ownClassLoader = PythonApplicationRuntime.class.getClassLoader();
+        return ownClassLoader != null ? ownClassLoader : ClassLoader.getSystemClassLoader();
+    }
+
+    /**
+     * Hand a context bootstrapped outside an application to the application that is starting, which
+     * owns it from then on: a Python object a platform entry point created before the application
+     * belongs to the application's primary context, instead of a context the application knows
+     * nothing about.
+     *
+     * @param classLoader The class loader of the application that is starting
+     * @return The adopted runtime, or {@code null} when no context was bootstrapped outside an
+     * application, or one was but another class loader built it
+     */
+    static @Nullable PythonApplicationRuntime adoptStandalone(@Nullable ClassLoader classLoader) {
+        synchronized (INSTALLED) {
+            PythonApplicationRuntime adopted = standalone;
+            if (adopted == null || (classLoader != null && adopted.classLoader() != classLoader)) {
+                return null;
+            }
+            standalone = null;
+            install(adopted);
+            return adopted;
+        }
+    }
+
+    /**
+     * Close the engine created for a context this runtime bootstrapped outside an application, once
+     * that context is closed. Nothing else owns that engine: the engine of an application is a bean.
+     */
+    void closeOwnedEngine() {
+        Engine engine = ownedEngine.getAndSet(null);
+        if (engine != null) {
+            GraalPyContextFactory.closeQuietly(engine);
+        }
     }
 
     /**
@@ -205,6 +315,9 @@ final class PythonApplicationRuntime {
     static boolean uninstall(PythonApplicationRuntime runtime) {
         synchronized (INSTALLED) {
             boolean removed = INSTALLED.remove(runtime);
+            if (standalone == runtime) {
+                standalone = null;
+            }
             CURRENT.set(INSTALLED.isEmpty() ? null : INSTALLED.getLast());
             return removed;
         }
@@ -238,6 +351,7 @@ final class PythonApplicationRuntime {
         synchronized (INSTALLED) {
             List<PythonApplicationRuntime> removed = List.copyOf(INSTALLED);
             INSTALLED.clear();
+            standalone = null;
             CURRENT.set(null);
             return removed;
         }
