@@ -40,6 +40,11 @@ import java.util.regex.Pattern;
 @Internal
 public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTemplateMatcher> {
 
+    /**
+     * Stands for a path variable in the structure of a template, see {@link #exactPathSegments()}.
+     */
+    private static final char VARIABLE_MARKER = '\u0000';
+
     private final String templateString;
     private final List<UriTemplateParser.Part> parts;
     private final List<UriMatchVariable> variables;
@@ -567,6 +572,111 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             uri = uri.substring(0, length - 1);
         }
         return uri;
+    }
+
+    /**
+     * The structure of this template, segment by segment, when the template is matched exactly
+     * by comparing literal segments and by accepting whole-segment variables with
+     * {@link #acceptsSegmentVariable(String, int, int)}: a template of literal segments and simple
+     * {@code {name}} variables that fill a segment, optionally followed by query variables, which
+     * the matching of a path ignores. A compiler of route templates generates a parser from it
+     * that accepts the same paths as {@link #tryMatch(String)}, once they are normalised with
+     * {@link #normalizeForMatching(String)}, and captures the same raw values. For another
+     * template, e.g. with a pattern, an explicit or optional variable, or a variable that is
+     * only part of a segment, the result is {@code null}.
+     *
+     * <p>A variable segment is {@link RouteTemplateSegment#VARIABLE}; the path variables are
+     * captured in the order of the variable segments. The root template has no exact segments:
+     * whether it matches a path with a query depends on the text of the template, which the
+     * normalised path does not tell.</p>
+     *
+     * @return The segments, or {@code null} if this template is not matched segment by segment
+     * @since 5.3.0
+     */
+    @Internal
+    public @Nullable List<RouteTemplateSegment> exactPathSegments() {
+        if (isRoot) {
+            return null;
+        }
+        StringBuilder path = new StringBuilder();
+        int variableCount = 0;
+        for (int i = 0; i < segments.length; i++) {
+            Segment segment = segments[i];
+            switch (segment.type) {
+                case LITERAL -> {
+                    if (segment.value.indexOf(VARIABLE_MARKER) >= 0) {
+                        return null;
+                    }
+                    path.append(segment.value);
+                }
+                case PATH -> {
+                    path.append(VARIABLE_MARKER);
+                    variableCount++;
+                }
+                case REGEXP -> {
+                    // only the trailing, empty pattern of query variables: the rest of the path is empty
+                    if (i != segments.length - 1 || !segment.pattern.pattern().isEmpty()) {
+                        return null;
+                    }
+                }
+                default -> {
+                    return null;
+                }
+            }
+        }
+        String structure = path.toString();
+        int length = structure.length();
+        if (length < 2 || structure.charAt(0) != '/' || structure.charAt(length - 1) == '/') {
+            // the root is matched above; a trailing slash is never part of a normalised path
+            return null;
+        }
+        if (variables.isEmpty() && !structure.equals(templateString)) {
+            // a template without variables is matched by equality with its string
+            return null;
+        }
+        List<RouteTemplateSegment> result = new ArrayList<>();
+        int variableSegments = 0;
+        for (String part : structure.substring(1).split("/", -1)) {
+            if (part.isEmpty()) {
+                return null;
+            }
+            if (part.indexOf(VARIABLE_MARKER) < 0) {
+                result.add(RouteTemplateSegment.literal(part));
+            } else if (part.length() == 1) {
+                result.add(RouteTemplateSegment.VARIABLE);
+                variableSegments++;
+            } else {
+                // a variable that is only part of a segment
+                return null;
+            }
+        }
+        return variableSegments == variableCount ? List.copyOf(result) : null;
+    }
+
+    /**
+     * Whether a whole-segment path variable of a template accepts a segment of a path: exactly
+     * the rule {@link #tryMatch(String)} applies to such a variable, for the compilers of route
+     * templates, see {@link #exactPathSegments()}.
+     *
+     * @param path  The path, normalised with {@link #normalizeForMatching(String)}
+     * @param start The index of the first character of the segment
+     * @param end   The index after the last character of the segment, the index of the next slash or the length of the path
+     * @return Whether the variable accepts the segment
+     * @since 5.3.0
+     */
+    @Internal
+    public static boolean acceptsSegmentVariable(String path, int start, int end) {
+        if (end <= start) {
+            // an empty path variable is denied
+            return false;
+        }
+        for (int i = start; i < end; i++) {
+            // the characters after the segment are the rest of the path, as for readText
+            if (rejectCharacter(path.charAt(i), path, i)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean isRoot(String uri) {
