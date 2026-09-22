@@ -44,6 +44,7 @@ import java.util.Map;
 public final class StaticBodyGenerator {
 
     private static final ClassTypeDef PYTHON_STATIC = ClassTypeDef.of("io.micronaut.context.python.PythonStatic");
+    private static final ClassTypeDef PYTHON_CONVERSION = ClassTypeDef.of("io.micronaut.context.python.PythonConversion");
     private static final ClassTypeDef MATH = ClassTypeDef.of(Math.class);
     private static final TypeDef LONG = TypeDef.Primitive.LONG;
     private static final TypeDef DOUBLE = TypeDef.Primitive.DOUBLE;
@@ -608,9 +609,17 @@ public final class StaticBodyGenerator {
      * integers widen to double, references are cast.
      */
     private static ExpressionDef cast(ExpressionDef value, String from, String to) {
+        String declared = to;
+        String source = from;
         from = erased(from);
         to = erased(to);
         if (from.equals(to)) {
+            if (!declared.equals(source) && declared.indexOf('<') >= 0 && source.indexOf('<') >= 0) {
+                // Java generics are invariant: a value of the erased type with other type arguments
+                // reaches the declared type through Object and the raw type, as an unchecked
+                // assignment (a cast to the expression's own erased type would be elided)
+                return PYTHON_CONVERSION.invokeStatic("asObject", List.of(TypeDef.OBJECT), TypeDef.OBJECT, value).cast(type(to));
+            }
             return value;
         }
         if ("java.lang.Object".equals(from)) {
