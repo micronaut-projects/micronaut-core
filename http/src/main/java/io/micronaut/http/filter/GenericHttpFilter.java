@@ -21,8 +21,12 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Base interface for different filter types. Note that while the base interface is exposed, so you
@@ -65,36 +69,63 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     }
 
     /**
-     * Check if the filter is enabled.
-     * @param filter The filter
-     * @return true if enabled
-     * @since 4.2.0
-     */
-    /**
      * Create a filter of one route's requests.
      *
-     * @param filter The filter of the route's request, returning a response to answer the request
-     *               with, or {@code null} to proceed
+     * @param filter   Returns a response to answer the request with instead of the route, or {@code null} to proceed
+     * @param executor The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
      * @return The filter
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createRouteRequestFilter(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter) {
-        return new RouteFunctionFilter(filter, null);
+    static GenericHttpFilter createRouteRequestFilter(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter,
+                                                      @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.request(filter, executor);
+    }
+
+    /**
+     * Create an asynchronous filter of one route's requests.
+     *
+     * @param filter Completes with a response to answer the request with instead of the route, or {@code null} to proceed
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createAsyncRouteRequestFilter(Function<HttpRequest<?>, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> filter) {
+        return RouteFunctionFilter.requestAsync(filter);
     }
 
     /**
      * Create a filter of one route's responses.
      *
-     * @param filter The filter of the route's response
+     * @param filter   The filter of the route's response
+     * @param executor The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
      * @return The filter
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createRouteResponseFilter(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter) {
-        return new RouteFunctionFilter(null, filter);
+    static GenericHttpFilter createRouteResponseFilter(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter,
+                                                       @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.response(filter, executor);
     }
 
+    /**
+     * Create an asynchronous filter of one route's responses.
+     *
+     * @param filter Completes when the route's response is filtered
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createAsyncRouteResponseFilter(BiFunction<HttpRequest<?>, MutableHttpResponse<?>, ? extends CompletionStage<?>> filter) {
+        return RouteFunctionFilter.responseAsync(filter);
+    }
+
+    /**
+     * Check if the filter is enabled.
+     * @param filter The filter
+     * @return true if enabled
+     * @since 4.2.0
+     */
     @Internal
     static boolean isEnabled(GenericHttpFilter filter) {
         return !(filter instanceof AroundLegacyFilter aroundLegacyFilter) || aroundLegacyFilter.isEnabled();
