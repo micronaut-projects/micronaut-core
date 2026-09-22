@@ -992,27 +992,9 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
     }
 
     private List<ClassElement> resolveTypeVarBounds(TypeVar typeVar) {
-        List<ClassElement> bounds = new ArrayList<>();
-        addTypeVarBound(bounds, typeVar.bound());
-        for (Object constraint : typeVar.constraints()) {
-            addTypeVarBound(bounds, constraint);
-        }
-        return bounds;
+        return PythonGenericPlaceholderElement.resolveBounds(typeVar, environment, typeRef -> {
+            ClassElement pythonClass = findPythonClass(typeRef);
+            return pythonClass != null && pythonClass.getName().equals(getName());
+        });
     }
-
-    private void addTypeVarBound(List<ClassElement> bounds, Object bound) {
-        if (bound == null) {
-            return;
-        }
-        TypeRef typeRef = bound instanceof TypeRef tr ? tr : new TypeRef(bound.toString());
-        ClassElement pythonClass = findPythonClass(typeRef);
-        if (pythonClass != null && pythonClass.getName().equals(getName())) {
-            return;
-        }
-        ClassElement boundElement = environment.visitorContext().getTypeResolver().resolve(typeRef, Map.of());
-        if (!Object.class.getName().equals(boundElement.getName())) {
-            bounds.add(boundElement);
-        }
-    }
-
 }
