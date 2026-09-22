@@ -94,7 +94,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |The method is a dunder (`__init__` runs in Python so the instance keeps its Python semantics), an `async def`, a generator, or a static or class method.
 
 |`overriding-java-method`, `intercepted-method`
-|The method implements a method of a Java base or interface, whose bridge keeps the Java signature, or is advised (an around or introduction binding, or a validation constraint): its interceptor chain runs on the Python object, which a Java body would bypass.
+|The method implements a method of a Java base or interface, whose bridge keeps the Java signature; or it is a module-level function or a method of an introduction that is advised (an around binding or a validation constraint), whose interceptor chain runs on the Python object. An advised method of a class is compiled: its Java method runs the interceptor chain the bean's proxy binds before the body, as a proxy compiled for a Java bean does, so validation and around advice cost no crossing into Python.
 
 |`varargs-signature`, `unhinted-parameter`, `unhinted-return`, `java-reserved-name`
 |The signature has no fixed Java layout: `*args`, `**kwargs` or keyword-only parameters, a parameter without a hint, a parameter or return hint resolving to no Java type or class of the compilation, a method, parameter or local named with a Java keyword or a method of `Object`. A missing return hint is not a reason: the method returns `Object`, as its stub declares.

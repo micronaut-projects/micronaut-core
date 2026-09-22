@@ -530,6 +530,8 @@ public sealed interface Ir {
      * @param stats          What the body contains
      * @param wrapsCheckedExceptions Whether a call of the body declares a checked exception, which the
      *                       generated method rethrows unchecked as the bridge would
+     * @param advised        Whether the method is advised: the generated method runs the
+     *                       interceptor chain the proxy binds before the body
      */
     record CompiledBody(String className,
                         String methodName,
@@ -539,7 +541,8 @@ public sealed interface Ir {
                         Body body,
                         @Nullable SourceSpan span,
                         StaticCompilationDecision.Stats stats,
-                        boolean wrapsCheckedExceptions) {
+                        boolean wrapsCheckedExceptions,
+                        boolean advised) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(methodName, "methodName");

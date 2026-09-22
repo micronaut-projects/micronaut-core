@@ -249,9 +249,10 @@ class Refused(Exception):
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
-    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None):
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False):
         self.checker = checker
         self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
+        self.advised_method = advised_method  # whether this method is advised: its Java method runs the interceptor chain first
         self.module = module
         self.class_def = class_def
         self.function_def = function_def
@@ -297,7 +298,7 @@ class Lowering:
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
         owner = self.class_def.qualifiedName() if self.class_def is not None else self.module.script.qualifiedName()
         return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
-                            return_type, body, self.function_def.span(), stats, self.checked)
+                            return_type, body, self.function_def.span(), stats, self.checked, self.advised_method)
 
     def _shadow_reassigned_parameters(self):
         """

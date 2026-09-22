@@ -230,7 +230,7 @@ class Caller:
         context?.close()
     }
 
-    void "an advised method is not compiled: its interceptor chain runs on the python object from python and from java"() {
+    void "an advised method is compiled: its interceptor chain runs in java from java and on the python object from python"() {
         given:
         PythonStatic.resetEntries()
         def context = buildContext(INTERCEPTED)
@@ -239,22 +239,21 @@ class Caller:
         def interceptor = getBean(context, 'python.LoggingInterceptor')
 
         expect:
-        def decision = decisions.find { it.qualifiedName() == 'Calc.label' }
-        decision.outcome() == StaticCompilationDecision.Outcome.NOT_CANDIDATE
-        decision.reasons()*.rule() == ['intercepted-method']
+        decisions.find { it.qualifiedName() == 'Calc.label' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
         decisions.find { it.qualifiedName() == 'Calc.twice' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
+        calc instanceof io.micronaut.context.python.aop.StaticAdviceTarget
 
         when:
         def viaJava = calc.label(3, 'jar')
         def viaPython = caller.run()
         def viaSelf = calc.twice('cup')
 
-        then: "every path ran the interceptor once"
+        then: "every path ran the interceptor once and the body as Java once"
         viaJava == 'logged 3 x jar'
         viaPython == 'logged 4 x pen'
         viaSelf == 'logged 2 x cup'
         interceptor.asPolyglotValue().getMember('calls').toString() == "['label', 'label', 'label']"
-        PythonStatic.entries('python.Calc#label') == 0
+        PythonStatic.entries('python.Calc#label') == 3
 
         and: "the compiled caller of the advised method ran as Java and called it through the Python object"
         PythonStatic.entries('python.Calc#twice') == 1
