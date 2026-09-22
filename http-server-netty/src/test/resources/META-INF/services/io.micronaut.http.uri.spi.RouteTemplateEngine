@@ -1,2 +1,3 @@
 io.micronaut.web.router.TestColonRouteTemplateEngine
 io.micronaut.web.router.TestSelectingColonRouteTemplateEngine
+io.micronaut.web.router.TestMatrixColonRouteTemplateEngine

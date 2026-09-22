@@ -21,7 +21,9 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
+import io.micronaut.http.uri.spi.RouteTemplateEngine;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.spi.RouteMatchSelector;
@@ -33,12 +35,14 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 /**
@@ -87,6 +91,17 @@ final class UriRouteSet {
      * {@link RouteMatchSelector}.
      */
     private final boolean hasEngineSelectors;
+    /**
+     * The engines, other than the Micronaut one, of the templates of the routes: each gives the
+     * path its routes are matched against, see {@link RouteTemplateEngine#matchingPath(String)}.
+     * Empty when every route is a Micronaut route: the router then matches the request path as
+     * is, with no extra work.
+     */
+    private final RouteTemplateEngine[] pathEngines;
+    /**
+     * The identifiers of the {@link #pathEngines}.
+     */
+    private final String[] pathEngineIds;
     private final boolean empty;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
@@ -110,6 +125,18 @@ final class UriRouteSet {
             hasEngineSelectors |= hasEngineSelector(routes);
         }
         this.hasEngineSelectors = hasEngineSelectors;
+        Set<String> engineIds = new LinkedHashSet<>();
+        for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
+            addEngineIds(engineIds, routes);
+        }
+        for (List<UriRouteInfo<Object, Object>> routes : customRoutesByMethod.values()) {
+            addEngineIds(engineIds, routes);
+        }
+        this.pathEngineIds = engineIds.toArray(String[]::new);
+        this.pathEngines = new RouteTemplateEngine[pathEngineIds.length];
+        for (int i = 0; i < pathEngineIds.length; i++) {
+            pathEngines[i] = RouteTemplateEngines.defaults().engine(pathEngineIds[i]);
+        }
         Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(HttpMethod.values());
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
@@ -180,7 +207,8 @@ final class UriRouteSet {
      * @return The matches
      */
     <T, R> List<UriRouteMatch<T, R>> find(HttpRequest<?> request, String uri, @Nullable Set<Integer> ports) {
-        return toMatches(uri, findInternal(request, ports));
+        String[] paths = matchingPaths(uri);
+        return toMatches(uri, paths, findInternal(request, uri, paths, ports));
     }
 
     /**
@@ -193,7 +221,7 @@ final class UriRouteSet {
      * @return The matches
      */
     <T, R> List<UriRouteMatch<T, R>> find(HttpMethod httpMethod, String uri) {
-        List<UriRouteMatch<T, R>> matches = toMatches(uri, allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY));
+        List<UriRouteMatch<T, R>> matches = toMatches(uri, matchingPaths(uri), allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY));
         if (!constrained || matches.isEmpty()) {
             return matches;
         }
@@ -228,13 +256,19 @@ final class UriRouteSet {
     }
 
     private @Nullable <T, R> UriRouteMatch<T, R> findClosestRoute(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request, ports);
+        String path = request.getPath();
+        String[] paths = matchingPaths(path);
+        List<UriRouteInfo<Object, Object>> routes = findInternal(request, path, paths, ports);
         if (routes.isEmpty()) {
             return null;
         }
-        String path = request.getPath();
+        if (paths != null) {
+            List<UriRouteMatch<T, R>> matches = toMatches(path, paths, routes);
+            RouteMatchSelector selector = !hasEngineSelectors || matches.isEmpty() ? null : sameEngineSelector(matches);
+            return closest(request, path, selector == null ? matches : select(selector, request, matches), selector == null);
+        }
         if (hasEngineSelectors) {
-            List<UriRouteMatch<T, R>> matches = toMatches(path, routes);
+            List<UriRouteMatch<T, R>> matches = toMatches(path, null, routes);
             RouteMatchSelector selector = matches.isEmpty() ? null : sameEngineSelector(matches);
             return closest(request, path, selector == null ? matches : select(selector, request, matches), selector == null);
         }
@@ -356,7 +390,8 @@ final class UriRouteSet {
      * The closest matches of a request.
      *
      * @param request The request
-     * @param filter  The filter of the candidates, or {@code null}
+     * @param filter  The filter of the candidates, or {@code null}, applied before the ambiguity
+     *                is resolved and before a route selector of an engine selects among them
      * @param ports   The default ports, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
@@ -365,11 +400,13 @@ final class UriRouteSet {
     private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
                                                                   @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                                   @Nullable Set<Integer> ports) {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request, ports);
+        String path = request.getPath();
+        String[] paths = matchingPaths(path);
+        List<UriRouteInfo<Object, Object>> routes = findInternal(request, path, paths, ports);
         if (routes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
+        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(path, paths, routes), filter);
         if (hasEngineSelectors && !uriRoutes.isEmpty()) {
             RouteMatchSelector selector = sameEngineSelector(uriRoutes);
             if (selector != null) {
@@ -403,7 +440,17 @@ final class UriRouteSet {
         return hasDynamicTargets && DynamicRouteTarget.of(match.getRouteInfo()) != null || filter.test(match);
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
+    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, String @Nullable [] paths, List<UriRouteInfo<Object, Object>> routes) {
+        if (paths != null) {
+            var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.size());
+            for (UriRouteInfo<Object, Object> route : routes) {
+                UriRouteMatch match = route.tryMatch(pathFor(route, path, paths));
+                if (match != null) {
+                    uriRoutes.add(match);
+                }
+            }
+            return uriRoutes;
+        }
         if (routes.size() == 1) {
             UriRouteMatch match = routes.iterator().next().tryMatch(path);
             if (match != null) {
@@ -421,7 +468,10 @@ final class UriRouteSet {
         return uriRoutes;
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
+    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, String @Nullable [] paths, UriRouteInfo<Object, Object>[] routes) {
+        if (paths != null) {
+            return toMatches(path, paths, Arrays.asList(routes));
+        }
         if (routes.length == 1) {
             UriRouteMatch match = routes[0].tryMatch(path);
             if (match != null) {
@@ -449,8 +499,9 @@ final class UriRouteSet {
      * @return The match
      */
     <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, String uri) {
+        String[] paths = matchingPaths(uri);
         for (UriRouteInfo<Object, Object> uriRouteInfo : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY)) {
-            Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri);
+            Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(pathFor(uriRouteInfo, uri, paths));
             if (match.isPresent() && acceptsVariables(uriRouteInfo, match.get())) {
                 return (Optional) match;
             }
@@ -471,13 +522,14 @@ final class UriRouteSet {
     @SuppressWarnings("unchecked")
     <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
+        String[] paths = matchingPaths(uri);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
                 // the route of any method has a route of each standard method too
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : index(entry.getKey()).candidates(uri)) {
+            for (int candidate : candidates(entry.getKey(), routes, uri, paths)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
                 if (request != null) {
                     if (shouldSkipForPort(request, route, ports)) {
@@ -487,7 +539,7 @@ final class UriRouteSet {
                         continue;
                     }
                 }
-                UriRouteMatch match = route.tryMatch(uri);
+                UriRouteMatch match = route.tryMatch(pathFor(route, uri, paths));
                 if (match != null && acceptsVariables(route, match)) {
                     matchedRoutes.add(match);
                 }
@@ -508,6 +560,7 @@ final class UriRouteSet {
      */
     <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, @Nullable Set<Integer> ports) {
         String path = request.getPath();
+        String[] paths = matchingPaths(path);
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
             if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
@@ -515,7 +568,7 @@ final class UriRouteSet {
                 continue;
             }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : index(entry.getKey()).candidates(path)) {
+            for (int candidate : candidates(entry.getKey(), routes, path, paths)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
                 if (shouldSkipForPort(request, route, ports)) {
                     continue;
@@ -523,7 +576,7 @@ final class UriRouteSet {
                 if (!route.matching(request)) {
                     continue;
                 }
-                UriRouteMatch match = route.tryMatch(path);
+                UriRouteMatch match = route.tryMatch(pathFor(route, path, paths));
                 if (match != null && acceptsVariables(route, match)) {
                     matchedRoutes.add(match);
                 }
@@ -556,7 +609,7 @@ final class UriRouteSet {
         return result;
     }
 
-    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request, @Nullable Set<Integer> ports) {
+    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request, String path, String @Nullable [] paths, @Nullable Set<Integer> ports) {
         HttpMethod httpMethod = request.getMethod();
         boolean permitsBody = httpMethod.permitsRequestBody();
         Collection<MediaType> acceptedProducedTypes = null;
@@ -571,7 +624,7 @@ final class UriRouteSet {
         if (routes == null || routes.length == 0) {
             return Collections.emptyList();
         }
-        int[] candidates = index(methodKey).candidates(request.getPath());
+        int[] candidates = candidates(methodKey, routes, path, paths);
         if (candidates.length == 0) {
             return Collections.emptyList();
         }
@@ -581,7 +634,7 @@ final class UriRouteSet {
             if (shouldSkipForPort(request, route, ports)) {
                 continue;
             }
-            if (rejectsVariables(route, request.getPath())) {
+            if (rejectsVariables(route, pathFor(route, path, paths))) {
                 continue;
             }
             if (permitsBody) {
@@ -638,6 +691,113 @@ final class UriRouteSet {
     private static boolean acceptsVariables(UriRouteInfo<?, ?> route, UriMatchInfo match) {
         return !(route instanceof DefaultUrlRouteInfo<?, ?> info && info.isConstrained())
             || info.acceptsVariables(match.getVariableValues());
+    }
+
+    /**
+     * The positions of the routes of a method that can match: each route is looked up in the
+     * index with the path its engine matches.
+     *
+     * @param methodKey The method
+     * @param routes    The routes of the method
+     * @param path      The request path
+     * @param paths     The paths of the {@link #pathEngines}, or {@code null} if they all match the request path
+     * @return The positions, in ascending order
+     */
+    private int[] candidates(String methodKey, UriRouteInfo<Object, Object>[] routes, String path, String @Nullable [] paths) {
+        RouteIndex index = index(methodKey);
+        if (paths == null) {
+            return index.candidates(path);
+        }
+        IntStream result = candidatesFor(index, routes, path, path, paths);
+        for (int i = 0; i < paths.length; i++) {
+            String enginePath = paths[i];
+            if (!enginePath.equals(path) && firstIndexOf(paths, enginePath) == i) {
+                result = IntStream.concat(result, candidatesFor(index, routes, enginePath, path, paths));
+            }
+        }
+        return result.sorted().toArray();
+    }
+
+    /**
+     * @return The candidates of a path among the routes that are matched against that path
+     */
+    private IntStream candidatesFor(RouteIndex index, UriRouteInfo<Object, Object>[] routes, String matchingPath, String path, String[] paths) {
+        return Arrays.stream(index.candidates(matchingPath)).filter(i -> pathFor(routes[i], path, paths).equals(matchingPath));
+    }
+
+    private static int firstIndexOf(String[] values, String value) {
+        for (int i = 0; i < values.length; i++) {
+            if (values[i].equals(value)) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    /**
+     * The paths the routes of the engines other than the Micronaut one match for a request path,
+     * see {@link RouteTemplateEngine#matchingPath(String)}.
+     *
+     * @param path The request path
+     * @return The path of each of the {@link #pathEngines}, or {@code null} if they all match the
+     * request path itself: always for a router of Micronaut routes only
+     */
+    private String @Nullable [] matchingPaths(String path) {
+        RouteTemplateEngine[] engines = pathEngines;
+        if (engines.length == 0) {
+            return null;
+        }
+        String[] paths = null;
+        for (int i = 0; i < engines.length; i++) {
+            String enginePath = Objects.requireNonNull(engines[i].matchingPath(path), "The matching path");
+            if (enginePath != path && !enginePath.equals(path)) {
+                if (paths == null) {
+                    paths = new String[engines.length];
+                    Arrays.fill(paths, path);
+                }
+                paths[i] = enginePath;
+            }
+        }
+        return paths;
+    }
+
+    /**
+     * @param route A route
+     * @param path  The request path
+     * @param paths The paths of the {@link #pathEngines}, or {@code null} if they all match the request path
+     * @return The path the route is matched against
+     */
+    private String pathFor(UriRouteInfo<?, ?> route, String path, String @Nullable [] paths) {
+        if (paths == null) {
+            return path;
+        }
+        String engineId = engineId(route);
+        for (int i = 0; i < pathEngineIds.length; i++) {
+            if (pathEngineIds[i].equals(engineId)) {
+                return paths[i];
+            }
+        }
+        return path;
+    }
+
+    /**
+     * @param route A route
+     * @return The identifier of the engine of the route's template
+     */
+    private static String engineId(UriRouteInfo<?, ?> route) {
+        if (route instanceof DefaultUrlRouteInfo<?, ?> info) {
+            return info.isMicronautTemplate() ? RouteTemplate.MICRONAUT : info.parsedTemplate().engineId();
+        }
+        return route.getRouteTemplate().engineId();
+    }
+
+    private static void addEngineIds(Set<String> engineIds, List<UriRouteInfo<Object, Object>> routes) {
+        for (UriRouteInfo<Object, Object> route : routes) {
+            String engineId = engineId(route);
+            if (!RouteTemplate.MICRONAUT.equals(engineId)) {
+                engineIds.add(engineId);
+            }
+        }
     }
 
     private static boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
