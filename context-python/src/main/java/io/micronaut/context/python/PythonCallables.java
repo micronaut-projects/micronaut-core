@@ -16,16 +16,22 @@
 package io.micronaut.context.python;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.reflect.ClassUtils;
 import org.graalvm.polyglot.HostAccess;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.lang.reflect.Proxy;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
@@ -78,18 +84,26 @@ import java.util.function.UnaryOperator;
  * overloaded on functional interfaces of different arities (for example {@code Predicate} and
  * {@code BiPredicate}) cannot be called with a Python lambda: every overload applies. The host
  * access built by {@link GraalPyHostAccessFactory} registers a target type mapping for each of the
- * {@link #STANDARD_INTERFACES standard functional interfaces} that only applies when the number of
+ * {@link #STANDARD_INTERFACES standard functional interfaces} and for every functional interface
+ * the Python compiler found in the Java types the Python sources reference (a
+ * {@link PythonFunctionalInterfaceProvider} per compilation) that only applies when the number of
  * positional parameters of the callable matches the arity of the interface method, which lets the
- * overload selection of the host interop pick the overload by arity. A callable declaring exactly
- * the parameters of the interface method wins over one that accepts them through default values,
- * and value-returning interfaces take precedence over void ones so that a zero-argument lambda
- * selects {@code Supplier} over {@code Runnable}, like a Java lambda expression does. The mappings
- * stay out of the decision for a callable whose signature cannot be read (a {@code functools.partial},
- * a builtin) or that only fits an arity through {@code *args}: the mapping of every overload would
- * apply and the call be ambiguous, where the default conversion of the host interop has an answer
- * ({@code Function} is a loose conversion of any executable, other interfaces are function proxies).
+ * overload selection of the host interop pick the overload by arity. The mappings also take
+ * precedence over the default conversions of the host interop, so a callable selects a functional
+ * interface overload over an {@code Iterable} one (an {@code Iterable} counts as a functional
+ * interface for the host interop) or an {@code Object} one. A callable declaring exactly the
+ * parameters of the interface method wins
+ * over one that accepts them through default values, and value-returning interfaces take
+ * precedence over void ones so that a zero-argument lambda selects {@code Supplier} over
+ * {@code Runnable}, like a Java lambda expression does. The mappings stay out of the decision for
+ * a callable whose signature cannot be read (a {@code functools.partial}, a builtin) or that only
+ * fits an arity through {@code *args}: the mapping of every overload would apply and the call be
+ * ambiguous, where the default conversion of the host interop has an answer ({@code Function} is
+ * a loose conversion of any executable, other interfaces are function proxies).
  * <p>
- * {@link PythonInterop#fn(Class, Value)} adapts a callable to any functional interface explicitly.
+ * {@link PythonInterop#fn(Class, Value)} adapts a callable to any functional interface explicitly,
+ * which remains the way to select between overloads on functional interfaces of the same arity, or
+ * on an interface the compiler did not see (one only reachable through objects obtained at run time).
  *
  * @since 5.2.3
  */
@@ -114,6 +128,8 @@ final class PythonCallables {
         ToLongFunction.class, UnaryOperator.class
     );
 
+    private static final Logger LOG = LoggerFactory.getLogger(PythonCallables.class);
+
     /** Bound while a callable is converted with the default host interop conversion. */
     private static final ScopedValue<Boolean> DEFAULT_CONVERSION = ScopedValue.newInstance();
 
@@ -129,26 +145,47 @@ final class PythonCallables {
     }
 
     /**
-     * Registers the arity-aware target type mappings of the standard functional interfaces.
+     * Registers the arity-aware target type mappings of the standard functional interfaces and of
+     * the given ones. An entry naming a type the class loader does not have (an interface of a
+     * compile-time only dependency of the Python sources) is skipped: the callable is then
+     * converted by the default conversion of the host interop, as before.
      *
      * @param builder The host access builder
+     * @param entries Further functional interfaces; the first entry of a type counts
+     * @param classLoader The class loader that resolves the named interfaces, or {@code null} for
+     *                    the context class loader of the calling thread
      */
-    static void registerStandardInterfaces(HostAccess.Builder builder) {
+    static void registerFunctionalInterfaces(HostAccess.Builder builder,
+                                             Collection<PythonFunctionalInterfaceProvider.Entry> entries,
+                                             @Nullable ClassLoader classLoader) {
+        Map<Class<?>, PythonFunctionalInterfaceProvider.Entry> byType = new LinkedHashMap<>();
         for (Class<?> type : STANDARD_INTERFACES) {
             Method method = functionalMethod(type);
             if (method != null) {
-                registerArityMapping(builder, type, method);
+                byType.put(type, new PythonFunctionalInterfaceProvider.Entry(
+                    type.getName(), method.getParameterCount(), method.getReturnType() != void.class));
             }
+        }
+        for (PythonFunctionalInterfaceProvider.Entry entry : entries) {
+            Class<?> type = ClassUtils.forName(entry.typeName(), classLoader).orElse(null);
+            if (type == null) {
+                LOG.debug("The functional interface {} is absent from the class path: a Python callable passed where it is expected is converted by the default conversion",
+                    entry.typeName());
+                continue;
+            }
+            byType.putIfAbsent(type, entry);
+        }
+        for (Map.Entry<Class<?>, PythonFunctionalInterfaceProvider.Entry> entry : byType.entrySet()) {
+            registerArityMapping(builder, entry.getKey(), entry.getValue().arity(), entry.getValue().returnsValue());
         }
     }
 
-    private static <T> void registerArityMapping(HostAccess.Builder builder, Class<T> type, Method method) {
-        int arity = method.getParameterCount();
+    private static <T> void registerArityMapping(HostAccess.Builder builder, Class<T> type, int arity, boolean returnsValue) {
         // a callable declaring exactly the parameters of the interface method wins; a value-returning
         // interface wins over a void one (Supplier over Runnable), like a Java lambda expression
-        HostAccess.TargetMappingPrecedence exact = method.getReturnType() == void.class
-            ? HostAccess.TargetMappingPrecedence.HIGH
-            : HostAccess.TargetMappingPrecedence.HIGHEST;
+        HostAccess.TargetMappingPrecedence exact = returnsValue
+            ? HostAccess.TargetMappingPrecedence.HIGHEST
+            : HostAccess.TargetMappingPrecedence.HIGH;
         builder.targetTypeMapping(
             Value.class,
             type,

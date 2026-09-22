@@ -15,6 +15,7 @@ import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.stream.StreamSupport;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -185,6 +186,61 @@ class PythonCallablesTest {
     }
 
     @Test
+    void registeredCustomInterfacesAreSelectedByArity() {
+        try (Context custom = contextWith(Overloads.Callback.class, Overloads.BiCallback.class, Overloads.OtherCallback.class)) {
+            Value overloads = custom.asValue(new Overloads());
+            Value python = custom.eval("python", """
+                def calls(overloads):
+                    return [
+                        overloads.callback(lambda value: value + '!'),
+                        overloads.callback(lambda value, count: value * count),
+                        # a callable is not an Iterable: the functional interface overload wins
+                        overloads.deleteAll(lambda value: value + '?'),
+                        overloads.deleteAll(['a', 'b', 'c']),
+                        overloads.deleteAll(lambda: 'all'),
+                        overloads.describe(lambda value: value),
+                        overloads.describe({'a': 'b'}),
+                    ]
+                calls
+                """);
+            assertEquals(
+                List.of("custom:x!", "custombi:xx", "callback:a?", "iterable:3", "supplier:all", "callback:x", "map:1"),
+                python.execute(overloads).as(List.class)
+            );
+
+            Value sameArity = custom.eval("python", "lambda overloads: overloads.same(lambda value: value)");
+            assertThrows(PolyglotException.class, () -> sameArity.execute(overloads), "same-arity custom interfaces stay ambiguous");
+        }
+    }
+
+    @Test
+    void providersAreLoadedAsServicesOfTheClassLoader() {
+        // TestFunctionalInterfaceProvider registers OtherCallback, and an absent interface, the way a generated provider does
+        try (Context custom = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(), PythonCallablesTest.class.getClassLoader()))
+            .build()) {
+            Value overloads = custom.asValue(new Overloads());
+            Value python = custom.eval("python", "lambda overloads: overloads.same(lambda value: value)");
+            assertEquals("other:x", python.execute(overloads).asString());
+        }
+    }
+
+    private static Context contextWith(Class<?>... functionalInterfaces) {
+        List<PythonFunctionalInterfaceProvider.Entry> entries = new ArrayList<>();
+        // an interface no class loader has: the host access skips it and builds
+        entries.add(new PythonFunctionalInterfaceProvider.Entry("com.example.absent.Callback", 1, true));
+        for (Class<?> type : functionalInterfaces) {
+            java.lang.reflect.Method method = PythonCallables.functionalMethod(type);
+            entries.add(new PythonFunctionalInterfaceProvider.Entry(type.getName(), method.getParameterCount(), method.getReturnType() != void.class));
+        }
+        return Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of(), null, entries))
+            .build();
+    }
+
+    @Test
     void rejectsNonFunctionalInterfacesAndNonCallables() {
         Value callable = context.eval("python", "lambda: 1");
         Value nonCallable = context.eval("python", "1");
@@ -259,6 +315,34 @@ class PythonCallablesTest {
             return callbacks;
         }
 
+        public String deleteAll(Iterable<String> values) {
+            return "iterable:" + StreamSupport.stream(values.spliterator(), false).count();
+        }
+
+        public String deleteAll(Callback callback) {
+            return "callback:" + callback.call("a");
+        }
+
+        public String deleteAll(Supplier<String> supplier) {
+            return "supplier:" + supplier.get();
+        }
+
+        public String describe(java.util.Map<String, String> attributes) {
+            return "map:" + attributes.size();
+        }
+
+        public String describe(Callback callback) {
+            return "callback:" + callback.call("x");
+        }
+
+        public String same(Callback callback) {
+            return "callback:" + callback.call("x");
+        }
+
+        public String same(OtherCallback callback) {
+            return "other:" + callback.call("x");
+        }
+
         @FunctionalInterface
         public interface Callback {
             String call(String value);
@@ -267,6 +351,10 @@ class PythonCallablesTest {
         @FunctionalInterface
         public interface BiCallback {
             String call(String value, int count);
+        }
+
+        public interface OtherCallback {
+            String call(String value);
         }
     }
 }
