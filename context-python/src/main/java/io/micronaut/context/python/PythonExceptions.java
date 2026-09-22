@@ -38,8 +38,72 @@ public final class PythonExceptions {
     private static final String CAUSE = "__cause__";
     private static final String CONTEXT = "__context__";
     private static final String STR_HELPER = "builtin:str";
+    /**
+     * The bookkeeping Truffle attaches to a host throwable that crosses guest frames. The class is
+     * package private to {@code com.oracle.truffle.api}, so it is recognised by name.
+     */
+    private static final String TRUFFLE_LAZY_STACK_TRACE = "com.oracle.truffle.api.TruffleStackTrace$LazyStackTrace";
+    private static final Throwable[] NO_SUPPRESSED = new Throwable[0];
 
     private PythonExceptions() {
+    }
+
+    /**
+     * Whether a suppressed exception is Truffle bookkeeping rather than an exception the application
+     * suppressed.
+     * <p>
+     * A Java exception that Python creates and raises is wrapped by Truffle, which shares the guest
+     * frames it unwinds through with the host throwable by attaching a
+     * {@code TruffleStackTrace.LazyStackTrace} to it as a suppressed exception. That entry carries no
+     * message and no stack trace of its own, it is not an exception the application suppressed, and a
+     * serializer rendering the suppressed exceptions of an error response has nothing to write for it:
+     * the problem+json body of a Java problem raised from Python failed with
+     * {@code No serializable introspection present for type LazyStackTrace} and the client saw a 500.
+     *
+     * @param suppressed A suppressed exception
+     * @return {@code true} when the entry is Truffle's guest stack trace
+     * @since 5.2.4
+     */
+    public static boolean isTruffleStackTrace(@Nullable Throwable suppressed) {
+        return suppressed != null && TRUFFLE_LAZY_STACK_TRACE.equals(suppressed.getClass().getName());
+    }
+
+    /**
+     * The exceptions the application suppressed on a throwable that crossed Python.
+     * <p>
+     * {@link Throwable#getSuppressed()} of a Java exception that crossed Python also reports Truffle's
+     * guest stack trace (see {@link #isTruffleStackTrace(Throwable)}). The entry cannot be taken off the
+     * throwable: {@link Throwable#addSuppressed(Throwable)} and {@link Throwable#getSuppressed()} are
+     * final, there is no removal, and the field behind them is in {@code java.base/java.lang}, which is
+     * not open. This is the view of the suppressed exceptions without it, for code that reports or
+     * serializes them; the genuine entries keep their order.
+     *
+     * @param throwable The throwable
+     * @return The suppressed exceptions of the application
+     * @since 5.2.4
+     */
+    public static Throwable[] suppressed(Throwable throwable) {
+        Throwable[] all = throwable.getSuppressed();
+        int genuine = 0;
+        for (Throwable suppressed : all) {
+            if (!isTruffleStackTrace(suppressed)) {
+                genuine++;
+            }
+        }
+        if (genuine == all.length) {
+            return all;
+        }
+        if (genuine == 0) {
+            return NO_SUPPRESSED;
+        }
+        Throwable[] kept = new Throwable[genuine];
+        int index = 0;
+        for (Throwable suppressed : all) {
+            if (!isTruffleStackTrace(suppressed)) {
+                kept[index++] = suppressed;
+            }
+        }
+        return kept;
     }
 
     /**
