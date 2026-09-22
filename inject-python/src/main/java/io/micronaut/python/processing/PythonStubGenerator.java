@@ -22,6 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
@@ -844,10 +846,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyAccessible()
                     .onlyInstance()
                     .onlyDeclared());
-            for (MethodElement hostMethod : hostMethods) {
-                if (declaredMethods.stream().anyMatch(declaredMethod -> overridesHostMethod(declaredMethod, hostMethod))) {
-                    addBridgeMethod(hostBridgeMethodSpec(hostMethod, element, superType), builder, context, addedMethodNames);
+            for (List<MethodElement> overloads : hostMethodOverloads(hostMethods)) {
+                MethodElement declaredMethod = declaredMethods.stream()
+                    .filter(method -> overridesHostMethod(method, overloads.getFirst()))
+                    .findFirst()
+                    .orElse(null);
+                if (declaredMethod == null) {
+                    continue;
                 }
+                MethodElement hostMethod = overloads.size() == 1
+                    ? overloads.getFirst()
+                    : selectHostOverload(classElement, declaredMethod, overloads, superType);
+                addBridgeMethod(hostBridgeMethodSpec(hostMethod, element, superType), builder, context, addedMethodNames);
             }
         }
 
@@ -2070,6 +2080,93 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static boolean overridesHostMethod(MethodElement declaredMethod, MethodElement hostMethod) {
         return declaredMethod.getName().equals(hostMethod.getName())
             && declaredMethod.getParameters().length == hostMethod.getParameters().length;
+    }
+
+    /**
+     * The methods of a Java base class grouped by what a Python {@code def} can name of them: the method
+     * name and the number of parameters. A group of more than one is a set of same-arity overloads, of
+     * which a Python method overrides one.
+     *
+     * @param hostMethods The overridable methods of the Java base class
+     * @return The groups, in the order the methods were given
+     */
+    private static Collection<List<MethodElement>> hostMethodOverloads(List<MethodElement> hostMethods) {
+        Map<String, List<MethodElement>> overloads = new LinkedHashMap<>();
+        for (MethodElement hostMethod : hostMethods) {
+            overloads.computeIfAbsent(hostMethod.getName() + '/' + hostMethod.getParameters().length, key -> new ArrayList<>())
+                .add(hostMethod);
+        }
+        return overloads.values();
+    }
+
+    /**
+     * The single overload of a Java base class method a Python method overrides. Python has no overloading,
+     * so a base declaring several same-arity overloads of one name (a reactive gRPC service base declares
+     * {@code sayHello(HelloRequest)} and {@code sayHello(Mono<HelloRequest>)}, the first delegating to the
+     * second) is overridden in the one place the parameter type hints name; the other overloads keep their
+     * inherited implementation, which is what their Java callers reach. Bridging every overload to the same
+     * Python callable would instead hand the Python method a value of a type it does not declare.
+     *
+     * @param classElement   The Python class
+     * @param declaredMethod The Python method
+     * @param overloads      The same-arity overloads of the base
+     * @param superType      The Java base class
+     * @return The overload the hints select
+     */
+    private static MethodElement selectHostOverload(AbstractPythonClassElement classElement,
+                                                    MethodElement declaredMethod,
+                                                    List<MethodElement> overloads,
+                                                    ClassElement superType) {
+        List<MethodElement> matches = overloads.stream()
+            .filter(overload -> matchesHostOverload(declaredMethod, overload, false))
+            .toList();
+        if (matches.isEmpty()) {
+            matches = overloads.stream()
+                .filter(overload -> matchesHostOverload(declaredMethod, overload, true))
+                .toList();
+        }
+        if (matches.size() == 1) {
+            return matches.getFirst();
+        }
+        String signatures = overloads.stream()
+            .map(PythonStubGenerator::hostOverloadSignature)
+            .collect(Collectors.joining(", "));
+        throw new ProcessingException(declaredMethod, "Python method [" + declaredMethod.getName() + "] of class ["
+            + classElement.getSimpleName() + "] matches several overloads of [" + superType.getName() + "]: " + signatures
+            + ". Python has no overloading: add a type hint naming the parameter types of the one overload to override,"
+            + " the others keep their inherited implementation.");
+    }
+
+    /**
+     * Whether the type hints of a Python method name the parameter types of a base overload. An unhinted
+     * parameter names no type, so it selects no overload of a base that declares one.
+     *
+     * @param declaredMethod The Python method
+     * @param hostMethod     The base overload
+     * @param assignable     Whether a hint naming a subtype of the parameter type matches, the second pass
+     *                       made when no overload is named exactly
+     * @return Whether the hints select the overload
+     */
+    private static boolean matchesHostOverload(MethodElement declaredMethod, MethodElement hostMethod, boolean assignable) {
+        ParameterElement[] parameters = declaredMethod.getParameters();
+        ParameterElement[] hostParameters = hostMethod.getParameters();
+        for (int i = 0; i < parameters.length; i++) {
+            ClassElement type = parameters[i].getType();
+            ClassElement hostType = hostParameters[i].getType();
+            if (PythonJavaTypes.isSameOrBoxedType(type, hostType)) {
+                continue;
+            }
+            if (isObjectType(type) || !assignable || !type.isAssignable(hostType)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static String hostOverloadSignature(MethodElement hostMethod) {
+        return Arrays.stream(hostMethod.getParameters())
+            .map(parameter -> parameter.getType().getName())
+            .collect(Collectors.joining(", ", hostMethod.getName() + "(", ")"));
     }
 
     private static Map<String, ClassElement> resolvedTypeArguments(ClassElement classElement) {
