@@ -110,8 +110,6 @@ import java.util.function.UnaryOperator;
 @Internal
 final class PythonCallables {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PythonCallables.class);
-
     /**
      * The functional interfaces converted by arity: every interface of {@code java.util.function}
      * plus {@link Runnable}, {@link Callable} and {@link Comparator}.
@@ -129,6 +127,8 @@ final class PythonCallables {
         ToDoubleFunction.class, ToIntBiFunction.class, ToIntFunction.class, ToLongBiFunction.class,
         ToLongFunction.class, UnaryOperator.class
     );
+
+    private static final Logger LOG = LoggerFactory.getLogger(PythonCallables.class);
 
     /** Bound while a callable is converted with the default host interop conversion. */
     private static final ScopedValue<Boolean> DEFAULT_CONVERSION = ScopedValue.newInstance();
