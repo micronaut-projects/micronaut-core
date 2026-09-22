@@ -147,7 +147,8 @@ public final class RouteTableFactory {
      */
     public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
-        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, uri -> uri, route -> { });
+        // relative to the prefix of the locator: no context path, so templates of every engine are supported
+        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, (String) null, route -> { });
         routes.routes(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));

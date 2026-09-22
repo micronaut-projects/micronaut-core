@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.uri.RouteTemplate;
 
 import java.util.Set;
 import java.util.function.Function;
@@ -439,6 +440,31 @@ public interface HttpRouteBuilder {
      * @since 5.3.0
      */
     void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located at runtime, see {@link #locate(String, LocatorHandler, Function)}. The
+     * prefix is parsed, nested and mounted under the context path by its engine; the router
+     * matches it with the matcher of the engine, followed by the rest of the path, which is empty
+     * or starts with a slash. When the prefix matches more than one part of the path, e.g. with a
+     * variable with a regular expression that matches slashes, the longest part is the prefix.
+     * The route table of the target may have routes of any engine, see
+     * {@link io.micronaut.web.router.RouteTableFactory#buildLocatedHttpRoutes}.
+     *
+     * <pre>{@code
+     * routes.locate(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.find(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>A Micronaut template is the same as {@link #locate(String, LocatorHandler, Function)}
+     * with its expression.</p>
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target, or answers {@code null} for {@code 404}
+     * @param tables  The route table of a located target
+     * @since 5.3.0
+     */
+    void locate(RouteTemplate prefix, LocatorHandler locator, Function<Object, RouteTable> tables);
 
     /**
      * A body type that is {@code null} when the request has no body, for the handlers that

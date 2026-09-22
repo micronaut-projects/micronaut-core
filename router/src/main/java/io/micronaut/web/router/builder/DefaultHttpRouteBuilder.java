@@ -23,6 +23,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
@@ -149,6 +150,20 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
     @Override
     public HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
         return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
+    @Override
+    public void locate(RouteTemplate prefix, LocatorHandler locator, Function<Object, RouteTable> tables) {
+        Objects.requireNonNull(prefix, "prefix");
+        if (prefix.isMicronaut()) {
+            locate(prefix.expression(), locator, tables);
+            return;
+        }
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(new RouteLocator(locator, tables)));
+        for (RouteAssembly.DefaultUriRoute route : assembly.addLocatorRoutes(prefix, DEFAULT_CONSUMES, target)) {
+            // the routes of the target decide which media types they consume and produce
+            route.consumesAll();
+        }
     }
 
     @Override
