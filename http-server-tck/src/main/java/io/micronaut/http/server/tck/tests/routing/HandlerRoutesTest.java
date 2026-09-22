@@ -30,11 +30,16 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
+import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.form.FileUpload;
+import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
+import io.micronaut.http.form.FormParts;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -51,6 +56,7 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
@@ -59,14 +65,18 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
@@ -466,6 +476,148 @@ public class HandlerRoutesTest {
         }
     }
 
+    @Test
+    void annotatedHandlersBindTheFormContracts() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/annotated-forms/data", "name=Fred")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("data Fred 1")
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/annotated-forms/data", "age=3")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/annotated-forms/parts", "age=3&name=Fred&city=Prague")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("parts [Fred]")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void collectedFileIsTransferredToANewFile() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("name", "Fred")
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-transfer", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Fred avatar.txt 7 picture")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void transferDoesNotReplaceAnExistingFile() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-existing", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("exists kept")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void fileLargerThanTheLimitIsRejected() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .build();
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-limited", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void closingTheFormReleasesTheFilesAndKeepsTheText() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("name", "Fred")
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-closed", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Fred avatar.txt closed")
+                .build());
+        }
+    }
+
+    @Test
+    void requiredFileThatIsMissingIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-transfer", "name=Fred")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+        }
+    }
+
+    @Test
+    void textPartAskedForAsAFileIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-part-file/name", "name=Fred")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+        }
+    }
+
+    @Test
+    void boundedTextIsReadAndTheRestReleased() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Map<String, String> form = new LinkedHashMap<>();
+            form.put("title", "Report");
+            form.put("rest", "not read");
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-bounded/8", form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("[Report]")
+                .build());
+            // the limit counts bytes
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-bounded/5", form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.REQUEST_ENTITY_TOO_LARGE)
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void takenBodyIsConsumedBeforeTheNextPart() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (int i = 0; i < 2; i++) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-taken", largeForm()).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("name=4;archive=262144;age=2;")
+                    .build());
+            }
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void closingThePartsCancelsTheOperationInProgress() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (int i = 0; i < 2; i++) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-close-cancels", largeForm()).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("cancelled, then refused")
+                    .build());
+            }
+        }
+    }
+
     private static MultipartBody largeForm() {
         byte[] archive = new byte[256 * 1024];
         Arrays.fill(archive, (byte) 'x');
@@ -613,6 +765,18 @@ public class HandlerRoutesTest {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    private static void write(Path file, String content) {
+        try {
+            Files.writeString(file, content);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static @Nullable Throwable cause(@Nullable Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
     }
 
     private static String read(Path file) {
@@ -771,6 +935,74 @@ public class HandlerRoutesTest {
                         parts.close();
                         return HttpResponse.ok("closed while pending").contentType(MediaType.TEXT_PLAIN_TYPE);
                     });
+                });
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms-transfer", (request, pathVariables, form) -> {
+                    String name = form.getString("name");
+                    FileUpload avatar = form.getFile("avatar");
+                    Path destination = temporaryFile();
+                    // the transfer is part of the stage returned: the request owns the upload until then
+                    return avatar.transferTo(destination)
+                        .thenApply(done -> HttpResponse.ok(name + " " + avatar.fileName() + " " + avatar.size().orElse(-1) + " " + read(destination))
+                            .contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms-existing", (request, pathVariables, form) -> {
+                    Path destination = temporaryFile();
+                    write(destination, "kept");
+                    return form.getFile("avatar").transferTo(destination).handle((done, error) -> {
+                        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                        String result = (cause instanceof FileAlreadyExistsException ? "exists" : "unexpected " + cause) + " " + read(destination);
+                        return HttpResponse.ok(result).contentType(MediaType.TEXT_PLAIN_TYPE);
+                    });
+                });
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms-limited", (request, pathVariables, form) ->
+                    form.getFile("avatar").bytes(3).thenApply(bytes -> HttpResponse.ok("not reached")));
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms-closed", (request, pathVariables, form) -> {
+                    FileUpload avatar = form.getFile("avatar");
+                    return form.closeAsync().thenApply(closed -> {
+                        String state;
+                        try {
+                            avatar.bytes(100);
+                            state = "open";
+                        } catch (IllegalStateException e) {
+                            state = "closed";
+                        }
+                        return HttpResponse.ok(form.getString("name") + " " + avatar.fileName() + " " + state).contentType(MediaType.TEXT_PLAIN_TYPE);
+                    });
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-part-file/{name}", (request, pathVariables, parts) ->
+                    parts.part(pathVariables.getString("name"), part -> part.file().transferTo(temporaryFile()))
+                        .thenApply(found -> HttpResponse.ok("not reached")));
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-bounded/{limit}", (request, pathVariables, parts) -> {
+                    List<String> titles = new ArrayList<>();
+                    return parts.part("title", part -> part.text(pathVariables.getInt("limit")).thenAccept(titles::add))
+                        .thenCompose(found -> parts.closeAsync()
+                            .thenApply(closed -> HttpResponse.ok(titles.toString()).contentType(MediaType.TEXT_PLAIN_TYPE)));
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-taken", (request, pathVariables, parts) -> {
+                    StringBuilder result = new StringBuilder();
+                    return parts.forEach(part -> {
+                        // the callback takes the body, and consumes it before its stage completes
+                        CloseableByteBody body = part.takeBody();
+                        return body.buffer().thenAccept(available -> {
+                            try (available) {
+                                result.append(part.name()).append('=').append(available.length()).append(';');
+                            }
+                        });
+                    }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-close-cancels", (request, pathVariables, parts) -> {
+                    CompletableFuture<Void> holding = new CompletableFuture<>();
+                    CompletionStage<Boolean> operation = parts.part("archive", part -> {
+                        holding.complete(null);
+                        // never completes: closing the parts ends the operation
+                        return new CompletableFuture<>();
+                    });
+                    return holding
+                        .thenCompose(held -> parts.closeAsync())
+                        .thenCompose(closed -> operation.handle((found, error) -> cause(error) instanceof CancellationException ? "cancelled" : "not cancelled " + error))
+                        .thenCompose(first -> parts.forEach(part -> CompletableFuture.completedFuture(null)).handle((done, error) ->
+                            first + ", then " + (cause(error) instanceof IllegalStateException ? "refused" : "not refused " + error)))
+                        .thenApply(result -> HttpResponse.ok(result).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
                 routes.GET("/fn/rejected", (request, pathVariables) -> HttpResponse.ok("accepted").contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before(request -> request.getHeaders().contains("X-Token") ? null : HttpResponse.status(HttpStatus.FORBIDDEN))
@@ -954,6 +1186,23 @@ public class HandlerRoutesTest {
         @Error(global = true, exception = CheckedFailure.class)
         HttpResponse<String> checkedFailure(CheckedFailure failure) {
             return HttpResponse.<String>status(HttpStatus.CONFLICT).body("handled " + failure.getMessage()).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+    }
+
+    @Controller("/annotated-forms")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class AnnotatedForms {
+        @Post(uri = "/data", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        String data(FormData form) {
+            return "data " + form.getString("name") + " " + form.getInt("age", 1);
+        }
+
+        @Post(uri = "/parts", consumes = MediaType.APPLICATION_FORM_URLENCODED, produces = MediaType.TEXT_PLAIN)
+        CompletionStage<String> parts(FormParts parts) {
+            // not closed here: the request closes the parts when it ends
+            List<String> names = new ArrayList<>();
+            return parts.part("name", part -> part.text(64).thenAccept(names::add))
+                .thenApply(found -> "parts " + names);
         }
     }
 }

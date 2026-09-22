@@ -28,7 +28,6 @@ import java.util.concurrent.Executor;
  * What the form content of a request needs: the executor for disk work, the byte body factory,
  * the charset and the limits.
  *
- * @param formFactory      The form factory
  * @param ioExecutor       The executor for blocking disk work
  * @param byteBodyFactory  The byte body factory of the request
  * @param charset          The charset of the request
@@ -38,8 +37,7 @@ import java.util.concurrent.Executor;
  * @since 5.3.0
  */
 @Internal
-record UploadContext(FormFactory formFactory,
-                     Executor ioExecutor,
+record UploadContext(Executor ioExecutor,
                      ByteBodyFactory byteBodyFactory,
                      Charset charset,
                      int maxBufferSize,
@@ -48,7 +46,6 @@ record UploadContext(FormFactory formFactory,
     static UploadContext of(FormFactory formFactory, FormCapableHttpRequest<?> request) {
         HttpServerConfiguration configuration = formFactory.getConfiguration();
         return new UploadContext(
-            formFactory,
             formFactory.getDiskWriteExecutor(),
             request.byteBodyFactory(),
             request.getCharacterEncoding(),
