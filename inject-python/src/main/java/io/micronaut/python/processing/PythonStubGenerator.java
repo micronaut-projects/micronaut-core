@@ -5531,10 +5531,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING)
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING ->
-                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
                 default -> {
@@ -6051,9 +6051,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             case "byte", "java.lang.Byte" ->
                 invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
-                invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING)
+                invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
                     .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-            default -> invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING);
+            default -> invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING);
         };
     }
 
@@ -6099,8 +6099,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
                 case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
                 case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "char" -> member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-                default -> member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING);
+                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING);
             };
         } else {
             String referenceTypeName = type.getName();
@@ -6120,9 +6120,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte":
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING:
-                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
