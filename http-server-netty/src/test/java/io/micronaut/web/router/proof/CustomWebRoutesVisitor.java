@@ -24,9 +24,10 @@ import java.util.Set;
  * {@code @Resource}, {@code @Read} and {@code @Write}, and declares the routes of each resource
  * at compile time as an enum of {@code RouteDeclaration}s: one constant per annotated method,
  * with the HTTP method, the URI template and the keys the router indexes and orders routes by,
- * computed here once. Handler functions are bound to the constants at runtime with
- * {@code routes.handle(PetResourceRoutes.NAME, handler)}; the router registers the routes without
- * parsing their templates and builds each one the first time it is used.
+ * computed here once, and a generated URL parser, the enum's {@code CompiledRouteMatcher}, that
+ * maps a request path to a constant. Handler functions are bound to the constants at runtime with
+ * {@code routes.handle(PetResourceRoutes.NAME, handler)}; the router asks the parser first and
+ * selects the bound route by the ordinal it answers.
  */
 public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, Object> {
 
@@ -51,12 +52,22 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
         }
         String basePath = element.stringValue(RESOURCE).orElse("");
         List<String> constants = new ArrayList<>();
+        CompiledRouteMatcherGenerator matcher = new CompiledRouteMatcherGenerator();
         for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared())) {
+            String httpMethod;
+            String uri;
             if (method.hasDeclaredAnnotation(READ)) {
-                constants.add(constant(method, "GET", basePath + method.stringValue(READ).orElse("")));
+                httpMethod = "GET";
+                uri = basePath + method.stringValue(READ).orElse("");
             } else if (method.hasDeclaredAnnotation(WRITE)) {
-                constants.add(constant(method, "POST", basePath + method.stringValue(WRITE).orElse("")));
+                httpMethod = "POST";
+                uri = basePath + method.stringValue(WRITE).orElse("");
+            } else {
+                continue;
             }
+            // the ordinal of the constant is its position
+            matcher.add(constants.size(), httpMethod, uri);
+            constants.add(constant(method, httpMethod, uri));
         }
         String name = element.getSimpleName() + "Routes";
         String source = """
@@ -106,8 +117,14 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
                 public int pathVariableCount() {
                     return pathVariableCount;
                 }
-            }
-            """.formatted(element.getPackageName(), element.getSimpleName(), name, String.join(",\n", constants), name);
+
+                @Override
+                public io.micronaut.web.router.CompiledRouteMatcher matcher() {
+                    return Matcher.INSTANCE;
+                }
+
+            %s}
+            """.formatted(element.getPackageName(), element.getSimpleName(), name, String.join(",\n", constants), name, matcher.generate("Matcher"));
         GeneratedFile file = context.visitGeneratedSourceFile(element.getPackageName(), name, element)
             .orElseThrow(() -> new IllegalStateException("Cannot write the routes of " + element.getName()));
         try (Writer writer = file.openWriter()) {

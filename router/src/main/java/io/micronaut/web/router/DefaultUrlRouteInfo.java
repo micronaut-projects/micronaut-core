@@ -209,6 +209,17 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return null;
     }
 
+    /**
+     * A match of this route whose path variables were captured by a {@link CompiledRouteMatcher}.
+     *
+     * @param path     The matched path
+     * @param captured The raw values of the path variables, in the order of the template
+     * @return The match
+     */
+    UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
+        return new DefaultUriRouteMatch<>(new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured), this, defaultCharset, conversionService);
+    }
+
     @Override
     public @Nullable Integer getPort() {
         return port;
