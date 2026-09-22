@@ -34,14 +34,13 @@ import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.multipart.MultipartBody;
-import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.form.FormPart;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
 import io.micronaut.web.router.RouteInfo;
-import io.micronaut.web.router.builder.FormPart;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.RouteSource;
@@ -601,9 +600,14 @@ public class HandlerRoutesTest {
         return CompletableFuture.supplyAsync(value, executor);
     }
 
+    /**
+     * @return A new file in a new directory, which does not exist yet: uploads are written to new files
+     */
     private static Path temporaryFile() {
         try {
-            Path file = Files.createTempFile("handler-routes", ".upload");
+            Path directory = Files.createTempDirectory("handler-routes");
+            directory.toFile().deleteOnExit();
+            Path file = directory.resolve("upload");
             file.toFile().deleteOnExit();
             return file;
         } catch (IOException e) {
@@ -614,14 +618,6 @@ public class HandlerRoutesTest {
     private static String read(Path file) {
         try {
             return Files.readString(file);
-        } catch (IOException e) {
-            throw new UncheckedIOException(e);
-        }
-    }
-
-    private static byte[] bytes(CompletedFileUpload upload) {
-        try {
-            return upload.getBytes();
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -678,12 +674,13 @@ public class HandlerRoutesTest {
                         request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
                         return null;
                     });
-                routes.POST("/fn/forms/{id}", (request, pathVariables, form) -> {
-                    String file = form.findFile("avatar")
-                        .map(upload -> upload.getFilename() + "=" + new String(bytes(upload), StandardCharsets.UTF_8))
-                        .orElse("no-file");
-                    return HttpResponse.ok(pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
-                        + " " + form.getValues("tag") + " " + file).contentType(MediaType.TEXT_PLAIN_TYPE);
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms/{id}", (request, pathVariables, form) -> {
+                    String fields = pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
+                        + " " + form.getValues("tag") + " ";
+                    CompletionStage<String> file = form.findFile("avatar")
+                        .map(upload -> upload.bytes(1024).thenApply(bytes -> upload.fileName() + "=" + new String(bytes, StandardCharsets.UTF_8)))
+                        .orElse(CompletableFuture.completedFuture("no-file"));
+                    return file.thenApply(value -> HttpResponse.ok(fields + value).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
                 routes.POST("/fn/forms-defaults", (request, pathVariables, form) ->
                     HttpResponse.ok(form.getInt("quantity", 1) + " " + form.getString("shipping", "standard") + " " + form.getBoolean("gift", false))
@@ -748,7 +745,7 @@ public class HandlerRoutesTest {
                     return parts.forEach(part -> {
                         if (part.isFile()) {
                             // obtained, never read: discarded when the consumer's stage completes
-                            part.stream();
+                            part.file();
                             return CompletableFuture.completedFuture(null);
                         }
                         return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
@@ -757,8 +754,8 @@ public class HandlerRoutesTest {
                 routes.handleFormStream(HttpMethod.POST, "/fn/forms-failing", (request, pathVariables, parts) ->
                     parts.forEach(part -> {
                         if (part.isFile()) {
-                            part.stream();
-                            throw new IllegalStateException("failed after obtaining the stream");
+                            part.file();
+                            throw new IllegalStateException("failed after obtaining the file");
                         }
                         return CompletableFuture.completedFuture(null);
                     }).thenApply(done -> HttpResponse.ok("not reached")));
@@ -766,7 +763,7 @@ public class HandlerRoutesTest {
                     CompletableFuture<Void> holding = new CompletableFuture<>();
                     parts.part("archive", part -> {
                         // obtained and held, never read, and the consumer never completes
-                        part.stream();
+                        part.file();
                         holding.complete(null);
                         return new CompletableFuture<>();
                     });

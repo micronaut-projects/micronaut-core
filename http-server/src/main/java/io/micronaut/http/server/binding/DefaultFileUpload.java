@@ -19,29 +19,25 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.form.FileUpload;
-import io.micronaut.http.form.FormFieldException;
-import io.micronaut.http.form.FormPart;
-import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A {@link FormPart} read from the form as it arrives. The part and its {@link #file()} view share
- * one {@link UploadContent}.
+ * A {@link FileUpload}: a view of an {@link UploadContent}, which holds its state.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class DefaultFormPart implements FormPart {
+final class DefaultFileUpload implements FileUpload {
     private final UploadContent content;
-    private final @Nullable FileUpload file;
 
-    DefaultFormPart(UploadContent content) {
+    DefaultFileUpload(UploadContent content) {
         this.content = content;
-        this.file = content.fileName() != null ? new DefaultFileUpload(content) : null;
     }
 
     @Override
@@ -50,8 +46,8 @@ final class DefaultFormPart implements FormPart {
     }
 
     @Override
-    public @Nullable String fileName() {
-        return content.fileName();
+    public String fileName() {
+        return Objects.requireNonNullElse(content.fileName(), "");
     }
 
     @Override
@@ -60,22 +56,13 @@ final class DefaultFormPart implements FormPart {
     }
 
     @Override
-    public FileUpload file() {
-        FileUpload f = file;
-        if (f == null) {
-            throw FormFieldException.notAFile(name());
-        }
-        return f;
+    public OptionalLong size() {
+        return content.size();
     }
 
     @Override
-    public CompletionStage<String> text() {
-        return content.text(content.context.maxBufferSize());
-    }
-
-    @Override
-    public CompletionStage<String> text(int maximumBytes) {
-        return content.text(maximumBytes);
+    public OptionalLong expectedSize() {
+        return content.expectedSize();
     }
 
     @Override
@@ -105,6 +92,6 @@ final class DefaultFormPart implements FormPart {
 
     @Override
     public String toString() {
-        return "FormPart[" + content.metadata + "]";
+        return "FileUpload[" + content.metadata + "]";
     }
 }

@@ -22,8 +22,8 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.form.FormParts;
 import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.web.router.builder.FormParts;
 import jakarta.inject.Singleton;
 
 import java.util.Optional;
@@ -56,7 +56,11 @@ final class FormPartsArgumentBinder implements TypedRequestArgumentBinder<FormPa
         if (!(source instanceof FormCapableHttpRequest<?> request) || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
-        FormParts parts = new DefaultFormParts(request, formFactory.get());
+        FormFactory factory = formFactory.get();
+        DefaultFormParts parts = new DefaultFormParts(request, UploadContext.of(factory, request));
+        // the handler closes the parts when it completes; this is the safety net for handlers
+        // that do not, failures before the handler is called, and disconnects
+        request.addDisposalResource(parts::close);
         return () -> Optional.of(parts);
     }
 }
