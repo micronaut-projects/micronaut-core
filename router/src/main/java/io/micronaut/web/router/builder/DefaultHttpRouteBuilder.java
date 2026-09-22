@@ -20,7 +20,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.RouteAssembly;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -28,103 +30,111 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * The {@link HttpRouteBuilder} of handler functions, adding routes to a {@link DefaultRouteBuilder}.
+ * The {@link HttpRouteBuilder}: adds the routes to handler functions to a {@link RouteAssembly},
+ * like the legacy route builder adds its routes, without depending on it.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public final class DefaultHandlerRouteBuilder implements HttpRouteBuilder {
+public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
 
-    private final DefaultRouteBuilder builder;
+    private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
+    private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
 
-    public DefaultHandlerRouteBuilder(DefaultRouteBuilder builder) {
-        this.builder = builder;
+    private final RouteAssembly assembly;
+
+    /**
+     * @param assembly The assembly the routes are added to
+     */
+    public DefaultHttpRouteBuilder(RouteAssembly assembly) {
+        this.assembly = assembly;
     }
 
     @Override
     public HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler) {
-        return new Routes(builder.handle(method, uri, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return new Routes(builder.handle(method, uri, bodyType, handler));
+        // the body argument is annotated @Body
+        return new Routes(route(method, uri, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return new Routes(builder.handleAsync(method, uri, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public <B> HttpRouteSpec handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new Routes(builder.handleAsync(method, uri, bodyType, handler));
-    }
-
-    @Override
-    public <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new Routes(builder.handleAsync(route, bodyType, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return new Routes(builder.handleForm(method, uri, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
     public HttpRouteSpec handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
-        return new Routes(builder.handleFormAsync(method, uri, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
     public HttpRouteSpec handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
-        return new Routes(builder.handleFormStream(method, uri, handler));
+        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
     public HttpRouteSpec handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
-        return forEach(methods, uri, method -> builder.handle(method, uri, handler));
+        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
-        return forEach(methods, uri, method -> builder.handleAsync(method, uri, handler));
+        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
-        return new Routes(builder.handle(route, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), null));
     }
 
     @Override
     public <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return new Routes(builder.handle(route, bodyType, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(bodyType, handler)), null));
     }
 
     @Override
     public HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
-        return new Routes(builder.handleAsync(route, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), null));
+    }
+
+    @Override
+    public <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(bodyType, handler)), null));
     }
 
     @Override
     public HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return new Routes(builder.handleForm(route, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
     }
 
     @Override
     public HttpRouteSpec handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
-        return new Routes(builder.handleFormAsync(route, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
     }
 
     @Override
     public HttpRouteSpec handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
-        return new Routes(builder.handleFormStream(route, handler));
+        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
     }
 
     @Override
     public <E extends Throwable> ErrorRouteSpec error(Class<E> type, ErrorRouteHandler<E> handler) {
-        io.micronaut.web.router.ErrorRoute route = builder.error(type, handler);
+        RouteAssembly.DefaultErrorRoute route = assembly.addErrorRoute(null, type, handle(HandlerMethod.of(type, handler)));
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
@@ -136,7 +146,7 @@ public final class DefaultHandlerRouteBuilder implements HttpRouteBuilder {
 
     @Override
     public StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
-        io.micronaut.web.router.StatusRoute route = builder.status(status, handler);
+        RouteAssembly.DefaultStatusRoute route = assembly.addStatusRoute(null, status, handle(HandlerMethod.of(handler)));
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {
@@ -144,6 +154,16 @@ public final class DefaultHandlerRouteBuilder implements HttpRouteBuilder {
                 return this;
             }
         };
+    }
+
+    private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+        RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri, DEFAULT_CONSUMES, handle(handler));
+        return consumes == null ? route : route.consumes(consumes);
+    }
+
+    @SuppressWarnings("unchecked")
+    private static MethodExecutionHandle<Object, Object> handle(HandlerMethod<?> method) {
+        return (MethodExecutionHandle<Object, Object>) method;
     }
 
     private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {

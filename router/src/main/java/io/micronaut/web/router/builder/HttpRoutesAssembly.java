@@ -21,7 +21,8 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
-import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.AssembledRoutes;
+import io.micronaut.web.router.RouteAssembly;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -29,9 +30,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Adds the routes of the {@link HttpRoutes} beans to the application routes, in their order.
- * Like controller routes, their URIs are under {@code micronaut.server.context-path}, and like a
- * {@code @Get} method, every {@code GET} route gets an implicit {@code HEAD} route unless a
+ * Assembles the routes of the {@link HttpRoutes} beans, in their order, for the application
+ * router. Like controller routes, their URIs are under {@code micronaut.server.context-path}, and
+ * like a {@code @Get} method, every {@code GET} route gets an implicit {@code HEAD} route unless a
  * {@code HEAD} route has the same URI.
  *
  * @author Denis Stepanov
@@ -40,35 +41,33 @@ import java.util.List;
 @Internal
 @Singleton
 @Requires(beans = HttpRoutes.class)
-final class HttpRoutesRouteBuilder extends DefaultRouteBuilder {
+final class HttpRoutesAssembly implements AssembledRoutes {
 
-    private final @Nullable String contextPath;
+    private final RouteAssembly assembly;
 
     /**
-     * @param executionHandleLocator The locator of the executable methods
-     * @param uriNamingStrategy      The URI naming strategy
+     * @param executionHandleLocator The locator of the application beans
      * @param conversionService      The conversion service
      * @param routes                 The routes to add
      * @param contextPath            The context path of the server
      */
-    HttpRoutesRouteBuilder(ExecutionHandleLocator executionHandleLocator,
-                           UriNamingStrategy uriNamingStrategy,
-                           ConversionService conversionService,
-                           List<HttpRoutes> routes,
-                           @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
-        super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.contextPath = contextPath;
-        DefaultHandlerRouteBuilder handlers = new DefaultHandlerRouteBuilder(this);
+    HttpRoutesAssembly(ExecutionHandleLocator executionHandleLocator,
+                       ConversionService conversionService,
+                       List<HttpRoutes> routes,
+                       @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
+        this.assembly = new RouteAssembly(executionHandleLocator, conversionService,
+            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         List<HttpRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
         for (HttpRoutes httpRoutes : ordered) {
-            httpRoutes.routes(handlers);
+            httpRoutes.routes(builder);
         }
-        addImplicitHeadRoutes();
+        assembly.addImplicitHeadRoutes();
     }
 
     @Override
-    protected String routeUri(String uri) {
-        return underContextPath(contextPath, uri);
+    public RouteAssembly routes() {
+        return assembly;
     }
 }

@@ -30,6 +30,7 @@ import io.micronaut.http.annotation.HttpMethodMapping;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.RouteAssembly.DefaultUriRoute;
 import io.micronaut.web.router.exceptions.RoutingException;
 import io.micronaut.web.router.naming.HyphenatedUriNamingStrategy;
 import jakarta.inject.Singleton;
@@ -155,13 +156,12 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         } else {
             handle = (MethodExecutionHandle<Object, Object>) executionHandleLocator.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         }
-        DefaultUriRoute route = new DefaultUriRoute(
+        DefaultUriRoute route = assembly.newRoute(
             HttpMethod.parse(precompiledRoute.httpMethod()),
             precompiledRoute.uri(),
             List.of(MediaType.APPLICATION_JSON_TYPE),
             handle,
-            precompiledRoute.httpMethodName(),
-            conversionService
+            precompiledRoute.httpMethodName()
         );
         if (precompiledRoute.consumes() != null) {
             route.consumes(MediaType.of(precompiledRoute.consumes()));

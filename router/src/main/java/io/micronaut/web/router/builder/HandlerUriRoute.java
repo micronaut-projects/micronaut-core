@@ -16,16 +16,37 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.MediaType;
 
 /**
- * A route that can run on a chosen executor and have route filters: the routes to handler
- * functions and the routes they are built into.
+ * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
+ * assembled routes and the declared routes implement it. Not a legacy route contract.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public interface HandlerUriRoute extends io.micronaut.web.router.UriRoute {
+public interface HandlerUriRoute {
+
+    /**
+     * @param mediaTypes The media types
+     * @return The route
+     * @see HttpRouteSpec#consumes(MediaType...)
+     */
+    HandlerUriRoute consumes(MediaType... mediaTypes);
+
+    /**
+     * @return The route
+     * @see HttpRouteSpec#consumesAll()
+     */
+    HandlerUriRoute consumesAll();
+
+    /**
+     * @param mediaTypes The media types
+     * @return The route
+     * @see HttpRouteSpec#produces(MediaType...)
+     */
+    HandlerUriRoute produces(MediaType... mediaTypes);
 
     /**
      * @param executorName The name of the executor

@@ -104,8 +104,19 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      *
      * @param builders The builders
      */
-    @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
+        this(builders, List.of());
+    }
+
+    /**
+     * Construct a new router for the given route builders and the routes assembled without one.
+     *
+     * @param builders  The builders
+     * @param assembled The routes assembled without a builder, e.g. the routes of the {@link io.micronaut.web.router.builder.HttpRoutes} beans
+     * @since 5.3.0
+     */
+    @Inject
+    public DefaultRouter(Collection<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         Set<Integer> exposedPorts = new HashSet<>(5);
         Map<CompiledRouteMatcher, CompiledRoutes> compiled = new IdentityHashMap<>(2);
         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
@@ -117,9 +128,20 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         preconditionFilterRoutes = new ArrayList<>(20);
         preMatchingAlwaysMatchesFilterRoutes = new ArrayList<>(10);
         preMatchingPreconditionFilterRoutes = new ArrayList<>(10);
+        List<RouteSet> routeSets = new ArrayList<>(builders.size() + assembled.size());
         for (RouteBuilder builder : builders) {
-            List<UriRoute> constructedRoutes = builder.getUriRoutes();
-            for (UriRoute route : constructedRoutes) {
+            routeSets.add(new RouteSet(builder.getUriRoutes(), builder.getStatusRoutes(), builder.getErrorRoutes(), builder.getFilterRoutes(),
+                // precompiled controller routes and declared routes, built when first used
+                builder instanceof DefaultRouteBuilder defaultBuilder ? defaultBuilder.lazyRouteInfos() : List.of(),
+                builder.getExposedPorts()));
+        }
+        for (AssembledRoutes routes : assembled) {
+            RouteAssembly assembly = routes.routes();
+            routeSets.add(new RouteSet(assembly.uriRoutes(), assembly.statusRoutes(), assembly.errorRoutes(), List.of(),
+                assembly.lazyRouteInfos(), assembly.exposedPorts()));
+        }
+        for (RouteSet routeSet : routeSets) {
+            for (UriRoute route : routeSet.uriRoutes()) {
                 HttpMethod httpMethod = route.getHttpMethod();
                 UriRouteInfo<Object, Object> uriRouteInfo = route.toRouteInfo();
                 if (httpMethod == HttpMethod.CUSTOM) {
@@ -130,7 +152,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
 
-            for (StatusRoute statusRoute : builder.getStatusRoutes()) {
+            for (StatusRoute statusRoute : routeSet.statusRoutes()) {
                 StatusRouteInfo<Object, Object> routeInfo = statusRoute.toRouteInfo();
                 if (statusRoutes.contains(routeInfo)) {
                     final StatusRouteInfo<Object, Object> existing = statusRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
@@ -138,7 +160,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
                 statusRoutes.add(routeInfo);
             }
-            for (ErrorRoute errorRoute : builder.getErrorRoutes()) {
+            for (ErrorRoute errorRoute : routeSet.errorRoutes()) {
                 ErrorRouteInfo<Object, Object> routeInfo = errorRoute.toRouteInfo();
                 if (errorRoutes.contains(routeInfo)) {
                     final ErrorRouteInfo<Object, Object> existing = errorRoutes.stream().filter(r -> r.equals(routeInfo)).findFirst().orElse(null);
@@ -146,7 +168,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
                 errorRoutes.add(routeInfo);
             }
-            for (FilterRoute filterRoute : builder.getFilterRoutes()) {
+            for (FilterRoute filterRoute : routeSet.filterRoutes()) {
                 if (filterRoute.isPreMatching()) {
                     if (isMatchesAll(filterRoute)) {
                         preMatchingAlwaysMatchesFilterRoutes.add(filterRoute);
@@ -159,19 +181,16 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     preconditionFilterRoutes.add(filterRoute);
                 }
             }
-            if (builder instanceof DefaultRouteBuilder defaultBuilder) {
-                // precompiled controller routes and declared handler routes, built when first used
-                for (LazyUriRouteInfo uriRouteInfo : defaultBuilder.lazyRouteInfos()) {
-                    addCompiled(compiled, uriRouteInfo);
-                    HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
-                    if (httpMethod == HttpMethod.CUSTOM) {
-                        customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
-                    } else {
-                        routesByMethod.computeIfAbsent(httpMethod, x -> new ArrayList<>()).add(uriRouteInfo);
-                    }
+            for (LazyUriRouteInfo uriRouteInfo : routeSet.lazyRoutes()) {
+                addCompiled(compiled, uriRouteInfo);
+                HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
+                if (httpMethod == HttpMethod.CUSTOM) {
+                    customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
+                } else {
+                    routesByMethod.computeIfAbsent(httpMethod, x -> new ArrayList<>()).add(uriRouteInfo);
                 }
             }
-            exposedPorts.addAll(builder.getExposedPorts());
+            exposedPorts.addAll(routeSet.exposedPorts());
         }
 
         if (CollectionUtils.isNotEmpty(exposedPorts)) {
@@ -1106,5 +1125,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         CompiledRoutes(CompiledRouteMatcher matcher, UriRouteInfo<Object, Object>[] byOrdinal, UriRouteInfo<Object, Object>[] headByOrdinal) {
             this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length]);
         }
+    }
+
+    /**
+     * The routes of a route builder, or assembled without one.
+     *
+     * @param uriRoutes    The URI routes
+     * @param statusRoutes The status routes
+     * @param errorRoutes  The error routes
+     * @param filterRoutes The filter routes
+     * @param lazyRoutes   The routes built when first used
+     * @param exposedPorts The exposed ports, read after the lazy routes: building one can expose a port
+     */
+    private record RouteSet(List<UriRoute> uriRoutes,
+                            List<StatusRoute> statusRoutes,
+                            List<ErrorRoute> errorRoutes,
+                            List<FilterRoute> filterRoutes,
+                            List<LazyUriRouteInfo> lazyRoutes,
+                            Set<Integer> exposedPorts) {
     }
 }

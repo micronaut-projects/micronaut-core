@@ -22,7 +22,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
-import io.micronaut.web.router.builder.DefaultHandlerRouteBuilder;
+import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -85,32 +85,14 @@ public final class RouteTableFactory {
      */
     public RouteTable build(Consumer<? super RouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
-        return newTable(routes::accept);
-    }
-
-    /**
-     * Build a route table of routes to handler functions, declared like the routes of an
-     * {@link HttpRoutes} bean.
-     *
-     * @param routes Declares the URI routes of the table. Status and error routes are not
-     *               supported: they belong to the application router
-     * @return The table
-     * @throws IllegalArgumentException if the routes declare anything but URI routes
-     */
-    public RouteTable buildHttpRoutes(HttpRoutes routes) {
-        Objects.requireNonNull(routes, "routes");
-        return newTable(builder -> routes.routes(new DefaultHandlerRouteBuilder(builder)));
-    }
-
-    private RouteTable newTable(Consumer<DefaultRouteBuilder> routes) {
         DefaultRouteBuilder builder = new DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy, conversionService) {
             @Override
             protected String routeUri(String uri) {
-                return underContextPath(contextPath, uri);
+                return RouteAssembly.underContextPath(contextPath, uri);
             }
 
             @Override
-            void routeCreated(DefaultUriRoute route) {
+            void routeCreated(RouteAssembly.DefaultUriRoute route) {
                 // like a controller method: the media types of the handler method apply, and calls
                 // on the route in the build callback can still change them
                 MediaType[] consumes = MediaType.of(route.targetMethod.stringValues(Consumes.class));
@@ -125,12 +107,37 @@ public final class RouteTableFactory {
         };
         routes.accept(builder);
         builder.addImplicitHeadRoutes();
-        if (!builder.getFilterRoutes().isEmpty() || !builder.getStatusRoutes().isEmpty() || !builder.getErrorRoutes().isEmpty()) {
+        if (!builder.getFilterRoutes().isEmpty()) {
             throw new IllegalArgumentException("A route table can only declare URI routes, not filter, status or error routes");
         }
-        if (!builder.getExposedPorts().isEmpty()) {
-            throw new IllegalArgumentException("A route table cannot expose ports: " + builder.getExposedPorts());
+        return table(builder.assembly, List.of(builder), List.of());
+    }
+
+    /**
+     * Build a route table of routes to handler functions, declared like the routes of an
+     * {@link HttpRoutes} bean.
+     *
+     * @param routes Declares the URI routes of the table. Status and error routes are not
+     *               supported: they belong to the application router
+     * @return The table
+     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     */
+    public RouteTable buildHttpRoutes(HttpRoutes routes) {
+        Objects.requireNonNull(routes, "routes");
+        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
+            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        assembly.addImplicitHeadRoutes();
+        return table(assembly, List.of(), List.of(() -> assembly));
+    }
+
+    private static RouteTable table(RouteAssembly assembly, List<RouteBuilder> builders, List<AssembledRoutes> assembled) {
+        if (!assembly.statusRoutes().isEmpty() || !assembly.errorRoutes().isEmpty()) {
+            throw new IllegalArgumentException("A route table can only declare URI routes, not filter, status or error routes");
         }
-        return new DefaultRouteTable(new DefaultRouter(List.of(builder)));
+        if (!assembly.exposedPorts().isEmpty()) {
+            throw new IllegalArgumentException("A route table cannot expose ports: " + assembly.exposedPorts());
+        }
+        return new DefaultRouteTable(new DefaultRouter(builders, assembled));
     }
 }

@@ -15,77 +15,36 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.BeanLocator;
 import io.micronaut.context.ExecutionHandleLocator;
-import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ExceptionUtils;
-import io.micronaut.core.util.ObjectUtils;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
-import io.micronaut.http.annotation.RouteCondition;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
-import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
-import io.micronaut.inject.MethodReference;
-import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
-import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
-import io.micronaut.scheduling.executor.ExecutorSelector;
-import io.micronaut.scheduling.executor.ThreadSelection;
-import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
-import io.micronaut.web.router.builder.AsyncFormRequestHandler;
-import io.micronaut.web.router.builder.AsyncRequestHandler;
-import io.micronaut.web.router.builder.AsyncRouteRequestFilter;
-import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
-import io.micronaut.web.router.builder.AsyncBodyRequestHandler;
-import io.micronaut.web.router.builder.BodyRequestHandler;
-import io.micronaut.web.router.builder.DeclaredUriRoute;
-import io.micronaut.web.router.builder.ErrorRouteHandler;
-import io.micronaut.web.router.builder.FormRequestHandler;
-import io.micronaut.web.router.builder.HandlerMethod;
-import io.micronaut.web.router.builder.HandlerUriRoute;
-import io.micronaut.web.router.builder.RequestHandler;
-import io.micronaut.web.router.builder.RouteDeclaration;
-import io.micronaut.web.router.builder.RouteRequestFilter;
-import io.micronaut.web.router.builder.RouteResponseFilter;
-import io.micronaut.web.router.builder.StatusRouteHandler;
-import io.micronaut.web.router.builder.StreamingFormRequestHandler;
+import io.micronaut.web.router.RouteAssembly.DefaultUriRoute;
 import io.micronaut.web.router.exceptions.RoutingException;
-import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.concurrent.Executor;
-import java.util.concurrent.ExecutorService;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 
@@ -105,24 +64,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
-    private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
 
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
-    private final @Nullable ExecutorSelector executorSelector;
 
-    private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
-
-    private @Nullable DefaultUriRoute currentParentRoute;
-    private final List<UriRoute> uriRoutes = new ArrayList<>();
-    private final List<StatusRoute> statusRoutes = new ArrayList<>();
-    private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final List<FilterRoute> filterRoutes = new ArrayList<>();
-    private final Set<Integer> exposedPorts = new HashSet<>(5);
-    private final List<DeclaredUriRoute> declaredRoutes = new ArrayList<>(0);
-    private final List<DeclaredUriRoute> implicitHeadDeclaredRoutes = new ArrayList<>(0);
+    /**
+     * The routes of this builder, assembled like the routes of every route builder.
+     */
+    final RouteAssembly assembly;
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -148,21 +100,13 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
-        if (executionHandleLocator instanceof ApplicationContext applicationContext) {
-            Environment environment = applicationContext.getEnvironment();
-            defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
-            this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
-            this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
-        } else {
-            defaultCharset = StandardCharsets.UTF_8;
-            this.executorSelector = null;
-            this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
-        }
+        this.assembly = new RouteAssembly(executionHandleLocator, conversionService, this::routeUri, this::routeCreated);
+        this.defaultCharset = assembly.defaultCharset;
     }
 
     @Override
     public Set<Integer> getExposedPorts() {
-        return exposedPorts;
+        return assembly.exposedPorts();
     }
 
     @Override
@@ -189,17 +133,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public List<StatusRoute> getStatusRoutes() {
-        return Collections.unmodifiableList(statusRoutes);
+        return assembly.statusRoutes();
     }
 
     @Override
     public List<ErrorRoute> getErrorRoutes() {
-        return Collections.unmodifiableList(errorRoutes);
+        return assembly.errorRoutes();
     }
 
     @Override
     public List<UriRoute> getUriRoutes() {
-        return Collections.unmodifiableList(uriRoutes);
+        return assembly.uriRoutes();
     }
 
     @Override
@@ -225,9 +169,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultStatusRoute statusRoute = new DefaultStatusRoute(originatingClass, status, executableHandle, conversionService);
-        this.statusRoutes.add(statusRoute);
-        return statusRoute;
+        return assembly.addStatusRoute(originatingClass, status, executableHandle);
     }
 
     @Override
@@ -238,9 +180,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, executableHandle, conversionService);
-        this.statusRoutes.add(statusRoute);
-        return statusRoute;
+        return assembly.addStatusRoute(null, status, executableHandle);
     }
 
     @Override
@@ -251,9 +191,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultErrorRoute errorRoute = new DefaultErrorRoute(originatingClass, error, executableHandle, conversionService);
-        this.errorRoutes.add(errorRoute);
-        return errorRoute;
+        return assembly.addErrorRoute(originatingClass, error, executableHandle);
     }
 
     @Override
@@ -264,9 +202,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             new RoutingException("No such route: " + type.getName() + "." + method)
         );
 
-        DefaultErrorRoute errorRoute = new DefaultErrorRoute(error, executableHandle, conversionService);
-        this.errorRoutes.add(errorRoute);
-        return errorRoute;
+        return assembly.addErrorRoute(null, error, executableHandle);
     }
 
     @Override
@@ -404,149 +340,14 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildBeanRoute(HttpMethod.TRACE, uri, beanDefinition, method);
     }
 
-    @Internal
-    public HandlerUriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
-    }
-
-    @Internal
-    public <B> HandlerUriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        // the body argument is annotated @Body
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
-    }
-
-    @Internal
-    public HandlerUriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(FORM_MEDIA_TYPES);
-    }
-
-    @Internal
-    public HandlerUriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(FORM_MEDIA_TYPES);
-    }
-
-    @Internal
-    public HandlerUriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(FORM_MEDIA_TYPES);
-    }
-
-    @Internal
-    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
-        DefaultErrorRoute errorRoute = new DefaultErrorRoute(type, handlerHandle(HandlerMethod.of(type, handler)), conversionService);
-        this.errorRoutes.add(errorRoute);
-        return errorRoute;
-    }
-
-    @Internal
-    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
-        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, handlerHandle(HandlerMethod.of(handler)), conversionService);
-        this.statusRoutes.add(statusRoute);
-        return statusRoute;
-    }
-
-    @Internal
-    public HandlerUriRoute handle(RouteDeclaration route, RequestHandler handler) {
-        return declare(route, HandlerMethod.of(handler), null);
-    }
-
-    @Internal
-    public <B> HandlerUriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return declare(route, HandlerMethod.of(bodyType, handler), null);
-    }
-
-    @Internal
-    public HandlerUriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
-        return declare(route, HandlerMethod.of(handler), null);
-    }
-
-    @Internal
-    public <B> HandlerUriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return declare(route, HandlerMethod.of(bodyType, handler), null);
-    }
-
-    @Internal
-    public <B> HandlerUriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        // the body argument is annotated @Body
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
-    }
-
-    @Internal
-    public HandlerUriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
-    }
-
-    @Internal
-    public HandlerUriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
-        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
-    }
-
-    @Internal
-    public HandlerUriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
-        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
-    }
-
     /**
-     * Bind a handler to a declared route: the route is built when the router first uses it.
-     *
-     * @param declaration The declared route
-     * @param method      The handler
-     * @param consumes    The media types the route consumes, or {@code null} for the default
-     * @return The route
-     */
-    private HandlerUriRoute declare(RouteDeclaration declaration, HandlerMethod<?> method, MediaType @Nullable [] consumes) {
-        HttpMethod httpMethod = declaration.httpMethod();
-        String uri = declaration.uriTemplate();
-        MethodExecutionHandle<Object, Object> handle = handlerHandle(method);
-        if (currentParentRoute != null || !routeUri(uri).equals(uri)) {
-            // nested, or under a context path: the keys of the declaration do not describe the route
-            HandlerUriRoute route = (HandlerUriRoute) buildRoute(httpMethod.name(), httpMethod, uri, handle);
-            return consumes == null ? route : (HandlerUriRoute) route.consumes(consumes);
-        }
-        DeclaredUriRoute route = new DeclaredUriRoute(
-            declaration,
-            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), handle, httpMethod.name(), conversionService),
-            exposedPorts::add
-        );
-        if (consumes != null) {
-            route.consumes(consumes);
-        }
-        declaredRoutes.add(route);
-        return route;
-    }
-
-    /**
-     * The routes that are built when the router first uses them: here, the handler functions
-     * bound to declared routes, and their implicit {@code HEAD} routes. Their configuration is
-     * fixed when this method is called.
+     * The routes that are built when the router first uses them. Their configuration is fixed
+     * when this method is called.
      *
      * @return The routes
      */
     List<LazyUriRouteInfo> lazyRouteInfos() {
-        if (declaredRoutes.isEmpty()) {
-            return List.of();
-        }
-        List<LazyUriRouteInfo> infos = new ArrayList<>(declaredRoutes.size() + implicitHeadDeclaredRoutes.size());
-        for (DeclaredUriRoute route : declaredRoutes) {
-            route.fix();
-            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false, route::toRouteInfo));
-        }
-        for (DeclaredUriRoute route : implicitHeadDeclaredRoutes) {
-            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true, route::implicitHeadRouteInfo));
-        }
-        return infos;
-    }
-
-    @Internal
-    public HandlerUriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
-    }
-
-    @SuppressWarnings("unchecked")
-    private static MethodExecutionHandle<Object, Object> handlerHandle(HandlerMethod<?> method) {
-        return (MethodExecutionHandle<Object, Object>) method;
+        return assembly.lazyRouteInfos();
     }
 
     /**
@@ -604,24 +405,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     private UriRoute buildRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
-        DefaultUriRoute route;
-        if (currentParentRoute != null) {
-            route = new DefaultUriRoute(
-                httpMethod,
-                currentParentRoute.uriMatchTemplate.nest(uri),
-                mediaTypes,
-                executableHandle,
-                httpMethodName,
-                conversionService
-            );
-            currentParentRoute.nestedRoutes.add(route);
-        } else {
-            route = new DefaultUriRoute(httpMethod, routeUri(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
-        }
-
-        this.uriRoutes.add(route);
-        routeCreated(route);
-        return route;
+        return assembly.addRoute(httpMethodName, httpMethod, uri, mediaTypes, executableHandle);
     }
 
     /**
@@ -633,22 +417,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Internal
     protected String routeUri(String uri) {
         return uri;
-    }
-
-    /**
-     * A URI template under a context path.
-     *
-     * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
-     * @param uri         The URI template
-     * @return The template under the context path
-     */
-    @Internal
-    protected static String underContextPath(@Nullable String contextPath, String uri) {
-        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
-            return uri;
-        }
-        String prefix = contextPath.charAt(0) == '/' ? contextPath : '/' + contextPath;
-        return UriTemplate.of(prefix).nest(uri).toString();
     }
 
     /**
@@ -666,39 +434,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      */
     @Internal
     protected void addImplicitHeadRoutes() {
-        List<DefaultUriRoute> getRoutes = new ArrayList<>();
-        Set<UriMatchTemplate> headTemplates = new HashSet<>();
-        for (UriRoute route : uriRoutes) {
-            if (route instanceof DefaultUriRoute defaultUriRoute) {
-                if (defaultUriRoute.httpMethod == HttpMethod.GET) {
-                    getRoutes.add(defaultUriRoute);
-                } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
-                    headTemplates.add(defaultUriRoute.uriMatchTemplate);
-                }
-            }
-        }
-        for (DefaultUriRoute getRoute : getRoutes) {
-            if (!headTemplates.contains(getRoute.uriMatchTemplate)
-                && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
-                uriRoutes.add(getRoute.implicitHeadCopy());
-            }
-        }
-        // declared routes, compared by their templates without building them
-        Set<String> declaredHeads = new HashSet<>();
-        for (UriMatchTemplate template : headTemplates) {
-            declaredHeads.add(template.toString());
-        }
-        for (DeclaredUriRoute route : declaredRoutes) {
-            if (route.declaration().httpMethod() == HttpMethod.HEAD) {
-                declaredHeads.add(route.declaration().uriTemplate());
-            }
-        }
-        for (DeclaredUriRoute route : declaredRoutes) {
-            if (route.declaration().httpMethod() == HttpMethod.GET && !declaredHeads.contains(route.declaration().uriTemplate())
-                && !implicitHeadDeclaredRoutes.contains(route)) {
-                implicitHeadDeclaredRoutes.add(route);
-            }
-        }
+        assembly.addImplicitHeadRoutes();
     }
 
     private UriRoute buildBeanRoute(HttpMethod httpMethod, String uri, BeanDefinition<?> beanDefinition, ExecutableMethod<?, ?> method) {
@@ -718,725 +454,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         MethodExecutionHandle<Object, Object> executionHandle = (MethodExecutionHandle<Object, Object>) executionHandleLocator
                                                                 .createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         return buildRoute(httpMethodName, httpMethod, uri, executionHandle);
-    }
-
-    /**
-     * Abstract class for base {@link MethodBasedRouteInfo}.
-     */
-    abstract static class AbstractRoute implements Route {
-        protected final List<Predicate<HttpRequest<?>>> conditions = new ArrayList<>();
-        protected final MethodExecutionHandle<Object, Object> targetMethod;
-        protected final ConversionService conversionService;
-        protected List<MediaType> consumesMediaTypes;
-        protected List<MediaType> producesMediaTypes = List.of();
-        protected @Nullable String bodyArgumentName;
-        protected @Nullable Argument<?> bodyArgument;
-
-        /**
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         * @param mediaTypes The media types
-         */
-        AbstractRoute(MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService, List<MediaType> mediaTypes) {
-            this.targetMethod = targetMethod;
-            this.conversionService = conversionService;
-            this.consumesMediaTypes = mediaTypes;
-            for (Argument<?> argument : targetMethod.getArguments()) {
-                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)) {
-                    this.bodyArgument = argument;
-                }
-            }
-        }
-
-        @Override
-        public Route consumes(MediaType... mediaTypes) {
-            if (mediaTypes != null) {
-                this.consumesMediaTypes = List.of(mediaTypes);
-            }
-            return this;
-        }
-
-        @Override
-        public List<MediaType> getConsumes() {
-            return consumesMediaTypes;
-        }
-
-        @Override
-        public Route consumesAll() {
-            this.consumesMediaTypes = Collections.emptyList();
-            return this;
-        }
-
-        @Override
-        public Route where(Predicate<HttpRequest<?>> condition) {
-            if (condition != null) {
-                conditions.add(condition);
-            }
-            return this;
-        }
-
-        @Override
-        public Route body(String argument) {
-            this.bodyArgumentName = argument;
-            return this;
-        }
-
-        @Override
-        public Route body(Argument<?> argument) {
-            this.bodyArgument = argument;
-            return this;
-        }
-
-        @Override
-        public Route produces(MediaType... mediaType) {
-            if (mediaType != null) {
-                this.producesMediaTypes = List.of(mediaType);
-            }
-            return this;
-        }
-
-        @Override
-        public List<MediaType> getProduces() {
-            return producesMediaTypes;
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof AbstractRoute that)) {
-                return false;
-            }
-            return Objects.equals(consumesMediaTypes, that.consumesMediaTypes) &&
-                    Objects.equals(producesMediaTypes, that.producesMediaTypes);
-        }
-
-        @Override
-        public int hashCode() {
-            return ObjectUtils.hash(consumesMediaTypes, producesMediaTypes);
-        }
-    }
-
-    /**
-     * Default Error Route.
-     */
-    final class DefaultErrorRoute extends AbstractRoute implements ErrorRoute {
-
-        private final Class<? extends Throwable> error;
-        private final @Nullable Class<?> originatingClass;
-
-         /**
-          * @param error The throwable
-
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        public DefaultErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
-            this(null, error, targetMethod, conversionService);
-        }
-
-        /**
-         * @param originatingClass The originating class
-         * @param error The throwable
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        public DefaultErrorRoute(@Nullable Class<?> originatingClass,
-                                 Class<? extends Throwable> error,
-                                 MethodExecutionHandle<Object, Object> targetMethod,
-                                 ConversionService conversionService) {
-            super(targetMethod, conversionService, Collections.emptyList());
-            this.originatingClass = originatingClass;
-            this.error = error;
-        }
-
-        @Override
-        public ErrorRouteInfo<Object, Object> toRouteInfo() {
-            return new DefaultErrorRouteInfo<>(
-                    originatingClass,
-                    error,
-                    targetMethod,
-                    bodyArgumentName,
-                    bodyArgument,
-                    consumesMediaTypes,
-                    producesMediaTypes,
-                    conditions,
-                    conversionService,
-                    messageBodyHandlerRegistry);
-        }
-
-        @Override
-        @Nullable
-        public Class<?> originatingType() {
-            return originatingClass;
-        }
-
-        @Override
-        public Class<? extends Throwable> exceptionType() {
-            return error;
-        }
-
-        @Override
-        public ErrorRoute consumes(MediaType... mediaType) {
-            return (ErrorRoute) super.consumes(mediaType);
-        }
-
-        @Override
-        public ErrorRoute produces(MediaType... mediaType) {
-            return (ErrorRoute) super.produces(mediaType);
-        }
-
-        @Override
-        public Route consumesAll() {
-            super.consumesAll();
-            return this;
-        }
-
-        @Override
-        public ErrorRoute nest(Runnable nested) {
-            return this;
-        }
-
-        @Override
-        public ErrorRoute where(Predicate<HttpRequest<?>> condition) {
-            return (ErrorRoute) super.where(condition);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (o == null || getClass() != o.getClass()) {
-                return false;
-            }
-            if (!super.equals(o)) {
-                return false;
-            }
-            DefaultErrorRoute that = (DefaultErrorRoute) o;
-            return error.equals(that.error) &&
-                    Objects.equals(originatingClass, that.originatingClass);
-        }
-
-        @Override
-        public int hashCode() {
-            return ObjectUtils.hash(super.hashCode(), error, originatingClass);
-        }
-
-        @Override
-        public String toString() {
-            return ' ' + error.getSimpleName()
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod;
-        }
-    }
-
-    /**
-     * Represents a route for an {@link io.micronaut.http.HttpStatus} code.
-     */
-    final class DefaultStatusRoute extends AbstractRoute implements StatusRoute {
-
-        private final int statusCode;
-        @Nullable
-        private final Class<?> originatingClass;
-
-        /**
-         * @param status The HTTP Status
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        public DefaultStatusRoute(HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
-            this(null, status, targetMethod, conversionService);
-        }
-
-        /**
-         * @param originatingClass The originating class
-         * @param status The HTTP Status
-         * @param targetMethod The target method execution handle
-         * @param conversionService The conversion service
-         */
-        public DefaultStatusRoute(@Nullable Class<?> originatingClass, HttpStatus status, MethodExecutionHandle<Object, Object> targetMethod, ConversionService conversionService) {
-            super(targetMethod, conversionService, Collections.emptyList());
-            this.originatingClass = originatingClass;
-            this.statusCode = status.getCode();
-        }
-
-        @Override
-        public StatusRouteInfo<Object, Object> toRouteInfo() {
-            return new DefaultStatusRouteInfo<>(
-                    originatingClass,
-                    statusCode,
-                    targetMethod,
-                    bodyArgumentName,
-                    bodyArgument,
-                    consumesMediaTypes,
-                    producesMediaTypes,
-                    conditions,
-                    conversionService,
-                    messageBodyHandlerRegistry
-            );
-        }
-
-        @Override
-        @Nullable
-        public Class<?> originatingType() {
-            return originatingClass;
-        }
-
-        @Override
-        public HttpStatus status() {
-            return HttpStatus.valueOf(statusCode);
-        }
-
-        @Override
-        public int statusCode() {
-            return statusCode;
-        }
-
-        @Override
-        public StatusRoute consumes(MediaType... mediaType) {
-            return this;
-        }
-
-        @Override
-        public Route consumesAll() {
-            return this;
-        }
-
-        @Override
-        public StatusRoute nest(Runnable nested) {
-            return this;
-        }
-
-        @Override
-        public StatusRoute where(Predicate<HttpRequest<?>> condition) {
-            return (StatusRoute) super.where(condition);
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) {
-                return true;
-            }
-            if (!(o instanceof DefaultStatusRoute that)) {
-                return false;
-            }
-            if (!super.equals(o)) {
-                return false;
-            }
-            return statusCode == that.statusCode &&
-                    Objects.equals(originatingClass, that.originatingClass);
-        }
-
-        @Override
-        public int hashCode() {
-            return ObjectUtils.hash(super.hashCode(), statusCode, originatingClass);
-        }
-    }
-
-    /**
-     * The default route impl.
-     */
-    @Internal
-    public final class DefaultUriRoute extends AbstractRoute implements HandlerUriRoute {
-        final String httpMethodName;
-        final HttpMethod httpMethod;
-        final UriMatchTemplate uriMatchTemplate;
-        final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
-        private @Nullable Integer port;
-        private @Nullable String executeOn;
-        private boolean nonBlocking;
-        private final List<GenericHttpFilter> requestFilters = new ArrayList<>(0);
-        private final List<GenericHttpFilter> responseFilters = new ArrayList<>(0);
-        private boolean implicitHead;
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param targetMethod The target method execution handle
-         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        String httpMethodName,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, MediaType.APPLICATION_JSON_TYPE, targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param mediaType The Media type
-         * @param targetMethod The target method execution handle
-         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
-                        MediaType mediaType,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        String httpMethodName,
-                        ConversionService conversionService) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), Collections.singletonList(mediaType), targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link CharSequence}
-         * @param mediaTypes The Media types
-         * @param targetMethod The target method execution handle
-         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        CharSequence uriTemplate,
-                        List<MediaType> mediaTypes,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        String httpMethodName,
-                        ConversionService conversionService) {
-            this(httpMethod, new UriMatchTemplate(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param targetMethod The target method execution handle
-         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        String httpMethodName,
-                        ConversionService conversionService) {
-            this(httpMethod, uriTemplate, Collections.singletonList(MediaType.APPLICATION_JSON_TYPE), targetMethod, httpMethodName, conversionService);
-        }
-
-        /**
-         * @param httpMethod The HTTP method
-         * @param uriTemplate The URI Template as a {@link UriMatchTemplate}
-         * @param mediaTypes The media types
-         * @param targetMethod The target method execution handle
-         * @param httpMethodName The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-         * @param conversionService The conversion service
-         */
-        DefaultUriRoute(HttpMethod httpMethod,
-                        UriMatchTemplate uriTemplate,
-                        List<MediaType> mediaTypes,
-                        MethodExecutionHandle<Object, Object> targetMethod,
-                        String httpMethodName,
-                        ConversionService conversionService) {
-            super(targetMethod, conversionService, mediaTypes);
-            this.httpMethod = httpMethod;
-            this.uriMatchTemplate = uriTemplate;
-            this.httpMethodName = httpMethodName;
-            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
-                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
-                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
-                    where(request -> annotation.booleanValue().orElse(false));
-                }
-            }
-        }
-
-        @Override
-        public UriRouteInfo<Object, Object> toRouteInfo() {
-            DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
-                httpMethod,
-                httpMethodName,
-                uriMatchTemplate,
-                defaultCharset,
-                targetMethod,
-                bodyArgumentName,
-                bodyArgument,
-                consumesMediaTypes,
-                producesMediaTypes,
-                // a copy: the route info must not change with the route it was built from
-                List.copyOf(conditions),
-                port,
-                conversionService,
-                // the executor choice as it is now: a later change to the route does not change the route info
-                new RouteExecutorSelector(executeOn, nonBlocking),
-                messageBodyHandlerRegistry,
-                implicitHead
-            );
-            routeInfo.routeFilters = routeFilters();
-            return routeInfo;
-        }
-
-        /**
-         * A {@code HEAD} copy of this finished route, marked as implicit.
-         *
-         * @return The copy
-         */
-        @Internal
-        public DefaultUriRoute implicitHeadCopy() {
-            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, uriMatchTemplate, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
-            head.conditions.clear();
-            head.conditions.addAll(conditions);
-            head.producesMediaTypes = producesMediaTypes;
-            head.bodyArgumentName = bodyArgumentName;
-            head.bodyArgument = bodyArgument;
-            head.port = port;
-            head.executeOn = executeOn;
-            head.nonBlocking = nonBlocking;
-            head.requestFilters.addAll(requestFilters);
-            head.responseFilters.addAll(responseFilters);
-            head.implicitHead = true;
-            return head;
-        }
-
-        /**
-         * Marks this route as an implicit {@code HEAD} route derived from a {@code @Get} mapping.
-         *
-         * @see UriRouteInfo#isImplicitHead()
-         */
-        void markImplicitHead() {
-            this.implicitHead = true;
-        }
-
-        @Override
-        public String getHttpMethodName() {
-            return httpMethodName;
-        }
-
-        @Override
-        public String toString() {
-            return getHttpMethodName() + ' '
-                    + uriMatchTemplate
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod.getName()
-                    + " (" + String.join(",", consumesMediaTypes) + ')';
-        }
-
-        @Override
-        public HttpMethod getHttpMethod() {
-            return httpMethod;
-        }
-
-        @Override
-        public UriRoute body(String argument) {
-            return (UriRoute) super.body(argument);
-        }
-
-        @Override
-        public HandlerUriRoute executeOn(String executorName) {
-            this.executeOn = Objects.requireNonNull(executorName, "executorName");
-            this.nonBlocking = false;
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute before(RouteRequestFilter filter) {
-            return addRequestFilter(filter, null);
-        }
-
-        @Override
-        public HandlerUriRoute before(String executorName, RouteRequestFilter filter) {
-            return addRequestFilter(filter, executor(executorName));
-        }
-
-        @Override
-        public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
-            Objects.requireNonNull(filter, "filter");
-            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute after(RouteResponseFilter filter) {
-            return addResponseFilter(filter, null);
-        }
-
-        @Override
-        public HandlerUriRoute after(String executorName, RouteResponseFilter filter) {
-            return addResponseFilter(filter, executor(executorName));
-        }
-
-        @Override
-        public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
-            Objects.requireNonNull(filter, "filter");
-            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
-            return this;
-        }
-
-        private HandlerUriRoute addRequestFilter(RouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
-            Objects.requireNonNull(filter, "filter");
-            requestFilters.add(GenericHttpFilter.createRouteRequestFilter(request -> {
-                try {
-                    return filter.filter(request);
-                } catch (Exception e) {
-                    return ExceptionUtils.sneakyThrow(e);
-                }
-            }, executor));
-            return this;
-        }
-
-        private HandlerUriRoute addResponseFilter(RouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
-            Objects.requireNonNull(filter, "filter");
-            responseFilters.add(GenericHttpFilter.createRouteResponseFilter((request, response) -> {
-                try {
-                    filter.filter(request, response);
-                } catch (Exception e) {
-                    ExceptionUtils.sneakyThrow(e);
-                }
-            }, executor));
-            return this;
-        }
-
-        /**
-         * The named executor, looked up when a filter first runs on it.
-         *
-         * @param executorName The name of the executor
-         * @return The executor
-         */
-        private Supplier<Executor> executor(String executorName) {
-            Objects.requireNonNull(executorName, "executorName");
-            return SupplierUtil.memoized(() -> {
-                ExecutorSelector selector = DefaultRouteBuilder.this.executorSelector;
-                if (selector == null) {
-                    throw new IllegalStateException("No executor selector to find executor: " + executorName);
-                }
-                return selector.select(executorName).orElseThrow(() -> new SchedulerConfigurationException(
-                    targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
-            });
-        }
-
-        /**
-         * @return The filters of the route in the order the filter chain runs them: the request
-         * filters as declared, then the response filters in reverse, as response filters run from
-         * the last to the first
-         */
-        List<GenericHttpFilter> routeFilters() {
-            if (requestFilters.isEmpty() && responseFilters.isEmpty()) {
-                return List.of();
-            }
-            List<GenericHttpFilter> filters = new ArrayList<>(requestFilters.size() + responseFilters.size());
-            // response filters first: the chain runs them on the way back from wherever the response
-            // was produced, the route or a request filter that answered instead of it, in the order
-            // they were declared
-            filters.addAll(responseFilters.reversed());
-            filters.addAll(requestFilters);
-            return List.copyOf(filters);
-        }
-
-        @Override
-        public HandlerUriRoute nonBlocking() {
-            this.nonBlocking = true;
-            this.executeOn = null;
-            return this;
-        }
-
-        @Override
-        public UriRoute exposedPort(int port) {
-            this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
-            DefaultRouteBuilder.this.exposedPorts.add(port);
-            return this;
-        }
-
-        @Override
-        public @Nullable Integer getPort() {
-            return port;
-        }
-
-        @Override
-        public UriRoute consumes(MediaType... mediaTypes) {
-            return (UriRoute) super.consumes(mediaTypes);
-        }
-
-        @Override
-        public UriRoute produces(MediaType... mediaType) {
-            return (UriRoute) super.produces(mediaType);
-        }
-
-        @Override
-        public UriRoute consumesAll() {
-            return (UriRoute) super.consumesAll();
-        }
-
-        @Override
-        public UriRoute nest(Runnable nested) {
-            DefaultUriRoute previous = DefaultRouteBuilder.this.currentParentRoute;
-            DefaultRouteBuilder.this.currentParentRoute = this;
-            try {
-                nested.run();
-            } finally {
-                DefaultRouteBuilder.this.currentParentRoute = previous;
-            }
-            return this;
-        }
-
-        @Override
-        public UriRoute where(Predicate<HttpRequest<?>> condition) {
-            return (UriRoute) super.where(condition);
-        }
-
-        @Override
-        public UriMatchTemplate getUriMatchTemplate() {
-            return this.uriMatchTemplate;
-        }
-
-        @Override
-        public int compareTo(UriRoute o) {
-            return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
-        }
-
-        /**
-         * Selects the executor of a route info, with the choice of the route when the route info
-         * was built.
-         */
-        private final class RouteExecutorSelector implements ExecutorSelector {
-            private final @Nullable String executorName;
-            private final boolean eventLoop;
-
-            RouteExecutorSelector(@Nullable String executorName, boolean eventLoop) {
-                this.executorName = executorName;
-                this.eventLoop = eventLoop;
-            }
-
-            @Override
-            public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
-                // like @ExecuteOn and @NonBlocking on the method
-                String name = executorName;
-                if (name != null) {
-                    return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
-                        targetMethod.getExecutableMethod(), "No executor configured for name: " + name)));
-                }
-                if (eventLoop && threadSelection == ThreadSelection.AUTO) {
-                    return Optional.empty();
-                }
-                if (DefaultRouteBuilder.this.executorSelector != null) {
-                    return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Optional<ExecutorService> select(String name) {
-                if (DefaultRouteBuilder.this.executorSelector != null) {
-                    return DefaultRouteBuilder.this.executorSelector.select(name);
-                } else {
-                    return Optional.empty();
-                }
-            }
-
-            @Override
-            public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
-                if (executorName != null || eventLoop) {
-                    // selects with the route's choice, see select(MethodReference, ThreadSelection)
-                    return ExecutorSelector.super.selectExecutor(method, configuration);
-                }
-                if (DefaultRouteBuilder.this.executorSelector != null) {
-                    return DefaultRouteBuilder.this.executorSelector.selectExecutor(method, configuration);
-                } else {
-                    return ImmediateExecutor.INSTANCE;
-                }
-            }
-        }
     }
 
     /**
@@ -1544,12 +561,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public ResourceRoute nest(Runnable nested) {
-            DefaultUriRoute previous = DefaultRouteBuilder.this.currentParentRoute;
-            DefaultRouteBuilder.this.currentParentRoute = getRoute;
+            DefaultUriRoute previous = assembly.currentParentRoute;
+            assembly.currentParentRoute = getRoute;
             try {
                 nested.run();
             } finally {
-                DefaultRouteBuilder.this.currentParentRoute = previous;
+                assembly.currentParentRoute = previous;
             }
             return this;
         }
@@ -1650,7 +667,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             var newMap = new LinkedHashMap<HttpMethod, Route>();
             this.resourceRoutes.forEach((key, value) -> {
                 if (excluded.contains(key)) {
-                    DefaultRouteBuilder.this.uriRoutes.remove(value);
+                    assembly.uriRoutes.remove(value);
                 } else {
                     newMap.put(key, value);
                 }
