@@ -84,8 +84,10 @@ final class RouteSourceRouter implements Router {
             if (table == null) {
                 throw new IllegalStateException("Route source " + source + " returned no route table");
             }
-            if (!table.isEmpty()) {
-                tables.add(table.router(ports));
+            // sealed: the RouteTableFactory builds every table
+            DefaultRouteTable defaultTable = (DefaultRouteTable) table;
+            if (!defaultTable.isEmpty()) {
+                tables.add(defaultTable.router(ports));
             }
         }
         if (request != null) {
