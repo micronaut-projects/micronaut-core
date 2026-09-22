@@ -34,6 +34,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
@@ -182,7 +183,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
             new Class<?>[]{HttpRequest.class, PathVariables.class, FormParts.class},
             new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM_PARTS},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormParts) args[2])
+            args -> closeWhenDone((FormParts) args[2], () -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormParts) args[2]))
         );
     }
 
@@ -283,6 +284,25 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     @Override
     public String toString() {
         return handlerType.getSimpleName() + " " + handler;
+    }
+
+    /**
+     * Close the form parts when the handler completes, throwing out what it did not read.
+     *
+     * @param parts   The form parts
+     * @param handler Calls the handler
+     * @return The stage of the handler
+     * @throws Exception If the handler fails
+     */
+    private static CompletionStage<? extends HttpResponse<?>> closeWhenDone(FormParts parts, Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
+        CompletionStage<? extends HttpResponse<?>> stage;
+        try {
+            stage = handler.call();
+        } catch (Exception e) {
+            parts.close();
+            throw e;
+        }
+        return stage.whenComplete((response, error) -> parts.close());
     }
 
     /**
