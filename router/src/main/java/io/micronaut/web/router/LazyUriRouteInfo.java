@@ -184,6 +184,13 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     }
 
     /**
+     * @return The identifier of the engine of the declared template, without building the route
+     */
+    String engineId() {
+        return template.engineId();
+    }
+
+    /**
      * @return The name of the HTTP method the router registers the route under, which is the custom name for a custom method
      */
     String methodKey() {
