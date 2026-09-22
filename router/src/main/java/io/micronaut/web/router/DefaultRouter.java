@@ -270,6 +270,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
         }
         if (uriRoutes.size() > 1) {
+            uriRoutes = preferDefaultProducedType(request, uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(path, (List) uriRoutes);
         } else if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);
@@ -354,6 +357,39 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             uriRoutes = closestMatches;
         }
         return uriRoutes;
+    }
+
+    /**
+     * When routes are still tied and the request expresses no media type preference (no Accept header,
+     * or only {@code *}{@code /*}), prefer the only route producing the default response type (JSON).
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> preferDefaultProducedType(HttpRequest<?> request,
+                                                                              List<UriRouteMatch<T, R>> uriRoutes) {
+        if (!acceptsAnyType(request.accept())) {
+            return uriRoutes;
+        }
+        UriRouteMatch<T, R> jsonRoute = null;
+        for (UriRouteMatch<T, R> match : uriRoutes) {
+            if (match.getRouteInfo().getProduces().contains(MediaType.APPLICATION_JSON_TYPE)) {
+                if (jsonRoute != null) {
+                    return uriRoutes;
+                }
+                jsonRoute = match;
+            }
+        }
+        return jsonRoute != null ? List.of(jsonRoute) : uriRoutes;
+    }
+
+    private static boolean acceptsAnyType(@Nullable Collection<MediaType> acceptedTypes) {
+        if (CollectionUtils.isEmpty(acceptedTypes)) {
+            return true;
+        }
+        for (MediaType acceptedType : acceptedTypes) {
+            if (!acceptedType.equals(MediaType.ALL_TYPE)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
