@@ -54,6 +54,7 @@ import io.micronaut.web.router.builder.AsyncFormRequestHandler;
 import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.AsyncRouteRequestFilter;
 import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
+import io.micronaut.web.router.builder.AsyncBodyRequestHandler;
 import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.ErrorRouteHandler;
@@ -459,6 +460,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Internal
     public HandlerUriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
+    }
+
+    @Internal
+    public <B> HandlerUriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return declare(route, HandlerMethod.of(bodyType, handler), null);
+    }
+
+    @Internal
+    public <B> HandlerUriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        // the body argument is annotated @Body
+        return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
     }
 
     @Internal

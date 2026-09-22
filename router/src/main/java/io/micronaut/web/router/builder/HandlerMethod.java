@@ -110,6 +110,24 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * @param bodyType The body type, which the handler binds like a {@code @Body} argument
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The method that calls it
+     */
+    @SuppressWarnings("unchecked")
+    public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return new HandlerMethod<>(
+            handler,
+            AsyncBodyRequestHandler.class,
+            new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, BODY, bodyType.getTypeParameters())},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
+        );
+    }
+
+    /**
      * @param handler The handler
      * @return The method that calls it
      */
