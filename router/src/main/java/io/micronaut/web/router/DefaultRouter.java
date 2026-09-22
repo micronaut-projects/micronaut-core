@@ -29,6 +29,7 @@ import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -41,6 +42,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -68,6 +70,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * The index of the routes of each method, by method name, see {@link #allRoutesByMethod}.
      */
     private final Map<String, RouteIndex> indexesByMethod;
+    /**
+     * The routes of generated URL parsers, by the ordinal of their declarations.
+     */
+    private final CompiledRoutes[] compiledRoutes;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
@@ -98,6 +104,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
         Set<Integer> exposedPorts = new HashSet<>(5);
+        Map<CompiledRouteMatcher, CompiledRoutes> compiled = new IdentityHashMap<>(2);
         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
         HttpMethod[] httpMethods = HttpMethod.values();
         Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newEnumMap(httpMethods);
@@ -152,6 +159,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (builder instanceof DefaultRouteBuilder defaultBuilder) {
                 // precompiled controller routes and declared handler routes, built when first used
                 for (LazyUriRouteInfo uriRouteInfo : defaultBuilder.lazyRouteInfos()) {
+                    addCompiled(compiled, uriRouteInfo);
                     HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
                     if (httpMethod == HttpMethod.CUSTOM) {
                         customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
@@ -185,6 +193,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             indexes.put(e.getKey(), indexRoutes(e.getValue()));
         }
         this.indexesByMethod = indexes;
+        this.compiledRoutes = compiled.values().toArray(CompiledRoutes[]::new);
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
@@ -263,6 +272,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
+        if (compiledRoutes.length != 0) {
+            UriRouteMatch<T, R> compiledMatch = findCompiled(request);
+            if (compiledMatch != null) {
+                return compiledMatch;
+            }
+        }
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return null;
@@ -300,6 +315,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        if (compiledRoutes.length != 0) {
+            UriRouteMatch<T, R> compiledMatch = findCompiled(request);
+            if (compiledMatch != null) {
+                return List.of(compiledMatch);
+            }
+        }
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return Collections.emptyList();
@@ -725,6 +746,80 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return matchedRoutes;
     }
 
+    /**
+     * Match the request with the generated URL parsers: the answered ordinal selects the bound
+     * route directly, and the match is built from the captured path variables.
+     *
+     * @param request The request
+     * @return The match, or {@code null} if no parser answers a bound route the request is acceptable for
+     */
+    @SuppressWarnings("unchecked")
+    private <T, R> @Nullable UriRouteMatch<T, R> findCompiled(HttpRequest<?> request) {
+        HttpMethod method = request.getMethod();
+        if (method == HttpMethod.CUSTOM) {
+            return null;
+        }
+        String path = UriTemplateMatcher.normalizeForMatching(request.getPath());
+        for (CompiledRoutes compiled : compiledRoutes) {
+            String[] captured = new String[compiled.matcher.maxVariables()];
+            UriRouteInfo<Object, Object> route = null;
+            int ordinal = compiled.matcher.match(method, path, captured);
+            if (ordinal >= 0 && ordinal < compiled.byOrdinal.length) {
+                route = compiled.byOrdinal[ordinal];
+            } else if (method == HttpMethod.HEAD) {
+                // the implicit HEAD route of a GET route
+                ordinal = compiled.matcher.match(HttpMethod.GET, path, captured);
+                if (ordinal >= 0 && ordinal < compiled.headByOrdinal.length) {
+                    route = compiled.headByOrdinal[ordinal];
+                }
+            }
+            if (route == null || !isAcceptable(request, route)) {
+                continue;
+            }
+            UriRouteInfo<Object, Object> built = route instanceof LazyUriRouteInfo lazy ? lazy.delegate() : route;
+            if (built instanceof DefaultUrlRouteInfo<?, ?> defaultRoute) {
+                return (UriRouteMatch<T, R>) defaultRoute.capturedMatch(request.getPath(), captured);
+            }
+            return (UriRouteMatch<T, R>) built.tryMatch(request.getPath());
+        }
+        return null;
+    }
+
+    /**
+     * The same checks as {@link #findInternal(HttpRequest)} for one route.
+     */
+    private boolean isAcceptable(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
+        if (shouldSkipForPort(request, route)) {
+            return false;
+        }
+        if (request.getMethod().permitsRequestBody()) {
+            if (!route.isPermitsRequestBody()) {
+                return false;
+            }
+            if (!route.consumesAll() && !route.doesConsume(request.getContentType().orElse(null))) {
+                return false;
+            }
+        }
+        if (!route.producesAll() && !route.doesProduce(request.accept())) {
+            return false;
+        }
+        return route.matching(request);
+    }
+
+    private static void addCompiled(Map<CompiledRouteMatcher, CompiledRoutes> compiled, LazyUriRouteInfo route) {
+        RouteDeclaration declaration = route.declaration();
+        if (declaration == null || !(declaration instanceof Enum<?> constant)) {
+            return;
+        }
+        CompiledRouteMatcher matcher = declaration.matcher();
+        if (matcher == null) {
+            return;
+        }
+        int size = constant.getDeclaringClass().getEnumConstants().length;
+        CompiledRoutes routes = compiled.computeIfAbsent(matcher, m -> new CompiledRoutes(m, new UriRouteInfo[size], new UriRouteInfo[size]));
+        (route.isImplicitHead() ? routes.headByOrdinal : routes.byOrdinal)[constant.ordinal()] = route;
+    }
+
     private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
         HttpMethod httpMethod = request.getMethod();
         boolean permitsBody = httpMethod.permitsRequestBody();
@@ -884,5 +979,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return true;
         }
         return context.getRouteInfo().getAnnotationMetadata().hasStereotype(matchingAnnotation);
+    }
+
+    /**
+     * The routes bound to the declarations of a generated URL parser.
+     *
+     * @param matcher       The parser
+     * @param byOrdinal     The bound routes, by the ordinal of their declarations
+     * @param headByOrdinal The implicit {@code HEAD} routes of the bound {@code GET} routes, by ordinal
+     */
+    private record CompiledRoutes(CompiledRouteMatcher matcher,
+                                  UriRouteInfo<Object, Object>[] byOrdinal,
+                                  UriRouteInfo<Object, Object>[] headByOrdinal) {
     }
 }

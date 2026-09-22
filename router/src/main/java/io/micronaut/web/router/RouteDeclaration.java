@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The declaration of a route: its HTTP method and URI template, with the keys the router indexes
@@ -74,6 +75,17 @@ public interface RouteDeclaration {
      * {@link UriTemplateMatcher#getPathVariableCount()}
      */
     int pathVariableCount();
+
+    /**
+     * The URL parser generated for the enum this declaration is a constant of, if any. The router
+     * asks it before its own matching; the ordinal it answers selects the route bound to the
+     * constant with that ordinal.
+     *
+     * @return The matcher, or {@code null}
+     */
+    default @Nullable CompiledRouteMatcher matcher() {
+        return null;
+    }
 
     /**
      * Declare a route in code: the keys are computed from the template.

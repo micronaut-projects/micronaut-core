@@ -2,6 +2,7 @@ package io.micronaut.web.router.proof
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.context.ApplicationContext
+import io.micronaut.http.HttpMethod
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MediaType
@@ -11,6 +12,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.CompiledRouteMatcher
 import io.micronaut.web.router.RouteDeclaration
 import io.micronaut.web.router.Router
 
@@ -23,6 +25,13 @@ import io.micronaut.web.router.Router
  * run on the Netty server like controller routes.
  */
 class CustomWebAnnotationsSpec extends AbstractTypeElementSpec {
+
+    /**
+     * The constants of the generated enum, loaded from the in-memory compilation.
+     */
+    static class RouteDeclarationsHolder {
+        static Object[] constants
+    }
 
     private static final String SOURCE = '''
 package petstore.web;
@@ -66,6 +75,11 @@ class PetResource {
         return new byte[0];
     }
 
+    @Read("/{id}/files/{+file}")
+    String file(long id, String file) {
+        return pets.get(id) + ": " + file;
+    }
+
     @Write
     String add(String name, int age) {
         long id = ids.incrementAndGet();
@@ -103,10 +117,27 @@ class PetRoutes implements HttpRoutes {
             pets.get().rename(path.getLong("id"), form.getString("name"));
             return HttpResponse.noContent();
         });
+        routes.handle(PetResourceRoutes.FILE, (request, path) ->
+            HttpResponse.ok(pets.get().file(path.getLong("id"), path.getString("file"))));
         // PetResourceRoutes.PHOTO is declared but not bound: it is not a route
     }
 }
 '''
+
+    private static List<String> parse(CompiledRouteMatcher matcher, HttpMethod method, String path) {
+        String[] variables = new String[matcher.maxVariables()]
+        int ordinal = matcher.match(method, path, variables)
+        if (ordinal < 0) {
+            return []
+        }
+        def declaration = RouteDeclarationsHolder.constants[ordinal] as RouteDeclaration
+        return [((Enum) declaration).name()] + variables.toList().subList(0, declaration.pathVariableCount())
+    }
+
+    private static String matchedBy(Router router, HttpRequest<?> request) {
+        def match = router.findClosest(request)
+        return match.@matchInfo.class.simpleName
+    }
 
     @Override
     protected Collection<TypeElementVisitor> getLocalTypeElementVisitors() {
@@ -117,19 +148,36 @@ class PetRoutes implements HttpRoutes {
         given:
         ApplicationContext context = buildContext('petstore.web.PetResource', SOURCE, true, ['micronaut.server.port': -1])
         Class<?> declarations = context.classLoader.loadClass('petstore.web.PetResourceRoutes')
+        RouteDeclarationsHolder.constants = declarations.enumConstants
 
         expect: 'the annotation processor generated an enum of route declarations'
         declarations.isEnum()
         RouteDeclaration.isAssignableFrom(declarations)
-        declarations.enumConstants*.name() == ['NAME', 'OWNED', 'PHOTO', 'ADD', 'RENAME']
+        declarations.enumConstants*.name() == ['NAME', 'OWNED', 'PHOTO', 'FILE', 'ADD', 'RENAME']
         declarations.enumConstants.collect { RouteDeclaration d -> d.httpMethod().name() + ' ' + d.uriTemplate() } ==
-                ['GET /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'GET /pets/{id}/photo', 'POST /pets', 'POST /pets/{id}/rename']
+                ['GET /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'GET /pets/{id}/photo', 'GET /pets/{id}/files/{+file}', 'POST /pets', 'POST /pets/{id}/rename']
 
         and: 'its index keys are the ones the router computes for a route built at runtime'
         declarations.enumConstants.every { RouteDeclaration d ->
             def runtime = RouteDeclaration.of(d.httpMethod(), d.uriTemplate())
             d.requiredPathPrefix() == runtime.requiredPathPrefix() && d.rawLength() == runtime.rawLength() && d.pathVariableCount() == runtime.pathVariableCount()
         }
+
+        and: 'the generated URL parser maps a request path to a constant and captures the path variables'
+        CompiledRouteMatcher matcher = (declarations.enumConstants[0] as RouteDeclaration).matcher()
+        matcher.maxVariables() == 2
+        parse(matcher, HttpMethod.GET, '/pets/7') == ['NAME', '7']
+        parse(matcher, HttpMethod.GET, '/pets/7/owners/abc') == ['OWNED', '7', 'abc']
+        parse(matcher, HttpMethod.GET, '/pets/7/photo') == ['PHOTO', '7']
+        parse(matcher, HttpMethod.POST, '/pets') == ['ADD']
+        parse(matcher, HttpMethod.POST, '/pets/7/rename') == ['RENAME', '7']
+
+        and: 'it answers nothing for another method, an unknown path, or a template it leaves to the router'
+        parse(matcher, HttpMethod.GET, '/pets') == []
+        parse(matcher, HttpMethod.DELETE, '/pets/7') == []
+        parse(matcher, HttpMethod.GET, '/pets/7/unknown') == []
+        parse(matcher, HttpMethod.GET, '/cats/7') == []
+        parse(matcher, HttpMethod.GET, '/pets/7/files/a/b') == []
 
         and: 'there is no controller, and the resource is a plain bean without executable methods'
         context.getBeanDefinitions(Qualifiers.byStereotype(Controller)).isEmpty()
@@ -142,8 +190,16 @@ class PetRoutes implements HttpRoutes {
         then: 'the bound declarations are routes, with implicit HEAD, registered lazily with their precomputed keys'
         petRoutes.collect { it.httpMethodName + ' ' + it.toString().split(' ')[1] }.toSet() ==
                 ['GET /pets/{id}', 'HEAD /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'HEAD /pets/{id}/owners/{owner}',
-                 'POST /pets', 'POST /pets/{id}/rename'] as Set
+                 'GET /pets/{id}/files/{+file}', 'HEAD /pets/{id}/files/{+file}', 'POST /pets', 'POST /pets/{id}/rename'] as Set
         petRoutes.every { it.class.simpleName == 'LazyUriRouteInfo' }
+
+        and: 'the router resolves a request with the generated parser, the route selected by the ordinal'
+        matchedBy(router, HttpRequest.GET('/pets/1')) == 'CapturedUriMatchInfo'
+        matchedBy(router, HttpRequest.HEAD('/pets/1')) == 'CapturedUriMatchInfo'
+        matchedBy(router, HttpRequest.POST('/pets', [name: 'x', age: '1']).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE)) == 'CapturedUriMatchInfo'
+
+        and: 'a template the parser does not compile is matched by the router'
+        matchedBy(router, HttpRequest.GET('/pets/1/files/a/b')) != 'CapturedUriMatchInfo'
 
         when:
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
@@ -154,6 +210,7 @@ class PetRoutes implements HttpRoutes {
         http.retrieve('/pets/1') == 'Rex'
         http.retrieve('/pets/1/owners/3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e') == 'Rex of 3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e'
         http.exchange(HttpRequest.HEAD('/pets/1')).status == HttpStatus.OK
+        http.retrieve('/pets/1/files/a/b') == 'Rex: a/b'
 
         when: 'a form is posted'
         String id = http.retrieve(HttpRequest.POST('/pets', [name: 'Bella', age: '3']).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
