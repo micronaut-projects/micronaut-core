@@ -560,6 +560,48 @@ public final class PythonCoercion {
     }
 
     /**
+     * The Python object a generated wrapper exposes to the Python context that is entered, which is
+     * the context of the code asking for it.
+     * <p>
+     * A wrapper that Java created rather than read from Python ({@code ObjectMapper.readValue(json,
+     * PyDataclass)}, {@code client.retrieve(request, PyDataclass)}, a bean introspection) creates its
+     * Python object in the primary context of the application whose runtime is installed. While a
+     * nested {@code ApplicationContext.run(...)} is the installed one, that is not the context the
+     * calling Python code runs in, and the object reached it as a foreign object: the Python view of
+     * the wrapper then reported the class of, compared and printed that foreign object instead of the
+     * Python one, so {@code isinstance}, {@code ==} and {@code repr} all failed. A reconstructible
+     * wrapper is therefore reconstructed in the entered context; a wrapper of that context, which is
+     * every wrapper of an application that runs alone, is returned unchanged.
+     *
+     * @param coercible The generated wrapper
+     * @return The Python object of the entered context, or the wrapper's own when there is no other
+     */
+    static @Nullable Value polyglotValueInCurrentContext(ValueCoercible coercible) {
+        Value value = coercible.asPolyglotValue();
+        if (value == null || !(coercible instanceof PooledValueCoercible pooled)) {
+            return value;
+        }
+        Context current = enteredContext();
+        if (current == null || isValueInContext(value, current)) {
+            return value;
+        }
+        return coercePooledValue(pooled, current);
+    }
+
+    /**
+     * The polyglot context the calling thread is executing in.
+     *
+     * @return The entered context, or {@code null} when the caller is plain Java
+     */
+    private static @Nullable Context enteredContext() {
+        try {
+            return Context.getCurrent();
+        } catch (IllegalStateException e) {
+            return null;
+        }
+    }
+
+    /**
      * Converts a generated wrapper while preserving wrapper identity for the current conversion.
      *
      * @param value The generated wrapper

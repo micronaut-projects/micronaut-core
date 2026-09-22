@@ -98,7 +98,9 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
                 if (arguments.length != 0) {
                     throw new IllegalArgumentException("asPolyglotValue expects no arguments");
                 }
-                return asPolyglotValue();
+                // the caller is Python: hand it the object of the context it runs in, which is not the
+                // primary context of the installed runtime while a nested application is the current one
+                return PythonCoercion.polyglotValueInCurrentContext(this);
             };
         }
         Value value = asPolyglotValue();
