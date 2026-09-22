@@ -178,7 +178,6 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
         }
     }
 
-
     // called holding the lock
     private void checkAvailable() {
         if (state == CLOSED) {
