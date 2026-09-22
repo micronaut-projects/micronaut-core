@@ -14,7 +14,7 @@ import ast
 
 import java
 
-from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, Typed
+from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, Typed
 
 # names Java cannot declare: its keywords and literals, and the methods of Object
 JAVA_RESERVED_NAMES = frozenset((
@@ -38,6 +38,7 @@ Body, Local, Assign, PutSelf, If, Return, Eval = (_ir(n) for n in ("Body", "Loca
 While, ForRange, ForEach, Break, Continue, Throw, Try, Catch = (_ir(n) for n in ("While", "ForRange", "ForEach", "Break", "Continue", "Throw", "Try", "Catch"))
 Const, Param, LocalRef, SelfProperty = (_ir(n) for n in ("Const", "Param", "LocalRef", "SelfProperty"))
 InvokeJava, NewJava, StaticField, Field, InvokeSibling = (_ir(n) for n in ("InvokeJava", "NewJava", "StaticField", "Field", "InvokeSibling"))
+InvokePython, PythonMember = (_ir(n) for n in ("InvokePython", "PythonMember"))
 Binary, Unary, Compare, And, Or, Conditional, Truthy, StrJoin, Helper, Cast = (
     _ir(n) for n in ("Binary", "Unary", "Compare", "And", "Or", "Conditional", "Truthy", "StrJoin", "Helper", "Cast"))
 
@@ -141,6 +142,42 @@ def _assigned_names(statements):
                     if isinstance(target, ast.Name) and target.id not in names:
                         names.append(target.id)
     return names
+
+
+def _default_node(model, name, function_node):
+    """The AST of the default of a parameter: from the __init__ it is declared in, else from the dataclass field of the class body."""
+    if function_node is not None:
+        args = function_node.args
+        positional = list(getattr(args, "posonlyargs", [])) + list(args.args)
+        defaults = list(args.defaults)
+        for argument, default in zip(positional[len(positional) - len(defaults):], defaults):
+            if argument.arg == name:
+                return default
+        for argument, default in zip(args.kwonlyargs, args.kw_defaults):
+            if argument.arg == name:
+                return default
+        return None
+    for statement in getattr(model.node, "body", ()):
+        if isinstance(statement, ast.AnnAssign) and isinstance(statement.target, ast.Name) and statement.target.id == name:
+            value = statement.value
+            if isinstance(value, ast.Call) and (getattr(value.func, "id", None) == "field" or getattr(value.func, "attr", None) == "field"):
+                for keyword in value.keywords:
+                    if keyword.arg == "default":
+                        return keyword.value
+                return value
+            return value
+    return None
+
+
+def _default_factory(default):
+    """The builtin a field(default_factory=...) names (list, dict or set), or None."""
+    if not isinstance(default, ast.Call) or not (getattr(default.func, "id", None) == "field" or getattr(default.func, "attr", None) == "field"):
+        return None
+    for keyword in default.keywords:
+        if keyword.arg == "default_factory":
+            factory = keyword.value.id if isinstance(keyword.value, ast.Name) else getattr(keyword.value, "attr", None)
+            return factory if factory in ("list", "dict", "set") else None
+    return None
 
 
 def _decorated_with(function_node, names):
@@ -785,7 +822,27 @@ class Lowering:
             return PutSelf(target.attr, property_type, self._coerce(value, property_type, node), self._is_accessor(target.attr))
         if isinstance(target, ast.Subscript):
             return self._subscript_store(target, value, node)
+        if isinstance(target, ast.Attribute):
+            model = self._python_model_of(target.value)
+            if model is not None:
+                return self._python_attribute_store(model, target, value, node)
         self._refuse("unsupported-statement", "assigning to anything but a local, a property of self or an element has no static lowering", node)
+
+    def _python_attribute_store(self, model, target, value, node):
+        """An assignment of a hinted attribute of an object of the compilation: the setter its generated class declares."""
+        owner = self._generated_class(model, node)
+        found = model.find(target.attr)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no attribute [{target.attr}]", node)
+        if found[0] != "attribute" or not self._declared_by_generated_class(model, target.attr):
+            self._refuse("unsupported-statement", f"assigning [{target.attr}] of [{model.name}], which is not a hinted attribute of its generated class, has no static lowering", node)
+        if model.class_def.frozenDataclass():
+            self._refuse("unsupported-statement", f"[{model.name}] is a frozen dataclass: Python raises FrozenInstanceError on the assignment", node)
+        hint = found[1].typeName()
+        stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        setter = "set" + target.attr[:1].upper() + target.attr[1:]
+        self.java_calls += 1
+        return Eval(InvokeJava(self._expression(target.value), owner, setter, [stub_type], [self._coerce(value, stub_type, node)], VOID))
 
     def _subscript_store(self, target, value, node):
         container = self._expression(target.value)
@@ -1105,9 +1162,24 @@ class Lowering:
             return LocalRef(name, self.locals[name])
         if name == "self":
             self._refuse("unsupported-expression", "self as a value has no static lowering", node)
+        constant = self._module_constant(name, node)
+        if constant is not None:
+            # a module-level literal (ROLE_USER = "user"), of this module or imported from another: inlined
+            return constant
         typed = self._typed(node)
         self._value_type(typed, node)  # a class, a module or a callable refuses with its reason
         self._refuse("unknown-type", f"[{name}] has no static lowering", node)
+
+    def _module_constant(self, name, node):
+        """The Const a module-level assignment of a literal binds the name to, or None: the visitor tracks them, imports included."""
+        visitor = getattr(self.module, "visitor", None)
+        values = getattr(visitor, "local_constant_values", None) or {}
+        if name not in values:
+            return None
+        value = values[name]
+        if value is None or isinstance(value, (bool, int, float, str)):
+            return self._constant(ast.copy_location(ast.Constant(value=value), node))
+        return None
 
     def _attribute(self, node):
         if isinstance(node.value, ast.Name) and node.value.id == "self":
@@ -1117,6 +1189,9 @@ class Lowering:
             # an int attribute (an instance attribute hinted through __init__) is a long in the body
             used = JAVA_NUMBERS.get(property_type, property_type)
             return Cast(read, used) if used != property_type else read
+        model = self._python_model_of(node.value)
+        if model is not None:
+            return self._python_attribute(model, self._expression(node.value), node)
         target = self.rules.targets.get(id(node))
         if target is not None and target[0] == "field":
             _, owner, name, field_type, static = target
@@ -1165,8 +1240,8 @@ class Lowering:
 
     def _call(self, node):
         function = node.func
-        if node.keywords:
-            self._refuse("kwargs-to-java", "keyword arguments have no static lowering", node)
+        if any(keyword.arg is None for keyword in node.keywords):
+            self._refuse("dynamic-call", "spreading keyword arguments has no static lowering", node)
         if any(isinstance(argument, ast.Starred) for argument in node.args):
             self._refuse("dynamic-call", "spreading arguments has no static lowering", node)
         if isinstance(function, ast.Name) and function.id == "str" and len(node.args) == 1 and function.id not in self.locals:
@@ -1176,7 +1251,18 @@ class Lowering:
         if target is None and isinstance(function, ast.Name) and function.id not in self.locals and function.id not in self.parameters:
             builtin = self._builtin_call(function, node, [self._expression(argument) for argument in node.args])
             if builtin is not None:
+                if node.keywords:
+                    self._refuse("kwargs-to-java", f"keyword arguments to [{function.id}] have no static lowering", node)
                 return builtin
+        if target is None and isinstance(function, ast.Attribute) and not (isinstance(function.value, ast.Name) and function.value.id == "self"):
+            model = self._python_model_of(function.value)
+            if model is not None:
+                return self._python_receiver_call(model, function.value, function.attr, node)
+        if target is None and isinstance(function, (ast.Name, ast.Attribute)):
+            # the checker types the arguments of a construction, not the callee: the bindings know the class
+            callee = self.bindings.lookup(function.id) if isinstance(function, ast.Name) and function.id not in self.locals and function.id not in self.parameters else self._typed(function)
+            if callee is not None and callee.kind == PY_REF:
+                return self._python_construction(callee.name, node)
         if target is None and isinstance(function, ast.Attribute):
             receiver_typed = self._typed(function.value)
             if receiver_typed is not None:
@@ -1186,6 +1272,8 @@ class Lowering:
                 # collection): the type the lowering gave it decides
                 builtin_receiver = self._lowered_type(function.value) in (LIST, SET, MAP, STRING)
             if builtin_receiver:
+                if node.keywords:
+                    self._refuse("kwargs-to-java", f"keyword arguments to [{function.attr}] have no static lowering", node)
                 receiver = self._expression(function.value)
                 lowered = self._collection_method(receiver, function.attr, node, [self._expression(argument) for argument in node.args])
                 if lowered is not None:
@@ -1201,6 +1289,8 @@ class Lowering:
                 self._refuse("python-builtin-not-lowered", f"the builtin [{function.id}] has no static lowering yet", node)
             self._refuse("dynamic-call", "the call resolves to no Java method or constructor", node)
         kind, owner, name, matching, static = target
+        if node.keywords:
+            self._refuse("kwargs-to-java", "keyword arguments to a Java method or constructor have no static lowering", node)
         lowered_arguments = [self._expression(argument) for argument in node.args]
         signature = self._most_specific(list(matching), lowered_arguments, owner, name, node)
         parameter_types = list(signature.parameterTypes())
@@ -1253,21 +1343,24 @@ class Lowering:
             return_type = VOID
         else:
             return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
-        lowered_arguments = [self._expression(argument) for argument in node.args]
         parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        bound = self._bind_arguments(self.class_model, parameters, function_node, node, f"{self.class_model.name}.{name}")
         declares = (not name.startswith("_") and not self.advised(function_def) and not self.class_model.subclass_defines(name)
-                    and len(parameters) == len(lowered_arguments)
+                    and bound is not None
                     and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
                     and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
         if declares:
             parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
             arguments = [self._coerce(argument, parameter_type, argument_node)
-                         for argument, parameter_type, argument_node in zip(lowered_arguments, parameter_types, node.args)]
+                         for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeSibling(name, parameter_types, arguments, declared, "java")
             call = Cast(call, return_type) if declared != return_type else call
         else:
+            if node.keywords:
+                self._refuse("sibling-call", f"calling [{name}] with keyword arguments has no static lowering: the stub declares no Java method the call fills", node)
+            lowered_arguments = [self._expression(argument) for argument in node.args]
             self.bridge_calls += 1
             call = InvokeSibling(name, [], [self._boxed(argument, node) for argument in lowered_arguments], return_type, "python")
         used = JAVA_NUMBERS.get(return_type, return_type)
@@ -1288,6 +1381,213 @@ class Lowering:
             return OBJECT
         # a number or a boolean stays the Object the method declares: its box is Python's choice
         return OBJECT if value_type in (LONG, DOUBLE, BOOLEAN) else value_type
+
+    # ---------------------------------------------------------------- objects of the classes of the compilation
+
+    def _python_model_of(self, node):
+        """The class model of a value of a Python class of the compilation, from the checker's type or the lowering's, else None."""
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is None:
+            return None
+        typed = self._typed(node)
+        if typed is not None:
+            return classes.of(typed.name) if typed.kind == PY else None
+        lowered = self._lowered_type(node)
+        return classes.by_qualified.get(lowered) if lowered is not None else None
+
+    def _generated_class(self, model, node):
+        """The name of the generated Java class of a Python class, refusing the classes that generate no ordinary one."""
+        class_def = model.class_def
+        if class_def.isEnum():
+            self._refuse("unsupported-expression", f"[{model.name}] is an enum; its members are constants", node)
+        for base in class_def.bases():
+            if base.name() in ("Protocol", "typing.Protocol"):
+                self._refuse("unsupported-expression", f"[{model.name}] is a protocol", node)
+        for decorator in class_def.decorators():
+            if decorator.annotationName().rsplit(".", 1)[-1] == "ContextPooled":
+                self._refuse("unsupported-expression", f"[{model.name}] is served by a context pool; its objects have no Java class of their own", node)
+        return model.qualified
+
+    def _declared_by_generated_class(self, model, name):
+        """
+        Whether the generated Java class of the model declares the member: the class's own, or
+        inherited through its first Python base, the only base a generated class extends. A member
+        of another base is reachable through the Python object only.
+        """
+        seen = set()
+        current = model
+        while current is not None and current.qualified not in seen:
+            seen.add(current.qualified)
+            if name in current.methods or name in current.properties or name in current.attributes or name in current.instance_attributes:
+                return True
+            bases = current.bases()
+            current = bases[0] if bases and isinstance(bases[0], type(model)) else None
+        return False
+
+    def _python_attribute(self, model, receiver, node):
+        """An attribute of an object of the compilation: the accessor its generated class declares, else the attribute of the Python object."""
+        owner = self._generated_class(model, node)
+        found = model.find(node.attr)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no attribute [{node.attr}]", node)
+        kind = found[0]
+        if kind == "attribute":
+            # a hinted class attribute is a bean property of the generated class, read by its accessor
+            hint = found[1].typeName()
+            typed = self.bindings.of_hint(hint)
+            stub_type = self._stub_type(typed, hint, node)
+            if self._declared_by_generated_class(model, node.attr):
+                getter = ("is" if stub_type == BOOLEAN else "get") + node.attr[:1].upper() + node.attr[1:]
+                self.java_calls += 1
+                read = InvokeJava(receiver, owner, getter, [], [], stub_type)
+            else:
+                self.bridge_calls += 1
+                read = PythonMember(receiver, node.attr, stub_type)
+        elif kind == "property":
+            getter = found[1].getter()
+            return_def = getter.returnType() if getter is not None else None
+            hint = return_def.typeAnnotation() if return_def is not None else None
+            if hint is None:
+                self._refuse("unknown-type", f"the property [{node.attr}] of [{model.name}] has no return hint", node)
+            stub_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+            self.bridge_calls += 1
+            read = PythonMember(receiver, node.attr, stub_type)
+        elif kind == "instance":
+            typed = model.instance_attribute_type(node.attr, self.bindings)
+            if typed is None:
+                self._refuse("unknown-type", f"the attribute [{node.attr}] of [{model.name}] has no hinted type", node)
+            stub_type = self._stub_type(typed, None, node)
+            self.bridge_calls += 1
+            read = PythonMember(receiver, node.attr, stub_type)
+        else:
+            self._refuse("unsupported-expression", f"reading [{node.attr}] of [{model.name}], which is not an attribute, has no static lowering", node)
+        used = JAVA_NUMBERS.get(stub_type, stub_type)
+        return Cast(read, used) if used != stub_type else read
+
+    def _python_receiver_call(self, model, receiver_node, name, node):
+        """
+        A call of a method of an object of the compilation. The generated class's Java method is
+        called when it declares one for the call (a public method with a hinted signature the call
+        fills exactly; the class's own or inherited, Java dispatch resolving an override); otherwise
+        the method of the Python object is invoked, as the Python code would.
+        """
+        owner = self._generated_class(model, node)
+        found = model.find(name)
+        if found is None:
+            self._refuse("unknown-type", f"[{model.name}] has no method [{name}]", node)
+        if found[0] != "method":
+            self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}], which is not a method, has no static lowering", node)
+        function_def, function_node = found[1], found[2]
+        if function_node is None or function_def.isAsync() or function_def.isGenerator():
+            self._refuse("unsupported-expression", f"calling the async or generator method [{name}] of [{model.name}] has no static lowering", node)
+        static = function_def.isStatic() or _decorated_with(function_node, ("staticmethod", "classmethod"))
+        return_def = function_def.returnType()
+        hint = return_def.typeAnnotation() if return_def is not None else None
+        if hint is None:
+            return_type = self._inferred_return(model, function_def, function_node, node) if function_def.hasReturnValue() else VOID
+        elif hint.name() == "None":
+            return_type = VOID
+        else:
+            return_type = self._stub_type(self.bindings.of_hint(hint), hint, node)
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() not in ("self", "cls")]
+        bound = self._bind_arguments(model, parameters, function_node, node, f"{model.name}.{name}")
+        declares = (not name.startswith("_") and bound is not None
+                    and self._declared_by_generated_class(model, name)
+                    and all(argument.typeAnnotation() is not None and not argument.variadic() for argument in parameters)
+                    and function_node.args.vararg is None and not function_node.args.kwonlyargs and function_node.args.kwarg is None)
+        if declares:
+            parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+            arguments = [self._coerce(argument, parameter_type, argument_node)
+                         for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+            self.java_calls += 1
+            receiver = None if static else self._expression(receiver_node)
+            declared = OBJECT if hint is None and return_type != VOID else return_type
+            call = InvokeJava(receiver, owner, name, parameter_types, arguments, declared)
+            call = Cast(call, return_type) if declared != return_type else call
+        else:
+            if static:
+                self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] with this signature has no static lowering", node)
+            if node.keywords:
+                self._refuse("unsupported-expression", f"calling [{name}] of [{model.name}] with keyword arguments has no static lowering: the generated class declares no Java method the call fills", node)
+            lowered_arguments = [self._expression(argument) for argument in node.args]
+            self.bridge_calls += 1
+            call = InvokePython(self._expression(receiver_node), name, [self._boxed(argument, node) for argument in lowered_arguments], return_type)
+        used = JAVA_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _python_construction(self, class_def, node):
+        """A construction of an object of the compilation: the generated class's constructor, which mirrors the hinted __init__."""
+        model = self.checker.python_classes.of(class_def)
+        owner = self._generated_class(model, node)
+        constructor = model.constructor_of()
+        if constructor is UNKNOWN:
+            self._refuse("unsupported-expression", f"the constructor of [{model.name}] is not the compilation's own", node)
+        if constructor is None:
+            if node.args or node.keywords:
+                self._refuse("unsupported-expression", f"[{model.name}] takes no constructor arguments", node)
+            self.java_calls += 1
+            return NewJava(owner, [], [])
+        function_def, function_node = constructor
+        parameters = [argument for argument in function_def.arguments().arguments() if argument.name() != "self"]
+        if (any(argument.typeAnnotation() is None or argument.variadic() for argument in parameters)
+                or (function_node is not None and (function_node.args.vararg is not None or function_node.args.kwonlyargs or function_node.args.kwarg is not None))):
+            self._refuse("unsupported-expression", f"constructing [{model.name}] with these arguments has no static lowering: the generated constructor takes every hinted parameter", node)
+        bound = self._bind_arguments(model, parameters, function_node, node, model.name)
+        if bound is None:
+            self._refuse("unsupported-expression", f"constructing [{model.name}] with these arguments has no static lowering: the generated constructor takes every hinted parameter", node)
+        parameter_types = [self._stub_type(self.bindings.of_hint(argument.typeAnnotation()), argument.typeAnnotation(), node) for argument in parameters]
+        arguments = [self._coerce(argument, parameter_type, argument_node)
+                     for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+        self.java_calls += 1
+        return NewJava(owner, parameter_types, arguments)
+
+    def _bind_arguments(self, model, parameters, function_node, node, label):
+        """
+        The arguments of a call of a Python function or constructor of the compilation, one per
+        parameter in declaration order, as (expression, node) pairs: the positional arguments, then
+        the keyword arguments by name, then the defaults of the parameters the call omits. None when
+        the call does not fill the parameters (too many positional arguments, an unknown keyword, a
+        parameter given twice); refused when an omitted parameter has a default the body cannot
+        reproduce (anything but a literal, None, or an empty list, dict or set factory).
+        """
+        names = [argument.name() for argument in parameters]
+        if len(node.args) > len(names):
+            return None
+        keywords = {}
+        for keyword in node.keywords:
+            if keyword.arg not in names or keyword.arg in keywords or names.index(keyword.arg) < len(node.args):
+                return None
+            keywords[keyword.arg] = keyword.value
+        bound = []
+        for index, argument in enumerate(parameters):
+            if index < len(node.args):
+                argument_node = node.args[index]
+            elif argument.name() in keywords:
+                argument_node = keywords[argument.name()]
+            else:
+                bound.append((self._default_argument(model, argument, function_node, node, label), node))
+                continue
+            bound.append((self._expression(argument_node), argument_node))
+        return bound
+
+    def _default_argument(self, model, argument, function_node, node, label):
+        """The value of a parameter a call omits: its default, when the body can reproduce it."""
+        if not argument.hasDefaultValue():
+            self._refuse("unsupported-expression", f"calling [{label}] without [{argument.name()}], which has no default, has no static lowering", node)
+        default = _default_node(model, argument.name(), function_node)
+        if isinstance(default, ast.Constant) and (default.value is None or isinstance(default.value, (bool, int, float, str))):
+            return self._constant(ast.copy_location(ast.Constant(value=default.value), node))
+        if isinstance(default, ast.UnaryOp) and isinstance(default.op, ast.USub) and isinstance(default.operand, ast.Constant) and isinstance(default.operand.value, (int, float)) and not isinstance(default.operand.value, bool):
+            return self._constant(ast.copy_location(ast.Constant(value=-default.operand.value), node))
+        factory = _default_factory(default)
+        if factory is not None:
+            # field(default_factory=list): Python calls the factory for every instance, as the helper does here
+            hint = argument.typeAnnotation()
+            typed = self.bindings.of_hint(hint) if hint is not None else None
+            stub_type = self._stub_type(typed, hint, node) if typed is not None and typed.kind == BUILTIN and typed.name in COLLECTION_TYPES else COLLECTION_TYPES[factory]
+            self.helper_calls += 1
+            return Helper({"list": "list", "dict": "map", "set": "set"}[factory], [], stub_type)
+        self._refuse("unsupported-expression", f"the default of [{argument.name()}] of [{label}] is not a literal the body can reproduce", node)
 
     def _most_specific(self, matching, arguments, owner, name, node):
         """

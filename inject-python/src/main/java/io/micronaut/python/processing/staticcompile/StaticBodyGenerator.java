@@ -51,6 +51,8 @@ public final class StaticBodyGenerator {
     private static final TypeDef BOOLEAN = TypeDef.Primitive.BOOLEAN;
 
     private static final ClassTypeDef ITERATOR = ClassTypeDef.of(Iterator.class);
+    private static final ClassTypeDef VALUE_COERCIBLE_TYPE = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible");
+    private static final ClassTypeDef POLYGLOT_VALUE_TYPE = ClassTypeDef.of("org.graalvm.polyglot.Value");
 
     private final SelfAccess self;
     private final Map<String, VariableDef.MethodParameter> parameters = new HashMap<>();
@@ -175,6 +177,11 @@ public final class StaticBodyGenerator {
                 call.arguments().forEach(a -> collectNames(a, names));
             }
             case Ir.InvokeSibling call -> call.arguments().forEach(a -> collectNames(a, names));
+            case Ir.InvokePython call -> {
+                collectNames(call.receiver(), names);
+                call.arguments().forEach(a -> collectNames(a, names));
+            }
+            case Ir.PythonMember member -> collectNames(member.receiver(), names);
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
             case Ir.Field field -> collectNames(field.receiver(), names);
             case Ir.Binary binary -> {
@@ -436,6 +443,8 @@ public final class StaticBodyGenerator {
             case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
+            case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
+            case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), member.name(), member.type(), type(member.type()));
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), expressions(construction.arguments()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
@@ -601,6 +610,14 @@ public final class StaticBodyGenerator {
         };
     }
 
+    /**
+     * The Python object behind a value of a generated class: every generated class is a
+     * {@code ValueCoercible}.
+     */
+    private ExpressionDef pythonObject(Ir.Expression receiver) {
+        return expression(receiver).cast(VALUE_COERCIBLE_TYPE).invoke("asPolyglotValue", POLYGLOT_VALUE_TYPE);
+    }
+
     private ExpressionDef.ConditionExpressionDef condition(Ir.Expression test) {
         ExpressionDef value = expression(test);
         return value instanceof ExpressionDef.ConditionExpressionDef condition ? condition : operand(value).isTrue();
@@ -725,6 +742,25 @@ public final class StaticBodyGenerator {
          * @return The expression calling it
          */
         ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct);
+
+        /**
+         * @param value     The Python object of another object of the compilation
+         * @param name      The method to invoke on it
+         * @param arguments The arguments, boxed
+         * @param typeName  The Java return type as the IR spells it, {@code void} for none
+         * @param type      The Java return type
+         * @return The expression invoking it and converting the result
+         */
+        ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type);
+
+        /**
+         * @param value    The Python object of another object of the compilation
+         * @param property The attribute to read
+         * @param typeName The Java type of the value as the IR spells it
+         * @param type     The Java type of the value
+         * @return The expression reading and converting it
+         */
+        ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type);
 
         /**
          * @param property The property

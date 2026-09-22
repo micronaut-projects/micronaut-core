@@ -322,6 +322,33 @@ public sealed interface Ir {
     }
 
     /**
+     * A call of a method of a Python object of the compilation through the Python object itself: the
+     * generated class of the receiver declares no Java method for it (a method the class does not
+     * bridge, a call relying on default arguments), so the method is invoked as Python code would.
+     *
+     * @param receiver  The receiver, a value of a generated class
+     * @param name      The method name
+     * @param arguments The arguments, boxed
+     * @param type      The Java return type, {@code void} for none
+     */
+    record InvokePython(Expression receiver, String name, List<Expression> arguments, String type) implements Expression {
+        public InvokePython {
+            arguments = List.copyOf(arguments);
+        }
+    }
+
+    /**
+     * A read of an attribute of a Python object of the compilation through the Python object: an
+     * attribute the generated class of the receiver declares no accessor for.
+     *
+     * @param receiver The receiver, a value of a generated class
+     * @param name     The attribute
+     * @param type     The Java type of the value
+     */
+    record PythonMember(Expression receiver, String name, String type) implements Expression {
+    }
+
+    /**
      * A construction of a Java object with a chosen constructor.
      *
      * @param type           The class

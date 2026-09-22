@@ -86,6 +86,7 @@ class Caller:
         PythonStatic.resetEntries()
         def context = buildContext('''
 from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
 
 @Singleton
 class Calc:
@@ -93,6 +94,7 @@ class Calc:
         return f"{count} x {name}"
 
 @Singleton
+@CompileStatic(False)
 class Caller:
     def __init__(self, calc: Calc):
         self.calc = calc
@@ -108,7 +110,7 @@ class Caller:
 
         expect:
         decisions.find { it.qualifiedName() == 'Calc.label' }.outcome() == StaticCompilationDecision.Outcome.COMPILED
-        decisions.find { it.qualifiedName() == 'Caller.through_bean' }.outcome() == StaticCompilationDecision.Outcome.SKIPPED
+        decisions.find { it.qualifiedName() == 'Caller.through_bean' }.outcome() == StaticCompilationDecision.Outcome.EXCLUDED
 
         when: "Python code calls the method of the injected bean"
         def viaBean = caller.through_bean()
@@ -140,6 +142,7 @@ class Caller:
         PythonStatic.resetEntries()
         def context = buildContext('''
 from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
 
 class Base:
     def foo(self, n: int) -> int:
@@ -151,6 +154,7 @@ class Sub(Base):
         return n * 2
 
 @Singleton
+@CompileStatic(False)
 class Caller:
     def __init__(self, sub: Sub):
         self.sub = sub
@@ -180,6 +184,7 @@ class Caller:
         PythonStatic.resetEntries()
         def context = buildContext('''
 from jakarta.inject import Singleton
+from micronaut.context.python.annotation import CompileStatic
 
 class Left:
     def foo(self, n: int) -> int:
@@ -198,6 +203,7 @@ class Both(Left, Right):
         return n * 2
 
 @Singleton
+@CompileStatic(False)
 class Caller:
     def __init__(self, both: Both):
         self.both = both
