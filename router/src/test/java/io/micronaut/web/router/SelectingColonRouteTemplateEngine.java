@@ -25,6 +25,7 @@ import io.micronaut.web.router.spi.RouteMatchSelector;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The ordered colon language with a simple route selector, like JAX-RS: the most specific
@@ -40,6 +41,11 @@ public final class SelectingColonRouteTemplateEngine extends OrderedColonRouteTe
      */
     public static final AtomicInteger SELECTIONS = new AtomicInteger();
 
+    /**
+     * The candidates of the last selection, for the tests.
+     */
+    public static final AtomicReference<List<UriRouteMatch<?, ?>>> LAST_CANDIDATES = new AtomicReference<>(List.of());
+
     public SelectingColonRouteTemplateEngine() {
         super(ID);
     }
@@ -51,6 +57,7 @@ public final class SelectingColonRouteTemplateEngine extends OrderedColonRouteTe
     @Override
     public List<Selection> select(HttpRequest<?> request, List<UriRouteMatch<?, ?>> matches) {
         SELECTIONS.incrementAndGet();
+        LAST_CANDIDATES.set(List.copyOf(matches));
         List<UriRouteMatch<?, ?>> best = new ArrayList<>();
         ParsedRouteTemplate bestTemplate = null;
         for (UriRouteMatch<?, ?> match : matches) {

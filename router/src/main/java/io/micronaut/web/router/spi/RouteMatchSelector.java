@@ -35,7 +35,10 @@ import java.util.Objects;
  * <p>The router calls it when every route that matches the path of a request, and accepts its
  * method, port, conditions, content type ({@link io.micronaut.web.router.RouteInfo#doesConsume})
  * and accepted types ({@link io.micronaut.web.router.RouteInfo#doesProduce}), has a template of
- * the engine, even when there is only one such route, instead of the Micronaut resolution of
+ * the engine (for the routes of such an engine, the types are compatible when one matches the
+ * other, without the parameters: {@code Accept: image/*} reaches the routes that produce
+ * {@code image/png} and {@code image/*}; when none is compatible the router answers {@code 406}
+ * or {@code 415} as for other routes), even when there is only one such route, instead of the Micronaut resolution of
  * ambiguous routes by the media types and the specificity of the templates. When the candidates
  * are of different engines, the Micronaut policy selects, and the selector is not called. For
  * example a JAX-RS engine selects by the specificity of JAX-RS (section 3.7.2), then by the
