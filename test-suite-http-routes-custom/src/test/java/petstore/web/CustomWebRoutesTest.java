@@ -9,6 +9,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.Router;
@@ -85,6 +86,34 @@ class CustomWebRoutesTest {
         assertEquals(List.of("PHOTO", "7"), parse(matcher, HttpMethod.GET, "/pets/7/photo"));
         assertEquals(List.of("ADD"), parse(matcher, HttpMethod.POST, "/pets"));
         assertEquals(List.of("RENAME", "7"), parse(matcher, HttpMethod.POST, "/pets/7/rename"));
+    }
+
+    @Test
+    void theGeneratedParserAcceptsTheVariablesTheRouterAccepts() {
+        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
+        UriTemplateMatcher ordinary = new UriTemplateMatcher("/pets/{id}");
+        // no ? or #: the router matches the path, without the query and fragment
+        for (String id : List.of("7", "a+b", "a%20b", "a(b", "a)b", "a!b", "a{b", "a&b", "a;b", "a.b", "a-b_c~d", "%2B")) {
+            String path = "/pets/" + id;
+            boolean routerMatches = ordinary.tryMatch(path) != null;
+            List<String> parsed = parse(matcher, HttpMethod.GET, path);
+            assertEquals(routerMatches, !parsed.isEmpty(), path);
+            if (routerMatches) {
+                assertEquals(List.of("NAME", id), parsed, path);
+            }
+        }
+    }
+
+    @Test
+    void theGeneratedParserRejectsTheCharactersAVariableDoesNotMatch() {
+        // known results, not only agreement with the ordinary matcher
+        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
+        for (String id : List.of("a+b", "a&b", "a;b", "a{b", "a}b")) {
+            assertEquals(List.of(), parse(matcher, HttpMethod.GET, "/pets/" + id), id);
+        }
+        // raw, not decoded
+        assertEquals(List.of("NAME", "a%20b"), parse(matcher, HttpMethod.GET, "/pets/a%20b"));
+        assertEquals(List.of("NAME", "a(b"), parse(matcher, HttpMethod.GET, "/pets/a(b"));
     }
 
     @Test

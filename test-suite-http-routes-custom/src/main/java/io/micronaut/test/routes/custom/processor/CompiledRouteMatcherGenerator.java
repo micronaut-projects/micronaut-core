@@ -82,6 +82,12 @@ final class CompiledRouteMatcherGenerator {
         for (Node node : nodes) {
             appendNode(source, node, node == root);
         }
+        // a whole-segment {variable} accepts exactly what the native matcher accepts: ask it,
+        // instead of copying its character rules
+        source.append("\n        private static final io.micronaut.http.uri.UriTemplateMatcher VARIABLE = new io.micronaut.http.uri.UriTemplateMatcher(\"/{v}\");\n");
+        source.append("\n        private static boolean variable(String p, int s, int e) {\n")
+            .append("            return VARIABLE.tryMatch(\"/\" + p.substring(s, e)) != null;\n")
+            .append("        }\n");
         source.append("    }\n");
         return source.toString();
     }
@@ -125,7 +131,7 @@ final class CompiledRouteMatcherGenerator {
                 .append("                if (r >= 0) {\n                    return r;\n                }\n            }\n");
         }
         if (node.variable != null) {
-            source.append("            if (e > s) {\n")
+            source.append("            if (e > s && variable(p, s, e)) {\n")
                 .append("                v[k] = p.substring(s, e);\n")
                 .append("                r = n").append(node.variable.id).append("(m, p, e, v, k + 1);\n")
                 .append("                if (r >= 0) {\n                    return r;\n                }\n            }\n");
