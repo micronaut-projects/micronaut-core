@@ -24,6 +24,7 @@ import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -81,6 +82,11 @@ final class UriRouteSet {
      * {@link io.micronaut.http.uri.spi.RouteTemplateEngine#comparator()}.
      */
     private final boolean hasEngineOrders;
+    /**
+     * Whether a route has a template of an engine that selects among its matches, see
+     * {@link RouteMatchSelector}.
+     */
+    private final boolean hasEngineSelectors;
     private final boolean empty;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
@@ -96,6 +102,14 @@ final class UriRouteSet {
             }
         }
         this.hasEngineOrders = hasEngineOrders;
+        boolean hasEngineSelectors = false;
+        for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
+            hasEngineSelectors |= hasEngineSelector(routes);
+        }
+        for (List<UriRouteInfo<Object, Object>> routes : customRoutesByMethod.values()) {
+            hasEngineSelectors |= hasEngineSelector(routes);
+        }
+        this.hasEngineSelectors = hasEngineSelectors;
         Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(HttpMethod.values());
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
@@ -219,6 +233,11 @@ final class UriRouteSet {
             return null;
         }
         String path = request.getPath();
+        if (hasEngineSelectors) {
+            List<UriRouteMatch<T, R>> matches = toMatches(path, routes);
+            RouteMatchSelector selector = matches.isEmpty() ? null : sameEngineSelector(matches);
+            return closest(request, path, selector == null ? matches : select(selector, request, matches), selector == null);
+        }
         if (routes.size() == 1) {
             Object o = routes.iterator().next();
             // avoid type pollution perf issues
@@ -232,12 +251,30 @@ final class UriRouteSet {
                 uriRoutes.add(match);
             }
         }
+        return closest(request, path, uriRoutes, true);
+    }
+
+    /**
+     * The closest of the matches of a path.
+     *
+     * @param request     The request
+     * @param path        The path
+     * @param uriRoutes   The matches
+     * @param resolve     Whether to resolve an ambiguity with the Micronaut policy, or the matches
+     *                    were selected by a route selector
+     * @return The closest match, or {@code null}
+     * @throws DuplicateRouteException if the matches are ambiguous
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private @Nullable <T, R> UriRouteMatch<T, R> closest(HttpRequest<?> request, String path, List<UriRouteMatch<T, R>> uriRoutes, boolean resolve) {
         if (uriRoutes.size() == 1) {
             Object obj = uriRoutes.get(0);
             // type pollution avoidance (should be covered by type pollution test)
             return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
         }
-        uriRoutes = DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
+        if (resolve) {
+            uriRoutes = DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
+        }
         return closest(path, uriRoutes);
     }
 
@@ -333,6 +370,12 @@ final class UriRouteSet {
             return Collections.emptyList();
         }
         List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
+        if (hasEngineSelectors && !uriRoutes.isEmpty()) {
+            RouteMatchSelector selector = sameEngineSelector(uriRoutes);
+            if (selector != null) {
+                return select(selector, request, uriRoutes);
+            }
+        }
         if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
@@ -615,6 +658,91 @@ final class UriRouteSet {
             prefixes[i] = routes[i] instanceof IndexedRoute route ? route.getRequiredPathPrefix() : "";
         }
         return RouteIndex.build(prefixes);
+    }
+
+    /**
+     * Let the route selector of an engine select among the matches of its routes.
+     *
+     * @param selector The route selector
+     * @param request  The request
+     * @param matches  The matches, of routes of the engine
+     * @return The selected matches, with their negotiated media types
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static <T, R> List<UriRouteMatch<T, R>> select(RouteMatchSelector selector, HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+        List<RouteMatchSelector.Selection> selections = selector.select(request, Collections.unmodifiableList((List) matches));
+        if (selections.isEmpty()) {
+            return List.of();
+        }
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(selections.size());
+        for (RouteMatchSelector.Selection selection : selections) {
+            UriRouteMatch<?, ?> selected = selection.match();
+            if (!containsIdentical(matches, selected)) {
+                throw new IllegalStateException("The route selector " + selector + " selected a match that it was not given: " + selected);
+            }
+            MediaType mediaType = selection.responseMediaType();
+            if (mediaType != null && selected instanceof DefaultUriRouteMatch<?, ?> defaultMatch) {
+                selected = defaultMatch.withSelectedMediaType(mediaType);
+            }
+            result.add((UriRouteMatch<T, R>) selected);
+        }
+        return result;
+    }
+
+    private static boolean containsIdentical(List<? extends UriRouteMatch<?, ?>> matches, UriRouteMatch<?, ?> match) {
+        for (UriRouteMatch<?, ?> candidate : matches) {
+            if (candidate == match) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * @param matches The matches of a path
+     * @return The route selector of the engine of the templates of all the matches, or
+     * {@code null} if they are of different engines, their engine has no route selector, or a
+     * match is of a route with a dynamic target, e.g. a locator route, whose resolved routes are
+     * selected when the rest of the path is matched
+     */
+    private static @Nullable RouteMatchSelector sameEngineSelector(List<? extends UriRouteMatch<?, ?>> matches) {
+        RouteMatchSelector selector = null;
+        for (UriRouteMatch<?, ?> match : matches) {
+            if (DynamicRouteTarget.of(match.getRouteInfo()) != null) {
+                return null;
+            }
+            RouteMatchSelector own = routeMatchSelector(match.getRouteInfo());
+            if (own == null || selector != null && own != selector) {
+                return null;
+            }
+            selector = own;
+        }
+        return selector;
+    }
+
+    /**
+     * @param route A route
+     * @return The route selector of the engine of the route's template, or {@code null}
+     */
+    private static @Nullable RouteMatchSelector routeMatchSelector(UriRouteInfo<?, ?> route) {
+        if (route instanceof DefaultUrlRouteInfo<?, ?> info) {
+            return info.routeMatchSelector();
+        }
+        ParsedRouteTemplate template = DefaultRouter.engineTemplate(route);
+        return template != null && RouteTemplateEngines.defaults().engine(template.engineId()) instanceof RouteMatchSelector selector ? selector : null;
+    }
+
+    /**
+     * @param routes The routes of a method
+     * @return Whether a route is of an engine with a route selector
+     */
+    private static boolean hasEngineSelector(List<UriRouteInfo<Object, Object>> routes) {
+        for (UriRouteInfo<Object, Object> route : routes) {
+            if (routeMatchSelector(route) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

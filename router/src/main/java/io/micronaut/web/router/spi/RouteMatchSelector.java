@@ -1,0 +1,117 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.web.router.spi;
+
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.UriRouteMatch;
+import io.micronaut.web.router.builder.DefaultPathVariables;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Selects among the routes of a {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template
+ * engine} that match a request, instead of the Micronaut route selection policy, and negotiates
+ * the media type of the response. It is implemented by the engine itself: the router uses it when
+ * the engine of the templates of the candidate routes is an instance of this interface.
+ *
+ * <p>The router calls it when every route that matches the path of a request, and accepts its
+ * method, port, conditions, content type ({@link io.micronaut.web.router.RouteInfo#doesConsume})
+ * and accepted types ({@link io.micronaut.web.router.RouteInfo#doesProduce}), has a template of
+ * the engine, even when there is only one such route, instead of the Micronaut resolution of
+ * ambiguous routes by the media types and the specificity of the templates. When the candidates
+ * are of different engines, the Micronaut policy selects, and the selector is not called. For
+ * example a JAX-RS engine selects by the specificity of JAX-RS (section 3.7.2), then by the
+ * content type of the request against {@code @Consumes} and the accepted types, with their
+ * quality, against {@code @Produces}, with their {@code qs}.</p>
+ *
+ * <p>The matches are normal route matches: filters, argument binding and the annotations of the
+ * route apply to the selected match as to any other. The negotiated media type of a selection
+ * reaches the handler as {@link UriRouteMatch#getSelectedMediaType()} and
+ * {@link #selectedMediaType(io.micronaut.http.PathVariables)}, and is the content
+ * type of the response when the handler does not set one.</p>
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Experimental
+public interface RouteMatchSelector {
+
+    /**
+     * Select among the matches of a request.
+     *
+     * @param request The request
+     * @param matches The matches of the path, of routes of this engine, in the order of the route
+     *                table: at least one
+     * @return The selected matches, each one of the given matches: one to route the request, none
+     * for no route ({@code 404}, or the status the router answers for a path no route matches), and
+     * more than one for an ambiguous request
+     */
+    List<Selection> select(HttpRequest<?> request, List<UriRouteMatch<?, ?>> matches);
+
+    /**
+     * The media type of the response that the route selector of the engine of the route
+     * negotiated, for the path variables given to a handler, see
+     * {@link UriRouteMatch#getSelectedMediaType()}.
+     *
+     * @param pathVariables The path variables a handler received
+     * @return The media type, or {@code null} if none was negotiated
+     * @since 5.3.0
+     */
+    static @Nullable MediaType selectedMediaType(PathVariables pathVariables) {
+        return pathVariables instanceof DefaultPathVariables routeVariables ? routeVariables.selectedMediaType() : null;
+    }
+
+    /**
+     * A selected match.
+     *
+     * @param match             One of the matches given to the selector
+     * @param responseMediaType The negotiated media type of the response, or {@code null} to let
+     *                          the server choose as for other routes
+     */
+    @Experimental
+    record Selection(UriRouteMatch<?, ?> match, @Nullable MediaType responseMediaType) {
+
+        /**
+         * @param match             One of the matches given to the selector
+         * @param responseMediaType The negotiated media type of the response, or {@code null}
+         */
+        public Selection {
+            Objects.requireNonNull(match, "match");
+        }
+
+        /**
+         * @param match A match, without a negotiated media type
+         * @return The selection
+         */
+        public static Selection of(UriRouteMatch<?, ?> match) {
+            return new Selection(match, null);
+        }
+
+        /**
+         * @param match             A match
+         * @param responseMediaType The negotiated media type of the response
+         * @return The selection
+         */
+        public static Selection of(UriRouteMatch<?, ?> match, @Nullable MediaType responseMediaType) {
+            return new Selection(match, responseMediaType);
+        }
+    }
+}
