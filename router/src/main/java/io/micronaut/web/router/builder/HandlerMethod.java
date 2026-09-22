@@ -301,7 +301,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @Override
     public String toString() {
-        return handlerType.getSimpleName() + " " + handler;
+        return "handler " + handler;
     }
 
     /**
