@@ -1302,8 +1302,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 return List.of();
             }
             List<GenericHttpFilter> filters = new ArrayList<>(requestFilters.size() + responseFilters.size());
-            filters.addAll(requestFilters);
+            // response filters first: the chain runs them on the way back from wherever the response
+            // was produced, the route or a request filter that answered instead of it, in the order
+            // they were declared
             filters.addAll(responseFilters.reversed());
+            filters.addAll(requestFilters);
             return List.copyOf(filters);
         }
 

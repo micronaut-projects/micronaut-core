@@ -81,7 +81,9 @@ public interface UriRoute {
     /**
      * Filter the responses of this route, like a {@code @ResponseFilter} method that applies to
      * this route only. Route filters run after the route and before the application's response
-     * filters, in the order they are declared.
+     * filters, in the order they are declared. They also filter a response a {@link #before}
+     * filter of this route answered with instead of the route, e.g. to add headers to a rejected
+     * request.
      *
      * @param filter The filter
      * @return The route
