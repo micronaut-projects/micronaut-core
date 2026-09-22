@@ -4421,6 +4421,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return members.invokeOn(value, name, arguments, typeName, type);
+            }
+
+            @Override
+            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+                return members.readOf(value, property, typeName, type);
+            }
+
+            @Override
             public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
                 FieldDef field = accessor ? null : model.propertyFields().get(property);
                 return field != null ? aThis.field(field).assign(value) : members.write(property, type, value, accessor);
@@ -4442,33 +4452,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
 
             @Override
+            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+                ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
+                return convertPythonValue(model, member, typeName, type, Optional.empty());
+            }
+
+            @Override
+            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return invokePython(model, value, name, arguments, typeName, type);
+            }
+
+            @Override
             public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
                 if (direct) {
                     return stub.invoke(name, parameterTypes, type, arguments);
                 }
-                // through the Python object, as the Python code would call it: its interceptors, its
-                // overrides in subclasses and its default arguments apply
-                List<ExpressionDef> boxed = new ArrayList<>(arguments.size());
-                for (ExpressionDef argument : arguments) {
-                    boxed.add(boxForPython(argument));
-                }
-                ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(boxed);
-                if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
-                    // converted by one call on the result: the invocation is evaluated once
-                    ExpressionDef result = PYTHON_INVOCATION.invokeStatic("invokePythonMethod", POLYGLOT_VALUE, self, ExpressionDef.constant(name), pythonArguments);
-                    return TypeDef.VOID.equals(type) ? result : convertPythonValue(model, result, typeName, type, Optional.empty());
-                }
-                // a reference conversion reads its value more than once (a null check first): the
-                // result is handed to a converter, so the method is invoked once
-                MethodDef convertMethod = MethodDef.builder("convert")
-                    .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                    .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                    .returns(TypeDef.OBJECT)
-                    .build();
-                MethodDef implementation = MethodDef.override(convertMethod)
-                    .build((aThis, methodParameters) -> convertPythonValue(model, methodParameters.get(0), typeName, type, Optional.empty()).returning());
-                ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
-                return PYTHON_STATIC.invokeStatic("invoke", TypeDef.OBJECT, self, ExpressionDef.constant(name), pythonArguments, converter).cast(type);
+                return invokePython(model, self, name, arguments, typeName, type);
             }
 
             @Override
@@ -4476,6 +4475,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 return (StatementDef) self.invoke(PUT_MEMBER, TypeDef.VOID, ExpressionDef.constant(property), value);
             }
         };
+    }
+
+    /**
+     * A call of a method of a Python object, as the Python code would make it: through the object,
+     * so its interceptors, its overrides and its default arguments apply; the result converted by a
+     * converter so the method is invoked once.
+     */
+    private ExpressionDef invokePython(ClassStubModel model, ExpressionDef target, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+        List<ExpressionDef> boxed = new ArrayList<>(arguments.size());
+        for (ExpressionDef argument : arguments) {
+            boxed.add(boxForPython(argument));
+        }
+        ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(boxed);
+        if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
+            // converted by one call on the result: the invocation is evaluated once
+            ExpressionDef result = PYTHON_INVOCATION.invokeStatic("invokePythonMethod", POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
+            return TypeDef.VOID.equals(type) ? result : convertPythonValue(model, result, typeName, type, Optional.empty());
+        }
+        // a reference conversion reads its value more than once (a null check first): the
+        // result is handed to a converter, so the method is invoked once
+        MethodDef convertMethod = MethodDef.builder("convert")
+            .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
+            .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build();
+        MethodDef implementation = MethodDef.override(convertMethod)
+            .build((aThis, methodParameters) -> convertPythonValue(model, methodParameters.get(0), typeName, type, Optional.empty()).returning());
+        ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
+        return PYTHON_STATIC.invokeStatic("invoke", TypeDef.OBJECT, target, ExpressionDef.constant(name), pythonArguments, converter).cast(type);
     }
 
     /**

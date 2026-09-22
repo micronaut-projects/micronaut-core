@@ -65,6 +65,9 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from jakarta.inject import Singleton
 
+ROLE = "user"
+LIMIT = 20
+
 
 @dataclass
 class Form:
@@ -82,6 +85,21 @@ class Finder:
 
     def pick(self, fallback: Form) -> Form:
         return self.form or fallback
+
+    def role(self) -> str:
+        return ROLE
+
+    def limit(self, n: int) -> int:
+        return n + LIMIT
+
+    def form_of(self) -> Form:
+        return Form(name="x")
+
+    def form_count(self, form: Form) -> int:
+        return Form(form.name, count=3).count
+
+    def rename(self, form: Form, name: str) -> None:
+        form.name = name
 
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
@@ -152,6 +170,35 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def _returned(self, name):
         return list(self._compiled(name).body().statements())[-1].value()
+
+    def test_a_module_constant_is_inlined(self):
+        returned = self._returned("role")
+        self.assertEqual("Const", returned.getClass().getSimpleName())
+        self.assertEqual("user", returned.value())
+        returned = _uncast(self._returned("limit"))
+        self.assertEqual("Binary", returned.getClass().getSimpleName())
+        self.assertEqual(20, returned.right().value())
+
+    def test_a_construction_by_keyword_fills_the_defaults(self):
+        returned = self._returned("form_of")
+        self.assertEqual("NewJava", returned.getClass().getSimpleName())
+        self.assertEqual(["java.lang.String", "int", "java.util.List<java.lang.String>"], list(returned.parameterTypes()))
+        arguments = list(returned.arguments())
+        self.assertEqual("x", arguments[0].value())
+        self.assertEqual(0, _uncast(arguments[1]).value())
+        self.assertEqual("Helper", arguments[2].getClass().getSimpleName())
+        self.assertEqual("list", arguments[2].name())
+        construction = _uncast(self._returned("form_count")).receiver()
+        self.assertEqual("NewJava", construction.getClass().getSimpleName())
+        self.assertEqual(3, _uncast(list(construction.arguments())[1]).value())
+
+    def test_an_attribute_of_an_object_of_the_compilation_is_assigned_through_its_setter(self):
+        statement = list(self._compiled("rename").body().statements())[0]
+        self.assertEqual("Eval", statement.getClass().getSimpleName())
+        call = statement.expression()
+        self.assertEqual("InvokeJava", call.getClass().getSimpleName())
+        self.assertEqual("setName", call.name())
+        self.assertEqual(["java.lang.String"], list(call.parameterTypes()))
 
     def test_or_on_an_attribute_of_an_object_yields_the_fallback_when_none(self):
         returned = self._returned("pick")
@@ -442,10 +489,30 @@ from jakarta.inject import Singleton
 from java.lang import Exception, RuntimeException
 
 
+class Cart:
+    items: int = 0
+
+    def __init__(self, items: int, owner: str):
+        self.items = items
+        self.owner = owner
+
+    def total(self, n: int) -> int:
+        return self.items * n
+
+    def _hidden(self) -> int:
+        return 1
+
+
 @Singleton
 class Pricing:
     def __init__(self, rate: float):
         self.rate = rate
+
+    def carted(self, cart: Cart, n: int) -> int:
+        return cart.total(n) + cart.items + cart._hidden()
+
+    def built(self, n: int) -> str:
+        return Cart(n, "x").owner
 
     def total(self, quantity: int, unit_price: float) -> float:
         subtotal = quantity * unit_price
@@ -699,6 +766,26 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
 
+    def test_objects_of_the_compilation_are_reached_through_their_generated_classes(self):
+        for name in ("carted", "built"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), f"{name}: {[(r.rule(), r.message()) for r in self.decisions[f'Pricing.{name}'].reasons()]}")
+        carted = _uncast(list(self.bodies["carted"].body().statements())[0].value())
+        total = _uncast(carted.left().left())
+        self.assertEqual("InvokeJava", total.getClass().getSimpleName())
+        self.assertEqual("pkg.Cart", total.owner())
+        self.assertEqual("total", total.name())
+        self.assertEqual(["int"], list(total.parameterTypes()))
+        items = _uncast(carted.left().right())
+        self.assertEqual("getItems", items.name())  # a hinted class attribute: the accessor of the generated class
+        hidden = _uncast(carted.right())
+        self.assertEqual("InvokePython", hidden.getClass().getSimpleName())  # not bridged: through the Python object
+        self.assertEqual(2, self.bodies["carted"].stats().javaCalls())
+        self.assertEqual(1, self.bodies["carted"].stats().bridgeCalls())
+        built = _uncast(list(self.bodies["built"].body().statements())[0].value())
+        self.assertEqual("PythonMember", built.getClass().getSimpleName())  # an instance attribute: no accessor
+        self.assertEqual("NewJava", built.receiver().getClass().getSimpleName())
+        self.assertEqual(["int", "java.lang.String"], list(built.receiver().parameterTypes()))
+
     def test_a_literal_of_mixed_elements_holds_objects(self):
         # [1, "x"] hinted list[int]: the literal holds Objects, cast through the raw type; Python checks the hint no more
         self.assertEqual("COMPILED", self.decisions["Pricing.mixed"].outcome().name(), rules(self.decisions["Pricing.mixed"]))
@@ -716,8 +803,9 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual(1, self.bodies["sibling"].stats().javaCalls())
         hidden = _uncast(list(self.bodies["hidden_call"].body().statements())[0].value())
         self.assertEqual("python", _uncast(hidden.left()).dispatch())  # not bridged: the stub has no Java method for it
-        self.assertEqual("python", _uncast(hidden.right()).dispatch())  # the call relies on a default argument
-        self.assertEqual(2, self.bodies["hidden_call"].stats().bridgeCalls())
+        self.assertEqual("java", _uncast(hidden.right()).dispatch())  # the default the call relies on is filled in
+        self.assertEqual(1, _uncast(list(_uncast(hidden.right()).arguments())[0]).value())
+        self.assertEqual(1, self.bodies["hidden_call"].stats().bridgeCalls())
         via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
         self.assertEqual("doubled", via_property.left().property())
         self.assertEqual("double", via_property.left().type())
