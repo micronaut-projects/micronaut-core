@@ -97,6 +97,6 @@ public final class RouteTableFactory {
         if (!builder.getExposedPorts().isEmpty()) {
             throw new IllegalArgumentException("A route table cannot expose ports: " + builder.getExposedPorts());
         }
-        return new RouteTable(new DefaultRouter(List.of(builder)));
+        return new DefaultRouteTable(new DefaultRouter(List.of(builder)));
     }
 }
