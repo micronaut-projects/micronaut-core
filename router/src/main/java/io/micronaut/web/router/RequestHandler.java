@@ -27,7 +27,7 @@ import io.micronaut.http.HttpResponse;
  * {@link UriRoute#nonBlocking()}).
  *
  * <pre>{@code
- * routes.GET("/hello/{name}", request -> HttpResponse.ok("Hello " + PathVariables.of(request).get("name")));
+ * routes.GET("/hello/{name}", request -> HttpResponse.ok("Hello " + PathVariables.of(request).getString("name")));
  * routes.GET("/report", request -> HttpResponse.ok(reports.build())).executeOn(TaskExecutors.BLOCKING);
  * }</pre>
  *

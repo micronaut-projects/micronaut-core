@@ -62,6 +62,22 @@ class HandlerRoutesSpec extends Specification {
         get('/ctx/h/optional/7') == '7'
     }
 
+    void "typed accessors convert strings and primitives"() {
+        expect:
+        get('/ctx/h/typed/abc/42/9000000000/1.5/true/x/3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e') ==
+                'abc,42,9000000000,1.5,true,x,3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e'
+        get('/ctx/h/find/7') == '7,7.0,7,false,false'
+    }
+
+    void "a primitive accessor that does not convert is a bad request"() {
+        when:
+        get('/ctx/h/typed/abc/notanint/1/1.5/true/x/3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e')
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
     void "route table routes are under the context path"() {
         expect:
         get('/ctx/table/x') == 'table /ctx/table/x'
@@ -97,7 +113,18 @@ class HandlerRoutesSpec extends Specification {
                     text("item $id ${id.class.name}")
                 } as RequestHandler)
                 routes.GET('/h/optional{/id}', { HttpRequest<?> request ->
-                    text(PathVariables.of(request).find('id', Integer).map(String::valueOf).orElse('none'))
+                    OptionalInt id = PathVariables.of(request).findInt('id')
+                    text(id.present ? String.valueOf(id.asInt) : 'none')
+                } as RequestHandler)
+                routes.GET('/h/typed/{s}/{i}/{l}/{d}/{b}/{c}/{u}', { HttpRequest<?> request ->
+                    PathVariables vars = PathVariables.of(request)
+                    text([vars.getString('s'), vars.getInt('i'), vars.getLong('l'), vars.getDouble('d'),
+                          vars.getBoolean('b'), vars.getChar('c'), vars.get('u', UUID)].join(','))
+                } as RequestHandler)
+                routes.GET('/h/find/{l}', { HttpRequest<?> request ->
+                    PathVariables vars = PathVariables.of(request)
+                    text([vars.findLong('l').asLong, vars.findDouble('l').asDouble, vars.findString('l').get(),
+                          vars.findInt('missing').present, vars.findBoolean('missing').present].join(','))
                 } as RequestHandler)
                 routes.handleAsync(io.micronaut.http.HttpMethod.GET, '/h/executor', { HttpRequest<?> request ->
                     CompletableFuture.completedFuture(text(Thread.currentThread().name))
