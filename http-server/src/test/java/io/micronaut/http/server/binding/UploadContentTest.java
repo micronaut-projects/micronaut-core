@@ -22,6 +22,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
@@ -36,6 +37,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -63,7 +65,11 @@ class UploadContentTest {
     private final ManualExecutor executor = new ManualExecutor();
 
     private UploadContext context(long maxFileSize) {
-        return new UploadContext(executor, BODY_FACTORY, StandardCharsets.UTF_8, 1024, maxFileSize);
+        return context(executor, maxFileSize);
+    }
+
+    private static UploadContext context(Executor ioExecutor, long maxFileSize) {
+        return new UploadContext(ioExecutor, BODY_FACTORY, StandardCharsets.UTF_8, 1024, maxFileSize);
     }
 
     private FileUpload memory(String content) {
@@ -299,6 +305,58 @@ class UploadContentTest {
     }
 
     @Test
+    void aWriteFailingAfterTheLastBufferFailsTheTransferAndPublishesNothing() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
+        Path destination = directory.resolve("corrupted.txt");
+        CompletionStage<Void> transfer = part.file().transferTo(destination);
+        executor.runAll();
+        // a buffer that cannot be written, then the end of the upload, before the write runs
+        publisher.emit(new UnwritableBuffer());
+        publisher.complete();
+        executor.runAll();
+        assertInstanceOf(RuntimeException.class, failure(transfer));
+        assertFalse(Files.exists(destination), "a failed transfer publishes nothing");
+        assertEquals(OptionalLong.empty(), part.file().size());
+        assertEquals(List.of(), leftovers());
+        join(part.closeAsync());
+    }
+
+    @Test
+    void aRejectingExecutorFailsTheTransferAndClosingCompletes() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        Executor rejecting = command -> {
+            throw new RejectedExecutionException("no I/O thread");
+        };
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(rejecting, Long.MAX_VALUE)));
+        Path destination = directory.resolve("rejected.txt");
+        CompletionStage<Void> transfer = part.file().transferTo(destination);
+        assertInstanceOf(RejectedExecutionException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+        join(part.closeAsync());
+        assertFalse(Files.exists(destination));
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
+    void anExecutorRejectingDuringTheTransferReleasesTheStagingFile() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        ManualExecutor limited = new ManualExecutor();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(limited, Long.MAX_VALUE)));
+        Path destination = directory.resolve("half.txt");
+        CompletionStage<Void> transfer = part.file().transferTo(destination);
+        // the staging file is open, then the executor shuts down
+        limited.runAll();
+        limited.reject = true;
+        publisher.emit("first");
+        assertInstanceOf(RejectedExecutionException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+        join(part.closeAsync());
+        assertFalse(Files.exists(destination));
+        assertEquals(List.of(), leftovers(), "the staging file is deleted on the rejecting thread");
+    }
+
+    @Test
     void closingThePartAbortsAStreamingTransfer() throws IOException {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
@@ -344,9 +402,13 @@ class UploadContentTest {
      */
     private static final class ManualExecutor implements Executor {
         private final Queue<Runnable> tasks = new ArrayDeque<>();
+        volatile boolean reject;
 
         @Override
         public synchronized void execute(Runnable command) {
+            if (reject) {
+                throw new RejectedExecutionException("shut down");
+            }
             tasks.add(command);
         }
 
@@ -361,6 +423,67 @@ class UploadContentTest {
                 }
                 task.run();
             }
+        }
+    }
+
+    /**
+     * A buffer whose size is known but whose content cannot be read, like a failing disk write.
+     */
+    private static final class UnwritableBuffer extends ReadBuffer {
+        private int size;
+        private boolean closed;
+
+        UnwritableBuffer() {
+            this(4);
+        }
+
+        private UnwritableBuffer(int size) {
+            this.size = size;
+        }
+
+        @Override
+        public int readable() {
+            return size;
+        }
+
+        @Override
+        public ReadBuffer duplicate() {
+            return new UnwritableBuffer(size);
+        }
+
+        @Override
+        public ReadBuffer split(int splitPosition) {
+            UnwritableBuffer first = new UnwritableBuffer(splitPosition);
+            size -= splitPosition;
+            return first;
+        }
+
+        @Override
+        public ReadBuffer move() {
+            UnwritableBuffer moved = new UnwritableBuffer(size);
+            closed = true;
+            return moved;
+        }
+
+        @Override
+        public void toArray(byte[] destination, int offset) {
+            closed = true;
+            throw new UncheckedIOException(new IOException("write failed"));
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
+
+        @Override
+        protected boolean isConsumed() {
+            return closed;
+        }
+
+        @Override
+        protected byte[] peekArray(int n) {
+            throw new UncheckedIOException(new IOException("write failed"));
         }
     }
 
@@ -387,7 +510,11 @@ class UploadContentTest {
         }
 
         void emit(String value) {
-            subscriber.onNext(ReadBufferFactory.getJdkFactory().copyOf(value, StandardCharsets.UTF_8));
+            emit(ReadBufferFactory.getJdkFactory().copyOf(value, StandardCharsets.UTF_8));
+        }
+
+        void emit(ReadBuffer buffer) {
+            subscriber.onNext(buffer);
         }
 
         void complete() {

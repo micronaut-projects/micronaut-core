@@ -34,6 +34,7 @@ import java.util.Objects;
 import java.util.OptionalLong;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 
 /**
@@ -238,6 +239,8 @@ final class StreamingUploadContent extends UploadContent {
     /**
      * Writes the content to a staging file on the I/O executor, one buffer at a time, and
      * publishes it. The disk tasks run in sequence: each one is chained to the previous one.
+     * Completion of the upstream and completion of the transfer are separate: a write that fails
+     * after the last buffer arrived still fails the transfer, and nothing is published.
      */
     private final class Transfer extends UploadContent.Operation<Void> implements Subscriber<ReadBuffer> {
         private final Path destination;
@@ -248,9 +251,11 @@ final class StreamingUploadContent extends UploadContent {
         private CompletableFuture<?> tail = CompletableFuture.completedFuture(null);
         private long total;
         // no more upstream signals are handled: completed, failed or aborted
-        private boolean done;
-        // failed or aborted: the queued writes are skipped
+        private boolean upstreamDone;
+        // failed or aborted: the queued disk tasks are skipped, and the transfer settles with the failure
         private boolean stopped;
+        // the one outcome of the transfer is being settled
+        private boolean settling;
         // only used by the disk tasks, which run in sequence
         private @Nullable Path staging;
         private @Nullable OutputStream out;
@@ -264,7 +269,7 @@ final class StreamingUploadContent extends UploadContent {
         @Override
         void start() {
             synchronized (this) {
-                if (done) {
+                if (stopped) {
                     return;
                 }
             }
@@ -280,19 +285,27 @@ final class StreamingUploadContent extends UploadContent {
         }
 
         private void enqueue(Runnable task) {
+            CompletableFuture<?> next;
             synchronized (this) {
-                tail = tail.handleAsync((ignored, error) -> {
+                next = tail.handleAsync((ignored, error) -> {
                     task.run();
                     return null;
                 }, executor);
+                tail = next;
             }
+            // the tasks handle their own failures: a failed task means the executor rejected it
+            next.whenComplete((ignored, error) -> {
+                if (error != null) {
+                    rejected(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                }
+            });
         }
 
         @Override
         public void onSubscribe(Subscription s) {
             boolean cancel;
             synchronized (this) {
-                cancel = done;
+                cancel = upstreamDone;
                 subscription = s;
             }
             if (cancel) {
@@ -305,7 +318,7 @@ final class StreamingUploadContent extends UploadContent {
 
         private void request(Subscription s) {
             synchronized (this) {
-                if (done || stopped) {
+                if (upstreamDone || stopped) {
                     return;
                 }
             }
@@ -317,7 +330,7 @@ final class StreamingUploadContent extends UploadContent {
             Subscription s;
             boolean tooLarge = false;
             synchronized (this) {
-                if (done) {
+                if (upstreamDone) {
                     buffer.close();
                     return;
                 }
@@ -367,14 +380,21 @@ final class StreamingUploadContent extends UploadContent {
         public void onComplete() {
             long size;
             synchronized (this) {
-                if (done) {
+                if (upstreamDone) {
                     return;
                 }
-                // from now on, closing waits for the publication instead of aborting it
-                done = true;
+                // no more buffers: closing now waits for the publication instead of aborting it,
+                // but a queued write that fails still fails the transfer
+                upstreamDone = true;
                 size = total;
             }
             enqueue(() -> {
+                synchronized (this) {
+                    if (stopped) {
+                        // a write failed: the cleanup task queued by fail() settles the transfer
+                        return;
+                    }
+                }
                 Throwable error = null;
                 try {
                     OutputStream o = out;
@@ -396,51 +416,98 @@ final class StreamingUploadContent extends UploadContent {
                 } else {
                     completeSize = size;
                 }
-                settle(null, error, cleanupError);
+                settleOnce(null, error, cleanupError);
             });
         }
 
         @Override
         void abort() {
+            synchronized (this) {
+                if (upstreamDone && !stopped) {
+                    // every buffer arrived: the publication completes
+                    return;
+                }
+            }
             fail(new CancellationException("The form field " + name() + " was closed"), true);
         }
 
         /**
          * Stop: cancel the upstream, then close and delete the staging file after the disk tasks
-         * that were queued.
+         * that were queued, and settle with the failure. A failure after the upstream completed
+         * stops the publication too.
          */
         private void fail(Throwable error, boolean cancel) {
             Subscription s;
+            boolean upstreamWasDone;
             synchronized (this) {
-                if (done) {
+                if (stopped) {
                     return;
                 }
-                done = true;
                 stopped = true;
+                upstreamWasDone = upstreamDone;
+                upstreamDone = true;
                 s = subscription;
             }
-            if (cancel) {
-                if (s != null) {
-                    s.cancel();
-                } else {
-                    field.close();
+            if (cancel && !upstreamWasDone) {
+                cancelUpstream(s);
+            }
+            enqueue(() -> settleOnce(null, error, releaseStaging(null)));
+        }
+
+        /**
+         * The executor rejected a disk task: nothing queued after it runs. Release the staging
+         * file on this thread, as the executor cannot, and settle, so that neither the transfer
+         * nor closing the upload waits forever.
+         */
+        private void rejected(Throwable error) {
+            Subscription s;
+            boolean upstreamWasDone;
+            synchronized (this) {
+                if (settling) {
+                    return;
+                }
+                stopped = true;
+                upstreamWasDone = upstreamDone;
+                upstreamDone = true;
+                s = subscription;
+            }
+            if (!upstreamWasDone) {
+                cancelUpstream(s);
+            }
+            settleOnce(null, error, releaseStaging(null));
+        }
+
+        private void cancelUpstream(@Nullable Subscription s) {
+            if (s != null) {
+                s.cancel();
+            } else {
+                field.close();
+            }
+        }
+
+        private @Nullable Throwable releaseStaging(@Nullable Throwable cleanupError) {
+            OutputStream o = out;
+            out = null;
+            if (o != null) {
+                try {
+                    o.close();
+                } catch (IOException e) {
+                    cleanupError = e;
                 }
             }
-            enqueue(() -> {
-                Throwable cleanupError = null;
-                OutputStream o = out;
-                out = null;
-                if (o != null) {
-                    try {
-                        o.close();
-                    } catch (IOException e) {
-                        cleanupError = e;
-                    }
+            cleanupError = deleteQuietly(staging, cleanupError);
+            staging = null;
+            return cleanupError;
+        }
+
+        private void settleOnce(@Nullable Void value, @Nullable Throwable error, @Nullable Throwable cleanupError) {
+            synchronized (this) {
+                if (settling) {
+                    return;
                 }
-                cleanupError = deleteQuietly(staging, cleanupError);
-                staging = null;
-                settle(null, error, cleanupError);
-            });
+                settling = true;
+            }
+            settle(value, error, cleanupError);
         }
     }
 }
