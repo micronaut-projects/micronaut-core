@@ -26,11 +26,21 @@ import java.util.List;
  * exactly as the pattern of the engine does. It reads the engine's own structure of the parsed
  * template, not the text of the template.
  */
-public final class ColonRouteTemplateCompiler implements RouteTemplateCompiler {
+public class ColonRouteTemplateCompiler implements RouteTemplateCompiler {
+
+    private final String engineId;
+
+    public ColonRouteTemplateCompiler() {
+        this(ColonRouteTemplateEngine.ID);
+    }
+
+    protected ColonRouteTemplateCompiler(String engineId) {
+        this.engineId = engineId;
+    }
 
     @Override
     public String engineId() {
-        return ColonRouteTemplateEngine.ID;
+        return engineId;
     }
 
     @Override
@@ -56,5 +66,23 @@ public final class ColonRouteTemplateCompiler implements RouteTemplateCompiler {
             }
         }
         return LoweredTemplate.of(segments, captures);
+    }
+
+    /**
+     * The compiler of {@link ColonRouteTemplateEngine.Ordered}.
+     */
+    public static final class Ordered extends ColonRouteTemplateCompiler {
+        public Ordered() {
+            super(ColonRouteTemplateEngine.Ordered.ORDERED_ID);
+        }
+    }
+
+    /**
+     * The compiler of {@link ColonRouteTemplateEngine.Selecting}.
+     */
+    public static final class Selecting extends ColonRouteTemplateCompiler {
+        public Selecting() {
+            super(ColonRouteTemplateEngine.Selecting.SELECTING_ID);
+        }
     }
 }

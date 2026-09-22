@@ -159,6 +159,52 @@ public class ColonRouteTemplateEngine implements RouteTemplateEngine {
         }
     }
 
+    /**
+     * The same language with its own order of specificity, the reverse of the Micronaut one for the
+     * literal text: fewer literal characters first.
+     */
+    public static final class Ordered extends ColonRouteTemplateEngine {
+        public static final String ORDERED_ID = "test.colon-ordered";
+
+        public Ordered() {
+            super(ORDERED_ID);
+        }
+
+        @Override
+        public java.util.Optional<java.util.Comparator<ParsedRouteTemplate>> comparator() {
+            return java.util.Optional.of(java.util.Comparator.comparingInt(ParsedRouteTemplate::rawLength));
+        }
+    }
+
+    /**
+     * The same language with a route selector: the first accepted type a route produces.
+     */
+    public static final class Selecting extends ColonRouteTemplateEngine implements io.micronaut.web.router.spi.RouteMatchSelector {
+        public static final String SELECTING_ID = "test.colon-selecting";
+
+        public Selecting() {
+            super(SELECTING_ID);
+        }
+
+        @Override
+        public List<Selection> select(io.micronaut.http.HttpRequest<?> request, List<io.micronaut.web.router.UriRouteMatch<?, ?>> matches) {
+            List<io.micronaut.http.MediaType> accepted = new ArrayList<>(request.accept());
+            if (accepted.isEmpty()) {
+                accepted.add(io.micronaut.http.MediaType.ALL_TYPE);
+            }
+            for (io.micronaut.http.MediaType accept : accepted) {
+                for (io.micronaut.web.router.UriRouteMatch<?, ?> match : matches) {
+                    for (io.micronaut.http.MediaType produced : match.getRouteInfo().getProduces()) {
+                        if (accept.matches(produced)) {
+                            return List.of(Selection.of(match, produced));
+                        }
+                    }
+                }
+            }
+            return List.of();
+        }
+    }
+
     record Segment(String text, boolean variable) {
     }
 

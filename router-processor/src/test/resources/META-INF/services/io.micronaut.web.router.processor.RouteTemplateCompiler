@@ -1,1 +1,3 @@
 io.micronaut.web.router.processor.ColonRouteTemplateCompiler
+io.micronaut.web.router.processor.ColonRouteTemplateCompiler$Ordered
+io.micronaut.web.router.processor.ColonRouteTemplateCompiler$Selecting
