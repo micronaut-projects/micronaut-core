@@ -126,12 +126,14 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             ).add(interceptedMethod);
         }
         Map<String, ProxyExecutable> introductionFunctions = new LinkedHashMap<>();
+        List<RuntimeProxyDefinition.InterceptedMethod<T>> staticallyIntercepted = new ArrayList<>();
         for (Map.Entry<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> entry : interceptedMethodsByName.entrySet()) {
             String methodName = entry.getKey();
             List<RuntimeProxyDefinition.InterceptedMethod<T>> interceptedMethods = entry.getValue()
                 .stream()
                 .map(interceptedMethod -> withoutConcreteIntroductionInterceptors(proxyDefinition, interceptedMethod))
                 .toList();
+            staticallyIntercepted.addAll(interceptedMethods);
             Value originalFunction = PythonInvocation.getRawClassMember(value, methodName);
             ProxyExecutable proxiedFunction = createProxiedFunction(
                 true,
@@ -155,6 +157,10 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
         targetBeanRef.set(target);
         for (Map.Entry<String, ProxyExecutable> entry : introductionFunctions.entrySet()) {
             targetValue.putMember(entry.getKey(), entry.getValue());
+        }
+        if (target instanceof StaticAdviceTarget advised) {
+            // the generated class runs the chain of an introduced method in Java when called from Java
+            advised.bindStaticAdvice(new StaticAdvice<>(proxyDefinition, staticallyIntercepted, () -> target));
         }
         return target;
     }

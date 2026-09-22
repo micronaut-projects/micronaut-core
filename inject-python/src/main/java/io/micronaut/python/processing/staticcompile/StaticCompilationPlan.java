@@ -82,6 +82,22 @@ public record StaticCompilationPlan(List<StaticCompilationDecision> decisions,
     }
 
     /**
+     * @return Whether static compilation is on: a function of the compilation was considered for it
+     * (the planner records every function as excluded when the mode is off)
+     */
+    public boolean active() {
+        if (!bodies.isEmpty()) {
+            return true;
+        }
+        for (StaticCompilationDecision decision : decisions) {
+            if (decision.outcome() != StaticCompilationDecision.Outcome.EXCLUDED) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
      * @param className The generated class
      * @return Whether any method of the class is compiled
      */
