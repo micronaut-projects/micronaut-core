@@ -420,6 +420,18 @@ public final class PythonAstParser {
         return calls;
     }
 
+    /**
+     * The run time strips a leading {@code io.} from every Java package when it derives the Python
+     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
+     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
+     * name as well, for any library and not only {@code io.micronaut}.
+     */
+    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+
+    private static boolean isJavaIoPackage(String name) {
+        return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
+    }
+
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         return transform(visitorContext, List.of(), pythonSource);
     }
@@ -458,6 +470,12 @@ public final class PythonAstParser {
                 // a class generated from a Python source of a package under micronaut.* carries no io. prefix
                 classElement = visitorContext.getClassElement(name).filter(PythonJavaTypes::isPythonClass);
             }
+            if (classElement.isEmpty() && !isJavaIoPackage(javaName)) {
+                // The run time strips a leading "io." from every Java package, not just io.micronaut,
+                // so an import written the way the run time names it -- swagger.v3.oas.annotations for
+                // io.swagger.v3.oas.annotations -- has to resolve here too.
+                classElement = visitorContext.getClassElement(JAVA_IO_PACKAGE_PREFIX + javaName);
+            }
             if (classElement.isPresent()) {
                 classElementCache.put(javaName, classElement.get());
                 return classElement.get();
@@ -471,7 +489,14 @@ public final class PythonAstParser {
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
             return packageClassElementsCache.computeIfAbsent(
                 javaPackageName,
-                name -> visitorContext.getClassElements(name, "*")
+                name -> {
+                    Object[] elements = visitorContext.getClassElements(name, "*");
+                    if ((elements == null || elements.length == 0) && !isJavaIoPackage(name)) {
+                        // As above: io.swagger.v3.oas.annotations is imported as swagger.v3.oas.annotations.
+                        elements = visitorContext.getClassElements(JAVA_IO_PACKAGE_PREFIX + name, "*");
+                    }
+                    return elements;
+                }
             );
         });
         List<TransformResult> results = new ArrayList<>();
