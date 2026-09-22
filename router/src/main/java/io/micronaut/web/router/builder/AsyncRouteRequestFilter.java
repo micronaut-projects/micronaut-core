@@ -41,6 +41,7 @@ public interface AsyncRouteRequestFilter {
      * @param request The request
      * @return Completes with a response to answer the request with instead of the route, or with
      * {@code null} to proceed; completing exceptionally is handled by the error routes
+     * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request);
+    CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request) throws Exception;
 }

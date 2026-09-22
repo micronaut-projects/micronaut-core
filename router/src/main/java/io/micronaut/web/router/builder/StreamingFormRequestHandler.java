@@ -43,6 +43,7 @@ public interface StreamingFormRequestHandler {
      * @param pathVariables The path variables of the matched route
      * @param parts         The parts of the form, read as the handler consumes them
      * @return The response, completed later
+     * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormParts parts);
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormParts parts) throws Exception;
 }

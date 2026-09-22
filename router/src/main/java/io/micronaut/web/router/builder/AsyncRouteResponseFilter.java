@@ -39,6 +39,7 @@ public interface AsyncRouteResponseFilter {
      * @param request  The request
      * @param response The response of the route, which the filter can change until the stage completes
      * @return Completes when the response is filtered; completing exceptionally is handled by the error routes
+     * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response);
+    CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response) throws Exception;
 }

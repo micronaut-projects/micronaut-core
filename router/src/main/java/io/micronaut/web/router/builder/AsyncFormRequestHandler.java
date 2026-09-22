@@ -41,6 +41,7 @@ public interface AsyncFormRequestHandler {
      * @param pathVariables The path variables of the matched route
      * @param form          The submitted form
      * @return The response, completed later
+     * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormData form);
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormData form) throws Exception;
 }

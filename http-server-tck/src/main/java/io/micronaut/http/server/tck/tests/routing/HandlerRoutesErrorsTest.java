@@ -67,6 +67,21 @@ public class HandlerRoutesErrorsTest {
     }
 
     @Test
+    void checkedExceptionOfAnAsyncHandlerIsHandledLikeTheRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // thrown by the handler itself, not by the stage it returns
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/errors/handler/async-checked"), HttpResponseAssertion.builder()
+                .status(HttpStatus.I_AM_A_TEAPOT)
+                .body("handled checked failure")
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/errors/handler/async-filtered"), HttpResponseAssertion.builder()
+                .status(HttpStatus.I_AM_A_TEAPOT)
+                .body("handled checked failure")
+                .build());
+        }
+    }
+
+    @Test
     void exceptionIsHandledByAnExceptionHandlerBean() throws IOException {
         try (ServerUnderTest server = server()) {
             for (String source : SOURCES) {
@@ -185,6 +200,13 @@ public class HandlerRoutesErrorsTest {
             routes.GET("/errors/handler/unhandled", (request, pathVariables) -> {
                 throw new UnhandledFailure("unhandled failure");
             });
+            routes.asyncGET("/errors/handler/async-checked", (request, pathVariables) -> {
+                throw new CheckedFailure("checked failure");
+            });
+            routes.GET("/errors/handler/async-filtered", (request, pathVariables) -> HttpResponse.ok("not reached"))
+                .beforeAsync(request -> {
+                    throw new CheckedFailure("checked failure");
+                });
             routes.GET("/errors/handler/filtered", (request, pathVariables) -> HttpResponse.ok("not reached"))
                 .before(request -> {
                     throw new CheckedFailure("checked failure");
