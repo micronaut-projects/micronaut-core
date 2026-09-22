@@ -27,6 +27,9 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
 import java.util.Set;
 
 /**
@@ -34,14 +37,16 @@ import java.util.Set;
  *
  * <pre>{@code
  * routes.GET("/items/{id}", request -> {
- *     long id = PathVariables.of(request).get("id", Long.class);
+ *     long id = PathVariables.of(request).getLong("id");
  *     return HttpResponse.ok(items.find(id));
  * });
  * }</pre>
  *
- * <p>Values convert with the conversion service of the route, like the path variable arguments
- * of a controller method, and fail the same way: a missing variable or a value that does not
- * convert is answered with 400.</p>
+ * <p>There are accessors for strings and the primitive types, e.g. {@code getLong("id")} or
+ * {@code findInt("page")}, and {@link #get(String, Class)} and {@link #find(String, Class)} for
+ * any other type, e.g. {@code UUID}. Values convert with the conversion service of the route,
+ * like the path variable arguments of a controller method, and fail the same way: a missing
+ * variable or a value that does not convert is answered with 400.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -91,17 +96,6 @@ public final class PathVariables {
     }
 
     /**
-     * A required variable.
-     *
-     * @param name The name of the variable
-     * @return The value
-     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
-     */
-    public String get(String name) {
-        return get(name, String.class);
-    }
-
-    /**
      * A required variable converted to a type.
      *
      * @param name The name of the variable
@@ -121,16 +115,6 @@ public final class PathVariables {
     }
 
     /**
-     * An optional variable.
-     *
-     * @param name The name of the variable
-     * @return The value, if present
-     */
-    public Optional<String> find(String name) {
-        return find(name, String.class);
-    }
-
-    /**
      * An optional variable converted to a type.
      *
      * @param name The name of the variable
@@ -145,6 +129,172 @@ public final class PathVariables {
             return Optional.empty();
         }
         return Optional.of(convert(Argument.of(type, name), value));
+    }
+
+    /**
+     * A required variable as a string.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public String getString(String name) {
+        return get(name, String.class);
+    }
+
+    /**
+     * A required variable as an {@code int}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public int getInt(String name) {
+        return get(name, Integer.class);
+    }
+
+    /**
+     * A required variable as a {@code long}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public long getLong(String name) {
+        return get(name, Long.class);
+    }
+
+    /**
+     * A required variable as a {@code double}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public double getDouble(String name) {
+        return get(name, Double.class);
+    }
+
+    /**
+     * A required variable as a {@code float}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public float getFloat(String name) {
+        return get(name, Float.class);
+    }
+
+    /**
+     * A required variable as a {@code short}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public short getShort(String name) {
+        return get(name, Short.class);
+    }
+
+    /**
+     * A required variable as a {@code byte}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public byte getByte(String name) {
+        return get(name, Byte.class);
+    }
+
+    /**
+     * A required variable as a {@code char}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public char getChar(String name) {
+        return get(name, Character.class);
+    }
+
+    /**
+     * A required variable as a {@code boolean}.
+     *
+     * @param name The name of the variable
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     */
+    public boolean getBoolean(String name) {
+        return get(name, Boolean.class);
+    }
+
+    /**
+     * An optional variable as a string.
+     *
+     * @param name The name of the variable
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    public Optional<String> findString(String name) {
+        return find(name, String.class);
+    }
+
+    /**
+     * An optional variable as an {@code int}.
+     *
+     * @param name The name of the variable
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    public OptionalInt findInt(String name) {
+        Optional<Integer> value = find(name, Integer.class);
+        return value.isPresent() ? OptionalInt.of(value.get().intValue()) : OptionalInt.empty();
+    }
+
+    /**
+     * An optional variable as a {@code long}.
+     *
+     * @param name The name of the variable
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    public OptionalLong findLong(String name) {
+        Optional<Long> value = find(name, Long.class);
+        return value.isPresent() ? OptionalLong.of(value.get().longValue()) : OptionalLong.empty();
+    }
+
+    /**
+     * An optional variable as a {@code double}.
+     *
+     * @param name The name of the variable
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    public OptionalDouble findDouble(String name) {
+        Optional<Double> value = find(name, Double.class);
+        return value.isPresent() ? OptionalDouble.of(value.get().doubleValue()) : OptionalDouble.empty();
+    }
+
+    /**
+     * An optional variable as a {@code boolean}.
+     *
+     * @param name The name of the variable
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    public Optional<Boolean> findBoolean(String name) {
+        return find(name, Boolean.class);
     }
 
     private <T> T convert(Argument<T> argument, Object value) {
