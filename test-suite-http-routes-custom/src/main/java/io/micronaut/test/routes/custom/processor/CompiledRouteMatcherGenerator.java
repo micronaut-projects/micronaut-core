@@ -71,7 +71,7 @@ final class CompiledRouteMatcherGenerator {
         number(root);
         StringBuilder source = new StringBuilder();
         source.append("    /**\n     * The URL parser of the declared routes, generated at compile time.\n     */\n");
-        source.append("    static final class ").append(className).append(" implements io.micronaut.web.router.CompiledRouteMatcher {\n");
+        source.append("    static final class ").append(className).append(" implements io.micronaut.web.router.builder.CompiledRouteMatcher {\n");
         source.append("        static final ").append(className).append(" INSTANCE = new ").append(className).append("();\n\n");
         source.append("        @Override\n        public int maxVariables() {\n            return ").append(maxVariables).append(";\n        }\n\n");
         source.append("        @Override\n        public int match(io.micronaut.http.HttpMethod m, String p, String[] v) {\n");

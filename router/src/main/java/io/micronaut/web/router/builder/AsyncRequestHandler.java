@@ -13,32 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.HttpResponse;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * An asynchronous filter of one route's responses, declared with
- * {@link io.micronaut.web.router.builder.UriRoute#afterAsync(AsyncRouteResponseFilter)}. The filter chain continues when the
- * returned stage completes, so the filter must not block.
+ * A route handler that completes the response later. The executor is selected like for a
+ * controller method returning a {@link CompletionStage}: with automatic thread selection it runs
+ * on the event loop and must not block.
  *
  * @author Denis Stepanov
  * @since 5.3.0
+ * @see io.micronaut.web.router.builder.RouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncRouteResponseFilter {
+public interface AsyncRequestHandler {
 
     /**
-     * Filter the response.
+     * Handle the request.
      *
-     * @param request  The request
-     * @param response The response of the route, which the filter can change until the stage completes
-     * @return Completes when the response is filtered; completing exceptionally is handled by the error routes
+     * @param request       The request
+     * @param pathVariables The path variables of the matched route
+     * @return The response, completed later
      */
-    CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response);
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables);
 }

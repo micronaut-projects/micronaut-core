@@ -19,16 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.web.router.AsyncFormRequestHandler;
-import io.micronaut.web.router.AsyncRequestHandler;
-import io.micronaut.web.router.BodyRequestHandler;
-import io.micronaut.web.router.ErrorRouteHandler;
-import io.micronaut.web.router.FormRequestHandler;
-import io.micronaut.web.router.HttpRoutes;
-import io.micronaut.web.router.RequestHandler;
-import io.micronaut.web.router.RouteDeclaration;
-import io.micronaut.web.router.StatusRouteHandler;
-import io.micronaut.web.router.StreamingFormRequestHandler;
+import io.micronaut.web.router.Route;
 
 import java.util.Set;
 

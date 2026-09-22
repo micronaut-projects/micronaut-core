@@ -13,30 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.HttpResponse;
 
 /**
- * A filter of one route's responses, declared with {@link io.micronaut.web.router.builder.UriRoute#after(RouteResponseFilter)}.
- * Like a {@code @ResponseFilter} method it runs after the route, before the application's
- * response filters, and can change the response.
+ * A handler function for an error: it answers a request whose handling failed with an exception
+ * of the type it is registered for, like an {@code @Error(global = true)} method. It handles the
+ * exceptions of controller routes and handler routes alike.
  *
+ * @param <E> The type of the exception
  * @author Denis Stepanov
  * @since 5.3.0
+ * @see io.micronaut.web.router.builder.RouteBuilder#error(Class, ErrorRouteHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface RouteResponseFilter {
+public interface ErrorRouteHandler<E extends Throwable> {
 
     /**
-     * Filter the response.
+     * Handle the error.
      *
-     * @param request  The request
-     * @param response The response of the route
-     * @throws Exception An error, handled by the error routes
+     * @param request The request
+     * @param error   The exception
+     * @return The response
+     * @throws Exception An error, answered with the default error response
      */
-    void filter(HttpRequest<?> request, MutableHttpResponse<?> response) throws Exception;
+    HttpResponse<?> handle(HttpRequest<?> request, E error) throws Exception;
 }

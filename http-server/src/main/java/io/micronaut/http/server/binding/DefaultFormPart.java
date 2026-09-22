@@ -22,7 +22,7 @@ import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.web.router.FormPart;
+import io.micronaut.web.router.builder.FormPart;
 import org.jspecify.annotations.Nullable;
 import reactor.core.publisher.Mono;
 

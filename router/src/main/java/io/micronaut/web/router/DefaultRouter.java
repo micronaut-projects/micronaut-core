@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -29,12 +28,15 @@ import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
-import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.web.router.builder.CompiledRouteMatcher;
+import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Arrays;

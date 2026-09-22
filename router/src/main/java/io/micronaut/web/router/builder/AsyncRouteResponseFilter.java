@@ -13,31 +13,32 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.http.MutableHttpResponse;
+
+import java.util.concurrent.CompletionStage;
 
 /**
- * A filter of one route's requests, declared with {@link io.micronaut.web.router.builder.UriRoute#before(RouteRequestFilter)}.
- * Like a {@code @RequestFilter} method it runs before the route, after the application's
- * filters, and can answer the request instead of the route.
+ * An asynchronous filter of one route's responses, declared with
+ * {@link io.micronaut.web.router.builder.UriRoute#afterAsync(AsyncRouteResponseFilter)}. The filter chain continues when the
+ * returned stage completes, so the filter must not block.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @FunctionalInterface
-public interface RouteRequestFilter {
+public interface AsyncRouteResponseFilter {
 
     /**
-     * Filter the request.
+     * Filter the response.
      *
-     * @param request The request
-     * @return A response to answer the request with instead of the route, or {@code null} to proceed
-     * @throws Exception An error, handled by the error routes
+     * @param request  The request
+     * @param response The response of the route, which the filter can change until the stage completes
+     * @return Completes when the response is filtered; completing exceptionally is handled by the error routes
      */
-    @Nullable HttpResponse<?> filter(HttpRequest<?> request) throws Exception;
+    CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response);
 }

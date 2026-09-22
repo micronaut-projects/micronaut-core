@@ -76,7 +76,7 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
             /**
              * The routes of {@link %s}, declared at compile time from its web annotations.
              */
-            public enum %s implements io.micronaut.web.router.RouteDeclaration {
+            public enum %s implements io.micronaut.web.router.builder.RouteDeclaration {
             %s;
 
                 private final io.micronaut.http.HttpMethod httpMethod;
@@ -119,7 +119,7 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
                 }
 
                 @Override
-                public io.micronaut.web.router.CompiledRouteMatcher matcher() {
+                public io.micronaut.web.router.builder.CompiledRouteMatcher matcher() {
                     return Matcher.INSTANCE;
                 }
 

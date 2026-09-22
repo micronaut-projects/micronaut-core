@@ -28,7 +28,7 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
-import io.micronaut.web.router.HttpRoutes;
+import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 

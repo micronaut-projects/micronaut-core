@@ -13,34 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-import org.jspecify.annotations.Nullable;
-
-import java.util.concurrent.CompletionStage;
 
 /**
- * An asynchronous filter of one route's requests, declared with
- * {@link io.micronaut.web.router.builder.UriRoute#beforeAsync(AsyncRouteRequestFilter)}. The filter chain continues when the
- * returned stage completes, so the filter must not block: it runs on the thread of the filter
- * chain, which can be the event loop.
+ * A handler function for a response status: it answers a request whose response has the status
+ * it is registered for, e.g. {@code 404}, like an {@code @Error(status = ..., global = true)}
+ * method.
  *
  * @author Denis Stepanov
  * @since 5.3.0
+ * @see RouteBuilder#status(io.micronaut.http.HttpStatus, StatusRouteHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncRouteRequestFilter {
+public interface StatusRouteHandler {
 
     /**
-     * Filter the request.
+     * Handle the status.
      *
      * @param request The request
-     * @return Completes with a response to answer the request with instead of the route, or with
-     * {@code null} to proceed; completing exceptionally is handled by the error routes
+     * @return The response
+     * @throws Exception An error, answered with the default error response
      */
-    CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request);
+    HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
 }

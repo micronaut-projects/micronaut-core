@@ -13,36 +13,33 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
-import java.util.concurrent.CompletionStage;
-
 /**
- * A route handler that reads a submitted form as it arrives, part by part, with
- * {@link FormParts#forEach}: large files can be streamed to their destination without buffering
- * the form. The executor is selected like for a controller method returning a
- * {@link CompletionStage}, so with automatic thread selection it runs on the event loop and must
- * not block.
+ * A route handler for a submitted form, {@code application/x-www-form-urlencoded} or
+ * {@code multipart/form-data}. The whole form is read before the handler runs, and the executor
+ * is selected like for a blocking controller method.
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleFormStream(io.micronaut.http.HttpMethod, String, StreamingFormRequestHandler)
+ * @see io.micronaut.web.router.builder.RouteBuilder#handleForm(io.micronaut.http.HttpMethod, String, FormRequestHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface StreamingFormRequestHandler {
+public interface FormRequestHandler {
 
     /**
      * Handle the request.
      *
      * @param request       The request
      * @param pathVariables The path variables of the matched route
-     * @param parts         The parts of the form, read as the handler consumes them
-     * @return The response, completed later
+     * @param form          The submitted form
+     * @return The response
+     * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormParts parts);
+    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables, FormData form) throws Exception;
 }

@@ -13,34 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
+import java.util.concurrent.CompletionStage;
+
 /**
- * A route handler that receives the request body decoded to a type, like a controller method
- * with a {@code @Body} argument: the body is read and decoded by the message body readers
- * before the handler runs.
+ * A route handler that reads a submitted form as it arrives, part by part, with
+ * {@link FormParts#forEach}: large files can be streamed to their destination without buffering
+ * the form. The executor is selected like for a controller method returning a
+ * {@link CompletionStage}, so with automatic thread selection it runs on the event loop and must
+ * not block.
  *
- * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handle(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, BodyRequestHandler)
+ * @see io.micronaut.web.router.builder.RouteBuilder#handleFormStream(io.micronaut.http.HttpMethod, String, StreamingFormRequestHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface BodyRequestHandler<B> {
+public interface StreamingFormRequestHandler {
 
     /**
      * Handle the request.
      *
      * @param request       The request
      * @param pathVariables The path variables of the matched route
-     * @param body          The decoded body
-     * @return The response
-     * @throws Exception An error, handled by the error routes like a controller error
+     * @param parts         The parts of the form, read as the handler consumes them
+     * @return The response, completed later
      */
-    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormParts parts);
 }

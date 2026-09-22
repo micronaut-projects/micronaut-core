@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Requires;
@@ -21,6 +21,7 @@ import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.web.router.DefaultRouteBuilder;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -67,7 +68,7 @@ final class HttpRoutesRouteBuilder extends DefaultRouteBuilder {
     }
 
     @Override
-    String routeUri(String uri) {
+    protected String routeUri(String uri) {
         return underContextPath(contextPath, uri);
     }
 }

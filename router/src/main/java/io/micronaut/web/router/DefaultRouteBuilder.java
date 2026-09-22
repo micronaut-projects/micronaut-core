@@ -21,6 +21,7 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.env.Environment;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
@@ -49,6 +50,22 @@ import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.builder.AsyncFormRequestHandler;
+import io.micronaut.web.router.builder.AsyncRequestHandler;
+import io.micronaut.web.router.builder.AsyncRouteRequestFilter;
+import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
+import io.micronaut.web.router.builder.BodyRequestHandler;
+import io.micronaut.web.router.builder.DeclaredUriRoute;
+import io.micronaut.web.router.builder.ErrorRouteHandler;
+import io.micronaut.web.router.builder.FormRequestHandler;
+import io.micronaut.web.router.builder.HandlerMethod;
+import io.micronaut.web.router.builder.HandlerUriRoute;
+import io.micronaut.web.router.builder.RequestHandler;
+import io.micronaut.web.router.builder.RouteDeclaration;
+import io.micronaut.web.router.builder.RouteRequestFilter;
+import io.micronaut.web.router.builder.RouteResponseFilter;
+import io.micronaut.web.router.builder.StatusRouteHandler;
+import io.micronaut.web.router.builder.StreamingFormRequestHandler;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -386,63 +403,76 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildBeanRoute(HttpMethod.TRACE, uri, beanDefinition, method);
     }
 
-    HandlerUriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
     }
 
-    <B> HandlerUriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    @Internal
+    public <B> HandlerUriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         // the body argument is annotated @Body
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
     }
 
-    HandlerUriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    HandlerUriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    HandlerUriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
             .consumes(FORM_MEDIA_TYPES);
     }
 
-    <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+    @Internal
+    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
         DefaultErrorRoute errorRoute = new DefaultErrorRoute(type, handlerHandle(HandlerMethod.of(type, handler)), conversionService);
         this.errorRoutes.add(errorRoute);
         return errorRoute;
     }
 
-    StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+    @Internal
+    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
         DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, handlerHandle(HandlerMethod.of(handler)), conversionService);
         this.statusRoutes.add(statusRoute);
         return statusRoute;
     }
 
-    HandlerUriRoute handle(RouteDeclaration route, RequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handle(RouteDeclaration route, RequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
     }
 
-    <B> HandlerUriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    @Internal
+    public <B> HandlerUriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return declare(route, HandlerMethod.of(bodyType, handler), null);
     }
 
-    HandlerUriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
     }
 
-    HandlerUriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
-    HandlerUriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
-    HandlerUriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
     }
 
@@ -497,7 +527,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return infos;
     }
 
-    HandlerUriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+    @Internal
+    public HandlerUriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
         return (HandlerUriRoute) buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
     }
 
@@ -587,7 +618,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param uri The URI template given to the builder
      * @return The URI template of the route
      */
-    String routeUri(String uri) {
+    @Internal
+    protected String routeUri(String uri) {
         return uri;
     }
 
@@ -598,7 +630,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * @param uri         The URI template
      * @return The template under the context path
      */
-    static String underContextPath(@Nullable String contextPath, String uri) {
+    @Internal
+    protected static String underContextPath(@Nullable String contextPath, String uri) {
         if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
             return uri;
         }
@@ -619,7 +652,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
      * for the same URI, like {@link AnnotatedMethodRouteBuilder} does for {@code @Get} methods.
      * Each {@code HEAD} route is a copy of the finished {@code GET} route.
      */
-    void addImplicitHeadRoutes() {
+    @Internal
+    protected void addImplicitHeadRoutes() {
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
         Set<UriMatchTemplate> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
@@ -992,7 +1026,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     /**
      * The default route impl.
      */
-    final class DefaultUriRoute extends AbstractRoute implements HandlerUriRoute {
+    @Internal
+    public final class DefaultUriRoute extends AbstractRoute implements HandlerUriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
@@ -1124,7 +1159,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
          *
          * @return The copy
          */
-        DefaultUriRoute implicitHeadCopy() {
+        @Internal
+        public DefaultUriRoute implicitHeadCopy() {
             DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, uriMatchTemplate, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
             head.conditions.clear();
             head.conditions.addAll(conditions);

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
@@ -48,7 +48,7 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecutionHandle<Object, R> {
+public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecutionHandle<Object, R> {
 
     /**
      * The name of the body argument of a {@link BodyRequestHandler}.
@@ -98,7 +98,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<HttpResponse<?>> of(RequestHandler handler) {
+    public static HandlerMethod<HttpResponse<?>> of(RequestHandler handler) {
         return new HandlerMethod<>(
             handler,
             RequestHandler.class,
@@ -113,7 +113,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncRequestHandler handler) {
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncRequestHandler handler) {
         return new HandlerMethod<>(
             handler,
             AsyncRequestHandler.class,
@@ -131,7 +131,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @return The method that calls it
      */
     @SuppressWarnings("unchecked")
-    static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    public static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
@@ -146,7 +146,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<HttpResponse<?>> of(FormRequestHandler handler) {
+    public static HandlerMethod<HttpResponse<?>> of(FormRequestHandler handler) {
         return new HandlerMethod<>(
             handler,
             FormRequestHandler.class,
@@ -161,7 +161,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncFormRequestHandler handler) {
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncFormRequestHandler handler) {
         return new HandlerMethod<>(
             handler,
             AsyncFormRequestHandler.class,
@@ -176,7 +176,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(StreamingFormRequestHandler handler) {
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(StreamingFormRequestHandler handler) {
         return new HandlerMethod<>(
             handler,
             StreamingFormRequestHandler.class,
@@ -194,7 +194,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @return The method that calls it
      */
     @SuppressWarnings("unchecked")
-    static <E extends Throwable> HandlerMethod<HttpResponse<?>> of(Class<E> errorType, ErrorRouteHandler<E> handler) {
+    public static <E extends Throwable> HandlerMethod<HttpResponse<?>> of(Class<E> errorType, ErrorRouteHandler<E> handler) {
         return new HandlerMethod<>(
             handler,
             ErrorRouteHandler.class,
@@ -209,7 +209,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
      * @param handler The handler
      * @return The method that calls it
      */
-    static HandlerMethod<HttpResponse<?>> of(StatusRouteHandler handler) {
+    public static HandlerMethod<HttpResponse<?>> of(StatusRouteHandler handler) {
         return new HandlerMethod<>(
             handler,
             StatusRouteHandler.class,

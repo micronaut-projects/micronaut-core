@@ -33,7 +33,7 @@ import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.web.router.FormData;
+import io.micronaut.web.router.builder.FormData;
 import jakarta.inject.Singleton;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
