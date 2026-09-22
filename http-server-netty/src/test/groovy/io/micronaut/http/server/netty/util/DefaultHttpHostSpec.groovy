@@ -248,6 +248,86 @@ class DefaultHttpHostSpec extends Specification {
         server.close()
     }
 
+    void "test malformed forwarded host port falls back to URI host"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["host=\"example.com:notaport\";proto=https"],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "http://localhost:8080"
+
+        cleanup:
+        server.close()
+    }
+
+    void "test bracketed IPv6 host retrieved from forwarded"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["host=\"[::1]:5000\";proto=https"],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "https://[::1]:5000"
+
+        cleanup:
+        server.close()
+    }
+
+    void "test bracketed IPv6 host without port retrieved from forwarded"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["host=\"[::1]\";proto=https"],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "https://[::1]"
+
+        cleanup:
+        server.close()
+    }
+
+    void "test unbracketed IPv6 forwarded host falls back to URI host"() {
+        EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
+        HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
+        def request = Stub(HttpRequest) {
+            getHeaders() >> new MockHttpHeaders([
+                    "Forwarded": ["host=\"2001:db8::1\";proto=https"],
+            ])
+            getUri() >> new URI("http://localhost:8080")
+        }
+
+        when:
+        String host = hostResolver.resolve(request)
+
+        then:
+        host == "http://localhost:8080"
+
+        cleanup:
+        server.close()
+    }
+
     void "test host retrieved from x-forwarded"() {
         EmbeddedServer server = ApplicationContext.run(EmbeddedServer)
         HttpHostResolver hostResolver = server.applicationContext.getBean(HttpHostResolver)
