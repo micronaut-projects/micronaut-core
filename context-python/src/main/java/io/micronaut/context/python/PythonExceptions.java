@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 import org.jspecify.annotations.Nullable;
 
@@ -107,6 +108,23 @@ public final class PythonExceptions {
             return null;
         }
         return asString(exception);
+    }
+
+    /**
+     * The exception a generated bridge method declaring checked exceptions rethrows for the
+     * exception of its Python call: a host exception of one of the declared types (raised in Python,
+     * or thrown by a Java method the Python code called), or the generated Java exception of a
+     * Python exception class extending one of the declared types. Any other Python exception is
+     * reported as the {@link PolyglotException} itself.
+     *
+     * @param exception The exception of the Python call
+     * @param generatedClass The generated class of the bridge method, whose class loader loads the generated exceptions
+     * @param declaredTypes The checked exception types the bridge method declares
+     * @return The exception to rethrow, or {@code null} when the Python exception is none of them
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Throwable declared(PolyglotException exception, Class<?> generatedClass, Class<?>... declaredTypes) {
+        return GraalPyExceptionHandler.toDeclaredException(exception, generatedClass.getClassLoader(), declaredTypes);
     }
 
     /**
