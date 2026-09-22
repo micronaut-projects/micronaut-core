@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.context.BeanLocator;
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Indexed;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.naming.NameUtils;
@@ -23,7 +24,9 @@ import io.micronaut.core.naming.conventions.MethodConvention;
 import io.micronaut.core.naming.conventions.PropertyConvention;
 import io.micronaut.core.naming.conventions.TypeConvention;
 import io.micronaut.core.reflect.ReflectionUtils;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.UriMapping;
@@ -373,6 +376,151 @@ public interface RouteBuilder {
      * @return The route
      */
     UriRoute GET(String uri, Class<?> type, String method, Class<?>... parameterTypes);
+
+    /**
+     * Route a {@code GET} request to a handler function, with an implicit {@code HEAD} route
+     * only if the route builder adds them.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute GET(String uri, RequestHandler handler) {
+        return handle(HttpMethod.GET, uri, handler);
+    }
+
+    /**
+     * Route a {@code POST} request to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute POST(String uri, RequestHandler handler) {
+        return handle(HttpMethod.POST, uri, handler);
+    }
+
+    /**
+     * Route a {@code PUT} request to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute PUT(String uri, RequestHandler handler) {
+        return handle(HttpMethod.PUT, uri, handler);
+    }
+
+    /**
+     * Route a {@code PATCH} request to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute PATCH(String uri, RequestHandler handler) {
+        return handle(HttpMethod.PATCH, uri, handler);
+    }
+
+    /**
+     * Route a {@code DELETE} request to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute DELETE(String uri, RequestHandler handler) {
+        return handle(HttpMethod.DELETE, uri, handler);
+    }
+
+    /**
+     * Route a {@code POST} request to a handler function that receives the decoded body.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default <B> UriRoute POST(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(HttpMethod.POST, uri, bodyType, handler);
+    }
+
+    /**
+     * Route a {@code PUT} request to a handler function that receives the decoded body.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default <B> UriRoute PUT(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(HttpMethod.PUT, uri, bodyType, handler);
+    }
+
+    /**
+     * Route requests to a handler function. The route runs like a controller method that takes
+     * the request and returns a response: filters, error routes, body writers and executor
+     * selection apply, and as a blocking method it runs on the blocking executor by default.
+     * Like a controller route it consumes JSON unless {@link UriRoute#consumes} says otherwise.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Route requests to a handler function that receives the body decoded to the given type, like
+     * a controller method with a {@code @Body} argument.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Route requests to a handler function that completes the response later. Like a controller
+     * method returning a {@code CompletionStage}, it runs on the event loop by default.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
 
     /**
      * Route the specified URI to the specified target for an HTTP POST. Since the method to execute is not

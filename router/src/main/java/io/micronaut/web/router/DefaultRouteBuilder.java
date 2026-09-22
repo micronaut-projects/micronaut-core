@@ -378,6 +378,27 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         return buildBeanRoute(HttpMethod.TRACE, uri, beanDefinition, method);
     }
 
+    @Override
+    public UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
+    }
+
+    @Override
+    public <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        // the body argument is annotated @Body
+        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(bodyType, handler)));
+    }
+
+    @Override
+    public UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
+    }
+
+    @SuppressWarnings("unchecked")
+    private static MethodExecutionHandle<Object, Object> handlerHandle(HandlerMethod<?> method) {
+        return (MethodExecutionHandle<Object, Object>) method;
+    }
+
     /**
      * Build a route.
      *
