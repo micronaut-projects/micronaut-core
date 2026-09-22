@@ -127,7 +127,7 @@ class StaticPlanner:
         span = function_def.span()
         if not compiled:
             return self._record(qualified, span, "EXCLUDED", scope, [], 0)
-        reasons = self._candidate_reasons(class_def, class_node, function_def, node, span)
+        reasons = self._candidate_reasons(module, class_def, class_node, function_def, node, span)
         if reasons:
             return self._record(qualified, span, "NOT_CANDIDATE", scope, reasons, 0, explicit=scope == "FUNCTION")
         reasons = self._signature_reasons(module, class_def, function_def, node, span)
@@ -141,17 +141,22 @@ class StaticPlanner:
         body, reasons = self._lower(module, class_def, function_def, node)
         if body is None:
             return self._record(qualified, span, "SKIPPED", scope, reasons, statements, explicit=scope != "MODE")
+        if class_def is None and not module.decorators and body.stats().bridgeCalls() > 0:
+            # a module without a module-level annotation is served by a context pool: a body of its
+            # generated class runs outside any Python context, so it cannot reach a Python object
+            reason = ("pooled-module", "the module is served by a context pool; a body reaching a Python object has no context to reach it in", span)
+            return self._record(qualified, span, "SKIPPED", scope, [reason], statements, explicit=scope != "MODE")
         self.bodies.append(body)
         return self._record(qualified, span, "COMPILED", scope, [], statements, stats=body.stats())
 
     def _lower(self, module, class_def, function_def, node):
         """The compiled body of a candidate, or None with the reasons: what the inference flags, then what the lowering refuses."""
-        unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}", function_def, node, class_def, None, module)
+        unit = CheckUnit(module.source_path, f"{class_def.name()}.{function_def.name()}" if class_def is not None else function_def.name(), function_def, node, class_def, None, module)
         rules = JavaReceiverRules(self.checker, unit, silent=True)
         rules.check()
         if rules.problems:
             return None, list(rules.problems)
-        class_model = self.checker.python_classes.of(class_def)
+        class_model = self.checker.python_classes.of(class_def) if class_def is not None else None
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
                             advised=lambda sibling: self._advice(class_def, sibling) is not None)
         body = lowering.lower()
@@ -171,16 +176,24 @@ class StaticPlanner:
 
     # ---------------------------------------------------------------- the checks
 
-    def _candidate_reasons(self, class_def, class_node, function_def, node, span):
+    def _candidate_reasons(self, module, class_def, class_node, function_def, node, span):
         """Why the function can never be compiled, whatever its body."""
         reasons = []
         if class_def is None:
-            reasons.append(("class-not-eligible", "a module-level function has no class stub to be compiled into", span))
-            return reasons
-        ineligible = self._class_ineligibility(class_def, class_node)
-        if ineligible is not None:
-            reasons.append(("class-not-eligible", ineligible, class_def.span() or span))
-            return reasons
+            # a module-level function is a method of the module's generated class when a decorator
+            # makes the stub generator bridge it: a route, an executable, an advised or scoped function
+            script = getattr(module, "script", None)
+            if script is None:
+                reasons.append(("class-not-eligible", "the module generates no class to compile the function into", span))
+                return reasons
+            if not self._bridged(function_def):
+                reasons.append(("class-not-eligible", "a module-level function without an executable decorator is not a method of the generated class", span))
+                return reasons
+        else:
+            ineligible = self._class_ineligibility(class_def, class_node)
+            if ineligible is not None:
+                reasons.append(("class-not-eligible", ineligible, class_def.span() or span))
+                return reasons
         name = function_def.name()
         if function_def.isStatic():
             reasons.append(("static-method", "a static or class method is bridged as a static Java method; not compiled yet", span))
@@ -193,7 +206,7 @@ class StaticPlanner:
             reasons.append(("special-method", what, span))
         if function_def.isAbstract() or function_def.hasPlaceholderBody():
             reasons.append(("abstract-method", "an abstract method has no body to compile; a call of it runs the implementation of the object", span))
-        implemented = self._java_method_implemented(class_def, name)
+        implemented = self._java_method_implemented(class_def, name) if class_def is not None else None
         if implemented is not None:
             reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; not compiled yet", span))
         advice = self._advice(class_def, function_def)
@@ -211,7 +224,7 @@ class StaticPlanner:
         facts = getattr(self.checker, "facts", None)
         if facts is None:
             return None
-        for decorator in list(function_def.decorators()) + list(class_def.decorators()):
+        for decorator in list(function_def.decorators()) + (list(class_def.decorators()) if class_def is not None else []):
             description = self._annotation(facts, decorator)
             if description is not None and description.interceptorBinding():
                 return decorator.annotationName().rsplit(".", 1)[-1]
@@ -224,6 +237,17 @@ class StaticPlanner:
             if description is not None and description.validationConstraint():
                 return decorator.annotationName().rsplit(".", 1)[-1]
         return None
+
+    def _bridged(self, function_def):
+        """Whether the stub generator gives a module-level function a Java method: a decorator of an executable kind."""
+        facts = getattr(self.checker, "facts", None)
+        decorators = list(function_def.decorators())
+        if facts is None or not hasattr(facts, "describeAnnotation"):
+            return bool(decorators)
+        descriptions = [self._annotation(facts, decorator) for decorator in decorators]
+        if all(description is None for description in descriptions):
+            return bool(decorators)  # a compilation modelled without Java facts
+        return any(description is not None and description.executable() for description in descriptions)
 
     @staticmethod
     def _annotation(facts, decorator):

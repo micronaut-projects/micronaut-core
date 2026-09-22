@@ -182,6 +182,8 @@ public final class StaticBodyGenerator {
                 call.arguments().forEach(a -> collectNames(a, names));
             }
             case Ir.PythonMember member -> collectNames(member.receiver(), names);
+            case Ir.ModuleAttribute attribute -> {
+            }
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
             case Ir.Field field -> collectNames(field.receiver(), names);
             case Ir.Binary binary -> {
@@ -445,6 +447,7 @@ public final class StaticBodyGenerator {
             case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
             case Ir.InvokePython call -> self.invokeOn(pythonObject(call.receiver()), call.name(), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()));
             case Ir.PythonMember member -> self.readOf(pythonObject(member.receiver()), member.name(), member.type(), type(member.type()));
+            case Ir.ModuleAttribute attribute -> classType(attribute.owner()).getStaticField(injectedField(attribute.name()), type(attribute.type()));
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), expressions(construction.arguments()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
@@ -608,6 +611,14 @@ public final class StaticBodyGenerator {
             case Ir.BOOLEAN -> PYTHON_STATIC.invokeStatic("str", List.of(BOOLEAN), ClassTypeDef.STRING, value);
             default -> PYTHON_STATIC.invokeStatic("str", List.of(TypeDef.OBJECT), ClassTypeDef.STRING, value);
         };
+    }
+
+    /**
+     * @param attribute An injected attribute of a module
+     * @return The static field of the module's generated class holding the injected bean
+     */
+    public static String injectedField(String attribute) {
+        return "injected_" + attribute;
     }
 
     /**

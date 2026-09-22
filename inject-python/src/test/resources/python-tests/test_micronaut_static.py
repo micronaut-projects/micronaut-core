@@ -484,9 +484,10 @@ class WarningTest(unittest.TestCase):
 
 
 LOWERED = '''
-from typing import Optional
-from jakarta.inject import Singleton
+from typing import Annotated, Optional
+from jakarta.inject import Inject, Singleton
 from java.lang import Exception, RuntimeException
+from micronaut.context.annotation import Executable
 
 
 class Cart:
@@ -705,6 +706,23 @@ class Pricing:
     def charred(self, text: str) -> bool:
         return 1 in text
 
+
+pricing: Annotated[Pricing, Inject]
+
+
+@Executable
+def route(n: int) -> int:
+    return pricing.truncate(n) + n
+
+
+@Executable
+def peek(cart: Cart) -> str:
+    return cart.owner
+
+
+def helper_only(n: int) -> int:
+    return n
+
     def counted(self, counts: dict[str, int], values: list[str]) -> int:
         counts["added"] = len(values)
         return counts["added"]
@@ -765,6 +783,22 @@ class LoweringTest(unittest.TestCase):
         branch = statements[1]
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
+
+    def test_module_functions_compile_into_the_script_class(self):
+        route = self.decisions["route"]
+        self.assertEqual("COMPILED", route.outcome().name(), [(r.rule(), r.message()) for r in route.reasons()])
+        body = self.bodies["route"]
+        self.assertTrue(body.className().endswith("Module"), body.className())  # the generated class of module.py
+        call = _uncast(_uncast(list(body.body().statements())[0].value()).left())
+        self.assertEqual("truncate", call.name())
+        self.assertEqual("ModuleAttribute", call.receiver().getClass().getSimpleName())
+        self.assertEqual("pricing", call.receiver().name())
+        self.assertEqual(call.receiver().owner(), body.className())
+        # a module without a module-level annotation is served by a context pool: a Python read is out of reach
+        self.assertEqual("SKIPPED", self.decisions["peek"].outcome().name())
+        self.assertEqual(["pooled-module"], rules(self.decisions["peek"]))
+        self.assertEqual("NOT_CANDIDATE", self.decisions["helper_only"].outcome().name())
+        self.assertEqual(["class-not-eligible"], rules(self.decisions["helper_only"]))
 
     def test_objects_of_the_compilation_are_reached_through_their_generated_classes(self):
         for name in ("carted", "built"):
