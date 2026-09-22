@@ -399,10 +399,17 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * The metadata of the body argument of a handler.
      *
      * @param bodyType The body type
-     * @return {@code @Body}, and {@code @Nullable} if the type is nullable
+     * @return {@code @Body}, and {@code @Nullable} if the type is nullable, layered over the
+     * annotations of the body type, which message body readers see
      */
     private static AnnotationMetadata bodyMetadata(Argument<?> bodyType) {
-        return bodyType.isNullable() ? NULLABLE_BODY : BODY;
+        AnnotationMetadata body = bodyType.isNullable() ? NULLABLE_BODY : BODY;
+        AnnotationMetadata given = bodyType.getAnnotationMetadata();
+        if (given.isEmpty()) {
+            return body;
+        }
+        // the last element is the declared metadata and wins on conflict
+        return new AnnotationMetadataHierarchy(given, body);
     }
 
     @Override
