@@ -18,6 +18,7 @@ package io.micronaut.context.python;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.python.annotation.PythonClass;
+import io.micronaut.core.io.service.SoftServiceLoader;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.graalvm.polyglot.HostAccess;
@@ -73,13 +74,16 @@ final class GraalPyHostAccessFactory {
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
      *
      * @param mappings The discovered TargetTypeMapping beans
+     * @param functionalInterfaceProviders The generated providers of the functional interfaces the Python sources reference
      * @param beanContext The bean context, whose class loader loads the generated classes
      * @return A HostAccess configured with custom target type mappings
      */
     @Singleton
     @Named(PythonContextRuntime.PYTHON)
-    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, BeanContext beanContext) {
-        return hostAccess(mappings, beanContext.getClassLoader());
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings,
+                          Collection<PythonFunctionalInterfaceProvider> functionalInterfaceProviders,
+                          BeanContext beanContext) {
+        return hostAccess(mappings, beanContext.getClassLoader(), entries(functionalInterfaceProviders));
     }
 
     /**
@@ -102,6 +106,22 @@ final class GraalPyHostAccessFactory {
      * @return A HostAccess configured with custom target type mappings
      */
     HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings, @Nullable ClassLoader classLoader) {
+        return hostAccess(mappings, classLoader, functionalInterfaces(classLoader));
+    }
+
+    /**
+     * Builds a HostAccess instance and registers all TargetTypeMapping instances.
+     *
+     * @param mappings The TargetTypeMapping instances
+     * @param classLoader The class loader of the generated classes, or {@code null} to use the context
+     *                    class loader of the calling thread
+     * @param functionalInterfaces The functional interfaces a callable is converted to by arity,
+     *                             besides the standard ones
+     * @return A HostAccess configured with custom target type mappings
+     */
+    HostAccess hostAccess(Collection<TargetTypeMapping<?>> mappings,
+                          @Nullable ClassLoader classLoader,
+                          Collection<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces) {
         HostAccess.Builder builder = HostAccess.newBuilder(HostAccess.ALL);
         PythonClassResolver pythonClassResolver = new PythonClassResolver(mappings, classLoader);
         Map<Class<?>, List<TargetTypeMapping<?>>> assignableMappings = new LinkedHashMap<>();
@@ -127,9 +147,26 @@ final class GraalPyHostAccessFactory {
         registerObjectMapping(builder, pythonClassResolver);
         registerStandardLibraryMappings(builder);
         registerSequenceMappings(builder);
-        PythonCallables.registerStandardInterfaces(builder);
+        PythonCallables.registerFunctionalInterfaces(builder, functionalInterfaces, classLoader);
         registerNumericMappings(builder);
         return builder.build();
+    }
+
+    /**
+     * The functional interfaces the Python compiler found in the Java types the Python sources
+     * reference, from the generated {@link PythonFunctionalInterfaceProvider} services of the class loader.
+     */
+    private static List<PythonFunctionalInterfaceProvider.Entry> functionalInterfaces(@Nullable ClassLoader classLoader) {
+        ClassLoader loader = classLoader != null ? classLoader : Thread.currentThread().getContextClassLoader();
+        return entries(SoftServiceLoader.load(PythonFunctionalInterfaceProvider.class, loader).collectAll());
+    }
+
+    private static List<PythonFunctionalInterfaceProvider.Entry> entries(Collection<PythonFunctionalInterfaceProvider> providers) {
+        List<PythonFunctionalInterfaceProvider.Entry> entries = new ArrayList<>();
+        for (PythonFunctionalInterfaceProvider provider : providers) {
+            entries.addAll(provider.entries());
+        }
+        return entries;
     }
 
     /**
