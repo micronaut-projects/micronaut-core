@@ -47,6 +47,8 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -221,6 +223,33 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void asyncFormHandlerCompletesLater() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-async", "name=Fred")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("async Fred")
+                .build());
+        }
+    }
+
+    @Test
+    void streamingFormHandlerReadsPartsAsTheyArrive() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("name", "Fred")
+                .addPart("ignored", "not read")
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .addPart("age", "42")
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-stream", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("name=Fred;avatar.txt=picture;age=42;")
+                .build());
+        }
+    }
+
+    @Test
     void runtimeRoutesUseHandlers() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
@@ -247,6 +276,24 @@ public class HandlerRoutesTest {
      */
     private static <T> CompletableFuture<T> completeLater(ExecutorService executor, Supplier<T> value) {
         return CompletableFuture.supplyAsync(value, executor);
+    }
+
+    private static Path temporaryFile() {
+        try {
+            Path file = Files.createTempFile("handler-routes", ".upload");
+            file.toFile().deleteOnExit();
+            return file;
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    private static String read(Path file) {
+        try {
+            return Files.readString(file);
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     private static byte[] bytes(CompletedFileUpload upload) {
@@ -304,6 +351,23 @@ public class HandlerRoutesTest {
                         .orElse("no-file");
                     return HttpResponse.ok(pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
                         + " " + form.getValues("tag") + " " + file).contentType(MediaType.TEXT_PLAIN_TYPE);
+                });
+                routes.handleFormAsync(HttpMethod.POST, "/fn/forms-async", (request, pathVariables, form) ->
+                    completeLater(executor, () -> HttpResponse.ok("async " + form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE)));
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-stream", (request, pathVariables, parts) -> {
+                    StringBuilder result = new StringBuilder();
+                    return parts.forEach(part -> {
+                        if (part.name().equals("ignored")) {
+                            // not read: discarded before the next part
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        if (part.isFile()) {
+                            Path file = temporaryFile();
+                            return part.transferTo(file).thenAccept(done ->
+                                result.append(part.fileName()).append('=').append(read(file)).append(';'));
+                        }
+                        return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
+                    }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
                 routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");

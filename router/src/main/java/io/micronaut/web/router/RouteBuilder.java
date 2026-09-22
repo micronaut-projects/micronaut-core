@@ -551,6 +551,38 @@ public interface RouteBuilder {
     }
 
     /**
+     * Route requests with a submitted form to a handler function that completes the response
+     * later. The whole form is read before the handler runs, as for
+     * {@link #handleForm(HttpMethod, String, FormRequestHandler)}.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Route requests with a submitted form to a handler function that reads the form as it
+     * arrives, part by part, with {@link FormParts#forEach}. The route consumes both form media
+     * types.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
      * Route requests to a handler function that completes the response later. The executor is
      * selected like for a controller method returning a {@code CompletionStage}.
      *

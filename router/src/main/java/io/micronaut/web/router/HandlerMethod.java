@@ -55,6 +55,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
+    private static final Argument<FormParts> FORM_PARTS = Argument.of(FormParts.class, "parts");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -138,6 +139,34 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
             new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])
+        );
+    }
+
+    /**
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncFormRequestHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            ReflectionUtils.getRequiredMethod(AsyncFormRequestHandler.class, "handle", HttpRequest.class, PathVariables.class, FormData.class),
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])
+        );
+    }
+
+    /**
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(StreamingFormRequestHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            ReflectionUtils.getRequiredMethod(StreamingFormRequestHandler.class, "handle", HttpRequest.class, PathVariables.class, FormParts.class),
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM_PARTS},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormParts) args[2])
         );
     }
 
