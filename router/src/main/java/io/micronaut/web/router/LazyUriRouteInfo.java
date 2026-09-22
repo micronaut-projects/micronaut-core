@@ -32,6 +32,7 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -43,22 +44,73 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 /**
- * A precompiled URI route that is built the first time it is needed. Until then, the router
- * indexes and orders it with the keys computed at compile time.
+ * A URI route that is built the first time it is needed: a precompiled controller route, or a
+ * handler function bound to a {@link IndexedRouteDeclaration}. Until then, the router indexes and orders
+ * it with keys computed at compile time.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRoute {
-    private final PrecompiledRoute route;
     private final HttpMethod httpMethod;
+    private final String methodKey;
+    private final String uri;
+    private final String requiredPathPrefix;
+    private final int rawLength;
+    private final int pathVariableCount;
+    private final boolean implicitHead;
+    private final String target;
+    private final @Nullable IndexedRouteDeclaration declaration;
     private final Supplier<UriRouteInfo<Object, Object>> delegate;
 
+    /**
+     * @param route   A precompiled controller route
+     * @param builder Builds the route
+     */
     LazyUriRouteInfo(PrecompiledRoute route, Supplier<UriRouteInfo<Object, Object>> builder) {
-        this.route = route;
-        this.httpMethod = HttpMethod.parse(route.httpMethod());
+        this(HttpMethod.parse(route.httpMethod()), route.httpMethodName(), route.uri(), route.requiredPathPrefix(),
+            route.rawLength(), route.pathVariableCount(), route.implicitHead(), route.controllerType() + '#' + route.methodName(), null, builder);
+    }
+
+    /**
+     * @param declaration  The declaration a handler function is bound to
+     * @param httpMethod   The HTTP method of the route, which is {@code HEAD} for the implicit {@code HEAD} route of a {@code GET} declaration
+     * @param implicitHead Whether the route is an implicit {@code HEAD} route
+     * @param builder      Builds the route
+     */
+    LazyUriRouteInfo(IndexedRouteDeclaration declaration, HttpMethod httpMethod, boolean implicitHead, Supplier<UriRouteInfo<Object, Object>> builder) {
+        this(httpMethod, httpMethod.name(), declaration.uriTemplate(), declaration.requiredPathPrefix(),
+            declaration.rawLength(), declaration.pathVariableCount(), implicitHead, String.valueOf(declaration), declaration, builder);
+    }
+
+    private LazyUriRouteInfo(HttpMethod httpMethod,
+                             String methodKey,
+                             String uri,
+                             String requiredPathPrefix,
+                             int rawLength,
+                             int pathVariableCount,
+                             boolean implicitHead,
+                             String target,
+                             @Nullable IndexedRouteDeclaration declaration,
+                             Supplier<UriRouteInfo<Object, Object>> builder) {
+        this.httpMethod = httpMethod;
+        this.methodKey = methodKey;
+        this.uri = uri;
+        this.requiredPathPrefix = requiredPathPrefix;
+        this.rawLength = rawLength;
+        this.pathVariableCount = pathVariableCount;
+        this.implicitHead = implicitHead;
+        this.target = target;
+        this.declaration = declaration;
         this.delegate = SupplierUtil.memoized(builder);
+    }
+
+    /**
+     * @return The declaration a handler function is bound to, or {@code null} for a precompiled controller route
+     */
+    @Nullable IndexedRouteDeclaration declaration() {
+        return declaration;
     }
 
     /**
@@ -70,17 +122,17 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     @Override
     public String getRequiredPathPrefix() {
-        return route.requiredPathPrefix();
+        return requiredPathPrefix;
     }
 
     @Override
     public int getRawLength() {
-        return route.rawLength();
+        return rawLength;
     }
 
     @Override
     public int getPathVariableCount() {
-        return route.pathVariableCount();
+        return pathVariableCount;
     }
 
     @Override
@@ -95,10 +147,17 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     }
 
     /**
+     * @return The URI template of the route, without parsing it
+     */
+    String uriTemplate() {
+        return uri;
+    }
+
+    /**
      * @return The name of the HTTP method the router registers the route under, which is the custom name for a custom method
      */
     String methodKey() {
-        return route.httpMethodName();
+        return methodKey;
     }
 
     @Override
@@ -144,7 +203,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     @Override
     public boolean isImplicitHead() {
-        return route.implicitHead();
+        return implicitHead;
     }
 
     @Override
@@ -354,6 +413,6 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     @Override
     public String toString() {
-        return route.httpMethodName() + ' ' + route.uri() + " -> " + route.controllerType() + '#' + route.methodName();
+        return methodKey + ' ' + uri + " -> " + target;
     }
 }

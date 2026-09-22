@@ -11,21 +11,26 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.inject.qualifiers.Qualifiers
 import io.micronaut.inject.visitor.TypeElementVisitor
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.web.router.HttpRoutes
+import io.micronaut.web.router.RouteDeclaration
 import io.micronaut.web.router.Router
 
 /**
- * Proof that handler routes are a compilation target for other web annotation models: the
- * {@link CustomWebRoutesVisitor} reads the annotations of a made-up framework at compile time and
- * writes an {@link HttpRoutes} bean, whose handler functions get the resource bean from the bean
- * context and call its methods directly. The routes then run on the Netty server like controller
- * routes, with no {@code @Controller}, no executable methods and no reflection.
+ * Proof that routes can be declared at compile time from other web annotation models and
+ * implemented by handler functions: the {@link CustomWebRoutesVisitor} reads the annotations of a
+ * made-up framework and generates an enum of {@link RouteDeclaration}s with precomputed index
+ * keys. A functional router binds a handler to each constant, calling the resource bean from the
+ * bean context. The router registers the routes lazily, without parsing their templates, and they
+ * run on the Netty server like controller routes.
  */
 class CustomWebAnnotationsSpec extends AbstractTypeElementSpec {
 
     private static final String SOURCE = '''
 package petstore.web;
 
+import io.micronaut.context.BeanProvider;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.web.router.HttpRoutes;
+import io.micronaut.web.router.RouteBuilder;
 import jakarta.inject.Singleton;
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -39,8 +44,6 @@ import java.util.concurrent.atomic.AtomicLong;
 @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.TYPE) @interface Resource { String value(); }
 @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) @interface Read { String value() default ""; }
 @Retention(RetentionPolicy.RUNTIME) @Target(ElementType.METHOD) @interface Write { String value() default ""; }
-@Retention(RetentionPolicy.RUNTIME) @Target(ElementType.PARAMETER) @interface Param { String value(); }
-@Retention(RetentionPolicy.RUNTIME) @Target(ElementType.PARAMETER) @interface Field { String value(); }
 
 @Singleton
 @Resource("/pets")
@@ -49,25 +52,58 @@ class PetResource {
     private final AtomicLong ids = new AtomicLong(1);
 
     @Read("/{id}")
-    String name(@Param("id") long id) {
+    String name(long id) {
         return pets.getOrDefault(id, "unknown");
     }
 
     @Read("/{id}/owners/{owner}")
-    String owned(@Param("id") long id, @Param("owner") UUID owner) {
+    String owned(long id, UUID owner) {
         return pets.get(id) + " of " + owner;
     }
 
+    @Read("/{id}/photo")
+    byte[] photo(long id) {
+        return new byte[0];
+    }
+
     @Write
-    String add(@Field("name") String name, @Field("age") int age) {
+    String add(String name, int age) {
         long id = ids.incrementAndGet();
         pets.put(id, name + " (" + age + ")");
         return String.valueOf(id);
     }
 
     @Write("/{id}/rename")
-    void rename(@Param("id") long id, @Field("name") String name) {
+    void rename(long id, String name) {
         pets.put(id, name);
+    }
+}
+
+/**
+ * The functional router: binds a handler function to each declared route it implements, and
+ * calls the resource bean.
+ */
+@Singleton
+class PetRoutes implements HttpRoutes {
+    private final BeanProvider<PetResource> pets;
+
+    PetRoutes(BeanProvider<PetResource> pets) {
+        this.pets = pets;
+    }
+
+    @Override
+    public void routes(RouteBuilder routes) {
+        routes.handle(PetResourceRoutes.NAME, (request, path) ->
+            HttpResponse.ok(pets.get().name(path.getLong("id"))));
+        routes.handle(PetResourceRoutes.OWNED, (request, path) ->
+            HttpResponse.ok(pets.get().owned(path.getLong("id"), path.get("owner", UUID.class))));
+        routes.handleForm(PetResourceRoutes.ADD, (request, path, form) ->
+            HttpResponse.ok(pets.get().add(form.getString("name"), form.getInt("age"))));
+        routes.handleForm(PetResourceRoutes.RENAME, (request, path, form) -> {
+            pets.get().rename(path.getLong("id"), form.getString("name"));
+            return HttpResponse.noContent();
+        });
+        // PetResourceRoutes.PHOTO is declared but not bound: it is not a route
     }
 }
 '''
@@ -77,37 +113,52 @@ class PetResource {
         return [new CustomWebRoutesVisitor()]
     }
 
-    void "routes written at compile time from custom annotations call the bean's methods"() {
+    void "routes declared at compile time from custom annotations are implemented by handler functions"() {
         given:
         ApplicationContext context = buildContext('petstore.web.PetResource', SOURCE, true, ['micronaut.server.port': -1])
+        Class<?> declarations = context.classLoader.loadClass('petstore.web.PetResourceRoutes')
+
+        expect: 'the annotation processor generated an enum of route declarations'
+        declarations.isEnum()
+        RouteDeclaration.isAssignableFrom(declarations)
+        declarations.enumConstants*.name() == ['NAME', 'OWNED', 'PHOTO', 'ADD', 'RENAME']
+        declarations.enumConstants.collect { RouteDeclaration d -> d.httpMethod().name() + ' ' + d.uriTemplate() } ==
+                ['GET /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'GET /pets/{id}/photo', 'POST /pets', 'POST /pets/{id}/rename']
+
+        and: 'its index keys are the ones the router computes for a route built at runtime'
+        declarations.enumConstants.every { RouteDeclaration d ->
+            def runtime = RouteDeclaration.of(d.httpMethod(), d.uriTemplate())
+            d.requiredPathPrefix() == runtime.requiredPathPrefix() && d.rawLength() == runtime.rawLength() && d.pathVariableCount() == runtime.pathVariableCount()
+        }
+
+        and: 'there is no controller, and the resource is a plain bean without executable methods'
+        context.getBeanDefinitions(Qualifiers.byStereotype(Controller)).isEmpty()
+        context.getBeanDefinition(context.classLoader.loadClass('petstore.web.PetResource')).executableMethods.isEmpty()
+
+        when:
+        Router router = context.getBean(Router)
+        def petRoutes = router.uriRoutes().filter { it.toString().contains('/pets') }.toList()
+
+        then: 'the bound declarations are routes, with implicit HEAD, registered lazily with their precomputed keys'
+        petRoutes.collect { it.httpMethodName + ' ' + it.toString().split(' ')[1] }.toSet() ==
+                ['GET /pets/{id}', 'HEAD /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'HEAD /pets/{id}/owners/{owner}',
+                 'POST /pets', 'POST /pets/{id}/rename'] as Set
+        petRoutes.every { it.class.simpleName == 'LazyUriRouteInfo' }
+
+        when:
         EmbeddedServer server = context.getBean(EmbeddedServer).start()
         HttpClient client = context.createBean(HttpClient, server.URL)
         def http = client.toBlocking()
 
-        expect: 'the annotation processor wrote an HttpRoutes bean, and there is no controller'
-        context.getBeanDefinitions(HttpRoutes)*.beanType*.name == ['petstore.web.PetResourceRoutes']
-        context.getBeanDefinitions(Qualifiers.byStereotype(Controller)).isEmpty()
-
-        and: 'the resource is a plain bean: its methods are called by the generated code, not through executable methods'
-        context.getBeanDefinition(context.classLoader.loadClass('petstore.web.PetResource')).executableMethods.isEmpty()
-
-        and: 'the routes are handler routes of the router'
-        context.getBean(Router).uriRoutes()
-            .filter { it.uriMatchTemplate.toString().startsWith('/pets') }
-            .map { it.httpMethodName + ' ' + it.uriMatchTemplate }
-            .distinct()
-            .sorted()
-            .toList() == ['GET /pets/{id}', 'GET /pets/{id}/owners/{owner}', 'HEAD /pets/{id}', 'HEAD /pets/{id}/owners/{owner}',
-                          'POST /pets', 'POST /pets/{id}/rename']
-
-        and: 'path variables are converted to the parameter types'
+        then: 'the handlers call the resource with typed path variables'
         http.retrieve('/pets/1') == 'Rex'
         http.retrieve('/pets/1/owners/3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e') == 'Rex of 3f2b8c1e-8f0a-4a36-9d4f-2f6f1b3c4d5e'
+        http.exchange(HttpRequest.HEAD('/pets/1')).status == HttpStatus.OK
 
         when: 'a form is posted'
         String id = http.retrieve(HttpRequest.POST('/pets', [name: 'Bella', age: '3']).contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE))
 
-        then: 'the fields are converted to the parameter types'
+        then:
         http.retrieve("/pets/$id") == 'Bella (3)'
 
         when: 'a void method is called'
@@ -117,10 +168,17 @@ class PetResource {
         renamed.status == HttpStatus.NO_CONTENT
         http.retrieve("/pets/$id") == 'Luna'
 
+        when: 'a declared route has no handler'
+        http.retrieve('/pets/1/photo')
+
+        then: 'it is not a route'
+        def notFound = thrown(HttpClientResponseException)
+        notFound.status == HttpStatus.NOT_FOUND
+
         when: 'a path variable does not convert'
         http.retrieve('/pets/rex')
 
-        then: 'the request is answered with 400, like a controller'
+        then:
         def badRequest = thrown(HttpClientResponseException)
         badRequest.status == HttpStatus.BAD_REQUEST
 

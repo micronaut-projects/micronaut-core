@@ -37,9 +37,13 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.HttpRoutes;
+import io.micronaut.web.router.RouteBuilder;
+import io.micronaut.web.router.RouteDeclaration;
 import io.micronaut.web.router.RouteSource;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
+import io.micronaut.web.router.Router;
+import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
@@ -53,6 +57,8 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Routes to handler functions, declared by {@link HttpRoutes} beans or published at runtime by a
@@ -270,6 +276,50 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void handlerIsBoundToADeclaredRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/5"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("declared 5 handler-filter-thread")
+                .headers(Map.of("X-Declared", "true", "X-Fn-Filter", "true"))
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.HEAD("/fn/declared/5"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .headers(Map.of("X-Declared", "true"))
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.DELETE("/fn/declared/5"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+        }
+    }
+
+    @Test
+    void declaredRouteIsLazyAndFixedWhenTheRouterIsBuilt() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Router router = server.getApplicationContext().getBean(Router.class);
+            assertTrue(router.uriRoutes().anyMatch(route -> route.toString().startsWith("GET /fn/declared/{id}") && route.getClass().getSimpleName().equals("LazyUriRouteInfo")));
+            // changed after the router took the route: ignored
+            server.getApplicationContext().getBean(DeclaredRoutes.class).route.consumes(MediaType.TEXT_XML_TYPE).before(request -> HttpResponse.serverError());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/6"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .build());
+        }
+    }
+
+    @Test
+    void runtimeTableBindsADeclaredRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            server.getApplicationContext().getBean(DynamicHandlerRoutes.class).enable();
+
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn-declared-dynamic/7"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("dynamic declared 7")
+                .headers(Map.of("X-Table-Route", "true"))
+                .build());
+        }
+    }
+
+    @Test
     void runtimeRoutesUseHandlers() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
@@ -410,6 +460,28 @@ public class HandlerRoutesTest {
         }
     }
 
+    /**
+     * Binds a handler to a declared route, like a route declared at compile time.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class DeclaredRoutes implements HttpRoutes {
+        static final RouteDeclaration FIND = RouteDeclaration.of(HttpMethod.GET, "/fn/declared/{id}");
+
+        UriRoute route;
+
+        @Override
+        public void routes(RouteBuilder routes) {
+            route = routes.handle(FIND, (request, pathVariables) -> HttpResponse.ok("declared " + pathVariables.getLong("id") + " "
+                    + request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .before("handler-filter", request -> {
+                    request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
+                    return null;
+                })
+                .after((request, response) -> response.header("X-Declared", "true"));
+        }
+    }
+
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class DynamicHandlerRoutes implements RouteSource {
@@ -421,9 +493,14 @@ public class HandlerRoutesTest {
         }
 
         void enable() {
-            current = tables.build(routes -> routes.GET("/fn-dynamic/{+path}", (request, pathVariables) ->
-                HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE))
-                .after((request, response) -> response.header("X-Table-Route", "true")));
+            current = tables.build(routes -> {
+                routes.GET("/fn-dynamic/{+path}", (request, pathVariables) ->
+                        HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .after((request, response) -> response.header("X-Table-Route", "true"));
+                routes.handle(RouteDeclaration.of(HttpMethod.GET, "/fn-declared-dynamic/{id}"), (request, pathVariables) ->
+                        HttpResponse.ok("dynamic declared " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .after((request, response) -> response.header("X-Table-Route", "true"));
+            });
         }
 
         @Override

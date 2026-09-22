@@ -583,6 +583,94 @@ public interface RouteBuilder {
     }
 
     /**
+     * Bind a handler function to a declared route, e.g. a constant generated at compile time. The
+     * route is registered with the keys of the declaration and built the first time the router
+     * uses it; otherwise it is the same as {@link #handle(HttpMethod, String, RequestHandler)}.
+     * A {@code GET} route gets an implicit {@code HEAD} route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handle(RouteDeclaration route, RequestHandler handler) {
+        return handle(route.httpMethod(), route.uriTemplate(), handler);
+    }
+
+    /**
+     * Bind a handler function that receives the decoded body to a declared route.
+     *
+     * @param route    The declared route
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route, to configure further
+     * @since 5.3.0
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    @Experimental
+    default <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(route.httpMethod(), route.uriTemplate(), bodyType, handler);
+    }
+
+    /**
+     * Bind a handler function that completes the response later to a declared route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @since 5.3.0
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+        return handleAsync(route.httpMethod(), route.uriTemplate(), handler);
+    }
+
+    /**
+     * Bind a form handler function to a declared route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @since 5.3.0
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+        return handleForm(route.httpMethod(), route.uriTemplate(), handler);
+    }
+
+    /**
+     * Bind an asynchronous form handler function to a declared route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @since 5.3.0
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+        return handleFormAsync(route.httpMethod(), route.uriTemplate(), handler);
+    }
+
+    /**
+     * Bind a streaming form handler function to a declared route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @since 5.3.0
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+        return handleFormStream(route.httpMethod(), route.uriTemplate(), handler);
+    }
+
+    /**
      * Route requests to a handler function that completes the response later. The executor is
      * selected like for a controller method returning a {@code CompletionStage}.
      *

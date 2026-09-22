@@ -108,6 +108,18 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
         return routes;
     }
 
+    @Override
+    List<LazyUriRouteInfo> lazyRouteInfos() {
+        List<LazyUriRouteInfo> declared = super.lazyRouteInfos();
+        List<LazyUriRouteInfo> precompiled = precompiledRouteInfos();
+        if (declared.isEmpty()) {
+            return precompiled;
+        }
+        List<LazyUriRouteInfo> infos = new ArrayList<>(declared);
+        infos.addAll(precompiled);
+        return infos;
+    }
+
     /**
      * The routes of the enabled controllers whose routes are precompiled. They are built when first used.
      *
