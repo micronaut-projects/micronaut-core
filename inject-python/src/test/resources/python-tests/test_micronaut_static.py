@@ -710,6 +710,13 @@ class Pricing:
         counts["added"] = len(values)
         return counts["added"]
 
+    def paged(self, pages: dict[str, int]) -> int:
+        total = 0
+        for title, count in pages.items():
+            if len(title) > 0:
+                total = total + count
+        return total
+
 
 pricing: Annotated[Pricing, Inject]
 
@@ -727,6 +734,69 @@ def peek(cart: Cart) -> str:
 def helper_only(n: int) -> int:
     return n
 '''
+
+
+ADVISED = '''
+from jakarta.inject import Singleton
+
+
+def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
+    def decorator(func):
+        return func
+    return decorator
+
+
+@micronaut_annotation("pkg.Logged")
+def Logged():
+    def decorator(target):
+        return target
+    return decorator
+
+
+@Singleton
+class Audit:
+    @Logged
+    def label(self, n: int) -> str:
+        return str(n)
+
+    def plain(self, n: int) -> int:
+        return n
+'''
+
+
+class AroundBinding:
+    """What the planner asks of the description of an around binding."""
+
+    def annotation(self):
+        return True
+
+    def interceptorBinding(self):
+        return True
+
+    def validationConstraint(self):
+        return False
+
+    def executable(self):
+        return True
+
+    def introduction(self):
+        return False
+
+
+class AdvisedFacts(FakeFacts):
+    """Facts describing the decorator Logged as an around binding."""
+
+    def describeAnnotation(self, name):
+        return AroundBinding() if name.rsplit(".", 1)[-1] == "Logged" else None
+
+
+class AdviceTest(unittest.TestCase):
+    def test_an_advised_method_is_compiled_with_its_chain(self):
+        decisions, planner = plan(ADVISED, MODE_ALL, facts=AdvisedFacts())
+        self.assertEqual("COMPILED", decisions["Audit.label"].outcome().name(), [(r.rule(), r.message()) for r in decisions["Audit.label"].reasons()])
+        bodies = {body.methodName(): body for body in planner.bodies}
+        self.assertTrue(bodies["label"].advised())
+        self.assertFalse(bodies["plain"].advised())
 
 
 class LoweringTest(unittest.TestCase):
@@ -783,6 +853,18 @@ class LoweringTest(unittest.TestCase):
         branch = statements[1]
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
+
+    def test_dict_entries_unpack_into_the_loop_variables(self):
+        paged = self.bodies["paged"]
+        loop = list(paged.body().statements())[2]  # after the copy of the parameter and total = 0
+        self.assertEqual("ForEach", loop.getClass().getSimpleName())
+        self.assertEqual("java.util.Map.Entry", loop.type())
+        self.assertEqual("entrySet", loop.iterable().name())
+        bindings = list(loop.body().statements())[:2]
+        self.assertEqual(["title", "count"], [binding.name() for binding in bindings])
+        self.assertEqual(["java.lang.String", "long"], [binding.type() for binding in bindings])
+        self.assertEqual(["getKey", "getValue"], [_uncast(binding.value()).name() for binding in bindings])
+        self.assertEqual("COMPILED", self.decisions["Pricing.paged"].outcome().name())
 
     def test_module_functions_compile_into_the_script_class(self):
         route = self.decisions["route"]
