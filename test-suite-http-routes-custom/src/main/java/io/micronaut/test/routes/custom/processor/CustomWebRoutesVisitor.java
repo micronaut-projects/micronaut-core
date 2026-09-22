@@ -22,7 +22,7 @@ import java.util.Set;
 /**
  * An annotation processor of a made-up web framework. It reads the framework's own annotations,
  * {@code @Resource}, {@code @Read} and {@code @Write}, and declares the routes of each resource
- * at compile time as an enum of {@code RouteDeclaration}s: one constant per annotated method,
+ * at compile time as an enum of {@code IndexedRouteDeclaration}s: one constant per annotated method,
  * with the HTTP method, the URI template and the keys the router indexes and orders routes by,
  * computed here once, and a generated URL parser, the enum's {@code CompiledRouteMatcher}, that
  * maps a request path to a constant. Handler functions are bound to the constants at runtime with
@@ -76,7 +76,7 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
             /**
              * The routes of {@link %s}, declared at compile time from its web annotations.
              */
-            public enum %s implements io.micronaut.web.router.builder.RouteDeclaration {
+            public enum %s implements io.micronaut.web.router.spi.IndexedRouteDeclaration {
             %s;
 
                 private final io.micronaut.http.HttpMethod httpMethod;
@@ -119,7 +119,7 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
                 }
 
                 @Override
-                public io.micronaut.web.router.builder.CompiledRouteMatcher matcher() {
+                public io.micronaut.web.router.spi.CompiledRouteMatcher matcher() {
                     return Matcher.INSTANCE;
                 }
 

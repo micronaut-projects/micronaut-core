@@ -17,30 +17,22 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.uri.UriMatchTemplate;
-import io.micronaut.http.uri.UriTemplateMatcher;
-import org.jspecify.annotations.Nullable;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 
 /**
- * The declaration of a route: its HTTP method and URI template, with the keys the router indexes
- * and orders routes by. A handler function is bound to it with
- * {@link io.micronaut.web.router.builder.HttpRouteBuilder#handle(RouteDeclaration, RequestHandler)} and the other {@code handle}
- * methods taking a declaration.
- *
- * <p>Declarations are meant to be generated at compile time, typically as the constants of an
- * enum, by an annotation processor that reads the web annotations of an application or a
- * framework: the keys are then computed once, and the router registers the route without parsing
- * its template, building it the first time it is used. {@link #of(HttpMethod, String)} declares a
- * route in code.</p>
+ * The declaration of a route: its HTTP method and URI template, to bind a handler function to with
+ * {@link HttpRouteBuilder#handle(RouteDeclaration, RequestHandler)} and the other {@code handle}
+ * methods taking a declaration. It separates the shape of a route from its implementation: a
+ * declaration without a handler is not a route.
  *
  * <pre>{@code
- * public enum PetRoutes implements RouteDeclaration {
- *     FIND(HttpMethod.GET, "/pets/{id}", "/pets/", 6, 1);
- *     ...
- * }
+ * static final RouteDeclaration FIND = RouteDeclaration.of(HttpMethod.GET, "/pets/{id}");
  *
- * routes.handle(PetRoutes.FIND, (request, pathVariables) -> HttpResponse.ok(pets.find(pathVariables.getLong("id"))));
+ * routes.handle(FIND, (request, pathVariables) -> HttpResponse.ok(pets.find(pathVariables.getLong("id"))));
  * }</pre>
+ *
+ * <p>Annotation processors generate declarations as {@link IndexedRouteDeclaration}s, with the
+ * keys the router indexes routes by computed at compile time.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -59,43 +51,14 @@ public interface RouteDeclaration {
     String uriTemplate();
 
     /**
-     * @return The literal every path the route matches starts with, or an empty string; the same
-     * as {@link UriTemplateMatcher#getRequiredPrefix()} of the template
-     */
-    String requiredPathPrefix();
-
-    /**
-     * @return The length of the literal parts of the template; the same as
-     * {@link UriTemplateMatcher#getRawLength()}
-     */
-    int rawLength();
-
-    /**
-     * @return The number of path variables of the template; the same as
-     * {@link UriTemplateMatcher#getPathVariableCount()}
-     */
-    int pathVariableCount();
-
-    /**
-     * The URL parser generated for the enum this declaration is a constant of, if any. The router
-     * asks it before its own matching; the ordinal it answers selects the route bound to the
-     * constant with that ordinal.
-     *
-     * @return The matcher, or {@code null}
-     */
-    default @Nullable CompiledRouteMatcher matcher() {
-        return null;
-    }
-
-    /**
-     * Declare a route in code: the keys are computed from the template.
+     * Declare a route in code. The route is registered like a generated declaration, built the
+     * first time the router uses it.
      *
      * @param httpMethod  The HTTP method
      * @param uriTemplate The URI template
      * @return The declaration
      */
     static RouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
-        UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString());
-        return new DefaultRouteDeclaration(httpMethod, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount());
+        return IndexedRouteDeclaration.of(httpMethod, uriTemplate);
     }
 }

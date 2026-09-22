@@ -20,6 +20,7 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -38,7 +39,7 @@ import java.util.function.Supplier;
  */
 @Internal
 public final class DeclaredUriRoute implements HandlerUriRoute {
-    private final RouteDeclaration declaration;
+    private final IndexedRouteDeclaration declaration;
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
@@ -47,7 +48,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
      * @param declaration The declaration
      * @param factory     Creates the route, not added to the assembly
      */
-    public DeclaredUriRoute(RouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory) {
+    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory) {
         this.declaration = declaration;
         this.route = SupplierUtil.memoized(() -> {
             RouteAssembly.DefaultUriRoute built = factory.get();
@@ -62,7 +63,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     /**
      * @return The declaration
      */
-    public RouteDeclaration declaration() {
+    public IndexedRouteDeclaration declaration() {
         return declaration;
     }
 

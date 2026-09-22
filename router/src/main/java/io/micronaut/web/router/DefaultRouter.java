@@ -30,10 +30,10 @@ import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
-import io.micronaut.web.router.builder.CompiledRouteMatcher;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.spi.CompiledRouteMatcher;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -933,7 +933,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private static void addCompiled(Map<CompiledRouteMatcher, CompiledRoutes> compiled, LazyUriRouteInfo route) {
-        RouteDeclaration declaration = route.declaration();
+        IndexedRouteDeclaration declaration = route.declaration();
         if (declaration == null || !(declaration instanceof Enum<?> constant)) {
             return;
         }

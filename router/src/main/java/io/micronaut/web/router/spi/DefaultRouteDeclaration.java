@@ -13,13 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router.builder;
+package io.micronaut.web.router.spi;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 
 /**
- * A {@link RouteDeclaration} declared in code.
+ * An {@link IndexedRouteDeclaration} declared in code, with the keys computed from the template.
  *
  * @param httpMethod         The HTTP method
  * @param uriTemplate        The URI template
@@ -34,5 +34,5 @@ record DefaultRouteDeclaration(HttpMethod httpMethod,
                                String uriTemplate,
                                String requiredPathPrefix,
                                int rawLength,
-                               int pathVariableCount) implements RouteDeclaration {
+                               int pathVariableCount) implements IndexedRouteDeclaration {
 }
