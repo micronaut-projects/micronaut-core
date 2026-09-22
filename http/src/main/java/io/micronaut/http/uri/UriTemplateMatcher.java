@@ -486,6 +486,28 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
     }
 
     /**
+     * @return The length of the literal parts, the first key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getRawLength() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.rawLength;
+    }
+
+    /**
+     * @return The number of path variables, the second key of the order of templates, see
+     * {@link #compareTo(UriTemplateMatcher)}
+     * @since 5.3.0
+     */
+    public int getPathVariableCount() {
+        PathEvaluator evaluator = new PathEvaluator();
+        visitParts(parts, evaluator);
+        return evaluator.variableCount;
+    }
+
+    /**
      * Normalise a URI the way {@link #tryMatch(String)} does before it matches the segments: the
      * query and a trailing slash are removed.
      *

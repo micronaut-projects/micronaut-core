@@ -30,6 +30,8 @@ dependencies {
     api(projects.micronautHttpClient)
     api(projects.micronautJacksonDatabind)
     api(projects.micronautRouter)
+    // generates the precompiled routes of RouterBenchmark's in-memory compilation
+    api(projects.micronautHttpValidation)
     api(projects.micronautRuntime)
     api(projects.micronautCoreReactive)
 

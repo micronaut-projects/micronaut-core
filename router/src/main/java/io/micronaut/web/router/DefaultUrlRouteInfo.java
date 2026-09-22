@@ -47,7 +47,7 @@ import java.util.function.Predicate;
  * @since 4.0.0
  */
 @Internal
-public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R> {
+public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
 
     private final HttpMethod httpMethod;
     private final String httpMethodName;
@@ -162,8 +162,21 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @since 5.3.0
      */
     @Internal
+    @Override
     public String getRequiredPathPrefix() {
         return uriTemplateMatcher.getRequiredPrefix();
+    }
+
+    @Internal
+    @Override
+    public int getRawLength() {
+        return uriTemplateMatcher.getRawLength();
+    }
+
+    @Internal
+    @Override
+    public int getPathVariableCount() {
+        return uriTemplateMatcher.getPathVariableCount();
     }
 
     @Override
@@ -202,7 +215,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public int compareTo(UriRouteInfo o) {
-        return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
+        if (o instanceof DefaultUrlRouteInfo<?, ?> other) {
+            return uriTemplateMatcher.compareTo(other.uriTemplateMatcher);
+        }
+        // e.g. a precompiled route that is not built yet
+        return IndexedRoute.compare(this, (IndexedRoute) o);
     }
 
     @Override
