@@ -1424,7 +1424,8 @@ public final class PythonContextRuntime {
         // while it waits for the instantiation. Only a missing submodule is tolerated on the way: an
         // error raised while executing one propagates.
         Value module = importPackageOfMember(ctx, packageName);
-        if (module == null) {
+        if (PythonConversion.isNone(module)) {
+            // The import of the package runs on this thread or on another one.
             return importMemberWhilePackageImports(ctx, packageName, importName);
         }
         Value member = classMember(ctx, module, importName);
@@ -1510,13 +1511,10 @@ public final class PythonContextRuntime {
 
     /**
      * The package a class is resolved from, imported unless its import is running already:
-     * {@code null} while this or another thread is still executing it.
+     * {@code None} while this or another thread is still executing it.
      */
-    private static @Nullable Value importPackageOfMember(Context ctx, String packageName) {
-        return withContextClassLoader(() -> {
-            Value module = helper(ctx, "__micronaut_import_package_of_member").execute(packageName);
-            return PythonConversion.isNone(module) ? null : module;
-        });
+    private static Value importPackageOfMember(Context ctx, String packageName) {
+        return withContextClassLoader(() -> helper(ctx, "__micronaut_import_package_of_member").execute(packageName));
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {
