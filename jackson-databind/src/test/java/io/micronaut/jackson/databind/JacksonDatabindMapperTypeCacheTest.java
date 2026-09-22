@@ -137,6 +137,18 @@ class JacksonDatabindMapperTypeCacheTest {
         assertSame(specific.writer(Argument.of(Item.class)), specific.writer(Argument.of(Other.class)));
     }
 
+    @Test
+    void cloningSpecializedMapperWithViewPreservesGenericType() throws IOException {
+        Argument<List<Item>> type = Argument.listOf(Item.class);
+        var specific = mapper.createSpecific(type);
+        var viewed = specific.cloneWithViewClass(Summary.class);
+        byte[] json = "[{\"id\":7,\"name\":\"hidden\"}]".getBytes(StandardCharsets.UTF_8);
+
+        assertEquals(List.of(new Item(7, null)), viewed.readValue(json, type));
+        assertEquals("[{\"id\":7}]", new String(viewed.writeValueAsBytes(type, List.of(new Item(7, "hidden"))), StandardCharsets.UTF_8));
+        assertEquals(List.of(new Item(7, "hidden")), specific.readValue(json, type));
+    }
+
     private record JsonMapperSpecific(io.micronaut.json.JsonMapper mapper) {
         ObjectWriter writer(Argument<?> type) {
             return ((JacksonDatabindMapper) mapper).createWriter(type);
