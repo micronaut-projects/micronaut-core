@@ -389,4 +389,61 @@ public interface RouteBuilder {
      */
     UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
 
+    /**
+     * Route requests to a handler function that receives the body decoded to the given type and
+     * completes the response later: a {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}
+     * route whose handler returns a {@code CompletionStage}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     */
+    <B> UriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
+
+    /**
+     * Bind a handler function that receives the decoded body and completes the response later to
+     * a declared route.
+     *
+     * @param route    The declared route
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route, to configure further
+     * @see #handle(RouteDeclaration, RequestHandler)
+     */
+    <B> UriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
+
+    /**
+     * Route a {@code POST} request to a handler function that receives the body decoded to the
+     * given type and completes the response later.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
+     */
+    default <B> UriRoute asyncPOST(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return handleAsync(HttpMethod.POST, uri, bodyType, handler);
+    }
+
+    /**
+     * Route a {@code PUT} request to a handler function that receives the body decoded to the
+     * given type and completes the response later.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
+     */
+    default <B> UriRoute asyncPUT(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return handleAsync(HttpMethod.PUT, uri, bodyType, handler);
+    }
+
 }

@@ -58,6 +58,16 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public <B> UriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return new Routes(builder.handleAsync(method, uri, bodyType, handler));
+    }
+
+    @Override
+    public <B> UriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return new Routes(builder.handleAsync(route, bodyType, handler));
+    }
+
+    @Override
     public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return new Routes(builder.handleForm(method, uri, handler));
     }
