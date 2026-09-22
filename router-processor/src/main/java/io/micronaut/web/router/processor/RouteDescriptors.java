@@ -101,6 +101,10 @@ public final class RouteDescriptors {
         writeString(json, slot.requiredPrefix());
         json.append(", \"rawLength\": ").append(slot.rawLength());
         json.append(", \"pathVariableCount\": ").append(slot.pathVariableCount());
+        if (slot.patternVariableCount() != 0) {
+            // written only when there are such variables: a descriptor without it has none
+            json.append(", \"patternVariableCount\": ").append(slot.patternVariableCount());
+        }
         json.append(", \"captures\": ");
         writeStrings(json, slot.captures());
         json.append(", \"compiled\": ").append(slot.compiled());
@@ -215,6 +219,7 @@ public final class RouteDescriptors {
                 string(slot, "requiredPrefix"),
                 number(slot, "rawLength"),
                 number(slot, "pathVariableCount"),
+                slot.get("patternVariableCount") == null ? 0 : number(slot, "patternVariableCount"),
                 strings(slot, "captures"),
                 bool(slot, "compiled"),
                 (String) slot.get("fallbackReason"),

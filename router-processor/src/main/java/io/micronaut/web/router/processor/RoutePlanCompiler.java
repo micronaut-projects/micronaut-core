@@ -121,6 +121,7 @@ public final class RoutePlanCompiler {
                 parsed.requiredPrefix(),
                 parsed.rawLength(),
                 parsed.pathVariableCount(),
+                parsed.patternVariableCount(),
                 lowering.captures().toArray(String[]::new),
                 lowering.isSupported(),
                 lowering.unsupportedReason(),

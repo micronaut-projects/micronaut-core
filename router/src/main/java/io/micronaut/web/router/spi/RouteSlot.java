@@ -37,6 +37,7 @@ import java.util.Objects;
  * @param requiredPrefix    A literal every path the route matches starts with, see {@link io.micronaut.http.uri.ParsedRouteTemplate#requiredPrefix()}
  * @param rawLength         The length of the literal parts, see {@link io.micronaut.http.uri.ParsedRouteTemplate#rawLength()}
  * @param pathVariableCount The number of path variables, see {@link io.micronaut.http.uri.ParsedRouteTemplate#pathVariableCount()}
+ * @param patternVariableCount The number of path variables with a regular expression, see {@link io.micronaut.http.uri.ParsedRouteTemplate#patternVariableCount()}
  * @param captures          The names of the path variables the parser captures, in the order of their spans
  * @param compiled          Whether the parser of the plan matches the slot; otherwise the engine of the template does
  * @param fallbackReason    Why the parser does not match the slot, or {@code null} when it does
@@ -52,6 +53,7 @@ public record RouteSlot(String key,
                         String requiredPrefix,
                         int rawLength,
                         int pathVariableCount,
+                        int patternVariableCount,
                         String[] captures,
                         boolean compiled,
                         @Nullable String fallbackReason,
@@ -65,6 +67,7 @@ public record RouteSlot(String key,
      * @param requiredPrefix    The required path prefix
      * @param rawLength         The length of the literal parts
      * @param pathVariableCount The number of path variables
+     * @param patternVariableCount The number of path variables with a regular expression
      * @param captures          The names of the captured path variables
      * @param compiled          Whether the parser matches the slot
      * @param fallbackReason    Why the parser does not match the slot
@@ -98,6 +101,10 @@ public record RouteSlot(String key,
             .append(template.expression()).append(s).append(engineVersion).append(s).append(requiredPrefix).append(s)
             .append(rawLength).append(s).append(pathVariableCount).append(s).append(String.join(",", captures)).append(s)
             .append(compiled).append(s).append(fallbackReason == null ? "" : fallbackReason);
+        if (patternVariableCount != 0) {
+            // only when there are such variables, so that the fingerprints of the plans without them are unchanged
+            builder.append(s).append("patternVariableCount=").append(patternVariableCount);
+        }
         if (controller != null) {
             builder.append(s);
             controller.appendCanonical(builder);
@@ -108,7 +115,8 @@ public record RouteSlot(String key,
     public boolean equals(Object o) {
         return o instanceof RouteSlot other && key.equals(other.key) && httpMethodName.equals(other.httpMethodName)
             && template.equals(other.template) && engineVersion.equals(other.engineVersion) && requiredPrefix.equals(other.requiredPrefix)
-            && rawLength == other.rawLength && pathVariableCount == other.pathVariableCount && Arrays.equals(captures, other.captures)
+            && rawLength == other.rawLength && pathVariableCount == other.pathVariableCount
+            && patternVariableCount == other.patternVariableCount && Arrays.equals(captures, other.captures)
             && compiled == other.compiled && Objects.equals(fallbackReason, other.fallbackReason) && Objects.equals(controller, other.controller);
     }
 

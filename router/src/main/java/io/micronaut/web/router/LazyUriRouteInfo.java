@@ -91,7 +91,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
      */
     LazyUriRouteInfo(RoutePlan plan, RouteSlot slot, Supplier<UriRouteInfo<Object, Object>> builder) {
         this(slot.httpMethod(), slot.httpMethodName(), slot.template(), null, slot.requiredPrefix(), slot.rawLength(),
-            slot.pathVariableCount(), 0, implicitHead(slot), 0,
+            slot.pathVariableCount(), slot.patternVariableCount(), implicitHead(slot), 0,
             String.valueOf(slot.controller()), null, plan, slot.key(), builder);
     }
 
