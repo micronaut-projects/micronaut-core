@@ -109,6 +109,7 @@ class MutableByteBodyHttpResponseTest {
         MessageBodyWriter<Object> writer = new MessageBodyWriter<>() {
             @Override
             public void writeTo(Argument<Object> type, MediaType mediaType, Object object, io.micronaut.core.type.MutableHeaders outgoingHeaders, OutputStream outputStream) {
+                // never called: the test only checks that the response keeps the writer
             }
         };
         assertSame(typed, typed.bodyWriter(writer));
