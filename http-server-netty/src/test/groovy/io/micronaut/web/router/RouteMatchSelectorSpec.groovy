@@ -83,6 +83,46 @@ class RouteMatchSelectorSpec extends Specification {
         get('/neg/items/5', 'image/png').statusCode() == 406
     }
 
+    @Unroll
+    void "an accepted wildcard reaches the selector with every compatible route #accept"() {
+        when:
+        JdkResponse<String> response = get(path, accept)
+
+        then:
+        response.statusCode() == 200
+        response.headers().firstValue('Content-Type').get().startsWith(contentType)
+        response.body() == body
+
+        where:
+        path              | accept    | contentType  | body
+        '/neg/image/5'    | 'image/*' | 'image/png'  | 'png'
+        '/neg/image/5'    | '*/*'     | 'image/png'  | 'png'
+        '/neg/items/5'    | 'text/*'  | 'text/plain' | 'text 5 text/plain'
+    }
+
+    void "a content type reaches a route that consumes its wildcard"() {
+        when:
+        JdkResponse<String> response = post('/neg/consume/5', 'text/plain')
+
+        then:
+        response.statusCode() == 200
+        response.body() == 'consumed'
+    }
+
+    void "incompatible types are not acceptable or unsupported"() {
+        expect:
+        get('/neg/image/5', 'text/*').statusCode() == 406
+        post('/neg/consume/5', 'application/json').statusCode() == 415
+    }
+
+    private JdkResponse<String> post(String path, String contentType) {
+        def request = java.net.http.HttpRequest.newBuilder(URI.create("${server.URL}${path}"))
+            .header('Content-Type', contentType)
+            .POST(java.net.http.HttpRequest.BodyPublishers.ofString('{}'))
+            .build()
+        client.send(request, JdkResponse.BodyHandlers.ofString())
+    }
+
     private JdkResponse<String> get(String path, String accept) {
         def builder = java.net.http.HttpRequest.newBuilder(URI.create("${server.URL}${path}")).GET()
         if (accept != null) {
@@ -109,6 +149,15 @@ class RouteMatchSelectorSpec extends Specification {
                 routes.handle(RouteDeclaration.of(HttpMethod.GET, TestSelectingColonRouteTemplateEngine.template('/neg/explicit/:id')), { HttpRequest<?> request, PathVariables pathVariables ->
                     HttpResponse.ok('a,b').contentType(MediaType.of('text/csv'))
                 } as RequestHandler).produces(MediaType.TEXT_PLAIN_TYPE)
+                routes.handle(RouteDeclaration.of(HttpMethod.GET, TestSelectingColonRouteTemplateEngine.template('/neg/image/:id')), { HttpRequest<?> request, PathVariables pathVariables ->
+                    HttpResponse.ok('png'.bytes)
+                } as RequestHandler).produces(MediaType.of('image/png;qs=0.6'))
+                routes.handle(RouteDeclaration.of(HttpMethod.GET, TestSelectingColonRouteTemplateEngine.template('/neg/image/:id')), { HttpRequest<?> request, PathVariables pathVariables ->
+                    HttpResponse.ok('any'.bytes)
+                } as RequestHandler).produces(MediaType.of('image/*;qs=0.7'))
+                routes.handle(RouteDeclaration.of(HttpMethod.POST, TestSelectingColonRouteTemplateEngine.template('/neg/consume/:id')), { HttpRequest<?> request, PathVariables pathVariables ->
+                    HttpResponse.ok('consumed')
+                } as RequestHandler).consumes(MediaType.of('text/*')).produces(MediaType.TEXT_PLAIN_TYPE)
                 routes.GET('/nat/single/{id}', { HttpRequest<?> request, PathVariables pathVariables ->
                     HttpResponse.ok('single')
                 } as RequestHandler).produces(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE)

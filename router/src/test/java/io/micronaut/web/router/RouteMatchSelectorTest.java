@@ -49,6 +49,18 @@ class RouteMatchSelectorTest {
             .produces(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE);
         routes.handle(RouteDeclaration.of(HttpMethod.GET, SelectingColonRouteTemplateEngine.template("/mixed/:id")), (request, variables) -> HttpResponse.ok());
         routes.GET("/mixed/{id}", (request, variables) -> HttpResponse.ok());
+        routes.handle(RouteDeclaration.of(HttpMethod.GET, SelectingColonRouteTemplateEngine.template("/image/:id")), (request, variables) -> HttpResponse.ok())
+            .produces(MediaType.of("image/png;qs=0.6"));
+        routes.handle(RouteDeclaration.of(HttpMethod.GET, SelectingColonRouteTemplateEngine.template("/image/:id")), (request, variables) -> HttpResponse.ok())
+            .produces(MediaType.of("image/*;qs=0.7"));
+        routes.handle(RouteDeclaration.of(HttpMethod.GET, SelectingColonRouteTemplateEngine.template("/text/:id")), (request, variables) -> HttpResponse.ok())
+            .produces(MediaType.TEXT_PLAIN_TYPE);
+        routes.handle(RouteDeclaration.of(HttpMethod.GET, SelectingColonRouteTemplateEngine.template("/text/:id")), (request, variables) -> HttpResponse.ok())
+            .produces(MediaType.TEXT_HTML_TYPE);
+        routes.handle(RouteDeclaration.of(HttpMethod.POST, SelectingColonRouteTemplateEngine.template("/consume/:id")), (request, variables) -> HttpResponse.ok())
+            .consumes(MediaType.of("text/*"));
+        routes.GET("/native/{id}", (request, variables) -> HttpResponse.ok()).produces(MediaType.IMAGE_PNG_TYPE);
+        routes.POST("/native/{id}", (request, variables) -> HttpResponse.ok()).consumes(MediaType.of("text/*"));
     });
 
     @Test
@@ -137,6 +149,56 @@ class RouteMatchSelectorTest {
         assertEquals("5", match.getVariableValues().get("id"));
         assertEquals("3", match.getVariableValues().get("item"));
         assertEquals(Optional.of(MediaType.APPLICATION_XML_TYPE), match.getSelectedMediaType());
+    }
+
+    @Test
+    void aWildcardAcceptedTypeReachesTheSelectorWithEveryCompatibleRoute() {
+        UriRouteMatch<Object, Object> match = router.findClosest(get("/image/1", "image/*"));
+        assertNotNull(match);
+        assertEquals(2, SelectingColonRouteTemplateEngine.LAST_CANDIDATES.get().size());
+        assertEquals(Optional.of(MediaType.IMAGE_PNG_TYPE), match.getSelectedMediaType());
+
+        // a concrete accepted type reaches the route that produces the wildcard too (the test
+        // selector then selects nothing: it only matches accepted wildcards)
+        router.findAllClosest(get("/image/1", "image/gif"));
+        assertEquals(1, SelectingColonRouteTemplateEngine.LAST_CANDIDATES.get().size());
+        assertEquals(List.of(MediaType.of("image/*")), SelectingColonRouteTemplateEngine.LAST_CANDIDATES.get().get(0).getRouteInfo().getProduces());
+    }
+
+    @Test
+    void aWildcardSubtypeReachesTheSelectorWithEveryRouteOfTheType() {
+        UriRouteMatch<Object, Object> match = router.findClosest(get("/text/1", "text/*"));
+        assertNotNull(match);
+        assertEquals(2, SelectingColonRouteTemplateEngine.LAST_CANDIDATES.get().size());
+        assertEquals(Optional.of(MediaType.TEXT_PLAIN_TYPE), match.getSelectedMediaType());
+    }
+
+    @Test
+    void aContentTypeReachesARouteThatConsumesItsWildcard() {
+        UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.POST("/consume/1", "a").contentType(MediaType.TEXT_PLAIN_TYPE));
+        assertNotNull(match);
+        assertEquals(1, SelectingColonRouteTemplateEngine.LAST_CANDIDATES.get().size());
+    }
+
+    @Test
+    void incompatibleTypesStillRemoveTheRoutesBeforeTheSelector() {
+        int before = SelectingColonRouteTemplateEngine.SELECTIONS.get();
+        assertNull(router.findClosest(get("/image/1", "text/plain")));
+        assertNull(router.findClosest(get("/text/1", "application/*")));
+        assertNull(router.findClosest(HttpRequest.POST("/consume/1", "a").contentType(MediaType.APPLICATION_JSON_TYPE)));
+        assertEquals(before, SelectingColonRouteTemplateEngine.SELECTIONS.get());
+        // the routes of the path, for the 406 and 415 of the server
+        UriRouteInfo<?, ?> image = router.findAny(get("/image/1", "text/plain")).get(0).getRouteInfo();
+        assertTrue(!image.doesProduce(List.of(MediaType.TEXT_PLAIN_TYPE)));
+        UriRouteInfo<?, ?> consume = router.findAny(HttpRequest.POST("/consume/1", "a")).get(0).getRouteInfo();
+        assertTrue(!consume.doesConsume(MediaType.APPLICATION_JSON_TYPE));
+    }
+
+    @Test
+    void micronautRoutesKeepTheExactTypes() {
+        assertNull(router.findClosest(get("/native/1", "image/*")));
+        assertNotNull(router.findClosest(get("/native/1", "image/png")));
+        assertNull(router.findClosest(HttpRequest.POST("/native/1", "a").contentType(MediaType.TEXT_PLAIN_TYPE)));
     }
 
     private static MutableHttpRequest<Object> get(String path, String accept) {
