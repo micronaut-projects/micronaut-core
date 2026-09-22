@@ -446,6 +446,43 @@ public interface HttpRouteBuilder {
     <B> HttpRouteSpec handleAsync(String httpMethodName, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
 
     /**
+     * Route requests of a method by its name, including a custom HTTP method, with a submitted
+     * form to a handler function that receives the whole form. The route consumes both form
+     * media types.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handleForm(HttpMethod, String, FormRequestHandler)
+     */
+    HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, with a submitted
+     * form to a handler function that completes the response later.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handleFormAsync(HttpMethod, String, AsyncFormRequestHandler)
+     */
+    HttpRouteSpec handleFormAsync(String httpMethodName, String uri, AsyncFormRequestHandler handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, with a submitted
+     * form to a handler function that reads the form as it arrives.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handleFormStream(HttpMethod, String, StreamingFormRequestHandler)
+     */
+    HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler);
+
+    /**
      * A body type that is {@code null} when the request has no body, for the handlers that
      * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)}.
      *

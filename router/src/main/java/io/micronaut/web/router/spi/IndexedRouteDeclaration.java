@@ -79,7 +79,26 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * @return The declaration
      */
     static IndexedRouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
+        return of(httpMethod, httpMethod.name(), uriTemplate);
+    }
+
+    /**
+     * A declaration of a method by its name, including a custom HTTP method, with the keys
+     * computed from the template. A standard name maps to its {@link HttpMethod}; any other name
+     * to {@link HttpMethod#CUSTOM} with that name.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uriTemplate    The URI template
+     * @return The declaration
+     */
+    static IndexedRouteDeclaration of(String httpMethodName, String uriTemplate) {
+        HttpMethod httpMethod = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        return of(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), uriTemplate);
+    }
+
+    private static IndexedRouteDeclaration of(HttpMethod httpMethod, String httpMethodName, String uriTemplate) {
         UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString());
-        return new DefaultRouteDeclaration(httpMethod, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount());
+        return new DefaultRouteDeclaration(httpMethod, httpMethodName, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount());
     }
 }

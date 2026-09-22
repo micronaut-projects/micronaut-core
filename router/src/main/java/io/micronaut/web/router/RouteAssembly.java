@@ -241,15 +241,16 @@ public final class RouteAssembly {
      */
     public HandlerUriRoute declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
         HttpMethod httpMethod = declaration.httpMethod();
+        String httpMethodName = declaration.httpMethodName();
         String uri = declaration.uriTemplate();
         if (!(declaration instanceof IndexedRouteDeclaration indexed) || currentParentRoute != null || !routeUri.apply(uri).equals(uri)) {
             // no index keys, or they do not describe the route: an ordinary route
-            DefaultUriRoute route = addRoute(httpMethod.name(), httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
+            DefaultUriRoute route = addRoute(httpMethodName, httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
             return consumes == null ? route : route.consumes(consumes);
         }
         DeclaredUriRoute route = new DeclaredUriRoute(
             indexed,
-            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethod.name(), conversionService)
+            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService)
         );
         if (consumes != null) {
             route.consumes(consumes);

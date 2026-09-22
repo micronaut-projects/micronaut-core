@@ -167,6 +167,6 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public String toString() {
-        return declaration.httpMethod() + " " + declaration.uriTemplate() + " (declared)";
+        return declaration.httpMethodName() + " " + declaration.uriTemplate() + " (declared)";
     }
 }

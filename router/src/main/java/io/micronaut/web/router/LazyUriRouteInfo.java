@@ -80,7 +80,8 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
      * @param builder      Builds the route
      */
     LazyUriRouteInfo(IndexedRouteDeclaration declaration, HttpMethod httpMethod, boolean implicitHead, Supplier<UriRouteInfo<Object, Object>> builder) {
-        this(httpMethod, httpMethod.name(), declaration.uriTemplate(), declaration.requiredPathPrefix(),
+        // the custom name for a custom method, so that the router indexes the route under it
+        this(httpMethod, implicitHead ? httpMethod.name() : declaration.httpMethodName(), declaration.uriTemplate(), declaration.requiredPathPrefix(),
             declaration.rawLength(), declaration.pathVariableCount(), implicitHead, String.valueOf(declaration), declaration, builder);
     }
 

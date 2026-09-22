@@ -46,6 +46,16 @@ public interface RouteDeclaration {
     HttpMethod httpMethod();
 
     /**
+     * The name of the HTTP method the route answers: {@link HttpMethod#name()} for a standard
+     * method, and the actual name, e.g. {@code PROPFIND}, for {@link HttpMethod#CUSTOM}.
+     *
+     * @return The name of the HTTP method
+     */
+    default String httpMethodName() {
+        return httpMethod().name();
+    }
+
+    /**
      * @return The URI template, e.g. {@code /pets/{id}}
      */
     String uriTemplate();
@@ -60,5 +70,18 @@ public interface RouteDeclaration {
      */
     static RouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
         return IndexedRouteDeclaration.of(httpMethod, uriTemplate);
+    }
+
+    /**
+     * Declare a route of a method by its name, including a custom HTTP method such as
+     * {@code PROPFIND}. A standard name maps to its {@link HttpMethod}; any other name to
+     * {@link HttpMethod#CUSTOM} with that name.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uriTemplate    The URI template
+     * @return The declaration
+     */
+    static RouteDeclaration of(String httpMethodName, String uriTemplate) {
+        return IndexedRouteDeclaration.of(httpMethodName, uriTemplate);
     }
 }

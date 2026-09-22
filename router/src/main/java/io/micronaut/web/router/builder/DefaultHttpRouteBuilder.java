@@ -179,6 +179,21 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         return new Routes(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
     }
 
+    @Override
+    public HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
+    @Override
+    public HttpRouteSpec handleFormAsync(String httpMethodName, String uri, AsyncFormRequestHandler handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
+    @Override
+    public HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
         Objects.requireNonNull(httpMethodName, "httpMethodName");
         HttpMethod method = HttpMethod.parse(httpMethodName);

@@ -170,6 +170,34 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void customHttpMethodIsRoutedToADeclaredRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/fn/declared-custom/3", "PROPFIND"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("declared PROPFIND 3")
+                .build());
+            // no implicit HEAD route, and the declaration answers only its method
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/declared-custom/3"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.create(HttpMethod.CUSTOM, "/fn/declared-custom/3", "PROPPATCH"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+        }
+    }
+
+    @Test
+    void customHttpMethodIsRoutedToAFormHandler() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/fn/custom-form", "PROPFIND")
+                .body("name=Fred").contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("PROPFIND Fred")
+                .build());
+        }
+    }
+
+    @Test
     void nullableBodyHelperIsNullWithoutABody() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/nullable-helper", null).contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
@@ -1121,6 +1149,7 @@ public class HandlerRoutesTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class AnnotatedRoutes implements HttpRoutes {
+        static final RouteDeclaration DECLARED_CUSTOM = RouteDeclaration.of("PROPFIND", "/fn/declared-custom/{id}");
         private final BeanContext beanContext;
         private final MarkedTarget target;
 
@@ -1140,6 +1169,10 @@ public class HandlerRoutesTest {
             routes.handle("PROPFIND", "/fn/custom-body", Argument.of(String.class), (request, pathVariables, body) ->
                 HttpResponse.ok(request.getMethodName() + " " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .consumesAll();
+            routes.handleForm("PROPFIND", "/fn/custom-form", (request, pathVariables, form) ->
+                HttpResponse.ok(request.getMethodName() + " " + form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.handle(DECLARED_CUSTOM, (request, pathVariables) ->
+                HttpResponse.ok("declared " + request.getMethodName() + " " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.POST("/fn/nullable-helper", HttpRouteBuilder.nullableBody(String.class), (request, pathVariables, body) ->
                 HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .consumesAll();

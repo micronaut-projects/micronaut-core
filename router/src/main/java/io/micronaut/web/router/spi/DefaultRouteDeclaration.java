@@ -22,6 +22,7 @@ import io.micronaut.http.HttpMethod;
  * An {@link IndexedRouteDeclaration} declared in code, with the keys computed from the template.
  *
  * @param httpMethod         The HTTP method
+ * @param httpMethodName     The name of the HTTP method, the custom name for {@link HttpMethod#CUSTOM}
  * @param uriTemplate        The URI template
  * @param requiredPathPrefix The literal prefix of the matched paths
  * @param rawLength          The length of the literal parts
@@ -31,6 +32,7 @@ import io.micronaut.http.HttpMethod;
  */
 @Internal
 record DefaultRouteDeclaration(HttpMethod httpMethod,
+                               String httpMethodName,
                                String uriTemplate,
                                String requiredPathPrefix,
                                int rawLength,
