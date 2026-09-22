@@ -30,8 +30,11 @@ import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
 import io.micronaut.web.router.filter.RouteMatchFilter;
@@ -42,9 +45,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -500,6 +505,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Internal
     public static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
                                                                     List<UriRouteMatch<T, R>> uriRoutes) {
+        // the matches may have templates of an engine with its own order, see RouteTemplateEngine#comparator()
+        return resolveAmbiguity(request, uriRoutes, RouteTemplateEngines.defaults().hasComparators());
+    }
+
+    /**
+     * Narrows the given route matches for a request down to the closest ones.
+     *
+     * @param request     The request
+     * @param uriRoutes   The route matches of the request
+     * @param engineOrders Whether a match may have a template of an engine with its own order
+     * @param <T>         The target type
+     * @param <R>         The result type
+     * @return The closest matches
+     */
+    static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
+                                                             List<UriRouteMatch<T, R>> uriRoutes,
+                                                             boolean engineOrders) {
         // if there are multiple routes, try to resolve the ambiguity
 
         final Collection<MediaType> acceptedProducedTypes = request.accept();
@@ -539,6 +561,15 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
          * Any changes to the logic below may also need changes to {@link io.micronaut.http.uri.UriTemplate#compareTo(UriTemplate)}
          */
         routeCount = uriRoutes.size();
+        if (routeCount > 1 && engineOrders) {
+            Comparator<ParsedRouteTemplate> engineOrder = sameEngineOrder(uriRoutes);
+            if (engineOrder != null) {
+                return mostSpecific(uriRoutes, engineOrder);
+            }
+            // the routes of an engine with its own order are not in the Micronaut order in the table
+            uriRoutes = new ArrayList<>(uriRoutes);
+            uriRoutes.sort(DefaultRouter::compareMicronaut);
+        }
         if (routeCount > 1) {
             long variableCount = 0;
             long rawLength = 0;
@@ -571,6 +602,77 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             uriRoutes = closestMatches.size() > 1 ? fewestPatternVariables(closestMatches) : closestMatches;
         }
         return uriRoutes;
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static int compareMicronaut(UriRouteMatch<?, ?> a, UriRouteMatch<?, ?> b) {
+        return ((UriRouteInfo) a.getRouteInfo()).compareTo((UriRouteInfo) b.getRouteInfo());
+    }
+
+    /**
+     * @param matches The matches of a path
+     * @return The order of the engine of the templates of all the matches, or {@code null} if they
+     * are of different engines or their engine has no order of its own
+     */
+    private static @Nullable Comparator<ParsedRouteTemplate> sameEngineOrder(List<? extends UriRouteMatch<?, ?>> matches) {
+        String engineId = null;
+        for (UriRouteMatch<?, ?> match : matches) {
+            ParsedRouteTemplate template = engineTemplate(match.getRouteInfo());
+            if (template == null) {
+                return null;
+            }
+            if (engineId == null) {
+                engineId = template.engineId();
+            } else if (!engineId.equals(template.engineId())) {
+                return null;
+            }
+        }
+        return engineId == null ? null : RouteTemplateEngines.defaults().comparator(engineId);
+    }
+
+    /**
+     * The matches whose templates are the most specific by the order of their engine.
+     *
+     * @param matches The matches, of routes of one engine
+     * @param order   The order of the engine
+     * @return The most specific matches, in their order
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> mostSpecific(List<UriRouteMatch<T, R>> matches, Comparator<ParsedRouteTemplate> order) {
+        int size = matches.size();
+        ParsedRouteTemplate[] templates = new ParsedRouteTemplate[size];
+        ParsedRouteTemplate best = null;
+        for (int i = 0; i < size; i++) {
+            ParsedRouteTemplate template = Objects.requireNonNull(engineTemplate(matches.get(i).getRouteInfo()));
+            templates[i] = template;
+            if (best == null || order.compare(template, best) < 0) {
+                best = template;
+            }
+        }
+        var result = new ArrayList<UriRouteMatch<T, R>>(size);
+        for (int i = 0; i < size; i++) {
+            if (order.compare(templates[i], Objects.requireNonNull(best)) == 0) {
+                result.add(matches.get(i));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * The template of a route of an engine other than the Micronaut one, as the engine parsed it,
+     * without building a route that is not built yet.
+     *
+     * @param route The route
+     * @return The template, or {@code null} for a Micronaut template
+     */
+    static @Nullable ParsedRouteTemplate engineTemplate(UriRouteInfo<?, ?> route) {
+        if (route instanceof DefaultUrlRouteInfo<?, ?> info) {
+            return info.isMicronautTemplate() ? null : info.parsedTemplate();
+        }
+        if (route instanceof LazyUriRouteInfo lazy) {
+            return lazy.isMicronautTemplate() ? null : lazy.parsedTemplate();
+        }
+        RouteTemplate template = route.getRouteTemplate();
+        return template.isMicronaut() ? null : RouteTemplateEngines.defaults().parse(template);
     }
 
     /**

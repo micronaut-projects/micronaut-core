@@ -155,6 +155,13 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     }
 
     /**
+     * @return Whether the declared template is of the Micronaut engine, without building the route
+     */
+    boolean isMicronautTemplate() {
+        return template.isMicronaut();
+    }
+
+    /**
      * @return The name of the HTTP method the router registers the route under, which is the custom name for a custom method
      */
     String methodKey() {
