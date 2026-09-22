@@ -53,6 +53,14 @@ val jmhProfilers = providers.gradleProperty("jmh.profilers")
     .getOrElse(emptyList())
 val jmhPoolSizes = providers.gradleProperty("jmh.poolSizes")
     .map { it.split(",").map(String::trim).filter(String::isNotEmpty) }
+// -Pjmh.benchmarkParameters='mode=STATIC;warm=false|true;fixture=shop' narrows a benchmark's @Param matrix
+val jmhBenchmarkParameters = providers.gradleProperty("jmh.benchmarkParameters")
+    .map { spec ->
+        spec.split(";").map(String::trim).filter(String::isNotEmpty).associate { assignment ->
+            val (name, values) = assignment.split("=", limit = 2)
+            name.trim() to values.split("|").map(String::trim).filter(String::isNotEmpty)
+        }
+    }
 val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
     .map(layout.projectDirectory::file)
 // Benchmark switches read by BenchOptions in the forked JMH JVM. A -D on the Gradle command line
@@ -60,10 +68,16 @@ val jmhHumanOutput = providers.gradleProperty("jmh.humanOutput")
 // -Pjmh.dateHeader=true, -Pjmh.accessLog=true
 val jmhBenchSwitches = listOf(
     "jmh.dateHeader" to "micronaut.bench.date-header",
-    "jmh.accessLog" to "micronaut.bench.access-log"
+    "jmh.accessLog" to "micronaut.bench.access-log",
+    // -Pjmh.pythonSampler=/path/histogram.txt profiles the Python side of the compilation pipeline
+    "jmh.pythonSampler" to "micronaut.python.cpusampler"
 ).mapNotNull { (property, systemProperty) ->
     providers.gradleProperty(property).orNull?.let { "-D$systemProperty=$it" }
-}
+} + (if (jmhIncludes.any { it.contains("PythonPipelineBenchmark") }) listOf(
+    // the stage timings PythonPipelineBenchmark reports; a JMH -jvmArgsAppend replaces the @Fork ones,
+    // and no other benchmark pays for the instrumentation
+    "-Dmicronaut.python.timings=true"
+) else emptyList())
 
 jmh {
     includes = jmhIncludes
@@ -75,6 +89,9 @@ jmh {
     providers.gradleProperty("jmh.timeOnIteration").orNull?.let(timeOnIteration::set)
     jmhPoolSizes.orNull?.let { sizes ->
         benchmarkParameters.put("poolSize", objects.listProperty(String::class.java).value(sizes))
+    }
+    jmhBenchmarkParameters.orNull?.forEach { (name, values) ->
+        benchmarkParameters.put(name, objects.listProperty(String::class.java).value(values))
     }
     humanOutputFile.set(jmhHumanOutput)
     jvmArgsAppend.addAll(jmhBenchSwitches)
@@ -89,6 +106,9 @@ tasks {
     named<Jar>("jmhJar") {
         isZip64 = true
         manifest.attributes["Multi-Release"] = "true"
+        // the GraalPy virtual filesystems stay in the module jars on the classpath: a copy in the
+        // benchmark jar is a second instance GraalPy refuses to choose between
+        exclude("GRAALPY-VFS/**")
     }
 }
 
