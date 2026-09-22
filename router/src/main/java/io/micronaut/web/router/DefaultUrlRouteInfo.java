@@ -23,6 +23,11 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.MicronautRouteTemplateEngine;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteCaptures;
+import io.micronaut.http.uri.RoutePattern;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
@@ -80,8 +85,18 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final Map<String, Object> attributes;
     private final HttpMethod httpMethod;
     private final String httpMethodName;
-    private final UriMatchTemplate uriMatchTemplate;
-    private final UriTemplateMatcher uriTemplateMatcher;
+    /**
+     * The template of a route of the Micronaut engine, otherwise {@code null}.
+     */
+    private final @Nullable UriMatchTemplate uriMatchTemplate;
+    /**
+     * The matcher of a route of the Micronaut engine, otherwise {@code null}: such routes match
+     * with it directly, as before there were engines.
+     */
+    private final @Nullable UriTemplateMatcher uriTemplateMatcher;
+    private final RoutePattern pattern;
+    private final ParsedRouteTemplate parsedTemplate;
+    private @Nullable RouteTemplate routeTemplate;
     private final Charset defaultCharset;
     private final @Nullable Integer port;
     private final ConversionService conversionService;
@@ -172,7 +187,46 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                boolean implicitHead) {
-        this(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
+        this(httpMethod, httpMethodName, MicronautRouteTemplateEngine.INSTANCE.matcher(MicronautRouteTemplateEngine.of(uriMatchTemplate)),
+            defaultCharset, targetMethod, bodyArgumentName, bodyArgument, consumesMediaTypes, producesMediaTypes, predicates, port,
+            conversionService, executorSelector, messageBodyHandlerRegistry, implicitHead);
+    }
+
+    /**
+     * @param httpMethod                 The HTTP method
+     * @param httpMethodName             The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+     * @param pattern                    The matcher the engine of the template prepared
+     * @param defaultCharset             The default charset
+     * @param targetMethod               The target method
+     * @param bodyArgumentName           The body argument name
+     * @param bodyArgument               The body argument
+     * @param consumesMediaTypes         The consumed media types
+     * @param producesMediaTypes         The produced media types
+     * @param predicates                 The predicates
+     * @param port                       The port
+     * @param conversionService          The conversion service
+     * @param executorSelector           The executor selector
+     * @param messageBodyHandlerRegistry The message body handler registry
+     * @param implicitHead               Whether this is an implicit {@code HEAD} route
+     * @since 5.3.0
+     */
+    @SuppressWarnings("ParameterNumber")
+    public DefaultUrlRouteInfo(HttpMethod httpMethod,
+                               String httpMethodName,
+                               RoutePattern pattern,
+                               Charset defaultCharset,
+                               MethodExecutionHandle<T, R> targetMethod,
+                               @Nullable String bodyArgumentName,
+                               @Nullable Argument<?> bodyArgument,
+                               List<MediaType> consumesMediaTypes,
+                               List<MediaType> producesMediaTypes,
+                               List<Predicate<HttpRequest<?>>> predicates,
+                               @Nullable Integer port,
+                               ConversionService conversionService,
+                               ExecutorSelector executorSelector,
+                               MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                               boolean implicitHead) {
+        this(httpMethod, httpMethodName, pattern, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
             messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of());
     }
@@ -182,7 +236,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      *
      * @param httpMethod                 The HTTP method
      * @param httpMethodName             The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
-     * @param uriMatchTemplate           The URI match template
+     * @param pattern                    The matcher the engine of the template prepared
      * @param defaultCharset             The default charset
      * @param targetMethod               The target method
      * @param bodyArgumentName           The body argument name
@@ -206,7 +260,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
                         String httpMethodName,
-                        UriMatchTemplate uriMatchTemplate,
+                        RoutePattern pattern,
                         Charset defaultCharset,
                         MethodExecutionHandle<T, R> targetMethod,
                         @Nullable String bodyArgumentName,
@@ -229,8 +283,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
         this.httpMethodName = httpMethodName;
-        this.uriMatchTemplate = uriMatchTemplate;
-        this.uriTemplateMatcher = new UriTemplateMatcher(uriMatchTemplate.getTemplateString());
+        this.pattern = pattern;
+        this.parsedTemplate = pattern.template();
+        this.uriTemplateMatcher = MicronautRouteTemplateEngine.uriTemplateMatcher(pattern);
+        this.uriMatchTemplate = uriTemplateMatcher == null ? null : MicronautRouteTemplateEngine.uriMatchTemplate(parsedTemplate);
         this.defaultCharset = defaultCharset;
         this.port = port;
         this.conversionService = conversionService;
@@ -287,25 +343,39 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Internal
     @Override
     public String getRequiredPathPrefix() {
-        return uriTemplateMatcher.getRequiredPrefix();
+        return uriTemplateMatcher != null ? uriTemplateMatcher.getRequiredPrefix() : parsedTemplate.requiredPrefix();
     }
 
     @Internal
     @Override
     public int getRawLength() {
-        return uriTemplateMatcher.getRawLength();
+        return uriTemplateMatcher != null ? uriTemplateMatcher.getRawLength() : parsedTemplate.rawLength();
     }
 
     @Internal
     @Override
     public int getPathVariableCount() {
-        return uriTemplateMatcher.getPathVariableCount();
+        return uriTemplateMatcher != null ? uriTemplateMatcher.getPathVariableCount() : parsedTemplate.pathVariableCount();
+    }
+
+    /**
+     * @return The template the engine of the route parsed
+     */
+    ParsedRouteTemplate parsedTemplate() {
+        return parsedTemplate;
+    }
+
+    /**
+     * @return Whether the template of the route is of the Micronaut engine
+     */
+    boolean isMicronautTemplate() {
+        return uriMatchTemplate != null;
     }
 
     @Internal
     @Override
     public int getPatternVariableCount() {
-        return uriTemplateMatcher.getPatternVariableCount();
+        return uriTemplateMatcher != null ? uriTemplateMatcher.getPatternVariableCount() : 0;
     }
 
     @Override
@@ -315,7 +385,21 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public UriMatchTemplate getUriMatchTemplate() {
+        if (uriMatchTemplate == null) {
+            throw new UnsupportedOperationException("The route " + this + " has a template of the route template engine '"
+                + parsedTemplate.engineId() + "', which is not a UriMatchTemplate: use getRouteTemplate()");
+        }
         return uriMatchTemplate;
+    }
+
+    @Override
+    public RouteTemplate getRouteTemplate() {
+        RouteTemplate template = routeTemplate;
+        if (template == null) {
+            template = uriMatchTemplate != null ? RouteTemplate.micronaut(uriMatchTemplate.toString()) : parsedTemplate.template();
+            routeTemplate = template;
+        }
+        return template;
     }
 
     @Override
@@ -325,7 +409,13 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public @Nullable UriRouteMatch<T, R> tryMatch(String uri) {
-        UriMatchInfo matchInfo = uriTemplateMatcher.tryMatch(uri);
+        UriMatchInfo matchInfo;
+        if (uriTemplateMatcher != null) {
+            matchInfo = uriTemplateMatcher.tryMatch(uri);
+        } else {
+            RouteCaptures captures = pattern.match(uri);
+            matchInfo = captures == null ? null : captures.toUriMatchInfo();
+        }
         if (matchInfo != null) {
             return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
         }
@@ -364,7 +454,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
 
     @Override
     public int compareTo(UriRouteInfo o) {
-        if (o instanceof DefaultUrlRouteInfo<?, ?> other) {
+        if (o instanceof DefaultUrlRouteInfo<?, ?> other && uriTemplateMatcher != null && other.uriTemplateMatcher != null) {
             return uriTemplateMatcher.compareTo(other.uriTemplateMatcher);
         }
         // e.g. a declared route that is not built yet
@@ -374,7 +464,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public String toString() {
         return getHttpMethodName() + ' '
-                + uriMatchTemplate + " -> " + RouteAssembly.target(getTargetMethod())
+                + (uriMatchTemplate != null ? uriMatchTemplate : parsedTemplate.template()) + " -> " + RouteAssembly.target(getTargetMethod())
                 + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 

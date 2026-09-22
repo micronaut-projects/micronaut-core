@@ -17,18 +17,24 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 
 /**
  * A {@link RouteDeclaration} declared in code.
  *
  * @param httpMethod     The HTTP method
  * @param httpMethodName The name of the HTTP method, the custom name for {@link HttpMethod#CUSTOM}
- * @param uriTemplate    The URI template
+ * @param template       The route template
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 record DefaultRouteDeclaration(HttpMethod httpMethod,
                                String httpMethodName,
-                               String uriTemplate) implements RouteDeclaration {
+                               RouteTemplate template) implements RouteDeclaration {
+
+    @Override
+    public String uriTemplate() {
+        return template.expression();
+    }
 }

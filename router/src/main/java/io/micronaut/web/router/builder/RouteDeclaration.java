@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.web.router.RouteArguments;
 
 import java.util.Objects;
@@ -55,9 +56,23 @@ public interface RouteDeclaration {
     }
 
     /**
-     * @return The URI template, e.g. {@code /pets/{id}}
+     * @return The expression of the URI template, e.g. {@code /pets/{id}}. For a template of an
+     * engine other than the Micronaut one, the expression in the language of that engine, see
+     * {@link #template()}
      */
     String uriTemplate();
+
+    /**
+     * The template of the route with the engine of its language. The default is the
+     * {@link #uriTemplate() expression} as a {@link RouteTemplate#MICRONAUT Micronaut} template;
+     * a declaration in another language overrides it and keeps {@link #uriTemplate()} as its
+     * expression.
+     *
+     * @return The template
+     */
+    default RouteTemplate template() {
+        return RouteTemplate.micronaut(uriTemplate());
+    }
 
     /**
      * Declare a route in code.
@@ -71,7 +86,7 @@ public interface RouteDeclaration {
     static RouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
         RouteArguments.standardMethod(httpMethod, "RouteDeclaration.of(\"PROPFIND\", uriTemplate)");
         Objects.requireNonNull(uriTemplate, "uriTemplate");
-        return new DefaultRouteDeclaration(httpMethod, httpMethod.name(), uriTemplate);
+        return new DefaultRouteDeclaration(httpMethod, httpMethod.name(), RouteTemplate.micronaut(uriTemplate));
     }
 
     /**
@@ -89,6 +104,25 @@ public interface RouteDeclaration {
         Objects.requireNonNull(uriTemplate, "uriTemplate");
         HttpMethod httpMethod = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
-        return new DefaultRouteDeclaration(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), uriTemplate);
+        return new DefaultRouteDeclaration(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), RouteTemplate.micronaut(uriTemplate));
+    }
+
+    /**
+     * Declare a route in code with a template of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine engine}. The engine is resolved when
+     * the routes are assembled; the application fails to start if it is not registered.
+     *
+     * <pre>{@code
+     * RouteDeclaration.of(HttpMethod.GET, RouteTemplate.of("jaxrs", "/items/{id: [0-9]+}"));
+     * }</pre>
+     *
+     * @param httpMethod The HTTP method
+     * @param template   The template
+     * @return The declaration
+     */
+    static RouteDeclaration of(HttpMethod httpMethod, RouteTemplate template) {
+        RouteArguments.standardMethod(httpMethod, "RouteDeclaration.of(\"PROPFIND\", uriTemplate)");
+        Objects.requireNonNull(template, "template");
+        return new DefaultRouteDeclaration(httpMethod, httpMethod.name(), template);
     }
 }

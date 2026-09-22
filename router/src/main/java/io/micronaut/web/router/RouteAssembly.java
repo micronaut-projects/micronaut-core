@@ -36,8 +36,13 @@ import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.MicronautRouteTemplateEngine;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RoutePattern;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
@@ -103,6 +108,17 @@ public final class RouteAssembly {
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;
     private final Consumer<DefaultUriRoute> routeCreated;
+    /**
+     * Whether the literal path the routes that are not nested are mounted under is known, see
+     * {@link #mountPrefix}: only then can templates of engines other than the Micronaut one be
+     * mounted, since {@link #routeUri} composes Micronaut templates only.
+     */
+    private final boolean mountKnown;
+    /**
+     * The literal path the routes that are not nested are mounted under, e.g. the context path,
+     * or {@code null} for none.
+     */
+    private final @Nullable String mountPrefix;
     private final List<ServerFilters> serverFilters = new ArrayList<>(0);
     private final @Nullable String contextPath;
     private final @Nullable Object beanLocator;
@@ -132,11 +148,41 @@ public final class RouteAssembly {
                          UnaryOperator<String> routeUri,
                          Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
+        this(beanLocator, conversionService, routeUri, routeCreated, false, null, contextPath);
+    }
+
+    /**
+     * An assembly of routes under a context path. The context path is a literal mount: the
+     * templates of every engine are mounted under it by their engine. The patterns of the server
+     * filters are under it too.
+     *
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param contextPath       The context path, e.g. the {@code micronaut.server.context-path} property, or {@code null}
+     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         @Nullable String contextPath,
+                         Consumer<DefaultUriRoute> routeCreated) {
+        this(beanLocator, conversionService, uri -> underContextPath(contextPath, uri), routeCreated, true, mountPrefix(contextPath), contextPath);
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    private RouteAssembly(@Nullable Object beanLocator,
+                          ConversionService conversionService,
+                          UnaryOperator<String> routeUri,
+                          Consumer<DefaultUriRoute> routeCreated,
+                          boolean mountKnown,
+                          @Nullable String mountPrefix,
+                          @Nullable String contextPath) {
         this.contextPath = contextPath;
         this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
         this.routeCreated = routeCreated;
+        this.mountKnown = mountKnown;
+        this.mountPrefix = mountPrefix;
         if (beanLocator instanceof ApplicationContext applicationContext) {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
@@ -236,9 +282,15 @@ public final class RouteAssembly {
     public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, String uri, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
         DefaultUriRoute route;
         if (currentParentRoute != null) {
+            UriMatchTemplate parentTemplate = currentParentRoute.uriMatchTemplate;
+            if (parentTemplate == null) {
+                // nesting across engines: rejected
+                RouteTemplateEngines.defaults().nest(currentParentRoute.template, MicronautRouteTemplateEngine.INSTANCE.parse(RouteTemplate.micronaut(uri)));
+                throw new IllegalStateException("Nesting across route template engines");
+            }
             route = new DefaultUriRoute(
                 httpMethod,
-                currentParentRoute.uriMatchTemplate.nest(uri),
+                parentTemplate.nest(uri),
                 mediaTypes,
                 executableHandle,
                 httpMethodName,
@@ -251,6 +303,61 @@ public final class RouteAssembly {
         uriRoutes.add(route);
         routeCreated.accept(route);
         return route;
+    }
+
+    /**
+     * Add a URI route with a template of any engine: nested in the current parent route by the
+     * engine, or mounted under the context path by the engine.
+     *
+     * @param httpMethodName   The name of the HTTP method, which differs from {@link HttpMethod#name()} for a custom method
+     * @param httpMethod       The HTTP method
+     * @param template         The template
+     * @param mediaTypes       The media types the route consumes
+     * @param executableHandle The target of the route
+     * @return The route
+     * @throws IllegalArgumentException if the engine of the template is not registered, or the
+     *                                  route would be nested in a route of another engine
+     */
+    public DefaultUriRoute addRoute(String httpMethodName, HttpMethod httpMethod, RouteTemplate template, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        if (template.isMicronaut() && (currentParentRoute == null || currentParentRoute.uriMatchTemplate != null)) {
+            return addRoute(httpMethodName, httpMethod, template.expression(), mediaTypes, executableHandle);
+        }
+        RouteTemplateEngines engines = RouteTemplateEngines.defaults();
+        ParsedRouteTemplate parsed = engines.parse(template);
+        DefaultUriRoute route;
+        if (currentParentRoute != null) {
+            route = new DefaultUriRoute(httpMethod, engines.nest(currentParentRoute.template, parsed), mediaTypes, executableHandle, httpMethodName, conversionService);
+            currentParentRoute.nestedRoutes.add(route);
+        } else {
+            route = new DefaultUriRoute(httpMethod, mount(engines, parsed), mediaTypes, executableHandle, httpMethodName, conversionService);
+        }
+        uriRoutes.add(route);
+        routeCreated.accept(route);
+        return route;
+    }
+
+    private ParsedRouteTemplate mount(RouteTemplateEngines engines, ParsedRouteTemplate parsed) {
+        if (!mountKnown) {
+            throw new IllegalArgumentException("The route template " + parsed.template() + " of the engine '" + parsed.engineId()
+                + "' is not supported here: this route builder composes Micronaut URI templates only");
+        }
+        return mountPrefix == null ? parsed : engines.mount(mountPrefix, parsed);
+    }
+
+    /**
+     * @param contextPath A context path
+     * @return The literal prefix of the context path: with a leading slash, without a trailing
+     * one, and {@code null} for none
+     */
+    private static @Nullable String mountPrefix(@Nullable String contextPath) {
+        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
+            return null;
+        }
+        String prefix = contextPath.charAt(0) == '/' ? contextPath : '/' + contextPath;
+        while (prefix.length() > 1 && prefix.charAt(prefix.length() - 1) == '/') {
+            prefix = prefix.substring(0, prefix.length() - 1);
+        }
+        return prefix;
     }
 
     /**
@@ -308,7 +415,7 @@ public final class RouteAssembly {
      * @return The route
      */
     public RouteSettings declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
-        RouteSettings settings = addRoute(declaration.httpMethodName(), declaration.httpMethod(), declaration.uriTemplate(),
+        RouteSettings settings = addRoute(declaration.httpMethodName(), declaration.httpMethod(), declaration.template(),
             List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle).settings();
         if (consumes != null) {
             settings.consumes(consumes);
@@ -322,20 +429,22 @@ public final class RouteAssembly {
      * Each {@code HEAD} route is a copy of the finished {@code GET} route.
      */
     public void addImplicitHeadRoutes() {
+        // keyed by the engine and the template, never by the text alone: the same text can be a
+        // different template for another engine
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
-        Set<UriMatchTemplate> headTemplates = new HashSet<>();
+        Set<Object> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
             // a route of any method has its own HEAD route, and does not hide the implicit HEAD route of a GET route
             if (route instanceof DefaultUriRoute defaultUriRoute && !defaultUriRoute.settings.isAnyMethod()) {
                 if (defaultUriRoute.httpMethod == HttpMethod.GET) {
                     getRoutes.add(defaultUriRoute);
                 } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
-                    headTemplates.add(defaultUriRoute.uriMatchTemplate);
+                    headTemplates.add(defaultUriRoute.headKey());
                 }
             }
         }
         for (DefaultUriRoute getRoute : getRoutes) {
-            if (!headTemplates.contains(getRoute.uriMatchTemplate)
+            if (!headTemplates.contains(getRoute.headKey())
                 && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
                 uriRoutes.add(getRoute.implicitHeadCopy());
             }
@@ -1223,7 +1332,14 @@ public final class RouteAssembly {
     public final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
-        final UriMatchTemplate uriMatchTemplate;
+        /**
+         * The template, parsed by its engine.
+         */
+        final ParsedRouteTemplate template;
+        /**
+         * The template of a route of the Micronaut engine, otherwise {@code null}.
+         */
+        final @Nullable UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         /**
          * The settings of the route to a handler, and the port of a route to a bean method: the
@@ -1310,9 +1426,27 @@ public final class RouteAssembly {
                         MethodExecutionHandle<Object, Object> targetMethod,
                         String httpMethodName,
                         ConversionService conversionService) {
+            this(httpMethod, MicronautRouteTemplateEngine.of(uriTemplate), mediaTypes, targetMethod, httpMethodName, conversionService);
+        }
+
+        /**
+         * @param httpMethod        The HTTP method
+         * @param template          The template, parsed by its engine
+         * @param mediaTypes        The media types
+         * @param targetMethod      The target method execution handle
+         * @param httpMethodName    The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+         * @param conversionService The conversion service
+         */
+        DefaultUriRoute(HttpMethod httpMethod,
+                        ParsedRouteTemplate template,
+                        List<MediaType> mediaTypes,
+                        MethodExecutionHandle<Object, Object> targetMethod,
+                        String httpMethodName,
+                        ConversionService conversionService) {
             super(targetMethod, conversionService, mediaTypes);
             this.httpMethod = httpMethod;
-            this.uriMatchTemplate = uriTemplate;
+            this.template = template;
+            this.uriMatchTemplate = MicronautRouteTemplateEngine.uriMatchTemplate(template);
             this.httpMethodName = httpMethodName;
             // the handler is given the settings of the handler at once
             this.settings = new RouteSettings(RouteAssembly.this.exposedPorts::add, targetMethod instanceof HandlerMethod<?> handler ? handler : null);
@@ -1332,12 +1466,15 @@ public final class RouteAssembly {
                 handlerMethod.groupAnnotations(group.annotations); // before the executor reads them
             }
             checkBlockingBody();
+            RoutePattern pattern = uriMatchTemplate != null
+                ? MicronautRouteTemplateEngine.INSTANCE.matcher(template)
+                : RouteTemplateEngines.defaults().matcher(template);
             Integer effectivePort = effectivePort();
             RouteGroup errorScope = group != null && group.hasErrorOrStatusRoutes() ? group : null;
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
-                uriMatchTemplate,
+                pattern,
                 defaultCharset,
                 targetMethod,
                 bodyArgumentName,
@@ -1466,7 +1603,7 @@ public final class RouteAssembly {
          */
         @Internal
         public DefaultUriRoute implicitHeadCopy() {
-            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, uriMatchTemplate, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
+            DefaultUriRoute head = new DefaultUriRoute(HttpMethod.HEAD, template, consumesMediaTypes, targetMethod, HttpMethod.HEAD.name(), conversionService);
             head.conditions.clear();
             head.conditions.addAll(conditions);
             head.producesMediaTypes = producesMediaTypes;
@@ -1494,7 +1631,7 @@ public final class RouteAssembly {
         @Override
         public String toString() {
             return getHttpMethodName() + ' '
-                    + uriMatchTemplate
+                    + (uriMatchTemplate != null ? uriMatchTemplate : template.template())
                     + " -> " + target(targetMethod)
                     + " (" + String.join(",", getConsumes()) + ')';
         }
@@ -1584,12 +1721,38 @@ public final class RouteAssembly {
 
         @Override
         public UriMatchTemplate getUriMatchTemplate() {
-            return this.uriMatchTemplate;
+            if (uriMatchTemplate == null) {
+                throw new UnsupportedOperationException("The route " + this + " has a template of the route template engine '"
+                    + template.engineId() + "', which is not a UriMatchTemplate: use getRouteTemplate()");
+            }
+            return uriMatchTemplate;
+        }
+
+        @Override
+        public RouteTemplate getRouteTemplate() {
+            return uriMatchTemplate != null ? RouteTemplate.micronaut(uriMatchTemplate.toString()) : template.template();
+        }
+
+        /**
+         * @return The key of the template of the route for implicit {@code HEAD} routes: the
+         * {@link UriMatchTemplate} of a Micronaut template, as before there were engines, otherwise
+         * the template with its engine
+         */
+        Object headKey() {
+            return uriMatchTemplate != null ? uriMatchTemplate : template.template();
         }
 
         @Override
         public int compareTo(UriRoute o) {
-            return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            if (uriMatchTemplate != null && (!(o instanceof DefaultUriRoute other) || other.uriMatchTemplate != null)) {
+                return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
+            }
+            if (o instanceof DefaultUriRoute other) {
+                // the Micronaut selection policy: more literal text first, then fewer variables
+                int rawCompare = Integer.compare(other.template.rawLength(), template.rawLength());
+                return rawCompare != 0 ? rawCompare : Integer.compare(template.pathVariableCount(), other.template.pathVariableCount());
+            }
+            return 0;
         }
 
         /**
