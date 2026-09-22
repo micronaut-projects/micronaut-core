@@ -21,12 +21,14 @@ import io.micronaut.http.HttpResponse;
 
 /**
  * A route handler written as a function of the request. It runs like a controller method that
- * takes the {@link HttpRequest} and returns an {@link HttpResponse}: filters, error routes, body
- * writers and executor selection apply unchanged. As a blocking method it runs on the blocking
- * executor by default.
+ * takes the {@link HttpRequest} and returns an {@link HttpResponse}: filters, error routes and
+ * body writers apply unchanged, and the executor is selected like for a blocking controller
+ * method (see {@code micronaut.server.thread-selection}, {@link UriRoute#executeOn(String)} and
+ * {@link UriRoute#nonBlocking()}).
  *
  * <pre>{@code
- * routes.GET("/hello/{name}", request -> HttpResponse.ok("Hello " + RequestHandler.pathVariable(request, "name")));
+ * routes.GET("/hello/{name}", request -> HttpResponse.ok("Hello " + PathVariables.of(request).get("name")));
+ * routes.GET("/report", request -> HttpResponse.ok(reports.build())).executeOn(TaskExecutors.BLOCKING);
  * }</pre>
  *
  * @author Denis Stepanov
@@ -46,17 +48,4 @@ public interface RequestHandler {
      */
     HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
 
-    /**
-     * A path variable of the matched route.
-     *
-     * @param request The request
-     * @param name    The name of the variable
-     * @return The value, or {@code null} if the route has no such variable or it is not present
-     */
-    static @org.jspecify.annotations.Nullable String pathVariable(HttpRequest<?> request, String name) {
-        return io.micronaut.http.BasicHttpAttributes.getRouteMatchInfo(request)
-            .map(info -> info.getVariableValues().get(name))
-            .map(Object::toString)
-            .orElse(null);
-    }
 }
