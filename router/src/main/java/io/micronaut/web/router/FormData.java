@@ -45,7 +45,8 @@ import java.util.Set;
  * }</pre>
  *
  * <p>The whole form is read before the handler runs. Text fields convert like the path
- * variables, with the conversion service of the route: a missing required field or a value that
+ * variables, with the same accessors, including default values for missing fields, e.g.
+ * {@code getInt("quantity", 1)}, with the conversion service of the route: a missing required field or a value that
  * does not convert is answered with 400. File parts are stored as {@link CompletedFileUpload}s,
  * in memory or on disk depending on the {@code micronaut.server.multipart} configuration, and
  * released when the request completes.</p>
@@ -235,6 +236,128 @@ public interface FormData {
      */
     default boolean getBoolean(String name) {
         return get(name, Boolean.class);
+    }
+
+    /**
+     * A field converted to a type, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param type         The type
+     * @param defaultValue The value to return if the field has no value
+     * @param <T>          The type
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default <T> T get(String name, Class<T> type, T defaultValue) {
+        return find(name, type).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a string, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default String getString(String name, String defaultValue) {
+        return find(name, String.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as an {@code int}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default int getInt(String name, int defaultValue) {
+        return find(name, Integer.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code long}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default long getLong(String name, long defaultValue) {
+        return find(name, Long.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code double}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default double getDouble(String name, double defaultValue) {
+        return find(name, Double.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code float}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default float getFloat(String name, float defaultValue) {
+        return find(name, Float.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code short}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default short getShort(String name, short defaultValue) {
+        return find(name, Short.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code byte}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default byte getByte(String name, byte defaultValue) {
+        return find(name, Byte.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code char}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default char getChar(String name, char defaultValue) {
+        return find(name, Character.class).orElse(defaultValue);
+    }
+
+    /**
+     * A field as a {@code boolean}, or a default value if it has none.
+     *
+     * @param name         The name of the field
+     * @param defaultValue The value to return if the field has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default boolean getBoolean(String name, boolean defaultValue) {
+        return find(name, Boolean.class).orElse(defaultValue);
     }
 
     /**
