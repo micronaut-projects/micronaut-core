@@ -63,6 +63,14 @@ import org.graalvm.polyglot.Source;
 public class PythonAstParserTest {
 
     @Test
+    void recognizesWindowsSourceUriWithinWindowsSourceDirectory() {
+        assertTrue(PythonAstParser.isWithinSourceDir(
+            "C:\\builds\\project\\src\\main\\python",
+            "/C:/builds/project/src/main/python/example/micronaut/forecast_controller.py"
+        ));
+    }
+
+    @Test
     void incrementalProcessorTransformsOnlyAffectedSourcesUnlessAggregationIsRequired(
         @TempDir Path directory
     ) throws Exception {
