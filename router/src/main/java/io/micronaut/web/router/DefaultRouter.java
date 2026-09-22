@@ -28,6 +28,9 @@ import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
+import io.micronaut.http.uri.MicronautRouteTemplateEngine;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateSegment;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
@@ -52,7 +55,6 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Supplier;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -447,9 +449,18 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
             for (int i = 0; i < routeCount; i++) {
                 UriRouteMatch<T, R> match = uriRoutes.get(i);
-                UriMatchTemplate template = match.getRouteInfo().getUriMatchTemplate();
-                long variable = template.getPathVariableSegmentCount();
-                long raw = template.getRawSegmentLength();
+                UriRouteInfo<T, R> routeInfo = match.getRouteInfo();
+                long variable;
+                long raw;
+                if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> info && !info.isMicronautTemplate()) {
+                    // the facts the engine of the template described for this policy
+                    variable = info.getPathVariableCount();
+                    raw = info.getRawLength();
+                } else {
+                    UriMatchTemplate template = routeInfo.getUriMatchTemplate();
+                    variable = template.getPathVariableSegmentCount();
+                    raw = template.getRawSegmentLength();
+                }
                 if (i == 0) {
                     variableCount = variable;
                     rawLength = raw;
@@ -929,7 +940,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * @return The routes with their exclusivity
      */
     private CompiledRoutes[] withExclusivity(Collection<CompiledRoutes> compiled) {
-        Map<UriRouteInfo<Object, Object>, String[]> segments = new IdentityHashMap<>();
+        Map<UriRouteInfo<Object, Object>, Optional<List<RouteTemplateSegment>>> segments = new IdentityHashMap<>();
         CompiledRoutes[] result = new CompiledRoutes[compiled.size()];
         int i = 0;
         for (CompiledRoutes routes : compiled) {
@@ -946,11 +957,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return result;
     }
 
-    private boolean isExclusive(@Nullable UriRouteInfo<Object, Object> route, Map<UriRouteInfo<Object, Object>, String[]> segments) {
+    private boolean isExclusive(@Nullable UriRouteInfo<Object, Object> route, Map<UriRouteInfo<Object, Object>, Optional<List<RouteTemplateSegment>>> segments) {
         if (!(route instanceof LazyUriRouteInfo lazy)) {
             return false;
         }
-        String[] own = segments.computeIfAbsent(route, DefaultRouter::templateSegments);
+        Optional<List<RouteTemplateSegment>> own = segments.computeIfAbsent(route, DefaultRouter::templateSegments);
         for (UriRouteInfo<Object, Object> other : allRoutesByMethod.getOrDefault(lazy.methodKey(), EMPTY)) {
             if (other != route && mayOverlap(own, segments.computeIfAbsent(other, DefaultRouter::templateSegments))) {
                 return false;
@@ -959,56 +970,50 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return true;
     }
 
-    private static final String VARIABLE_SEGMENT = "{}";
-    private static final String ANY_SEGMENTS = "{*}";
-    private static final Pattern SIMPLE_VARIABLE = Pattern.compile("\\{\\w[\\w-]*}");
-
     /**
-     * The path segments of a route's template: a literal, {@link #VARIABLE_SEGMENT} for a
-     * variable that is a whole segment, or {@link #ANY_SEGMENTS} for anything else, which may
-     * match any number of segments, e.g. {@code {+path}}, {@code {/id}} or a regular expression.
+     * The path segments of a route's template, as the engine of the template describes them in
+     * the parsed template, without building a route that is not built yet. Empty when the engine
+     * cannot tell: the route may then overlap any other.
      */
-    private static String[] templateSegments(UriRouteInfo<Object, Object> route) {
-        String template = route instanceof LazyUriRouteInfo lazy ? lazy.uriTemplate() : route.getUriMatchTemplate().toString();
-        int query = template.indexOf("{?");
-        if (query >= 0) {
-            template = template.substring(0, query);
+    private static Optional<List<RouteTemplateSegment>> templateSegments(UriRouteInfo<Object, Object> route) {
+        if (route instanceof LazyUriRouteInfo lazy) {
+            return Optional.ofNullable(lazy.parsedTemplate().pathSegments());
         }
-        List<String> result = new ArrayList<>();
-        for (String segment : template.split("/")) {
-            if (segment.isEmpty()) {
-                continue;
-            }
-            if (segment.indexOf('{') < 0) {
-                result.add(segment);
-            } else if (SIMPLE_VARIABLE.matcher(segment).matches()) {
-                result.add(VARIABLE_SEGMENT);
-            } else {
-                result.add(ANY_SEGMENTS);
-            }
+        if (route instanceof DefaultUrlRouteInfo<?, ?> info) {
+            return Optional.ofNullable(info.parsedTemplate().pathSegments());
         }
-        return result.toArray(String[]::new);
+        RouteTemplate template = route.getRouteTemplate();
+        if (template.isMicronaut()) {
+            return Optional.ofNullable(MicronautRouteTemplateEngine.INSTANCE.parse(template).pathSegments());
+        }
+        return Optional.empty();
     }
 
     /**
-     * Whether two templates may match the same path. Only {@code false} is certain.
+     * Whether two templates may match the same path. Only {@code false} is certain; unknown
+     * segments may overlap anything.
      */
-    private static boolean mayOverlap(String[] a, String[] b) {
-        int common = Math.min(a.length, b.length);
+    private static boolean mayOverlap(Optional<List<RouteTemplateSegment>> first, Optional<List<RouteTemplateSegment>> second) {
+        if (first.isEmpty() || second.isEmpty()) {
+            return true;
+        }
+        List<RouteTemplateSegment> a = first.get();
+        List<RouteTemplateSegment> b = second.get();
+        int common = Math.min(a.size(), b.size());
         for (int i = 0; i < common; i++) {
-            String x = a[i];
-            String y = b[i];
-            if (ANY_SEGMENTS.equals(x) || ANY_SEGMENTS.equals(y)) {
+            RouteTemplateSegment x = a.get(i);
+            RouteTemplateSegment y = b.get(i);
+            if (x.kind() == RouteTemplateSegment.Kind.ANY || y.kind() == RouteTemplateSegment.Kind.ANY) {
                 return true;
             }
-            if (!VARIABLE_SEGMENT.equals(x) && !VARIABLE_SEGMENT.equals(y) && !x.equals(y)) {
+            if (x.kind() == RouteTemplateSegment.Kind.LITERAL && y.kind() == RouteTemplateSegment.Kind.LITERAL && !x.literal().equals(y.literal())) {
                 return false;
             }
         }
         // the longer template matches the same paths only if its remaining segments can be empty
-        String[] longer = a.length > b.length ? a : b;
-        for (int i = common; i < longer.length; i++) {
-            if (!ANY_SEGMENTS.equals(longer[i])) {
+        List<RouteTemplateSegment> longer = a.size() > b.size() ? a : b;
+        for (int i = common; i < longer.size(); i++) {
+            if (longer.get(i).kind() != RouteTemplateSegment.Kind.ANY) {
                 return false;
             }
         }

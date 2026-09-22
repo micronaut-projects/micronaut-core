@@ -17,6 +17,8 @@ package io.micronaut.web.router.spi;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.builder.RouteDeclaration;
@@ -44,18 +46,20 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
 
     /**
      * @return The literal every path the route matches starts with, or an empty string; the same
-     * as {@link UriTemplateMatcher#getRequiredPrefix()} of the template
+     * as {@link ParsedRouteTemplate#requiredPrefix()} of the template, for a Micronaut template
+     * {@link UriTemplateMatcher#getRequiredPrefix()}
      */
     String requiredPathPrefix();
 
     /**
      * @return The length of the literal parts of the template; the same as
-     * {@link UriTemplateMatcher#getRawLength()}
+     * {@link ParsedRouteTemplate#rawLength()}, for a Micronaut template {@link UriTemplateMatcher#getRawLength()}
      */
     int rawLength();
 
     /**
      * @return The number of path variables of the template; the same as
+     * {@link ParsedRouteTemplate#pathVariableCount()}, for a Micronaut template
      * {@link UriTemplateMatcher#getPathVariableCount()}
      */
     int pathVariableCount();
@@ -117,5 +121,22 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
     private static IndexedRouteDeclaration of(HttpMethod httpMethod, String httpMethodName, String uriTemplate) {
         UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString());
         return new DefaultRouteDeclaration(httpMethod, httpMethodName, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount(), matcher.getPatternVariableCount());
+    }
+
+    /**
+     * A declaration of a template of any engine, with the keys computed from the template the
+     * engine parsed. The engine is resolved, and the template parsed, when the keys are first
+     * read, not when the declaration is created.
+     *
+     * @param httpMethod The HTTP method
+     * @param template   The template
+     * @return The declaration
+     * @since 5.3.0
+     */
+    static IndexedRouteDeclaration of(HttpMethod httpMethod, RouteTemplate template) {
+        if (template.isMicronaut()) {
+            return of(httpMethod, template.expression());
+        }
+        return new EngineRouteDeclaration(httpMethod, template);
     }
 }
