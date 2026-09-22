@@ -48,12 +48,16 @@ class RoutePlanEngineHooksTest {
     private static final RouteTemplate ORDERED_LITERAL = RouteTemplate.of(ColonRouteTemplateEngine.Ordered.ORDERED_ID, "/o/special");
     private static final RouteTemplate SELECTED = RouteTemplate.of(ColonRouteTemplateEngine.Selecting.SELECTING_ID, "/s/:id");
     private static final RouteTemplate SELECTED_SINGLE = RouteTemplate.of(ColonRouteTemplateEngine.Selecting.SELECTING_ID, "/one/:id");
+    private static final RouteTemplate SELECTED_IMAGE = RouteTemplate.of(ColonRouteTemplateEngine.Selecting.SELECTING_ID, "/img/:id");
+    private static final RouteTemplate SELECTED_CONSUME = RouteTemplate.of(ColonRouteTemplateEngine.Selecting.SELECTING_ID, "/in/:id");
 
     private static final CompiledRoutePlan COMPILED = new RoutePlanCompiler().plan("test.$Hooks$RoutePlan", "test:hooks", List.of(), List.of(
         GeneratedPlans.route("hooks:var", "GET", ORDERED_VAR),
         GeneratedPlans.route("hooks:literal", "GET", ORDERED_LITERAL),
         GeneratedPlans.route("hooks:selected", "GET", SELECTED),
-        GeneratedPlans.route("hooks:single", "GET", SELECTED_SINGLE)
+        GeneratedPlans.route("hooks:single", "GET", SELECTED_SINGLE),
+        GeneratedPlans.route("hooks:image", "GET", SELECTED_IMAGE),
+        GeneratedPlans.route("hooks:consume", "POST", SELECTED_CONSUME)
     ));
 
     private static final List<HttpRequest<?>> REQUESTS = List.of(
@@ -67,7 +71,14 @@ class RoutePlanEngineHooksTest {
         HttpRequest.GET("/s/5").accept(MediaType.IMAGE_PNG_TYPE),
         HttpRequest.HEAD("/s/5").accept(MediaType.APPLICATION_JSON_TYPE),
         HttpRequest.GET("/one/5").header("Accept", "text/html, text/plain;q=0.5"),
-        HttpRequest.GET("/one/5")
+        HttpRequest.GET("/one/5"),
+        // compatible media types reach the route selector, see RouteMatchSelector
+        HttpRequest.GET("/img/5").header("Accept", "image/*"),
+        HttpRequest.GET("/img/5").header("Accept", "image/gif"),
+        HttpRequest.GET("/img/5").header("Accept", "text/plain"),
+        HttpRequest.GET("/s/5").header("Accept", "text/*"),
+        HttpRequest.POST("/in/5", "a").contentType(MediaType.TEXT_PLAIN_TYPE),
+        HttpRequest.POST("/in/5", "a").contentType(MediaType.APPLICATION_JSON_TYPE)
     );
 
     @Test
@@ -108,6 +119,24 @@ class RoutePlanEngineHooksTest {
         assertTrue(observed.matches > 0);
     }
 
+    @Test
+    void compatibleMediaTypesReachTheSelectorWithAndWithoutThePlan() {
+        GeneratedPlans.ObservedPlan observed = new GeneratedPlans.ObservedPlan(GeneratedPlans.load(COMPILED));
+        Router planned = routerOf(key -> PlannedRouteDeclaration.of(observed, key));
+        Router ordinary = routerOf(key -> RouteDeclaration.of(slot(key).httpMethodName(), slot(key).template()));
+        for (Router router : List.of(planned, ordinary)) {
+            assertEquals("GET test.colon-selecting:/img/:id [image/png;qs=0.6] {id=5} image/png;qs=0.6",
+                closest(router, HttpRequest.GET("/img/5").header("Accept", "image/*")));
+            assertEquals("GET test.colon-selecting:/s/:id [text/plain] {id=5} text/plain",
+                closest(router, HttpRequest.GET("/s/5").header("Accept", "text/*")));
+            assertEquals("POST test.colon-selecting:/in/:id [application/json] {id=5} application/json",
+                closest(router, HttpRequest.POST("/in/5", "a").contentType(MediaType.TEXT_PLAIN_TYPE)));
+            assertEquals(null, closest(router, HttpRequest.GET("/img/5").header("Accept", "text/plain")));
+            assertEquals(null, closest(router, HttpRequest.POST("/in/5", "a").contentType(MediaType.APPLICATION_JSON_TYPE)));
+        }
+        assertTrue(observed.matches > 0);
+    }
+
     private static String closest(Router router, HttpRequest<?> request) {
         try {
             return describe(router.findClosest(request));
@@ -134,6 +163,9 @@ class RoutePlanEngineHooksTest {
         routes.handle(declarations.apply("hooks:selected"), (request, variables) -> HttpResponse.ok()).produces(MediaType.APPLICATION_JSON_TYPE);
         routes.handle(declarations.apply("hooks:single"), (request, variables) -> HttpResponse.ok())
             .produces(MediaType.APPLICATION_JSON_TYPE, MediaType.TEXT_PLAIN_TYPE);
+        routes.handle(declarations.apply("hooks:image"), (request, variables) -> HttpResponse.ok()).produces(MediaType.of("image/png;qs=0.6"));
+        routes.handle(declarations.apply("hooks:image"), (request, variables) -> HttpResponse.ok()).produces(MediaType.of("image/*;qs=0.7"));
+        routes.handle(declarations.apply("hooks:consume"), (request, variables) -> HttpResponse.ok()).consumes(MediaType.of("text/*"));
         assembly.addImplicitHeadRoutes();
         return new DefaultRouter(List.of(), List.of(() -> assembly));
     }
