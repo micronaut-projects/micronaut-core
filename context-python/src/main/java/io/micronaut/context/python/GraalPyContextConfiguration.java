@@ -39,6 +39,8 @@ import java.util.function.Predicate;
 @ConfigurationProperties(GraalPyContextConfiguration.PREFIX)
 public final class GraalPyContextConfiguration {
     public static final String PREFIX = "graalpy.context";
+    static final String LOG_LEVEL_OPTION = "log.level";
+    static final String ROOT_LOG_LEVEL_PROPERTY = "logger.levels.root";
     /** Package prefixes Python code can always look up: the JDK, Jakarta and the framework itself. */
     private static final List<String> FRAMEWORK_PACKAGES = List.of("java.", "jakarta.", "io.micronaut.");
     private static final Logger LOG = LoggerFactory.getLogger(GraalPyContextFactory.class);
@@ -74,7 +76,7 @@ public final class GraalPyContextConfiguration {
         // we use experimental features by default so don't warn about them
         builder.option("python.WarnExperimentalFeatures", "false")
             // Avoid creating records that the SLF4J backend will discard.
-            .option("log.level", polyglotLogLevel);
+            .option(LOG_LEVEL_OPTION, polyglotLogLevel);
     }
 
     /**
@@ -85,16 +87,16 @@ public final class GraalPyContextConfiguration {
     }
 
     @Inject
-    void configureRootLogLevel(@Property(name = "logger.levels.root") @Nullable String rootLogLevel) {
+    void configureRootLogLevel(@Property(name = ROOT_LOG_LEVEL_PROPERTY) @Nullable String rootLogLevel) {
         String configuredLevel = GraalPySlf4jLogHandler.polyglotLevel(rootLogLevel);
-        if (configuredLevel != null && !options.containsKey("log.level")) {
-            builder.option("log.level", configuredLevel);
+        if (configuredLevel != null && !options.containsKey(LOG_LEVEL_OPTION)) {
+            builder.option(LOG_LEVEL_OPTION, configuredLevel);
             polyglotLogLevel = configuredLevel;
         }
     }
 
     String polyglotLogLevel() {
-        return options.getOrDefault("log.level", polyglotLogLevel);
+        return options.getOrDefault(LOG_LEVEL_OPTION, polyglotLogLevel);
     }
 
     /**

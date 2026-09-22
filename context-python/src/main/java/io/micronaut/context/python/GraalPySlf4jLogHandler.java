@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import io.micronaut.logging.LogLevel;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +34,14 @@ import java.util.logging.LogRecord;
  * Routes GraalVM engine log records through SLF4J instead of the default polyglot console handler.
  */
 final class GraalPySlf4jLogHandler extends Handler {
+    static final String POLYGLOT_LEVEL_ALL = "ALL";
+    static final String POLYGLOT_LEVEL_FINEST = "FINEST";
+    static final String POLYGLOT_LEVEL_FINE = "FINE";
+    static final String POLYGLOT_LEVEL_INFO = "INFO";
+    static final String POLYGLOT_LEVEL_WARNING = "WARNING";
+    static final String POLYGLOT_LEVEL_SEVERE = "SEVERE";
+    static final String POLYGLOT_LEVEL_OFF = "OFF";
+    private static final String BOOLEAN_FALSE = "false";
     private static final String DEFAULT_LOGGER_NAME = "org.graalvm.polyglot";
     private static final Map<String, Logger> CACHED_LOGGERS = new ConcurrentHashMap<>();
 
@@ -42,36 +51,47 @@ final class GraalPySlf4jLogHandler extends Handler {
 
     static String polyglotLevel(Logger logger) {
         if (logger.isTraceEnabled()) {
-            return "FINEST";
+            return POLYGLOT_LEVEL_FINEST;
         }
         if (logger.isDebugEnabled()) {
-            return "FINE";
+            return POLYGLOT_LEVEL_FINE;
         }
         if (logger.isInfoEnabled()) {
-            return "INFO";
+            return POLYGLOT_LEVEL_INFO;
         }
         if (logger.isWarnEnabled()) {
-            return "WARNING";
+            return POLYGLOT_LEVEL_WARNING;
         }
         if (logger.isErrorEnabled()) {
-            return "SEVERE";
+            return POLYGLOT_LEVEL_SEVERE;
         }
-        return "OFF";
+        return POLYGLOT_LEVEL_OFF;
     }
 
     static @Nullable String polyglotLevel(@Nullable String slf4jLevel) {
         if (slf4jLevel == null || slf4jLevel.isBlank()) {
             return null;
         }
-        return switch (slf4jLevel.toUpperCase(Locale.ENGLISH)) {
-            case "ALL" -> "ALL";
-            case "TRACE" -> "FINEST";
-            case "DEBUG" -> "FINE";
-            case "INFO" -> "INFO";
-            case "WARN" -> "WARNING";
-            case "ERROR" -> "SEVERE";
-            case "OFF", "FALSE" -> "OFF";
-            default -> null;
+        if (BOOLEAN_FALSE.equalsIgnoreCase(slf4jLevel)) {
+            return POLYGLOT_LEVEL_OFF;
+        }
+        try {
+            return polyglotLevel(LogLevel.valueOf(slf4jLevel.toUpperCase(Locale.ENGLISH)));
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
+    }
+
+    private static @Nullable String polyglotLevel(LogLevel slf4jLevel) {
+        return switch (slf4jLevel) {
+            case ALL -> POLYGLOT_LEVEL_ALL;
+            case TRACE -> POLYGLOT_LEVEL_FINEST;
+            case DEBUG -> POLYGLOT_LEVEL_FINE;
+            case INFO -> POLYGLOT_LEVEL_INFO;
+            case WARN -> POLYGLOT_LEVEL_WARNING;
+            case ERROR -> POLYGLOT_LEVEL_SEVERE;
+            case OFF -> POLYGLOT_LEVEL_OFF;
+            case NOT_SPECIFIED -> null;
         };
     }
 

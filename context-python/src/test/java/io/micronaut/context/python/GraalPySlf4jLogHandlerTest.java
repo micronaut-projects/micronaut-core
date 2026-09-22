@@ -16,8 +16,6 @@
 package io.micronaut.context.python;
 
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.CsvSource;
 import org.slf4j.Logger;
 
 import java.lang.reflect.Proxy;
@@ -30,16 +28,17 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 final class GraalPySlf4jLogHandlerTest {
 
-    @ParameterizedTest
-    @CsvSource({
-        "isTraceEnabled, FINEST",
-        "isDebugEnabled, FINE",
-        "isInfoEnabled, INFO",
-        "isWarnEnabled, WARNING",
-        "isErrorEnabled, SEVERE",
-        "'', OFF"
-    })
-    void mapsSlf4jThresholdToPolyglotLevel(String enabledMethod, String expectedLevel) {
+    @Test
+    void mapsSlf4jThresholdToPolyglotLevel() {
+        assertLoggerLevel("isTraceEnabled", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINEST);
+        assertLoggerLevel("isDebugEnabled", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE);
+        assertLoggerLevel("isInfoEnabled", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_INFO);
+        assertLoggerLevel("isWarnEnabled", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_WARNING);
+        assertLoggerLevel("isErrorEnabled", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_SEVERE);
+        assertLoggerLevel("", GraalPySlf4jLogHandler.POLYGLOT_LEVEL_OFF);
+    }
+
+    private static void assertLoggerLevel(String enabledMethod, String expectedLevel) {
         Logger logger = (Logger) Proxy.newProxyInstance(
             Logger.class.getClassLoader(),
             new Class<?>[] {Logger.class},
@@ -49,19 +48,16 @@ final class GraalPySlf4jLogHandlerTest {
         assertEquals(expectedLevel, GraalPySlf4jLogHandler.polyglotLevel(logger));
     }
 
-    @ParameterizedTest
-    @CsvSource({
-        "ALL, ALL",
-        "TRACE, FINEST",
-        "DEBUG, FINE",
-        "INFO, INFO",
-        "WARN, WARNING",
-        "ERROR, SEVERE",
-        "OFF, OFF",
-        "false, OFF"
-    })
-    void mapsConfiguredSlf4jLevelToPolyglotLevel(String slf4jLevel, String expectedLevel) {
-        assertEquals(expectedLevel, GraalPySlf4jLogHandler.polyglotLevel(slf4jLevel));
+    @Test
+    void mapsConfiguredSlf4jLevelToPolyglotLevel() {
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_ALL, GraalPySlf4jLogHandler.polyglotLevel("ALL"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINEST, GraalPySlf4jLogHandler.polyglotLevel("TRACE"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, GraalPySlf4jLogHandler.polyglotLevel("DEBUG"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_INFO, GraalPySlf4jLogHandler.polyglotLevel("INFO"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_WARNING, GraalPySlf4jLogHandler.polyglotLevel("WARN"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_SEVERE, GraalPySlf4jLogHandler.polyglotLevel("ERROR"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_OFF, GraalPySlf4jLogHandler.polyglotLevel("OFF"));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_OFF, GraalPySlf4jLogHandler.polyglotLevel("false"));
     }
 
     @Test
