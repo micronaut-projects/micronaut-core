@@ -31,12 +31,14 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -106,6 +108,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * The constraints on the path variables of the route, of its groups first, empty for a route without them.
      */
     private final List<Predicate<? super PathVariables>> constraints;
+    /**
+     * The route selector of the engine of the template, or {@code null}, see {@link RouteMatchSelector}.
+     */
+    private final @Nullable RouteMatchSelector routeMatchSelector;
 
     @Nullable
     private ExecutorService executorService;
@@ -297,6 +303,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.errorScope = errorScope;
         this.anyMethod = anyMethod;
         this.constraints = List.copyOf(constraints);
+        this.routeMatchSelector = uriTemplateMatcher == null
+            && RouteTemplateEngines.defaults().engine(parsedTemplate.engineId()) instanceof RouteMatchSelector selector ? selector : null;
     }
 
     /**
@@ -376,6 +384,24 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public int getPatternVariableCount() {
         return uriTemplateMatcher != null ? uriTemplateMatcher.getPatternVariableCount() : parsedTemplate.patternVariableCount();
+    }
+
+    /**
+     * @return The route selector of the engine of the template, or {@code null}
+     */
+    @Nullable RouteMatchSelector routeMatchSelector() {
+        return routeMatchSelector;
+    }
+
+    /**
+     * @return Whether the route selector of the engine of the template selects the matches of
+     * this route, which may have a negotiated media type, see
+     * {@link UriRouteMatch#getSelectedMediaType()}
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isSelectedByEngine() {
+        return routeMatchSelector != null;
     }
 
     @Override

@@ -34,9 +34,19 @@ import java.util.List;
  * included, is literal. {@code /items/{id:3}} is therefore literal text here, while it is a
  * variable of at most three characters for the Micronaut engine.
  */
-public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
+public class TestColonRouteTemplateEngine implements RouteTemplateEngine {
 
     public static final String ID = "test.colon";
+
+    private final String id;
+
+    public TestColonRouteTemplateEngine() {
+        this(ID);
+    }
+
+    protected TestColonRouteTemplateEngine(String id) {
+        this.id = id;
+    }
 
     public static RouteTemplate template(String expression) {
         return RouteTemplate.of(ID, expression);
@@ -44,7 +54,7 @@ public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
 
     @Override
     public String id() {
-        return ID;
+        return id;
     }
 
     @Override
@@ -54,7 +64,7 @@ public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
 
     @Override
     public ParsedRouteTemplate parse(RouteTemplate template) {
-        if (!ID.equals(template.engineId())) {
+        if (!id.equals(template.engineId())) {
             throw new IllegalArgumentException("Not a colon template: " + template);
         }
         String expression = template.expression();
@@ -86,7 +96,7 @@ public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
         segments.addAll(c.segments);
         String childExpression = c.template.expression();
         String expression = p.template.expression() + (childExpression.startsWith("/") ? childExpression : '/' + childExpression);
-        return new Parsed(template(expression), List.copyOf(segments));
+        return new Parsed(RouteTemplate.of(id, expression), List.copyOf(segments));
     }
 
     @Override
@@ -100,7 +110,7 @@ public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
             }
         }
         segments.addAll(parsed.segments);
-        return new Parsed(template(prefix + parsed.template.expression()), List.copyOf(segments));
+        return new Parsed(RouteTemplate.of(id, prefix + parsed.template.expression()), List.copyOf(segments));
     }
 
     @Override

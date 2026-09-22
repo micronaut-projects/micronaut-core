@@ -25,6 +25,7 @@ import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.PostponedRequestArgumentBinder;
@@ -294,6 +295,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         return null;
     }
 
+    /**
+     * @return The media type of the response a route selector negotiated, or {@code null}
+     */
+    @Nullable MediaType selectedMediaType() {
+        return null;
+    }
+
     @Override
     public void fulfillBeforeFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request) {
         if (fulfilled) {
@@ -310,7 +318,7 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Argument<Object> argument = (Argument<Object>) arguments[i];
             if (arguments[i].getType() == PathVariables.class) {
                 // a handler function's path variables come from the match, not a binder
-                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, resolvedTarget()));
+                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, resolvedTarget(), selectedMediaType()));
                 continue;
             }
             Object value = getVariableValues().get(argumentNames[i]);

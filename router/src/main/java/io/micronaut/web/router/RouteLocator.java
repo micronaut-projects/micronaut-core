@@ -515,7 +515,7 @@ public final class RouteLocator implements DynamicRouteTarget {
          */
         @SuppressWarnings("unchecked")
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
-            if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
+            if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?>)) {
                 return match;
             }
             UriMatchInfo inner = innerMatch.matchInfo();
@@ -528,7 +528,8 @@ public final class RouteLocator implements DynamicRouteTarget {
             List<UriMatchVariable> variables = new ArrayList<>(request.variables);
             variables.addAll(inner.getVariables());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters, request.errorScopes);
-            return (UriRouteMatch<T, R>) route.resolvedMatch(info);
+            // the media type a route selector of the target's table negotiated is kept
+            return innerMatch.withMatchInfo(info);
         }
 
         /**
