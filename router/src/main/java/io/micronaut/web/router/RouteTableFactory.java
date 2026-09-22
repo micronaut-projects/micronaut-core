@@ -77,7 +77,8 @@ public final class RouteTableFactory {
      */
     private <T> DefaultRouteTable build(LocatedRoutes<T> routes) {
         Argument<T> targetType = Objects.requireNonNull(routes.targetType(), "targetType");
-        RouteAssembly assembly = new RouteAssembly(beanLocator, conversionService, uri -> uri, route -> { });
+        // relative to the prefix of the locator: no context path, so templates of every engine are supported
+        RouteAssembly assembly = new RouteAssembly(beanLocator, conversionService, (String) null, route -> { });
         // the located tables of the table are kept here too
         assembly.locatedTables = this;
         DefaultLocatedHttpRouteBuilder<T> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, targetType);
