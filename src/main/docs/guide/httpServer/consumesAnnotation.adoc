@@ -8,7 +8,9 @@ snippet::io.micronaut.docs.server.consumes.ConsumesController[tags="imports,claz
 
 === Customizing Processed Content Types
 
-Normally JSON parsing only happens if the content type is `application/json`. The other api:io.micronaut.http.codec.MediaTypeCodec[] classes behave similarly in that they have predefined content types they can process. To extend the list of media types that a given codec processes, provide configuration that will be stored in api:io.micronaut.http.codec.CodecConfiguration[]:
+JSON is read and written for `application/json` and a few other well known JSON media types, such as `application/hal+json` and `application/problem+json`. Any media type with the `+json` structured suffix, for example `application/vnd.acme+json` or `application/prs.hal-forms+json`, is also read and written as JSON, both by the server and by the HTTP client, unless a api:io.micronaut.http.body.MessageBodyReader[] or api:io.micronaut.http.body.MessageBodyWriter[] is registered for that exact media type with `@Consumes` or `@Produces`. Such a handler takes precedence over the JSON handler.
+
+To process a media type that has no `+json` suffix, for example `text/javascript`, as JSON, extend the list of media types of the codec with configuration that will be stored in api:io.micronaut.http.codec.CodecConfiguration[]:
 
 [configuration]
 ----

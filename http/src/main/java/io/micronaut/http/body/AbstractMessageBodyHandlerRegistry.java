@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -61,6 +62,12 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
         MessageBodyReader<?> messageBodyReader = readers.get(key);
         if (messageBodyReader == null) {
             MessageBodyReader<T> reader = findReaderImpl(type, mediaTypes);
+            if (reader == null) {
+                List<MediaType> jsonFallback = jsonSuffixFallback(mediaTypes);
+                if (jsonFallback != null) {
+                    reader = findReaderImpl(type, jsonFallback);
+                }
+            }
             if (reader != null) {
                 readers.put(key, reader);
                 return Optional.of(reader);
@@ -92,6 +99,12 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
         MessageBodyWriter<?> messageBodyWriter = writers.get(key);
         if (messageBodyWriter == null) {
             MessageBodyWriter<T> writer = findWriterImpl(type, mediaTypes);
+            if (writer == null) {
+                List<MediaType> jsonFallback = jsonSuffixFallback(mediaTypes);
+                if (jsonFallback != null) {
+                    writer = findWriterImpl(type, jsonFallback);
+                }
+            }
             if (writer != null) {
                 writers.put(key, writer);
                 return Optional.of(writer);
@@ -105,6 +118,45 @@ abstract sealed class AbstractMessageBodyHandlerRegistry implements MessageBodyH
             //noinspection unchecked
             return Optional.of((MessageBodyWriter<T>) messageBodyWriter);
         }
+    }
+
+    /**
+     * A media type with the {@code +json} structured suffix (RFC 6839), for example
+     * {@code application/vnd.acme+json}, is JSON. When no handler is registered for such a type,
+     * the lookup is repeated with {@code application/json} appended, so that the JSON handler
+     * reads and writes it. The original media types stay first, and the handler is still called
+     * with the original media type.
+     *
+     * @param mediaTypes The media types of the failed lookup
+     * @return The media types to retry with, or {@code null} if none has the {@code +json} suffix
+     */
+    @Nullable
+    private static List<MediaType> jsonSuffixFallback(List<MediaType> mediaTypes) {
+        boolean hasJsonSuffix = false;
+        for (MediaType mediaType : mediaTypes) {
+            if (MediaType.APPLICATION_JSON_TYPE.matches(mediaType)) {
+                return null;
+            }
+            if (hasJsonSuffix(mediaType)) {
+                hasJsonSuffix = true;
+            }
+        }
+        if (!hasJsonSuffix) {
+            return null;
+        }
+        List<MediaType> fallback = new ArrayList<>(mediaTypes.size() + 1);
+        fallback.addAll(mediaTypes);
+        fallback.add(MediaType.APPLICATION_JSON_TYPE);
+        return fallback;
+    }
+
+    private static boolean hasJsonSuffix(MediaType mediaType) {
+        String subtype = mediaType.getSubtype();
+        int suffixLength = MediaType.EXTENSION_JSON.length() + 1;
+        int start = subtype.length() - suffixLength;
+        return start > 0
+            && subtype.charAt(start) == '+'
+            && subtype.regionMatches(true, start + 1, MediaType.EXTENSION_JSON, 0, suffixLength - 1);
     }
 
     private record HandlerKey<T>(Argument<T> type, List<MediaType> mediaTypes) {
