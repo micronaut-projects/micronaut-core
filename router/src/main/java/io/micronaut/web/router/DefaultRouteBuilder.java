@@ -394,6 +394,12 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+        return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
+            .consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE);
+    }
+
+    @Override
     public UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
         return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)));
     }
