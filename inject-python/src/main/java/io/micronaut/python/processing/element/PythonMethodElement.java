@@ -825,7 +825,11 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
 
         List<GenericPlaceholderElement> placeholders = new ArrayList<>(typeVars.size());
         for (TypeVar typeVar : typeVars) {
-            placeholders.add(new PythonGenericPlaceholderElement(typeVar, environment, Collections.emptyList(), this));
+            placeholders.add(new PythonGenericPlaceholderElement(
+                typeVar,
+                environment,
+                PythonGenericPlaceholderElement.resolveBounds(typeVar, environment, typeRef -> false),
+                this));
         }
         return placeholders;
     }
