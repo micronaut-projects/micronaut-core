@@ -619,6 +619,10 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                 return true;
             }
             ClassElement baseElement = findPythonClass(base);
+            if (baseElement == null) {
+                // a Java class base: assignable to its superclasses and the interfaces they implement
+                baseElement = toJavaType(base).orElse(null);
+            }
             if (baseElement != null && baseElement.isAssignable(type)) {
                 return true;
             }
