@@ -14,12 +14,14 @@
  * limitations under the License.
  */
 /**
- * Annotations of the router.
+ * Contracts between the router and code generated at compile time: route declarations with the
+ * keys the router indexes routes by, and {@link io.micronaut.web.router.spi.RoutePlan route plans},
+ * the generated parsers and slot descriptors the router binds routes to.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @NullMarked
-package io.micronaut.web.router.annotation;
+package io.micronaut.web.router.spi;
 
 import org.jspecify.annotations.NullMarked;

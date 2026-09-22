@@ -33,7 +33,9 @@ import io.micronaut.web.router.spi.IndexedRouteDeclaration;
  * }</pre>
  *
  * <p>Annotation processors generate declarations as {@link IndexedRouteDeclaration}s, with the
- * keys the router indexes routes by computed at compile time.</p>
+ * keys the router indexes routes by computed at compile time, or as
+ * {@link io.micronaut.web.router.spi.PlannedRouteDeclaration}s bound to the slots of a generated
+ * {@link io.micronaut.web.router.spi.RoutePlan}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

@@ -23,7 +23,6 @@ import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.builder.RouteDeclaration;
-import org.jspecify.annotations.Nullable;
 
 /**
  * A {@link RouteDeclaration} generated at compile time, with the keys the router indexes and
@@ -86,16 +85,6 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
             return 0;
         }
         return new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString()).getPatternVariableCount();
-    }
-
-    /**
-     * The URL parser generated for the enum this declaration is a constant of, if any: the
-     * ordinal it answers selects the route bound to the constant with that ordinal.
-     *
-     * @return The matcher, or {@code null}
-     */
-    default @Nullable CompiledRouteMatcher matcher() {
-        return null;
     }
 
     /**

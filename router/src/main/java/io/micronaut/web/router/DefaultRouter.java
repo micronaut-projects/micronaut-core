@@ -28,22 +28,23 @@ import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpServerFilterResolver;
-import io.micronaut.http.uri.MicronautRouteTemplateEngine;
 import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RouteTemplate;
-import io.micronaut.http.uri.RouteTemplateSegment;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngine;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
-import io.micronaut.web.router.spi.CompiledRouteMatcher;
-import io.micronaut.web.router.spi.IndexedRouteDeclaration;
+import io.micronaut.web.router.spi.RouteCandidateSink;
+import io.micronaut.web.router.spi.RoutePlan;
+import io.micronaut.web.router.spi.RouteSlot;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -52,7 +53,6 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.IdentityHashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -60,6 +60,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.IntPredicate;
 import java.util.function.Supplier;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -75,17 +76,24 @@ import java.util.stream.Stream;
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultRouter.class);
 
     private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
     /**
-     * The index of the routes of each method, by method name, see {@link #allRoutesByMethod}.
+     * The index of the routes of each method, by method name, see {@link #allRoutesByMethod}. A
+     * route bound to a compiled slot of a route plan is not in the index: the parser of the plan
+     * finds it.
      */
     private final Map<String, RouteIndex> indexesByMethod;
     /**
-     * The routes of generated URL parsers, by the ordinal of their declarations.
+     * The route plans with the slots the routes of this router are bound to.
      */
-    private final CompiledRoutes[] compiledRoutes;
+    private final PlanBinding[] plans;
+    /**
+     * The index of {@link #plans} by the literal every path their parsers match starts with.
+     */
+    private final RouteIndex planIndex;
     /**
      * Whether a route is a locator route, see {@link RouteLocator}.
      */
@@ -152,7 +160,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         Set<Integer> exposedPorts = new HashSet<>(5);
-        Map<CompiledRouteMatcher, CompiledRoutes> compiled = new IdentityHashMap<>(2);
         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
         HttpMethod[] httpMethods = HttpMethod.values();
         Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newEnumMap(httpMethods);
@@ -166,7 +173,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         boolean hasLocators = false;
         for (RouteBuilder builder : builders) {
             routeSets.add(new RouteSet(builder.getUriRoutes(), builder.getStatusRoutes(), builder.getErrorRoutes(), builder.getFilterRoutes(),
-                // precompiled controller routes and declared routes, built when first used
+                // the routes of controllers with a route plan and declared routes, built when first used
                 builder instanceof DefaultRouteBuilder defaultBuilder ? defaultBuilder.lazyRouteInfos() : List.of(),
                 builder.getExposedPorts()));
         }
@@ -218,7 +225,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
             for (LazyUriRouteInfo uriRouteInfo : routeSet.lazyRoutes()) {
-                addCompiled(compiled, uriRouteInfo);
                 HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
                 if (httpMethod == HttpMethod.CUSTOM) {
                     customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
@@ -277,12 +283,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.methodRoutesByMethod = methodMap;
         this.allRoutesByMethod = customMethodMap;
         Map<String, RouteIndex> indexes = CollectionUtils.newHashMap(customMethodMap.size());
+        Map<String, PlanBinding> bindings = new LinkedHashMap<>();
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> e : customMethodMap.entrySet()) {
-            indexes.put(e.getKey(), indexRoutes(e.getValue()));
+            indexes.put(e.getKey(), indexRoutes(e.getKey(), e.getValue(), bindings));
         }
         this.indexesByMethod = indexes;
         this.hasLocators = hasLocators;
-        this.compiledRoutes = compiled.isEmpty() ? new CompiledRoutes[0] : withExclusivity(compiled.values());
+        List<PlanBinding> boundPlans = new ArrayList<>(bindings.size());
+        for (PlanBinding binding : bindings.values()) {
+            if (binding.isBound()) {
+                binding.freeze();
+                boundPlans.add(binding);
+            }
+        }
+        this.plans = boundPlans.toArray(PlanBinding[]::new);
+        String[] planPrefixes = new String[plans.length];
+        for (int i = 0; i < plans.length; i++) {
+            planPrefixes[i] = plans[i].plan.commonPrefix();
+        }
+        this.planIndex = RouteIndex.build(planPrefixes);
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
@@ -338,16 +357,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
+        // the candidates of the given URI, matched with their templates
         String path = uri.toString();
         String[] paths = matchingPaths(path);
-        return this.<T, R>toMatches(path, paths, findInternal(request, path, paths)).stream();
+        List<Candidate> candidates = findInternal(request, path, paths);
+        var matches = new ArrayList<UriRouteMatch<T, R>>(candidates.size());
+        for (Candidate candidate : candidates) {
+            UriRouteMatch match = candidate.route.tryMatch(pathFor(candidate.route, path, paths));
+            if (match != null) {
+                matches.add(match);
+            }
+        }
+        return matches.stream();
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
         String path = request.getPath();
         String[] paths = matchingPaths(path);
-        return this.<T, R>toMatches(path, paths, findInternal(request, path, paths)).stream();
+        return this.<T, R>toCandidateMatches(path, paths, findInternal(request, path, paths)).stream();
     }
 
     @Override
@@ -386,40 +414,27 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private @Nullable <T, R> UriRouteMatch<T, R> findClosestRoute(HttpRequest<?> request) throws DuplicateRouteException {
         String path = request.getPath();
         String[] paths = matchingPaths(path);
-        if (compiledRoutes.length != 0 && paths == null) {
-            // the generated parsers match the request path: an engine that matches another path uses the runtime matching
-            UriRouteMatch<T, R> compiledMatch = findCompiled(request);
-            if (compiledMatch != null) {
-                return compiledMatch;
-            }
-        }
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request, path, paths);
+        List<Candidate> routes = findInternal(request, path, paths);
         if (routes.isEmpty()) {
             return null;
         }
-        if (paths != null) {
-            List<UriRouteMatch<T, R>> matches = toMatches(path, paths, routes);
-            RouteMatchSelector selector = !hasEngineSelectors || matches.isEmpty() ? null : sameEngineSelector(matches);
-            return closest(request, path, selector == null ? matches : select(selector, request, matches), selector == null);
-        }
         if (hasEngineSelectors) {
-            List<UriRouteMatch<T, R>> matches = toMatches(path, null, routes);
+            List<UriRouteMatch<T, R>> matches = toCandidateMatches(path, paths, routes);
             RouteMatchSelector selector = matches.isEmpty() ? null : sameEngineSelector(matches);
             return closest(request, path, selector == null ? matches : select(selector, request, matches), selector == null);
         }
         if (routes.size() == 1) {
-            Object o = routes.iterator().next();
+            Candidate candidate = routes.get(0);
+            if (candidate.captured != null) {
+                // the only accepted route: the parser of its plan matched it and captured its variables
+                return (UriRouteMatch) candidate.capturedMatch();
+            }
+            Object o = candidate.route;
             // avoid type pollution perf issues
             UriRouteInfo next = o instanceof DefaultUrlRouteInfo def ? def : (UriRouteInfo<Object, Object>) o;
-            return (UriRouteMatch) next.tryMatch(path);
+            return (UriRouteMatch) next.tryMatch(pathFor(candidate.route, path, paths));
         }
-        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
-            }
-        }
+        List<UriRouteMatch<T, R>> uriRoutes = toCandidateMatches(path, paths, routes);
         return closest(request, path, uriRoutes, true);
     }
 
@@ -479,17 +494,11 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request) {
         String path = request.getPath();
         String[] paths = matchingPaths(path);
-        if (compiledRoutes.length != 0 && paths == null) {
-            UriRouteMatch<T, R> compiledMatch = findCompiled(request);
-            if (compiledMatch != null) {
-                return List.of(compiledMatch);
-            }
-        }
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request, path, paths);
+        List<Candidate> routes = findInternal(request, path, paths);
         if (routes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<UriRouteMatch<T, R>> uriRoutes = toMatches(path, paths, routes);
+        List<UriRouteMatch<T, R>> uriRoutes = toCandidateMatches(path, paths, routes);
         if (hasEngineSelectors && !uriRoutes.isEmpty()) {
             RouteMatchSelector selector = sameEngineSelector(uriRoutes);
             if (selector != null) {
@@ -825,27 +834,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return new UriTemplateMatcher(route.getUriMatchTemplate().toString()).getPatternVariableCount();
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, String @Nullable [] paths, List<UriRouteInfo<Object, Object>> routes) {
-        if (paths != null) {
-            var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.size());
-            for (UriRouteInfo<Object, Object> route : routes) {
-                UriRouteMatch match = route.tryMatch(pathFor(route, path, paths));
-                if (match != null) {
-                    uriRoutes.add(match);
-                }
-            }
-            return uriRoutes;
-        }
-        if (routes.size() == 1) {
-            UriRouteMatch match = routes.iterator().next().tryMatch(path);
-            if (match != null) {
-                return List.of(match);
-            }
-            return List.of();
-        }
-        var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.size());
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
+    /**
+     * Match candidates: a route the parser of its plan matched is matched with the captured
+     * values, any other route with its template.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> toCandidateMatches(String path, String @Nullable [] paths, List<Candidate> candidates) {
+        var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(candidates.size());
+        for (Candidate candidate : candidates) {
+            UriRouteMatch match = candidate.captured != null ? candidate.capturedMatch() : candidate.route.tryMatch(pathFor(candidate.route, path, paths));
             if (match != null) {
                 uriRoutes.add(match);
             }
@@ -855,7 +851,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, String @Nullable [] paths, UriRouteInfo<Object, Object>[] routes) {
         if (paths != null) {
-            return toMatches(path, paths, Arrays.asList(routes));
+            var matches = new ArrayList<UriRouteMatch<T, R>>(routes.length);
+            for (UriRouteInfo<Object, Object> route : routes) {
+                UriRouteMatch match = route.tryMatch(pathFor(route, path, paths));
+                if (match != null) {
+                    matches.add(match);
+                }
+            }
+            return matches;
         }
         if (routes.length == 1) {
             UriRouteMatch match = routes[0].tryMatch(path);
@@ -1145,10 +1148,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         final String uriStr = uri.toString();
         String[] paths = matchingPaths(uriStr);
-        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
-            UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : candidates(entry.getKey(), routes, uriStr, paths)) {
-                UriRouteInfo<Object, Object> route = routes[candidate];
+        for (String methodKey : allRoutesByMethod.keySet()) {
+            for (Candidate candidate : candidates(methodKey, uriStr, paths)) {
+                UriRouteInfo<Object, Object> route = candidate.route;
                 if (request != null) {
                     if (shouldSkipForPort(request, route)) {
                         continue;
@@ -1157,7 +1159,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                         continue;
                     }
                 }
-                UriRouteMatch match = route.tryMatch(pathFor(route, uriStr, paths));
+                UriRouteMatch match = candidate.captured != null ? candidate.capturedMatch() : route.tryMatch(pathFor(route, uriStr, paths));
                 if (match != null) {
                     matchedRoutes.add(match);
                 }
@@ -1171,17 +1173,16 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         String path = request.getPath();
         String[] paths = matchingPaths(path);
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
-        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
-            UriRouteInfo<Object, Object>[] routes = entry.getValue();
-            for (int candidate : candidates(entry.getKey(), routes, path, paths)) {
-                UriRouteInfo<Object, Object> route = routes[candidate];
+        for (String methodKey : allRoutesByMethod.keySet()) {
+            for (Candidate candidate : candidates(methodKey, path, paths)) {
+                UriRouteInfo<Object, Object> route = candidate.route;
                 if (shouldSkipForPort(request, route)) {
                     continue;
                 }
                 if (!route.matching(request)) {
                     continue;
                 }
-                UriRouteMatch match = route.tryMatch(pathFor(route, path, paths));
+                UriRouteMatch match = candidate.captured != null ? candidate.capturedMatch() : route.tryMatch(pathFor(route, path, paths));
                 if (match != null) {
                     matchedRoutes.add(match);
                 }
@@ -1296,206 +1297,76 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     /**
-     * Match the request with the generated URL parsers. A route the parser answers is returned
-     * directly only when no other route of its method can match the same paths: then the normal
-     * selection could not choose another route, and the match is built from the captured path
-     * variables. Otherwise the router selects among all candidates as usual, so specificity,
-     * media types, ambiguity and explicit {@code HEAD} routes decide, and the order of the
-     * parsers does not.
+     * The routes of a method that may match a path, in the order of the routes: the routes the
+     * index of the method finds, and the routes the parsers of the route plans matched, with the
+     * values they captured. A route of a plan is a candidate like any other: the caller applies
+     * the same acceptance and selection rules to both.
      *
-     * @param request The request
-     * @return The match, or {@code null} to select among the candidates
+     * <p>Every route is looked up with the path its engine matches, see
+     * {@link RouteTemplateEngine#matchingPath(String)}: the index and the parsers of the plans
+     * are given that path, so a compiled plan answers exactly what the runtime matching does.</p>
+     *
+     * @param methodKey The method name
+     * @param path      The path
+     * @param paths     The paths of the {@link #pathEngines}, or {@code null} if they all match the path
+     * @return The candidates
      */
-    @SuppressWarnings("unchecked")
-    private <T, R> @Nullable UriRouteMatch<T, R> findCompiled(HttpRequest<?> request) {
-        HttpMethod method = request.getMethod();
-        if (method == HttpMethod.CUSTOM) {
-            return null;
+    private List<Candidate> candidates(String methodKey, String path, String @Nullable [] paths) {
+        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.getOrDefault(methodKey, EMPTY);
+        if (routes.length == 0) {
+            return List.of();
         }
-        String path = UriTemplateMatcher.normalizeForMatching(request.getPath());
-        for (CompiledRoutes compiled : compiledRoutes) {
-            String[] captured = new String[compiled.matcher.maxVariables()];
-            UriRouteInfo<Object, Object> route = null;
-            boolean exclusive = false;
-            int ordinal = compiled.matcher.match(method, path, captured);
-            if (ordinal >= 0 && ordinal < compiled.byOrdinal.length) {
-                route = compiled.byOrdinal[ordinal];
-                exclusive = compiled.exclusive[ordinal];
-            } else if (method == HttpMethod.HEAD) {
-                // the implicit HEAD route of a GET route
-                ordinal = compiled.matcher.match(HttpMethod.GET, path, captured);
-                if (ordinal >= 0 && ordinal < compiled.headByOrdinal.length) {
-                    route = compiled.headByOrdinal[ordinal];
-                    exclusive = compiled.headExclusive[ordinal];
+        int[] ordinary = ordinaryCandidates(methodKey, routes, path, paths);
+        PlanCandidates planned = null;
+        if (plans.length != 0) {
+            planned = matchPlans(methodKey, routes, path, path, paths, null);
+            if (paths != null) {
+                for (int i = 0; i < paths.length; i++) {
+                    String enginePath = paths[i];
+                    if (!enginePath.equals(path) && firstIndexOf(paths, enginePath) == i) {
+                        planned = matchPlans(methodKey, routes, enginePath, path, paths, planned);
+                    }
                 }
             }
-            if (route == null) {
-                // not a bound route of this parser: another parser, or the router, may have one
-                continue;
-            }
-            if (!exclusive || !isAcceptable(request, route)) {
-                return null;
-            }
-            UriRouteInfo<Object, Object> built = route instanceof LazyUriRouteInfo lazy ? lazy.delegate() : route;
-            if (built instanceof DefaultUrlRouteInfo<?, ?> defaultRoute) {
-                return (UriRouteMatch<T, R>) defaultRoute.capturedMatch(request.getPath(), captured);
-            }
-            return (UriRouteMatch<T, R>) built.tryMatch(request.getPath());
         }
-        return null;
-    }
-
-    /**
-     * Mark the compiled routes that no other route of the same method can compete with.
-     *
-     * @param compiled The routes bound to the generated URL parsers
-     * @return The routes with their exclusivity
-     */
-    private CompiledRoutes[] withExclusivity(Collection<CompiledRoutes> compiled) {
-        Map<UriRouteInfo<Object, Object>, Optional<List<RouteTemplateSegment>>> segments = new IdentityHashMap<>();
-        CompiledRoutes[] result = new CompiledRoutes[compiled.size()];
-        int i = 0;
-        for (CompiledRoutes routes : compiled) {
-            boolean[] exclusive = new boolean[routes.byOrdinal.length];
-            boolean[] headExclusive = new boolean[routes.headByOrdinal.length];
-            for (int ordinal = 0; ordinal < exclusive.length; ordinal++) {
-                exclusive[ordinal] = isExclusive(routes.byOrdinal[ordinal], segments);
+        if (planned == null || planned.size == 0) {
+            if (ordinary.length == 0) {
+                return List.of();
             }
-            for (int ordinal = 0; ordinal < headExclusive.length; ordinal++) {
-                headExclusive[ordinal] = isExclusive(routes.headByOrdinal[ordinal], segments);
+            List<Candidate> result = new ArrayList<>(ordinary.length);
+            for (int rank : ordinary) {
+                result.add(new Candidate(routes[rank], null, null));
             }
-            result[i++] = new CompiledRoutes(routes.matcher, routes.byOrdinal, routes.headByOrdinal, exclusive, headExclusive);
+            return result;
+        }
+        planned.sort();
+        List<Candidate> result = new ArrayList<>(ordinary.length + planned.size);
+        int o = 0;
+        int h = 0;
+        while (o < ordinary.length || h < planned.size) {
+            if (h == planned.size || o < ordinary.length && ordinary[o] < planned.ranks[h]) {
+                result.add(new Candidate(routes[ordinary[o++]], null, null));
+            } else {
+                result.add(new Candidate(routes[planned.ranks[h]], planned.paths[h], planned.captured[h]));
+                h++;
+            }
         }
         return result;
     }
 
-    private boolean isExclusive(@Nullable UriRouteInfo<Object, Object> route, Map<UriRouteInfo<Object, Object>, Optional<List<RouteTemplateSegment>>> segments) {
-        if (!(route instanceof LazyUriRouteInfo lazy)) {
-            return false;
-        }
-        if (hasEngineSelectors && routeMatchSelector(route) != null) {
-            // its engine selects among its matches and negotiates the media type
-            return false;
-        }
-        Optional<List<RouteTemplateSegment>> own = segments.computeIfAbsent(route, DefaultRouter::templateSegments);
-        for (UriRouteInfo<Object, Object> other : allRoutesByMethod.getOrDefault(lazy.methodKey(), EMPTY)) {
-            if (other != route && mayOverlap(own, segments.computeIfAbsent(other, DefaultRouter::templateSegments))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * The path segments of a route's template, as the engine of the template describes them in
-     * the parsed template, without building a route that is not built yet. Empty when the engine
-     * cannot tell: the route may then overlap any other.
-     */
-    private static Optional<List<RouteTemplateSegment>> templateSegments(UriRouteInfo<Object, Object> route) {
-        if (route instanceof LazyUriRouteInfo lazy) {
-            return Optional.ofNullable(lazy.parsedTemplate().pathSegments());
-        }
-        if (route instanceof DefaultUrlRouteInfo<?, ?> info) {
-            return Optional.ofNullable(info.parsedTemplate().pathSegments());
-        }
-        RouteTemplate template = route.getRouteTemplate();
-        if (template.isMicronaut()) {
-            return Optional.ofNullable(MicronautRouteTemplateEngine.INSTANCE.parse(template).pathSegments());
-        }
-        return Optional.empty();
-    }
-
-    /**
-     * Whether two templates may match the same path. Only {@code false} is certain; unknown
-     * segments may overlap anything.
-     */
-    private static boolean mayOverlap(Optional<List<RouteTemplateSegment>> first, Optional<List<RouteTemplateSegment>> second) {
-        if (first.isEmpty() || second.isEmpty()) {
-            return true;
-        }
-        List<RouteTemplateSegment> a = first.get();
-        List<RouteTemplateSegment> b = second.get();
-        int common = Math.min(a.size(), b.size());
-        for (int i = 0; i < common; i++) {
-            RouteTemplateSegment x = a.get(i);
-            RouteTemplateSegment y = b.get(i);
-            if (x.kind() == RouteTemplateSegment.Kind.ANY || y.kind() == RouteTemplateSegment.Kind.ANY) {
-                return true;
-            }
-            if (x.kind() == RouteTemplateSegment.Kind.LITERAL && y.kind() == RouteTemplateSegment.Kind.LITERAL && !x.literal().equals(y.literal())) {
-                return false;
-            }
-        }
-        // the longer template matches the same paths only if its remaining segments can be empty
-        List<RouteTemplateSegment> longer = a.size() > b.size() ? a : b;
-        for (int i = common; i < longer.size(); i++) {
-            if (longer.get(i).kind() != RouteTemplateSegment.Kind.ANY) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    /**
-     * The same checks as {@link #findInternal(HttpRequest, String, String[])} for one route.
-     */
-    private boolean isAcceptable(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
-        if (shouldSkipForPort(request, route)) {
-            return false;
-        }
-        if (request.getMethod().permitsRequestBody()) {
-            if (!route.isPermitsRequestBody()) {
-                return false;
-            }
-            if (!route.consumesAll() && !route.doesConsume(request.getContentType().orElse(null))) {
-                return false;
-            }
-        }
-        if (!route.producesAll() && !route.doesProduce(request.accept())) {
-            return false;
-        }
-        return route.matching(request);
-    }
-
-    private static void addCompiled(Map<CompiledRouteMatcher, CompiledRoutes> compiled, LazyUriRouteInfo route) {
-        IndexedRouteDeclaration declaration = route.declaration();
-        if (declaration == null || !(declaration instanceof Enum<?> constant)) {
-            return;
-        }
-        CompiledRouteMatcher matcher = declaration.matcher();
-        if (matcher == null) {
-            return;
-        }
-        int ordinal = constant.ordinal();
-        CompiledRoutes routes = compiled.get(matcher);
-        if (routes == null || ordinal >= routes.byOrdinal.length) {
-            // sized by the largest bound ordinal: the enum's constants are not read reflectively
-            int size = Math.max(ordinal + 1, routes == null ? 0 : routes.byOrdinal.length);
-            routes = routes == null
-                ? new CompiledRoutes(matcher, new UriRouteInfo[size], new UriRouteInfo[size])
-                : new CompiledRoutes(matcher, Arrays.copyOf(routes.byOrdinal, size), Arrays.copyOf(routes.headByOrdinal, size));
-            compiled.put(matcher, routes);
-        }
-        (route.isImplicitHead() ? routes.headByOrdinal : routes.byOrdinal)[ordinal] = route;
-    }
-
-    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request, String path, String @Nullable [] paths) {
+    private List<Candidate> findInternal(HttpRequest<?> request, String path, String @Nullable [] paths) {
         HttpMethod httpMethod = request.getMethod();
         boolean permitsBody = httpMethod.permitsRequestBody();
         Collection<MediaType> acceptedProducedTypes = null;
         MediaType contentType = null;
         String methodKey = httpMethod == HttpMethod.CUSTOM ? request.getMethodName() : httpMethod.name();
-        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.getOrDefault(methodKey, EMPTY);
-        if (routes.length == 0) {
+        List<Candidate> candidates = candidates(methodKey, path, paths);
+        if (candidates.isEmpty()) {
             return Collections.emptyList();
         }
-        int[] candidates = candidates(methodKey, routes, path, paths);
-        if (candidates.length == 0) {
-            return Collections.emptyList();
-        }
-        var result = new ArrayList<UriRouteInfo<Object, Object>>(candidates.length);
-        for (int candidate : candidates) {
-            UriRouteInfo<Object, Object> route = routes[candidate];
+        var result = new ArrayList<Candidate>(candidates.size());
+        for (Candidate candidate : candidates) {
+            UriRouteInfo<Object, Object> route = candidate.route;
             if (shouldSkipForPort(request, route)) {
                 continue;
             }
@@ -1523,22 +1394,50 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             if (!route.matching(request)) {
                 continue;
             }
-            result.add(route);
+            result.add(candidate);
         }
         return result;
     }
 
     /**
-     * The positions of the routes of a method that can match: each route is looked up in the
-     * index with the path its engine matches.
+     * Match the parsers of the route plans against one path, and keep the routes that are
+     * matched against that path.
      *
-     * @param methodKey The method
-     * @param routes    The routes of the method
-     * @param path      The request path
-     * @param paths     The paths of the {@link #pathEngines}, or {@code null} if they all match the request path
-     * @return The positions, in ascending order
+     * @param methodKey    The method name
+     * @param routes       The routes of the method
+     * @param matchingPath The path to match the parsers against
+     * @param path         The request path
+     * @param paths        The paths of the {@link #pathEngines}, or {@code null} if they all match the path
+     * @param planned      The routes matched so far, or {@code null}
+     * @return The routes matched so far and the routes of this path
      */
-    private int[] candidates(String methodKey, UriRouteInfo<Object, Object>[] routes, String path, String @Nullable [] paths) {
+    private @Nullable PlanCandidates matchPlans(String methodKey,
+                                                UriRouteInfo<Object, Object>[] routes,
+                                                String matchingPath,
+                                                String path,
+                                                String @Nullable [] paths,
+                                                @Nullable PlanCandidates planned) {
+        String normalized = UriTemplateMatcher.normalizeForMatching(matchingPath);
+        for (int p : planIndex.candidates(normalized)) {
+            PlanBinding binding = plans[p];
+            if (binding.hasMethod(methodKey)) {
+                if (planned == null) {
+                    planned = new PlanCandidates(methodKey);
+                }
+                planned.binding = binding;
+                // a route of another engine matches another path: it is a candidate of that path
+                planned.accept = paths == null ? null : rank -> pathFor(routes[rank], path, paths).equals(matchingPath);
+                binding.plan.match(normalized, planned);
+            }
+        }
+        return planned;
+    }
+
+    /**
+     * @return The positions of the routes of the index that can match, each looked up with the
+     * path its engine matches, in ascending order
+     */
+    private int[] ordinaryCandidates(String methodKey, UriRouteInfo<Object, Object>[] routes, String path, String @Nullable [] paths) {
         RouteIndex index = index(methodKey);
         if (paths == null) {
             return index.candidates(path);
@@ -1650,12 +1549,57 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return Objects.requireNonNull(indexesByMethod.get(methodKey));
     }
 
-    private static RouteIndex indexRoutes(UriRouteInfo<Object, Object>[] routes) {
-        String[] prefixes = new String[routes.length];
+    /**
+     * Index the routes of a method, and bind the routes of the compiled slots of route plans to
+     * their slots: those are found by the parsers of the plans, not by the index.
+     */
+    private static RouteIndex indexRoutes(String methodKey, UriRouteInfo<Object, Object>[] routes, Map<String, PlanBinding> bindings) {
+        @Nullable String[] prefixes = new String[routes.length];
         for (int i = 0; i < routes.length; i++) {
-            prefixes[i] = routes[i] instanceof IndexedRoute route ? route.getRequiredPathPrefix() : "";
+            UriRouteInfo<Object, Object> route = routes[i];
+            if (route instanceof LazyUriRouteInfo lazy && bind(methodKey, i, lazy, bindings)) {
+                prefixes[i] = null;
+            } else {
+                prefixes[i] = route instanceof IndexedRoute indexed ? indexed.getRequiredPathPrefix() : "";
+            }
         }
         return RouteIndex.build(prefixes);
+    }
+
+    /**
+     * Bind a route to the slot of its declaration in its route plan: the key of the declaration is
+     * resolved to the slot once, here. A route whose plan the router cannot use, whose slot the
+     * parser does not match, or that does not agree with its slot, stays an ordinary route.
+     *
+     * @return Whether the route is bound
+     */
+    private static boolean bind(String methodKey, int rank, LazyUriRouteInfo route, Map<String, PlanBinding> bindings) {
+        RoutePlan plan = route.plan();
+        String key = route.planKey();
+        if (plan == null || key == null) {
+            return false;
+        }
+        PlanBinding binding = bindings.computeIfAbsent(plan.id(), id -> PlanBinding.of(plan));
+        if (binding == PlanBinding.UNUSABLE) {
+            return false;
+        }
+        if (binding.plan != plan && !binding.plan.fingerprint().equals(plan.fingerprint())) {
+            LOG.warn("Two different route plans have the identity {}: the routes of {} are matched at runtime", plan.id(), plan);
+            return false;
+        }
+        Integer slot = binding.slotByKey.get(key);
+        if (slot == null) {
+            return false;
+        }
+        RouteSlot descriptor = binding.slots[slot];
+        boolean sameMethod = descriptor.httpMethodName().equals(methodKey)
+            // the implicit HEAD route of a declared GET route is bound to the slot of the GET route
+            || route.isImplicitHead() && HttpMethod.GET.name().equals(descriptor.httpMethodName());
+        if (!descriptor.compiled() || !sameMethod || !descriptor.template().equals(route.template())) {
+            return false;
+        }
+        binding.bind(slot, new Bound(methodKey, rank, route, descriptor.captures().length));
+        return true;
     }
 
     private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
@@ -1754,22 +1698,213 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     /**
-     * The routes bound to the declarations of a generated URL parser.
+     * A route that may match a path.
      *
-     * @param matcher       The parser
-     * @param byOrdinal     The bound routes, by the ordinal of their declarations
-     * @param headByOrdinal The implicit {@code HEAD} routes of the bound {@code GET} routes, by ordinal
-     * @param exclusive     Whether the route of an ordinal is the only route that can match its paths
-     * @param headExclusive Whether the implicit {@code HEAD} route of an ordinal is the only route that can match its paths
+     * @param route    The route
+     * @param path     The normalised path the parser of the plan of the route matched, or {@code null}
+     * @param captured The values the parser captured, or {@code null} for a route matched with its template
      */
-    private record CompiledRoutes(CompiledRouteMatcher matcher,
-                                  UriRouteInfo<Object, Object>[] byOrdinal,
-                                  UriRouteInfo<Object, Object>[] headByOrdinal,
-                                  boolean[] exclusive,
-                                  boolean[] headExclusive) {
+    private record Candidate(UriRouteInfo<Object, Object> route, @Nullable String path, String @Nullable [] captured) {
 
-        CompiledRoutes(CompiledRouteMatcher matcher, UriRouteInfo<Object, Object>[] byOrdinal, UriRouteInfo<Object, Object>[] headByOrdinal) {
-            this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length]);
+        UriRouteMatch<Object, Object> capturedMatch() {
+            return ((LazyUriRouteInfo) route).capturedMatch(Objects.requireNonNull(path), Objects.requireNonNull(captured));
+        }
+    }
+
+    /**
+     * A route bound to a slot of a route plan.
+     *
+     * @param methodKey The method name the route is registered under
+     * @param rank      The position of the route among the routes of the method
+     * @param route     The route
+     * @param captures  The number of values the parser captures for the slot
+     */
+    private record Bound(String methodKey, int rank, LazyUriRouteInfo route, int captures) {
+    }
+
+    /**
+     * The routes of this router bound to the slots of a route plan: the binding arrays of one
+     * router, never shared with another router or kept in static state.
+     */
+    private static final class PlanBinding {
+        static final PlanBinding UNUSABLE = new PlanBinding(null, new RouteSlot[0]);
+        private static final Bound[] NONE = new Bound[0];
+
+        final RoutePlan plan;
+        final RouteSlot[] slots;
+        final Map<String, Integer> slotByKey;
+        private final List<Bound>[] bound;
+        private Bound[][] bySlot = new Bound[0][];
+        private final Set<String> methods = new HashSet<>();
+
+        @SuppressWarnings("unchecked")
+        private PlanBinding(@Nullable RoutePlan plan, RouteSlot[] slots) {
+            this.plan = plan == null ? NoPlan.INSTANCE : plan;
+            this.slots = slots;
+            this.slotByKey = CollectionUtils.newHashMap(slots.length);
+            for (int i = 0; i < slots.length; i++) {
+                if (slotByKey.putIfAbsent(slots[i].key(), i) != null) {
+                    throw new RoutingException("The route plan " + this.plan.id() + " has two slots with the key " + slots[i].key());
+                }
+            }
+            this.bound = new List[slots.length];
+        }
+
+        static PlanBinding of(RoutePlan plan) {
+            RouteSlot[] slots = plan.slots();
+            return RoutePlans.usable(plan, slots) ? new PlanBinding(plan, slots) : UNUSABLE;
+        }
+
+        void bind(int slot, Bound route) {
+            List<Bound> routes = bound[slot];
+            if (routes == null) {
+                routes = new ArrayList<>(2);
+                bound[slot] = routes;
+            }
+            routes.add(route);
+            methods.add(route.methodKey());
+        }
+
+        boolean isBound() {
+            return !methods.isEmpty();
+        }
+
+        boolean hasMethod(String methodKey) {
+            return methods.contains(methodKey);
+        }
+
+        void freeze() {
+            Bound[][] frozen = new Bound[bound.length][];
+            for (int i = 0; i < bound.length; i++) {
+                frozen[i] = bound[i] == null ? NONE : bound[i].toArray(NONE);
+            }
+            bySlot = frozen;
+        }
+
+        Bound[] bound(int slot) {
+            return slot >= 0 && slot < bySlot.length ? bySlot[slot] : NONE;
+        }
+    }
+
+    /**
+     * Collects the routes of one method whose slots the parser of a plan matched.
+     */
+    private static final class PlanCandidates implements RouteCandidateSink {
+        final String methodKey;
+        @Nullable PlanBinding binding;
+        /**
+         * Accepts the routes that are matched against the path the parser was given, or
+         * {@code null} for every route.
+         */
+        @Nullable IntPredicate accept;
+        int size;
+        int[] ranks = new int[4];
+        String[] paths = new String[4];
+        String[][] captured = new String[4][];
+
+        PlanCandidates(String methodKey) {
+            this.methodKey = methodKey;
+        }
+
+        @Override
+        public void candidate(int slot, String path, int[] spans) {
+            for (Bound bound : Objects.requireNonNull(binding).bound(slot)) {
+                if (!bound.methodKey().equals(methodKey)) {
+                    continue;
+                }
+                if (accept != null && !accept.test(bound.rank())) {
+                    continue;
+                }
+                String[] values = new String[bound.captures()];
+                for (int i = 0; i < values.length; i++) {
+                    values[i] = path.substring(spans[2 * i], spans[2 * i + 1]);
+                }
+                if (size == ranks.length) {
+                    ranks = Arrays.copyOf(ranks, size * 2);
+                    paths = Arrays.copyOf(paths, size * 2);
+                    captured = Arrays.copyOf(captured, size * 2);
+                }
+                ranks[size] = bound.rank();
+                paths[size] = path;
+                captured[size] = values;
+                size++;
+            }
+        }
+
+        /**
+         * Sort the matched routes by their rank; there are few.
+         */
+        void sort() {
+            for (int i = 1; i < size; i++) {
+                for (int j = i; j > 0 && ranks[j - 1] > ranks[j]; j--) {
+                    int rank = ranks[j];
+                    ranks[j] = ranks[j - 1];
+                    ranks[j - 1] = rank;
+                    String path = paths[j];
+                    paths[j] = paths[j - 1];
+                    paths[j - 1] = path;
+                    String[] values = captured[j];
+                    captured[j] = captured[j - 1];
+                    captured[j - 1] = values;
+                }
+            }
+        }
+    }
+
+    /**
+     * Stands for the plan of a binding the router cannot use.
+     */
+    private static final class NoPlan implements RoutePlan {
+        static final NoPlan INSTANCE = new NoPlan();
+
+        @Override
+        public String id() {
+            return "none";
+        }
+
+        @Override
+        public int abiVersion() {
+            return ABI_VERSION;
+        }
+
+        @Override
+        public String inputProfile() {
+            return INPUT_PROFILE;
+        }
+
+        @Override
+        public String selectionPolicy() {
+            return SELECTION_POLICY;
+        }
+
+        @Override
+        public String fingerprint() {
+            return "";
+        }
+
+        @Override
+        public String[] owners() {
+            return new String[0];
+        }
+
+        @Override
+        public RouteSlot[] slots() {
+            return new RouteSlot[0];
+        }
+
+        @Override
+        public String commonPrefix() {
+            return "";
+        }
+
+        @Override
+        public int maxCaptures() {
+            return 0;
+        }
+
+        @Override
+        public void match(String path, RouteCandidateSink sink) {
+            // matches nothing
         }
     }
 

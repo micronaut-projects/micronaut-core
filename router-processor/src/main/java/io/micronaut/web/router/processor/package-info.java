@@ -13,27 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
-
-import io.micronaut.core.annotation.Internal;
-
 /**
- * The URI routes of the controllers of a compilation, generated at compile time for
- * {@link io.micronaut.web.router.annotation.PrecompiledHttpRoutes} and loaded as a service.
+ * The route compiler: derives routes at compile time, from controllers and from the
+ * {@link io.micronaut.web.router.processor.RouteDescription descriptions} of custom declaration
+ * processors, lowers their templates with {@link io.micronaut.web.router.processor.RouteTemplateCompiler}s
+ * and generates {@link io.micronaut.web.router.spi.RoutePlan route plans} and their descriptors.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
-@Internal
-public interface PrecompiledHttpRoutesDefinition {
+@NullMarked
+package io.micronaut.web.router.processor;
 
-    /**
-     * @return The names of the controller types whose routes are precompiled
-     */
-    String[] controllerTypes();
-
-    /**
-     * @return The routes, in the order the router registers them
-     */
-    PrecompiledRoute[] routes();
-}
+import org.jspecify.annotations.NullMarked;

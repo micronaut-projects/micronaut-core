@@ -20,8 +20,6 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.processor.BeanDefinitionProcessor;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.io.service.SoftServiceLoader;
-import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
@@ -33,6 +31,9 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteAssembly.DefaultUriRoute;
 import io.micronaut.web.router.exceptions.RoutingException;
 import io.micronaut.web.router.naming.HyphenatedUriNamingStrategy;
+import io.micronaut.web.router.spi.ControllerRoute;
+import io.micronaut.web.router.spi.RoutePlan;
+import io.micronaut.web.router.spi.RouteSlot;
 import jakarta.inject.Singleton;
 
 import java.util.ArrayList;
@@ -41,6 +42,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 /**
@@ -54,13 +56,13 @@ import java.util.Optional;
 public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements BeanDefinitionProcessor<Controller> {
 
     /**
-     * The precompiled routes by controller type name.
+     * The slots of the usable route plans of controllers, by controller type name.
      */
-    private final Map<String, List<PrecompiledRoute>> precompiledRoutes;
+    private final Map<String, PlannedController> plannedRoutes;
     /**
-     * The enabled controllers whose routes are precompiled, in processing order.
+     * The enabled controllers whose routes are the slots of a route plan, in processing order.
      */
-    private final Map<String, PrecompiledController> precompiledControllers = new LinkedHashMap<>();
+    private final Map<String, PlannedControllerBean> plannedControllers = new LinkedHashMap<>();
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -69,16 +71,17 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
      */
     public AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy, ConversionService conversionService) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        // precompiled routes are derived by this class with the default naming strategy and no context path
+        // the route compiler derives the routes of controllers like this class does with the
+        // default naming strategy and no context path
         if (getClass() == AnnotatedMethodRouteBuilder.class
             && uriNamingStrategy.getClass() == HyphenatedUriNamingStrategy.class
             && "/".equals(uriNamingStrategy.resolveUri(""))) {
             ClassLoader classLoader = executionHandleLocator instanceof BeanContext beanContext
                 ? beanContext.getClassLoader()
                 : AnnotatedMethodRouteBuilder.class.getClassLoader();
-            this.precompiledRoutes = byController(SoftServiceLoader.load(PrecompiledHttpRoutesDefinition.class, classLoader).collectAll());
+            this.plannedRoutes = byController(RoutePlans.load(classLoader));
         } else {
-            this.precompiledRoutes = Map.of();
+            this.plannedRoutes = Map.of();
         }
     }
 
@@ -86,24 +89,39 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
      * @param executionHandleLocator The execution handler locator
      * @param uriNamingStrategy      The URI naming strategy
      * @param conversionService      The conversion service
-     * @param definitions            The precompiled routes to use
+     * @param plans                  The route plans of controllers to use
      */
     AnnotatedMethodRouteBuilder(ExecutionHandleLocator executionHandleLocator,
                                 UriNamingStrategy uriNamingStrategy,
                                 ConversionService conversionService,
-                                List<PrecompiledHttpRoutesDefinition> definitions) {
+                                List<RoutePlan> plans) {
         super(executionHandleLocator, uriNamingStrategy, conversionService);
-        this.precompiledRoutes = byController(definitions);
+        this.plannedRoutes = byController(plans);
     }
 
-    private static Map<String, List<PrecompiledRoute>> byController(List<PrecompiledHttpRoutesDefinition> definitions) {
-        Map<String, List<PrecompiledRoute>> routes = new HashMap<>();
-        for (PrecompiledHttpRoutesDefinition definition : definitions) {
-            for (String controllerType : definition.controllerTypes()) {
-                routes.putIfAbsent(controllerType, new ArrayList<>());
+    private static Map<String, PlannedController> byController(List<RoutePlan> plans) {
+        Map<String, PlannedController> routes = new HashMap<>();
+        for (RoutePlan plan : plans) {
+            RouteSlot[] slots = plan.slots();
+            if (!RoutePlans.usable(plan, slots)) {
+                continue;
             }
-            for (PrecompiledRoute route : definition.routes()) {
-                routes.computeIfAbsent(route.controllerType(), k -> new ArrayList<>()).add(route);
+            Map<String, List<RouteSlot>> byOwner = new LinkedHashMap<>();
+            for (String owner : plan.owners()) {
+                byOwner.put(owner, new ArrayList<>());
+            }
+            for (RouteSlot slot : slots) {
+                ControllerRoute controller = slot.controller();
+                if (controller != null) {
+                    byOwner.computeIfAbsent(controller.ownerType(), k -> new ArrayList<>()).add(slot);
+                }
+            }
+            for (Map.Entry<String, List<RouteSlot>> entry : byOwner.entrySet()) {
+                PlannedController existing = routes.putIfAbsent(entry.getKey(), new PlannedController(plan, entry.getValue()));
+                if (existing != null && LOG.isDebugEnabled()) {
+                    // e.g. the plan of a controller and a plan linked from the same controller
+                    LOG.debug("The routes of {} are in the route plans {} and {}: using {}", entry.getKey(), existing.plan().id(), plan.id(), existing.plan().id());
+                }
             }
         }
         return routes;
@@ -112,34 +130,37 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     @Override
     List<LazyUriRouteInfo> lazyRouteInfos() {
         List<LazyUriRouteInfo> declared = super.lazyRouteInfos();
-        List<LazyUriRouteInfo> precompiled = precompiledRouteInfos();
+        List<LazyUriRouteInfo> planned = plannedRouteInfos();
         if (declared.isEmpty()) {
-            return precompiled;
+            return planned;
         }
         List<LazyUriRouteInfo> infos = new ArrayList<>(declared);
-        infos.addAll(precompiled);
+        infos.addAll(planned);
         return infos;
     }
 
     /**
-     * The routes of the enabled controllers whose routes are precompiled. They are built when first used.
+     * The routes of the enabled controllers whose routes are the slots of a route plan. They are
+     * built when first used.
      *
      * @return The routes
      */
-    List<LazyUriRouteInfo> precompiledRouteInfos() {
-        if (precompiledControllers.isEmpty()) {
+    List<LazyUriRouteInfo> plannedRouteInfos() {
+        if (plannedControllers.isEmpty()) {
             return List.of();
         }
         List<LazyUriRouteInfo> infos = new ArrayList<>();
-        for (PrecompiledController controller : precompiledControllers.values()) {
+        for (PlannedControllerBean controller : plannedControllers.values()) {
             BeanDefinition<?> beanDefinition = controller.beanDefinition();
-            for (PrecompiledRoute route : controller.routes()) {
+            RoutePlan plan = controller.routes().plan();
+            for (RouteSlot slot : controller.routes().slots()) {
+                ControllerRoute route = Objects.requireNonNull(slot.controller());
                 if (route.port() > -1) {
                     // the router collects the exposed ports when it is created
-                    UriRouteInfo<Object, Object> info = buildPrecompiledRoute(beanDefinition, route);
-                    infos.add(new LazyUriRouteInfo(route, () -> info));
+                    UriRouteInfo<Object, Object> info = buildPlannedRoute(beanDefinition, slot, route);
+                    infos.add(new LazyUriRouteInfo(plan, slot, () -> info));
                 } else {
-                    infos.add(new LazyUriRouteInfo(route, () -> buildPrecompiledRoute(beanDefinition, route)));
+                    infos.add(new LazyUriRouteInfo(plan, slot, () -> buildPlannedRoute(beanDefinition, slot, route)));
                 }
             }
         }
@@ -147,47 +168,49 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     @SuppressWarnings("unchecked")
-    private UriRouteInfo<Object, Object> buildPrecompiledRoute(BeanDefinition<?> beanDefinition, PrecompiledRoute precompiledRoute) {
-        ExecutableMethod<?, ?> method = findMethod(beanDefinition, precompiledRoute);
+    private UriRouteInfo<Object, Object> buildPlannedRoute(BeanDefinition<?> beanDefinition, RouteSlot slot, ControllerRoute controllerRoute) {
+        ExecutableMethod<?, ?> method = findMethod(beanDefinition, controllerRoute);
         MethodExecutionHandle<Object, Object> handle;
-        if (precompiledRoute.declaringTypeTarget()) {
+        if (controllerRoute.declaringTypeTarget()) {
             handle = executionHandleLocator.findExecutionHandle((Class<Object>) method.getDeclaringType(), method.getMethodName(), method.getArgumentTypes())
                 .orElseThrow(() -> new RoutingException("No such route: " + method.getDeclaringType().getName() + "." + method.getMethodName()));
         } else {
             handle = (MethodExecutionHandle<Object, Object>) executionHandleLocator.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         }
         DefaultUriRoute route = assembly.newRoute(
-            HttpMethod.parse(precompiledRoute.httpMethod()),
-            precompiledRoute.uri(),
+            slot.httpMethod(),
+            slot.template().expression(),
             List.of(MediaType.APPLICATION_JSON_TYPE),
             handle,
-            precompiledRoute.httpMethodName()
+            slot.httpMethodName()
         );
-        if (precompiledRoute.consumes() != null) {
-            route.consumes(MediaType.of(precompiledRoute.consumes()));
+        String[] consumes = controllerRoute.consumes();
+        if (consumes != null) {
+            route.consumes(MediaType.of(consumes));
         }
-        if (precompiledRoute.produces() != null) {
-            route.produces(MediaType.of(precompiledRoute.produces()));
+        String[] produces = controllerRoute.produces();
+        if (produces != null) {
+            route.produces(MediaType.of(produces));
         }
-        if (precompiledRoute.implicitHead()) {
+        if (controllerRoute.implicitHead()) {
             route.markImplicitHead();
         }
-        if (precompiledRoute.port() > -1) {
-            route.exposedPort(precompiledRoute.port());
+        if (controllerRoute.port() > -1) {
+            route.exposedPort(controllerRoute.port());
         }
         if (LOG.isDebugEnabled()) {
-            LOG.debug("Created precompiled Route: {}", route);
+            LOG.debug("Created Route of the slot {}: {}", slot.key(), route);
         }
         return route.toRouteInfo();
     }
 
-    private static ExecutableMethod<?, ?> findMethod(BeanDefinition<?> beanDefinition, PrecompiledRoute route) {
+    private static ExecutableMethod<?, ?> findMethod(BeanDefinition<?> beanDefinition, ControllerRoute route) {
         for (ExecutableMethod<?, ?> method : beanDefinition.getExecutableMethods()) {
             if (method.getMethodName().equals(route.methodName()) && hasArgumentTypes(method, route.argumentTypes())) {
                 return method;
             }
         }
-        throw new RoutingException("No such route: " + route.controllerType() + "." + route.methodName());
+        throw new RoutingException("No such route: " + route.ownerType() + "." + route.methodName());
     }
 
     private static boolean hasArgumentTypes(ExecutableMethod<?, ?> method, String[] argumentTypes) {
@@ -205,11 +228,11 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
 
     @Override
     public void process(BeanDefinition<?> beanDefinition, BeanContext beanContext) {
-        if (!precompiledRoutes.isEmpty()) {
+        if (!plannedRoutes.isEmpty()) {
             String typeName = beanDefinition.getBeanType().getName();
-            List<PrecompiledRoute> routes = precompiledRoutes.get(typeName);
-            if (routes != null && !precompiledControllers.containsKey(typeName)) {
-                precompiledControllers.put(typeName, new PrecompiledController(beanDefinition, routes));
+            PlannedController routes = plannedRoutes.get(typeName);
+            if (routes != null && !plannedControllers.containsKey(typeName)) {
+                plannedControllers.put(typeName, new PlannedControllerBean(beanDefinition, routes));
                 processErrors(beanDefinition);
                 return;
             }
@@ -315,11 +338,20 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
     }
 
     /**
-     * An enabled controller whose routes are precompiled.
+     * The slots of a route plan that are the routes of a controller.
+     *
+     * @param plan  The plan
+     * @param slots The slots of the routes of the controller
+     */
+    private record PlannedController(RoutePlan plan, List<RouteSlot> slots) {
+    }
+
+    /**
+     * An enabled controller whose routes are the slots of a route plan.
      *
      * @param beanDefinition The controller
-     * @param routes         The routes
+     * @param routes         The slots
      */
-    private record PrecompiledController(BeanDefinition<?> beanDefinition, List<PrecompiledRoute> routes) {
+    private record PlannedControllerBean(BeanDefinition<?> beanDefinition, PlannedController routes) {
     }
 }

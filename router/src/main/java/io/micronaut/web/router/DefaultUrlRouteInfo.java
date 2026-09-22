@@ -28,6 +28,7 @@ import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RouteCaptures;
 import io.micronaut.http.uri.RoutePattern;
 import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateVariable;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
@@ -36,12 +37,11 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
-import io.micronaut.web.router.spi.CompiledRouteMatcher;
 import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
-import java.util.Arrays;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -396,16 +396,27 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     /**
-     * A match of this route whose path variables were captured by a {@link CompiledRouteMatcher}.
+     * A match of this route whose path variables the parser of a {@link io.micronaut.web.router.spi.RoutePlan}
+     * captured, without matching the template again.
      *
-     * @param path     The matched path
-     * @param captured The raw values of the path variables, in the order of the template
+     * @param path     The matched path, normalised
+     * @param captured The raw values of the path variables, in the order of the template; query
+     *                 variables are not captured
      * @return The match
      */
     UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
-        UriMatchInfo matchInfo = uriMatchTemplate != null
-            ? new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured)
-            : new RouteCaptures(path, parsedTemplate.variables(), Arrays.asList(captured)).toUriMatchInfo();
+        UriMatchInfo matchInfo;
+        if (uriMatchTemplate != null) {
+            matchInfo = new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured);
+        } else {
+            List<RouteTemplateVariable> variables = parsedTemplate.variables();
+            List<@Nullable String> values = new ArrayList<>(variables.size());
+            int next = 0;
+            for (RouteTemplateVariable variable : variables) {
+                values.add(variable.location() == RouteTemplateVariable.Location.PATH && next < captured.length ? captured[next++] : null);
+            }
+            matchInfo = new RouteCaptures(path, variables, values).toUriMatchInfo();
+        }
         return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
     }
 
@@ -424,7 +435,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         if (o instanceof DefaultUrlRouteInfo<?, ?> other && uriTemplateMatcher != null && other.uriTemplateMatcher != null) {
             return uriTemplateMatcher.compareTo(other.uriTemplateMatcher);
         }
-        // e.g. a precompiled route that is not built yet
+        // e.g. the route of a route plan that is not built yet
         return IndexedRoute.compare(this, (IndexedRoute) o);
     }
 
