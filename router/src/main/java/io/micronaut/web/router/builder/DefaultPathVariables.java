@@ -21,6 +21,7 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
+import io.micronaut.http.MediaType;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
@@ -36,20 +37,31 @@ import java.util.Set;
  * @param values            The variable values
  * @param conversionService The conversion service of the route
  * @param locatedTarget     The target a locator returned for the route, or {@code null}
+ * @param selectedMediaType The media type of the response a route selector negotiated, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 public record DefaultPathVariables(Map<String, Object> values,
                                    ConversionService conversionService,
-                                   @Nullable Object locatedTarget) implements PathVariables {
+                                   @Nullable Object locatedTarget,
+                                   @Nullable MediaType selectedMediaType) implements PathVariables {
 
     /**
      * @param values            The variable values
      * @param conversionService The conversion service of the route
      */
     public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService) {
-        this(values, conversionService, null);
+        this(values, conversionService, null, null);
+    }
+
+    /**
+     * @param values            The variable values
+     * @param conversionService The conversion service of the route
+     * @param locatedTarget     The target a locator returned for the route, or {@code null}
+     */
+    public DefaultPathVariables(Map<String, Object> values, ConversionService conversionService, @Nullable Object locatedTarget) {
+        this(values, conversionService, locatedTarget, null);
     }
 
     @Override
