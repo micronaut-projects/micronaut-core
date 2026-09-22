@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.tck.tests.routing;
 
+import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.type.Argument;
@@ -44,6 +45,7 @@ import org.junit.jupiter.api.Test;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutorService;
 
 /**
  * Routes to handler functions, declared by {@link HttpRoutes} beans or published at runtime by a
@@ -59,6 +61,7 @@ import java.util.concurrent.CompletableFuture;
 public class HandlerRoutesTest {
     public static final String SPEC_NAME = "HandlerRoutesTest";
     private static final String TRACE = "handler-routes-trace";
+    private static final String FILTER_THREAD = "handler-routes-filter-thread";
 
     @Test
     void handlerRouteIsHandledAndFiltered() throws IOException {
@@ -148,6 +151,30 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void asyncRouteFiltersCompleteTheChainLater() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/async-guarded"), HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/async-guarded").header("X-Token", "secret"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("async guarded")
+                .headers(Map.of("X-Async-After", "true"))
+                .build());
+        }
+    }
+
+    @Test
+    void routeFilterRunsOnItsExecutor() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/filter-executor"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("handler-filter-thread")
+                .build());
+        }
+    }
+
+    @Test
     void runtimeRoutesUseHandlers() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
@@ -199,10 +226,31 @@ public class HandlerRoutesTest {
                     .before(request -> append(request, "before2"))
                     .after((request, response) -> response.getHeaders().set("X-Trace", "after1"))
                     .after((request, response) -> response.getHeaders().set("X-Trace", response.getHeaders().get("X-Trace") + ",after2"));
+                routes.GET("/fn/async-guarded", (request, pathVariables) -> HttpResponse.ok("async guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .beforeAsync(request -> CompletableFuture.supplyAsync(() ->
+                        "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.status(HttpStatus.FORBIDDEN)))
+                    .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Async-After", "true")));
+                routes.GET("/fn/filter-executor", (request, pathVariables) ->
+                        HttpResponse.ok(request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .before("handler-filter", request -> {
+                        request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
+                        return null;
+                    });
                 routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");
                 });
             };
+        }
+    }
+
+    @Factory
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class Executors {
+        @Singleton
+        @Named("handler-filter")
+        @Bean(preDestroy = "shutdown")
+        ExecutorService handlerFilterExecutor() {
+            return java.util.concurrent.Executors.newSingleThreadExecutor(runnable -> new Thread(runnable, "handler-filter-thread"));
         }
     }
 

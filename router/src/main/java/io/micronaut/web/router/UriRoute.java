@@ -132,6 +132,61 @@ public interface UriRoute extends Route, Comparable<UriRoute> {
     }
 
     /**
+     * Filter the requests of this route on the named executor, like a {@code @RequestFilter}
+     * method annotated {@code @ExecuteOn}: use it for a filter that blocks, e.g. on a database.
+     * The filter chain continues on that executor.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter, which can answer the request instead of the route
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute before(String executorName, RouteRequestFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Filter the responses of this route on the named executor, like a {@code @ResponseFilter}
+     * method annotated {@code @ExecuteOn}.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute after(String executorName, RouteResponseFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Filter the requests of this route asynchronously, like a {@code @RequestFilter} method
+     * returning a {@code CompletionStage}: the filter chain continues when the stage completes.
+     *
+     * @param filter The filter, which can answer the request instead of the route
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Filter the responses of this route asynchronously: the filter chain continues when the
+     * stage completes.
+     *
+     * @param filter The filter
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
      * @return The port the route listens to, or null if the default port
      */
     @Nullable

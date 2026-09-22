@@ -16,6 +16,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.http.HttpRequest;
@@ -23,60 +24,130 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * A filter declared on one route, as a function: it filters the request before the route runs
- * and may answer it instead, or it filters the response of the route. It runs synchronously on
- * the thread of the filter chain.
+ * and may answer it instead, or it filters the response of the route. A synchronous filter runs
+ * on the thread of the filter chain, or on its executor if it has one; an asynchronous filter
+ * completes the filter chain when its {@link CompletionStage} completes.
  *
- * @param requestFilter  The request filter, returning a response to answer the request with, or {@code null} to proceed
- * @param responseFilter The response filter
+ * @param requestStep  The request filter
+ * @param responseStep The response filter
+ * @param executor     The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 record RouteFunctionFilter(
-    @Nullable Function<HttpRequest<?>, @Nullable HttpResponse<?>> requestFilter,
-    @Nullable BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> responseFilter
+    @Nullable RequestStep requestStep,
+    @Nullable ResponseStep responseStep,
+    @Nullable Supplier<? extends Executor> executor
 ) implements InternalHttpFilter {
+
+    /**
+     * A synchronous request filter.
+     *
+     * @param filter   Returns a response to answer the request with, or {@code null} to proceed
+     * @param executor The executor to run the filter on, or {@code null}
+     * @return The filter
+     */
+    static RouteFunctionFilter request(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter, @Nullable Supplier<? extends Executor> executor) {
+        return new RouteFunctionFilter(context -> {
+            HttpResponse<?> response = filter.apply(context.request());
+            return ExecutionFlow.just(response == null ? context : context.withResponse(response));
+        }, null, executor);
+    }
+
+    /**
+     * An asynchronous request filter.
+     *
+     * @param filter Completes with a response to answer the request with, or {@code null} to proceed
+     * @return The filter
+     */
+    static RouteFunctionFilter requestAsync(Function<HttpRequest<?>, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> filter) {
+        return new RouteFunctionFilter(context -> CompletableFutureExecutionFlow.just(
+            filter.apply(context.request()).thenApply(response -> response == null ? context : context.withResponse(response))
+        ), null, null);
+    }
+
+    /**
+     * A synchronous response filter.
+     *
+     * @param filter   The filter
+     * @param executor The executor to run the filter on, or {@code null}
+     * @return The filter
+     */
+    static RouteFunctionFilter response(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter, @Nullable Supplier<? extends Executor> executor) {
+        return new RouteFunctionFilter(null, (context, response) -> {
+            filter.accept(context.request(), response);
+            return ExecutionFlow.just(context.withResponse(response));
+        }, executor);
+    }
+
+    /**
+     * An asynchronous response filter.
+     *
+     * @param filter Completes when the response is filtered
+     * @return The filter
+     */
+    static RouteFunctionFilter responseAsync(BiFunction<HttpRequest<?>, MutableHttpResponse<?>, ? extends CompletionStage<?>> filter) {
+        return new RouteFunctionFilter(null, (context, response) -> CompletableFutureExecutionFlow.just(
+            filter.apply(context.request(), response).thenApply(ignored -> context.withResponse(response))
+        ), null);
+    }
 
     @Override
     public boolean isFiltersRequest() {
-        return requestFilter != null;
+        return requestStep != null;
     }
 
     @Override
     public boolean isFiltersResponse() {
-        return responseFilter != null;
+        return responseStep != null;
     }
 
     @Override
     public ExecutionFlow<FilterContext> processRequestFilter(FilterContext context) {
-        Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter = requestFilter;
-        if (filter == null) {
+        RequestStep step = requestStep;
+        if (step == null) {
             return ExecutionFlow.just(context);
         }
+        return run(() -> step.apply(context));
+    }
+
+    @Override
+    public ExecutionFlow<FilterContext> processResponseFilter(FilterContext context, @Nullable Throwable exceptionToFilter) {
+        ResponseStep step = responseStep;
+        HttpResponse<?> response = context.response();
+        if (step == null || exceptionToFilter != null || response == null) {
+            return ExecutionFlow.just(context);
+        }
+        MutableHttpResponse<?> mutableResponse = response instanceof MutableHttpResponse<?> mutable ? mutable : response.toMutableResponse();
+        return run(() -> step.apply(context, mutableResponse));
+    }
+
+    private ExecutionFlow<FilterContext> run(Step step) {
+        Supplier<? extends Executor> executorSupplier = executor;
+        if (executorSupplier == null) {
+            return invoke(step);
+        }
         try {
-            HttpResponse<?> response = filter.apply(context.request());
-            return ExecutionFlow.just(response == null ? context : context.withResponse(response));
+            // like a filter method annotated @ExecuteOn, which the propagated context follows
+            return ExecutionFlow.async(executorSupplier.get(), () -> invoke(step));
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
     }
 
-    @Override
-    public ExecutionFlow<FilterContext> processResponseFilter(FilterContext context, @Nullable Throwable exceptionToFilter) {
-        BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter = responseFilter;
-        HttpResponse<?> response = context.response();
-        if (filter == null || exceptionToFilter != null || response == null) {
-            return ExecutionFlow.just(context);
-        }
+    private static ExecutionFlow<FilterContext> invoke(Step step) {
         try {
-            MutableHttpResponse<?> mutableResponse = response instanceof MutableHttpResponse<?> mutable ? mutable : response.toMutableResponse();
-            filter.accept(context.request(), mutableResponse);
-            return ExecutionFlow.just(context.withResponse(mutableResponse));
+            return step.apply();
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
@@ -86,5 +157,29 @@ record RouteFunctionFilter(
     public int getOrder() {
         // route filters are not sorted: they run after the application's filters, in the order declared
         return Ordered.LOWEST_PRECEDENCE;
+    }
+
+    /**
+     * Filters the request.
+     */
+    @FunctionalInterface
+    interface RequestStep {
+        ExecutionFlow<FilterContext> apply(FilterContext context) throws Throwable;
+    }
+
+    /**
+     * Filters the response.
+     */
+    @FunctionalInterface
+    interface ResponseStep {
+        ExecutionFlow<FilterContext> apply(FilterContext context, MutableHttpResponse<?> response) throws Throwable;
+    }
+
+    /**
+     * A step to run.
+     */
+    @FunctionalInterface
+    private interface Step {
+        ExecutionFlow<FilterContext> apply() throws Throwable;
     }
 }

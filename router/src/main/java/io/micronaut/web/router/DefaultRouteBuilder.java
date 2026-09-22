@@ -26,6 +26,7 @@ import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.ObjectUtils;
+import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
@@ -1062,6 +1063,39 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public UriRoute before(RouteRequestFilter filter) {
+            return addRequestFilter(filter, null);
+        }
+
+        @Override
+        public UriRoute before(String executorName, RouteRequestFilter filter) {
+            return addRequestFilter(filter, executor(executorName));
+        }
+
+        @Override
+        public UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
+            return this;
+        }
+
+        @Override
+        public UriRoute after(RouteResponseFilter filter) {
+            return addResponseFilter(filter, null);
+        }
+
+        @Override
+        public UriRoute after(String executorName, RouteResponseFilter filter) {
+            return addResponseFilter(filter, executor(executorName));
+        }
+
+        @Override
+        public UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
+            return this;
+        }
+
+        private UriRoute addRequestFilter(RouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
             requestFilters.add(GenericHttpFilter.createRouteRequestFilter(request -> {
                 try {
@@ -1069,12 +1103,11 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 } catch (Exception e) {
                     return ExceptionUtils.sneakyThrow(e);
                 }
-            }));
+            }, executor));
             return this;
         }
 
-        @Override
-        public UriRoute after(RouteResponseFilter filter) {
+        private UriRoute addResponseFilter(RouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
             responseFilters.add(GenericHttpFilter.createRouteResponseFilter((request, response) -> {
                 try {
@@ -1082,8 +1115,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 } catch (Exception e) {
                     ExceptionUtils.sneakyThrow(e);
                 }
-            }));
+            }, executor));
             return this;
+        }
+
+        /**
+         * The named executor, looked up when a filter first runs on it.
+         *
+         * @param executorName The name of the executor
+         * @return The executor
+         */
+        private Supplier<Executor> executor(String executorName) {
+            Objects.requireNonNull(executorName, "executorName");
+            return SupplierUtil.memoized(() -> {
+                ExecutorSelector selector = DefaultRouteBuilder.this.executorSelector;
+                if (selector == null) {
+                    throw new IllegalStateException("No executor selector to find executor: " + executorName);
+                }
+                return selector.select(executorName).orElseThrow(() -> new SchedulerConfigurationException(
+                    targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
+            });
         }
 
         /**
