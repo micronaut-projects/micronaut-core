@@ -94,6 +94,21 @@ def _rank(argument_type, parameter_type):
     return 1
 
 
+def _plain_receiver(node):
+    """Whether the receiver is a name or a chain of attributes of a name, whose evaluation a static call can skip."""
+    while isinstance(node, ast.Attribute):
+        node = node.value
+    return isinstance(node, ast.Name)
+
+
+def _declared(hint):
+    """The type a hint declares: the member of a union with None, the hint itself otherwise."""
+    if hint is not None and hint.isUnion():
+        members = list(hint.nonNoneMembers())
+        return members[0] if len(members) == 1 else hint
+    return hint
+
+
 def _erased(type_name):
     """A Java type name without the type arguments the lowering carries in it."""
     index = type_name.find("<")
@@ -360,6 +375,10 @@ class Lowering:
         if hint.name() == "None":
             return VOID
         typed = self.bindings.of_hint(hint)
+        declared = _declared(hint)
+        if typed is not None and typed.kind == PY and declared.typeArguments():
+            # the stub returns X<Y> while the generated class of a subclass extends the raw X: Java takes no Y for it
+            self._refuse("unsupported-expression", f"returning a [{declared.name()}] with type arguments has no static lowering: the generated class of a subclass extends the raw base", self.node)
         return self._stub_type(typed, hint, self.node)
 
     def _stub_type(self, typed, hint, node):
@@ -1491,7 +1510,7 @@ class Lowering:
             seen.add(current.qualified)
             if name in current.methods or name in current.properties or name in current.attributes or name in current.instance_attributes:
                 return True
-            bases = current.bases()
+            bases = current.bases  # a Java base is None
             current = bases[0] if bases and isinstance(bases[0], type(model)) else None
         return False
 
@@ -1571,6 +1590,9 @@ class Lowering:
             arguments = [self._coerce(argument, parameter_type, argument_node)
                          for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
             self.java_calls += 1
+            if static and not _plain_receiver(receiver_node):
+                # Python evaluates the receiver (Cart(n).factory() constructs the Cart); a static Java call would not
+                self._refuse("unsupported-expression", f"calling the static method [{name}] of [{model.name}] on an expression has no static lowering: the expression would not be evaluated", node)
             receiver = None if static else self._expression(receiver_node)
             declared = OBJECT if hint is None and return_type != VOID else return_type
             call = InvokeJava(receiver, owner, name, parameter_types, arguments, declared)

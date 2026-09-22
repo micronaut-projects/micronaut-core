@@ -3227,7 +3227,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     // the injected bean is a member of the module, and a static field of the
                     // generated class for the compiled bodies of the module's functions
                     FieldDef injected = injectedField(builder, beanProperty, propertySourceType(beanProperty));
-                    addSetterScript(beanProperty, builder, pythonValue, thisType.getStaticField(injected.getName(), injected.getType()));
+                    addSetterScript(beanProperty, builder, pythonValue, injected);
                 }
 
                 if (beanProperty.hasStereotype(Bean.class) || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
@@ -4420,8 +4420,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static StatementDef adviceChain(VariableDef.This aThis, Ir.CompiledBody compiledBody, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
         VariableDef.Field advice = aThis.field(STATIC_ADVICE_FIELD, STATIC_ADVICE);
         List<ExpressionDef> arguments = new ArrayList<>(methodParameters);
+        List<ExpressionDef> parameterTypes = new ArrayList<>();
+        for (String parameterType : compiledBody.parameterTypes()) {
+            int generics = parameterType.indexOf('<');
+            parameterTypes.add(ExpressionDef.constant(generics < 0 ? parameterType : parameterType.substring(0, generics)));
+        }
         ExpressionDef proceed = advice.invoke("proceed", TypeDef.OBJECT,
-            ExpressionDef.constant(compiledBody.methodName()), TypeDef.OBJECT.array().instantiate(arguments));
+            ExpressionDef.constant(compiledBody.methodName()), TypeDef.STRING.array().instantiate(parameterTypes), TypeDef.OBJECT.array().instantiate(arguments));
         StatementDef intercepted = TypeDef.VOID.equals(returnType)
             ? StatementDef.multi((StatementDef) proceed, new StatementDef.Return(null))
             : proceed.cast(returnType).returning();
@@ -4490,8 +4495,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * generated class has no {@code self}; the objects of the compilation the body holds are
      * reached through their own Python objects.
      */
-    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context) {
+    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context, VariableDef.This aThis) {
         return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef injected(String field, TypeDef type) {
+                return aThis.field(field, type);
+            }
+
             @Override
             public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
                 throw new IllegalStateException("A module-level function has no self to read [" + property + "] of");
@@ -4524,8 +4534,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * The access of a compiled body of a module served by a context pool: the planner compiles
      * such a body only when it reaches no Python object, so nothing here is ever called.
      */
-    static StaticBodyGenerator.SelfAccess pooledScriptAccess() {
+    static StaticBodyGenerator.SelfAccess pooledScriptAccess(VariableDef.This aThis) {
         return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef injected(String field, TypeDef type) {
+                return aThis.field(field, type);
+            }
+
             @Override
             public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
                 throw new IllegalStateException("A body of a pooled module reaches no Python object");
@@ -4940,7 +4955,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             boolean trace = staticCompilationPlan(visitorContext).trace();
             builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
                 compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody, methodParameters, methodSourceReturnType) : StatementDef.multi(),
-                StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext), trace))));
+                StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext, aThis), trace))));
             return;
         }
         builder.addMethod(methodBuilder
@@ -6206,7 +6221,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * The static field of a script class holding an injected attribute of the module.
+     * The field of a script class holding an injected attribute of the module: one per instance,
+     * so the script of one application context never sees the beans of another.
      *
      * @param builder      The script class
      * @param beanProperty The injected attribute
@@ -6216,13 +6232,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     static FieldDef injectedField(ClassDef.ClassDefBuilder builder, PropertyElement beanProperty, TypeDef type) {
         FieldDef field = FieldDef.builder(StaticBodyGenerator.injectedField(beanProperty.getName()))
             .ofType(type)
-            .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
+            .addModifiers(Modifier.PRIVATE, Modifier.VOLATILE)
             .build();
         builder.addField(field);
         return field;
     }
 
-    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VariableDef.StaticField injected) {
+    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, FieldDef injected) {
         TypeDef returnType = beanProperty.getWriteMethod()
             .map(MethodElement::getReturnType)
             .map(TypeDef::of).orElse(TypeDef.VOID);
@@ -6250,7 +6266,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 TypeDef.VOID,
                 parameters
             );
-            StatementDef remember = new StatementDef.PutStaticField(injected, methodParameters.getFirst());
+            StatementDef remember = aThis.field(injected).assign(methodParameters.getFirst());
             if (returnType.equals(TypeDef.VOID)) {
                 return StatementDef.multi(remember, result);
             } else {

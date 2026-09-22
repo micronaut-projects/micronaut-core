@@ -27,7 +27,6 @@ import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.ast.PropertyElement;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
-import io.micronaut.sourcegen.model.VariableDef;
 import io.micronaut.python.processing.staticcompile.StaticCompilationPlan;
 import io.micronaut.python.processing.staticcompile.StaticBodyGenerator;
 import io.micronaut.python.processing.staticcompile.Ir;
@@ -202,7 +201,7 @@ final class PythonPooledStubGenerator {
         for (PropertyElement beanProperty : beanProperties) {
             if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
                 FieldDef injected = PythonStubGenerator.injectedField(builder, beanProperty, propertyType(beanProperty));
-                addSetterScriptPooled(beanProperty, builder, pkg, script, hasAsyncBridgeMethod, thisType.getStaticField(injected.getName(), injected.getType()));
+                addSetterScriptPooled(beanProperty, builder, pkg, script, hasAsyncBridgeMethod, injected);
             }
             if (beanProperty.hasStereotype(Bean.class)) {
                 addGetterScriptPooled(beanProperty, builder, pkg, script, allClasses);
@@ -275,7 +274,7 @@ final class PythonPooledStubGenerator {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
             }
             builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
-                StaticBodyGenerator.generate(compiledBody, methodParameters, PythonStubGenerator.pooledScriptAccess(), plan.trace())));
+                StaticBodyGenerator.generate(compiledBody, methodParameters, PythonStubGenerator.pooledScriptAccess(aThis), plan.trace())));
             return;
         }
 
@@ -357,7 +356,7 @@ final class PythonPooledStubGenerator {
                                               String pkg,
                                               String script,
                                               boolean adaptAsyncMembers,
-                                              VariableDef.StaticField injected) {
+                                              FieldDef injected) {
         TypeDef returnType = beanProperty.getWriteMethod().map(MethodElement::getReturnType).map(TypeDef::of).orElse(TypeDef.VOID);
         String setterName = beanProperty.getWriteMethod().map(MethodElement::getName).orElse(beanProperty.getName());
         MethodDef.MethodDefBuilder propertySetter = MethodDef
@@ -374,7 +373,7 @@ final class PythonPooledStubGenerator {
             parameters.add(ExpressionDef.constant(beanProperty.getName()));
             parameters.add(methodParameters.getFirst());
             var result = PYTHON_CONTEXT_RUNTIME.invokeStatic(adaptAsyncMembers ? "injectPooledScriptAsync" : "injectPooledScript", TypeDef.VOID, parameters);
-            StatementDef remember = new StatementDef.PutStaticField(injected, methodParameters.getFirst());
+            StatementDef remember = aThis.field(injected).assign(methodParameters.getFirst());
             if (returnType.equals(TypeDef.VOID)) {
                 return StatementDef.multi(remember, result);
             } else {

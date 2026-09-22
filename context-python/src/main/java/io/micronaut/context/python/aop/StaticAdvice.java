@@ -20,7 +20,6 @@ import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.runtime.RuntimeProxyDefinition;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.NullMarked;
@@ -31,6 +30,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -68,17 +68,19 @@ public final class StaticAdvice<T> {
      * Runs a compiled method through its interceptors: the chain ends by calling the method on
      * the target bean, which runs the compiled body.
      *
-     * @param methodName The method
-     * @param arguments  The arguments of the call
+     * @param methodName     The method
+     * @param parameterTypes The names of the parameter types of the generated method, which pick its
+     *                       executable method among overloads
+     * @param arguments      The arguments of the call
      * @return The result of the chain
      */
     @SuppressWarnings("unchecked")
-    public @Nullable Object proceed(String methodName, Object[] arguments) {
+    public @Nullable Object proceed(String methodName, String[] parameterTypes, Object[] arguments) {
         T targetBean = target.get();
-        RuntimeProxyDefinition.InterceptedMethod<T> intercepted = select(interceptedByName.get(methodName), arguments);
+        RuntimeProxyDefinition.InterceptedMethod<T> intercepted = select(interceptedByName.get(methodName), parameterTypes);
         if (intercepted == null) {
             // the registry resolved no interceptor for the method: the body runs on the target as it would through the bridge
-            ExecutableMethod<T, Object> executableMethod = executableMethod(methodName, arguments);
+            ExecutableMethod<T, Object> executableMethod = executableMethod(methodName, parameterTypes);
             return executableMethod.invoke(targetBean, arguments);
         }
         ExecutableMethod<T, Object> executableMethod = intercepted.executableMethod();
@@ -88,52 +90,55 @@ public final class StaticAdvice<T> {
         return new MethodInterceptorChain<>(chain, targetBean, executableMethod, arguments).proceed();
     }
 
-    private ExecutableMethod<T, Object> executableMethod(String methodName, Object[] arguments) {
+    private ExecutableMethod<T, Object> executableMethod(String methodName, String[] parameterTypes) {
         List<ExecutableMethod<T, Object>> candidates = new ArrayList<>();
         for (ExecutableMethod<T, ?> executableMethod : proxyDefinition.proxyBeanDefinition().getExecutableMethods()) {
             if (executableMethod.getMethodName().equals(methodName)) {
                 candidates.add((ExecutableMethod<T, Object>) executableMethod);
             }
         }
-        ExecutableMethod<T, Object> match = selectBy(candidates, ExecutableMethod::getArguments, arguments);
+        ExecutableMethod<T, Object> match = selectBy(candidates, ExecutableMethod::getArguments, parameterTypes);
         if (match == null) {
-            throw new IllegalStateException("No executable method [" + methodName + "] with " + arguments.length + " arguments on " + proxyDefinition.proxyBeanDefinition().getBeanType().getName());
+            throw new IllegalStateException("No executable method [" + methodName + "] with parameters " + Arrays.toString(parameterTypes) + " on " + proxyDefinition.proxyBeanDefinition().getBeanType().getName());
         }
         return match;
     }
 
-    private static <T> RuntimeProxyDefinition.@Nullable InterceptedMethod<T> select(@Nullable List<RuntimeProxyDefinition.InterceptedMethod<T>> candidates, Object[] arguments) {
-        return candidates == null ? null : selectBy(candidates, method -> method.executableMethod().getArguments(), arguments);
+    private static <T> RuntimeProxyDefinition.@Nullable InterceptedMethod<T> select(@Nullable List<RuntimeProxyDefinition.InterceptedMethod<T>> candidates, String[] parameterTypes) {
+        return candidates == null ? null : selectBy(candidates, method -> method.executableMethod().getArguments(), parameterTypes);
     }
 
     /**
-     * The candidate whose arguments the call fills: the one of the call's arity whose parameter
-     * types accept the arguments, or the first of that arity.
+     * The candidate declaring the parameter types of the generated method, the one whose body was
+     * entered; when none spells them the same way, the first of the same arity.
      */
-    private static <M> @Nullable M selectBy(List<M> candidates, java.util.function.Function<M, Argument<?>[]> argumentsOf, Object[] arguments) {
+    private static <M> @Nullable M selectBy(List<M> candidates, Function<M, Argument<?>[]> argumentsOf, String[] parameterTypes) {
         M first = null;
         for (M candidate : candidates) {
             Argument<?>[] parameters = argumentsOf.apply(candidate);
-            if (parameters.length != arguments.length) {
+            if (parameters.length != parameterTypes.length) {
                 continue;
             }
             if (first == null) {
                 first = candidate;
             }
-            if (accepts(parameters, arguments)) {
+            if (declares(parameters, parameterTypes)) {
                 return candidate;
             }
         }
         return first;
     }
 
-    private static boolean accepts(Argument<?>[] parameters, Object[] arguments) {
+    private static boolean declares(Argument<?>[] parameters, String[] parameterTypes) {
         for (int i = 0; i < parameters.length; i++) {
-            Object argument = arguments[i];
-            if (argument != null && !ReflectionUtils.getWrapperType(parameters[i].getType()).isInstance(argument)) {
+            if (!typeName(parameters[i].getType()).equals(parameterTypes[i].replace('$', '.'))) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static String typeName(Class<?> type) {
+        return type.getTypeName().replace('$', '.');
     }
 }
