@@ -1,0 +1,199 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.web.router;
+
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteCaptures;
+import io.micronaut.http.uri.RoutePattern;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateSegment;
+import io.micronaut.http.uri.RouteTemplateVariable;
+import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngine;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * A route template language for tests only, registered with the service loader of the tests: a
+ * segment {@code :name} is a variable of exactly one segment, and everything else, braces
+ * included, is literal. {@code /items/{id:3}} is therefore literal text here, while it is a
+ * variable of at most three characters for the Micronaut engine.
+ */
+public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
+
+    public static final String ID = "test.colon";
+
+    public static RouteTemplate template(String expression) {
+        return RouteTemplate.of(ID, expression);
+    }
+
+    @Override
+    public String id() {
+        return ID;
+    }
+
+    @Override
+    public String version() {
+        return "1";
+    }
+
+    @Override
+    public ParsedRouteTemplate parse(RouteTemplate template) {
+        if (!ID.equals(template.engineId())) {
+            throw new IllegalArgumentException("Not a colon template: " + template);
+        }
+        String expression = template.expression();
+        if (!expression.isEmpty() && expression.charAt(0) != '/') {
+            throw new IllegalArgumentException("A colon template starts with a slash: " + expression);
+        }
+        List<Segment> segments = new ArrayList<>();
+        for (String part : expression.split("/")) {
+            if (part.isEmpty()) {
+                continue;
+            }
+            if (part.charAt(0) == ':') {
+                if (part.length() == 1) {
+                    throw new IllegalArgumentException("A variable without a name: " + expression);
+                }
+                segments.add(new Segment(part.substring(1), true));
+            } else {
+                segments.add(new Segment(part, false));
+            }
+        }
+        return new Parsed(template, List.copyOf(segments));
+    }
+
+    @Override
+    public ParsedRouteTemplate nest(ParsedRouteTemplate parent, ParsedRouteTemplate child) {
+        Parsed p = (Parsed) parent;
+        Parsed c = (Parsed) child;
+        List<Segment> segments = new ArrayList<>(p.segments);
+        segments.addAll(c.segments);
+        String childExpression = c.template.expression();
+        String expression = p.template.expression() + (childExpression.startsWith("/") ? childExpression : '/' + childExpression);
+        return new Parsed(template(expression), List.copyOf(segments));
+    }
+
+    @Override
+    public ParsedRouteTemplate mount(String prefix, ParsedRouteTemplate template) {
+        // the prefix is literal: a ':' in it is not a variable
+        Parsed parsed = (Parsed) template;
+        List<Segment> segments = new ArrayList<>();
+        for (String part : prefix.split("/")) {
+            if (!part.isEmpty()) {
+                segments.add(new Segment(part, false));
+            }
+        }
+        segments.addAll(parsed.segments);
+        return new Parsed(template(prefix + parsed.template.expression()), List.copyOf(segments));
+    }
+
+    @Override
+    public RoutePattern matcher(ParsedRouteTemplate template) {
+        Parsed parsed = (Parsed) template;
+        return new RoutePattern() {
+            @Override
+            public ParsedRouteTemplate template() {
+                return parsed;
+            }
+
+            @Override
+            public @Nullable RouteCaptures match(String path) {
+                String normalized = UriTemplateMatcher.normalizeForMatching(path);
+                String[] parts = normalized.isEmpty() || "/".equals(normalized) ? new String[0] : normalized.substring(1).split("/", -1);
+                if (parts.length != parsed.segments.size()) {
+                    return null;
+                }
+                List<@Nullable String> values = new ArrayList<>();
+                for (int i = 0; i < parts.length; i++) {
+                    Segment segment = parsed.segments.get(i);
+                    if (segment.variable) {
+                        if (parts[i].isEmpty()) {
+                            return null;
+                        }
+                        values.add(parts[i]);
+                    } else if (!segment.text.equals(parts[i])) {
+                        return null;
+                    }
+                }
+                return new RouteCaptures(normalized, parsed.variables(), values);
+            }
+        };
+    }
+
+    private record Segment(String text, boolean variable) {
+    }
+
+    private record Parsed(RouteTemplate template, List<Segment> segments) implements ParsedRouteTemplate {
+
+        @Override
+        public String engineVersion() {
+            return "1";
+        }
+
+        @Override
+        public List<RouteTemplateVariable> variables() {
+            List<RouteTemplateVariable> variables = new ArrayList<>();
+            for (Segment segment : segments) {
+                if (segment.variable) {
+                    variables.add(RouteTemplateVariable.path(segment.text));
+                }
+            }
+            return variables;
+        }
+
+        @Override
+        public String requiredPrefix() {
+            if (segments.isEmpty()) {
+                return "";
+            }
+            StringBuilder prefix = new StringBuilder();
+            for (Segment segment : segments) {
+                prefix.append('/');
+                if (segment.variable) {
+                    return prefix.toString();
+                }
+                prefix.append(segment.text);
+            }
+            return prefix.toString();
+        }
+
+        @Override
+        public int rawLength() {
+            int length = 0;
+            for (Segment segment : segments) {
+                length += 1 + (segment.variable ? 0 : segment.text.length());
+            }
+            return length;
+        }
+
+        @Override
+        public int pathVariableCount() {
+            return variables().size();
+        }
+
+        @Override
+        public List<RouteTemplateSegment> pathSegments() {
+            List<RouteTemplateSegment> result = new ArrayList<>();
+            for (Segment segment : segments) {
+                result.add(segment.variable ? RouteTemplateSegment.VARIABLE : RouteTemplateSegment.literal(segment.text));
+            }
+            return result;
+        }
+    }
+}

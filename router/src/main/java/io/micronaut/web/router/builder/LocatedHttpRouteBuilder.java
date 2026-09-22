@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 
 import io.micronaut.http.PathVariables;
 import java.util.Objects;
@@ -132,6 +133,31 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
      */
     @Override
     LocatedHttpRouteSpec<T> any(String uri);
+
+    /**
+     * Declare a route of the requests of a method with a template of any registered route
+     * template engine, relative to the prefix of the locator, see {@link #route(HttpMethod, String)}.
+     *
+     * @param method   The HTTP method
+     * @param template The template, relative to the prefix of the locator
+     * @return The pending route
+     * @see HttpRouteBuilder#route(HttpMethod, RouteTemplate)
+     */
+    @Override
+    LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template);
+
+    /**
+     * Declare a route of the requests of a method by its name with a template of any registered
+     * route template engine, relative to the prefix of the locator, see
+     * {@link #route(HttpMethod, String)}.
+     *
+     * @param httpMethodName The name of the HTTP method, a token
+     * @param template       The template, relative to the prefix of the locator
+     * @return The pending route
+     * @see HttpRouteBuilder#route(String, RouteTemplate)
+     */
+    @Override
+    LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template);
 
     /**
      * Route the requests under a prefix to the routes of a target that a locator locates from the

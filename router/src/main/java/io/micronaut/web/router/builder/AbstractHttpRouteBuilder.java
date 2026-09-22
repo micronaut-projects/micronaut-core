@@ -20,6 +20,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
@@ -170,6 +171,46 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public HttpRouteSpec route(HttpMethod method, RouteTemplate template) {
+        standardMethod(method);
+        return route(method.name(), method, template);
+    }
+
+    @Override
+    public HttpRouteSpec route(String httpMethodName, RouteTemplate template) {
+        RouteArguments.httpMethodName(httpMethodName);
+        HttpMethod method = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        return route(method == HttpMethod.CUSTOM ? httpMethodName : method.name(), method, template);
+    }
+
+    /**
+     * Declare a pending route with a template of any engine: a Micronaut one under the prefix of
+     * the builder, another one by its engine, outside a group with a prefix.
+     *
+     * @param name     The name of the HTTP method
+     * @param method   The HTTP method
+     * @param template The template
+     * @return The spec of the pending route
+     */
+    private HttpRouteSpec route(String name, HttpMethod method, RouteTemplate template) {
+        Objects.requireNonNull(template, "template");
+        if (template.isMicronaut()) {
+            return pending(name, template.expression(), (uri, handler) ->
+                List.of(grouped(assembly.addRoute(name, method, uri, DEFAULT_CONSUMES, handle(handler.get())).settings())));
+        }
+        checkOpen();
+        RoutePrefix routePrefix = prefix;
+        if (routePrefix != null) {
+            throw new IllegalArgumentException("The route template " + template.expression() + " of the route template engine '"
+                + template.engineId() + "' cannot be declared in the route group with the prefix " + routePrefix
+                + ": the prefix of a group is joined to Micronaut URI templates only. Declare it outside the group, or in a group without a prefix");
+        }
+        return pending(name + " " + template.expression(), handler ->
+            List.of(grouped(assembly.addRoute(name, method, template, DEFAULT_CONSUMES, handle(handler.get())).settings())));
+    }
+
+    @Override
     public HttpRouteSpec any(String uri) {
         return pending("any", uri, this::anyMethod);
     }
@@ -184,11 +225,22 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      */
     private HttpRouteSpec pending(String methods, String uri, BiFunction<String, Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
         String template = uri(uri);
+        return pending(methods + " " + template, handler -> routes.apply(template, handler));
+    }
+
+    /**
+     * Declare a pending route, which its terminal adds.
+     *
+     * @param route  Describes the route, e.g. {@code GET /items/{id}}, for the messages
+     * @param routes Adds the routes of a handler
+     * @return The spec of the pending route
+     */
+    private HttpRouteSpec pending(String route, Function<Supplier<HandlerMethod<?>>, List<RouteSettings>> routes) {
         Class<?> bean = declaringBean;
-        String description = methods + " " + template + (bean == null ? "" : " declared by " + beanName(bean));
-        PendingRoute route = new PendingRoute(this, handler -> routes.apply(template, handler), description);
-        pending.add(route);
-        return new DefaultHttpRouteSpec(route);
+        String description = route + (bean == null ? "" : " declared by " + beanName(bean));
+        PendingRoute pendingRoute = new PendingRoute(this, routes, description);
+        pending.add(pendingRoute);
+        return new DefaultHttpRouteSpec(pendingRoute);
     }
 
     /**

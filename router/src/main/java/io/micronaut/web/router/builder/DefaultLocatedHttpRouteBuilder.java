@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
@@ -102,6 +103,16 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     @Override
     public LocatedHttpRouteSpec<T> any(String uri) {
         return located(super.any(uri));
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> route(HttpMethod method, RouteTemplate template) {
+        return located(super.route(method, template));
+    }
+
+    @Override
+    public LocatedHttpRouteSpec<T> route(String httpMethodName, RouteTemplate template) {
+        return located(super.route(httpMethodName, template));
     }
 
     /**

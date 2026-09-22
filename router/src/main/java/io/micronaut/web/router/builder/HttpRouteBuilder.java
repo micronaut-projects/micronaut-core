@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.HttpStatus;
 
 import java.util.Objects;
@@ -153,6 +154,46 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #route(HttpMethod, String)
      */
     HttpRouteSpec route(String httpMethodName, String uri);
+
+    /**
+     * Declare a route of the requests of a method with a template of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine}: the engine
+     * parses the template, mounts it under the context path and matches it.
+     *
+     * <pre>{@code
+     * routes.route(HttpMethod.GET, RouteTemplate.of("jaxrs", "/items/{id: [0-9]+}")).handle((request, pathVariables) -> ...);
+     * }</pre>
+     *
+     * <p>A Micronaut template is the same as {@link #route(HttpMethod, String)} with its
+     * expression. In a group with a prefix, see {@link #path(String, Consumer)}, the template must
+     * be a Micronaut one: the prefix of a group is joined to Micronaut URI templates only, and the
+     * template of another engine is rejected with an {@link IllegalArgumentException}.</p>
+     *
+     * @param method   The HTTP method, not {@link HttpMethod#CUSTOM}
+     * @param template The template
+     * @return The pending route
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}, the engine of the
+     *                                  template is not registered, or the template of another engine
+     *                                  is declared in a group with a prefix
+     * @since 5.3.0
+     */
+    HttpRouteSpec route(HttpMethod method, RouteTemplate template);
+
+    /**
+     * Declare a route of the requests of a method by its name, including a custom HTTP method,
+     * with a template of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine}, see
+     * {@link #route(HttpMethod, RouteTemplate)}.
+     *
+     * @param httpMethodName The name of the HTTP method, a token
+     * @param template       The template
+     * @return The pending route
+     * @throws IllegalArgumentException if the name is not a token, the engine of the template is
+     *                                  not registered, or the template of another engine is declared
+     *                                  in a group with a prefix
+     * @since 5.3.0
+     */
+    HttpRouteSpec route(String httpMethodName, RouteTemplate template);
 
     /**
      * Declare the routes of the requests of any HTTP method, standard or custom, to one handler:
