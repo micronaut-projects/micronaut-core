@@ -156,6 +156,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return httpMethod;
     }
 
+    /**
+     * @return A literal that every path this route matches starts with, see
+     * {@link UriTemplateMatcher#getRequiredPrefix()}
+     * @since 5.3.0
+     */
+    @Internal
+    public String getRequiredPathPrefix() {
+        return uriTemplateMatcher.getRequiredPrefix();
+    }
+
     @Override
     public String getHttpMethodName() {
         return httpMethodName;
