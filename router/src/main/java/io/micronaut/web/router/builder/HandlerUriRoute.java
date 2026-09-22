@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
+import io.micronaut.inject.ExecutableMethod;
 
 /**
  * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
@@ -62,6 +63,13 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#annotationMetadata(AnnotationMetadata)
      */
     HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata);
+
+    /**
+     * @param method The bean method
+     * @return The route
+     * @see HttpRouteSpec#implementing(ExecutableMethod)
+     */
+    HandlerUriRoute implementing(ExecutableMethod<?, ?> method);
 
     /**
      * @return The route

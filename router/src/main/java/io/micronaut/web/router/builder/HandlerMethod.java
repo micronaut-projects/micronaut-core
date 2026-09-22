@@ -27,9 +27,10 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
-import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
@@ -87,6 +88,15 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * The metadata of a nullable {@code @Body} parameter: a request without a body is handled
      * with {@code null}.
      */
+    private static final AnnotationMetadata NULLABLE = new DefaultAnnotationMetadata(
+        Map.of(AnnotationUtil.NULLABLE, Map.of()),
+        Map.of(),
+        Map.of(),
+        Map.of(AnnotationUtil.NULLABLE, Map.of()),
+        Map.of(),
+        false
+    );
+
     private static final AnnotationMetadata NULLABLE_BODY = new DefaultAnnotationMetadata(
         Map.of(Body.class.getName(), Map.of(), AnnotationUtil.NULLABLE, Map.of()),
         Map.of(Bindable.class.getName(), Map.of()),
@@ -103,6 +113,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private final ReturnType<R> returnType;
     private final Invoker<R> invoker;
     private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+    private @Nullable ExecutableMethod<?, ?> implemented;
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
@@ -291,7 +302,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @Override
     public Method getTargetMethod() {
-        return method.get();
+        ExecutableMethod<?, ?> target = implemented;
+        return target == null ? method.get() : target.getTargetMethod();
     }
 
     @Override
@@ -308,12 +320,14 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     @SuppressWarnings("unchecked")
     @Override
     public Class<Object> getDeclaringType() {
-        return (Class<Object>) handler.getClass();
+        ExecutableMethod<?, ?> target = implemented;
+        return (Class<Object>) (target == null ? handler.getClass() : target.getDeclaringType());
     }
 
     @Override
     public String getMethodName() {
-        return HANDLE;
+        ExecutableMethod<?, ?> target = implemented;
+        return target == null ? HANDLE : target.getMethodName();
     }
 
     @Override
@@ -331,6 +345,33 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         this.annotationMetadata = Objects.requireNonNull(annotationMetadata, "annotationMetadata");
         // like the return type of a method, it has the annotations of the method
         this.annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+    }
+
+    /**
+     * The route to the handler implements a bean method, see {@link HttpRouteSpec#implementing}.
+     *
+     * @param method The bean method
+     */
+    @Internal
+    public void implementing(ExecutableMethod<?, ?> method) {
+        this.implemented = Objects.requireNonNull(method, "method");
+        annotationMetadata(method.getAnnotationMetadata());
+    }
+
+    /**
+     * A body type that is {@code null} when the request has no body.
+     *
+     * @param bodyType The body type
+     * @param <T>      The type
+     * @return The nullable type, with the annotations of the given one
+     */
+    @Internal
+    public static <T> Argument<T> nullable(Argument<T> bodyType) {
+        if (bodyType.isNullable()) {
+            return bodyType;
+        }
+        return Argument.of(bodyType.getType(), bodyType.getName(),
+            new AnnotationMetadataHierarchy(bodyType.getAnnotationMetadata(), NULLABLE), bodyType.getTypeParameters());
     }
 
     /**

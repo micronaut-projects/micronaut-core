@@ -37,6 +37,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
@@ -844,6 +845,15 @@ public final class RouteAssembly {
                 throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
             }
             handlerMethod.annotationMetadata(annotationMetadata);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method already implements the method: " + this);
+            }
+            handlerMethod.implementing(method);
             return this;
         }
 

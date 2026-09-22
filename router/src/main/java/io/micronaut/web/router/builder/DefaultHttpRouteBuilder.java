@@ -21,12 +21,14 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Function;
 
@@ -157,6 +159,34 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         };
     }
 
+    @Override
+    public HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)));
+    }
+
+    @Override
+    public <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
+    }
+
+    @Override
+    public HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)));
+    }
+
+    @Override
+    public <B> HttpRouteSpec handleAsync(String httpMethodName, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+        return new Routes(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
+    }
+
+    private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
+        Objects.requireNonNull(httpMethodName, "httpMethodName");
+        HttpMethod method = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
+        return assembly.addRoute(name, method, uri, DEFAULT_CONSUMES, handle(handler));
+    }
+
     private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
         RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri, DEFAULT_CONSUMES, handle(handler));
         return consumes == null ? route : route.consumes(consumes);
@@ -217,6 +247,14 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         public HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata) {
             for (HandlerUriRoute route : routes) {
                 route.annotationMetadata(annotationMetadata);
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec implementing(ExecutableMethod<?, ?> method) {
+            for (HandlerUriRoute route : routes) {
+                route.implementing(method);
             }
             return this;
         }

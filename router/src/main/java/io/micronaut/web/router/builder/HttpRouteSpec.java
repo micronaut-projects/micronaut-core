@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
+import io.micronaut.inject.ExecutableMethod;
 
 /**
  * A route to a handler function, to configure after it was added with the {@link HttpRouteBuilder}.
@@ -63,6 +64,18 @@ public interface HttpRouteSpec {
      * @return The route
      */
     HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata);
+
+    /**
+     * The route implements a bean method, e.g. a method of a resource that a framework
+     * integration routes with handler functions: the route has the annotations of the method, see
+     * {@link #annotationMetadata(AnnotationMetadata)}, and its target method, declaring type and
+     * method name are the ones of the bean method. The arguments of the route stay those of the
+     * handler.
+     *
+     * @param method The bean method
+     * @return The route
+     */
+    HttpRouteSpec implementing(ExecutableMethod<?, ?> method);
 
     /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It

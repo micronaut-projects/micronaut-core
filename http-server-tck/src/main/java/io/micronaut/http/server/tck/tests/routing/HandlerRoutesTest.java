@@ -45,6 +45,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteDeclaration;
@@ -149,6 +150,42 @@ public class HandlerRoutesTest {
                 .status(HttpStatus.OK)
                 .body("annotated")
                 .headers(Map.of("X-Marked", "from the bean method", "X-Return-Marked", "from the bean method"))
+                .build());
+        }
+    }
+
+    @Test
+    void customHttpMethodIsRoutedByName() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/fn/custom", "PROPFIND"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("PROPFIND /fn/custom")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.create(HttpMethod.CUSTOM, "/fn/custom-body", "PROPFIND")
+                .body("depth").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("PROPFIND depth")
+                .build());
+        }
+    }
+
+    @Test
+    void nullableBodyHelperIsNullWithoutABody() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/nullable-helper", null).contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("no body")
+                .build());
+        }
+    }
+
+    @Test
+    void handlerRouteReportsTheBeanMethodItImplements() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/implementing"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("annotated")
+                .headers(Map.of("X-Target", "MarkedTarget#target", "X-Marked", "from the bean method"))
                 .build());
         }
     }
@@ -1096,6 +1133,29 @@ public class HandlerRoutesTest {
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/fn/annotated", (request, pathVariables) -> HttpResponse.ok(target.target()).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .annotationMetadata(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target").getAnnotationMetadata());
+            routes.GET("/fn/implementing", (request, pathVariables) -> HttpResponse.ok(target.target()).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .implementing(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target"));
+            routes.handle("PROPFIND", "/fn/custom", (request, pathVariables) ->
+                HttpResponse.ok(request.getMethodName() + " " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.handle("PROPFIND", "/fn/custom-body", Argument.of(String.class), (request, pathVariables, body) ->
+                HttpResponse.ok(request.getMethodName() + " " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .consumesAll();
+            routes.POST("/fn/nullable-helper", HttpRouteBuilder.nullableBody(String.class), (request, pathVariables, body) ->
+                HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .consumesAll();
+        }
+    }
+
+    @ServerFilter("/fn/implementing")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ImplementingRouteFilter {
+        @ResponseFilter
+        void target(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
+            if (routeInfo instanceof MethodBasedRouteInfo<?, ?> method
+                && method.getTargetMethod().getDeclaringType() == MarkedTarget.class) {
+                response.header("X-Target", "MarkedTarget#" + method.getTargetMethod().getMethodName());
+            }
+            routeInfo.getAnnotationMetadata().stringValue(Marked.class).ifPresent(value -> response.header("X-Marked", value));
         }
     }
 

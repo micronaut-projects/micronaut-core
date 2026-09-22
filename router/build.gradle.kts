@@ -40,7 +40,7 @@ noReflection {
     allowIn("io.micronaut.web.router.DefaultStatusRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.DefaultUrlRouteInfo", "CLASS_NAMES")
     // ExecutableMethod.getTargetMethod() of a handler function: looked up lazily, never while routing
-    allowIn("io.micronaut.web.router.builder.HandlerMethod", "REFLECTION_UTILS")
+    allowIn("io.micronaut.web.router.builder.HandlerMethod", "REFLECTION_UTILS", "TARGET_MEMBERS")
     allowIn("io.micronaut.web.router.RouteBuilder", "ANNOTATIONS", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.Router", "ENUM_CONSTANTS")
     allowIn("io.micronaut.web.router.exceptions.UnsatisfiedRouteException", "CLASS_NAMES")

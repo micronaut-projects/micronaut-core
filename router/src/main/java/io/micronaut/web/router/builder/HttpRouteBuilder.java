@@ -394,6 +394,82 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
 
     /**
+     * Route requests of a method by its name, including a custom HTTP method such as
+     * {@code PROPFIND}, like a controller method annotated {@code @CustomHttpMethod}.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handle(HttpMethod, String, RequestHandler)
+     */
+    HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, to a handler function
+     * that receives the decoded body.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @see #handle(HttpMethod, String, Argument, BodyRequestHandler)
+     */
+    <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, to a handler function
+     * that completes the response later.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, to a handler function
+     * that receives the decoded body and completes the response later.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
+     */
+    <B> HttpRouteSpec handleAsync(String httpMethodName, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
+
+    /**
+     * A body type that is {@code null} when the request has no body, for the handlers that
+     * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)}.
+     *
+     * @param bodyType The body type
+     * @param <T>      The type
+     * @return The nullable body type, with the annotations of the given one
+     */
+    static <T> Argument<T> nullableBody(Argument<T> bodyType) {
+        return HandlerMethod.nullable(bodyType);
+    }
+
+    /**
+     * A body type that is {@code null} when the request has no body.
+     *
+     * @param type The type
+     * @param <T>  The type
+     * @return The nullable body type
+     * @see #nullableBody(Argument)
+     */
+    static <T> Argument<T> nullableBody(Class<T> type) {
+        return nullableBody(Argument.of(type));
+    }
+
+    /**
      * Route requests to a handler function that receives the body decoded to the given type and
      * completes the response later: a {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}
      * route whose handler returns a {@code CompletionStage}.

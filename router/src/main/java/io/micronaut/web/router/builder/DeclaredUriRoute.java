@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -117,6 +118,11 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
         return configure(r -> r.annotationMetadata(annotationMetadata));
+    }
+
+    @Override
+    public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
+        return configure(r -> r.implementing(method));
     }
 
     @Override
