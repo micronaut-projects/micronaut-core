@@ -21,6 +21,7 @@ import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import org.jspecify.annotations.Nullable;
 
@@ -70,10 +71,16 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * return the value computed at compile time.
      *
      * @return The number of path variables with a regular expression; the same as
+     * {@link ParsedRouteTemplate#patternVariableCount()}, for a Micronaut template
      * {@link UriTemplateMatcher#getPatternVariableCount()}
      */
     default int patternVariableCount() {
-        String uriTemplate = uriTemplate();
+        RouteTemplate template = template();
+        if (!template.isMicronaut()) {
+            // the engine of the template counts its variables
+            return RouteTemplateEngines.defaults().parse(template).patternVariableCount();
+        }
+        String uriTemplate = template.expression();
         if (uriTemplate.indexOf(':') < 0) {
             // no variable has a modifier
             return 0;
@@ -134,9 +141,29 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * @since 5.3.0
      */
     static IndexedRouteDeclaration of(HttpMethod httpMethod, RouteTemplate template) {
+        return of(httpMethod, httpMethod.name(), template);
+    }
+
+    /**
+     * A declaration of a method by its name, including a custom HTTP method, with a template of
+     * any engine. A standard name maps to its {@link HttpMethod}; any other name to
+     * {@link HttpMethod#CUSTOM} with that name.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param template       The template
+     * @return The declaration
+     * @since 5.3.0
+     */
+    static IndexedRouteDeclaration of(String httpMethodName, RouteTemplate template) {
+        HttpMethod httpMethod = HttpMethod.parse(httpMethodName);
+        // a standard method by its canonical name, a custom one by the given name
+        return of(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), template);
+    }
+
+    private static IndexedRouteDeclaration of(HttpMethod httpMethod, String httpMethodName, RouteTemplate template) {
         if (template.isMicronaut()) {
-            return of(httpMethod, template.expression());
+            return of(httpMethod, httpMethodName, template.expression());
         }
-        return new EngineRouteDeclaration(httpMethod, template);
+        return new EngineRouteDeclaration(httpMethod, httpMethodName, template);
     }
 }
