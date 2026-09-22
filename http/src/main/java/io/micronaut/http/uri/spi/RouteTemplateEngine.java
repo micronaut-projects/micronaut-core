@@ -20,6 +20,9 @@ import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RoutePattern;
 import io.micronaut.http.uri.RouteTemplate;
 
+import java.util.Comparator;
+import java.util.Optional;
+
 /**
  * A route template language: parses {@link RouteTemplate}s with its {@link #id() identifier},
  * composes them and creates their matchers.
@@ -31,7 +34,9 @@ import io.micronaut.http.uri.RouteTemplate;
  * unique, see {@link RouteTemplateEngines}.</p>
  *
  * <p>Routes of every engine are selected with the Micronaut route selection policy: the parsed
- * templates must describe the facts it uses, see {@link ParsedRouteTemplate}.</p>
+ * templates must describe the facts it uses, see {@link ParsedRouteTemplate}. An engine whose
+ * language has its own order of specificity declares it with {@link #comparator()}: the router
+ * uses it between two routes of the engine.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -88,4 +93,24 @@ public interface RouteTemplateEngine {
      * @return The matcher
      */
     RoutePattern matcher(ParsedRouteTemplate template);
+
+    /**
+     * The order of specificity of the templates of this engine, when it is not the Micronaut
+     * one: more literal text first, then fewer variables, then fewer variables constrained by a
+     * regular expression. The router uses it only between two routes whose templates are both of
+     * this engine, to sort them and to select the most specific of the routes that match a path;
+     * a route of this engine and a route of another engine are ordered by the Micronaut policy.
+     * For example, JAX-RS prefers more literal characters, then more template variables, then
+     * more variables with a regular expression.
+     *
+     * <p>The comparator must be a total order of the templates of this engine, and
+     * {@code compare(a, b) < 0} means {@code a} is more specific than {@code b}. Templates that
+     * compare equal are equally specific: a request both match is ambiguous, unless the media
+     * types or a route selector decide.</p>
+     *
+     * @return The order, or empty for the Micronaut order
+     */
+    default Optional<Comparator<ParsedRouteTemplate>> comparator() {
+        return Optional.empty();
+    }
 }

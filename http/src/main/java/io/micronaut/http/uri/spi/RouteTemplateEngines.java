@@ -21,10 +21,13 @@ import io.micronaut.http.uri.MicronautRouteTemplateEngine;
 import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RoutePattern;
 import io.micronaut.http.uri.RouteTemplate;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,9 +51,16 @@ import java.util.TreeMap;
 public final class RouteTemplateEngines {
 
     private final Map<String, RouteTemplateEngine> engines;
+    /**
+     * The orders of the engines that declare one, see {@link RouteTemplateEngine#comparator()}.
+     */
+    private final Map<String, Comparator<ParsedRouteTemplate>> comparators;
 
     private RouteTemplateEngines(Map<String, RouteTemplateEngine> engines) {
         this.engines = engines;
+        Map<String, Comparator<ParsedRouteTemplate>> comparators = new HashMap<>();
+        engines.forEach((id, engine) -> engine.comparator().ifPresent(comparator -> comparators.put(id, comparator)));
+        this.comparators = comparators.isEmpty() ? Map.of() : Collections.unmodifiableMap(comparators);
     }
 
     /**
@@ -114,6 +124,23 @@ public final class RouteTemplateEngines {
                 + ". Engines are registered with a META-INF/services/io.micronaut.http.uri.spi.RouteTemplateEngine file");
         }
         return engine;
+    }
+
+    /**
+     * @return Whether an engine declares its own order of specificity, see
+     * {@link RouteTemplateEngine#comparator()}
+     */
+    public boolean hasComparators() {
+        return !comparators.isEmpty();
+    }
+
+    /**
+     * @param id The identifier of an engine
+     * @return The order of specificity the engine declares, or {@code null} for the Micronaut
+     * order, see {@link RouteTemplateEngine#comparator()}
+     */
+    public @Nullable Comparator<ParsedRouteTemplate> comparator(String id) {
+        return comparators.get(id);
     }
 
     /**

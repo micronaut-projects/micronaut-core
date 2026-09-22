@@ -20,7 +20,9 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 
@@ -28,6 +30,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,15 +76,30 @@ final class UriRouteSet {
      * Whether a route has constraints on its path variables.
      */
     private final boolean constrained;
+    /**
+     * Whether a route has a template of an engine that declares its own order of specificity, see
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine#comparator()}.
+     */
+    private final boolean hasEngineOrders;
     private final boolean empty;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
                         Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod,
                         boolean hasDynamicTargets) {
+        boolean hasEngineOrders = false;
+        if (RouteTemplateEngines.defaults().hasComparators()) {
+            for (List<UriRouteInfo<Object, Object>> routes : routesByMethod.values()) {
+                hasEngineOrders |= hasEngineOrder(routes);
+            }
+            for (List<UriRouteInfo<Object, Object>> routes : customRoutesByMethod.values()) {
+                hasEngineOrders |= hasEngineOrder(routes);
+            }
+        }
+        this.hasEngineOrders = hasEngineOrders;
         Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(HttpMethod.values());
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
-            UriRouteInfo<Object, Object>[] values = finalizeRoutes(e.getValue());
+            UriRouteInfo<Object, Object>[] values = finalizeRoutes(e.getValue(), hasEngineOrders);
             methodMap.put(e.getKey(), values);
             customMethodMap.put(e.getKey().name(), values);
         }
@@ -93,7 +111,7 @@ final class UriRouteSet {
                 routes = new ArrayList<>(routes);
                 routes.addAll(anyCustomMethod);
             }
-            customMethodMap.put(e.getKey(), finalizeRoutes(routes));
+            customMethodMap.put(e.getKey(), finalizeRoutes(routes, hasEngineOrders));
         }
         this.methodRoutesByMethod = methodMap;
         this.allRoutesByMethod = customMethodMap;
@@ -219,7 +237,7 @@ final class UriRouteSet {
             // type pollution avoidance (should be covered by type pollution test)
             return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
         }
-        uriRoutes = DefaultRouter.resolveAmbiguity(request, uriRoutes);
+        uriRoutes = DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
         return closest(path, uriRoutes);
     }
 
@@ -318,7 +336,7 @@ final class UriRouteSet {
         if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
-        return DefaultRouter.resolveAmbiguity(request, uriRoutes);
+        return DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
@@ -599,8 +617,62 @@ final class UriRouteSet {
         return RouteIndex.build(prefixes);
     }
 
-    private static UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
+    /**
+     * @param routes The routes of a method
+     * @return Whether a route is of an engine with its own order
+     */
+    private static boolean hasEngineOrder(List<UriRouteInfo<Object, Object>> routes) {
+        RouteTemplateEngines engines = RouteTemplateEngines.defaults();
+        for (UriRouteInfo<Object, Object> route : routes) {
+            ParsedRouteTemplate template = DefaultRouter.engineTemplate(route);
+            if (template != null && engines.comparator(template.engineId()) != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Order the routes of each engine that declares its own order of specificity by that order,
+     * among the positions its routes have in the Micronaut order: the routes of other engines keep
+     * their positions, and so does every route when no engine declares an order.
+     *
+     * @param routes The routes of a method, in the Micronaut order
+     */
+    private static void orderByEngines(List<UriRouteInfo<Object, Object>> routes) {
+        RouteTemplateEngines engines = RouteTemplateEngines.defaults();
+        Map<String, List<Integer>> positions = null;
+        for (int i = 0; i < routes.size(); i++) {
+            ParsedRouteTemplate template = DefaultRouter.engineTemplate(routes.get(i));
+            if (template != null && engines.comparator(template.engineId()) != null) {
+                if (positions == null) {
+                    positions = new HashMap<>(2);
+                }
+                positions.computeIfAbsent(template.engineId(), id -> new ArrayList<>()).add(i);
+            }
+        }
+        if (positions == null) {
+            return;
+        }
+        positions.forEach((engineId, indexes) -> {
+            Comparator<ParsedRouteTemplate> order = Objects.requireNonNull(engines.comparator(engineId));
+            List<UriRouteInfo<Object, Object>> engineRoutes = new ArrayList<>(indexes.size());
+            for (int index : indexes) {
+                engineRoutes.add(routes.get(index));
+            }
+            // stable: routes the engine considers equally specific keep their Micronaut order
+            engineRoutes.sort((a, b) -> order.compare(Objects.requireNonNull(DefaultRouter.engineTemplate(a)), Objects.requireNonNull(DefaultRouter.engineTemplate(b))));
+            for (int i = 0; i < indexes.size(); i++) {
+                routes.set(indexes.get(i), engineRoutes.get(i));
+            }
+        });
+    }
+
+    private static UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes, boolean hasEngineOrders) {
         Collections.sort(routes);
+        if (hasEngineOrders) {
+            orderByEngines(routes);
+        }
         return routes.toArray(EMPTY);
     }
 
