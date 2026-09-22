@@ -10,6 +10,7 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.builder.RouteBuilder
 import io.netty.util.concurrent.FastThreadLocalThread
 import jakarta.inject.Named
 import jakarta.inject.Singleton
@@ -170,7 +171,7 @@ class HandlerRoutesSpec extends Specification {
         private final RouteTable table
 
         TableRoutes(RouteTableFactory tables) {
-            table = tables.build { RouteBuilder routes ->
+            table = tables.buildHttpRoutes { RouteBuilder routes ->
                 routes.GET('/table/{+path}', { HttpRequest<?> request, PathVariables pathVariables -> text("table ${request.path}") } as RequestHandler)
             }
         }

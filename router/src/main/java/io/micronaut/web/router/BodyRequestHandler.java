@@ -27,7 +27,7 @@ import io.micronaut.http.HttpResponse;
  * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
- * @see RouteBuilder#handle(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, BodyRequestHandler)
+ * @see io.micronaut.web.router.builder.RouteBuilder#handle(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, BodyRequestHandler)
  */
 @Experimental
 @FunctionalInterface

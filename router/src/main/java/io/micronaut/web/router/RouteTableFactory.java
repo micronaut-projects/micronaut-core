@@ -39,9 +39,9 @@ import java.util.function.Consumer;
  * {@code @Version} and the executor apply when the route is matched and executed. Every
  * {@code GET} route gets an implicit {@code HEAD} route, unless the table has a {@code HEAD}
  * route for the same URI or the method is annotated {@code @Get(headRoute = false)}. Like
- * controller routes, the URIs are under {@code micronaut.server.context-path}. Routes can also
- * target handler functions, e.g. {@code routes.GET("/orders/{id}", (request, pathVariables) -> ...)}, see
- * {@link RequestHandler}.
+ * controller routes, the URIs are under {@code micronaut.server.context-path}. A table of routes to
+ * handler functions is built with {@link #buildHttpRoutes(HttpRoutes)}, e.g.
+ * {@code routes.GET("/orders/{id}", (request, pathVariables) -> ...)}.
  * <p>A table is immutable: changing a route returned by the builder after {@link #build} returned
  * does not change the table.
  *
@@ -83,6 +83,24 @@ public final class RouteTableFactory {
      */
     public RouteTable build(Consumer<? super RouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
+        return newTable(routes::accept);
+    }
+
+    /**
+     * Build a route table of routes to handler functions, declared like the routes of an
+     * {@link HttpRoutes} bean.
+     *
+     * @param routes Declares the URI routes of the table. Status and error routes are not
+     *               supported: they belong to the application router
+     * @return The table
+     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     */
+    public RouteTable buildHttpRoutes(HttpRoutes routes) {
+        Objects.requireNonNull(routes, "routes");
+        return newTable(builder -> routes.routes(new DefaultHandlerRouteBuilder(builder)));
+    }
+
+    private RouteTable newTable(Consumer<DefaultRouteBuilder> routes) {
         DefaultRouteBuilder builder = new DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy, conversionService) {
             @Override
             String routeUri(String uri) {

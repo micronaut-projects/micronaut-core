@@ -38,13 +38,13 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.FormPart;
 import io.micronaut.web.router.HttpRoutes;
-import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.RouteDeclaration;
 import io.micronaut.web.router.RouteSource;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.builder.RouteBuilder;
+import io.micronaut.web.router.builder.UriRoute;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Tag;
@@ -653,7 +653,7 @@ public class HandlerRoutesTest {
         }
 
         void enable() {
-            current = tables.build(routes -> {
+            current = tables.buildHttpRoutes(routes -> {
                 routes.GET("/fn-dynamic/{+path}", (request, pathVariables) ->
                         HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .after((request, response) -> response.header("X-Table-Route", "true"));

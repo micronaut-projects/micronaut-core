@@ -3,7 +3,7 @@ package petstore.web;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.HttpRoutes;
-import io.micronaut.web.router.RouteBuilder;
+import io.micronaut.web.router.builder.RouteBuilder;
 import jakarta.inject.Singleton;
 
 import java.util.UUID;
