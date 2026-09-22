@@ -28,24 +28,27 @@ import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 /**
- * A declarative client reads and writes media types with the {@code +json} structured suffix.
+ * A declarative client reads and writes a media type listed in
+ * {@code micronaut.codec.json.additional-types}.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class JsonSuffixMediaTypeTest {
-    public static final String SPEC_NAME = "JsonSuffixMediaTypeTest";
+public class JsonCodecAdditionalTypeTest {
+    public static final String SPEC_NAME = "JsonCodecAdditionalTypeTest";
     public static final String ACME_JSON = "application/vnd.acme+json";
 
     @Test
-    void declarativeClientReadsAndWritesJsonSuffixMediaType() throws IOException {
-        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME)) {
+    void declarativeClientReadsAndWritesAdditionalJsonType() throws IOException {
+        try (ServerUnderTest server = ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of("micronaut.codec.json.additional-types", List.of(ACME_JSON)))) {
             AcmeClient client = server.getApplicationContext().getBean(AcmeClient.class);
 
             assertEquals(new Widget("widget", 3), client.get());
@@ -59,7 +62,7 @@ public class JsonSuffixMediaTypeTest {
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
-    @Controller("/json-suffix")
+    @Controller("/json-additional-type")
     static class AcmeController {
 
         @Get(value = "/widget", produces = ACME_JSON)
@@ -74,7 +77,7 @@ public class JsonSuffixMediaTypeTest {
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
-    @io.micronaut.http.client.annotation.Client("/json-suffix")
+    @io.micronaut.http.client.annotation.Client("/json-additional-type")
     interface AcmeClient {
 
         @Get(value = "/widget", consumes = ACME_JSON)

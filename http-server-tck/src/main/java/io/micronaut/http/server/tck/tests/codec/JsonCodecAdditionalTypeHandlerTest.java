@@ -43,35 +43,40 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Media types with the {@code +json} structured suffix are read and written by the JSON handler
- * when no handler is registered for them.
+ * Media types listed in {@code micronaut.codec.json.additional-types} are read and written by the
+ * JSON handler, unless a handler is registered for the exact media type.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
     "checkstyle:MissingJavadocType",
     "checkstyle:DesignForExtension"
 })
-public class JsonSuffixMediaTypeTest {
-    public static final String SPEC_NAME = "JsonSuffixMediaTypeTest";
+public class JsonCodecAdditionalTypeHandlerTest {
+    public static final String SPEC_NAME = "JsonCodecAdditionalTypeHandlerTest";
     public static final String ACME_JSON = "application/vnd.acme+json";
     public static final String HAL_FORMS_JSON = "application/prs.hal-forms+json";
     public static final String CUSTOM_JSON = "application/vnd.custom+json";
+    private static final Map<String, Object> CONFIGURATION = Map.of(
+        "micronaut.codec.json.additional-types", List.of(ACME_JSON, HAL_FORMS_JSON, CUSTOM_JSON)
+    );
 
     @Test
-    void writesBeanForJsonSuffixMediaType() throws IOException {
-        assertWrites("/json-suffix/acme", ACME_JSON);
-        assertWrites("/json-suffix/hal-forms", HAL_FORMS_JSON);
+    void writesBeanForAdditionalJsonType() throws IOException {
+        assertWrites("/json-additional-handler/acme", ACME_JSON);
+        assertWrites("/json-additional-handler/hal-forms", HAL_FORMS_JSON);
     }
 
     @Test
-    void readsBeanForJsonSuffixMediaType() throws IOException {
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/json-suffix/acme", "{\"name\":\"posted\",\"count\":7}").contentType(ACME_JSON),
+    void readsBeanForAdditionalJsonType() throws IOException {
+        asserts(SPEC_NAME, CONFIGURATION,
+            HttpRequest.POST("/json-additional-handler/acme", "{\"name\":\"posted\",\"count\":7}").contentType(ACME_JSON),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("posted:7")
@@ -79,16 +84,16 @@ public class JsonSuffixMediaTypeTest {
     }
 
     @Test
-    void exactHandlerForJsonSuffixMediaTypeWins() throws IOException {
-        asserts(SPEC_NAME,
-            HttpRequest.GET("/json-suffix/custom").header(HttpHeaders.ACCEPT, CUSTOM_JSON),
+    void exactHandlerForAdditionalJsonTypeWins() throws IOException {
+        asserts(SPEC_NAME, CONFIGURATION,
+            HttpRequest.GET("/json-additional-handler/custom").header(HttpHeaders.ACCEPT, CUSTOM_JSON),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body(BodyAssertion.builder().body("{\"custom-writer\":\"widget\"}").equals())
                 .assertResponse(response -> assertTrue(response.header(HttpHeaders.CONTENT_TYPE).contains(CUSTOM_JSON)))
                 .build()));
-        asserts(SPEC_NAME,
-            HttpRequest.POST("/json-suffix/custom", "{\"name\":\"posted\",\"count\":7}").contentType(CUSTOM_JSON),
+        asserts(SPEC_NAME, CONFIGURATION,
+            HttpRequest.POST("/json-additional-handler/custom", "{\"name\":\"posted\",\"count\":7}").contentType(CUSTOM_JSON),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("custom-reader:0")
@@ -96,7 +101,7 @@ public class JsonSuffixMediaTypeTest {
     }
 
     private static void assertWrites(String uri, String mediaType) throws IOException {
-        asserts(SPEC_NAME,
+        asserts(SPEC_NAME, CONFIGURATION,
             HttpRequest.GET(uri).header(HttpHeaders.ACCEPT, mediaType),
             (server, request) -> AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
@@ -106,8 +111,8 @@ public class JsonSuffixMediaTypeTest {
     }
 
     @Requires(property = "spec.name", value = SPEC_NAME)
-    @Controller("/json-suffix")
-    static class JsonSuffixController {
+    @Controller("/json-additional-handler")
+    static class AdditionalTypeController {
 
         @Get("/acme")
         @Produces(ACME_JSON)
