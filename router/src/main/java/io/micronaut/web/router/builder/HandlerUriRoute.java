@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
+
+import io.micronaut.core.annotation.Internal;
 
 /**
  * A route that can run on a chosen executor and have route filters: the routes to handler
@@ -22,25 +24,26 @@ package io.micronaut.web.router;
  * @author Denis Stepanov
  * @since 5.3.0
  */
-interface HandlerUriRoute extends UriRoute {
+@Internal
+public interface HandlerUriRoute extends io.micronaut.web.router.UriRoute {
 
     /**
      * @param executorName The name of the executor
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#executeOn(String)
+     * @see UriRoute#executeOn(String)
      */
     HandlerUriRoute executeOn(String executorName);
 
     /**
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#nonBlocking()
+     * @see UriRoute#nonBlocking()
      */
     HandlerUriRoute nonBlocking();
 
     /**
      * @param filter The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#before(RouteRequestFilter)
+     * @see UriRoute#before(RouteRequestFilter)
      */
     HandlerUriRoute before(RouteRequestFilter filter);
 
@@ -48,21 +51,21 @@ interface HandlerUriRoute extends UriRoute {
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#before(String, RouteRequestFilter)
+     * @see UriRoute#before(String, RouteRequestFilter)
      */
     HandlerUriRoute before(String executorName, RouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#beforeAsync(AsyncRouteRequestFilter)
+     * @see UriRoute#beforeAsync(AsyncRouteRequestFilter)
      */
     HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#after(RouteResponseFilter)
+     * @see UriRoute#after(RouteResponseFilter)
      */
     HandlerUriRoute after(RouteResponseFilter filter);
 
@@ -70,14 +73,14 @@ interface HandlerUriRoute extends UriRoute {
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#after(String, RouteResponseFilter)
+     * @see UriRoute#after(String, RouteResponseFilter)
      */
     HandlerUriRoute after(String executorName, RouteResponseFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see io.micronaut.web.router.builder.UriRoute#afterAsync(AsyncRouteResponseFilter)
+     * @see UriRoute#afterAsync(AsyncRouteResponseFilter)
      */
     HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter);
 }

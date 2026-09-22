@@ -30,6 +30,8 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.builder.CapturedUriMatchInfo;
+import io.micronaut.web.router.builder.CompiledRouteMatcher;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;

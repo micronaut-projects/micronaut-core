@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
@@ -38,7 +38,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-record DefaultPathVariables(Map<String, Object> values, ConversionService conversionService) implements PathVariables {
+public record DefaultPathVariables(Map<String, Object> values, ConversionService conversionService) implements PathVariables {
 
     @Override
     public Set<String> names() {

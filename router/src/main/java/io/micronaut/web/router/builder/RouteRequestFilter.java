@@ -13,33 +13,31 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
-
-import java.util.concurrent.CompletionStage;
+import org.jspecify.annotations.Nullable;
 
 /**
- * A route handler that completes the response later. The executor is selected like for a
- * controller method returning a {@link CompletionStage}: with automatic thread selection it runs
- * on the event loop and must not block.
+ * A filter of one route's requests, declared with {@link io.micronaut.web.router.builder.UriRoute#before(RouteRequestFilter)}.
+ * Like a {@code @RequestFilter} method it runs before the route, after the application's
+ * filters, and can answer the request instead of the route.
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncRequestHandler {
+public interface RouteRequestFilter {
 
     /**
-     * Handle the request.
+     * Filter the request.
      *
-     * @param request       The request
-     * @param pathVariables The path variables of the matched route
-     * @return The response, completed later
+     * @param request The request
+     * @return A response to answer the request with instead of the route, or {@code null} to proceed
+     * @throws Exception An error, handled by the error routes
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables);
+    @Nullable HttpResponse<?> filter(HttpRequest<?> request) throws Exception;
 }

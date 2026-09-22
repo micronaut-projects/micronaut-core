@@ -10,6 +10,10 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.client.exceptions.HttpClientResponseException
 import io.micronaut.runtime.server.EmbeddedServer
+import io.micronaut.web.router.builder.AsyncRequestHandler
+import io.micronaut.web.router.builder.HttpRoutes
+import io.micronaut.web.router.builder.PathVariables
+import io.micronaut.web.router.builder.RequestHandler
 import io.micronaut.web.router.builder.RouteBuilder
 import io.netty.util.concurrent.FastThreadLocalThread
 import jakarta.inject.Named

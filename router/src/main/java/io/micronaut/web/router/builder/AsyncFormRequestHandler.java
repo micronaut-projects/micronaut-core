@@ -13,31 +13,34 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
+import java.util.concurrent.CompletionStage;
+
 /**
- * A handler function for a response status: it answers a request whose response has the status
- * it is registered for, e.g. {@code 404}, like an {@code @Error(status = ..., global = true)}
- * method.
+ * A route handler for a submitted form that completes the response later. The whole form is read
+ * before the handler runs; the executor is selected like for a controller method returning a
+ * {@link CompletionStage}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see RouteBuilder#status(io.micronaut.http.HttpStatus, StatusRouteHandler)
+ * @see io.micronaut.web.router.builder.RouteBuilder#handleFormAsync(io.micronaut.http.HttpMethod, String, AsyncFormRequestHandler)
  */
 @Experimental
 @FunctionalInterface
-public interface StatusRouteHandler {
+public interface AsyncFormRequestHandler {
 
     /**
-     * Handle the status.
+     * Handle the request.
      *
-     * @param request The request
-     * @return The response
-     * @throws Exception An error, answered with the default error response
+     * @param request       The request
+     * @param pathVariables The path variables of the matched route
+     * @param form          The submitted form
+     * @return The response, completed later
      */
-    HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables, FormData form);
 }

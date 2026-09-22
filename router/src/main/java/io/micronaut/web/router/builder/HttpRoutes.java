@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.web.router.builder.RouteBuilder;
+import io.micronaut.web.router.RouteSource;
+import io.micronaut.web.router.RouteTable;
+import io.micronaut.web.router.RouteTableFactory;
 
 /**
  * Routes declared in code. Every bean of this type adds its routes to the application routes

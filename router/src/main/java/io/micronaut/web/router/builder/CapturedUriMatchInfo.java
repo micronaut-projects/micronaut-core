@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.uri.UriMatchInfo;
@@ -31,7 +31,7 @@ import java.util.Map;
  * @since 5.3.0
  */
 @Internal
-final class CapturedUriMatchInfo implements UriMatchInfo {
+public final class CapturedUriMatchInfo implements UriMatchInfo {
     private final String uri;
     private final List<UriMatchVariable> variables;
     private final Map<String, Object> values;
@@ -42,7 +42,7 @@ final class CapturedUriMatchInfo implements UriMatchInfo {
      * @param variables The path variables of the route's template, in order
      * @param captured  The captured raw values, in the same order
      */
-    CapturedUriMatchInfo(String uri, List<UriMatchVariable> variables, String[] captured) {
+    public CapturedUriMatchInfo(String uri, List<UriMatchVariable> variables, String[] captured) {
         this.uri = uri;
         this.variables = variables;
         this.values = LinkedHashMap.newLinkedHashMap(variables.size());

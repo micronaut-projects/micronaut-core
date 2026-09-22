@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
@@ -22,6 +22,9 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.UriRoute;
+import io.micronaut.web.router.UriRouteInfo;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -41,7 +44,7 @@ import java.util.function.Supplier;
  * @since 5.3.0
  */
 @Internal
-final class DeclaredUriRoute implements HandlerUriRoute {
+public final class DeclaredUriRoute implements HandlerUriRoute {
     private final RouteDeclaration declaration;
     private final IntConsumer exposedPorts;
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
@@ -54,7 +57,7 @@ final class DeclaredUriRoute implements HandlerUriRoute {
      * @param factory      Creates the route, not registered with the builder
      * @param exposedPorts Registers an exposed port with the builder
      */
-    DeclaredUriRoute(RouteDeclaration declaration, Supplier<DefaultRouteBuilder.DefaultUriRoute> factory, IntConsumer exposedPorts) {
+    public DeclaredUriRoute(RouteDeclaration declaration, Supplier<DefaultRouteBuilder.DefaultUriRoute> factory, IntConsumer exposedPorts) {
         this.declaration = declaration;
         this.exposedPorts = exposedPorts;
         this.route = SupplierUtil.memoized(() -> {
@@ -70,14 +73,14 @@ final class DeclaredUriRoute implements HandlerUriRoute {
     /**
      * @return The declaration
      */
-    RouteDeclaration declaration() {
+    public RouteDeclaration declaration() {
         return declaration;
     }
 
     /**
      * Fix the configuration: a change after the router took the route does not change it.
      */
-    void fix() {
+    public void fix() {
         if (fixedConfiguration == null) {
             fixedConfiguration = List.copyOf(configuration);
         }
@@ -86,7 +89,7 @@ final class DeclaredUriRoute implements HandlerUriRoute {
     /**
      * @return The route info of the implicit {@code HEAD} route of this {@code GET} route
      */
-    UriRouteInfo<Object, Object> implicitHeadRouteInfo() {
+    public UriRouteInfo<Object, Object> implicitHeadRouteInfo() {
         return route.get().implicitHeadCopy().toRouteInfo();
     }
 

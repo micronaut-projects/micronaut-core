@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.web.router.builder.RouteBuilder;
+import io.micronaut.web.router.DefaultRouteBuilder;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -34,90 +34,90 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Internal
-final class DefaultHandlerRouteBuilder implements RouteBuilder {
+public final class DefaultHandlerRouteBuilder implements RouteBuilder {
 
     private final DefaultRouteBuilder builder;
 
-    DefaultHandlerRouteBuilder(DefaultRouteBuilder builder) {
+    public DefaultHandlerRouteBuilder(DefaultRouteBuilder builder) {
         this.builder = builder;
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+    public UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
         return new Routes(builder.handle(method, uri, handler));
     }
 
     @Override
-    public <B> io.micronaut.web.router.builder.UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    public <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new Routes(builder.handle(method, uri, bodyType, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+    public UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
         return new Routes(builder.handleAsync(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+    public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return new Routes(builder.handleForm(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
+    public UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
         return new Routes(builder.handleFormAsync(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
+    public UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         return new Routes(builder.handleFormStream(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
+    public UriRoute handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
         return forEach(methods, uri, method -> builder.handle(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
+    public UriRoute handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
         return forEach(methods, uri, method -> builder.handleAsync(method, uri, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handle(RouteDeclaration route, RequestHandler handler) {
+    public UriRoute handle(RouteDeclaration route, RequestHandler handler) {
         return new Routes(builder.handle(route, handler));
     }
 
     @Override
-    public <B> io.micronaut.web.router.builder.UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    public <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new Routes(builder.handle(route, bodyType, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+    public UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
         return new Routes(builder.handleAsync(route, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+    public UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
         return new Routes(builder.handleForm(route, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+    public UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
         return new Routes(builder.handleFormAsync(route, handler));
     }
 
     @Override
-    public io.micronaut.web.router.builder.UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+    public UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
         return new Routes(builder.handleFormStream(route, handler));
     }
 
     @Override
-    public <E extends Throwable> io.micronaut.web.router.builder.ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
-        ErrorRoute route = builder.error(type, handler);
-        return new io.micronaut.web.router.builder.ErrorRoute() {
+    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+        io.micronaut.web.router.ErrorRoute route = builder.error(type, handler);
+        return new ErrorRoute() {
             @Override
-            public io.micronaut.web.router.builder.ErrorRoute produces(MediaType... mediaTypes) {
+            public ErrorRoute produces(MediaType... mediaTypes) {
                 route.produces(mediaTypes);
                 return this;
             }
@@ -125,18 +125,18 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public io.micronaut.web.router.builder.StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
-        StatusRoute route = builder.status(status, handler);
-        return new io.micronaut.web.router.builder.StatusRoute() {
+    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+        io.micronaut.web.router.StatusRoute route = builder.status(status, handler);
+        return new StatusRoute() {
             @Override
-            public io.micronaut.web.router.builder.StatusRoute produces(MediaType... mediaTypes) {
+            public StatusRoute produces(MediaType... mediaTypes) {
                 route.produces(mediaTypes);
                 return this;
             }
         };
     }
 
-    private static io.micronaut.web.router.builder.UriRoute forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+    private static UriRoute forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
         }
@@ -150,7 +150,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
     /**
      * The routes of a handler: one, or one per HTTP method, configured together.
      */
-    private static final class Routes implements io.micronaut.web.router.builder.UriRoute {
+    private static final class Routes implements UriRoute {
 
         private final HandlerUriRoute[] routes;
 
@@ -159,7 +159,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute consumes(MediaType... mediaTypes) {
+        public UriRoute consumes(MediaType... mediaTypes) {
             for (HandlerUriRoute route : routes) {
                 route.consumes(mediaTypes);
             }
@@ -167,7 +167,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute consumesAll() {
+        public UriRoute consumesAll() {
             for (HandlerUriRoute route : routes) {
                 route.consumesAll();
             }
@@ -175,7 +175,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute produces(MediaType... mediaTypes) {
+        public UriRoute produces(MediaType... mediaTypes) {
             for (HandlerUriRoute route : routes) {
                 route.produces(mediaTypes);
             }
@@ -183,7 +183,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute executeOn(String executorName) {
+        public UriRoute executeOn(String executorName) {
             for (HandlerUriRoute route : routes) {
                 route.executeOn(executorName);
             }
@@ -191,7 +191,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute nonBlocking() {
+        public UriRoute nonBlocking() {
             for (HandlerUriRoute route : routes) {
                 route.nonBlocking();
             }
@@ -199,7 +199,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute before(RouteRequestFilter filter) {
+        public UriRoute before(RouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(filter);
             }
@@ -207,7 +207,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute before(String executorName, RouteRequestFilter filter) {
+        public UriRoute before(String executorName, RouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(executorName, filter);
             }
@@ -215,7 +215,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+        public UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.beforeAsync(filter);
             }
@@ -223,7 +223,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute after(RouteResponseFilter filter) {
+        public UriRoute after(RouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(filter);
             }
@@ -231,7 +231,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute after(String executorName, RouteResponseFilter filter) {
+        public UriRoute after(String executorName, RouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(executorName, filter);
             }
@@ -239,7 +239,7 @@ final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public io.micronaut.web.router.builder.UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+        public UriRoute afterAsync(AsyncRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.afterAsync(filter);
             }

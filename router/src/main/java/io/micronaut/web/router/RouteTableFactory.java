@@ -22,6 +22,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.web.router.builder.DefaultHandlerRouteBuilder;
+import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
@@ -103,7 +105,7 @@ public final class RouteTableFactory {
     private RouteTable newTable(Consumer<DefaultRouteBuilder> routes) {
         DefaultRouteBuilder builder = new DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy, conversionService) {
             @Override
-            String routeUri(String uri) {
+            protected String routeUri(String uri) {
                 return underContextPath(contextPath, uri);
             }
 

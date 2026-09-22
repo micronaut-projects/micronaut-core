@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router;
+package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionContext;
@@ -40,7 +40,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Internal
-record DefaultFormData(Map<String, List<String>> fields,
+public record DefaultFormData(Map<String, List<String>> fields,
                        Map<String, List<CompletedFileUpload>> files,
                        ConversionService conversionService) implements FormData {
 
