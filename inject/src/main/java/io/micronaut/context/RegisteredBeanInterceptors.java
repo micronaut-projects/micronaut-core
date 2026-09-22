@@ -100,4 +100,16 @@ public final class RegisteredBeanInterceptors {
     public static <S> S getState(BeanRegistration<?> bean, Object key, Supplier<S> supplier) {
         return bean.dependents.state(key, supplier);
     }
+
+    /**
+     * Whether an interceptor of the given definition belongs to a registered scope of its own, so that the instance
+     * is obtained from that scope for every call rather than kept.
+     *
+     * @param beanContext The bean context
+     * @param interceptor The interceptor definition
+     * @return Whether the interceptor is of a custom scope
+     */
+    public static boolean isScopedInterceptor(BeanContext beanContext, BeanDefinition<?> interceptor) {
+        return beanContext instanceof DefaultBeanContext defaultBeanContext && defaultBeanContext.isScopedInterceptor(interceptor);
+    }
 }

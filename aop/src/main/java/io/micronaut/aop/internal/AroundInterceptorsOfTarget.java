@@ -16,16 +16,12 @@
 package io.micronaut.aop.internal;
 
 import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ProxyTargetInterceptorResolver;
 import io.micronaut.context.Qualifier;
-import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,8 +32,8 @@ import java.util.concurrent.ConcurrentHashMap;
  * Creates the non-singleton interceptors bound to the methods of a proxy target with the target, as its dependents.
  *
  * <p>The binding is the one the proxy selects with, read from the methods of the target that carry around advice,
- * which are the methods the proxy intercepts. The singleton interceptors are left to the proxy, which resolves them
- * as it is created, and an interceptor of a custom scope to its scope, which hands out the instance on every call. A
+ * which are the methods the proxy intercepts. The singleton interceptors are left to the first selection for the
+ * target, and an interceptor of a custom scope to its scope, which hands out the instance on every call. A
  * target fronted by a runtime proxy is left to that proxy.</p>
  *
  * @author Denis Stepanov
@@ -71,16 +67,11 @@ public final class AroundInterceptorsOfTarget implements ProxyTargetInterceptorR
             // nothing: a runtime proxy selects on its first call, as it does for a target this does not see
             return List.of();
         }
-        List<AnnotationMetadata> advised = new ArrayList<>();
-        for (ExecutableMethod<?, ?> method : target.getExecutableMethods()) {
-            if (method.hasStereotype(AnnotationUtil.ANN_AROUND)) {
-                advised.add(method);
-            }
-        }
-        if (advised.isEmpty()) {
+        // the binding the proxy selects the interceptors of the target with
+        Qualifier<Interceptor<?, ?>> binding = InterceptorChain.targetBinding(target);
+        if (binding == null) {
             return List.of();
         }
-        Qualifier<Interceptor<?, ?>> binding = Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(advised.toArray(AnnotationMetadata[]::new)));
         List<BeanDefinition<Interceptor<?, ?>>> result = new ArrayList<>(2);
         for (BeanDefinition<Interceptor<?, ?>> definition : resolutionContext.getContext().getBeanDefinitions(Interceptor.ARGUMENT, binding)) {
             if (!definition.isSingleton() && !resolutionContext.isScopedInterceptor(definition)) {

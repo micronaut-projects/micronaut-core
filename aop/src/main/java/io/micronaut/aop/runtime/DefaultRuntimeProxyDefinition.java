@@ -17,7 +17,8 @@ package io.micronaut.aop.runtime;
 
 import io.micronaut.aop.Around;
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ProxyInterceptors;
+import io.micronaut.aop.InterceptorRegistry;
+import io.micronaut.aop.chain.InterceptorChain;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -26,13 +27,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
+
 /**
  * The default {@link RuntimeProxyDefinition}.
  *
@@ -150,16 +152,15 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         Qualifier<T> qualifier = (Qualifier<T>) resolutionContext.getCurrentQualifier();
         BeanDefinition<T> targetDefinition = beanContext.getProxyTargetBeanDefinition(argument, qualifier);
         ExecutableMethod<T, ?>[] methods = targetDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
-        ProxyInterceptors selection = new ProxyInterceptors(resolutionContext, methods, false);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
         // a lazy proxy leaves the target to the first call, so even a singleton one is not resolved here
         boolean lazy = proxyBeanDefinition.getAnnotationMetadata().isTrue(Around.class, "lazy");
-        if (targetDefinition.isSingleton() && !lazy && (!perTarget || !selection.hasScopedInterceptors())) {
+        if (targetDefinition.isSingleton() && !lazy && (!perTarget || !hasScopedInterceptors(resolutionContext, methods))) {
             BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);
-            Interceptor<?, ?>[][] interceptors = selection.resolve(target);
-            for (int i = 0; i < methods.length; i++) {
-                if (interceptors[i].length > 0) {
-                    interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], (Interceptor[]) interceptors[i]));
+            for (ExecutableMethod<T, ?> method : methods) {
+                Interceptor<?, ?>[] interceptors = InterceptorChain.resolveTargetInterceptors(beanContext, targetDefinition, target, method, false);
+                if (interceptors.length > 0) {
+                    interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) method, (Interceptor[]) interceptors));
                 }
             }
             return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues);
@@ -168,15 +169,47 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         // no non-singleton is bound, and a creator that asks per target gets the target's own on top; a creator
         // that reads the methods alone gets them all, resolved as the proxy's own and destroyed with it, as in 5.2,
         // rather than losing the non-singletons
-        Interceptor<?, ?>[][] shared = perTarget ? selection.shared() : ProxyInterceptors.resolve(resolutionContext, methods, false);
-        Map<ExecutableMethod<?, ?>, Integer> indexes = new IdentityHashMap<>();
+        Interceptor<?, ?>[][] shared = perTarget ? singletons(resolutionContext, methods) : InterceptorChain.resolveInterceptors(resolutionContext, methods, false);
         for (int i = 0; i < methods.length; i++) {
-            if (shared[i].length > 0 || selection.intercepted(i)) {
+            if (shared[i].length > 0 || !beanContext.getBeanDefinitions(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(methods[i].getAnnotationMetadata())).isEmpty()) {
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], (Interceptor[]) shared[i]));
-                indexes.put(methods[i], i);
             }
         }
-        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues, new TargetSelection<>(selection, indexes));
+        return new DefaultRuntimeProxyDefinition<>(proxyBeanDefinition, resolutionContext, interceptedMethods, false, true, constructorValues, new TargetSelection<>(targetDefinition));
+    }
+
+    /**
+     * The singleton interceptors of each method, which do not depend on the target.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static Interceptor<?, ?>[][] singletons(BeanResolutionContext resolutionContext, ExecutableMethod<?, ?>[] methods) {
+        Interceptor<?, ?>[][] result = new Interceptor[methods.length][];
+        // the hierarchy reverses the array it is given, so it gets a copy
+        List<BeanRegistration<Interceptor<?, ?>>> registrations = new ArrayList<>(resolutionContext.getInterceptorRegistrations(
+            Interceptor.ARGUMENT,
+            Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone()), true)
+        ));
+        InterceptorRegistry registry = resolutionContext.getBean(InterceptorRegistry.ARGUMENT);
+        for (int i = 0; i < methods.length; i++) {
+            result[i] = InterceptorChain.resolveAroundInterceptors(registry, (ExecutableMethod) methods[i], (List) registrations);
+        }
+        return result;
+    }
+
+    /**
+     * Whether an interceptor of a custom scope is bound to the methods, whose instance is its scope's at each call.
+     */
+    private static boolean hasScopedInterceptors(BeanResolutionContext resolutionContext, ExecutableMethod<?, ?>[] methods) {
+        if (methods.length == 0) {
+            return false;
+        }
+        for (BeanDefinition<Interceptor<?, ?>> definition : resolutionContext.getContext().getBeanDefinitions(
+            Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(new AnnotationMetadataHierarchy(methods.clone())))) {
+            if (!definition.isSingleton() && resolutionContext.isScopedInterceptor(definition)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -219,7 +252,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                                     BeanResolutionContext resolutionContext,
                                                                     boolean introduction) {
         ExecutableMethod<T, ?>[] methods = proxyBeanDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
-        Interceptor<?, ?>[][] interceptors = ProxyInterceptors.resolve(resolutionContext, methods, introduction);
+        Interceptor<?, ?>[][] interceptors = InterceptorChain.resolveInterceptors(resolutionContext, methods, introduction);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
         for (int i = 0; i < methods.length; i++) {
             if (interceptors[i].length > 0) {
@@ -253,7 +286,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
 
     @Override
     public Interceptor<T, Object>[] interceptors(InterceptedMethod<T> method, T target) {
-        return targetSelection == null ? method.interceptors() : targetSelection.interceptors(method, target);
+        return targetSelection == null ? method.interceptors() : targetSelection.interceptors(resolutionContext.getContext(), method, target);
     }
 
     @Override
@@ -262,22 +295,18 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
     }
 
     /**
-     * The selection of the interceptors of each call for the target of the call.
+     * The selection of the interceptors of each call for the target of the call, which is kept on the registration of
+     * the target.
      *
-     * @param selection The selection, by the index of the method
-     * @param indexes   The index of each intercepted method
-     * @param <T>       The proxy type
+     * @param targetDefinition The definition of the target
+     * @param <T>              The proxy type
      */
     @Internal
-    public record TargetSelection<T>(ProxyInterceptors selection, Map<ExecutableMethod<?, ?>, Integer> indexes) {
+    public record TargetSelection<T>(BeanDefinition<T> targetDefinition) {
 
         @SuppressWarnings("unchecked")
-        Interceptor<T, Object>[] interceptors(InterceptedMethod<T> method, T target) {
-            Integer index = indexes.get(method.executableMethod());
-            if (index == null) {
-                return method.interceptors();
-            }
-            return (Interceptor<T, Object>[]) selection.get(index, (Object) target);
+        Interceptor<T, Object>[] interceptors(BeanContext beanContext, InterceptedMethod<T> method, T target) {
+            return (Interceptor<T, Object>[]) InterceptorChain.resolveTargetInterceptors(beanContext, targetDefinition, null, target, method.executableMethod(), false);
         }
     }
 }

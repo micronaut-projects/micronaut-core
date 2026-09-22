@@ -161,6 +161,71 @@ class Meddler implements BeanCreatedEventListener<TargetService> {
         'through registration' | 'instances.proto.reg'  | true
     }
 
+    void 'test a bean a factory method binds with an interceptor binding alone is intercepted with its own instance'() {
+        given: 'a binding declared by @InterceptorBinding alone, with no @Around stereotype, as micronaut-jakarta-interceptors declares its own'
+        ApplicationContext context = buildContext('''
+package instances.produced;
+
+import io.micronaut.aop.*;
+import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Factory;
+import io.micronaut.context.annotation.Prototype;
+import jakarta.inject.Singleton;
+import java.lang.annotation.*;
+import java.util.*;
+
+@Retention(RetentionPolicy.RUNTIME)
+@Target({ElementType.TYPE, ElementType.METHOD})
+@InterceptorBinding(kind = InterceptorKind.AROUND)
+@InterceptorBinding(kind = InterceptorKind.POST_CONSTRUCT)
+@interface Bound {
+}
+
+@Prototype
+@InterceptorBinding(value = Bound.class, kind = InterceptorKind.AROUND)
+@InterceptorBinding(value = Bound.class, kind = InterceptorKind.POST_CONSTRUCT)
+class BoundInterceptor implements MethodInterceptor<Object, Object> {
+    static final List<BoundInterceptor> POST_CONSTRUCTED = new ArrayList<>();
+    static final List<BoundInterceptor> INVOKED = new ArrayList<>();
+    @Override
+    public Object intercept(MethodInvocationContext<Object, Object> context) {
+        if (context.getKind() == InterceptorKind.POST_CONSTRUCT) {
+            POST_CONSTRUCTED.add(this);
+        } else {
+            INVOKED.add(this);
+        }
+        return context.proceed();
+    }
+}
+
+class Product {
+    public String work() { return "done"; }
+}
+
+@Factory
+class ProductFactory {
+    @Singleton
+    @Bound
+    Product product() { return new Product(); }
+}
+''')
+        def interceptor = context.classLoader.loadClass('instances.produced.BoundInterceptor')
+
+        when:
+        def bean = context.getBean(context.classLoader.loadClass('instances.produced.Product'))
+
+        then:
+        bean.work() == 'done'
+
+        and: 'the business method is intercepted, by the instance that saw the post construct of the product'
+        interceptor.POST_CONSTRUCTED.size() == 1
+        interceptor.INVOKED.size() == 1
+        interceptor.INVOKED[0].is(interceptor.POST_CONSTRUCTED[0])
+
+        cleanup:
+        context.close()
+    }
+
     void 'test a bean created while the target of a proxy is being created has an interceptor of its own'() {
         given:
         String pkg = 'instances.meddled'
