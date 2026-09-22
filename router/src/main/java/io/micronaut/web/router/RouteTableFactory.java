@@ -125,7 +125,7 @@ public final class RouteTableFactory {
     public RouteTable buildHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
-            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+            contextPath, route -> { });
         routes.routes(new DefaultHttpRouteBuilder(assembly));
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));

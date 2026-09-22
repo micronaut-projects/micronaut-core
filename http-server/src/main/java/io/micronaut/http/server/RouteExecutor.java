@@ -185,7 +185,7 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getRouteTemplate().expression());
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {

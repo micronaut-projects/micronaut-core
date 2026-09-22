@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
@@ -42,16 +43,21 @@ import java.util.function.Supplier;
 @Internal
 public final class DeclaredUriRoute implements HandlerUriRoute {
     private final IndexedRouteDeclaration declaration;
+    private final Supplier<ParsedRouteTemplate> parsedTemplate;
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
 
     /**
-     * @param declaration The declaration
-     * @param factory     Creates the route, not added to the assembly
+     * @param declaration    The declaration
+     * @param parsedTemplate Parses the template of the declaration with its engine
+     * @param factory        Creates the route, not added to the assembly
      */
-    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory) {
+    public DeclaredUriRoute(IndexedRouteDeclaration declaration,
+                            Supplier<ParsedRouteTemplate> parsedTemplate,
+                            Supplier<RouteAssembly.DefaultUriRoute> factory) {
         this.declaration = declaration;
+        this.parsedTemplate = SupplierUtil.memoized(parsedTemplate);
         this.route = SupplierUtil.memoized(() -> {
             RouteAssembly.DefaultUriRoute built = factory.get();
             List<Consumer<HandlerUriRoute>> steps = fixedConfiguration != null ? fixedConfiguration : configuration;
@@ -67,6 +73,13 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
      */
     public IndexedRouteDeclaration declaration() {
         return declaration;
+    }
+
+    /**
+     * @return The template of the declaration as its engine parses it, parsed once
+     */
+    public Supplier<ParsedRouteTemplate> parsedTemplate() {
+        return parsedTemplate;
     }
 
     /**
@@ -167,6 +180,6 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public String toString() {
-        return declaration.httpMethodName() + " " + declaration.uriTemplate() + " (declared)";
+        return declaration.httpMethodName() + " " + declaration.template() + " (declared)";
     }
 }
