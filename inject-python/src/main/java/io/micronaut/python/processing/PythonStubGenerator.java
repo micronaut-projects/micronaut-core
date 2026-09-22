@@ -5668,14 +5668,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * The body of the static {@code fromPolyglotValue} factory of a wrapper that does not mirror the
-     * state of its Python object in fields.
-     */
-    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
-        return fromPolyglotValueBody(thisType, value, false);
-    }
-
-    /**
      * The body of the static {@code fromPolyglotValue} factory: {@code None} is {@code null}, an instance
      * of a generated Python subclass is wrapped by that subclass so it keeps its runtime type, and any other
      * value is wrapped by this type.
@@ -5772,7 +5764,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     statements.add(snapshot == null
                         ? read
                         : ClassTypeDef.of(Objects.class).invokeStatic(
-                            "equals",
+                            EQUALS_METHOD,
                             TypeDef.Primitive.BOOLEAN,
                             aThis.field(field).cast(TypeDef.OBJECT),
                             aThis.field(snapshot).cast(TypeDef.OBJECT)
