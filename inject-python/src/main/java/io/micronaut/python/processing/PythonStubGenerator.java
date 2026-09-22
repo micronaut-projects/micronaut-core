@@ -144,6 +144,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_OBJECT_METHOD = "asObject";
     private static final String CONVERT_VALUE = "convertValue";
     private static final String EQUALS_METHOD = "equals";
+    private static final String TO_STRING_METHOD = "toString";
+    private static final String PYTHON_STR_METHOD = "__str__";
+    private static final String PYTHON_REPR_METHOD = "__repr__";
+    private static final String TO_STRING_METHOD_KEY = TO_STRING_METHOD + "()";
+    private static final String AS_STRING_METHOD = "asString";
     private static final String VALUE_PARAMETER = "value";
     private static final String NEW_INSTANCE = "newInstance";
     private static final String NEW_INTRODUCTION = "newIntroduction";
@@ -566,7 +571,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     List<MethodElement> methodsToBridge = bridged.methodsToBridge();
                     boolean hasAsyncBridgeMethod = bridged.hasAsyncBridgeMethod();
                     addInjectionMethods(model, methodsToBridge);
-                    addCreatorsAndPropertyAccessors(model, hasAsyncBridgeMethod);
+                    boolean hasToString = addToStringBridge(model, addedMethodNames);
+                    addCreatorsAndPropertyAccessors(model, hasAsyncBridgeMethod, hasToString);
                 } catch (ProcessingException e) {
                     throw e;
                 } catch (Exception e) {
@@ -575,6 +581,69 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             }
         }
+    }
+
+    /**
+     * Bridges the string representation of a Python class to {@code toString()} of its generated class, so
+     * that Java code formatting the object (a serializer writing it as a map key, a log statement, a text
+     * response) sees what Python's {@code str(obj)} gives. The generated method invokes {@code __str__},
+     * which Python resolves through the class hierarchy and, for a class defining only {@code __repr__},
+     * through {@code object.__str__} to that {@code __repr__}. A Python method named {@code toString} is
+     * bridged as any other method and takes precedence; an introspected bean whose hierarchy defines
+     * neither keeps the {@code toString()} over its properties.
+     *
+     * @return Whether the generated class declares {@code toString()}
+     */
+    private static boolean addToStringBridge(ClassStubModel model, Set<String> addedMethodNames) {
+        if (model.isJunit5Test()) {
+            return false;
+        }
+        if (addedMethodNames.contains(TO_STRING_METHOD_KEY)) {
+            return true;
+        }
+        if (!definesStringRepresentation(model.classElement(), new HashSet<>())) {
+            return false;
+        }
+        addedMethodNames.add(TO_STRING_METHOD_KEY);
+        model.builder().addMethod(MethodDef.builder(TO_STRING_METHOD)
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeDef.STRING)
+            .build((aThis, methodParameters) -> PYTHON_INVOCATION.invokeStatic(
+                "invokePythonMethod",
+                POLYGLOT_VALUE,
+                aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
+                ExpressionDef.constant(PYTHON_STR_METHOD),
+                TypeDef.OBJECT.array().instantiate()
+            ).invoke(AS_STRING_METHOD, TypeDef.STRING).returning()));
+        return true;
+    }
+
+    /**
+     * Whether the Python class or any class of its hierarchy defines {@code __str__} or {@code __repr__},
+     * which is when {@code str(obj)} gives something other than the default representation. The decision is
+     * only whether to generate the bridge; which definition it reaches is Python's own resolution at run time.
+     */
+    private static boolean definesStringRepresentation(ClassElement element, Set<String> visited) {
+        if (!(element instanceof AbstractPythonClassElement pythonClass) || !visited.add(element.getName())) {
+            return false;
+        }
+        for (FunctionDef function : pythonClass.getNativeType().functions()) {
+            if ((PYTHON_STR_METHOD.equals(function.name()) || PYTHON_REPR_METHOD.equals(function.name()))
+                && !function.isStatic()
+                && function.arguments().arguments().isEmpty()) {
+                return true;
+            }
+        }
+        if (pythonClass.getSuperType().filter(superType -> definesStringRepresentation(superType, visited)).isPresent()) {
+            return true;
+        }
+        for (ClassElement anInterface : pythonClass.getInterfaces()) {
+            if (definesStringRepresentation(anInterface, visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -1113,9 +1182,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Emits @Creator factories, property getters and setters, Object methods and the property member bridge.
+     * Emits @Creator factories, property getters and setters, Object methods (except a {@code toString()} the
+     * class already declares) and the property member bridge.
      */
-    private void addCreatorsAndPropertyAccessors(ClassStubModel model, boolean hasAsyncBridgeMethod) {
+    private void addCreatorsAndPropertyAccessors(ClassStubModel model, boolean hasAsyncBridgeMethod, boolean hasToString) {
         ClassElement element = model.element();
         ClassDef.ClassDefBuilder builder = model.builder();
         List<PropertyElement> beanProperties = model.beanProperties();
@@ -1169,7 +1239,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         if (isIntrospectedBean) {
-            ObjectHelper.addObjectMethods(builder, javaClassType(element), beanProperties, propertyFields);
+            ObjectHelper.addObjectMethods(builder, javaClassType(element), beanProperties, propertyFields, !hasToString);
         }
 
         if (!beanProperties.isEmpty()) {
@@ -3998,25 +4068,25 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (MethodElement methodElement : enumMethods) {
             addBridgeMethod(BridgeMethodSpec.of(methodElement, classElement), enumBuilder, context, addedMethodNames);
         }
-        if (jsonValueMethod != null && !"toString".equals(jsonValueMethod.getName()) && addedMethodNames.add("toString()")) {
-            enumBuilder.addMethod(MethodDef.builder("toString")
+        if (jsonValueMethod != null && !TO_STRING_METHOD.equals(jsonValueMethod.getName()) && addedMethodNames.add(TO_STRING_METHOD_KEY)) {
+            enumBuilder.addMethod(MethodDef.builder(TO_STRING_METHOD)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(jsonValueMethod.getName(), TypeDef.STRING).returning()));
-        } else if (jsonValueMethod == null && addedMethodNames.add("toString()")) {
+        } else if (jsonValueMethod == null && addedMethodNames.add(TO_STRING_METHOD_KEY)) {
             enumBuilder.addMethod(MethodDef.builder("jsonValue")
                 .addAnnotation("com.fasterxml.jackson.annotation.JsonValue")
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke("name", TypeDef.STRING).returning()));
-            enumBuilder.addMethod(MethodDef.builder("toString")
+            enumBuilder.addMethod(MethodDef.builder(TO_STRING_METHOD)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
                     .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(VALUE_PARAMETER))
-                    .invoke("asString", TypeDef.STRING)
+                    .invoke(AS_STRING_METHOD, TypeDef.STRING)
                     .returning()));
         }
         return enumBuilder.build();
@@ -5486,10 +5556,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
                 default -> {
@@ -6006,9 +6076,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             case "byte", "java.lang.Byte" ->
                 invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
-                invokedValue.invoke("asString", ClassTypeDef.STRING)
+                invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING)
                     .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-            default -> invokedValue.invoke("asString", ClassTypeDef.STRING);
+            default -> invokedValue.invoke(AS_STRING_METHOD, TypeDef.STRING);
         };
     }
 
@@ -6054,8 +6124,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
                 case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
                 case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "char" -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-                default -> member.invoke("asString", ClassTypeDef.STRING);
+                case "char" -> member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                default -> member.invoke(AS_STRING_METHOD, TypeDef.STRING);
             };
         } else {
             String referenceTypeName = type.getName();
@@ -6075,9 +6145,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte":
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING:
-                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, TypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
