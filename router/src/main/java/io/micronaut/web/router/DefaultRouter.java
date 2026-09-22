@@ -149,6 +149,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     preconditionFilterRoutes.add(filterRoute);
                 }
             }
+            if (builder instanceof AnnotatedMethodRouteBuilder annotatedBuilder) {
+                // builds the routes with a port, which registers the exposed ports
+                for (LazyUriRouteInfo uriRouteInfo : annotatedBuilder.precompiledRouteInfos()) {
+                    HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
+                    if (httpMethod == HttpMethod.CUSTOM) {
+                        customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
+                    } else {
+                        routesByMethod.computeIfAbsent(httpMethod, x -> new ArrayList<>()).add(uriRouteInfo);
+                    }
+                }
+            }
             exposedPorts.addAll(builder.getExposedPorts());
         }
 
@@ -763,7 +774,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private static RouteIndex indexRoutes(UriRouteInfo<Object, Object>[] routes) {
         String[] prefixes = new String[routes.length];
         for (int i = 0; i < routes.length; i++) {
-            prefixes[i] = routes[i] instanceof DefaultUrlRouteInfo<?, ?> route ? route.getRequiredPathPrefix() : "";
+            prefixes[i] = routes[i] instanceof IndexedRoute route ? route.getRequiredPathPrefix() : "";
         }
         return RouteIndex.build(prefixes);
     }
