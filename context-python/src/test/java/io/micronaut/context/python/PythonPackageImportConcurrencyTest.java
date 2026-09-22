@@ -118,7 +118,7 @@ final class PythonPackageImportConcurrencyTest {
         }
     }
 
-    private static List<Value> resolveConcurrently(Context context, List<PythonContextRuntime.PythonClassReference> references) throws Exception {
+    private static List<Value> resolveConcurrently(Context context, List<PythonContextRuntime.PythonClassReference> references) {
         ExecutorService executor = Executors.newFixedThreadPool(references.size());
         try {
             CyclicBarrier start = new CyclicBarrier(references.size());

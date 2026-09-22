@@ -1424,22 +1424,36 @@ public final class PythonContextRuntime {
         // while it waits for the instantiation. Only a missing submodule is tolerated on the way: an
         // error raised while executing one propagates.
         Value module = importPackageOfMember(ctx, packageName);
-        Value member = module != null ? module.getMember(importName) : null;
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
-        }
-        member = importPackageSubmoduleMember(ctx, packageName, importName);
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
-        }
         if (module == null) {
-            module = importModule(ctx, packageName);
-            member = module.getMember(importName);
-            if (member != null && isPythonClass(ctx, member)) {
-                return member;
-            }
+            return importMemberWhilePackageImports(ctx, packageName, importName);
         }
-        member = findClassInPackageModules(ctx, packageName, importName);
+        Value member = classMember(ctx, module, importName);
+        if (member == null) {
+            member = importPackageSubmoduleMember(ctx, packageName, importName);
+        }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
+        }
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static Value importMemberWhilePackageImports(Context ctx, String packageName, String importName) {
+        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
+        if (member == null) {
+            member = classMember(ctx, importModule(ctx, packageName), importName);
+        }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
+        }
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static @Nullable Value classMember(Context ctx, Value module, String importName) {
+        Value member = module.getMember(importName);
+        return isPythonClass(ctx, member) ? member : null;
+    }
+
+    private static Value requireMember(Context ctx, @Nullable Value member, String packageName, String importName) {
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
