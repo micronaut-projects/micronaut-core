@@ -799,7 +799,14 @@ public final class PythonAstParser {
             if (body.span() != null && !body.span().path().equals(sourcePath)) {
                 continue;
             }
-            targets.add(body.className().substring(body.className().lastIndexOf('.') + 1) + "#" + body.methodName());
+            // a collection the Java body returns becomes a Python one for a Python caller
+            String conversion = switch (body.returnType()) {
+                case "java.util.List" -> "#list";
+                case "java.util.Set" -> "#set";
+                case "java.util.Map" -> "#dict";
+                default -> "";
+            };
+            targets.add(body.className().substring(body.className().lastIndexOf('.') + 1) + "#" + body.methodName() + conversion);
         }
         if (targets.isEmpty()) {
             return 0;

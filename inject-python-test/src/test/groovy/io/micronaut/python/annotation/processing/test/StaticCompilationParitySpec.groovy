@@ -159,11 +159,71 @@ class Calc:
     def keyed(self, prices: dict[str, int]) -> int:
         total = 0
         for name in prices:
-            if name == "a":
-                total += 1
-            else:
-                total += 10
+            total += len(name)
         return total
+
+    def collected(self, names: list[str], limit: int) -> list[str]:
+        picked: list[str] = []
+        for name in names:
+            if len(picked) >= limit:
+                break
+            if name in picked or not name.strip():
+                continue
+            picked.append(name.upper())
+        return picked
+
+    def indexed(self, values: list[int], index: int) -> int:
+        first = values[0]
+        return first + values[index] + len(values)
+
+    def priced(self, prices: dict[str, float], name: str) -> float:
+        if name in prices:
+            return prices[name]
+        return prices.get("default", -1.0)
+
+    def parsed(self, text: str) -> str:
+        parts = text.split(",")
+        total = 0
+        for part in parts:
+            total += int(part.strip())
+        return f"{max(total, 0)} {min(total, 10)} {abs(total)} {float(total) / 2}"
+
+    def tagged(self, names: list[str]) -> dict[str, int]:
+        lengths: dict[str, int] = {}
+        for name in names:
+            lengths[name] = len(name)
+        return lengths
+
+    def joined(self, names: list[str]) -> str:
+        return ", ".join(names) + "|" + "-".join(["a", "b"]) + "|" + "x y  z".split()[2] + "|" + "abc"[1] + "|" + "abc"[-1]
+
+    def counted(self, counts: dict[str, int], values: list[str]) -> int:
+        values.append("more")
+        counts["added"] = len(values)
+        return counts["added"] + counts.get("x", 0)
+
+    def unicode(self, text: str) -> str:
+        return text[0] + "|" + str(len(text)) + "|" + text[-1] + "|" + text.upper() + "|" + text.lower() + "|" + str("a" in text)
+
+    def maybe_count(self, n: int) -> int | None:
+        return n if n > 0 else None
+
+    def merged(self, extra: dict[str, str]) -> dict[str, str]:
+        return {"a": "1", **extra, "z": "9"}
+
+    def viewed(self, name: str):
+        return {"name": name, "n": 1}
+
+    def copied(self, values: list[str]) -> list[str]:
+        result = list(values)
+        result.append("z")
+        return result
+
+    def rows(self) -> list:
+        return self.mapped()
+
+    def mapped(self) -> list[dict]:
+        return [{"a": 1}]
 
     def branch_local(self, flag: bool) -> str:
         if flag:
@@ -205,6 +265,7 @@ class Pair:
         ["label", 2, "pen"],
         ["ratio", 1, 4], ["ratio", 1, 0],
         ["parity", 3], ["parity", 8],
+        ["unicode", "\uD83D\uDE00ab"], ["unicode", "i\u00DF"],
         ["floor", -7, 2], ["floor", 7, -2], ["floor", 7, 0],
         ["floats", -7.5d, 2.0d], ["floats", 1.0d, 3.0d],
         ["spell", true, 1e16d, 0.1d], ["spell", false, 2.0d, 1e-5d],
@@ -219,6 +280,7 @@ class Pair:
         ["checked", 3], ["checked", 0],
         ["boxed", 3, 2.5d], ["boxed", 2147483647, 1e16d],
         ["signed", 1.0d, 0.1d], ["signed", -4.0d, 2.0d], ["signed", 4.0d, -2.0d],
+        ["parsed", "1, 2,3"], ["parsed", "-7"], ["parsed", "x"],
         ["host", "http://example.com/x"], ["host", "not a url"],
         ["entry", "k", 3],
         ["summed", 10, 3, 7], ["summed", 10, 0, 0], ["summed", 0, 0, 0],
@@ -227,6 +289,7 @@ class Pair:
         ["relooped", 3], ["relooped", 0],
         ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["maybe_count", 3], ["maybe_count", 0],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],
     ]
@@ -246,9 +309,20 @@ class Pair:
                 results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
                 results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
                 results[m]['edge'] = calc.edge(0)
+                results[m]['collected'] = calc.collected(new ArrayList<>(['b', ' ', 'a', 'b', 'c']), 2)
+                results[m]['indexed'] = calc.indexed(new ArrayList<>([5, 6, 7]), -1)
+                results[m]['indexed-out'] = invoke(calc, ['indexed', new ArrayList<>([5]), 3])
+                results[m]['priced'] = [calc.priced(new LinkedHashMap<>([tea: 1.5d]), 'tea'), calc.priced(new LinkedHashMap<>([tea: 1.5d]), 'milk')]
+                results[m]['tagged'] = calc.tagged(new ArrayList<>(['a', 'bb']))
+                results[m]['joined'] = calc.joined(new ArrayList<>(['x', 'y']))
+                results[m]['counted'] = calc.counted(new LinkedHashMap<>([x: 1]), new ArrayList<>(['a', 'b']))
+                results[m]['rows'] = calc.rows().collect { row -> row.collectEntries { k, v -> [(k.toString()): v] } }
+                results[m]['merged'] = calc.merged(new LinkedHashMap<>([b: '2', a: '3'])).collectEntries { k, v -> [(k.toString()): v.toString()] }
+                results[m]['viewed'] = calc.viewed('v').collectEntries { k, v -> [(k.toString()): v.toString()] }
+                results[m]['copied'] = calc.copied(new ArrayList<>(['a'])).collect { it.toString() }
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge']), decisions.toString()
+                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge', 'Calc.collected', 'Calc.indexed', 'Calc.priced', 'Calc.tagged', 'Calc.joined', 'Calc.counted', 'Calc.rows', 'Calc.mapped', 'Calc.merged', 'Calc.viewed', 'Calc.copied']), decisions.toString()
                 }
             } finally {
                 context.close()
@@ -264,7 +338,18 @@ class Pair:
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
         results[StaticCompilationMode.OFF]['words'] == 'a;b;'
-        results[StaticCompilationMode.OFF]['keyed'] == 11
+        results[StaticCompilationMode.OFF]['keyed'] == 3
+        results[StaticCompilationMode.OFF]['collected'] == ['B', 'A']
+        results[StaticCompilationMode.OFF]['indexed'] == 15
+        results[StaticCompilationMode.OFF]['indexed-out'] == 'raised'
+        results[StaticCompilationMode.OFF]['priced'] == [1.5d, -1.0d]
+        results[StaticCompilationMode.OFF]['tagged'] == [a: 1, bb: 2]
+        results[StaticCompilationMode.OFF]['joined'] == 'x, y|a-b|z|b|c'
+        results[StaticCompilationMode.OFF]['merged'] == [a: '3', b: '2', z: '9']
+        results[StaticCompilationMode.OFF]['viewed'] == [name: 'v', n: '1']
+        results[StaticCompilationMode.OFF]['copied'] == ['a', 'z']
+        results[StaticCompilationMode.OFF][["parsed", "1, 2,3"].toString()] == '6 6 6 3.0'
+        results[StaticCompilationMode.OFF][["parsed", "x"].toString()] == 'raised'
         results[StaticCompilationMode.OFF]['edge'] == 1
         results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
         results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'
