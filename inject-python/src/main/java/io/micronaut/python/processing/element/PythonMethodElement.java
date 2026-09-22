@@ -88,7 +88,7 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     private final ClassElement declaringType;
     private final ClassElement owningType;
     private final ClassElement returnType;
-    private final ParameterElement[] parameters;
+    private final PythonParameterElement[] parameters;
     private final MethodElementAnnotationsHelper helper;
 
     private ClassElement resolvedGenericReturnType;
@@ -518,13 +518,13 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
     }
 
     private ParameterElement[] resolveParameters() {
-        ParameterElement[] resolved = parameters;
+        PythonParameterElement[] resolved = parameters;
         for (MethodElement overriddenMethod : getOverriddenMethods()) {
             ParameterElement[] overriddenParameters = overriddenMethod.getParameters();
             if (overriddenParameters.length != resolved.length) {
                 continue;
             }
-            ParameterElement[] merged = null;
+            PythonParameterElement[] merged = null;
             for (int i = 0; i < resolved.length; i++) {
                 AnnotationMetadata inheritedMetadata = overriddenParameters[i].getAnnotationMetadata();
                 if (inheritedMetadata.isEmpty()) {
@@ -533,12 +533,10 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
                 if (merged == null) {
                     merged = resolved.clone();
                 }
-                merged[i] = resolved[i].withAnnotationMetadata(
-                    // Validation visitors mutate parameter metadata while inheriting constraints.
-                    // Keep the declared child metadata concrete here; a hierarchy as the declared
-                    // child cannot be mutated by AbstractAnnotationMetadataBuilder.
-                    new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(resolved[i].getAnnotationMetadata()))
-                );
+                // The overridden parameter's annotations are read through the Python parameter as inherited ones;
+                // annotations a visitor adds (the validation visitor, while inheriting constraints itself) go to the
+                // parameter's own metadata, which is cached for it.
+                merged[i] = resolved[i].withInheritedAnnotationMetadata(inheritedMetadata);
             }
             if (merged != null) {
                 resolved = merged;
@@ -738,23 +736,23 @@ public non-sealed class PythonMethodElement extends AbstractPythonElement implem
         );
     }
 
-    private ParameterElement[] createParameters(FunctionDef functionDef) {
+    private PythonParameterElement[] createParameters(FunctionDef functionDef) {
         List<ArgumentDef> arguments = functionDef.arguments().arguments();
         int size = arguments.size();
         if (size == 0) {
-            return ParameterElement.ZERO_PARAMETER_ELEMENTS;
+            return new PythonParameterElement[0];
         }
         // A `@classmethod` receives the class as its first argument, a `@staticmethod` doesn't,
         // and `self` is already stripped when the function is parsed.
         int offset = functionDef.isStatic() && isReceiverArgument(arguments.get(0)) ? 1 : 0;
-        List<ParameterElement> created = new ArrayList<>(size - offset);
+        List<PythonParameterElement> created = new ArrayList<>(size - offset);
 
         for (int i = offset; i < size; i++) {
             ArgumentDef argDef = arguments.get(i);
             created.add(new PythonParameterElement(argDef, environment, this, getElementAnnotationMetadataFactory()));
         }
 
-        return created.toArray(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+        return created.toArray(new PythonParameterElement[0]);
     }
 
     @Override

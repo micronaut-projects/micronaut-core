@@ -25,3 +25,13 @@ class PythonDescribable(Describable):
 On the Python side the instance is a plain Python object: `isinstance`, `==` and `is` behave as for any Python class, whether the object is injected into another Python bean, looked up with `ApplicationContext.getBean` or created with the class itself. The default methods of the interface (and of the interfaces it extends) that the class does not override are available on it all the same. Calling one runs the Java default implementation on the Java view of the object, so the calls a default implementation makes to other interface methods reach the Python definitions.
 
 Only interfaces can be implemented this way: a Python class cannot extend a concrete Java class.
+
+== Inherited Parameter Constraints
+
+A Python override adopts the parameter annotations of the Java method it overrides, the way an overriding Java method does. When the interface declares <<validation, validation>> constraints on its parameters and `micronaut-validation-processor` is on the annotation processor path of the Python sources, the Python bean is validated without any decorator of its own, including the constraints inherited by the methods it does not override:
+
+snippet::micronaut.docs.javainterfaces.PythonMessageSender[tags="imports,class", indent=0, title="Implementing a constrained Java interface"]
+
+<1> A cascaded (`@Valid`) argument is validated through the introspection of the dataclass
+<2> The interface, declared as `interface MessageSender<M> { String send(@NotBlank String recipient, @NotNull @Valid M message); default String broadcast(@NotNull @Valid M message) { ... } }`
+<3> The override needs no constraint of its own: `send("", message)` and `send("bob", None)` raise a `ConstraintViolationException`, as does `broadcast(Message(""))`, the inherited default method
