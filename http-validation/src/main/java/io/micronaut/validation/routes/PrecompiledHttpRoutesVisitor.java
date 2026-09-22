@@ -18,7 +18,6 @@ package io.micronaut.validation.routes;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.core.annotation.Generated;
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Controller;
@@ -51,7 +50,6 @@ import org.jspecify.annotations.Nullable;
 import javax.lang.model.element.Modifier;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.lang.reflect.Constructor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -74,9 +72,14 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
     private static final String PLACEHOLDER = "${";
     private static final ClassTypeDef ROUTE_TYPE = ClassTypeDef.of(PrecompiledRoute.class);
     /**
-     * The canonical constructor, which types the {@code null} arguments of the generated calls.
+     * The parameter types of the canonical constructor of {@link PrecompiledRoute}, which type the
+     * {@code null} arguments of the generated calls.
      */
-    private static final Constructor<?> ROUTE_CONSTRUCTOR = PrecompiledRoute.class.getConstructors()[0];
+    private static final List<TypeDef> ROUTE_CONSTRUCTOR = List.of(
+        TypeDef.STRING, TypeDef.STRING, TypeDef.STRING.array(), TypeDef.STRING, TypeDef.STRING, TypeDef.STRING,
+        TypeDef.STRING.array(), TypeDef.STRING.array(), TypeDef.Primitive.BOOLEAN, TypeDef.Primitive.INT,
+        TypeDef.Primitive.BOOLEAN, TypeDef.STRING, TypeDef.Primitive.INT, TypeDef.Primitive.INT
+    );
     /**
      * The naming strategy the runtime uses with precompiled routes.
      */
@@ -314,7 +317,9 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
             .addSuperinterface(ClassTypeDef.of(PrecompiledHttpRoutesDefinition.class));
 
         List<ExpressionDef> controllerNames = controllerTypes.stream().map(name -> (ExpressionDef) ExpressionDef.constant(name)).toList();
-        classDefBuilder.addMethod(MethodDef.override(ReflectionUtils.getRequiredMethod(PrecompiledHttpRoutesDefinition.class, "controllerTypes"))
+        classDefBuilder.addMethod(MethodDef.builder("controllerTypes")
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeDef.STRING.array())
             .build((aThis, methodParameters) -> TypeDef.STRING.array().instantiate(controllerNames).returning()));
 
         // a method per route keeps every method far below the bytecode size limit
@@ -345,7 +350,9 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
             classDefBuilder.addMethod(routeMethod);
         }
         ClassTypeDef thisType = ClassTypeDef.of(className);
-        classDefBuilder.addMethod(MethodDef.override(ReflectionUtils.getRequiredMethod(PrecompiledHttpRoutesDefinition.class, "routes"))
+        classDefBuilder.addMethod(MethodDef.builder("routes")
+            .addModifiers(Modifier.PUBLIC)
+            .returns(ROUTE_TYPE.array())
             .build((aThis, methodParameters) -> ROUTE_TYPE.array().instantiate(
                 routeMethods.stream().map(thisType::invokeStatic).toList()
             ).returning()));

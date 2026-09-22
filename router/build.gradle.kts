@@ -30,6 +30,8 @@ tasks.withType<Test>().configureEach {
 //compileTestGroovy.groovyOptions.fork = true
 
 noReflection {
+    // loads the routes an annotation processor precompiled, see PrecompiledHttpRoutesDefinition
+    allowIn("io.micronaut.web.router.AnnotatedMethodRouteBuilder", "SERVICE_LOADING")
     allowIn("io.micronaut.web.router.AbstractRouteMatch", "TARGET_MEMBERS")
     allowIn("io.micronaut.web.router.DefaultErrorRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.DefaultRouteBuilder", "CLASS_NAMES")
