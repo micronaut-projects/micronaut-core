@@ -22,6 +22,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
@@ -49,6 +50,11 @@ import java.util.function.Predicate;
 @Internal
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
 
+    /**
+     * The filters of this route only, in the order the filter chain runs them. Set when the route
+     * is built, before the route info is published.
+     */
+    List<GenericHttpFilter> routeFilters = List.of();
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
