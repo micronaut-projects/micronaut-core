@@ -72,6 +72,8 @@ import java.util.function.Predicate;
  * @param returnHandler       The return handler
  * @param isConditional       Is conditional filter
  * @param executor            The executor to run this filter on
+ * @param mutableRequestIndex The index of the {@link MutableHttpRequest} argument of a request
+ *                            filter without a continuation, or {@code -1}
  * @author Jonas Konrad
  * @author Denis Stepanov
  * @since 4.2.0
@@ -93,7 +95,8 @@ record MethodFilter<T>(FilterOrder order,
                        boolean filtersException,
                        FilterReturnHandler returnHandler,
                        boolean isConditional,
-                       @Nullable Executor executor) implements InternalHttpFilter {
+                       @Nullable Executor executor,
+                       int mutableRequestIndex) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
     /**
@@ -127,6 +130,7 @@ record MethodFilter<T>(FilterOrder order,
         boolean skipOnError = isResponseFilter;
         boolean filtersException = false;
         ContinuationCreator continuationCreator = null;
+        int mutableRequestIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
@@ -136,6 +140,7 @@ record MethodFilter<T>(FilterOrder order,
                 // todo: only permit for server
                 fulfilled[i] = ctx -> (ServerHttpRequest<?>) ctx.request;
             } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
+                mutableRequestIndex = i;
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
@@ -238,7 +243,8 @@ record MethodFilter<T>(FilterOrder order,
             filtersException,
             returnHandler,
             bean instanceof ConditionalFilter,
-            executor
+            executor,
+            isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex
         );
     }
 
@@ -389,6 +395,9 @@ record MethodFilter<T>(FilterOrder order,
                 returnValue = Objects.requireNonNull(method).invoke(bean, args);
             }
             ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
+            if (mutableRequestIndex >= 0) {
+                executionFlow = keepChangedUri(filterContext, args[mutableRequestIndex], executionFlow);
+            }
             PropagatedContext mutatedPropagatedContext = methodContext.mutablePropagatedContext.getContext();
             if (mutatedPropagatedContext != filterContext.propagatedContext() && mutatedPropagatedContext != null) {
                 executionFlow = executionFlow.map(fc -> fc.withPropagatedContext(mutatedPropagatedContext));
@@ -397,6 +406,26 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * A request filter that is given a {@link MutableHttpRequest} while the request is not
+     * mutable receives a mutable view of it, see {@link HttpRequest#mutate()}. The headers of the
+     * view are those of the request, but a new URI is the view's own: when the filter changes
+     * the URI in place and does not return a request, the view replaces the request, so that
+     * the new URI is used, e.g. to match the route after a pre-matching filter.
+     *
+     * @param filterContext The context the filter ran with
+     * @param argument      The mutable request the filter was given
+     * @param flow          The result of the filter
+     * @return The result, with the changed request if the filter changed the URI in place
+     */
+    private static ExecutionFlow<FilterContext> keepChangedUri(FilterContext filterContext, @Nullable Object argument, ExecutionFlow<FilterContext> flow) {
+        HttpRequest<?> request = filterContext.request();
+        if (!(argument instanceof MutableHttpRequest<?> view) || argument == request || view.getUri().equals(request.getUri())) {
+            return flow;
+        }
+        return flow.map(result -> result.request() == request && result.response() == null ? result.withRequest(view) : result);
     }
 
     private Object[] bindArgsSync(FilterMethodContext context) {
