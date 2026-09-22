@@ -1,10 +1,12 @@
 package io.micronaut.web.router.proof;
 
 import io.micronaut.core.annotation.NonNull;
+import io.micronaut.core.naming.NameUtils;
+import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.MethodElement;
-import io.micronaut.inject.ast.ParameterElement;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.GeneratedFile;
@@ -14,23 +16,23 @@ import java.io.UncheckedIOException;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 
 /**
  * An annotation processor of a made-up web framework. It reads the framework's own annotations,
- * {@code @Resource}, {@code @Read}, {@code @Write}, {@code @Param} and {@code @Field}, and writes
- * the routes of each resource at compile time: a {@code @Singleton} {@code HttpRoutes} bean whose
- * handler functions call the resource bean's methods directly, with the arguments taken from the
- * path variables and the form. Nothing is read by reflection at runtime, and the resource needs no
- * executable methods.
+ * {@code @Resource}, {@code @Read} and {@code @Write}, and declares the routes of each resource
+ * at compile time as an enum of {@code RouteDeclaration}s: one constant per annotated method,
+ * with the HTTP method, the URI template and the keys the router indexes and orders routes by,
+ * computed here once. Handler functions are bound to the constants at runtime with
+ * {@code routes.handle(PetResourceRoutes.NAME, handler)}; the router registers the routes without
+ * parsing their templates and builds each one the first time it is used.
  */
 public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, Object> {
 
     static final String RESOURCE = "petstore.web.Resource";
     static final String READ = "petstore.web.Read";
     static final String WRITE = "petstore.web.Write";
-    static final String PARAM = "petstore.web.Param";
-    static final String FIELD = "petstore.web.Field";
 
     @Override
     public @NonNull VisitorKind getVisitorKind() {
@@ -48,34 +50,65 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
             return;
         }
         String basePath = element.stringValue(RESOURCE).orElse("");
-        List<String> routes = new ArrayList<>();
+        List<String> constants = new ArrayList<>();
         for (MethodElement method : element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared())) {
             if (method.hasDeclaredAnnotation(READ)) {
-                routes.add(readRoute(basePath + method.stringValue(READ).orElse(""), method));
+                constants.add(constant(method, "GET", basePath + method.stringValue(READ).orElse("")));
             } else if (method.hasDeclaredAnnotation(WRITE)) {
-                routes.add(writeRoute(basePath + method.stringValue(WRITE).orElse(""), method));
+                constants.add(constant(method, "POST", basePath + method.stringValue(WRITE).orElse("")));
             }
         }
-        String routesName = element.getSimpleName() + "Routes";
-        // a plain source bean: a class annotated @Generated is not processed into a bean definition
+        String name = element.getSimpleName() + "Routes";
         String source = """
             package %s;
 
-            @jakarta.inject.Singleton
-            final class %s implements io.micronaut.web.router.HttpRoutes {
-                private final io.micronaut.context.BeanProvider<%s> target;
+            /**
+             * The routes of {@link %s}, declared at compile time from its web annotations.
+             */
+            public enum %s implements io.micronaut.web.router.RouteDeclaration {
+            %s;
 
-                %s(io.micronaut.context.BeanProvider<%s> target) {
-                    this.target = target;
+                private final io.micronaut.http.HttpMethod httpMethod;
+                private final String uriTemplate;
+                private final String requiredPathPrefix;
+                private final int rawLength;
+                private final int pathVariableCount;
+
+                %s(io.micronaut.http.HttpMethod httpMethod, String uriTemplate, String requiredPathPrefix, int rawLength, int pathVariableCount) {
+                    this.httpMethod = httpMethod;
+                    this.uriTemplate = uriTemplate;
+                    this.requiredPathPrefix = requiredPathPrefix;
+                    this.rawLength = rawLength;
+                    this.pathVariableCount = pathVariableCount;
                 }
 
                 @Override
-                public void routes(io.micronaut.web.router.RouteBuilder routes) {
-            %s
+                public io.micronaut.http.HttpMethod httpMethod() {
+                    return httpMethod;
+                }
+
+                @Override
+                public String uriTemplate() {
+                    return uriTemplate;
+                }
+
+                @Override
+                public String requiredPathPrefix() {
+                    return requiredPathPrefix;
+                }
+
+                @Override
+                public int rawLength() {
+                    return rawLength;
+                }
+
+                @Override
+                public int pathVariableCount() {
+                    return pathVariableCount;
                 }
             }
-            """.formatted(element.getPackageName(), routesName, element.getSimpleName(), routesName, element.getSimpleName(), String.join("\n", routes));
-        GeneratedFile file = context.visitGeneratedSourceFile(element.getPackageName(), routesName, element)
+            """.formatted(element.getPackageName(), element.getSimpleName(), name, String.join(",\n", constants), name);
+        GeneratedFile file = context.visitGeneratedSourceFile(element.getPackageName(), name, element)
             .orElseThrow(() -> new IllegalStateException("Cannot write the routes of " + element.getName()));
         try (Writer writer = file.openWriter()) {
             writer.write(source);
@@ -84,55 +117,14 @@ public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, 
         }
     }
 
-    private static String readRoute(String uri, MethodElement method) {
-        List<String> arguments = new ArrayList<>();
-        for (ParameterElement parameter : method.getParameters()) {
-            arguments.add(accessor("pathVariables", parameter.stringValue(PARAM).orElse(parameter.getName()), parameter));
-        }
-        return "        routes.GET(\"" + uri + "\", (request, pathVariables) -> " + respond(method, arguments) + ");";
-    }
-
-    private static String writeRoute(String uri, MethodElement method) {
-        List<String> arguments = new ArrayList<>();
-        for (ParameterElement parameter : method.getParameters()) {
-            if (parameter.hasDeclaredAnnotation(PARAM)) {
-                arguments.add(accessor("pathVariables", parameter.stringValue(PARAM).orElseThrow(), parameter));
-            } else {
-                arguments.add(accessor("form", parameter.stringValue(FIELD).orElse(parameter.getName()), parameter));
-            }
-        }
-        return "        routes.POST(\"" + uri + "\", (request, pathVariables, form) -> " + respond(method, arguments) + ");";
-    }
-
     /**
-     * The call of the resource method, and the response: 204 for a void method, 200 with the
-     * result as the body otherwise.
+     * A constant for a method: the keys are computed like the router computes them for a route
+     * built at runtime.
      */
-    private static String respond(MethodElement method, List<String> arguments) {
-        String call = "target.get()." + method.getName() + "(" + String.join(", ", arguments) + ")";
-        if (method.getReturnType().getName().equals("void")) {
-            return "{ " + call + "; return io.micronaut.http.HttpResponse.noContent(); }";
-        }
-        return "io.micronaut.http.HttpResponse.ok(" + call + ")";
-    }
-
-    /**
-     * The typed accessor of the value of a parameter: a primitive or string getter, or the
-     * generic one for any other type.
-     */
-    private static String accessor(String source, String name, ParameterElement parameter) {
-        String type = parameter.getType().getName();
-        String getter = switch (type) {
-            case "java.lang.String" -> "getString";
-            case "int" -> "getInt";
-            case "long" -> "getLong";
-            case "double" -> "getDouble";
-            case "boolean" -> "getBoolean";
-            default -> null;
-        };
-        if (getter != null) {
-            return source + "." + getter + "(\"" + name + "\")";
-        }
-        return source + ".get(\"" + name + "\", " + type + ".class)";
+    private static String constant(MethodElement method, String httpMethod, String uri) {
+        UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uri).getTemplateString());
+        return "    " + NameUtils.environmentName(method.getName()).toUpperCase(Locale.ENGLISH)
+            + "(io.micronaut.http.HttpMethod." + httpMethod + ", \"" + uri + "\", \"" + matcher.getRequiredPrefix() + "\", "
+            + matcher.getRawLength() + ", " + matcher.getPathVariableCount() + ")";
     }
 }

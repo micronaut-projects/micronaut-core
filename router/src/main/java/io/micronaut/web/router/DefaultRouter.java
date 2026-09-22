@@ -149,9 +149,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                     preconditionFilterRoutes.add(filterRoute);
                 }
             }
-            if (builder instanceof AnnotatedMethodRouteBuilder annotatedBuilder) {
-                // builds the routes with a port, which registers the exposed ports
-                for (LazyUriRouteInfo uriRouteInfo : annotatedBuilder.precompiledRouteInfos()) {
+            if (builder instanceof DefaultRouteBuilder defaultBuilder) {
+                // precompiled controller routes and declared handler routes, built when first used
+                for (LazyUriRouteInfo uriRouteInfo : defaultBuilder.lazyRouteInfos()) {
                     HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
                     if (httpMethod == HttpMethod.CUSTOM) {
                         customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);

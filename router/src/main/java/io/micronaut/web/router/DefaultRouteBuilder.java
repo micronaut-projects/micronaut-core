@@ -87,6 +87,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
+    private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
+
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService conversionService;
@@ -101,6 +103,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     private final List<ErrorRoute> errorRoutes = new ArrayList<>();
     private final List<FilterRoute> filterRoutes = new ArrayList<>();
     private final Set<Integer> exposedPorts = new HashSet<>(5);
+    private final List<DeclaredUriRoute> declaredRoutes = new ArrayList<>(0);
+    private final List<DeclaredUriRoute> implicitHeadDeclaredRoutes = new ArrayList<>(0);
 
     /**
      * @param executionHandleLocator The execution handler locator
@@ -396,19 +400,100 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     @Override
     public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE);
+            .consumes(FORM_MEDIA_TYPES);
     }
 
     @Override
     public UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
         return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE);
+            .consumes(FORM_MEDIA_TYPES);
     }
 
     @Override
     public UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         return buildRoute(method.name(), method, uri, handlerHandle(HandlerMethod.of(handler)))
-            .consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE);
+            .consumes(FORM_MEDIA_TYPES);
+    }
+
+    @Override
+    public UriRoute handle(RouteDeclaration route, RequestHandler handler) {
+        return declare(route, HandlerMethod.of(handler), null);
+    }
+
+    @Override
+    public <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return declare(route, HandlerMethod.of(bodyType, handler), null);
+    }
+
+    @Override
+    public UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+        return declare(route, HandlerMethod.of(handler), null);
+    }
+
+    @Override
+    public UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
+    }
+
+    @Override
+    public UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
+    }
+
+    @Override
+    public UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+        return declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES);
+    }
+
+    /**
+     * Bind a handler to a declared route: the route is built when the router first uses it.
+     *
+     * @param declaration The declared route
+     * @param method      The handler
+     * @param consumes    The media types the route consumes, or {@code null} for the default
+     * @return The route
+     */
+    private UriRoute declare(RouteDeclaration declaration, HandlerMethod<?> method, MediaType @Nullable [] consumes) {
+        HttpMethod httpMethod = declaration.httpMethod();
+        String uri = declaration.uriTemplate();
+        MethodExecutionHandle<Object, Object> handle = handlerHandle(method);
+        if (currentParentRoute != null || !routeUri(uri).equals(uri)) {
+            // nested, or under a context path: the keys of the declaration do not describe the route
+            UriRoute route = buildRoute(httpMethod.name(), httpMethod, uri, handle);
+            return consumes == null ? route : route.consumes(consumes);
+        }
+        DeclaredUriRoute route = new DeclaredUriRoute(
+            declaration,
+            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), handle, httpMethod.name(), conversionService),
+            exposedPorts::add
+        );
+        if (consumes != null) {
+            route.consumes(consumes);
+        }
+        declaredRoutes.add(route);
+        return route;
+    }
+
+    /**
+     * The routes that are built when the router first uses them: here, the handler functions
+     * bound to declared routes, and their implicit {@code HEAD} routes. Their configuration is
+     * fixed when this method is called.
+     *
+     * @return The routes
+     */
+    List<LazyUriRouteInfo> lazyRouteInfos() {
+        if (declaredRoutes.isEmpty()) {
+            return List.of();
+        }
+        List<LazyUriRouteInfo> infos = new ArrayList<>(declaredRoutes.size() + implicitHeadDeclaredRoutes.size());
+        for (DeclaredUriRoute route : declaredRoutes) {
+            route.fix();
+            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false, route::toRouteInfo));
+        }
+        for (DeclaredUriRoute route : implicitHeadDeclaredRoutes) {
+            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true, route::implicitHeadRouteInfo));
+        }
+        return infos;
     }
 
     @Override
@@ -550,6 +635,22 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             if (!headTemplates.contains(getRoute.uriMatchTemplate)
                 && getRoute.targetMethod.booleanValue(Get.class, "headRoute").orElse(true)) {
                 uriRoutes.add(getRoute.implicitHeadCopy());
+            }
+        }
+        // declared routes, compared by their templates without building them
+        Set<String> declaredHeads = new HashSet<>();
+        for (UriMatchTemplate template : headTemplates) {
+            declaredHeads.add(template.toString());
+        }
+        for (DeclaredUriRoute route : declaredRoutes) {
+            if (route.declaration().httpMethod() == HttpMethod.HEAD) {
+                declaredHeads.add(route.declaration().uriTemplate());
+            }
+        }
+        for (DeclaredUriRoute route : declaredRoutes) {
+            if (route.declaration().httpMethod() == HttpMethod.GET && !declaredHeads.contains(route.declaration().uriTemplate())
+                && !implicitHeadDeclaredRoutes.contains(route)) {
+                implicitHeadDeclaredRoutes.add(route);
             }
         }
     }
