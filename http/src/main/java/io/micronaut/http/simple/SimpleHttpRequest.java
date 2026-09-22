@@ -49,6 +49,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     private final SimpleHttpParameters parameters = new SimpleHttpParameters(ConversionService.SHARED);
 
     private final HttpMethod method;
+    private final String methodName;
     private URI uri;
     private @Nullable Object body;
 
@@ -60,7 +61,21 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
      * @param body   the optional body of the request
      */
     public SimpleHttpRequest(HttpMethod method, String url, @Nullable B body) {
+        this(method, url, body, method.name());
+    }
+
+    /**
+     * Simple {@link MutableHttpRequest} implementation, also for a non-standard HTTP method.
+     *
+     * @param method     the HTTP method, {@link HttpMethod#CUSTOM} for a non-standard method
+     * @param url        the URI of the request
+     * @param body       the optional body of the request
+     * @param methodName the name of the method, e.g. {@code PROPFIND}
+     * @since 5.3.0
+     */
+    public SimpleHttpRequest(HttpMethod method, String url, @Nullable B body, String methodName) {
         this.method = method;
+        this.methodName = methodName;
         try {
             this.uri = new URI(url);
         } catch (URISyntaxException e) {
@@ -122,6 +137,11 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
     @Override
     public HttpMethod getMethod() {
         return this.method;
+    }
+
+    @Override
+    public String getMethodName() {
+        return this.methodName;
     }
 
     @Override
