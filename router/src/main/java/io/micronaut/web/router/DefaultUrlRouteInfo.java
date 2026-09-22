@@ -43,6 +43,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -353,6 +354,67 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Internal
     public boolean isSelectedByEngine() {
         return routeMatchSelector != null;
+    }
+
+    /**
+     * The route selector of the engine negotiates the media types (a JAX-RS engine, for example,
+     * with {@code image/*} against {@code image/png;qs=0.6}), so every route whose types are
+     * compatible with the content type reaches it, not only the routes that consume the same
+     * type. The routes of other engines keep the Micronaut checks.
+     */
+    @Override
+    public boolean doesConsume(@Nullable MediaType contentType) {
+        if (routeMatchSelector == null) {
+            return super.doesConsume(contentType);
+        }
+        return contentType == null || consumesMediaTypesContainsAll || anyCompatible(consumesMediaTypes, contentType);
+    }
+
+    /**
+     * The route selector of the engine negotiates the media types, so every route whose types
+     * are compatible with an accepted type reaches it, see {@link #doesConsume(MediaType)}.
+     */
+    @Override
+    public boolean doesProduce(@Nullable Collection<MediaType> acceptableTypes) {
+        if (routeMatchSelector == null) {
+            return super.doesProduce(acceptableTypes);
+        }
+        if (producesMediaTypesContainsAll || acceptableTypes == null || acceptableTypes.isEmpty()) {
+            return true;
+        }
+        for (MediaType acceptableType : acceptableTypes) {
+            if (anyCompatible(producesMediaTypes, acceptableType)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * The route selector of the engine negotiates the media types, see
+     * {@link #doesConsume(MediaType)}.
+     */
+    @Override
+    public boolean doesProduce(@Nullable MediaType acceptableType) {
+        if (routeMatchSelector == null) {
+            return super.doesProduce(acceptableType);
+        }
+        return producesMediaTypesContainsAll || acceptableType == null || anyCompatible(producesMediaTypes, acceptableType);
+    }
+
+    /**
+     * @param types     The types of a route
+     * @param mediaType A type of a request
+     * @return Whether one of the types matches the type in one direction or the other, without
+     * the parameters, {@code *}{@code /*} matching every type
+     */
+    private static boolean anyCompatible(List<MediaType> types, MediaType mediaType) {
+        for (MediaType type : types) {
+            if (type.matches(mediaType) || mediaType.matches(type)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
