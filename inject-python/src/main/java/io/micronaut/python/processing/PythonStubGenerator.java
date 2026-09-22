@@ -4231,7 +4231,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
 
-        ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
+        ClassElement effectiveReturnType = unhintedBridgeReturnType(methodElement, spec, returnTypeOverride);
         ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
             ? null
             : resolvedSignatureMethod.getGenericReturnType();
@@ -4468,6 +4468,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             TypeDef.of(CompletionStage.class),
             pythonCoroutine
         ).cast(TypeDef.of(CompletionStage.class)).cast(methodSourceReturnType);
+    }
+
+    /**
+     * The type a bridge converts the Python result to when the Python method declares no return hint: the
+     * (generic-resolved) return type of the Java method it implements, so that the conversion produces what
+     * the generated signature declares. Without it the result is converted as a plain object and cast, which
+     * fails for a value the conversion has to build ({@code PythonConversion.convertObject} of a Python lambda
+     * is a polyglot function, not the {@code BindingResult} functional interface the signature declares). The
+     * element model adopts the inherited signature for such an override in the same way.
+     */
+    private static ClassElement unhintedBridgeReturnType(MethodElement methodElement, BridgeMethodSpec spec, @Nullable ClassElement returnTypeOverride) {
+        ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
+        if (returnTypeOverride != null
+            || spec.resolvedSignatureMethod() == methodElement
+            || !Object.class.getName().equals(effectiveReturnType.getName())
+            || !(methodElement instanceof PythonMethodElement pythonMethod)
+            || pythonMethod.getNativeType().returnType().typeAnnotation() != null) {
+            return effectiveReturnType;
+        }
+        ClassElement inheritedReturnType = spec.resolvedSignatureMethod().getGenericReturnType();
+        if (inheritedReturnType.isVoid()
+            || inheritedReturnType instanceof GenericPlaceholderElement
+            || Object.class.getName().equals(inheritedReturnType.getName())) {
+            return effectiveReturnType;
+        }
+        return inheritedReturnType;
     }
 
     private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {
