@@ -33,7 +33,9 @@ import java.util.Optional;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A {@link FormPart} over a raw form field, whose content is read at most once.
+ * A {@link FormPart} over a raw form field, whose content is read at most once. The consumer the
+ * part is handed to owns it until {@link #release()}: then the content it did not consume is
+ * discarded, including an upload it obtained with {@link #stream()} but did not read.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -43,7 +45,10 @@ final class DefaultFormPart implements FormPart {
     private final RawFormField field;
     private final FormFactory formFactory;
     private final Charset charset;
-    private volatile boolean read;
+    // guarded by this
+    private boolean read;
+    private boolean released;
+    private @Nullable StreamingFileUpload upload;
 
     DefaultFormPart(RawFormField field, FormFactory formFactory, Charset charset) {
         this.field = field;
@@ -68,18 +73,23 @@ final class DefaultFormPart implements FormPart {
 
     @Override
     public CompletionStage<String> text() {
-        claim();
-        return InternalByteBody.bufferFlow(field.byteBody()).map(body -> {
-            try (CloseableAvailableByteBody available = body) {
-                return available.toString(charset);
-            }
-        }).toCompletableFuture();
+        synchronized (this) {
+            claim();
+            return InternalByteBody.bufferFlow(field.byteBody()).map(body -> {
+                try (CloseableAvailableByteBody available = body) {
+                    return available.toString(charset);
+                }
+            }).toCompletableFuture();
+        }
     }
 
     @Override
     public StreamingFileUpload stream() {
-        claim();
-        return formFactory.streamFileUpload(field);
+        synchronized (this) {
+            claim();
+            upload = formFactory.streamFileUpload(field);
+            return upload;
+        }
     }
 
     @Override
@@ -88,17 +98,29 @@ final class DefaultFormPart implements FormPart {
     }
 
     /**
-     * Close the content if the consumer did not read it.
+     * End the ownership of the consumer: discard what it did not consume. An upload it obtained
+     * and read keeps working, as closing a claimed body is a no-op; an upload it did not read is
+     * closed with its content. Reading the part afterwards fails.
      */
-    void discardIfUnread() {
-        if (!read) {
-            read = true;
+    void release() {
+        StreamingFileUpload handedOut;
+        synchronized (this) {
+            if (released) {
+                return;
+            }
+            released = true;
+            handedOut = upload;
+        }
+        if (handedOut != null) {
+            handedOut.close();
+        } else {
             field.close();
         }
     }
 
+    // called holding the lock
     private void claim() {
-        if (read) {
+        if (read || released) {
             throw new IllegalStateException("The content of form part " + name() + " was already read or discarded");
         }
         read = true;
