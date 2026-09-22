@@ -1038,7 +1038,6 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final List<GenericHttpFilter> requestFilters = new ArrayList<>(0);
         private final List<GenericHttpFilter> responseFilters = new ArrayList<>(0);
         private boolean implicitHead;
-        private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
         /**
          * @param httpMethod The HTTP method
@@ -1146,7 +1145,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 List.copyOf(conditions),
                 port,
                 conversionService,
-                executorSelector,
+                // the executor choice as it is now: a later change to the route does not change the route info
+                new RouteExecutorSelector(executeOn, nonBlocking),
                 messageBodyHandlerRegistry,
                 implicitHead
             );
@@ -1369,16 +1369,28 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             return uriMatchTemplate.compareTo(o.getUriMatchTemplate());
         }
 
+        /**
+         * Selects the executor of a route info, with the choice of the route when the route info
+         * was built.
+         */
         private final class RouteExecutorSelector implements ExecutorSelector {
+            private final @Nullable String executorName;
+            private final boolean eventLoop;
+
+            RouteExecutorSelector(@Nullable String executorName, boolean eventLoop) {
+                this.executorName = executorName;
+                this.eventLoop = eventLoop;
+            }
+
             @Override
             public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
                 // like @ExecuteOn and @NonBlocking on the method
-                String name = executeOn;
+                String name = executorName;
                 if (name != null) {
                     return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
                         targetMethod.getExecutableMethod(), "No executor configured for name: " + name)));
                 }
-                if (nonBlocking && threadSelection == ThreadSelection.AUTO) {
+                if (eventLoop && threadSelection == ThreadSelection.AUTO) {
                     return Optional.empty();
                 }
                 if (DefaultRouteBuilder.this.executorSelector != null) {
@@ -1399,7 +1411,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
             @Override
             public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
-                if (executeOn != null || nonBlocking) {
+                if (executorName != null || eventLoop) {
                     // selects with the route's choice, see select(MethodReference, ThreadSelection)
                     return ExecutorSelector.super.selectExecutor(method, configuration);
                 }

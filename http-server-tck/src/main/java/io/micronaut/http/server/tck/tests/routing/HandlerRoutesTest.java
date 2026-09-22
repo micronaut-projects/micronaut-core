@@ -43,8 +43,8 @@ import io.micronaut.web.router.RouteSource;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
 import io.micronaut.web.router.Router;
-import io.micronaut.web.router.builder.RouteBuilder;
-import io.micronaut.web.router.builder.UriRoute;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteSpec;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Tag;
@@ -57,6 +57,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -65,6 +66,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -114,6 +116,16 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void asyncBodyHandlerDecodesTheBodyAndCompletesLater() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/async-items", Map.of("name", "apple")), HttpResponseAssertion.builder()
+                .status(HttpStatus.CREATED)
+                .body("{\"saved\":\"apple later\"}")
+                .build());
+        }
+    }
+
+    @Test
     void asyncHandlerCompletesTheResponse() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/async"), HttpResponseAssertion.builder()
@@ -155,6 +167,21 @@ public class HandlerRoutesTest {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/guarded").header("X-Token", "secret"), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("guarded")
+                .build());
+        }
+    }
+
+    @Test
+    void routeResponseFiltersAlsoFilterTheAnswerOfARouteRequestFilter() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/rejected"), HttpResponseAssertion.builder()
+                .status(HttpStatus.FORBIDDEN)
+                .headers(Map.of("X-After", "after1,after2"))
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/rejected").header("X-Token", "secret"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("accepted")
+                .headers(Map.of("X-After", "after1,after2"))
                 .build());
         }
     }
@@ -363,6 +390,59 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    @Tag("multipart")
+    void aStreamObtainedButNotReadIsDiscarded() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (int i = 0; i < 2; i++) {
+                // twice: the form continues past the abandoned part, and the connection stays usable
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-abandoned", largeForm()).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("name=Fred;age=42;")
+                    .build());
+            }
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void aConsumerFailingAfterObtainingAStreamIsAnsweredLikeAnyError() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (int i = 0; i < 2; i++) {
+                AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-failing", largeForm()).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .build());
+            }
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/hello/Fred"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("Hello Fred")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void closingThePartsWhileAConsumerHoldsAPartDiscardsIt() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (int i = 0; i < 2; i++) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-close-pending", largeForm()).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("closed while pending")
+                    .build());
+            }
+        }
+    }
+
+    private static MultipartBody largeForm() {
+        byte[] archive = new byte[256 * 1024];
+        Arrays.fill(archive, (byte) 'x');
+        return MultipartBody.builder()
+            .addPart("name", "Fred")
+            .addPart("archive", "archive.bin", MediaType.APPLICATION_OCTET_STREAM_TYPE, archive)
+            .addPart("age", "42")
+            .build();
+    }
+
+    @Test
     void handlerIsBoundToADeclaredRoute() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/5"), HttpResponseAssertion.builder()
@@ -381,10 +461,32 @@ public class HandlerRoutesTest {
     }
 
     @Test
-    void declaredRouteIsLazyAndFixedWhenTheRouterIsBuilt() throws IOException {
+    void routeConfigurationIsFixedWhenTheRouterIsBuilt() throws IOException {
+        try (ServerUnderTest server = server()) {
+            FrozenRoutes routes = server.getApplicationContext().getBean(FrozenRoutes.class);
+            // changed after the router took the routes, before the first request: ignored
+            routes.consumes[0] = MediaType.APPLICATION_XML_TYPE;
+            routes.produces[0] = MediaType.IMAGE_PNG_TYPE;
+            routes.eagerThread.executeOn("handler-filter");
+            routes.declaredThread.executeOn("handler-filter");
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/frozen/declared", "fred")
+                .contentType(MediaType.TEXT_PLAIN_TYPE)
+                .accept(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("saved fred")
+                .build());
+            for (String path : List.of("/fn/frozen/eager-thread", "/fn/frozen/declared-thread")) {
+                String thread = server.exchange(HttpRequest.GET(path), String.class).body();
+                assertNotEquals("handler-filter-thread", thread, path);
+            }
+        }
+    }
+
+    @Test
+    void declaredRouteIsFixedWhenTheRouterIsBuilt() throws IOException {
         try (ServerUnderTest server = server()) {
             Router router = server.getApplicationContext().getBean(Router.class);
-            assertTrue(router.uriRoutes().anyMatch(route -> route.toString().startsWith("GET /fn/declared/{id}") && route.getClass().getSimpleName().equals("LazyUriRouteInfo")));
+            assertTrue(router.uriRoutes().anyMatch(route -> route.toString().startsWith("GET /fn/declared/{id}")));
             // changed after the router took the route: ignored
             server.getApplicationContext().getBean(DeclaredRoutes.class).route.consumes(MediaType.TEXT_XML_TYPE).before(request -> HttpResponse.serverError());
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/6"), HttpResponseAssertion.builder()
@@ -512,6 +614,8 @@ public class HandlerRoutesTest {
                     HttpResponse.ok("Hello " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
+                routes.asyncPOST("/fn/async-items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
+                    completeLater(executor, () -> HttpResponse.created(Map.of("saved", item.get("name") + " later"))));
                 routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
                 routes.GET("/fn/guarded", (request, pathVariables) -> HttpResponse.ok("guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
@@ -596,6 +700,42 @@ public class HandlerRoutesTest {
                             return HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE);
                         });
                 });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-abandoned", (request, pathVariables, parts) -> {
+                    StringBuilder result = new StringBuilder();
+                    return parts.forEach(part -> {
+                        if (part.isFile()) {
+                            // obtained, never read: discarded when the consumer's stage completes
+                            part.stream();
+                            return CompletableFuture.completedFuture(null);
+                        }
+                        return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
+                    }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-failing", (request, pathVariables, parts) ->
+                    parts.forEach(part -> {
+                        if (part.isFile()) {
+                            part.stream();
+                            throw new IllegalStateException("failed after obtaining the stream");
+                        }
+                        return CompletableFuture.completedFuture(null);
+                    }).thenApply(done -> HttpResponse.ok("not reached")));
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-close-pending", (request, pathVariables, parts) -> {
+                    CompletableFuture<Void> holding = new CompletableFuture<>();
+                    parts.part("archive", part -> {
+                        // obtained and held, never read, and the consumer never completes
+                        part.stream();
+                        holding.complete(null);
+                        return new CompletableFuture<>();
+                    });
+                    return holding.thenApply(held -> {
+                        parts.close();
+                        return HttpResponse.ok("closed while pending").contentType(MediaType.TEXT_PLAIN_TYPE);
+                    });
+                });
+                routes.GET("/fn/rejected", (request, pathVariables) -> HttpResponse.ok("accepted").contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .before(request -> request.getHeaders().contains("X-Token") ? null : HttpResponse.status(HttpStatus.FORBIDDEN))
+                    .after((request, response) -> response.header("X-After", "after1"))
+                    .after((request, response) -> response.getHeaders().set("X-After", response.getHeaders().get("X-After") + ",after2"));
                 routes.asyncGET("/fn/async-get", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async get").contentType(MediaType.TEXT_PLAIN_TYPE)));
                 routes.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/fn/multi", (request, pathVariables) ->
@@ -621,6 +761,37 @@ public class HandlerRoutesTest {
     }
 
     /**
+     * Keeps the routes and the arrays it configured them with, to change them after the router
+     * took the routes.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class FrozenRoutes implements HttpRoutes {
+        static final RouteDeclaration SAVE = RouteDeclaration.of(HttpMethod.POST, "/fn/frozen/declared");
+        static final RouteDeclaration THREAD = RouteDeclaration.of(HttpMethod.GET, "/fn/frozen/declared-thread");
+
+        final MediaType[] consumes = {MediaType.TEXT_PLAIN_TYPE};
+        final MediaType[] produces = {MediaType.TEXT_PLAIN_TYPE};
+        HttpRouteSpec declared;
+        HttpRouteSpec declaredThread;
+        HttpRouteSpec eagerThread;
+
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            declared = routes.handle(SAVE, Argument.of(String.class), (request, pathVariables, body) ->
+                    HttpResponse.ok("saved " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .consumes(consumes)
+                .produces(produces);
+            declaredThread = routes.handle(THREAD, (request, pathVariables) -> threadName());
+            eagerThread = routes.GET("/fn/frozen/eager-thread", (request, pathVariables) -> threadName());
+        }
+
+        private static HttpResponse<?> threadName() {
+            return HttpResponse.ok(Thread.currentThread().getName()).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+    }
+
+    /**
      * Binds a handler to a declared route, like a route declared at compile time.
      */
     @Singleton
@@ -628,10 +799,10 @@ public class HandlerRoutesTest {
     static class DeclaredRoutes implements HttpRoutes {
         static final RouteDeclaration FIND = RouteDeclaration.of(HttpMethod.GET, "/fn/declared/{id}");
 
-        UriRoute route;
+        HttpRouteSpec route;
 
         @Override
-        public void routes(RouteBuilder routes) {
+        public void routes(HttpRouteBuilder routes) {
             route = routes.handle(FIND, (request, pathVariables) -> HttpResponse.ok("declared " + pathVariables.getLong("id") + " "
                     + request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .before("handler-filter", request -> {
