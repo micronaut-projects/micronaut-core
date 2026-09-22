@@ -36,6 +36,7 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import io.micronaut.web.router.FormPart;
 import io.micronaut.web.router.HttpRoutes;
 import io.micronaut.web.router.RouteBuilder;
 import io.micronaut.web.router.RouteDeclaration;
@@ -54,10 +55,14 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -314,6 +319,50 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void streamingFormHandlerReadsSeveralPartsInOrder() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Map<String, String> form = new LinkedHashMap<>();
+            form.put("name", "Fred");
+            form.put("age", "42");
+            form.put("city", "Prague");
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-cursor/name/city", form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("name=Fred;city=Prague;")
+                .build());
+            // the cursor only moves forward: a part sent before the current position is not found
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-cursor/city/name", form)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("city=Prague;no name;")
+                .build());
+        }
+    }
+
+    @Test
+    @Tag("multipart")
+    void streamingFormHandlerClosesThePartsToThrowOutTheRest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            byte[] rest = new byte[256 * 1024];
+            Arrays.fill(rest, (byte) 'x');
+            for (int i = 0; i < 2; i++) {
+                // twice: the connection stays usable after the rest of the body was thrown out
+                MultipartBody body = MultipartBody.builder()
+                    .addPart("name", "Fred")
+                    .addPart("document", "cv.txt", MediaType.TEXT_PLAIN_TYPE, "not read".getBytes(StandardCharsets.UTF_8))
+                    .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                    .addPart("archive", "archive.bin", MediaType.APPLICATION_OCTET_STREAM_TYPE, rest)
+                    .addPart("age", "42")
+                    .build();
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-cursor/name/avatar", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("name=Fred;avatar.txt=picture;")
+                    .build());
+            }
+        }
+    }
+
+    @Test
     void handlerIsBoundToADeclaredRoute() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/5"), HttpResponseAssertion.builder()
@@ -520,6 +569,32 @@ public class HandlerRoutesTest {
                     }).thenApply(found -> found
                         ? HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE)
                         : HttpResponse.badRequest("no part " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                });
+                routes.handleFormStream(HttpMethod.POST, "/fn/forms-cursor/{first}/{second}", (request, pathVariables, parts) -> {
+                    StringBuilder result = new StringBuilder();
+                    Function<FormPart, CompletionStage<?>> append = part -> {
+                        if (part.isFile()) {
+                            Path file = temporaryFile();
+                            return part.transferTo(file).thenAccept(done -> result.append(part.fileName()).append('=').append(read(file)).append(';'));
+                        }
+                        return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
+                    };
+                    String first = pathVariables.getString("first");
+                    String second = pathVariables.getString("second");
+                    return parts.part(first, append)
+                        .thenCompose(found -> {
+                            if (!found) {
+                                result.append("no ").append(first).append(';');
+                            }
+                            return parts.part(second, append);
+                        })
+                        .thenApply(found -> {
+                            if (!found) {
+                                result.append("no ").append(second).append(';');
+                            }
+                            parts.close();
+                            return HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE);
+                        });
                 });
                 routes.asyncGET("/fn/async-get", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async get").contentType(MediaType.TEXT_PLAIN_TYPE)));
