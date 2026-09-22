@@ -112,7 +112,9 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             } else if (b.isAsyncOrReactive() || b.isOptional()) {
                 b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return findReader(messageBodyHandlerRegistry, b, consumesMediaTypes);
+            var readerType = (Argument<Object>) b;
+            return messageBodyHandlerRegistry.findReader(readerType, consumesMediaTypes)
+                .map(reader -> reader.createSpecific(readerType));
         }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
     }
@@ -121,12 +123,6 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
     @Nullable
     public final MessageBodyReader<?> getMessageBodyReader() {
         return messageBodyReader;
-    }
-
-    private static <B> Optional<MessageBodyReader<B>> findReader(MessageBodyHandlerRegistry registry,
-                                                                Argument<B> type,
-                                                                List<MediaType> mediaTypes) {
-        return registry.findReader(type, mediaTypes).map(reader -> reader.createSpecific(type));
     }
 
     private static boolean hasArg(Argument<?>[] arguments, Class<?> type) {
