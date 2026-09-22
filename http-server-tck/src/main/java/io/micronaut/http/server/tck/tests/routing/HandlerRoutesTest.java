@@ -46,6 +46,7 @@ import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRoute;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -54,6 +55,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
@@ -199,6 +201,7 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    @Tag("multipart")
     void multipartFormIsReadIntoFormData() throws IOException {
         try (ServerUnderTest server = server()) {
             MultipartBody body = MultipartBody.builder()
@@ -260,6 +263,7 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    @Tag("multipart")
     void streamingFormHandlerReadsPartsAsTheyArrive() throws IOException {
         try (ServerUnderTest server = server()) {
             MultipartBody body = MultipartBody.builder()
@@ -315,6 +319,35 @@ public class HandlerRoutesTest {
                 .status(HttpStatus.OK)
                 .body("dynamic declared 7")
                 .headers(Map.of("X-Table-Route", "true"))
+                .build());
+        }
+    }
+
+    @Test
+    void asyncGetRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/async-get"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("async get")
+                .build());
+        }
+    }
+
+    @Test
+    void handlerIsBoundToSeveralMethods() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.PUT("/fn/multi", "x").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("multi PUT")
+                .headers(Map.of("X-Multi", "true"))
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.PATCH("/fn/multi", "x").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("multi PATCH")
+                .headers(Map.of("X-Multi", "true"))
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.DELETE("/fn/multi"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .build());
         }
     }
@@ -442,6 +475,12 @@ public class HandlerRoutesTest {
                         return part.text().thenAccept(value -> result.append(part.name()).append('=').append(value).append(';'));
                     }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
+                routes.asyncGET("/fn/async-get", (request, pathVariables) ->
+                    completeLater(executor, () -> HttpResponse.ok("async get").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                routes.handle(Set.of(HttpMethod.PUT, HttpMethod.PATCH), "/fn/multi", (request, pathVariables) ->
+                        HttpResponse.ok("multi " + request.getMethodName()).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .consumesAll()
+                    .after((request, response) -> response.header("X-Multi", "true"));
                 routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");
                 });

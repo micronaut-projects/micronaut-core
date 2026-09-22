@@ -1,4 +1,4 @@
-package io.micronaut.web.router.proof;
+package io.micronaut.test.routes.custom.processor;
 
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.core.naming.NameUtils;
@@ -31,9 +31,9 @@ import java.util.Set;
  */
 public final class CustomWebRoutesVisitor implements TypeElementVisitor<Object, Object> {
 
-    static final String RESOURCE = "petstore.web.Resource";
-    static final String READ = "petstore.web.Read";
-    static final String WRITE = "petstore.web.Write";
+    static final String RESOURCE = "io.micronaut.test.routes.custom.annotation.Resource";
+    static final String READ = "io.micronaut.test.routes.custom.annotation.Read";
+    static final String WRITE = "io.micronaut.test.routes.custom.annotation.Write";
 
     @Override
     public @NonNull VisitorKind getVisitorKind() {

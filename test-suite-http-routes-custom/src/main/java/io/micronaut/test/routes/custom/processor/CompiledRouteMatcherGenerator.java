@@ -1,4 +1,4 @@
-package io.micronaut.web.router.proof;
+package io.micronaut.test.routes.custom.processor;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;

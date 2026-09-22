@@ -186,6 +186,39 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
         );
     }
 
+    /**
+     * @param errorType The type of the exception, which the error route binds to the second argument
+     * @param handler   The handler
+     * @param <E>       The type of the exception
+     * @return The method that calls it
+     */
+    @SuppressWarnings("unchecked")
+    static <E extends Throwable> HandlerMethod<HttpResponse<?>> of(Class<E> errorType, ErrorRouteHandler<E> handler) {
+        return new HandlerMethod<>(
+            handler,
+            ErrorRouteHandler.class,
+            new Class<?>[]{HttpRequest.class, Throwable.class},
+            new Argument<?>[]{REQUEST, Argument.of(errorType, "error")},
+            returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
+            args -> handler.handle((HttpRequest<?>) args[0], (E) args[1])
+        );
+    }
+
+    /**
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    static HandlerMethod<HttpResponse<?>> of(StatusRouteHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            StatusRouteHandler.class,
+            new Class<?>[]{HttpRequest.class},
+            new Argument<?>[]{REQUEST},
+            returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
+            args -> handler.handle((HttpRequest<?>) args[0])
+        );
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     private static <R> ReturnType<R> returnType(Class<?> type, Argument<?>... typeArguments) {
         return (ReturnType<R>) ReturnType.of((Class) type, typeArguments);
