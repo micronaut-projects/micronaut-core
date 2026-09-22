@@ -182,6 +182,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * The name of the nested class through which the Python side of a compiled method calls its Java body.
      */
     public static final String COMPILED_DELEGATE = "PyronautCompiled";
+    private static final ClassTypeDef STATIC_ADVICE = ClassTypeDef.of("io.micronaut.context.python.aop.StaticAdvice");
+    private static final ClassTypeDef STATIC_ADVICE_TARGET = ClassTypeDef.of("io.micronaut.context.python.aop.StaticAdviceTarget");
+    private static final String STATIC_ADVICE_FIELD = "__mn_advice";
+    private static final String STATIC_ADVICE_BIND = "bindStaticAdvice";
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
     public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
@@ -1257,6 +1261,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (bindsWrapper(model)) {
             builder.addInnerType(compiledDelegate(model));
+            declareStaticAdvice(model);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -4408,6 +4413,69 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * The interceptor chain of a compiled advised method: when the instance is the proxy of the
+     * bean, the advice it binds runs the interceptors and calls the method on the target bean,
+     * which runs the body; the target itself binds no advice and runs the body directly.
+     */
+    private static StatementDef adviceChain(VariableDef.This aThis, Ir.CompiledBody compiledBody, List<VariableDef.MethodParameter> methodParameters, TypeDef returnType) {
+        VariableDef.Field advice = aThis.field(STATIC_ADVICE_FIELD, STATIC_ADVICE);
+        List<ExpressionDef> arguments = new ArrayList<>(methodParameters);
+        ExpressionDef proceed = advice.invoke("proceed", TypeDef.OBJECT,
+            ExpressionDef.constant(compiledBody.methodName()), TypeDef.OBJECT.array().instantiate(arguments));
+        StatementDef intercepted = TypeDef.VOID.equals(returnType)
+            ? StatementDef.multi((StatementDef) proceed, new StatementDef.Return(null))
+            : proceed.cast(returnType).returning();
+        return advice.isNonNull().doIf(intercepted);
+    }
+
+    /**
+     * Declares the advice of a class with compiled advised methods: a field the proxy binds and
+     * the binding method. A class whose Java superclass is a generated class with advised methods
+     * inherits both.
+     */
+    private static void declareStaticAdvice(ClassStubModel model) {
+        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
+        if (plan == null || !advisesCompiled(plan, model.element().getName()) || inheritsStaticAdvice(model, plan)) {
+            return;
+        }
+        FieldDef field = FieldDef.builder(STATIC_ADVICE_FIELD)
+            .ofType(STATIC_ADVICE)
+            .addModifiers(Modifier.PROTECTED, Modifier.VOLATILE)
+            .build();
+        model.builder().addField(field);
+        model.builder().addSuperinterface(STATIC_ADVICE_TARGET);
+        model.builder().addMethod(MethodDef.builder(STATIC_ADVICE_BIND)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("advice", STATIC_ADVICE)
+            .returns(TypeDef.VOID)
+            .overrides()
+            .build((aThis, methodParameters) -> aThis.field(field).assign(methodParameters.getFirst())));
+    }
+
+    private static boolean advisesCompiled(StaticCompilationPlan plan, String className) {
+        for (Ir.CompiledBody body : plan.bodiesOf(className)) {
+            if (body.advised()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean inheritsStaticAdvice(ClassStubModel model, StaticCompilationPlan plan) {
+        if (!model.extendsPythonClass()) {
+            return false;
+        }
+        ClassElement current = model.superType();
+        while (current instanceof PythonClassElement pythonClass) {
+            if (advisesCompiled(plan, pythonClass.getName())) {
+                return true;
+            }
+            current = pythonClass.getSuperType().orElse(null);
+        }
+        return false;
+    }
+
+    /**
      * @param context The visitor context
      * @return The static compilation plan of the run, or {@code null} when none was made
      */
@@ -4870,8 +4938,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
             }
             boolean trace = staticCompilationPlan(visitorContext).trace();
-            builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
-                StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext), trace)));
+            builder.addMethod(methodBuilder.build((aThis, methodParameters) -> StatementDef.multi(
+                compiledBody.advised() && model != null ? adviceChain(aThis, compiledBody, methodParameters, methodSourceReturnType) : StatementDef.multi(),
+                StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext), trace))));
             return;
         }
         builder.addMethod(methodBuilder

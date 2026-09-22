@@ -158,7 +158,8 @@ class StaticPlanner:
             return None, list(rules.problems)
         class_model = self.checker.python_classes.of(class_def) if class_def is not None else None
         lowering = Lowering(self.checker, module, class_def, function_def, node, rules, class_model,
-                            advised=lambda sibling: self._advice(class_def, sibling) is not None)
+                            advised=lambda sibling: self._advice(class_def, sibling) is not None,
+                            advised_method=class_def is not None and self._advice(class_def, function_def) is not None)
         body = lowering.lower()
         return body, lowering.reasons
 
@@ -210,16 +211,30 @@ class StaticPlanner:
         if implemented is not None:
             reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; not compiled yet", span))
         advice = self._advice(class_def, function_def)
-        if advice is not None:
-            reasons.append(("intercepted-method", f"the method is advised by [{advice}]; its interceptor chain runs on the Python object; not compiled yet", span))
+        if advice is not None and class_def is None:
+            reasons.append(("intercepted-method", f"the function is advised by [{advice}]; a module has no proxy to run the interceptor chain of a compiled function in", span))
+        elif advice is not None and self._introduced(class_def, function_def):
+            reasons.append(("intercepted-method", f"the method is advised by [{advice}] of an introduction; the introduction proxy runs its chain on the Python object; not compiled yet", span))
         return reasons
+
+    def _introduced(self, class_def, function_def):
+        """Whether the method or its class carries an introduction binding."""
+        facts = getattr(self.checker, "facts", None)
+        if facts is None:
+            return False
+        for decorator in list(function_def.decorators()) + list(class_def.decorators()):
+            description = self._annotation(facts, decorator)
+            if description is not None and description.introduction():
+                return True
+        return False
 
     def _advice(self, class_def, function_def):
         """
         The annotation advising the method, or None: an around or introduction binding on the method
         or its class, or a validation constraint on a parameter or the return, which validates the
-        call. The chain of an advised method runs on the Python object, which a compiled body would
-        bypass.
+        call. The Java method of an advised method runs the interceptor chain its proxy binds before
+        the body; a Python caller reaches the chain on the Python object, which runs the body through
+        the delegate.
         """
         facts = getattr(self.checker, "facts", None)
         if facts is None:
