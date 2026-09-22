@@ -381,6 +381,33 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator,
+                                 Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables()));
+    }
+
+    private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
+        Objects.requireNonNull(prefixTemplate, "prefix");
+        if (prefixTemplate.isMicronaut()) {
+            locate(prefixTemplate.expression(), locator);
+            return;
+        }
+        checkOpen();
+        RoutePrefix routePrefix = prefix;
+        if (routePrefix != null) {
+            throw new IllegalArgumentException("The locator prefix " + prefixTemplate.expression() + " of the route template engine '"
+                + prefixTemplate.engineId() + "' cannot be declared in the route group with the prefix " + routePrefix
+                + ": the prefix of a group is joined to Micronaut URI templates only. Declare it outside the group, or in a group without a prefix");
+        }
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
+        for (RouteAssembly.DefaultUriRoute route : assembly.addLocatorRoutes(prefixTemplate, DEFAULT_CONSUMES, target)) {
+            // the routes of the target decide which media types they consume and produce
+            // the located route carries the filters of the groups of the locator route
+            grouped(route.settings()).consumesAll();
+        }
+    }
+
+    @Override
     public final ServerFilterSpec filter(String... patterns) {
         checkOpen();
         // global: the prefix and the filters of a group do not apply

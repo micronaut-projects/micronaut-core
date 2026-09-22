@@ -435,6 +435,51 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located at runtime, see {@link #locate(String, LocatorHandler, Function)}. The
+     * prefix is parsed, nested and mounted under the context path by its engine; the router
+     * matches it with the matcher of the engine, followed by the rest of the path, which is empty
+     * or starts with a slash. When the prefix matches more than one part of the path, e.g. with a
+     * variable with a regular expression that matches slashes, the longest part is the prefix.
+     * The located routes of the target may have routes of any engine, see {@link LocatedRoutes}.
+     *
+     * <pre>{@code
+     * routes.locate(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.find(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>A Micronaut template is the same as {@link #locate(String, LocatorHandler, Function)}
+     * with its expression. In a group with a prefix, see {@link #path(String, Consumer)}, the
+     * template must be a Micronaut one: the prefix of a group is joined to Micronaut URI templates
+     * only, and the template of another engine is rejected with an
+     * {@link IllegalArgumentException}.</p>
+     *
+     * @param prefix   The template of the prefix
+     * @param locator  Locates the target, or answers {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <T>      The type of the target
+     * @since 5.3.0
+     */
+    <T> void locate(RouteTemplate prefix, LocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets a locator locates, see
+     * {@link #locate(RouteTemplate, LocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target, or answers {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <T>     The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locate(RouteTemplate prefix, LocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locate(prefix, locator, target -> routes);
+    }
+
+    /**
      * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
      * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
      * the locator returns a stage of the target, and the router matches the rest of the path with
@@ -539,7 +584,10 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * to every route declared in the lambda, see {@link HttpRouteGroup}.
      *
      * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
-     * query or fragment.</p>
+     * query or fragment. The route template of another
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine engine} cannot be declared in a group
+     * with a prefix, see {@link #route(HttpMethod, RouteTemplate)}, nor can a locator whose prefix
+     * is such a template, see {@link #locate(RouteTemplate, LocatorHandler, Function)}.</p>
      *
      * @param prefix The prefix of the URI templates of the routes of the group
      * @param routes Declares the routes and the filters of the group
