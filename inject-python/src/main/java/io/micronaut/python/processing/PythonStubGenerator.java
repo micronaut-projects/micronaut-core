@@ -3699,6 +3699,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Copies the runtime annotations of the setter generated for an attribute of a class that carries no
+     * property fields: a class that is not {@code @Introspected} holds its state in the Python object, so
+     * the annotations a declared attribute carries ({@code @Option}, {@code @Parameters}) have no field to
+     * go on and are placed on the setter, the declaration a framework binds the value through and the one
+     * it reads them from. The getter is left alone so the annotation is declared once. An introspected
+     * class keeps them on its field instead.
+     */
+    private void copyAttributeSetterAnnotations(PropertyElement beanProperty, Optional<MethodElement> accessor, MethodDef.MethodDefBuilder builder, VisitorContext visitorContext) {
+        copyAccessorAnnotations(beanProperty, accessor, builder, visitorContext);
+        if (accessor.filter(method -> !method.isSynthetic()).isPresent()) {
+            return;
+        }
+        attributeField(beanProperty).ifPresent(pythonField ->
+            copyRuntimeAnnotations(pythonField, builder, ElementType.METHOD, beanProperty.getOwningType().getName(), visitorContext));
+    }
+
+    /**
      * Copies the test annotations of the Python bases of a standalone test class ({@code @MicronautTest},
      * {@code @TestInstance}, ...) that the class does not declare itself.
      */
@@ -4179,7 +4196,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ? resolvedSignatureMethod
             : signatureMethod;
         List<TypeDef.TypeVariable> methodTypeVariables = methodTypeVariables(sourceSignatureMethod, bridgeSignatureTypeArguments, inferredMethodBounds);
-        List<ParameterDef> parameterDefs = bridgeParameters(spec, sourceSignatureMethod, genericToArray, bridgeSignatureTypeArguments);
+        List<ParameterDef> parameterDefs = bridgeParameters(spec, sourceSignatureMethod, genericToArray, bridgeSignatureTypeArguments, visitorContext);
         // Duplicates are detected on the Java signature the stub emits, not on the Python method:
         // a Java interface may declare same-arity overloads (generate(Class<T>) and generate(T))
         // that Python, which has no overloading, implements with a single method. Each overload
@@ -4568,11 +4585,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * The parameters of a bridge method as the stub emits them: the Python parameters typed with the
      * (resolved) Java signature the bridge implements.
      */
-    private static List<ParameterDef> bridgeParameters(
+    private List<ParameterDef> bridgeParameters(
         BridgeMethodSpec spec,
         MethodElement sourceSignatureMethod,
         boolean genericToArray,
-        Map<String, ClassElement> bridgeSignatureTypeArguments
+        Map<String, ClassElement> bridgeSignatureTypeArguments,
+        VisitorContext visitorContext
     ) {
         MethodElement methodElement = spec.method();
         MethodElement signatureMethod = spec.signatureMethod();
@@ -4588,7 +4606,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             TypeDef parameterType = genericToArray
                 ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
                 : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
-            parameterDefs.add(ParameterDef.builder(parameter.getName(), parameterType).build());
+            ParameterDef.ParameterDefBuilder parameterBuilder = ParameterDef.builder(parameter.getName(), parameterType);
+            // A framework driving the generated class reflectively (Azure Functions reading @HttpTrigger,
+            // picocli reading @Option) reads the annotations of the parameter, not the annotation metadata
+            copyRuntimeAnnotations(parameter, parameterBuilder, ElementType.PARAMETER, spec.owner().getName(), visitorContext);
+            parameterDefs.add(parameterBuilder.build());
         }
         return parameterDefs;
     }
@@ -5424,7 +5446,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
+        copyAttributeSetterAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -5470,7 +5492,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
+        copyAttributeSetterAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
