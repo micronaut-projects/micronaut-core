@@ -211,9 +211,7 @@ class StaticPlanner:
         if implemented is not None:
             reasons.append(("overriding-java-method", f"the method implements [{implemented}], whose bridge keeps the Java signature; not compiled yet", span))
         advice = self._advice(class_def, function_def)
-        if advice is not None and class_def is None:
-            reasons.append(("intercepted-method", f"the function is advised by [{advice}]; a module has no proxy to run the interceptor chain of a compiled function in", span))
-        elif advice is not None and self._introduced(class_def, function_def):
+        if advice is not None and class_def is not None and self._introduced(class_def, function_def):
             reasons.append(("intercepted-method", f"the method is advised by [{advice}] of an introduction; the introduction proxy runs its chain on the Python object; not compiled yet", span))
         return reasons
 
@@ -361,7 +359,7 @@ class StaticPlanner:
                 return
             if isinstance(node, (ast.While, ast.For)) and node.orelse:
                 reasons.append(("unsupported-statement", "the else clause of a loop has no static lowering", module.span_of(node.orelse[0])))
-            if isinstance(node, ast.For) and not isinstance(node.target, ast.Name):
+            if isinstance(node, ast.For) and not isinstance(node.target, ast.Name) and not _unpacks_items(node):
                 reasons.append(("unsupported-statement", "unpacking the loop variable has no static lowering", module.span_of(node.target)))
             if isinstance(node, ast.Try):
                 if node.orelse:
@@ -396,6 +394,15 @@ if hasattr(ast, "Match"):
     _NAMES[ast.Match] = "a match statement"
 if hasattr(ast, "TryStar"):
     _NAMES[ast.TryStar] = "a try statement with except*"
+
+
+def _unpacks_items(node):
+    """Whether the loop is `for key, value in mapping.items()`, which the lowering unpacks."""
+    target, iterable = node.target, node.iter
+    return (isinstance(target, ast.Tuple) and len(target.elts) == 2
+            and all(isinstance(element, ast.Name) for element in target.elts)
+            and isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Attribute)
+            and iterable.func.attr == "items" and not iterable.args and not iterable.keywords)
 
 
 def _yields(function_node):

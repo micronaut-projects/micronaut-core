@@ -56,6 +56,7 @@ STANDARD_STR_TYPES = {"java.util.UUID", "java.time.LocalDate", "java.time.LocalT
 # the Java types a Python collection is in a compiled body
 COLLECTION_TYPES = {"list": "java.util.List", "tuple": "java.util.List", "set": "java.util.Set", "dict": "java.util.Map"}
 LIST, SET, MAP, OBJECT = "java.util.List", "java.util.Set", "java.util.Map", "java.lang.Object"
+MAP_ENTRY = "java.util.Map.Entry"
 # the methods of Python strings with a Java equivalent: name -> (Java method, parameter types, return type)
 STRING_METHODS = {
     "startswith": ("startsWith", [STRING], BOOLEAN), "endswith": ("endsWith", [STRING], BOOLEAN),
@@ -652,11 +653,12 @@ class Lowering:
         return factory(loop)
 
     def _for(self, node):
+        if isinstance(node.target, ast.Tuple):
+            return self._for_items(node)
         if not isinstance(node.target, ast.Name):
             self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", node.target)
         variable = node.target.id
-        if variable in self.parameters or variable in self.locals or variable in self.reassigned:
-            self._refuse("unsupported-statement", f"the loop variable [{variable}] is already a local or a parameter", node)
+        self._loop_variable(variable, node)
         iterable = node.iter
         if isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Name) and iterable.func.id == "range" and "range" not in self.locals:
             bounds = [self._coerce(self._expression(argument), LONG, argument) for argument in iterable.args]
@@ -693,6 +695,48 @@ class Lowering:
         def build(loop):
             self.locals[variable] = used
             return ForEach(loop, variable, used, declared, collection, Body(self._block(node.body)), *self._exits(loop))
+        return self._loop(node, build)[0]
+
+    def _loop_variable(self, variable, node):
+        if variable in self.parameters or variable in self.locals or variable in self.reassigned:
+            self._refuse("unsupported-statement", f"the loop variable [{variable}] is already a local or a parameter", node)
+
+    def _for_items(self, node):
+        """
+        for key, value in mapping.items(): the loop runs over the entries of the Java map, and the
+        body starts by binding the key and the value of the entry to the two loop variables.
+        """
+        target, iterable = node.target, node.iter
+        if len(target.elts) != 2 or not all(isinstance(element, ast.Name) for element in target.elts):
+            self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", target)
+        if not (isinstance(iterable, ast.Call) and isinstance(iterable.func, ast.Attribute) and iterable.func.attr == "items"
+                and not iterable.args and not iterable.keywords):
+            self._refuse("unsupported-statement", "unpacking the loop variable has no static lowering", target)
+        key_name, value_name = (element.id for element in target.elts)
+        if key_name == value_name:
+            self._refuse("unsupported-statement", f"the loop variables [{key_name}] are the same name", target)
+        for variable in (key_name, value_name):
+            self._loop_variable(variable, node)
+        mapping = self._expression(iterable.func.value)
+        mapping_type = mapping.type()
+        if not self.checker.facts.isAssignable(_erased(mapping_type), "java.util.Map"):
+            self._refuse("unsupported-expression", f"items() of a [{_erased(mapping_type)}] has no static lowering", iterable)
+        arguments = _arguments(mapping_type)
+        if len(arguments) != 2:
+            self._refuse("unknown-type", f"the entries of the [{_erased(mapping_type)}] have no static type", iterable)
+        used = [JAVA_NUMBERS.get(argument, argument) for argument in arguments]
+        self.java_calls += 3
+        entries = InvokeJava(mapping, "java.util.Map", "entrySet", [], [], f"java.util.Set<{MAP_ENTRY}>")
+
+        def build(loop):
+            entry = f"entry{loop}"
+            while entry in self.parameters or entry in self.locals or entry in self.reassigned:
+                entry = entry + "_"
+            bindings = []
+            for name, getter, java_type in ((key_name, "getKey", used[0]), (value_name, "getValue", used[1])):
+                self.locals[name] = java_type
+                bindings.append(Local(name, java_type, Cast(InvokeJava(LocalRef(entry, MAP_ENTRY), MAP_ENTRY, getter, [], [], OBJECT), java_type)))
+            return ForEach(loop, entry, MAP_ENTRY, MAP_ENTRY, entries, Body(bindings + self._block(node.body)), *self._exits(loop))
         return self._loop(node, build)[0]
 
     # ---------------------------------------------------------------- exceptions
@@ -1100,7 +1144,8 @@ class Lowering:
                 return Helper("split", [receiver] + [self._coerce(argument, STRING, node) for argument in arguments], f"{LIST}<{STRING}>")
             if name == "join" and len(arguments) == 1:
                 joined = arguments[0]
-                if _erased(joined.type()) not in (LIST, SET) or _arguments(joined.type()) != [STRING]:
+                # a raw Java list (the erased return of a Java call) is joined too: the helper refuses a non-string element as Python does
+                if _erased(joined.type()) not in (LIST, SET) or _arguments(joined.type()) not in ([], [STRING]):
                     self._refuse("unsupported-expression", "str.join of anything but a list or set of strings has no static lowering", node)
                 self.helper_calls += 1
                 return Helper("join", [receiver, joined], STRING)
@@ -1329,6 +1374,10 @@ class Lowering:
         if receiver is not None and receiver.type() in (LONG, DOUBLE, BOOLEAN):
             self._refuse("unsupported-expression", "a call on a Python value has no static lowering", node)
         return_type = signature.returnType()
+        type_arguments = list(signature.returnTypeArguments())
+        if type_arguments:
+            # the elements of a returned collection keep their static type: for title in repository.titles()
+            return_type = f"{return_type}<{','.join(type_arguments)}>"
         call = InvokeJava(receiver, owner, name, parameter_types, arguments, return_type)
         used = JAVA_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
