@@ -941,9 +941,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (matcher == null) {
             return;
         }
-        int size = constant.getDeclaringClass().getEnumConstants().length;
-        CompiledRoutes routes = compiled.computeIfAbsent(matcher, m -> new CompiledRoutes(m, new UriRouteInfo[size], new UriRouteInfo[size]));
-        (route.isImplicitHead() ? routes.headByOrdinal : routes.byOrdinal)[constant.ordinal()] = route;
+        int ordinal = constant.ordinal();
+        CompiledRoutes routes = compiled.get(matcher);
+        if (routes == null || ordinal >= routes.byOrdinal.length) {
+            // sized by the largest bound ordinal: the enum's constants are not read reflectively
+            int size = Math.max(ordinal + 1, routes == null ? 0 : routes.byOrdinal.length);
+            routes = routes == null
+                ? new CompiledRoutes(matcher, new UriRouteInfo[size], new UriRouteInfo[size])
+                : new CompiledRoutes(matcher, Arrays.copyOf(routes.byOrdinal, size), Arrays.copyOf(routes.headByOrdinal, size));
+            compiled.put(matcher, routes);
+        }
+        (route.isImplicitHead() ? routes.headByOrdinal : routes.byOrdinal)[ordinal] = route;
     }
 
     private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
