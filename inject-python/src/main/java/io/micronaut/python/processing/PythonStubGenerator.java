@@ -145,6 +145,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String AS_OBJECT_METHOD = "asObject";
     private static final String CONVERT_VALUE = "convertValue";
     private static final String EQUALS_METHOD = "equals";
+    private static final String TO_STRING_METHOD = "toString";
+    private static final String TO_STRING_METHOD_KEY = TO_STRING_METHOD + "()";
+    private static final String AS_STRING_METHOD = "asString";
     private static final String VALUE_PARAMETER = "value";
     private static final String NEW_INSTANCE = "newInstance";
     private static final String NEW_INTRODUCTION = "newIntroduction";
@@ -592,7 +595,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (model.isJunit5Test()) {
             return false;
         }
-        if (addedMethodNames.contains("toString()")) {
+        if (addedMethodNames.contains(TO_STRING_METHOD_KEY)) {
             return true;
         }
         List<FunctionDef> functions = model.classElement().getNativeType().functions();
@@ -603,8 +606,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (representation == null) {
             return false;
         }
-        addedMethodNames.add("toString()");
-        model.builder().addMethod(MethodDef.builder("toString")
+        addedMethodNames.add(TO_STRING_METHOD_KEY);
+        model.builder().addMethod(MethodDef.builder(TO_STRING_METHOD)
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .returns(TypeDef.STRING)
@@ -614,7 +617,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
                 ExpressionDef.constant(representation),
                 TypeDef.OBJECT.array().instantiate()
-            ).invoke("asString", TypeDef.STRING).returning()));
+            ).invoke(AS_STRING_METHOD, TypeDef.STRING).returning()));
         return true;
     }
 
@@ -4040,25 +4043,25 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (MethodElement methodElement : enumMethods) {
             addBridgeMethod(BridgeMethodSpec.of(methodElement, classElement), enumBuilder, context, addedMethodNames);
         }
-        if (jsonValueMethod != null && !"toString".equals(jsonValueMethod.getName()) && addedMethodNames.add("toString()")) {
-            enumBuilder.addMethod(MethodDef.builder("toString")
+        if (jsonValueMethod != null && !TO_STRING_METHOD.equals(jsonValueMethod.getName()) && addedMethodNames.add(TO_STRING_METHOD_KEY)) {
+            enumBuilder.addMethod(MethodDef.builder(TO_STRING_METHOD)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(jsonValueMethod.getName(), TypeDef.STRING).returning()));
-        } else if (jsonValueMethod == null && addedMethodNames.add("toString()")) {
+        } else if (jsonValueMethod == null && addedMethodNames.add(TO_STRING_METHOD_KEY)) {
             enumBuilder.addMethod(MethodDef.builder("jsonValue")
                 .addAnnotation("com.fasterxml.jackson.annotation.JsonValue")
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke("name", TypeDef.STRING).returning()));
-            enumBuilder.addMethod(MethodDef.builder("toString")
+            enumBuilder.addMethod(MethodDef.builder(TO_STRING_METHOD)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
                     .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(VALUE_PARAMETER))
-                    .invoke("asString", TypeDef.STRING)
+                    .invoke(AS_STRING_METHOD, TypeDef.STRING)
                     .returning()));
         }
         return enumBuilder.build();
@@ -5528,10 +5531,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
                 default -> {
@@ -6048,9 +6051,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             case "byte", "java.lang.Byte" ->
                 invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
-                invokedValue.invoke("asString", ClassTypeDef.STRING)
+                invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING)
                     .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-            default -> invokedValue.invoke("asString", ClassTypeDef.STRING);
+            default -> invokedValue.invoke(AS_STRING_METHOD, ClassTypeDef.STRING);
         };
     }
 
@@ -6096,8 +6099,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
                 case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
                 case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
-                case "char" -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
-                default -> member.invoke("asString", ClassTypeDef.STRING);
+                case "char" -> member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
+                default -> member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING);
             };
         } else {
             String referenceTypeName = type.getName();
@@ -6117,9 +6120,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 case "java.lang.Byte":
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
-                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
                 case JAVA_LANG_STRING:
-                    return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
+                    return convertNullableValue(member, member.invoke(AS_STRING_METHOD, ClassTypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
                         ClassElement componentType = type.getFirstTypeArgument().orElse(null);
