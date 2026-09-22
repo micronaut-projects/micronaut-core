@@ -17,6 +17,7 @@ dependencies {
     testImplementation(libs.managed.netty.codec.http)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(projects.micronautContextPropagation)
+    testRuntimeOnly(projects.micronautJsonCore)
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
