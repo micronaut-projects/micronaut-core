@@ -61,7 +61,7 @@ final class RoutePlanWriter {
     private static final TypeDef.Array SPANS_TYPE = TypeDef.Primitive.INT.array();
     private static final List<TypeDef> SLOT_CONSTRUCTOR = List.of(
         TypeDef.STRING, TypeDef.STRING, TEMPLATE_TYPE, TypeDef.STRING, TypeDef.STRING, TypeDef.Primitive.INT,
-        TypeDef.Primitive.INT, TypeDef.STRING.array(), TypeDef.Primitive.BOOLEAN, TypeDef.STRING, CONTROLLER_TYPE
+        TypeDef.Primitive.INT, TypeDef.Primitive.INT, TypeDef.STRING.array(), TypeDef.Primitive.BOOLEAN, TypeDef.STRING, CONTROLLER_TYPE
     );
     private static final List<TypeDef> CONTROLLER_CONSTRUCTOR = List.of(
         TypeDef.STRING, TypeDef.STRING, TypeDef.STRING.array(), TypeDef.Primitive.BOOLEAN, TypeDef.STRING.array(),
@@ -156,6 +156,7 @@ final class RoutePlanWriter {
             ExpressionDef.constant(slot.requiredPrefix()),
             ExpressionDef.constant(slot.rawLength()),
             ExpressionDef.constant(slot.pathVariableCount()),
+            ExpressionDef.constant(slot.patternVariableCount()),
             strings(slot.captures()),
             ExpressionDef.constant(slot.compiled()),
             slot.fallbackReason() == null ? ExpressionDef.nullValue() : ExpressionDef.constant(slot.fallbackReason()),

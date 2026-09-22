@@ -294,6 +294,95 @@ class PetController {
         descriptor.slots() == plan.slots().toList()
     }
 
+    void "the slots carry the pattern variable count and the routers select alike"() {
+        given:
+        ApplicationContext context = buildContext('test.SelController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/sel")
+class SelController {
+    @Get("/{id}")
+    String plain(String id) { return id; }
+
+    @Get("/{id:.+}")
+    String anyPath(String id) { return id; }
+
+    @Get("/two/{a}/{b:[0-9]+}")
+    String onePattern(String a, String b) { return a + b; }
+
+    @Get("/two/{a:[a-z]+}/{b:[0-9]+}")
+    String twoPatterns(String a, String b) { return a + b; }
+
+    @Get("/max/{id:3}")
+    String maxLength(String id) { return id; }
+}
+''')
+        RoutePlan plan = plan(context, 'test.$SelController$RoutePlan')
+        Map<String, RouteSlot> byMethod = plan.slots().findAll { it.httpMethodName() == 'GET' }.collectEntries { [(it.controller().methodName()): it] }
+        def runtimeRouter = new DefaultRouter(routeBuilder(context, []))
+        def compiledRouter = new DefaultRouter(routeBuilder(context, [plan]))
+
+        expect: 'the count of the native matcher, without the numeric modifier of a maximum length'
+        byMethod.plain.patternVariableCount() == 0
+        byMethod.anyPath.patternVariableCount() == 1
+        byMethod.onePattern.patternVariableCount() == 1
+        byMethod.twoPatterns.patternVariableCount() == 2
+        byMethod.maxLength.patternVariableCount() == 0
+
+        and: 'the compiled routes select like the runtime routes'
+        for (String path : ['/sel/1', '/sel/a/b', '/sel/two/x/1', '/sel/max/abc']) {
+            def request = HttpRequest.GET(path)
+            assert target(compiledRouter, request) == target(runtimeRouter, request)
+            assert compiledRouter.findAllClosest(request).collect { describe(it) } == runtimeRouter.findAllClosest(request).collect { describe(it) }
+        }
+        target(compiledRouter, HttpRequest.GET('/sel/1')) == 'test.SelController#plain'
+        target(compiledRouter, HttpRequest.GET('/sel/a/b')) == 'test.SelController#anyPath'
+        target(compiledRouter, HttpRequest.GET('/sel/two/x/1')) == 'test.SelController#onePattern'
+
+        cleanup:
+        context?.close()
+    }
+
+    void "the descriptor carries the pattern variable count only when there are pattern variables"() {
+        given:
+        ClassLoader classLoader = buildClassLoader('test.PatternController', '''
+package test;
+
+import io.micronaut.http.annotation.*;
+
+@Controller("/p")
+class PatternController {
+    @Get("/{id:[0-9]+}")
+    String show(String id) { return id; }
+}
+''')
+        String json = classLoader.getResources('META-INF/micronaut/routes/v1/controller_test.PatternController.json').toList().last().text
+        RoutePlan plan = classLoader.loadClass('test.$PatternController$RoutePlan').getDeclaredConstructor().newInstance() as RoutePlan
+        RouteDescriptors.Descriptor descriptor = RouteDescriptors.read(json)
+        RouteSlot get = plan.slots().find { it.httpMethodName() == 'GET' }
+        RouteSlot withoutCount = new RouteSlot(get.key(), get.httpMethodName(), get.template(), get.engineVersion(), get.requiredPrefix(),
+            get.rawLength(), get.pathVariableCount(), 0, get.captures(), get.compiled(), get.fallbackReason(), get.controller())
+
+        expect:
+        get.patternVariableCount() == 1
+        json.contains('"pathVariableCount": 1, "patternVariableCount": 1, ')
+        descriptor.slots() == plan.slots().toList()
+        descriptor.fingerprint() == plan.fingerprint()
+
+        and: 'the count is part of the fingerprint'
+        RoutePlan.fingerprint([withoutCount] as RouteSlot[]) != RoutePlan.fingerprint([get] as RouteSlot[])
+
+        and: 'a descriptor written without the count reads as no pattern variables'
+        String old = json.replace(', "patternVariableCount": 1', '')
+            .replace(plan.fingerprint(), RoutePlan.fingerprint(plan.slots().collect {
+                new RouteSlot(it.key(), it.httpMethodName(), it.template(), it.engineVersion(), it.requiredPrefix(),
+                    it.rawLength(), it.pathVariableCount(), 0, it.captures(), it.compiled(), it.fallbackReason(), it.controller())
+            } as RouteSlot[]))
+        RouteDescriptors.read(old).slots().every { it.patternVariableCount() == 0 }
+    }
+
     void "a plan that does not agree with the runtime is not used"() {
         given:
         ApplicationContext context = buildContext('test.ItemController', 'package test;' + CONTROLLERS)

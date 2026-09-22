@@ -71,6 +71,11 @@ record DefaultPlannedRouteDeclaration(RoutePlan plan, RouteSlot slot) implements
     }
 
     @Override
+    public int patternVariableCount() {
+        return slot.patternVariableCount();
+    }
+
+    @Override
     public String toString() {
         return slot.httpMethodName() + ' ' + slot.template() + " [" + slot.key() + ']';
     }
