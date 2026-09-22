@@ -57,7 +57,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     LazyUriRouteInfo(PrecompiledRoute route, Supplier<UriRouteInfo<Object, Object>> builder) {
         this.route = route;
-        this.httpMethod = HttpMethod.valueOf(route.httpMethod());
+        this.httpMethod = HttpMethod.parse(route.httpMethod());
         this.delegate = SupplierUtil.memoized(builder);
     }
 
@@ -86,6 +86,12 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public HttpMethod getHttpMethod() {
         return httpMethod;
+    }
+
+    @Override
+    public String getHttpMethodName() {
+        // the custom name for a custom method, like the route once it is built
+        return methodKey();
     }
 
     /**

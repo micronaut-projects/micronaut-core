@@ -144,7 +144,7 @@ public class AnnotatedMethodRouteBuilder extends DefaultRouteBuilder implements 
             handle = (MethodExecutionHandle<Object, Object>) executionHandleLocator.createExecutionHandle(beanDefinition, (ExecutableMethod<Object, Object>) method);
         }
         DefaultUriRoute route = new DefaultUriRoute(
-            HttpMethod.valueOf(precompiledRoute.httpMethod()),
+            HttpMethod.parse(precompiledRoute.httpMethod()),
             precompiledRoute.uri(),
             List.of(MediaType.APPLICATION_JSON_TYPE),
             handle,
