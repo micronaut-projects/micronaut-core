@@ -352,8 +352,20 @@ public final class PythonAstParser {
         return winner;
     }
 
-    private static boolean isWithinSourceDir(String srcDir, String path) {
-        return path.startsWith(srcDir) || path.startsWith("/private" + srcDir);
+    static boolean isWithinSourceDir(String srcDir, String path) {
+        String normalizedSrcDir = normalizePath(srcDir);
+        String normalizedPath = normalizePath(path);
+        return normalizedPath.startsWith(normalizedSrcDir) || normalizedPath.startsWith("/private" + normalizedSrcDir);
+    }
+
+    private static String normalizePath(String path) {
+        if (path == null) {
+            return null;
+        }
+        String normalized = path.replace('\\', '/');
+        return normalized.length() > 2 && normalized.charAt(0) == '/' && Character.isLetter(normalized.charAt(1)) && normalized.charAt(2) == ':'
+            ? normalized.substring(1)
+            : normalized;
     }
 
     private static String sourceRootOf(List<String> srcDirs, Source source) {
@@ -369,7 +381,8 @@ public final class PythonAstParser {
     }
 
     public static String getPackageNameOfSource(String srcDir, Source source) {
-        String path = source.getPath();
+        String path = normalizePath(source.getPath());
+        srcDir = normalizePath(srcDir);
         String packageName = "python";
         if (StringUtils.isNotEmpty(srcDir) && StringUtils.isNotEmpty(path)) {
             int i = path.indexOf(srcDir);

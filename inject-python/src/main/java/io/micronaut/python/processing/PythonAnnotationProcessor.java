@@ -656,7 +656,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             String packageName = PYTHON_LANGUAGE;
             for (String srcDir : srcDirs) {
-                if (source.getPath() != null && source.getPath().startsWith(srcDir)) {
+                if (source.getPath() != null && PythonAstParser.isWithinSourceDir(srcDir, source.getPath())) {
                     packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
                     break;
                 }
@@ -705,7 +705,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             Source source = transformed.originalSource();
             String packageName = "";
             for (String srcDir : values.src()) {
-                if (source.getPath() == null || source.getPath().startsWith(srcDir)) {
+                if (source.getPath() == null || PythonAstParser.isWithinSourceDir(srcDir, source.getPath())) {
                     packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
                     break;
                 }
