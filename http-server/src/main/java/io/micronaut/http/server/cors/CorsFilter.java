@@ -56,7 +56,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import static io.micronaut.http.HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS;
@@ -101,11 +100,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * The {@link CrossOrigin} configuration per route. Routes are fixed at startup, so this stays bounded.
      */
     private final Map<RouteInfo<?>, Optional<CorsOriginConfiguration>> routeConfigurations = new ConcurrentHashMap<>();
-
-    /**
-     * The compiled allowed origins regular expressions. They come from configuration and {@link CrossOrigin}, so this stays bounded.
-     */
-    private final Map<String, Pattern> originPatterns = new ConcurrentHashMap<>();
 
     /**
      * @param corsConfiguration The {@link CorsOriginConfiguration} instance
@@ -428,8 +422,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         return configuration;
     }
 
-    private boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
-        if (config.getAllowedOriginsRegex().map(regex -> matchesOrigin(regex, requestOrigin)).orElse(false)) {
+    private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
+        if (config.getAllowedOriginsRegex().map(regex -> config.getAllowedOriginsPattern(regex).matcher(requestOrigin).matches()).orElse(false)) {
             return true;
         }
         List<String> allowedOrigins = config.getAllowedOrigins();
@@ -437,15 +431,6 @@ public class CorsFilter implements Ordered, ConditionalFilter {
             (config.getAllowedOriginsRegex().isEmpty() && isAny(allowedOrigins)) ||
                 allowedOrigins.stream().anyMatch(origin -> origin.equals(requestOrigin))
         );
-    }
-
-    private boolean matchesOrigin(String originRegex, String requestOrigin) {
-        Pattern pattern = originPatterns.get(originRegex);
-        if (pattern == null) {
-            pattern = Pattern.compile(originRegex);
-            originPatterns.putIfAbsent(originRegex, pattern);
-        }
-        return pattern.matcher(requestOrigin).matches();
     }
 
     private static boolean isAny(List<String> values) {
