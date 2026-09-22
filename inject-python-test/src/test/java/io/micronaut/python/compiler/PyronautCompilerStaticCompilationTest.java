@@ -143,7 +143,7 @@ class PyronautCompilerStaticCompilationTest {
             generated = Files.readString(paths.filter(path -> path.getFileName().toString().equals("PricingService.java")).findFirst().orElseThrow());
         }
         assertTrue(generated.contains("PythonStatic.entered(\"python.PricingService#total\")"), generated);
-        assertTrue(generated.contains("PythonStatic.bindCompiled(value, new python.PricingService.PyronautCompiled(value))"), generated);
+        assertTrue(generated.contains("PythonStatic.bindCompiled(value, new python.PricingService.PyronautCompiled(this, value))"), generated);
         assertTrue(generated.contains("public static final class PyronautCompiled"), generated);
         assertTrue(generated.contains("private final Value self;"), generated);
         assertEquals(2, generated.split("Compiled from ", -1).length - 1, generated);

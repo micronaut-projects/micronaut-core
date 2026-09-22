@@ -48,6 +48,13 @@ def plan(source, mode, strict=False, path="module.py", facts=None):
     return {decision.qualifiedName(): decision for decision in decisions}, planner
 
 
+def _uncast(expression):
+    """The expression under its casts."""
+    while expression.getClass().getSimpleName() == "Cast":
+        expression = expression.operand()
+    return expression
+
+
 def rules(decision):
     return [reason.rule() for reason in decision.reasons()]
 
@@ -78,6 +85,9 @@ class Finder:
 
     def unhinted(self, flag: bool):
         return "x" if flag else "y"
+
+    def uses(self, flag: bool) -> str:
+        return self.unhinted(flag)
 
     def maybe(self, flag: bool) -> str:
         if flag:
@@ -150,6 +160,21 @@ class CorpusFindingsTest(unittest.TestCase):
 
     def test_an_unhinted_return_compiles_as_object(self):
         self.assertEqual("java.lang.Object", self._compiled("unhinted").returnType())
+
+    def test_a_collection_of_another_element_type_is_cast_through_the_raw_type(self):
+        # listed() -> list returns mapped() -> list[dict]: the sibling's List<Map<Object,Object>> reaches the raw List through a cast
+        self.assertEqual("COMPILED", self.decisions["Finder.listed"].outcome().name(), rules(self.decisions["Finder.listed"]))
+        self.assertEqual("java.util.List<java.lang.Object>", self.bodies["listed"].returnType())
+        returned = list(self.bodies["listed"].body().statements())[0].value()
+        self.assertEqual("Cast", returned.getClass().getSimpleName())
+        self.assertEqual("java.util.List<java.lang.Object>", returned.type())
+        self.assertEqual("java.util.List<java.util.Map<java.lang.Object,java.lang.Object>>", returned.operand().type())
+
+    def test_a_caller_of_an_unhinted_sibling_learns_the_type_its_body_returns(self):
+        returned = self._returned("uses")
+        self.assertEqual("Cast", returned.getClass().getSimpleName())
+        self.assertEqual("java.lang.String", returned.type())
+        self.assertEqual("java.lang.Object", returned.operand().type())
 
     def test_a_dict_unpacking_builds_the_map_in_order(self):
         returned = self._returned("merged")
@@ -461,6 +486,15 @@ class Pricing:
     def sibling(self, n: int) -> int:
         return self.truncate(n)
 
+    def hidden_call(self, n: int) -> int:
+        return self._secret(n) + self.defaulted()
+
+    def _secret(self, n: int) -> int:
+        return n
+
+    def defaulted(self, n: int = 1) -> int:
+        return n
+
     def builtin(self, name: str) -> int:
         return round(len(name) / 2)
 
@@ -672,22 +706,38 @@ class LoweringTest(unittest.TestCase):
         self.assertEqual("Cast", returned.getClass().getSimpleName())
         self.assertEqual("java.util.List<java.lang.Object>", returned.operand().type())
 
+    def test_sibling_calls_dispatch_to_the_stub_or_the_python_object(self):
+        for name in ("sibling", "hidden_call", "via_property"):
+            self.assertEqual("COMPILED", self.decisions[f"Pricing.{name}"].outcome().name(), f"{name}: {[(r.rule(), r.message()) for r in self.decisions[f'Pricing.{name}'].reasons()]}")
+        sibling = _uncast(list(self.bodies["sibling"].body().statements())[0].value())
+        self.assertEqual("truncate", sibling.name())
+        self.assertEqual("java", sibling.dispatch())
+        self.assertEqual(["int"], list(sibling.parameterTypes()))
+        self.assertEqual(1, self.bodies["sibling"].stats().javaCalls())
+        hidden = _uncast(list(self.bodies["hidden_call"].body().statements())[0].value())
+        self.assertEqual("python", _uncast(hidden.left()).dispatch())  # not bridged: the stub has no Java method for it
+        self.assertEqual("python", _uncast(hidden.right()).dispatch())  # the call relies on a default argument
+        self.assertEqual(2, self.bodies["hidden_call"].stats().bridgeCalls())
+        via_property = _uncast(list(self.bodies["via_property"].body().statements())[0].value())
+        self.assertEqual("doubled", via_property.left().property())
+        self.assertEqual("double", via_property.left().type())
+        self.assertTrue(via_property.left().accessor())  # read through the Python object, never a Java field
+
     def test_self_properties_are_read_through_the_stub(self):
         with_rate = self.bodies["with_rate"]
         product = list(with_rate.body().statements())[0].value()
         self.assertEqual("rate", product.right().property())
         self.assertEqual("double", product.right().type())
+        self.assertFalse(product.right().accessor())
         self.assertEqual(1, with_rate.stats().bridgeCalls())
 
     def test_constructs_without_a_lowering_are_skipped_with_their_reason(self):
         expectations = {
-            "sibling": "sibling-call",
             "builtin": "python-builtin-not-lowered",
             "power": "unbounded-integer-op",
             "retyped": "unknown-type",
             "falls_through": "unknown-type",
             "maybe_unbound": "unsupported-statement",
-            "via_property": "sibling-call",
             "maybe": "unsupported-expression",
             "switched": "java-reserved-name",
             "leaked": "unsupported-statement",
