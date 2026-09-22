@@ -16,12 +16,14 @@
 package io.micronaut.web.router;
 
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -36,7 +38,10 @@ import java.util.function.Consumer;
  * media types of the route (calls on the route in the build callback override them), and
  * {@code @Version} and the executor apply when the route is matched and executed. Every
  * {@code GET} route gets an implicit {@code HEAD} route, unless the table has a {@code HEAD}
- * route for the same URI or the method is annotated {@code @Get(headRoute = false)}.
+ * route for the same URI or the method is annotated {@code @Get(headRoute = false)}. Like
+ * controller routes, the URIs are under {@code micronaut.server.context-path}. Routes can also
+ * target handler functions, e.g. {@code routes.GET("/orders/{id}", request -> ...)}, see
+ * {@link RequestHandler}.
  * <p>A table is immutable: changing a route returned by the builder after {@link #build} returned
  * does not change the table.
  *
@@ -49,18 +54,22 @@ public final class RouteTableFactory {
     private final ExecutionHandleLocator executionHandleLocator;
     private final RouteBuilder.UriNamingStrategy uriNamingStrategy;
     private final ConversionService conversionService;
+    private final @Nullable String contextPath;
 
     /**
      * @param executionHandleLocator The locator of the executable methods
      * @param uriNamingStrategy      The URI naming strategy
      * @param conversionService      The conversion service
+     * @param contextPath            The context path of the server
      */
     RouteTableFactory(ExecutionHandleLocator executionHandleLocator,
                       RouteBuilder.UriNamingStrategy uriNamingStrategy,
-                      ConversionService conversionService) {
+                      ConversionService conversionService,
+                      @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         this.executionHandleLocator = executionHandleLocator;
         this.uriNamingStrategy = uriNamingStrategy;
         this.conversionService = conversionService;
+        this.contextPath = contextPath;
     }
 
     /**
@@ -75,6 +84,11 @@ public final class RouteTableFactory {
     public RouteTable build(Consumer<? super RouteBuilder> routes) {
         Objects.requireNonNull(routes, "routes");
         DefaultRouteBuilder builder = new DefaultRouteBuilder(executionHandleLocator, uriNamingStrategy, conversionService) {
+            @Override
+            String routeUri(String uri) {
+                return underContextPath(contextPath, uri);
+            }
+
             @Override
             void routeCreated(DefaultUriRoute route) {
                 // like a controller method: the media types of the handler method apply, and calls

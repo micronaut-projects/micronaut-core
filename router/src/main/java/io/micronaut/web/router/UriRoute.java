@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -76,6 +77,31 @@ public interface UriRoute extends Route, Comparable<UriRoute> {
      * @return The route
      */
     UriRoute exposedPort(int port);
+
+    /**
+     * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
+     * applies whatever the thread selection of the server.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute executeOn(String executorName) {
+        throw new UnsupportedOperationException("Executor selection is not supported by " + getClass().getName());
+    }
+
+    /**
+     * Run the route on the event loop, like {@code @NonBlocking} on a controller method, when the
+     * server selects threads automatically. The route must not block.
+     *
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute nonBlocking() {
+        throw new UnsupportedOperationException("Executor selection is not supported by " + getClass().getName());
+    }
 
     /**
      * @return The port the route listens to, or null if the default port

@@ -33,7 +33,7 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.HttpRoutes;
-import io.micronaut.web.router.RequestHandler;
+import io.micronaut.web.router.PathVariables;
 import io.micronaut.web.router.RouteSource;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
@@ -153,7 +153,7 @@ public class HandlerRoutesTest {
         HttpRoutes fnRoutes() {
             return routes -> {
                 routes.GET("/fn/hello/{name}", request ->
-                    HttpResponse.ok("Hello " + RequestHandler.pathVariable(request, "name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                    HttpResponse.ok("Hello " + PathVariables.of(request).get("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
                 routes.handleAsync(HttpMethod.GET, "/fn/async", request ->

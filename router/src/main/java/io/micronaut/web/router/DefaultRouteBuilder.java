@@ -37,11 +37,13 @@ import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
+import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
@@ -466,12 +468,37 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             );
             currentParentRoute.nestedRoutes.add(route);
         } else {
-            route = new DefaultUriRoute(httpMethod, uri, mediaTypes, executableHandle, httpMethodName, conversionService);
+            route = new DefaultUriRoute(httpMethod, routeUri(uri), mediaTypes, executableHandle, httpMethodName, conversionService);
         }
 
         this.uriRoutes.add(route);
         routeCreated(route);
         return route;
+    }
+
+    /**
+     * The URI template of a route that is not nested in another route.
+     *
+     * @param uri The URI template given to the builder
+     * @return The URI template of the route
+     */
+    String routeUri(String uri) {
+        return uri;
+    }
+
+    /**
+     * A URI template under a context path.
+     *
+     * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
+     * @param uri         The URI template
+     * @return The template under the context path
+     */
+    static String underContextPath(@Nullable String contextPath, String uri) {
+        if (contextPath == null || contextPath.isEmpty() || "/".equals(contextPath)) {
+            return uri;
+        }
+        String prefix = contextPath.charAt(0) == '/' ? contextPath : '/' + contextPath;
+        return UriTemplate.of(prefix).nest(uri).toString();
     }
 
     /**
@@ -850,6 +877,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
         private @Nullable Integer port;
+        private @Nullable String executeOn;
+        private boolean nonBlocking;
         private boolean implicitHead;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
@@ -978,6 +1007,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             head.bodyArgumentName = bodyArgumentName;
             head.bodyArgument = bodyArgument;
             head.port = port;
+            head.executeOn = executeOn;
+            head.nonBlocking = nonBlocking;
             head.implicitHead = true;
             return head;
         }
@@ -1013,6 +1044,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         @Override
         public UriRoute body(String argument) {
             return (UriRoute) super.body(argument);
+        }
+
+        @Override
+        public UriRoute executeOn(String executorName) {
+            this.executeOn = Objects.requireNonNull(executorName, "executorName");
+            this.nonBlocking = false;
+            return this;
+        }
+
+        @Override
+        public UriRoute nonBlocking() {
+            this.nonBlocking = true;
+            this.executeOn = null;
+            return this;
         }
 
         @Override
@@ -1073,6 +1118,15 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private final class RouteExecutorSelector implements ExecutorSelector {
             @Override
             public Optional<ExecutorService> select(@Nullable MethodReference<?, ?> method, ThreadSelection threadSelection) {
+                // like @ExecuteOn and @NonBlocking on the method
+                String name = executeOn;
+                if (name != null) {
+                    return Optional.of(select(name).orElseThrow(() -> new SchedulerConfigurationException(
+                        targetMethod.getExecutableMethod(), "No executor configured for name: " + name)));
+                }
+                if (nonBlocking && threadSelection == ThreadSelection.AUTO) {
+                    return Optional.empty();
+                }
                 if (DefaultRouteBuilder.this.executorSelector != null) {
                     return DefaultRouteBuilder.this.executorSelector.select(targetMethod.getExecutableMethod(), threadSelection);
                 } else {
@@ -1091,6 +1145,10 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
             @Override
             public Executor selectExecutor(@Nullable MethodReference<?, ?> method, ThreadSelectionConfiguration configuration) {
+                if (executeOn != null || nonBlocking) {
+                    // selects with the route's choice, see select(MethodReference, ThreadSelection)
+                    return ExecutorSelector.super.selectExecutor(method, configuration);
+                }
                 if (DefaultRouteBuilder.this.executorSelector != null) {
                     return DefaultRouteBuilder.this.executorSelector.selectExecutor(method, configuration);
                 } else {

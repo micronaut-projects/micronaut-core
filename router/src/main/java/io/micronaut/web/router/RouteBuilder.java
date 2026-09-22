@@ -476,8 +476,9 @@ public interface RouteBuilder {
     /**
      * Route requests to a handler function. The route runs like a controller method that takes
      * the request and returns a response: filters, error routes, body writers and executor
-     * selection apply, and as a blocking method it runs on the blocking executor by default.
-     * Like a controller route it consumes JSON unless {@link UriRoute#consumes} says otherwise.
+     * selection apply as they do for a blocking controller method. Like a controller route it
+     * consumes JSON unless {@link UriRoute#consumes} says otherwise, and in {@link HttpRoutes} and
+     * route tables its URI is under {@code micronaut.server.context-path}.
      *
      * @param method  The HTTP method
      * @param uri     The URI template
@@ -508,8 +509,8 @@ public interface RouteBuilder {
     }
 
     /**
-     * Route requests to a handler function that completes the response later. Like a controller
-     * method returning a {@code CompletionStage}, it runs on the event loop by default.
+     * Route requests to a handler function that completes the response later. The executor is
+     * selected like for a controller method returning a {@code CompletionStage}.
      *
      * @param method  The HTTP method
      * @param uri     The URI template

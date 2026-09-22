@@ -22,8 +22,9 @@ import io.micronaut.http.HttpResponse;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A route handler that completes the response later. Like a controller method returning a
- * {@link CompletionStage}, it runs on the event loop by default and must not block.
+ * A route handler that completes the response later. The executor is selected like for a
+ * controller method returning a {@link CompletionStage}: with automatic thread selection it runs
+ * on the event loop and must not block.
  *
  * @author Denis Stepanov
  * @since 5.3.0
