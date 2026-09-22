@@ -120,12 +120,15 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public UriRoute consumes(MediaType... mediaType) {
-        return configure(r -> r.consumes(mediaType));
+        // a copy: changing the caller's array must not change the recorded configuration
+        MediaType[] mediaTypes = mediaType.clone();
+        return configure(r -> r.consumes(mediaTypes));
     }
 
     @Override
     public UriRoute produces(MediaType... mediaType) {
-        return configure(r -> r.produces(mediaType));
+        MediaType[] mediaTypes = mediaType.clone();
+        return configure(r -> r.produces(mediaTypes));
     }
 
     @Override
