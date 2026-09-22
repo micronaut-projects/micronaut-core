@@ -1613,6 +1613,15 @@ final class NettyHttpClient implements
             }
 
             @Override
+            public void discardLimitReached() {
+                // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
+                // downstream client went away): close the connection (HTTP/1) or reset the stream
+                // (HTTP/2) instead of reading it
+                poolHandle.taint();
+                poolHandle.channel().close();
+            }
+
+            @Override
             public BodySizeLimits sizeLimits() {
                 return NettyHttpClient.this.sizeLimits();
             }
