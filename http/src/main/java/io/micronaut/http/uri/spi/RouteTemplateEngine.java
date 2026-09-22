@@ -95,6 +95,30 @@ public interface RouteTemplateEngine {
     RoutePattern matcher(ParsedRouteTemplate template);
 
     /**
+     * The path the routes of this engine are matched against, for a request path. The router
+     * uses it for the routes of this engine everywhere it compares a path: the
+     * {@link ParsedRouteTemplate#requiredPrefix() required prefix} and the
+     * {@link ParsedRouteTemplate#pathSegments() path segments} it prunes candidates with,
+     * {@link RoutePattern#match(String)} and the values it captures, and the rest of the path a
+     * locator route hands to the routes of its target. The request itself is never changed: its
+     * URI and path stay raw for the application. For example, a JAX-RS engine removes the matrix
+     * parameters, {@code /cars;color=red/7;trim=gt} is matched as {@code /cars/7}.
+     *
+     * <p>The function must be pure and cheap: the router calls it once per request for each
+     * engine with routes in the route table, with the raw, undecoded path of the request, or the
+     * rest of the path for the routes of a located target. It must not decode the path, since
+     * the router decodes the captured values, and it must be idempotent: the rest of a path it
+     * returned may be given to it again. It returns the path itself, the same instance, when the
+     * path needs no change; the router then does no extra work for the request.</p>
+     *
+     * @param rawPath The raw path of the request, without the query
+     * @return The path the routes of this engine match, by default the raw path
+     */
+    default String matchingPath(String rawPath) {
+        return rawPath;
+    }
+
+    /**
      * The order of specificity of the templates of this engine, when it is not the Micronaut
      * one: more literal text first, then fewer variables, then fewer variables constrained by a
      * regular expression. The router uses it only between two routes whose templates are both of

@@ -3,3 +3,4 @@ io.micronaut.web.router.OrderedColonRouteTemplateEngine
 io.micronaut.web.router.SelectingColonRouteTemplateEngine
 io.micronaut.web.router.RogueSelectingEngine
 io.micronaut.web.router.AmbiguousSelectingEngine
+io.micronaut.web.router.MatrixColonRouteTemplateEngine
