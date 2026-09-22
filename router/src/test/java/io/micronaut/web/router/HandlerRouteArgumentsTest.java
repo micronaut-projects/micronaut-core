@@ -161,7 +161,7 @@ class HandlerRouteArgumentsTest {
         assertThrows(IllegalArgumentException.class, () -> IndexedRouteDeclaration.of(HttpMethod.CUSTOM, "/x"));
         assertMissing("httpMethod", () -> IndexedRouteDeclaration.of((HttpMethod) null, "/x"));
         assertMissing("httpMethodName", () -> IndexedRouteDeclaration.of((String) null, "/x"));
-        assertMissing("uriTemplate", () -> RouteDeclaration.of(HttpMethod.GET, null));
+        assertMissing("uriTemplate", () -> RouteDeclaration.of(HttpMethod.GET, (String) null));
         assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of(" ", "/x"));
         assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of("", "/x"));
         RouteDeclaration propfind = RouteDeclaration.of("PROPFIND", "/x");

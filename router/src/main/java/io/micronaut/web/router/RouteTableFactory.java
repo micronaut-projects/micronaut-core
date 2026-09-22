@@ -130,7 +130,7 @@ public final class RouteTableFactory {
     public RouteTable buildHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
-            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+            contextPath, route -> { });
         declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, null);
