@@ -22,6 +22,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
@@ -64,6 +66,7 @@ import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
 import org.jspecify.annotations.Nullable;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
@@ -664,21 +667,26 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, List<MethodElement>> baseMethods = new LinkedHashMap<>();
         Set<String> signatures = new HashSet<>();
         for (MethodElement method : superType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
-            // a generic method (toArray(T[])) has no erasure javac can select an overload for; it is left out
+            // a generic method (toArray(T[])) has no erasure javac can select an overload for; it is left out,
+            // as is a method throwing a Throwable that is not an Exception, which the dispatcher declares
             if (method.isAbstract() || method.isStatic() || !(method.isPublic() || method.isProtected())
                 || !method.getDeclaredTypeVariables().isEmpty()
                 || Object.class.getName().equals(method.getDeclaringType().getName())
+                || !Arrays.stream(method.getThrownTypes()).allMatch(thrown -> thrown.isAssignable(Exception.class))
                 || !signatures.add(bridgeMethodKey(method))) {
                 continue;
             }
             baseMethods.computeIfAbsent(method.getName(), name -> new ArrayList<>()).add(method);
         }
+        // the base methods declare checked exceptions of their own (initialize(...) throws IOException):
+        // the dispatcher lets them through, and Python sees them as the host exceptions they are
         builder.addMethod(MethodDef.builder(INVOKE_JAVA_BASE_METHOD)
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("name", TypeDef.STRING)
             .addParameter("arguments", TypeDef.parameterized(ClassTypeDef.of(List.class), POLYGLOT_VALUE))
             .returns(TypeDef.OBJECT)
+            .addThrows(ClassTypeDef.of(Exception.class))
             .build((aThis, methodParameters) -> {
                 VariableDef.MethodParameter name = methodParameters.get(0);
                 VariableDef.MethodParameter arguments = methodParameters.get(1);
@@ -4249,6 +4257,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             methodBuilder.addModifiers(Modifier.PUBLIC);
         }
         methodTypeVariables.forEach(methodBuilder::addTypeVariable);
+        // the override of a Java method declaring checked exceptions declares them too, so that a base
+        // class or interface method calling it can catch them, and rethrows the ones the Python code raises
+        List<ClassElement> checkedExceptions = isJunit5Test ? List.of() : checkedExceptions(signatureMethod);
+        checkedExceptions.forEach(exception -> methodBuilder.addThrows(erasedType(exception)));
 
         copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, bridgeOwner.getName(), visitorContext);
         if (isJunit5Test && !isJunit5TestMethod(methodElement)) {
@@ -4260,7 +4272,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
         boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
         builder.addMethod(methodBuilder
-            .build(((aThis, methodParameters) -> {
+            .build(((aThis, methodParameters) -> rethrowingCheckedExceptions(checkedExceptions, javaClassType(bridgeOwner), () -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
                 ExpressionDef invokedValue;
                 boolean isAsyncMethod = isAsyncPythonMethod(methodElement);
@@ -4363,7 +4375,44 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null, declaredReturnType);
                     }
                 }
-            })));
+            }))));
+    }
+
+    /**
+     * The checked exceptions the Java method a bridge implements declares; a Python method declares none.
+     */
+    private static List<ClassElement> checkedExceptions(MethodElement signatureMethod) {
+        List<ClassElement> checked = new ArrayList<>();
+        for (ClassElement thrown : signatureMethod.getThrownTypes()) {
+            if (!(thrown instanceof GenericPlaceholderElement) && !thrown.isAssignable(RuntimeException.class) && !thrown.isAssignable(Error.class)) {
+                checked.add(thrown);
+            }
+        }
+        return checked;
+    }
+
+    /**
+     * Wraps the body of a bridge declaring checked exceptions: a Python exception that is one of them (a host
+     * exception raised in Python or thrown by a Java call, or a Python exception class extending one) is
+     * rethrown as that exception; any other Python exception propagates as the polyglot exception.
+     */
+    private static StatementDef rethrowingCheckedExceptions(List<ClassElement> checkedExceptions, ClassTypeDef generatedClass, Supplier<StatementDef> body) {
+        StatementDef statement = body.get();
+        if (checkedExceptions.isEmpty()) {
+            return statement;
+        }
+        List<ExpressionDef> declaredTypes = checkedExceptions.stream().map(PythonStubGenerator::classLiteral).toList();
+        return statement.doTry().doCatch(PolyglotException.class, exception ->
+            PYTHON_EXCEPTIONS.invokeStatic("declared", ClassTypeDef.of(Throwable.class), exception, ExpressionDef.constant(generatedClass), ClassTypeDef.of(Class.class).array().instantiate(declaredTypes))
+                .newLocal("declaredException", declaredException -> {
+                    List<StatementDef> statements = new ArrayList<>();
+                    for (ClassElement checkedException : checkedExceptions) {
+                        TypeDef exceptionType = erasedType(checkedException);
+                        statements.add(declaredException.instanceOf((ClassTypeDef) exceptionType).doIf(declaredException.cast(exceptionType).doThrow()));
+                    }
+                    statements.add(exception.doThrow());
+                    return StatementDef.multi(statements);
+                }));
     }
 
     private static TypeDef bridgeSourceReturnType(

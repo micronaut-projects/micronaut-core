@@ -249,9 +249,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
          * @param name The Java method name
          * @param arguments The Python arguments
          * @return The result, or {@code null} for a void method
+         * @throws Exception The checked exception the base method declares
          */
+        @SuppressWarnings("java:S112") // the base method may declare any checked exception
         @Transient
-        @Nullable Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments);
+        @Nullable Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments) throws Exception;
     }
 
     private @Nullable Object generatedGetter(String key) {
