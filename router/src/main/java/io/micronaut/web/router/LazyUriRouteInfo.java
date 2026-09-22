@@ -59,6 +59,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     private final String requiredPathPrefix;
     private final int rawLength;
     private final int pathVariableCount;
+    private final int patternVariableCount;
     private final boolean implicitHead;
     private final String target;
     private final @Nullable IndexedRouteDeclaration declaration;
@@ -70,7 +71,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
      */
     LazyUriRouteInfo(PrecompiledRoute route, Supplier<UriRouteInfo<Object, Object>> builder) {
         this(HttpMethod.parse(route.httpMethod()), route.httpMethodName(), route.uri(), route.requiredPathPrefix(),
-            route.rawLength(), route.pathVariableCount(), route.implicitHead(), route.controllerType() + '#' + route.methodName(), null, builder);
+            route.rawLength(), route.pathVariableCount(), route.patternVariableCount(), route.implicitHead(), route.controllerType() + '#' + route.methodName(), null, builder);
     }
 
     /**
@@ -82,7 +83,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     LazyUriRouteInfo(IndexedRouteDeclaration declaration, HttpMethod httpMethod, boolean implicitHead, Supplier<UriRouteInfo<Object, Object>> builder) {
         // the custom name for a custom method, so that the router indexes the route under it
         this(httpMethod, implicitHead ? httpMethod.name() : declaration.httpMethodName(), declaration.uriTemplate(), declaration.requiredPathPrefix(),
-            declaration.rawLength(), declaration.pathVariableCount(), implicitHead, String.valueOf(declaration), declaration, builder);
+            declaration.rawLength(), declaration.pathVariableCount(), declaration.patternVariableCount(), implicitHead, String.valueOf(declaration), declaration, builder);
     }
 
     private LazyUriRouteInfo(HttpMethod httpMethod,
@@ -91,6 +92,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
                              String requiredPathPrefix,
                              int rawLength,
                              int pathVariableCount,
+                             int patternVariableCount,
                              boolean implicitHead,
                              String target,
                              @Nullable IndexedRouteDeclaration declaration,
@@ -101,6 +103,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
         this.requiredPathPrefix = requiredPathPrefix;
         this.rawLength = rawLength;
         this.pathVariableCount = pathVariableCount;
+        this.patternVariableCount = patternVariableCount;
         this.implicitHead = implicitHead;
         this.target = target;
         this.declaration = declaration;
@@ -134,6 +137,11 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public int getPathVariableCount() {
         return pathVariableCount;
+    }
+
+    @Override
+    public int getPatternVariableCount() {
+        return patternVariableCount;
     }
 
     @Override

@@ -37,6 +37,7 @@ import org.jspecify.annotations.Nullable;
  * @param requiredPathPrefix  See {@link IndexedRoute#getRequiredPathPrefix()}
  * @param rawLength           See {@link IndexedRoute#getRawLength()}
  * @param pathVariableCount   See {@link IndexedRoute#getPathVariableCount()}
+ * @param patternVariableCount See {@link IndexedRoute#getPatternVariableCount()}
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -54,5 +55,6 @@ public record PrecompiledRoute(String controllerType,
                                boolean declaringTypeTarget,
                                String requiredPathPrefix,
                                int rawLength,
-                               int pathVariableCount) {
+                               int pathVariableCount,
+                               int patternVariableCount) {
 }

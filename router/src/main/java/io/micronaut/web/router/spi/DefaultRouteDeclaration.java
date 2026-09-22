@@ -27,6 +27,7 @@ import io.micronaut.http.HttpMethod;
  * @param requiredPathPrefix The literal prefix of the matched paths
  * @param rawLength          The length of the literal parts
  * @param pathVariableCount  The number of path variables
+ * @param patternVariableCount The number of path variables with a regular expression
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -36,5 +37,6 @@ record DefaultRouteDeclaration(HttpMethod httpMethod,
                                String uriTemplate,
                                String requiredPathPrefix,
                                int rawLength,
-                               int pathVariableCount) implements IndexedRouteDeclaration {
+                               int pathVariableCount,
+                               int patternVariableCount) implements IndexedRouteDeclaration {
 }

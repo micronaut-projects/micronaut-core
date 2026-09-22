@@ -78,7 +78,7 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
     private static final List<TypeDef> ROUTE_CONSTRUCTOR = List.of(
         TypeDef.STRING, TypeDef.STRING, TypeDef.STRING.array(), TypeDef.STRING, TypeDef.STRING, TypeDef.STRING,
         TypeDef.STRING.array(), TypeDef.STRING.array(), TypeDef.Primitive.BOOLEAN, TypeDef.Primitive.INT,
-        TypeDef.Primitive.BOOLEAN, TypeDef.STRING, TypeDef.Primitive.INT, TypeDef.Primitive.INT
+        TypeDef.Primitive.BOOLEAN, TypeDef.STRING, TypeDef.Primitive.INT, TypeDef.Primitive.INT, TypeDef.Primitive.INT
     );
     /**
      * The naming strategy the runtime uses with precompiled routes.
@@ -234,7 +234,8 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
                     spec.declaringTypeTarget(),
                     matcher.getRequiredPrefix(),
                     matcher.getRawLength(),
-                    matcher.getPathVariableCount()
+                    matcher.getPathVariableCount(),
+                    matcher.getPatternVariableCount()
                 ));
             }
         }
@@ -344,7 +345,8 @@ public final class PrecompiledHttpRoutesVisitor implements TypeElementVisitor<Ob
                     ExpressionDef.constant(route.declaringTypeTarget()),
                     ExpressionDef.constant(route.requiredPathPrefix()),
                     ExpressionDef.constant(route.rawLength()),
-                    ExpressionDef.constant(route.pathVariableCount())
+                    ExpressionDef.constant(route.pathVariableCount()),
+                    ExpressionDef.constant(route.patternVariableCount())
                 ).returning());
             routeMethods.add(routeMethod);
             classDefBuilder.addMethod(routeMethod);

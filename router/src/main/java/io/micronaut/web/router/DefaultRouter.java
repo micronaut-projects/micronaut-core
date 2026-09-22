@@ -415,9 +415,41 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
                 closestMatches.add(match);
             }
-            uriRoutes = closestMatches;
+            uriRoutes = closestMatches.size() > 1 ? fewestPatternVariables(closestMatches) : closestMatches;
         }
         return uriRoutes;
+    }
+
+    /**
+     * The third key of specificity, among routes with the same literal length and number of
+     * variables: fewer variables constrained by a regular expression is more specific, so
+     * {@code /t/{id}} is selected over {@code /t/{id:.+}}. It only breaks ties.
+     *
+     * @param matches The equally specific matches by the first two keys
+     * @return The matches with the fewest variables with a regular expression
+     */
+    private static <T, R> List<UriRouteMatch<T, R>> fewestPatternVariables(List<UriRouteMatch<T, R>> matches) {
+        int size = matches.size();
+        int[] counts = new int[size];
+        int min = Integer.MAX_VALUE;
+        for (int i = 0; i < size; i++) {
+            counts[i] = patternVariableCount(matches.get(i).getRouteInfo());
+            min = Math.min(min, counts[i]);
+        }
+        var result = new ArrayList<UriRouteMatch<T, R>>(size);
+        for (int i = 0; i < size; i++) {
+            if (counts[i] == min) {
+                result.add(matches.get(i));
+            }
+        }
+        return result;
+    }
+
+    private static int patternVariableCount(UriRouteInfo<?, ?> route) {
+        if (route instanceof IndexedRoute indexed) {
+            return indexed.getPatternVariableCount();
+        }
+        return new UriTemplateMatcher(route.getUriMatchTemplate().toString()).getPatternVariableCount();
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {

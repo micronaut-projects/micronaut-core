@@ -198,6 +198,27 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void fewerVariablesWithARegularExpressionIsMoreSpecific() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Map<String, String> expected = new LinkedHashMap<>();
+            // both match: the variable without a regular expression wins
+            expected.put("/fn/sel/1", "plain 1");
+            expected.put("/fn/sel2/1/2", "plain pair 1 2");
+            expected.put("/fn/dsel/1", "declared plain 1");
+            // only the constrained route matches
+            expected.put("/fn/sel/1/2", "pattern 1/2");
+            expected.put("/fn/sel2/1/2/3", "pattern pair 1 2/3");
+            expected.put("/fn/dsel/1/2", "declared pattern 1/2");
+            for (Map.Entry<String, String> entry : expected.entrySet()) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET(entry.getKey()), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body(entry.getValue())
+                    .build());
+            }
+        }
+    }
+
+    @Test
     void nullableBodyHelperIsNullWithoutABody() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/nullable-helper", null).contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
@@ -1149,6 +1170,10 @@ public class HandlerRoutesTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class AnnotatedRoutes implements HttpRoutes {
+        private static HttpResponse<?> text(String text) {
+            return HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+
         static final RouteDeclaration DECLARED_CUSTOM = RouteDeclaration.of("PROPFIND", "/fn/declared-custom/{id}");
         private final BeanContext beanContext;
         private final MarkedTarget target;
@@ -1173,6 +1198,12 @@ public class HandlerRoutesTest {
                 HttpResponse.ok(request.getMethodName() + " " + form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.handle(DECLARED_CUSTOM, (request, pathVariables) ->
                 HttpResponse.ok("declared " + request.getMethodName() + " " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE));
+            routes.GET("/fn/sel/{id}", (request, pathVariables) -> text("plain " + pathVariables.getString("id")));
+            routes.GET("/fn/sel/{id:.+}", (request, pathVariables) -> text("pattern " + pathVariables.getString("id")));
+            routes.GET("/fn/sel2/{a}/{b:.+}", (request, pathVariables) -> text("pattern pair " + pathVariables.getString("a") + " " + pathVariables.getString("b")));
+            routes.GET("/fn/sel2/{a}/{b}", (request, pathVariables) -> text("plain pair " + pathVariables.getString("a") + " " + pathVariables.getString("b")));
+            routes.handle(RouteDeclaration.of(HttpMethod.GET, "/fn/dsel/{id:.+}"), (request, pathVariables) -> text("declared pattern " + pathVariables.getString("id")));
+            routes.handle(RouteDeclaration.of(HttpMethod.GET, "/fn/dsel/{id}"), (request, pathVariables) -> text("declared plain " + pathVariables.getString("id")));
             routes.POST("/fn/nullable-helper", HttpRouteBuilder.nullableBody(String.class), (request, pathVariables, body) ->
                 HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .consumesAll();

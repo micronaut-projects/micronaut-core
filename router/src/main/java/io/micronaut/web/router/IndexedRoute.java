@@ -44,8 +44,15 @@ interface IndexedRoute {
     int getPathVariableCount();
 
     /**
+     * @return The number of path variables constrained by a regular expression, see
+     * {@link io.micronaut.http.uri.UriTemplateMatcher#getPatternVariableCount()}
+     */
+    int getPatternVariableCount();
+
+    /**
      * The order of routes, the same as {@link io.micronaut.http.uri.UriTemplateMatcher#compareTo}:
-     * longer literals first, then fewer variables.
+     * longer literals first, then fewer variables, then fewer variables constrained by a regular
+     * expression.
      *
      * @param a A route
      * @param b Another route
@@ -54,7 +61,11 @@ interface IndexedRoute {
     static int compare(IndexedRoute a, IndexedRoute b) {
         int rawCompare = Integer.compare(b.getRawLength(), a.getRawLength());
         if (rawCompare == 0) {
-            return Integer.compare(a.getPathVariableCount(), b.getPathVariableCount());
+            int variableCompare = Integer.compare(a.getPathVariableCount(), b.getPathVariableCount());
+            if (variableCompare == 0) {
+                return Integer.compare(a.getPatternVariableCount(), b.getPatternVariableCount());
+            }
+            return variableCompare;
         }
         return rawCompare;
     }

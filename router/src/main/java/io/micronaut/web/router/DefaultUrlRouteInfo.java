@@ -186,6 +186,12 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return uriTemplateMatcher.getPathVariableCount();
     }
 
+    @Internal
+    @Override
+    public int getPatternVariableCount() {
+        return uriTemplateMatcher.getPatternVariableCount();
+    }
+
     @Override
     public String getHttpMethodName() {
         return httpMethodName;

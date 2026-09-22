@@ -61,6 +61,23 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
     int pathVariableCount();
 
     /**
+     * The number of path variables constrained by a regular expression, the third key of the
+     * order of routes. The default computes it from the template; a generated declaration may
+     * return the value computed at compile time.
+     *
+     * @return The number of path variables with a regular expression; the same as
+     * {@link UriTemplateMatcher#getPatternVariableCount()}
+     */
+    default int patternVariableCount() {
+        String uriTemplate = uriTemplate();
+        if (uriTemplate.indexOf(':') < 0) {
+            // no variable has a modifier
+            return 0;
+        }
+        return new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString()).getPatternVariableCount();
+    }
+
+    /**
      * The URL parser generated for the enum this declaration is a constant of, if any: the
      * ordinal it answers selects the route bound to the constant with that ordinal.
      *
@@ -99,6 +116,6 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
 
     private static IndexedRouteDeclaration of(HttpMethod httpMethod, String httpMethodName, String uriTemplate) {
         UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString());
-        return new DefaultRouteDeclaration(httpMethod, httpMethodName, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount());
+        return new DefaultRouteDeclaration(httpMethod, httpMethodName, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount(), matcher.getPatternVariableCount());
     }
 }
