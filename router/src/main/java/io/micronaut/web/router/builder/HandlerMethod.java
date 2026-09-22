@@ -29,12 +29,16 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.http.form.FormData;
+import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
 
@@ -305,7 +309,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * Close the form parts when the handler completes, throwing out what it did not read.
+     * Close the form parts when the handler completes, throwing out what it did not read. The
+     * result of the handler is delivered once the parts were closed: a failure to release them
+     * fails a successful result, and is added as suppressed to a failure of the handler.
      *
      * @param parts   The form parts
      * @param handler Calls the handler
@@ -320,7 +326,33 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             parts.close();
             throw e;
         }
-        return stage.whenComplete((response, error) -> parts.close());
+        if (stage == null) {
+            parts.close();
+            throw new NullPointerException("The form handler returned no stage");
+        }
+        CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
+        stage.whenComplete((response, error) -> {
+            CompletionStage<Void> closed;
+            try {
+                closed = parts.closeAsync();
+            } catch (Throwable e) {
+                closed = CompletableFuture.failedFuture(e);
+            }
+            closed.whenComplete((ignored, closeError) -> {
+                if (error != null) {
+                    Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+                    if (closeError != null && closeError != cause) {
+                        cause.addSuppressed(closeError);
+                    }
+                    result.completeExceptionally(cause);
+                } else if (closeError != null) {
+                    result.completeExceptionally(closeError instanceof CompletionException && closeError.getCause() != null ? closeError.getCause() : closeError);
+                } else {
+                    result.complete(response);
+                }
+            });
+        });
+        return result;
     }
 
     /**

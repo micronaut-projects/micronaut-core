@@ -13,23 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router.builder;
+package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.web.router.exceptions.UnsatisfiedPartRouteException;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
 import java.util.OptionalLong;
 import java.util.Set;
+import java.util.concurrent.CompletionStage;
 
 /**
  * The submitted form of a request, {@code application/x-www-form-urlencoded} or
@@ -39,7 +34,7 @@ import java.util.Set;
  * routes.POST("/profile", (request, pathVariables, form) -> {
  *     String name = form.getString("name");
  *     int age = form.getInt("age");
- *     Optional<CompletedFileUpload> avatar = form.findFile("avatar");
+ *     Optional<FileUpload> avatar = form.findFile("avatar");
  *     ...
  * });
  * }</pre>
@@ -47,15 +42,24 @@ import java.util.Set;
  * <p>The whole form is read before the handler runs. Text fields convert like the path
  * variables, with the same accessors, including default values for missing fields, e.g.
  * {@code getInt("quantity", 1)}, with the conversion service of the route: a missing required field or a value that
- * does not convert is answered with 400. File parts are stored as {@link CompletedFileUpload}s,
- * in memory or on disk depending on the {@code micronaut.server.multipart} configuration, and
- * released when the request completes.</p>
+ * does not convert is answered with 400. Uploaded files are {@link FileUpload}s, stored in
+ * memory or on disk depending on the {@code micronaut.server.multipart} configuration, with the
+ * limits of that configuration. The files are owned by the request: what was not consumed is
+ * released when the request completes, and an operation on a file must be part of the stage the
+ * handler returns:</p>
+ * <pre>{@code
+ * routes.handleFormAsync(HttpMethod.POST, "/profile", (request, pathVariables, form) ->
+ *     form.getFile("avatar").transferTo(destination)
+ *         .thenApply(done -> HttpResponse.ok(form.getString("displayName"))));
+ * }</pre>
+ *
+ * <p>{@link #close()} releases the files early. The text fields stay readable after closing.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public interface FormData {
+public interface FormData extends AutoCloseable {
 
     /**
      * @return The names of the text fields that have a value
@@ -84,7 +88,7 @@ public interface FormData {
      * @param type The type
      * @param <T>  The type
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     <T> T get(String name, Class<T> type);
@@ -101,12 +105,12 @@ public interface FormData {
     <T> Optional<T> find(String name, Class<T> type);
 
     /**
-     * All the files uploaded in a field.
+     * All the files uploaded in a field. Every call returns the same handles.
      *
      * @param name The name of the field
-     * @return The files, in the order they were submitted, or an empty list
+     * @return The files, in the order they were submitted, or an empty list; immutable
      */
-    List<CompletedFileUpload> getFiles(String name);
+    List<FileUpload> getFiles(String name);
 
     /**
      * An optional file.
@@ -114,8 +118,8 @@ public interface FormData {
      * @param name The name of the field
      * @return The first file uploaded in the field, if any
      */
-    default Optional<CompletedFileUpload> findFile(String name) {
-        List<CompletedFileUpload> files = getFiles(name);
+    default Optional<FileUpload> findFile(String name) {
+        List<FileUpload> files = getFiles(name);
         return files.isEmpty() ? Optional.empty() : Optional.of(files.get(0));
     }
 
@@ -124,18 +128,34 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The first file uploaded in the field
-     * @throws UnsatisfiedPartRouteException if no file was uploaded in the field, answered with 400
+     * @throws FormFieldException if no file was uploaded in the field, answered with 400
      */
-    default CompletedFileUpload getFile(String name) {
-        return findFile(name).orElseThrow(() -> new UnsatisfiedPartRouteException(name, Argument.of(CompletedFileUpload.class, name)));
+    default FileUpload getFile(String name) {
+        return findFile(name).orElseThrow(() -> FormFieldException.missingFile(name));
     }
+
+    /**
+     * Release the files that were not consumed yet, and abort the operations on them that are
+     * still running. Closing is idempotent, and the same stage is returned on every call. The text
+     * fields stay readable.
+     *
+     * @return Completes when the resources of the files were released, or exceptionally when
+     * releasing them failed
+     */
+    CompletionStage<Void> closeAsync();
+
+    /**
+     * Start releasing the files like {@link #closeAsync()}, without waiting for it.
+     */
+    @Override
+    void close();
 
     /**
      * A required field as a string.
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default String getString(String name) {
@@ -147,7 +167,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default int getInt(String name) {
@@ -159,7 +179,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default long getLong(String name) {
@@ -171,7 +191,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default double getDouble(String name) {
@@ -183,7 +203,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default float getFloat(String name) {
@@ -195,7 +215,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default short getShort(String name) {
@@ -207,7 +227,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default byte getByte(String name) {
@@ -219,7 +239,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default char getChar(String name) {
@@ -231,7 +251,7 @@ public interface FormData {
      *
      * @param name The name of the field
      * @return The value
-     * @throws UnsatisfiedPartRouteException if the field has no value, answered with 400
+     * @throws FormFieldException if the field has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
     default boolean getBoolean(String name) {
@@ -416,18 +436,5 @@ public interface FormData {
      */
     default Optional<Boolean> findBoolean(String name) {
         return find(name, Boolean.class);
-    }
-
-    /**
-     * Create the form of a request.
-     *
-     * @param fields            The values of the text fields
-     * @param files             The uploaded files
-     * @param conversionService The conversion service to convert the text fields with
-     * @return The form
-     */
-    @Internal
-    static FormData of(Map<String, List<String>> fields, Map<String, List<CompletedFileUpload>> files, ConversionService conversionService) {
-        return new DefaultFormData(fields, files, conversionService);
     }
 }

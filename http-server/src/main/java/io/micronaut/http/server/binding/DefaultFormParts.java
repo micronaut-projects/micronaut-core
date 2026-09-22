@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2025 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,15 +17,15 @@ package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.form.FormCapableHttpRequest;
+import io.micronaut.http.form.FormPart;
+import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
-import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.web.router.builder.FormPart;
-import io.micronaut.web.router.builder.FormParts;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -33,7 +33,8 @@ import java.util.function.Function;
 
 /**
  * The {@link FormParts} of a request: a cursor over its raw form fields, which requests one
- * field at a time from the form decoder, so nothing is read ahead of the handler.
+ * field at a time from the form decoder, so nothing is read ahead of the handler. The next field
+ * is only requested once the consumer of the previous one is done and its part was released.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -42,7 +43,7 @@ import java.util.function.Function;
 final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
 
     private final FormCapableHttpRequest<?> request;
-    private final FormFactory formFactory;
+    private final UploadContext context;
 
     // guarded by this
     private @Nullable Subscription subscription;
@@ -50,13 +51,14 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     private boolean subscribed;
     private boolean ended;
     private @Nullable Throwable failure;
-    private boolean closed;
     private boolean busy;
     private @Nullable DefaultFormPart active;
+    private @Nullable Walk<?> walking;
+    private @Nullable CompletionStage<Void> closed;
 
-    DefaultFormParts(FormCapableHttpRequest<?> request, FormFactory formFactory) {
+    DefaultFormParts(FormCapableHttpRequest<?> request, UploadContext context) {
         this.request = request;
-        this.formFactory = formFactory;
+        this.context = context;
     }
 
     @Override
@@ -76,47 +78,80 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
 
     @Override
     public void close() {
+        closeAsync();
+    }
+
+    @Override
+    public CompletionStage<Void> closeAsync() {
         Subscription s;
         CompletableFuture<@Nullable RawFormField> p;
         DefaultFormPart part;
+        Walk<?> operation;
+        CompletableFuture<Void> result = new CompletableFuture<>();
         synchronized (this) {
-            if (closed) {
-                return;
+            if (closed != null) {
+                return closed;
             }
-            closed = true;
+            closed = result.minimalCompletionStage();
             s = subscription;
             p = pending;
             pending = null;
             part = active;
             active = null;
+            operation = walking;
         }
-        if (part != null) {
-            // the consumer of the part loses it: what it did not claim yet is discarded
-            part.release();
+        if (operation != null) {
+            // the operation in progress ends now, even if its consumer never completes
+            operation.result.completeExceptionally(closedException());
         }
         if (s != null) {
             // the form decoder discards the rest of the body
             s.cancel();
         }
         if (p != null) {
-            p.complete(null);
+            p.completeExceptionally(closedException());
         }
+        if (part == null) {
+            result.complete(null);
+        } else {
+            // the consumer of the part loses it: what it did not consume is discarded
+            part.closeAsync().whenComplete((ignored, error) -> {
+                if (error != null) {
+                    result.completeExceptionally(error);
+                } else {
+                    result.complete(null);
+                }
+            });
+        }
+        synchronized (this) {
+            return Objects.requireNonNull(closed);
+        }
+    }
+
+    private static CancellationException closedException() {
+        return new CancellationException("The form parts were closed");
     }
 
     private <T> CompletionStage<T> walk(Function<DefaultFormPart, @Nullable CompletionStage<?>> visitor, boolean once, @Nullable T ended, @Nullable T visited) {
         synchronized (this) {
+            if (closed != null) {
+                return CompletableFuture.failedFuture(new IllegalStateException("The form parts were closed"));
+            }
             if (busy) {
                 return CompletableFuture.failedFuture(new IllegalStateException("Another operation on the form parts is in progress"));
             }
             busy = true;
         }
         Walk<T> walk = new Walk<>(visitor, once, ended, visited);
+        synchronized (this) {
+            walking = walk;
+        }
         walk.run();
         return walk.result;
     }
 
     /**
-     * @return The next field, {@code null} at the end of the form or when closed
+     * @return The next field, {@code null} at the end of the form
      */
     private CompletableFuture<@Nullable RawFormField> next() {
         CompletableFuture<@Nullable RawFormField> future = new CompletableFuture<>();
@@ -126,7 +161,10 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             if (failure != null) {
                 return CompletableFuture.failedFuture(failure);
             }
-            if (ended || closed) {
+            if (closed != null) {
+                return CompletableFuture.failedFuture(closedException());
+            }
+            if (ended) {
                 return CompletableFuture.completedFuture(null);
             }
             pending = future;
@@ -150,7 +188,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
         boolean demand;
         synchronized (this) {
             subscription = s;
-            cancel = closed;
+            cancel = closed != null;
             demand = pending != null;
         }
         if (cancel) {
@@ -164,7 +202,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     public void onNext(RawFormField field) {
         CompletableFuture<@Nullable RawFormField> p;
         synchronized (this) {
-            p = closed ? null : pending;
+            p = closed != null ? null : pending;
             pending = null;
         }
         if (p == null) {
@@ -208,12 +246,12 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
      */
     private boolean own(DefaultFormPart part) {
         synchronized (this) {
-            if (!closed) {
+            if (closed == null) {
                 active = part;
                 return true;
             }
         }
-        part.release();
+        part.close();
         return false;
     }
 
@@ -221,14 +259,23 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
      * End the ownership of the consumer of a part, when its stage completes or fails.
      *
      * @param part The part
+     * @return Completes when what the consumer did not consume is released
      */
-    private void release(DefaultFormPart part) {
+    private CompletableFuture<Void> release(DefaultFormPart part) {
         synchronized (this) {
             if (active == part) {
                 active = null;
             }
         }
-        part.release();
+        try {
+            return part.closeAsync().toCompletableFuture();
+        } catch (Throwable e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+
+    private static Throwable unwrap(Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
     }
 
     /**
@@ -265,7 +312,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
                 RawFormField field;
                 try {
                     field = next.join();
-                } catch (CompletionException e) {
+                } catch (CompletionException | CancellationException e) {
                     accept(null, e);
                     return;
                 }
@@ -276,7 +323,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
         }
 
         /**
-         * @return Whether to read the next field
+         * @return Whether to read the next field now
          */
         private boolean accept(@Nullable RawFormField field, @Nullable Throwable error) {
             if (error != null) {
@@ -287,46 +334,86 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
                 finish(endedValue, null);
                 return false;
             }
-            DefaultFormPart part = new DefaultFormPart(field, formFactory, request.getCharacterEncoding());
+            DefaultFormPart part = new DefaultFormPart(new StreamingUploadContent(field, context));
             if (!own(part)) {
                 // closed meanwhile
-                finish(endedValue, null);
+                finish(null, closedException());
                 return false;
             }
             CompletableFuture<?> stage;
             try {
                 CompletionStage<?> visited = visitor.apply(part);
                 if (visited == null) {
-                    release(part);
-                    return true;
+                    // skipped: discarded before the next part is read
+                    return afterRelease(release(part), null, false);
                 }
                 stage = visited.toCompletableFuture();
             } catch (Throwable e) {
-                release(part);
-                finish(null, e);
-                return false;
+                return afterRelease(release(part), e, false);
             }
             if (!stage.isDone()) {
                 stage.whenComplete((ignored, e) -> {
-                    release(part);
-                    if (e != null) {
-                        finish(null, e);
-                    } else if (once) {
-                        finish(visitedValue, null);
-                    } else {
+                    if (afterRelease(release(part), e, once)) {
                         run();
                     }
                 });
                 return false;
             }
-            release(part);
+            Throwable e = null;
             try {
                 stage.join();
-            } catch (Throwable e) {
-                finish(null, e);
+            } catch (Throwable t) {
+                e = t;
+            }
+            return afterRelease(release(part), e, once);
+        }
+
+        /**
+         * Continue once the part was released: with the next field, or by finishing.
+         *
+         * @param released Completes when the part was released
+         * @param error    The failure of the consumer
+         * @param visited  Whether the part was the one the operation was looking for
+         * @return Whether to read the next field now
+         */
+        private boolean afterRelease(CompletableFuture<Void> released, @Nullable Throwable error, boolean visited) {
+            if (!released.isDone()) {
+                released.whenComplete((ignored, releaseError) -> {
+                    if (proceed(error, releaseError, visited)) {
+                        run();
+                    }
+                });
                 return false;
             }
-            if (once) {
+            Throwable releaseError = null;
+            try {
+                released.join();
+            } catch (Throwable t) {
+                releaseError = t;
+            }
+            return proceed(error, releaseError, visited);
+        }
+
+        private boolean proceed(@Nullable Throwable error, @Nullable Throwable releaseError, boolean visited) {
+            if (error != null) {
+                Throwable cause = unwrap(error);
+                if (releaseError != null && unwrap(releaseError) != cause) {
+                    cause.addSuppressed(unwrap(releaseError));
+                }
+                finish(null, cause);
+                return false;
+            }
+            if (releaseError != null) {
+                finish(null, releaseError);
+                return false;
+            }
+            synchronized (DefaultFormParts.this) {
+                if (closed != null) {
+                    finish(null, closedException());
+                    return false;
+                }
+            }
+            if (visited) {
                 finish(visitedValue, null);
                 return false;
             }
@@ -336,9 +423,12 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
         private void finish(@Nullable T value, @Nullable Throwable error) {
             synchronized (DefaultFormParts.this) {
                 busy = false;
+                if (walking == this) {
+                    walking = null;
+                }
             }
             if (error != null) {
-                result.completeExceptionally(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
+                result.completeExceptionally(unwrap(error));
             } else {
                 result.complete(value);
             }

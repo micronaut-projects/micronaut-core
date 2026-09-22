@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router.builder;
+package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
 
@@ -29,24 +29,31 @@ import java.util.function.Function;
  * <pre>{@code
  * routes.handleFormStream(HttpMethod.POST, "/upload", (request, pathVariables, parts) ->
  *     parts.forEach(part -> part.isFile()
- *             ? part.transferTo(uploads.resolve(part.fileName()))
- *             : part.text().thenAccept(value -> fields.put(part.name(), value)))
+ *             ? part.file().transferTo(uploads.resolve(UUID.randomUUID().toString()))
+ *             : part.text(8_192).thenAccept(value -> fields.put(part.name(), value)))
  *         .thenApply(done -> HttpResponse.ok()));
  * }</pre>
  *
  * <p>Or read only the parts that are needed, in the order the client sends them, and throw out
  * the rest:</p>
  * <pre>{@code
- * parts.part("title", part -> part.text().thenAccept(title::set))
- *     .thenCompose(found -> parts.part("avatar", part -> part.transferTo(path)))
- *     .thenApply(found -> {
- *         parts.close();
- *         return found ? HttpResponse.noContent() : HttpResponse.badRequest();
- *     });
+ * parts.part("title", part -> part.text(8_192).thenAccept(title::set))
+ *     .thenCompose(found -> parts.part("avatar", part -> part.file().transferTo(path)))
+ *     .thenCompose(found -> parts.closeAsync()
+ *         .thenApply(closed -> found ? HttpResponse.noContent() : HttpResponse.badRequest()));
  * }</pre>
  *
- * <p>One operation at a time: start the next one when the stage of the previous one completed.
- * The parts are closed when the stage returned by the handler completes.</p>
+ * <p>One operation at a time: start the next one when the stage of the previous one completed;
+ * an operation started while another one is in progress fails with an
+ * {@link IllegalStateException}. A consumer callback owns its part until the stage it returned
+ * completes; then what it did not consume is discarded, and the next part is only read once that
+ * is done. A callback that returns {@code null} fails the operation.</p>
+ *
+ * <p>The end of the form and closing are different: at the end of the form, {@link #part} completes
+ * with {@code false} and {@link #forEach} completes normally, while closing the parts during an
+ * operation completes that operation with a {@link java.util.concurrent.CancellationException},
+ * and an operation started after closing fails with an {@link IllegalStateException}. The parts
+ * are closed when the stage returned by the handler completes, and when the request ends.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -78,8 +85,16 @@ public interface FormParts extends AutoCloseable {
     CompletionStage<Boolean> part(String name, Function<? super FormPart, ? extends CompletionStage<?>> consumer);
 
     /**
-     * Throw out the rest of the form without reading it. An operation that has not completed ends
-     * as if the form ended. Closing again has no effect.
+     * Throw out the rest of the form without reading it, and discard the part a consumer holds.
+     * An operation that has not completed ends with a
+     * {@link java.util.concurrent.CancellationException}. Closing again returns the same stage.
+     *
+     * @return Completes when the part a consumer held was released
+     */
+    CompletionStage<Void> closeAsync();
+
+    /**
+     * Start closing like {@link #closeAsync()}, without waiting for it.
      */
     @Override
     void close();

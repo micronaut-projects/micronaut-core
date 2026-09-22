@@ -28,22 +28,26 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormCapableHttpRequest;
-import io.micronaut.http.multipart.CompletedFileUpload;
+import io.micronaut.http.form.FormData;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
-import io.micronaut.web.router.builder.FormData;
 import jakarta.inject.Singleton;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
-import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CompletableFuture;
 
 /**
@@ -57,6 +61,7 @@ import java.util.concurrent.CompletableFuture;
 @Singleton
 final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormData> {
     private static final Argument<FormData> ARGUMENT = Argument.of(FormData.class);
+    private static final Logger LOG = LoggerFactory.getLogger(FormDataArgumentBinder.class);
 
     private final BeanProvider<FormFactory> formFactory;
     private final ConversionService conversionService;
@@ -77,13 +82,18 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             return BindingResult.unsatisfied();
         }
         FormFactory factory = formFactory.get();
-        Charset charset = request.getCharacterEncoding();
+        UploadContext uploadContext = UploadContext.of(factory, request);
         Map<String, List<String>> fields = new LinkedHashMap<>();
-        Map<String, List<CompletedFileUpload>> files = new LinkedHashMap<>();
+        Map<String, List<FileUpload>> files = new LinkedHashMap<>();
+        List<FileUpload> owned = Collections.synchronizedList(new ArrayList<>());
+        // the request releases the files that were not consumed, also when collecting the form
+        // fails part way, or the handler is never called
+        request.addDisposalResource(() -> closeOwned(owned));
+        AtomicLong textBytes = new AtomicLong();
         // the parts of a form arrive in order: each one is read or stored before the next
         CompletableFuture<FormData> future = Flux.from(request.getRawFormFields())
-            .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, request, field, charset, fields, files))))
-            .then(Mono.fromSupplier(() -> FormData.of(fields, files, conversionService)))
+            .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
+            .then(Mono.fromSupplier(() -> form(fields, files)))
             .toFuture();
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
@@ -102,26 +112,58 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         };
     }
 
+    private FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files) {
+        Map<String, List<FileUpload>> immutable = new LinkedHashMap<>();
+        files.forEach((name, list) -> immutable.put(name, List.copyOf(list)));
+        return new DefaultFormData(fields, immutable, conversionService);
+    }
+
+    private static void closeOwned(List<FileUpload> owned) {
+        List<FileUpload> uploads;
+        synchronized (owned) {
+            if (owned.isEmpty()) {
+                return;
+            }
+            uploads = List.copyOf(owned);
+        }
+        DefaultFormData.closeAll(List.of(uploads)).whenComplete((ignored, error) -> {
+            if (error != null) {
+                LOG.warn("Failed to release the uploaded files of a form", error);
+            }
+        });
+    }
+
     private static ExecutionFlow<Boolean> complete(FormFactory factory,
+                                                   UploadContext context,
                                                    FormCapableHttpRequest<?> request,
                                                    RawFormField field,
-                                                   Charset charset,
                                                    Map<String, List<String>> fields,
-                                                   Map<String, List<CompletedFileUpload>> files) {
+                                                   Map<String, List<FileUpload>> files,
+                                                   List<FileUpload> owned,
+                                                   AtomicLong textBytes) {
         String name = field.metadata().name();
         if (name == null) {
             field.close();
             return ExecutionFlow.just(Boolean.TRUE);
         }
         if (field.metadata().fileName() != null) {
+            // stored with the limits of the multipart configuration
             return factory.completeFileUpload(request, field).map(upload -> {
-                files.computeIfAbsent(name, k -> new ArrayList<>(1)).add(upload);
+                // the request disposes of the upload it completed: this takes over the content
+                FileUpload file = new DefaultFileUpload(new StoredUploadContent(upload.moveResource(), context));
+                owned.add(file);
+                files.computeIfAbsent(name, k -> new ArrayList<>(1)).add(file);
                 return Boolean.TRUE;
             });
         }
         return InternalByteBody.bufferFlow(field.byteBody()).map(body -> {
             try (CloseableAvailableByteBody available = body) {
-                fields.computeIfAbsent(name, k -> new ArrayList<>(1)).add(available.toString(charset));
+                // the text of a form is buffered: it counts against the buffer limit
+                long total = textBytes.addAndGet(available.length());
+                if (total > context.maxBufferSize()) {
+                    throw new ContentLengthExceededException("The text fields of the form exceed the maximum allowed content length [" + context.maxBufferSize() + "]");
+                }
+                fields.computeIfAbsent(name, k -> new ArrayList<>(1)).add(available.toString(context.charset()));
             }
             return Boolean.TRUE;
         });
