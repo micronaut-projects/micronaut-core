@@ -52,6 +52,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     private @Nullable Throwable failure;
     private boolean closed;
     private boolean busy;
+    private @Nullable DefaultFormPart active;
 
     DefaultFormParts(FormCapableHttpRequest<?> request, FormFactory formFactory) {
         this.request = request;
@@ -77,6 +78,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     public void close() {
         Subscription s;
         CompletableFuture<@Nullable RawFormField> p;
+        DefaultFormPart part;
         synchronized (this) {
             if (closed) {
                 return;
@@ -85,6 +87,12 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             s = subscription;
             p = pending;
             pending = null;
+            part = active;
+            active = null;
+        }
+        if (part != null) {
+            // the consumer of the part loses it: what it did not claim yet is discarded
+            part.release();
         }
         if (s != null) {
             // the form decoder discards the rest of the body
@@ -193,6 +201,37 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     }
 
     /**
+     * Hand a part to the consumer of the current operation.
+     *
+     * @param part The part
+     * @return {@code false} if the parts were closed, and the part was released
+     */
+    private boolean own(DefaultFormPart part) {
+        synchronized (this) {
+            if (!closed) {
+                active = part;
+                return true;
+            }
+        }
+        part.release();
+        return false;
+    }
+
+    /**
+     * End the ownership of the consumer of a part, when its stage completes or fails.
+     *
+     * @param part The part
+     */
+    private void release(DefaultFormPart part) {
+        synchronized (this) {
+            if (active == part) {
+                active = null;
+            }
+        }
+        part.release();
+    }
+
+    /**
      * One operation: reads fields until the visitor consumed one (when {@code once}) or the form
      * ended. Stages that are already complete are handled in a loop, not by recursion.
      *
@@ -249,22 +288,27 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
                 return false;
             }
             DefaultFormPart part = new DefaultFormPart(field, formFactory, request.getCharacterEncoding());
+            if (!own(part)) {
+                // closed meanwhile
+                finish(endedValue, null);
+                return false;
+            }
             CompletableFuture<?> stage;
             try {
                 CompletionStage<?> visited = visitor.apply(part);
                 if (visited == null) {
-                    part.discardIfUnread();
+                    release(part);
                     return true;
                 }
                 stage = visited.toCompletableFuture();
             } catch (Throwable e) {
-                part.discardIfUnread();
+                release(part);
                 finish(null, e);
                 return false;
             }
             if (!stage.isDone()) {
                 stage.whenComplete((ignored, e) -> {
-                    part.discardIfUnread();
+                    release(part);
                     if (e != null) {
                         finish(null, e);
                     } else if (once) {
@@ -275,7 +319,7 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
                 });
                 return false;
             }
-            part.discardIfUnread();
+            release(part);
             try {
                 stage.join();
             } catch (Throwable e) {
