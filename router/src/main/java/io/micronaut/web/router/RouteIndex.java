@@ -53,14 +53,19 @@ final class RouteIndex {
     /**
      * Build an index.
      *
-     * @param prefixes The required path prefix of each route, by route position; empty for none
+     * @param prefixes The required path prefix of each route, by route position; empty for none,
+     *                 {@code null} for a route the index never returns, e.g. a route the parser of
+     *                 a route plan finds
      * @return The index
      */
-    static RouteIndex build(String[] prefixes) {
+    static RouteIndex build(@Nullable String[] prefixes) {
         MutableNode root = new MutableNode();
         List<Integer> unprefixed = new ArrayList<>();
         for (int i = 0; i < prefixes.length; i++) {
             String prefix = prefixes[i];
+            if (prefix == null) {
+                continue;
+            }
             if (prefix.isEmpty()) {
                 unprefixed.add(i);
                 continue;

@@ -14,8 +14,9 @@ import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
-import io.micronaut.web.router.spi.CompiledRouteMatcher;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
+import io.micronaut.web.router.spi.RoutePlan;
+import io.micronaut.web.router.spi.RouteSlot;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -35,9 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Routes declared at compile time from the annotations of a made-up web framework, implemented by
- * handler functions: the annotation processor generates {@link PetResourceRoutes}, an enum of
- * route declarations with a generated URL parser, and {@link PetRoutes} binds a handler to each
- * constant, calling the resource bean.
+ * handler functions: the annotation processor has the route compiler generate the route plan of
+ * the resource, and generates {@link PetResourceRoutes}, an enum of the declarations of its slots,
+ * and {@link PetRoutes} binds a handler to each constant, calling the resource bean.
  */
 class CustomWebRoutesTest {
     private static final Map<String, Object> FORM = Map.of("name", "Bella", "age", "3");
@@ -79,8 +80,8 @@ class CustomWebRoutesTest {
 
     @Test
     void theGeneratedParserMapsAPathToAConstant() {
-        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
-        assertEquals(2, matcher.maxVariables());
+        RoutePlan matcher = PetResourceRoutes.NAME.plan();
+        assertEquals(2, matcher.maxCaptures());
         assertEquals(List.of("NAME", "7"), parse(matcher, HttpMethod.GET, "/pets/7"));
         assertEquals(List.of("OWNED", "7", "abc"), parse(matcher, HttpMethod.GET, "/pets/7/owners/abc"));
         assertEquals(List.of("PHOTO", "7"), parse(matcher, HttpMethod.GET, "/pets/7/photo"));
@@ -90,7 +91,7 @@ class CustomWebRoutesTest {
 
     @Test
     void theGeneratedParserAcceptsTheVariablesTheRouterAccepts() {
-        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
+        RoutePlan matcher = PetResourceRoutes.NAME.plan();
         UriTemplateMatcher ordinary = new UriTemplateMatcher("/pets/{id}");
         // no ? or #: the router matches the path, without the query and fragment
         for (String id : List.of("7", "a+b", "a%20b", "a(b", "a)b", "a!b", "a{b", "a&b", "a;b", "a.b", "a-b_c~d", "%2B")) {
@@ -107,7 +108,7 @@ class CustomWebRoutesTest {
     @Test
     void theGeneratedParserRejectsTheCharactersAVariableDoesNotMatch() {
         // known results, not only agreement with the ordinary matcher
-        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
+        RoutePlan matcher = PetResourceRoutes.NAME.plan();
         for (String id : List.of("a+b", "a&b", "a;b", "a{b", "a}b")) {
             assertEquals(List.of(), parse(matcher, HttpMethod.GET, "/pets/" + id), id);
         }
@@ -118,7 +119,7 @@ class CustomWebRoutesTest {
 
     @Test
     void theGeneratedParserAnswersNothingForOtherRequests() {
-        CompiledRouteMatcher matcher = PetResourceRoutes.NAME.matcher();
+        RoutePlan matcher = PetResourceRoutes.NAME.plan();
         assertEquals(List.of(), parse(matcher, HttpMethod.GET, "/pets"));
         assertEquals(List.of(), parse(matcher, HttpMethod.DELETE, "/pets/7"));
         assertEquals(List.of(), parse(matcher, HttpMethod.GET, "/pets/7/unknown"));
@@ -197,16 +198,25 @@ class CustomWebRoutesTest {
         return assertThrows(HttpClientResponseException.class, request::run).getStatus();
     }
 
-    private static List<String> parse(CompiledRouteMatcher matcher, HttpMethod method, String path) {
-        String[] variables = new String[matcher.maxVariables()];
-        int ordinal = matcher.match(method, path, variables);
-        if (ordinal < 0) {
-            return List.of();
-        }
-        PetResourceRoutes route = PetResourceRoutes.values()[ordinal];
+    /**
+     * The constant of the slot the parser of the plan matches for a method, and the captured values.
+     */
+    private static List<String> parse(RoutePlan plan, HttpMethod method, String path) {
+        RouteSlot[] slots = plan.slots();
         List<String> result = new ArrayList<>();
-        result.add(route.name());
-        result.addAll(Arrays.asList(variables).subList(0, route.pathVariableCount()));
+        plan.match(path, (slot, p, spans) -> {
+            if (!slots[slot].httpMethodName().equals(method.name())) {
+                return;
+            }
+            PetResourceRoutes route = Arrays.stream(PetResourceRoutes.values())
+                .filter(r -> r.key().equals(slots[slot].key()))
+                .findFirst()
+                .orElseThrow();
+            result.add(route.name());
+            for (int i = 0; i < slots[slot].captures().length; i++) {
+                result.add(p.substring(spans[2 * i], spans[2 * i + 1]));
+            }
+        });
         return result;
     }
 

@@ -24,8 +24,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * The match of a route by a {@link CompiledRouteMatcher}: the captured values of the route's path
- * variables.
+ * The match of a route by the parser of a {@link io.micronaut.web.router.spi.RoutePlan}: the
+ * captured values of the route's path variables.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -39,17 +39,20 @@ final class CapturedUriMatchInfo implements UriMatchInfo {
 
     /**
      * @param uri       The matched path
-     * @param variables The path variables of the route's template, in order
-     * @param captured  The captured raw values, in the same order
+     * @param variables The variables of the route's template, in order
+     * @param captured  The captured raw values of the path variables, in the same order; query
+     *                  variables are not captured, as the matcher of the template does not match them
      */
     CapturedUriMatchInfo(String uri, List<UriMatchVariable> variables, String[] captured) {
         this.uri = uri;
         this.variables = variables;
         this.values = LinkedHashMap.newLinkedHashMap(variables.size());
         this.variableMap = LinkedHashMap.newLinkedHashMap(variables.size());
-        for (int i = 0; i < variables.size(); i++) {
-            UriMatchVariable variable = variables.get(i);
-            values.put(variable.getName(), captured[i]);
+        int next = 0;
+        for (UriMatchVariable variable : variables) {
+            if (!variable.isQuery() && next < captured.length) {
+                values.put(variable.getName(), captured[next++]);
+            }
             variableMap.put(variable.getName(), variable);
         }
     }

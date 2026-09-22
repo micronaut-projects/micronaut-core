@@ -148,7 +148,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         List<RouteSet> routeSets = new ArrayList<>(builders.size() + assembled.size());
         for (RouteBuilder builder : builders) {
             routeSets.add(new RouteSet(builder.getUriRoutes(), builder.getStatusRoutes(), builder.getErrorRoutes(), builder.getFilterRoutes(),
-                // declared routes, built when first used
+                // the routes of controllers with a route plan and declared routes, built when first used
                 builder instanceof DefaultRouteBuilder defaultBuilder ? defaultBuilder.lazyRouteInfos() : List.of(),
                 builder.getExposedPorts()));
         }
@@ -393,8 +393,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
-        String path = request.getPath();
-        return ofEveryTier(request, routes.find(request, path, ports), table -> table.find(request, path, ports));
+        return ofEveryTier(request, routes.find(request, ports), table -> table.find(request, ports));
     }
 
     @Override

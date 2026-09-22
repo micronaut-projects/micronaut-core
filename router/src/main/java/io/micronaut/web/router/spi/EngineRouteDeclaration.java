@@ -95,12 +95,12 @@ final class EngineRouteDeclaration implements IndexedRouteDeclaration {
 
     @Override
     public boolean equals(Object o) {
-        return o instanceof EngineRouteDeclaration other && httpMethod == other.httpMethod && httpMethodName.equals(other.httpMethodName) && template.equals(other.template);
+        return o instanceof EngineRouteDeclaration other && httpMethodName.equals(other.httpMethodName) && template.equals(other.template);
     }
 
     @Override
     public int hashCode() {
-        return 31 * (31 * httpMethod.hashCode() + httpMethodName.hashCode()) + template.hashCode();
+        return 31 * httpMethodName.hashCode() + template.hashCode();
     }
 
     @Override
