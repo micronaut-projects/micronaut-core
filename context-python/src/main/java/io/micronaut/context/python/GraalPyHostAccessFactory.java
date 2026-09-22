@@ -57,6 +57,14 @@ final class GraalPyHostAccessFactory {
     private static final String DECORATOR_CLASS = "java_class";
     private static final String DECORATOR_CLASS_NAME = "java_class_name";
 
+    /** The attributes a Python object is identified by: the resolution order of a class, and the name of any object. */
+    private static final String PYTHON_CLASS_MRO = "__mro__";
+    private static final String PYTHON_NAME = "__name__";
+    private static final String PYTHON_QUALIFIED_NAME = "__qualname__";
+    private static final String PYTHON_MODULE = "__module__";
+    /** The part a qualified name of a class or function defined inside a function contains. */
+    private static final String PYTHON_LOCALS = "<locals>";
+
     /** The name of the Python datetime module, which its own datetime type shares. */
     private static final String DATETIME = "datetime";
     private static final String BUILTINS = "builtins";
@@ -448,6 +456,9 @@ final class GraalPyHostAccessFactory {
                 if (javaClass == null) {
                     javaClass = resolveAnnotationDecoratorClass(value);
                 }
+                if (javaClass == null) {
+                    javaClass = resolvePythonAnnotationClass(value, pythonClassResolver);
+                }
                 if (javaClass != null) {
                     return javaClass;
                 }
@@ -509,6 +520,28 @@ final class GraalPyHostAccessFactory {
             return null;
         }
         return loadClass(className.asString());
+    }
+
+    /**
+     * The annotation type a Python-defined annotation stands for. Such an annotation is a Python
+     * function (a decorator factory), and the compiler generates its {@code @interface} in the Java
+     * package of the module that defines it, under the name of the function, where the resolution of
+     * a Python class finds it. Only a generated annotation type is accepted, so an ordinary Python
+     * function passed where a {@code Class} is expected is still rejected.
+     */
+    private static @Nullable Class<?> resolvePythonAnnotationClass(Value value, PythonClassResolver pythonClassResolver) {
+        if (!value.canExecute() || value.hasMember(PYTHON_CLASS_MRO)) {
+            return null;
+        }
+        String simpleName = stringMember(value, PYTHON_QUALIFIED_NAME);
+        if (simpleName == null || simpleName.isBlank()) {
+            simpleName = stringMember(value, PYTHON_NAME);
+        }
+        if (simpleName == null || simpleName.isBlank() || simpleName.contains(PYTHON_LOCALS)) {
+            return null;
+        }
+        Class<?> resolved = pythonClassResolver.findClass(stringMember(value, PYTHON_MODULE), simpleName);
+        return resolved != null && resolved.isAnnotation() ? resolved : null;
     }
 
     private static @Nullable Class<?> loadClass(String className) {
@@ -582,14 +615,14 @@ final class GraalPyHostAccessFactory {
     }
 
     private static @Nullable Class<?> findPythonClass(@Nullable Value value, PythonClassResolver pythonClassResolver) {
-        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember("__mro__")) {
+        if (value == null || value.isNull() || value.isHostObject() || !value.hasMembers() || !value.hasMember(PYTHON_CLASS_MRO)) {
             return null;
         }
-        String className = stringMember(value, "__name__");
-        String qualifiedName = stringMember(value, "__qualname__");
-        String moduleName = stringMember(value, "__module__");
+        String className = stringMember(value, PYTHON_NAME);
+        String qualifiedName = stringMember(value, PYTHON_QUALIFIED_NAME);
+        String moduleName = stringMember(value, PYTHON_MODULE);
         String simpleName = qualifiedName == null || qualifiedName.isBlank() ? className : qualifiedName;
-        if (simpleName == null || simpleName.isBlank() || simpleName.contains("<locals>")) {
+        if (simpleName == null || simpleName.isBlank() || simpleName.contains(PYTHON_LOCALS)) {
             return null;
         }
         return pythonClassResolver.findClass(moduleName, simpleName);
