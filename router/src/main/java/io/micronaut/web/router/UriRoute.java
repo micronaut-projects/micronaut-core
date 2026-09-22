@@ -104,6 +104,34 @@ public interface UriRoute extends Route, Comparable<UriRoute> {
     }
 
     /**
+     * Filter the requests of this route, like a {@code @RequestFilter} method that applies to this
+     * route only. Route filters run after the application's filters, closest to the route, in the
+     * order they are declared, and are resolved when the route is built.
+     *
+     * @param filter The filter, which can answer the request instead of the route
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute before(RouteRequestFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Filter the responses of this route, like a {@code @ResponseFilter} method that applies to
+     * this route only. Route filters run after the route and before the application's response
+     * filters, in the order they are declared.
+     *
+     * @param filter The filter
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute after(RouteResponseFilter filter) {
+        throw new UnsupportedOperationException("Route filters are not supported by " + getClass().getName());
+    }
+
+    /**
      * @return The port the route listens to, or null if the default port
      */
     @Nullable

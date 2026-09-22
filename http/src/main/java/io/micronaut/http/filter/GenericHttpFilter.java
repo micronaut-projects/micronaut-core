@@ -16,6 +16,13 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpResponse;
+import org.jspecify.annotations.Nullable;
+
+import java.util.function.BiConsumer;
+import java.util.function.Function;
 
 /**
  * Base interface for different filter types. Note that while the base interface is exposed, so you
@@ -63,6 +70,31 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @return true if enabled
      * @since 4.2.0
      */
+    /**
+     * Create a filter of one route's requests.
+     *
+     * @param filter The filter of the route's request, returning a response to answer the request
+     *               with, or {@code null} to proceed
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createRouteRequestFilter(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter) {
+        return new RouteFunctionFilter(filter, null);
+    }
+
+    /**
+     * Create a filter of one route's responses.
+     *
+     * @param filter The filter of the route's response
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createRouteResponseFilter(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter) {
+        return new RouteFunctionFilter(null, filter);
+    }
+
     @Internal
     static boolean isEnabled(GenericHttpFilter filter) {
         return !(filter instanceof AroundLegacyFilter aroundLegacyFilter) || aroundLegacyFilter.isEnabled();

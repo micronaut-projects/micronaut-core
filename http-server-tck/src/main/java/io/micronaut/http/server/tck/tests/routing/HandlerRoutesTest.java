@@ -26,6 +26,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
+import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.tck.AssertionUtils;
@@ -57,6 +58,7 @@ import java.util.concurrent.CompletableFuture;
 })
 public class HandlerRoutesTest {
     public static final String SPEC_NAME = "HandlerRoutesTest";
+    private static final String TRACE = "handler-routes-trace";
 
     @Test
     void handlerRouteIsHandledAndFiltered() throws IOException {
@@ -118,6 +120,34 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void routeRequestFilterAnswersInsteadOfTheRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/guarded"), HttpResponseAssertion.builder()
+                .status(HttpStatus.UNAUTHORIZED)
+                .headers(Map.of("X-Fn-Filter", "true"))
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.HEAD("/fn/guarded"), HttpResponseAssertion.builder()
+                .status(HttpStatus.UNAUTHORIZED)
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/guarded").header("X-Token", "secret"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("guarded")
+                .build());
+        }
+    }
+
+    @Test
+    void routeFiltersRunClosestToTheRouteInTheOrderDeclared() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/trace"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("global,before1,before2")
+                .headers(Map.of("X-Trace", "after1,after2,global"))
+                .build());
+        }
+    }
+
+    @Test
     void runtimeRoutesUseHandlers() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
@@ -129,13 +159,18 @@ public class HandlerRoutesTest {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .body("dynamic /fn-dynamic/x")
-                .headers(Map.of("X-Fn-Filter", "true"))
+                .headers(Map.of("X-Fn-Filter", "true", "X-Table-Route", "true"))
                 .build());
         }
     }
 
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
+    }
+
+    private static HttpResponse<?> append(HttpRequest<?> request, String step) {
+        request.setAttribute(TRACE, request.getAttribute(TRACE, String.class).orElse("") + "," + step);
+        return null;
     }
 
     static final class CheckedFailure extends Exception {
@@ -157,6 +192,13 @@ public class HandlerRoutesTest {
                     HttpResponse.created(Map.of("saved", item.get("name"))));
                 routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
                     CompletableFuture.supplyAsync(() -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                routes.GET("/fn/guarded", (request, pathVariables) -> HttpResponse.ok("guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .before(request -> "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.unauthorized());
+                routes.GET("/fn/trace", (request, pathVariables) -> HttpResponse.ok(request.getAttribute(TRACE, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .before(request -> append(request, "before1"))
+                    .before(request -> append(request, "before2"))
+                    .after((request, response) -> response.getHeaders().set("X-Trace", "after1"))
+                    .after((request, response) -> response.getHeaders().set("X-Trace", response.getHeaders().get("X-Trace") + ",after2"));
                 routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");
                 });
@@ -176,7 +218,8 @@ public class HandlerRoutesTest {
 
         void enable() {
             current = tables.build(routes -> routes.GET("/fn-dynamic/{+path}", (request, pathVariables) ->
-                HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE)));
+                HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .after((request, response) -> response.header("X-Table-Route", "true")));
         }
 
         @Override
@@ -188,9 +231,20 @@ public class HandlerRoutesTest {
     @ServerFilter({"/fn/**", "/fn-dynamic/**"})
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class FnFilter {
+        @RequestFilter
+        void filterRequest(HttpRequest<?> request) {
+            if (request.getPath().equals("/fn/trace")) {
+                request.setAttribute(TRACE, "global");
+            }
+        }
+
         @ResponseFilter
         void filter(MutableHttpResponse<?> response) {
             response.header("X-Fn-Filter", "true");
+            String trace = response.getHeaders().get("X-Trace");
+            if (trace != null) {
+                response.getHeaders().set("X-Trace", trace + ",global");
+            }
         }
     }
 

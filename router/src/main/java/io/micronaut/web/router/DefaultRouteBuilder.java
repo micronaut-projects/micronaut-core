@@ -24,6 +24,7 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
+import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -879,6 +880,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         private @Nullable Integer port;
         private @Nullable String executeOn;
         private boolean nonBlocking;
+        private final List<GenericHttpFilter> requestFilters = new ArrayList<>(0);
+        private final List<GenericHttpFilter> responseFilters = new ArrayList<>(0);
         private boolean implicitHead;
         private final RouteExecutorSelector executorSelector = new RouteExecutorSelector();
 
@@ -974,7 +977,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
-            return new DefaultUrlRouteInfo<>(
+            DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
                 uriMatchTemplate,
@@ -992,6 +995,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
                 messageBodyHandlerRegistry,
                 implicitHead
             );
+            routeInfo.routeFilters = routeFilters();
+            return routeInfo;
         }
 
         /**
@@ -1009,6 +1014,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             head.port = port;
             head.executeOn = executeOn;
             head.nonBlocking = nonBlocking;
+            head.requestFilters.addAll(requestFilters);
+            head.responseFilters.addAll(responseFilters);
             head.implicitHead = true;
             return head;
         }
@@ -1051,6 +1058,47 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
             this.executeOn = Objects.requireNonNull(executorName, "executorName");
             this.nonBlocking = false;
             return this;
+        }
+
+        @Override
+        public UriRoute before(RouteRequestFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            requestFilters.add(GenericHttpFilter.createRouteRequestFilter(request -> {
+                try {
+                    return filter.filter(request);
+                } catch (Exception e) {
+                    return ExceptionUtils.sneakyThrow(e);
+                }
+            }));
+            return this;
+        }
+
+        @Override
+        public UriRoute after(RouteResponseFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            responseFilters.add(GenericHttpFilter.createRouteResponseFilter((request, response) -> {
+                try {
+                    filter.filter(request, response);
+                } catch (Exception e) {
+                    ExceptionUtils.sneakyThrow(e);
+                }
+            }));
+            return this;
+        }
+
+        /**
+         * @return The filters of the route in the order the filter chain runs them: the request
+         * filters as declared, then the response filters in reverse, as response filters run from
+         * the last to the first
+         */
+        List<GenericHttpFilter> routeFilters() {
+            if (requestFilters.isEmpty() && responseFilters.isEmpty()) {
+                return List.of();
+            }
+            List<GenericHttpFilter> filters = new ArrayList<>(requestFilters.size() + responseFilters.size());
+            filters.addAll(requestFilters);
+            filters.addAll(responseFilters.reversed());
+            return List.copyOf(filters);
         }
 
         @Override

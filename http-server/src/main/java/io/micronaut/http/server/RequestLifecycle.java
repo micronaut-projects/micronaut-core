@@ -383,7 +383,8 @@ public class RequestLifecycle {
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
-                    return routeExecutor.router.findFilters(request);
+                    // the matched route selects the filters that apply to it, and brings its own route filters
+                    return routeExecutor.router.findFilters(request, routeMatch);
                 }
 
                 @Override

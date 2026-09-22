@@ -622,6 +622,21 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public List<GenericHttpFilter> findFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
+        List<GenericHttpFilter> routeFilters = routeMatch != null && routeMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> routeInfo
+            ? routeInfo.routeFilters
+            : List.of();
+        if (!routeFilters.isEmpty()) {
+            // the filters of the route run after the application's filters, closest to the route
+            List<GenericHttpFilter> applicationFilters = findApplicationFilters(request, routeMatch);
+            List<GenericHttpFilter> filters = new ArrayList<>(applicationFilters.size() + routeFilters.size());
+            filters.addAll(applicationFilters);
+            filters.addAll(routeFilters);
+            return filters;
+        }
+        return findApplicationFilters(request, routeMatch);
+    }
+
+    private List<GenericHttpFilter> findApplicationFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
         if (preconditionFilterRoutes.isEmpty()) {
             // for perf, this needs to be placed in an ArrayList variable first
             @SuppressWarnings("UnnecessaryLocalVariable")
