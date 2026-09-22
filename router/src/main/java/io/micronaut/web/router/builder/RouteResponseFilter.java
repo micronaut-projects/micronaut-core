@@ -20,7 +20,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 
 /**
- * A filter of one route's responses, declared with {@link io.micronaut.web.router.builder.UriRoute#after(RouteResponseFilter)}.
+ * A filter of one route's responses, declared with {@link io.micronaut.web.router.builder.HttpRouteSpec#after(RouteResponseFilter)}.
  * Like a {@code @ResponseFilter} method it runs after the route, before the application's
  * response filters, and can change the response.
  *

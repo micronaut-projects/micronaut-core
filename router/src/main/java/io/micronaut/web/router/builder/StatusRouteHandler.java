@@ -26,7 +26,7 @@ import io.micronaut.http.HttpResponse;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see RouteBuilder#status(io.micronaut.http.HttpStatus, StatusRouteHandler)
+ * @see HttpRouteBuilder#status(io.micronaut.http.HttpStatus, StatusRouteHandler)
  */
 @Experimental
 @FunctionalInterface

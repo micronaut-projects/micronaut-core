@@ -39,7 +39,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-public interface RouteBuilder {
+public interface HttpRouteBuilder {
 
     /**
      * Route a {@code GET} request to a handler function, with an implicit {@code HEAD} route
@@ -49,7 +49,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute GET(String uri, RequestHandler handler) {
+    default HttpRouteSpec GET(String uri, RequestHandler handler) {
         return handle(HttpMethod.GET, uri, handler);
     }
 
@@ -60,7 +60,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute POST(String uri, RequestHandler handler) {
+    default HttpRouteSpec POST(String uri, RequestHandler handler) {
         return handle(HttpMethod.POST, uri, handler);
     }
 
@@ -71,7 +71,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute PUT(String uri, RequestHandler handler) {
+    default HttpRouteSpec PUT(String uri, RequestHandler handler) {
         return handle(HttpMethod.PUT, uri, handler);
     }
 
@@ -82,7 +82,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute PATCH(String uri, RequestHandler handler) {
+    default HttpRouteSpec PATCH(String uri, RequestHandler handler) {
         return handle(HttpMethod.PATCH, uri, handler);
     }
 
@@ -93,7 +93,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute DELETE(String uri, RequestHandler handler) {
+    default HttpRouteSpec DELETE(String uri, RequestHandler handler) {
         return handle(HttpMethod.DELETE, uri, handler);
     }
 
@@ -106,7 +106,7 @@ public interface RouteBuilder {
      * @param <B>      The body type
      * @return The route
      */
-    default <B> UriRoute POST(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    default <B> HttpRouteSpec POST(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return handle(HttpMethod.POST, uri, bodyType, handler);
     }
 
@@ -119,7 +119,7 @@ public interface RouteBuilder {
      * @param <B>      The body type
      * @return The route
      */
-    default <B> UriRoute PUT(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    default <B> HttpRouteSpec PUT(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return handle(HttpMethod.PUT, uri, bodyType, handler);
     }
 
@@ -127,7 +127,7 @@ public interface RouteBuilder {
      * Route requests to a handler function. The route runs like a controller method that takes
      * the request and returns a response: filters, error routes, body writers and executor
      * selection apply as they do for a blocking controller method. Like a controller route it
-     * consumes JSON unless {@link UriRoute#consumes} says otherwise, and in {@link HttpRoutes} and
+     * consumes JSON unless {@link HttpRouteSpec#consumes} says otherwise, and in {@link HttpRoutes} and
      * route tables its URI is under {@code micronaut.server.context-path}.
      *
      * @param method  The HTTP method
@@ -135,7 +135,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    UriRoute handle(HttpMethod method, String uri, RequestHandler handler);
+    HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler);
 
     /**
      * Route requests to a handler function that receives the body decoded to the given type, like
@@ -148,7 +148,7 @@ public interface RouteBuilder {
      * @param <B>      The body type
      * @return The route
      */
-    <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
+    <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
 
     /**
      * Route a {@code POST} request with a submitted form to a handler function.
@@ -157,7 +157,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute POST(String uri, FormRequestHandler handler) {
+    default HttpRouteSpec POST(String uri, FormRequestHandler handler) {
         return handleForm(HttpMethod.POST, uri, handler);
     }
 
@@ -168,7 +168,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    default UriRoute PUT(String uri, FormRequestHandler handler) {
+    default HttpRouteSpec PUT(String uri, FormRequestHandler handler) {
         return handleForm(HttpMethod.PUT, uri, handler);
     }
 
@@ -182,7 +182,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler);
+    HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler);
 
     /**
      * Route requests with a submitted form to a handler function that completes the response
@@ -194,7 +194,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler);
+    HttpRouteSpec handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler);
 
     /**
      * Route requests with a submitted form to a handler function that reads the form as it
@@ -206,7 +206,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler);
+    HttpRouteSpec handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler);
 
     /**
      * Route a {@code GET} request to a handler function that completes the response later.
@@ -216,7 +216,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
-    default UriRoute asyncGET(String uri, AsyncRequestHandler handler) {
+    default HttpRouteSpec asyncGET(String uri, AsyncRequestHandler handler) {
         return handleAsync(HttpMethod.GET, uri, handler);
     }
 
@@ -228,7 +228,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
-    default UriRoute asyncPOST(String uri, AsyncRequestHandler handler) {
+    default HttpRouteSpec asyncPOST(String uri, AsyncRequestHandler handler) {
         return handleAsync(HttpMethod.POST, uri, handler);
     }
 
@@ -240,7 +240,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
-    default UriRoute asyncPUT(String uri, AsyncRequestHandler handler) {
+    default HttpRouteSpec asyncPUT(String uri, AsyncRequestHandler handler) {
         return handleAsync(HttpMethod.PUT, uri, handler);
     }
 
@@ -252,7 +252,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
-    default UriRoute asyncPATCH(String uri, AsyncRequestHandler handler) {
+    default HttpRouteSpec asyncPATCH(String uri, AsyncRequestHandler handler) {
         return handleAsync(HttpMethod.PATCH, uri, handler);
     }
 
@@ -264,7 +264,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
-    default UriRoute asyncDELETE(String uri, AsyncRequestHandler handler) {
+    default HttpRouteSpec asyncDELETE(String uri, AsyncRequestHandler handler) {
         return handleAsync(HttpMethod.DELETE, uri, handler);
     }
 
@@ -278,7 +278,7 @@ public interface RouteBuilder {
      * @return The routes, to configure together
      * @see #handle(HttpMethod, String, RequestHandler)
      */
-    UriRoute handle(Set<HttpMethod> methods, String uri, RequestHandler handler);
+    HttpRouteSpec handle(Set<HttpMethod> methods, String uri, RequestHandler handler);
 
     /**
      * Route requests of several HTTP methods to one handler function that completes the response
@@ -290,7 +290,7 @@ public interface RouteBuilder {
      * @return The routes, to configure together
      * @see #handle(Set, String, RequestHandler)
      */
-    UriRoute handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler);
+    HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler);
 
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function, like an
@@ -302,7 +302,7 @@ public interface RouteBuilder {
      * @param <E>     The type of the exception
      * @return The error route
      */
-    <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler);
+    <E extends Throwable> ErrorRouteSpec error(Class<E> type, ErrorRouteHandler<E> handler);
 
     /**
      * Handle the responses of a status with a handler function, like an
@@ -312,7 +312,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The status route
      */
-    StatusRoute status(HttpStatus status, StatusRouteHandler handler);
+    StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler);
 
     /**
      * Bind a handler function to a declared route, e.g. a constant generated at compile time. The
@@ -324,7 +324,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route, to configure further
      */
-    UriRoute handle(RouteDeclaration route, RequestHandler handler);
+    HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler);
 
     /**
      * Bind a handler function that receives the decoded body to a declared route.
@@ -336,7 +336,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler);
+    <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler);
 
     /**
      * Bind a handler function that completes the response later to a declared route.
@@ -346,7 +346,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler);
+    HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler);
 
     /**
      * Bind a form handler function to a declared route.
@@ -356,7 +356,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler);
+    HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler);
 
     /**
      * Bind an asynchronous form handler function to a declared route.
@@ -366,7 +366,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler);
+    HttpRouteSpec handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler);
 
     /**
      * Bind a streaming form handler function to a declared route.
@@ -376,7 +376,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler);
+    HttpRouteSpec handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler);
 
     /**
      * Route requests to a handler function that completes the response later. The executor is
@@ -387,7 +387,7 @@ public interface RouteBuilder {
      * @param handler The handler
      * @return The route
      */
-    UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
+    HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
 
     /**
      * Route requests to a handler function that receives the body decoded to the given type and
@@ -401,7 +401,7 @@ public interface RouteBuilder {
      * @param <B>      The body type
      * @return The route
      */
-    <B> UriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
+    <B> HttpRouteSpec handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
 
     /**
      * Bind a handler function that receives the decoded body and completes the response later to
@@ -414,7 +414,7 @@ public interface RouteBuilder {
      * @return The route, to configure further
      * @see #handle(RouteDeclaration, RequestHandler)
      */
-    <B> UriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
+    <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
 
     /**
      * Route a {@code POST} request to a handler function that receives the body decoded to the
@@ -427,7 +427,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
      */
-    default <B> UriRoute asyncPOST(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+    default <B> HttpRouteSpec asyncPOST(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
         return handleAsync(HttpMethod.POST, uri, bodyType, handler);
     }
 
@@ -442,7 +442,7 @@ public interface RouteBuilder {
      * @return The route
      * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
      */
-    default <B> UriRoute asyncPUT(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+    default <B> HttpRouteSpec asyncPUT(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
         return handleAsync(HttpMethod.PUT, uri, bodyType, handler);
     }
 

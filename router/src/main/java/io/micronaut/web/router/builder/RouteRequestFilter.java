@@ -21,7 +21,7 @@ import io.micronaut.http.HttpResponse;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A filter of one route's requests, declared with {@link io.micronaut.web.router.builder.UriRoute#before(RouteRequestFilter)}.
+ * A filter of one route's requests, declared with {@link io.micronaut.web.router.builder.HttpRouteSpec#before(RouteRequestFilter)}.
  * Like a {@code @RequestFilter} method it runs before the route, after the application's
  * filters, and can answer the request instead of the route.
  *

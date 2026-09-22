@@ -172,7 +172,7 @@ public class HandlerRoutesErrorsTest {
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class ThrowingRoutes implements HttpRoutes {
         @Override
-        public void routes(io.micronaut.web.router.builder.RouteBuilder routes) {
+        public void routes(io.micronaut.web.router.builder.HttpRouteBuilder routes) {
             routes.GET("/errors/handler/checked", (request, pathVariables) -> {
                 throw new CheckedFailure("checked failure");
             });

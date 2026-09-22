@@ -28,7 +28,7 @@ import java.util.concurrent.CompletionStage;
  * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, AsyncBodyRequestHandler)
+ * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, io.micronaut.core.type.Argument, AsyncBodyRequestHandler)
  */
 @Experimental
 @FunctionalInterface

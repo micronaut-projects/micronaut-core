@@ -19,14 +19,14 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 
 /**
- * A route to a handler function, to configure after it was added with the {@link RouteBuilder}.
+ * A route to a handler function, to configure after it was added with the {@link HttpRouteBuilder}.
  * A route on several HTTP methods configures all of them.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public interface UriRoute {
+public interface HttpRouteSpec {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method.
@@ -34,14 +34,14 @@ public interface UriRoute {
      * @param mediaTypes The media types
      * @return The route
      */
-    UriRoute consumes(MediaType... mediaTypes);
+    HttpRouteSpec consumes(MediaType... mediaTypes);
 
     /**
      * Accept requests with any media type.
      *
      * @return The route
      */
-    UriRoute consumesAll();
+    HttpRouteSpec consumesAll();
 
     /**
      * Produce these media types, like {@code @Produces} on a controller method.
@@ -49,7 +49,7 @@ public interface UriRoute {
      * @param mediaTypes The media types
      * @return The route
      */
-    UriRoute produces(MediaType... mediaTypes);
+    HttpRouteSpec produces(MediaType... mediaTypes);
 
     /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
@@ -58,7 +58,7 @@ public interface UriRoute {
      * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
      * @return The route
      */
-    UriRoute executeOn(String executorName);
+    HttpRouteSpec executeOn(String executorName);
 
     /**
      * Run the route on the event loop, like {@code @NonBlocking} on a controller method, when the
@@ -66,7 +66,7 @@ public interface UriRoute {
      *
      * @return The route
      */
-    UriRoute nonBlocking();
+    HttpRouteSpec nonBlocking();
 
     /**
      * Filter the requests of this route, like a {@code @RequestFilter} method that applies to this
@@ -76,7 +76,7 @@ public interface UriRoute {
      * @param filter The filter, which can answer the request instead of the route
      * @return The route
      */
-    UriRoute before(RouteRequestFilter filter);
+    HttpRouteSpec before(RouteRequestFilter filter);
 
     /**
      * Filter the responses of this route, like a {@code @ResponseFilter} method that applies to
@@ -88,7 +88,7 @@ public interface UriRoute {
      * @param filter The filter
      * @return The route
      */
-    UriRoute after(RouteResponseFilter filter);
+    HttpRouteSpec after(RouteResponseFilter filter);
 
     /**
      * Filter the requests of this route on the named executor, like a {@code @RequestFilter}
@@ -99,7 +99,7 @@ public interface UriRoute {
      * @param filter       The filter, which can answer the request instead of the route
      * @return The route
      */
-    UriRoute before(String executorName, RouteRequestFilter filter);
+    HttpRouteSpec before(String executorName, RouteRequestFilter filter);
 
     /**
      * Filter the responses of this route on the named executor, like a {@code @ResponseFilter}
@@ -109,7 +109,7 @@ public interface UriRoute {
      * @param filter       The filter
      * @return The route
      */
-    UriRoute after(String executorName, RouteResponseFilter filter);
+    HttpRouteSpec after(String executorName, RouteResponseFilter filter);
 
     /**
      * Filter the requests of this route asynchronously, like a {@code @RequestFilter} method
@@ -118,7 +118,7 @@ public interface UriRoute {
      * @param filter The filter, which can answer the request instead of the route
      * @return The route
      */
-    UriRoute beforeAsync(AsyncRouteRequestFilter filter);
+    HttpRouteSpec beforeAsync(AsyncRouteRequestFilter filter);
 
     /**
      * Filter the responses of this route asynchronously: the filter chain continues when the
@@ -127,5 +127,5 @@ public interface UriRoute {
      * @param filter The filter
      * @return The route
      */
-    UriRoute afterAsync(AsyncRouteResponseFilter filter);
+    HttpRouteSpec afterAsync(AsyncRouteResponseFilter filter);
 }

@@ -30,20 +30,20 @@ public interface HandlerUriRoute extends io.micronaut.web.router.UriRoute {
     /**
      * @param executorName The name of the executor
      * @return The route
-     * @see UriRoute#executeOn(String)
+     * @see HttpRouteSpec#executeOn(String)
      */
     HandlerUriRoute executeOn(String executorName);
 
     /**
      * @return The route
-     * @see UriRoute#nonBlocking()
+     * @see HttpRouteSpec#nonBlocking()
      */
     HandlerUriRoute nonBlocking();
 
     /**
      * @param filter The filter
      * @return The route
-     * @see UriRoute#before(RouteRequestFilter)
+     * @see HttpRouteSpec#before(RouteRequestFilter)
      */
     HandlerUriRoute before(RouteRequestFilter filter);
 
@@ -51,21 +51,21 @@ public interface HandlerUriRoute extends io.micronaut.web.router.UriRoute {
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see UriRoute#before(String, RouteRequestFilter)
+     * @see HttpRouteSpec#before(String, RouteRequestFilter)
      */
     HandlerUriRoute before(String executorName, RouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see UriRoute#beforeAsync(AsyncRouteRequestFilter)
+     * @see HttpRouteSpec#beforeAsync(AsyncRouteRequestFilter)
      */
     HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see UriRoute#after(RouteResponseFilter)
+     * @see HttpRouteSpec#after(RouteResponseFilter)
      */
     HandlerUriRoute after(RouteResponseFilter filter);
 
@@ -73,14 +73,14 @@ public interface HandlerUriRoute extends io.micronaut.web.router.UriRoute {
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see UriRoute#after(String, RouteResponseFilter)
+     * @see HttpRouteSpec#after(String, RouteResponseFilter)
      */
     HandlerUriRoute after(String executorName, RouteResponseFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see UriRoute#afterAsync(AsyncRouteResponseFilter)
+     * @see HttpRouteSpec#afterAsync(AsyncRouteResponseFilter)
      */
     HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter);
 }
