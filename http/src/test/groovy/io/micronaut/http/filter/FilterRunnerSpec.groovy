@@ -504,6 +504,48 @@ class FilterRunnerSpec extends Specification {
         events == ["terminal", "after"]
     }
 
+    def 'before returns a null publisher from a non-nullable method'() {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(Publisher, Argument.of(HttpResponse))) { HttpRequest<?> req ->
+                    events.add("before")
+                    null
+                }
+        ]
+
+        when:
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
+        then:
+        def e = thrown NullPointerException
+        e.message == "Returned publisher must not be null, or mark the method as @Nullable"
+        events == ["before"]
+    }
+
+    def 'after returns a null publisher from a non-nullable method'() {
+        given:
+        def events = []
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(Publisher, Argument.of(HttpResponse))) { HttpResponse<?> resp ->
+                    events.add("after")
+                    null
+                }
+        ]
+
+        when:
+        await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(HttpResponse.ok())
+        }).run(HttpRequest.GET("/")))
+        then:
+        def e = thrown NullPointerException
+        e.message == "Returned publisher must not be null, or mark the method as @Nullable"
+        events == ["terminal", "after"]
+    }
+
     def 'after should not be called if there is an exception but it cannot handle exceptions'() {
         given:
         def events = []
