@@ -211,6 +211,41 @@ def publish(*events: str) -> list:
         ctx?.close()
     }
 
+    void "a class defined inside a function with a no-argument constructor keeps its state"() {
+        given:
+        ApplicationContext ctx = buildContext('''
+from micronaut.python.annotation.processing.test.javabases import EventSink, EventSource
+
+
+def publish(*events: str) -> list:
+    class CountingSink(EventSink):
+        def __init__(self):
+            self.count = 0
+            self.seen = []
+
+        def onEvent(self, event: str) -> None:
+            self.count += 1
+            self.seen.append(event)
+
+        def onComplete(self) -> None:
+            self.seen.append("done")
+
+    sink = CountingSink()
+    result = [EventSource.publish(sink, *events)]
+    result.extend(sink.seen)
+    result.append(str(sink.count))
+    result.append(str(isinstance(sink, EventSink)))
+    return result
+''', true)
+        Context polyglot = ctx.getBean(Context)
+
+        expect: 'the class keeps the interface as its base and the state its constructor sets is readable and mutable from the methods Java calls'
+        strings(polyglot.eval('python', 'publish("a", "b")')) == ['sink', 'a', 'b', 'done', '2', 'True']
+
+        cleanup:
+        ctx?.close()
+    }
+
     void "a class defined inside a function with constructor parameters stays a plain Python object implementing the interface"() {
         given:
         ApplicationContext ctx = buildContext('''
