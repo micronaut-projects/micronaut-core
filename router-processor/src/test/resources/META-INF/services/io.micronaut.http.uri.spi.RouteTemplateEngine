@@ -2,3 +2,4 @@ io.micronaut.web.router.processor.ColonRouteTemplateEngine
 io.micronaut.web.router.processor.ColonRouteTemplateEngine$Runtime
 io.micronaut.web.router.processor.ColonRouteTemplateEngine$Ordered
 io.micronaut.web.router.processor.ColonRouteTemplateEngine$Selecting
+io.micronaut.web.router.processor.ColonRouteTemplateEngine$Matrix

@@ -177,6 +177,39 @@ public class ColonRouteTemplateEngine implements RouteTemplateEngine {
     }
 
     /**
+     * The same language whose routes ignore matrix parameters, like JAX-RS: the part of each
+     * segment from a {@code ;} is removed from the path the routes match, while the request keeps
+     * its raw URI.
+     */
+    public static final class Matrix extends ColonRouteTemplateEngine {
+        public static final String MATRIX_ID = "test.colon-matrix";
+
+        public Matrix() {
+            super(MATRIX_ID);
+        }
+
+        @Override
+        public String matchingPath(String rawPath) {
+            if (rawPath.indexOf(';') < 0) {
+                return rawPath;
+            }
+            StringBuilder result = new StringBuilder(rawPath.length());
+            int start = 0;
+            while (true) {
+                int slash = rawPath.indexOf('/', start);
+                int end = slash < 0 ? rawPath.length() : slash;
+                int semicolon = rawPath.indexOf(';', start);
+                result.append(rawPath, start, semicolon >= 0 && semicolon < end ? semicolon : end);
+                if (slash < 0) {
+                    return result.toString();
+                }
+                result.append('/');
+                start = slash + 1;
+            }
+        }
+    }
+
+    /**
      * The same language with a route selector: the first accepted type a route produces.
      */
     public static final class Selecting extends ColonRouteTemplateEngine implements io.micronaut.web.router.spi.RouteMatchSelector {

@@ -78,6 +78,15 @@ public class ColonRouteTemplateCompiler implements RouteTemplateCompiler {
     }
 
     /**
+     * The compiler of {@link ColonRouteTemplateEngine.Matrix}.
+     */
+    public static final class Matrix extends ColonRouteTemplateCompiler {
+        public Matrix() {
+            super(ColonRouteTemplateEngine.Matrix.MATRIX_ID);
+        }
+    }
+
+    /**
      * The compiler of {@link ColonRouteTemplateEngine.Selecting}.
      */
     public static final class Selecting extends ColonRouteTemplateCompiler {
