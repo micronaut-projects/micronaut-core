@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
+import io.micronaut.http.MediaType;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
@@ -377,6 +378,18 @@ public interface PathVariables {
      * @since 5.3.0
      */
     default @Nullable Object locatedTarget() {
+        return null;
+    }
+
+    /**
+     * The media type of the response that the
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector route selector} of the engine of the
+     * route negotiated, see {@link io.micronaut.web.router.UriRouteMatch#getSelectedMediaType()}.
+     *
+     * @return The media type, or {@code null} if none was negotiated
+     * @since 5.3.0
+     */
+    default @Nullable MediaType selectedMediaType() {
         return null;
     }
 

@@ -218,7 +218,7 @@ public final class RouteLocator {
          */
         @SuppressWarnings("unchecked")
         <T, R> UriRouteMatch<T, R> wrap(UriRouteMatch<T, R> match) {
-            if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> route)) {
+            if (!(match instanceof DefaultUriRouteMatch<T, R> innerMatch) || !(match.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?>)) {
                 return match;
             }
             UriMatchInfo inner = innerMatch.matchInfo();
@@ -231,7 +231,8 @@ public final class RouteLocator {
             List<UriMatchVariable> variables = new ArrayList<>(request.variables);
             variables.addAll(inner.getVariables());
             LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target);
-            return (UriRouteMatch<T, R>) route.locatedMatch(info);
+            // the media type a route selector of the target's table negotiated is kept
+            return innerMatch.withMatchInfo(info);
         }
 
         /**
