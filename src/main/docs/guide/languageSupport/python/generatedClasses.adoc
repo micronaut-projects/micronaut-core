@@ -33,6 +33,16 @@ An instance of a generated class created through its no-argument constructor, fo
 
 A class is resolved through the module named after it before its package is imported, so a class instantiated on another thread while its package is being imported (a service the parallel service loader creates for a call made at import time) does not wait for the import of the package.
 
+== String Representation
+
+`toString()` of the generated class calls `__str__` of the Python class, or `__repr__` when the class defines no `__str__`, so Java code that formats the object sees the Python representation: a serializer writing the object as a map key, a log statement, a `text/plain` response or `String.valueOf(...)`. A class defining neither keeps the default `Object.toString()`.
+
+snippet::micronaut.docs.tostring.Feature[tags="class", indent=0, title="The string representation of a Python class"]
+
+<1> `String.valueOf(feature)` and the string form of a Java collection holding the object give the feature name
+
+`__eq__` and `__hash__` are not bridged: the identity of a generated instance is that of the Java object, as for a Python class defining neither.
+
 == Runtime Annotations and Reflection Data
 
 Micronaut reads the annotations of a Python class from the annotation metadata the compiler builds for it, so the decorators of a Python bean, controller or configuration class need not appear on the generated Java class. Frameworks that read annotations reflectively from the Java class, with `Class.getAnnotation` or `Method.getAnnotation`, are different: Hibernate looks for `@Entity`, `@Id` and the other `jakarta.persistence` annotations on the class it maps, and finds nothing on the generated class unless the compiler copies them there.

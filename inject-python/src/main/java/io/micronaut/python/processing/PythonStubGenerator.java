@@ -34,6 +34,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
@@ -566,7 +567,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     List<MethodElement> methodsToBridge = bridged.methodsToBridge();
                     boolean hasAsyncBridgeMethod = bridged.hasAsyncBridgeMethod();
                     addInjectionMethods(model, methodsToBridge);
-                    addCreatorsAndPropertyAccessors(model, hasAsyncBridgeMethod);
+                    boolean hasToString = addToStringBridge(model, addedMethodNames);
+                    addCreatorsAndPropertyAccessors(model, hasAsyncBridgeMethod, hasToString);
                 } catch (ProcessingException e) {
                     throw e;
                 } catch (Exception e) {
@@ -575,6 +577,45 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
             }
         }
+    }
+
+    /**
+     * Bridges {@code __str__}, or {@code __repr__} when the class defines no {@code __str__}, to
+     * {@code toString()} of the generated class, so that Java code formatting the object (a serializer
+     * writing it as a map key, a log statement, a text response) sees the Python representation. A Python
+     * method named {@code toString} is bridged as any other method and takes precedence; an introspected
+     * bean defining neither gets the {@code toString()} over its properties.
+     *
+     * @return Whether the generated class declares {@code toString()}
+     */
+    private static boolean addToStringBridge(ClassStubModel model, Set<String> addedMethodNames) {
+        if (model.isJunit5Test()) {
+            return false;
+        }
+        if (addedMethodNames.contains("toString()")) {
+            return true;
+        }
+        List<FunctionDef> functions = model.classElement().getNativeType().functions();
+        String representation = Stream.of("__str__", "__repr__")
+            .filter(name -> functions.stream().anyMatch(function -> name.equals(function.name()) && !function.isStatic() && function.arguments().arguments().isEmpty()))
+            .findFirst()
+            .orElse(null);
+        if (representation == null) {
+            return false;
+        }
+        addedMethodNames.add("toString()");
+        model.builder().addMethod(MethodDef.builder("toString")
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(TypeDef.STRING)
+            .build((aThis, methodParameters) -> PYTHON_INVOCATION.invokeStatic(
+                "invokePythonMethod",
+                POLYGLOT_VALUE,
+                aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
+                ExpressionDef.constant(representation),
+                TypeDef.OBJECT.array().instantiate()
+            ).invoke("asString", TypeDef.STRING).returning()));
+        return true;
     }
 
     /**
@@ -1113,9 +1154,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Emits @Creator factories, property getters and setters, Object methods and the property member bridge.
+     * Emits @Creator factories, property getters and setters, Object methods (except a {@code toString()} the
+     * class already declares) and the property member bridge.
      */
-    private void addCreatorsAndPropertyAccessors(ClassStubModel model, boolean hasAsyncBridgeMethod) {
+    private void addCreatorsAndPropertyAccessors(ClassStubModel model, boolean hasAsyncBridgeMethod, boolean hasToString) {
         ClassElement element = model.element();
         ClassDef.ClassDefBuilder builder = model.builder();
         List<PropertyElement> beanProperties = model.beanProperties();
@@ -1169,7 +1211,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
 
         if (isIntrospectedBean) {
-            ObjectHelper.addObjectMethods(builder, javaClassType(element), beanProperties, propertyFields);
+            ObjectHelper.addObjectMethods(builder, javaClassType(element), beanProperties, propertyFields, !hasToString);
         }
 
         if (!beanProperties.isEmpty()) {
