@@ -401,6 +401,11 @@ def __micronaut_bind_self_invocations(target, names, overrides):
     A Python bean is a plain object behind the scoped proxy; an instance attribute per intercepted method
     gives ``self.method()`` the same semantics while ``self`` stays the bean object. ``overrides`` are the
     chains created for this target, one per name.
+
+    A name the object already holds is left alone: an instance attribute shadows the method of its class
+    in plain Python, and it does here too, so a bean holding state under the name of one of its methods
+    (``self.books`` next to a ``def books``) reads and writes its own value. The method keeps its
+    interception for the callers that reach it as a method.
     """
     try:
         attributes = vars(target)
@@ -410,8 +415,9 @@ def __micronaut_bind_self_invocations(target, names, overrides):
     cls = type(target)
     for i in range(len(names)):
         name = names[i]
-        if isinstance(attributes.get(name), _MicronautSelfInvocation):
-            # already bound: the same target resolved again
+        if name in attributes:
+            # an attribute of the object itself: either a chain bound when the same target resolved
+            # again, or a value the bean wrote, which shadows the method as it does in plain Python
             continue
         function = __micronaut_get_raw_class_member(cls, name)
         if function is None or not callable(function):
