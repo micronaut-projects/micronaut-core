@@ -3,7 +3,7 @@ package petstore.web;
 import io.micronaut.context.BeanProvider;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
 import jakarta.inject.Singleton;
 
 import java.util.UUID;
@@ -21,7 +21,7 @@ public class PetRoutes implements HttpRoutes {
     }
 
     @Override
-    public void routes(RouteBuilder routes) {
+    public void routes(HttpRouteBuilder routes) {
         routes.handle(PetResourceRoutes.NAME, (request, path) ->
             HttpResponse.ok(pets.get().name(path.getLong("id"))));
         routes.handle(PetResourceRoutes.OWNED, (request, path) ->

@@ -23,8 +23,8 @@ import io.micronaut.http.HttpResponse;
  * A route handler written as a function of the request and the {@link PathVariables} of the
  * matched route. It runs like a controller method that returns an {@link HttpResponse}: filters, error routes and
  * body writers apply unchanged, and the executor is selected like for a blocking controller
- * method (see {@code micronaut.server.thread-selection}, {@link io.micronaut.web.router.builder.UriRoute#executeOn(String)} and
- * {@link io.micronaut.web.router.builder.UriRoute#nonBlocking()}).
+ * method (see {@code micronaut.server.thread-selection}, {@link io.micronaut.web.router.builder.HttpRouteSpec#executeOn(String)} and
+ * {@link io.micronaut.web.router.builder.HttpRouteSpec#nonBlocking()}).
  *
  * <pre>{@code
  * routes.GET("/hello/{name}", (request, pathVariables) -> HttpResponse.ok("Hello " + pathVariables.getString("name")));
@@ -33,7 +33,7 @@ import io.micronaut.http.HttpResponse;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handle(io.micronaut.http.HttpMethod, String, RequestHandler)
+ * @see io.micronaut.web.router.builder.HttpRouteBuilder#handle(io.micronaut.http.HttpMethod, String, RequestHandler)
  */
 @Experimental
 @FunctionalInterface

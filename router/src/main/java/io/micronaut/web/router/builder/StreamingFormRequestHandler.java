@@ -30,7 +30,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleFormStream(io.micronaut.http.HttpMethod, String, StreamingFormRequestHandler)
+ * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleFormStream(io.micronaut.http.HttpMethod, String, StreamingFormRequestHandler)
  */
 @Experimental
 @FunctionalInterface

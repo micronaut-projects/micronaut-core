@@ -28,13 +28,13 @@ import java.util.Set;
 import java.util.function.Function;
 
 /**
- * The {@link RouteBuilder} of handler functions, adding routes to a {@link DefaultRouteBuilder}.
+ * The {@link HttpRouteBuilder} of handler functions, adding routes to a {@link DefaultRouteBuilder}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public final class DefaultHandlerRouteBuilder implements RouteBuilder {
+public final class DefaultHandlerRouteBuilder implements HttpRouteBuilder {
 
     private final DefaultRouteBuilder builder;
 
@@ -43,91 +43,91 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public UriRoute handle(HttpMethod method, String uri, RequestHandler handler) {
+    public HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler) {
         return new Routes(builder.handle(method, uri, handler));
     }
 
     @Override
-    public <B> UriRoute handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    public <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new Routes(builder.handle(method, uri, bodyType, handler));
     }
 
     @Override
-    public UriRoute handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
+    public HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
         return new Routes(builder.handleAsync(method, uri, handler));
     }
 
     @Override
-    public <B> UriRoute handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+    public <B> HttpRouteSpec handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
         return new Routes(builder.handleAsync(method, uri, bodyType, handler));
     }
 
     @Override
-    public <B> UriRoute handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
+    public <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
         return new Routes(builder.handleAsync(route, bodyType, handler));
     }
 
     @Override
-    public UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+    public HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return new Routes(builder.handleForm(method, uri, handler));
     }
 
     @Override
-    public UriRoute handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
+    public HttpRouteSpec handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
         return new Routes(builder.handleFormAsync(method, uri, handler));
     }
 
     @Override
-    public UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
+    public HttpRouteSpec handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         return new Routes(builder.handleFormStream(method, uri, handler));
     }
 
     @Override
-    public UriRoute handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
+    public HttpRouteSpec handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
         return forEach(methods, uri, method -> builder.handle(method, uri, handler));
     }
 
     @Override
-    public UriRoute handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
+    public HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
         return forEach(methods, uri, method -> builder.handleAsync(method, uri, handler));
     }
 
     @Override
-    public UriRoute handle(RouteDeclaration route, RequestHandler handler) {
+    public HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
         return new Routes(builder.handle(route, handler));
     }
 
     @Override
-    public <B> UriRoute handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+    public <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new Routes(builder.handle(route, bodyType, handler));
     }
 
     @Override
-    public UriRoute handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+    public HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
         return new Routes(builder.handleAsync(route, handler));
     }
 
     @Override
-    public UriRoute handleForm(RouteDeclaration route, FormRequestHandler handler) {
+    public HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
         return new Routes(builder.handleForm(route, handler));
     }
 
     @Override
-    public UriRoute handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
+    public HttpRouteSpec handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
         return new Routes(builder.handleFormAsync(route, handler));
     }
 
     @Override
-    public UriRoute handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
+    public HttpRouteSpec handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
         return new Routes(builder.handleFormStream(route, handler));
     }
 
     @Override
-    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+    public <E extends Throwable> ErrorRouteSpec error(Class<E> type, ErrorRouteHandler<E> handler) {
         io.micronaut.web.router.ErrorRoute route = builder.error(type, handler);
-        return new ErrorRoute() {
+        return new ErrorRouteSpec() {
             @Override
-            public ErrorRoute produces(MediaType... mediaTypes) {
+            public ErrorRouteSpec produces(MediaType... mediaTypes) {
                 route.produces(mediaTypes);
                 return this;
             }
@@ -135,18 +135,18 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
     }
 
     @Override
-    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+    public StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
         io.micronaut.web.router.StatusRoute route = builder.status(status, handler);
-        return new StatusRoute() {
+        return new StatusRouteSpec() {
             @Override
-            public StatusRoute produces(MediaType... mediaTypes) {
+            public StatusRouteSpec produces(MediaType... mediaTypes) {
                 route.produces(mediaTypes);
                 return this;
             }
         };
     }
 
-    private static UriRoute forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+    private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
         }
@@ -160,7 +160,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
     /**
      * The routes of a handler: one, or one per HTTP method, configured together.
      */
-    private static final class Routes implements UriRoute {
+    private static final class Routes implements HttpRouteSpec {
 
         private final HandlerUriRoute[] routes;
 
@@ -169,7 +169,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute consumes(MediaType... mediaTypes) {
+        public HttpRouteSpec consumes(MediaType... mediaTypes) {
             for (HandlerUriRoute route : routes) {
                 route.consumes(mediaTypes);
             }
@@ -177,7 +177,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute consumesAll() {
+        public HttpRouteSpec consumesAll() {
             for (HandlerUriRoute route : routes) {
                 route.consumesAll();
             }
@@ -185,7 +185,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute produces(MediaType... mediaTypes) {
+        public HttpRouteSpec produces(MediaType... mediaTypes) {
             for (HandlerUriRoute route : routes) {
                 route.produces(mediaTypes);
             }
@@ -193,7 +193,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute executeOn(String executorName) {
+        public HttpRouteSpec executeOn(String executorName) {
             for (HandlerUriRoute route : routes) {
                 route.executeOn(executorName);
             }
@@ -201,7 +201,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute nonBlocking() {
+        public HttpRouteSpec nonBlocking() {
             for (HandlerUriRoute route : routes) {
                 route.nonBlocking();
             }
@@ -209,7 +209,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute before(RouteRequestFilter filter) {
+        public HttpRouteSpec before(RouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(filter);
             }
@@ -217,7 +217,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute before(String executorName, RouteRequestFilter filter) {
+        public HttpRouteSpec before(String executorName, RouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(executorName, filter);
             }
@@ -225,7 +225,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+        public HttpRouteSpec beforeAsync(AsyncRouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.beforeAsync(filter);
             }
@@ -233,7 +233,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute after(RouteResponseFilter filter) {
+        public HttpRouteSpec after(RouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(filter);
             }
@@ -241,7 +241,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute after(String executorName, RouteResponseFilter filter) {
+        public HttpRouteSpec after(String executorName, RouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(executorName, filter);
             }
@@ -249,7 +249,7 @@ public final class DefaultHandlerRouteBuilder implements RouteBuilder {
         }
 
         @Override
-        public UriRoute afterAsync(AsyncRouteResponseFilter filter) {
+        public HttpRouteSpec afterAsync(AsyncRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.afterAsync(filter);
             }

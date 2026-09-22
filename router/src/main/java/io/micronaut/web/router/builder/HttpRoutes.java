@@ -54,5 +54,5 @@ public interface HttpRoutes extends Ordered {
      *
      * @param routes The route builder
      */
-    void routes(RouteBuilder routes);
+    void routes(HttpRouteBuilder routes);
 }

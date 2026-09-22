@@ -28,7 +28,7 @@ import java.util.concurrent.CompletionStage;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)
+ * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)
  */
 @Experimental
 @FunctionalInterface

@@ -26,7 +26,7 @@ import io.micronaut.http.HttpResponse;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see io.micronaut.web.router.builder.RouteBuilder#handleForm(io.micronaut.http.HttpMethod, String, FormRequestHandler)
+ * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleForm(io.micronaut.http.HttpMethod, String, FormRequestHandler)
  */
 @Experimental
 @FunctionalInterface

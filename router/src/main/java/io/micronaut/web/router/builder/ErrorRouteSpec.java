@@ -19,14 +19,14 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 
 /**
- * A status route to a handler function, to configure after it was added with the
- * {@link RouteBuilder}.
+ * An error route to a handler function, to configure after it was added with the
+ * {@link HttpRouteBuilder}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public interface StatusRoute {
+public interface ErrorRouteSpec {
 
     /**
      * Produce these media types, like {@code @Produces} on an {@code @Error} method.
@@ -34,5 +34,5 @@ public interface StatusRoute {
      * @param mediaTypes The media types
      * @return The route
      */
-    StatusRoute produces(MediaType... mediaTypes);
+    ErrorRouteSpec produces(MediaType... mediaTypes);
 }

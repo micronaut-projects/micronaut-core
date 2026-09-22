@@ -14,7 +14,7 @@ import io.micronaut.web.router.builder.AsyncRequestHandler
 import io.micronaut.web.router.builder.HttpRoutes
 import io.micronaut.web.router.builder.PathVariables
 import io.micronaut.web.router.builder.RequestHandler
-import io.micronaut.web.router.builder.RouteBuilder
+import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.netty.util.concurrent.FastThreadLocalThread
 import jakarta.inject.Named
 import jakarta.inject.Singleton
@@ -127,7 +127,7 @@ class HandlerRoutesSpec extends Specification {
     static class Routes {
         @Singleton
         HttpRoutes handlerRoutes() {
-            return { RouteBuilder routes ->
+            return { HttpRouteBuilder routes ->
                 routes.GET('/h/items/{id}', { HttpRequest<?> request, PathVariables pathVariables ->
                     Long id = pathVariables.get('id', Long)
                     text("item $id ${id.class.name}")
@@ -175,7 +175,7 @@ class HandlerRoutesSpec extends Specification {
         private final RouteTable table
 
         TableRoutes(RouteTableFactory tables) {
-            table = tables.buildHttpRoutes { RouteBuilder routes ->
+            table = tables.buildHttpRoutes { HttpRouteBuilder routes ->
                 routes.GET('/table/{+path}', { HttpRequest<?> request, PathVariables pathVariables -> text("table ${request.path}") } as RequestHandler)
             }
         }

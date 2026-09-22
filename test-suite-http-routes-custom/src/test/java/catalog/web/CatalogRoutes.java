@@ -4,7 +4,7 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.web.router.builder.HttpRoutes;
-import io.micronaut.web.router.builder.RouteBuilder;
+import io.micronaut.web.router.builder.HttpRouteBuilder;
 import jakarta.inject.Singleton;
 
 /**
@@ -14,7 +14,7 @@ import jakarta.inject.Singleton;
 @Requires(property = "spec.name", value = CompiledRouteSelectionTest.SPEC_NAME)
 public class CatalogRoutes implements HttpRoutes {
     @Override
-    public void routes(RouteBuilder routes) {
+    public void routes(HttpRouteBuilder routes) {
         routes.handle(ItemResourceRoutes.ITEM, (request, path) ->
             HttpResponse.ok("declared item " + path.getString("id")).header("X-Route", "declared"))
             .produces(MediaType.APPLICATION_JSON_TYPE);
