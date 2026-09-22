@@ -34,7 +34,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Predicate;
-import java.util.stream.Stream;
 
 import javax.lang.model.element.Modifier;
 import javax.lang.model.element.VariableElement;
@@ -146,6 +145,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String CONVERT_VALUE = "convertValue";
     private static final String EQUALS_METHOD = "equals";
     private static final String TO_STRING_METHOD = "toString";
+    private static final String PYTHON_STR_METHOD = "__str__";
+    private static final String PYTHON_REPR_METHOD = "__repr__";
     private static final String TO_STRING_METHOD_KEY = TO_STRING_METHOD + "()";
     private static final String AS_STRING_METHOD = "asString";
     private static final String VALUE_PARAMETER = "value";
@@ -583,11 +584,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
-     * Bridges {@code __str__}, or {@code __repr__} when the class defines no {@code __str__}, to
-     * {@code toString()} of the generated class, so that Java code formatting the object (a serializer
-     * writing it as a map key, a log statement, a text response) sees the Python representation. A Python
-     * method named {@code toString} is bridged as any other method and takes precedence; an introspected
-     * bean defining neither gets the {@code toString()} over its properties.
+     * Bridges the string representation of a Python class to {@code toString()} of its generated class, so
+     * that Java code formatting the object (a serializer writing it as a map key, a log statement, a text
+     * response) sees what Python's {@code str(obj)} gives. The generated method invokes {@code __str__},
+     * which Python resolves through the class hierarchy and, for a class defining only {@code __repr__},
+     * through {@code object.__str__} to that {@code __repr__}. A Python method named {@code toString} is
+     * bridged as any other method and takes precedence; an introspected bean whose hierarchy defines
+     * neither keeps the {@code toString()} over its properties.
      *
      * @return Whether the generated class declares {@code toString()}
      */
@@ -598,12 +601,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (addedMethodNames.contains(TO_STRING_METHOD_KEY)) {
             return true;
         }
-        List<FunctionDef> functions = model.classElement().getNativeType().functions();
-        String representation = Stream.of("__str__", "__repr__")
-            .filter(name -> functions.stream().anyMatch(function -> name.equals(function.name()) && !function.isStatic() && function.arguments().arguments().isEmpty()))
-            .findFirst()
-            .orElse(null);
-        if (representation == null) {
+        if (!definesStringRepresentation(model.classElement(), new HashSet<>())) {
             return false;
         }
         addedMethodNames.add(TO_STRING_METHOD_KEY);
@@ -615,10 +613,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 "invokePythonMethod",
                 POLYGLOT_VALUE,
                 aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
-                ExpressionDef.constant(representation),
+                ExpressionDef.constant(PYTHON_STR_METHOD),
                 TypeDef.OBJECT.array().instantiate()
             ).invoke(AS_STRING_METHOD, TypeDef.STRING).returning()));
         return true;
+    }
+
+    /**
+     * Whether the Python class or any class of its hierarchy defines {@code __str__} or {@code __repr__},
+     * which is when {@code str(obj)} gives something other than the default representation. The decision is
+     * only whether to generate the bridge; which definition it reaches is Python's own resolution at run time.
+     */
+    private static boolean definesStringRepresentation(ClassElement element, Set<String> visited) {
+        if (!(element instanceof AbstractPythonClassElement pythonClass) || !visited.add(element.getName())) {
+            return false;
+        }
+        for (FunctionDef function : pythonClass.getNativeType().functions()) {
+            if ((PYTHON_STR_METHOD.equals(function.name()) || PYTHON_REPR_METHOD.equals(function.name()))
+                && !function.isStatic()
+                && function.arguments().arguments().isEmpty()) {
+                return true;
+            }
+        }
+        if (pythonClass.getSuperType().filter(superType -> definesStringRepresentation(superType, visited)).isPresent()) {
+            return true;
+        }
+        for (ClassElement anInterface : pythonClass.getInterfaces()) {
+            if (definesStringRepresentation(anInterface, visited)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
