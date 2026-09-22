@@ -234,6 +234,9 @@ class Calc:
         form.count = 4
         return form.name + str(form.count) + str(len(form.tags)) + str(Form("q", 2).count)
 
+    def maybe_name(self, flag: bool) -> str | None:
+        return "x" if flag else None
+
     def maybe_count(self, n: int) -> int | None:
         return n if n > 0 else None
 
@@ -354,6 +357,7 @@ class Bag:
         ["relooped", 3], ["relooped", 0],
         ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
         ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["maybe_name", true], ["maybe_name", false],
         ["maybe_count", 3], ["maybe_count", 0],
         ["branch_local", true], ["branch_local", false],
         ["guarded", 3], ["guarded", 0],

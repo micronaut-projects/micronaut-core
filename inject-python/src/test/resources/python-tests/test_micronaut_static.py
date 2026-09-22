@@ -157,6 +157,10 @@ class CorpusFindingsTest(unittest.TestCase):
         self.assertEqual("Conditional", returned.getClass().getSimpleName())
         self.assertEqual("java.lang.Integer", returned.type())
 
+    def test_a_union_with_none_returns_its_member(self):
+        self.assertEqual("COMPILED", self.decisions["Finder.named"].outcome().name(), rules(self.decisions["Finder.named"]))
+        self.assertEqual("java.lang.String", self.bodies["named"].returnType())
+
     def test_an_abstract_method_is_not_a_candidate(self):
         for name in ("to_thing", "described"):
             decision = self.decisions[f"Mapper.{name}"]
@@ -497,6 +501,10 @@ class Cart:
         self.items = items
         self.owner = owner
 
+    @staticmethod
+    def tag(n: int) -> int:
+        return n
+
     def total(self, n: int) -> int:
         return self.items * n
 
@@ -710,6 +718,12 @@ class Pricing:
         counts["added"] = len(values)
         return counts["added"]
 
+    def tagged(self, cart: Cart, n: int) -> int:
+        return cart.tag(n)
+
+    def tagged_afresh(self, n: int) -> int:
+        return Cart(n, "x").tag(n)
+
     def paged(self, pages: dict[str, int]) -> int:
         total = 0
         for title, count in pages.items():
@@ -790,6 +804,49 @@ class AdvisedFacts(FakeFacts):
         return AroundBinding() if name.rsplit(".", 1)[-1] == "Logged" else None
 
 
+MIXED = '''
+from jakarta.inject import Singleton
+import java
+
+Describable = java.type("io.micronaut.python.annotation.processing.test.defaults.Describable")
+
+
+class Base(Describable):
+    def name(self) -> str:
+        return "base"
+
+
+@Singleton
+class Sub(Base, Describable):
+    def name(self) -> str:
+        return "sub"
+
+
+@Singleton
+class Consumer:
+    def __init__(self, target: Sub):
+        self.target = target
+
+    def describe_target(self) -> str:
+        return self.target.describe()
+
+    def name_target(self) -> str:
+        return self.target.name()
+'''
+
+
+class MixedBasesTest(unittest.TestCase):
+    def test_a_java_base_among_the_bases_of_a_receiver(self):
+        decisions, planner = plan(MIXED, MODE_ALL, facts=FakeFacts())
+        bodies = {body.methodName(): body for body in planner.bodies}
+        self.assertEqual("COMPILED", decisions["Consumer.name_target"].outcome().name(), [(r.rule(), r.message()) for r in decisions["Consumer.name_target"].reasons()])
+        call = _uncast(list(bodies["name_target"].body().statements())[0].value())
+        self.assertEqual("InvokeJava", call.getClass().getSimpleName())
+        # a default method of the Java interface is not modelled: the call is refused, not crashed on
+        self.assertEqual("SKIPPED", decisions["Consumer.describe_target"].outcome().name())
+        self.assertEqual(["unknown-type"], rules(decisions["Consumer.describe_target"]))
+
+
 class AdviceTest(unittest.TestCase):
     def test_an_advised_method_is_compiled_with_its_chain(self):
         decisions, planner = plan(ADVISED, MODE_ALL, facts=AdvisedFacts())
@@ -853,6 +910,14 @@ class LoweringTest(unittest.TestCase):
         branch = statements[1]
         self.assertEqual("result", list(branch.then().statements())[0].name())
         self.assertEqual("-", list(branch.orElse().statements())[0].value().op())
+
+    def test_a_static_method_is_called_on_a_plain_receiver_only(self):
+        tagged = _uncast(list(self.bodies["tagged"].body().statements())[0].value())
+        self.assertEqual("InvokeJava", tagged.getClass().getSimpleName())
+        self.assertIsNone(tagged.receiver())
+        # Python constructs the Cart before calling the static method; a static Java call would not
+        self.assertEqual("SKIPPED", self.decisions["Pricing.tagged_afresh"].outcome().name())
+        self.assertEqual(["unsupported-expression"], rules(self.decisions["Pricing.tagged_afresh"]))
 
     def test_dict_entries_unpack_into_the_loop_variables(self):
         paged = self.bodies["paged"]

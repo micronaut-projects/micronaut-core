@@ -350,7 +350,7 @@ public sealed interface Ir {
 
     /**
      * A read of an injected attribute of a module: a bean the module's generated class holds in a
-     * static field, set when the bean is injected.
+     * field of its instance, set when the bean is injected.
      *
      * @param owner The generated class of the module
      * @param name  The attribute
