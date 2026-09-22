@@ -237,10 +237,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public Stream<UriRouteInfo<?, ?>> uriRoutes() {
-        return Stream.concat(
-            allRoutesByMethod.values().stream().flatMap(Arrays::stream),
-            allRoutesByMethod.values().stream().flatMap(Arrays::stream)
-        );
+        return allRoutesByMethod.values().stream().flatMap(Arrays::stream);
     }
 
     @Override

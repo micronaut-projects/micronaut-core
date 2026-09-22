@@ -891,6 +891,7 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         public UriRouteInfo<Object, Object> toRouteInfo() {
             return new DefaultUrlRouteInfo<>(
                 httpMethod,
+                httpMethodName,
                 uriMatchTemplate,
                 defaultCharset,
                 targetMethod,

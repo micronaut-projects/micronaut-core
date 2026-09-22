@@ -72,7 +72,10 @@ Content-Type: ${contentType}\r
     }
 
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/6532')
-    @Timeout(10)
+    // guards against the upload hanging (the linked issue), so the bound only has to be well below
+    // the build timeout: the 10 seconds it used to be included the context start and Groovy's
+    // one-off classpath scan on the first GString conversion, which busy CI runners exceeded
+    @Timeout(60)
     def uploadTest() {
         given:
         def ctx = ApplicationContext.run([

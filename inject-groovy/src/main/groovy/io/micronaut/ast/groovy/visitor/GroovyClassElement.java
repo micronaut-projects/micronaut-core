@@ -60,8 +60,9 @@ import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.InnerClassNode;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PackageNode;
-import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.ast.PropertyNode;
+import org.codehaus.groovy.ast.RecordComponentNode;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 
 import java.lang.annotation.Annotation;
@@ -99,6 +100,8 @@ import java.util.stream.StreamSupport;
 @Internal
 public class GroovyClassElement extends AbstractGroovyElement implements ArrayableClassElement {
 
+    private static final String RECORD_TYPE = "groovy.transform.RecordType";
+    private static final String RECORD_BASE = "groovy.transform.RecordBase";
     private static final int ACC_SYNTHETIC = 0x1000; // class, field, method, parameter, module *
 
     /**
@@ -282,7 +285,25 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     @Override
     public boolean isRecord() {
-        return classNode.isRecord();
+        return classNode.isRecord() || isSourceRecord();
+    }
+
+    /**
+     * A Groovy record compiled from source is visited before Groovy's {@code RecordTypeASTTransformation} runs,
+     * so the class node is not yet marked a record and has neither record components, accessors nor
+     * a canonical constructor. The parser has already added {@code @RecordType} (or its collected {@code @RecordBase})
+     * and turned the record header into properties. Emulated records are never marked a native record.
+     *
+     * @return Whether the class is a Groovy record that is not yet (or never) a native record
+     */
+    private boolean isSourceRecord() {
+        for (AnnotationNode annotation : classNode.getAnnotations()) {
+            String name = annotation.getClassNode().getName();
+            if (RECORD_TYPE.equals(name) || RECORD_BASE.equals(name)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -414,11 +435,29 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     private Optional<MethodElement> possibleDefaultEmptyConstructor() {
         List<ConstructorNode> constructors = classNode.getDeclaredConstructors();
+        if (CollectionUtils.isEmpty(constructors) && isRecord()) {
+            // the canonical constructor of a source record is only generated later by Groovy
+            return createMethodElement(canonicalRecordConstructor());
+        }
         if (CollectionUtils.isEmpty(constructors) && !classNode.isAbstract() && !classNode.isEnum()) {
             // empty default constructor
             return createMethodElement(new ConstructorNode(Modifier.PUBLIC, new BlockStatement()));
         }
         return Optional.empty();
+    }
+
+    private ConstructorNode canonicalRecordConstructor() {
+        List<FieldNode> componentFields = getRecordComponentFields();
+        var parameters = new Parameter[componentFields.size()];
+        for (int i = 0; i < parameters.length; i++) {
+            FieldNode field = componentFields.get(i);
+            var parameter = new Parameter(field.getOriginType(), field.getName());
+            parameter.addAnnotations(field.getAnnotations());
+            parameters[i] = parameter;
+        }
+        var constructor = new ConstructorNode(Modifier.PUBLIC, parameters, ClassNode.EMPTY_ARRAY, new BlockStatement());
+        constructor.setDeclaringClass(classNode);
+        return constructor;
     }
 
     private Optional<MethodElement> createMethodElement(MethodNode method) {
@@ -513,10 +552,33 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
         );
     }
 
+    private List<FieldNode> getRecordComponentFields() {
+        var fields = new ArrayList<FieldNode>();
+        List<RecordComponentNode> recordComponents = classNode.getRecordComponents();
+        if (recordComponents.isEmpty()) {
+            // a source record before Groovy's record transform, or an emulated record: the header components are the instance properties
+            for (PropertyNode propertyNode : classNode.getProperties()) {
+                if (!propertyNode.isStatic()) {
+                    fields.add(propertyNode.getField());
+                }
+            }
+        } else {
+            for (RecordComponentNode recordComponentNode : recordComponents) {
+                fields.add(classNode.getField(recordComponentNode.getName()));
+            }
+        }
+        return fields;
+    }
+
     private List<MethodElement> getRecordMethods() {
         var methodElements = new ArrayList<MethodElement>();
-        for (var recordComponentNode : classNode.getRecordComponents()) {
-            var method = classNode.getMethods(recordComponentNode.getName()).get(0);
+        for (FieldNode field : getRecordComponentFields()) {
+            MethodNode method = classNode.getDeclaredMethod(field.getName(), Parameter.EMPTY_ARRAY);
+            if (method == null) {
+                // the accessor of a source record is only generated later by Groovy
+                method = new MethodNode(field.getName(), Modifier.PUBLIC, field.getOriginType(), Parameter.EMPTY_ARRAY, ClassNode.EMPTY_ARRAY, new BlockStatement());
+                method.setDeclaringClass(classNode);
+            }
             methodElements.add(
                 new GroovyMethodElement(
                     GroovyClassElement.this,
@@ -532,12 +594,12 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
 
     private List<FieldElement> getRecordFields() {
         var fieldElements = new ArrayList<FieldElement>();
-        for (var recordComponentNode : classNode.getRecordComponents()) {
+        for (FieldNode field : getRecordComponentFields()) {
             fieldElements.add(
                 new GroovyFieldElement(
                     visitorContext,
                     GroovyClassElement.this,
-                    classNode.getField(recordComponentNode.getName()),
+                    field,
                     elementAnnotationMetadataFactory
                 )
             );
@@ -572,7 +634,8 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 return null;
             }
             if (value.field != null && value.readAccessKind != BeanProperties.AccessKind.METHOD) {
-                String getterName = NameUtils.getterNameFor(
+                // a record component is read with its accessor
+                String getterName = isRecord() ? value.propertyName : NameUtils.getterNameFor(
                     value.propertyName,
                     value.type.equals(PrimitiveElement.BOOLEAN)
                 );
@@ -593,7 +656,7 @@ public class GroovyClassElement extends AbstractGroovyElement implements Arrayab
                 value.getter = null;
                 value.readAccessKind = null;
             }
-            if (value.field != null && !value.field.isFinal() && value.writeAccessKind != BeanProperties.AccessKind.METHOD) {
+            if (value.field != null && !value.field.isFinal() && !isRecord() && value.writeAccessKind != BeanProperties.AccessKind.METHOD) {
                 value.setter = MethodElement.of(
                     this,
                     value.field.getDeclaringType(),

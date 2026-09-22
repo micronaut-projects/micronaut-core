@@ -8,6 +8,10 @@ name: Python CI
 # the regular Java CI: the `io.micronaut.build.internal.python` build plugin only runs them when
 # the `python-ci` Gradle property is set, and registers the root `pythonCheck` task run here.
 # Does nothing for modules without a project applying that plugin.
+#
+# A large test suite is split across several jobs: a module sets `python-ci-shards=<count>` in its
+# gradle.properties and each job of the build matrix runs one shard of the test classes, selected
+# by the `python-ci-shard=<index>/<count>` Gradle property the build plugin understands.
 on:
   push:
     branches:
@@ -23,7 +27,6 @@ on:
       - 'python/**'
       - 'python-*'
     types: [opened, synchronize, reopened, ready_for_review]
-
 # A new push to a pull request cancels its older run, freeing the shared runner
 # pool. Pushes to branches get a group of their own and are never cancelled.
 concurrency:
@@ -36,6 +39,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       present: ${{ steps.detect.outputs.present }}
+      shards: ${{ steps.detect.outputs.shards }}
+      shard-count: ${{ steps.detect.outputs.shard-count }}
     steps:
       - name: "📥 Checkout repository"
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -51,11 +56,24 @@ jobs:
             echo "present=false" >> "$GITHUB_OUTPUT"
             echo "No project applies the io.micronaut.build.internal.python plugin, nothing to do"
           fi
+          # The number of jobs the tests are split across: python-ci-shards in gradle.properties, one by default
+          count=$(sed -n 's/^python-ci-shards=\([1-9][0-9]*\)[[:space:]]*$/\1/p' gradle.properties 2>/dev/null | tail -n 1)
+          count="${count:-1}"
+          echo "shard-count=$count" >> "$GITHUB_OUTPUT"
+          shards=$(printf ',%s' $(seq 1 "$count"))
+          echo "shards=[${shards#,}]" >> "$GITHUB_OUTPUT"
+          echo "Running the Python tests in $count job(s)"
   build:
-    name: "build"
+    # Modules with a single shard keep the plain job and check names
+    name: ${{ needs.detect.outputs.shard-count == '1' && 'build' || format('build ({0}/{1})', matrix.shard, needs.detect.outputs.shard-count) }}
     needs: detect
     if: needs.detect.outputs.present == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      # every shard reports its own tests
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJson(needs.detect.outputs.shards) }}
     env:
       TESTCONTAINERS_RYUK_DISABLED: true
       ORG_GRADLE_PROJECT_cachePush: ${{ github.event_name == 'push' }}
@@ -107,13 +125,13 @@ jobs:
           GH_TOKEN_PUBLIC_REPOS_READONLY: ${{ secrets.GH_TOKEN_PUBLIC_REPOS_READONLY }}
           GH_USERNAME: ${{ secrets.GH_USERNAME }}
         run: |
-          ./gradlew pythonCheck -Ppython-ci --no-daemon --continue
+          ./gradlew pythonCheck -Ppython-ci -Ppython-ci-shard=${{ matrix.shard }}/${{ needs.detect.outputs.shard-count }} --no-daemon --continue
 
       - name: "📊 Publish Test Report"
         if: always()
         uses: mikepenz/action-junit-report@a9170d5795813c01ab4901ffb045b52bab4ab09d # v6
         with:
-          check_name: Python CI / Test Report
+          check_name: ${{ needs.detect.outputs.shard-count == '1' && 'Python CI / Test Report' || format('Python CI / Test Report ({0}/{1})', matrix.shard, needs.detect.outputs.shard-count) }}
           report_paths: '**/build/test-results/test/TEST-*.xml'
           check_retries: 'true'
 

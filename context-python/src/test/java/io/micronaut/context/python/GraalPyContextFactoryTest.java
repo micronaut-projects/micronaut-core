@@ -16,8 +16,10 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.logging.LoggingSystem;
 import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Engine;
+import org.graalvm.polyglot.PolyglotException;
 import org.graalvm.python.embedding.GraalPyResources;
 import org.graalvm.python.embedding.VirtualFileSystem;
 import org.junit.jupiter.api.Test;
@@ -27,7 +29,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
-import org.graalvm.polyglot.PolyglotException;
 import java.util.Map;
 
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
@@ -204,13 +205,68 @@ final class GraalPyContextFactoryTest {
     }
 
     @Test
-    void contextOptionsCanBeConfiguredFromMicronautProperties() {
-        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
-            "graalpy.context.options", Map.of("log.level", "FINE")
-        ))) {
-            GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
-            assertTrue(config.getOptions().containsKey("log.level"));
+    void bootstrapContextOptionsOverrideTheInferredLogLevel() {
+        PythonContextRuntime.setReuseContext(false);
+        PythonContextRuntime.resetContext();
+        try {
+            PolyglotException exception = assertThrows(PolyglotException.class, () ->
+                GraalPyContextFactory.bootstrapReusableContext(
+                    getClass().getClassLoader(),
+                    Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, "INVALID")
+                )
+            );
+            assertTrue(exception.getMessage().contains("INVALID"), exception.getMessage());
+        } finally {
+            PythonContextRuntime.setReuseContext(false);
+            PythonContextRuntime.resetContext();
         }
+    }
+
+    @Test
+    void explicitLogLevelWinsRegardlessOfConfigurationOrder() {
+        GraalPyContextConfiguration rootFirst = new GraalPyContextConfiguration();
+        rootFirst.configureRootLogLevel("WARN");
+        rootFirst.setOptions(Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE));
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, rootFirst.polyglotLogLevel());
+
+        GraalPyContextConfiguration optionsFirst = new GraalPyContextConfiguration();
+        optionsFirst.setOptions(Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE));
+        optionsFirst.configureRootLogLevel("WARN");
+        assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, optionsFirst.polyglotLogLevel());
+    }
+
+    @Test
+    void contextLogLevelInheritsMicronautRootLevel() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            GraalPyContextConfiguration.ROOT_LOG_LEVEL_PROPERTY, "WARN"
+        ))) {
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_WARNING, config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
+        }
+    }
+
+    @Test
+    void contextLogLevelOptionOverridesMicronautRootLevel() {
+        try (ApplicationContext applicationContext = ApplicationContext.run(Map.of(
+            GraalPyContextConfiguration.ROOT_LOG_LEVEL_PROPERTY, "WARN",
+            GraalPyContextConfiguration.PREFIX + ".options",
+            Map.of(GraalPyContextConfiguration.LOG_LEVEL_OPTION, GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE)
+        ))) {
+            try {
+                GraalPyContextConfiguration config = applicationContext.getBean(GraalPyContextConfiguration.class);
+                assertEquals(GraalPySlf4jLogHandler.POLYGLOT_LEVEL_FINE, config.polyglotLogLevel());
+            } finally {
+                refreshLogging(applicationContext);
+            }
+        }
+    }
+
+    private static void refreshLogging(ApplicationContext applicationContext) {
+        applicationContext.getBeansOfType(LoggingSystem.class).forEach(LoggingSystem::refresh);
     }
 
     @Test
