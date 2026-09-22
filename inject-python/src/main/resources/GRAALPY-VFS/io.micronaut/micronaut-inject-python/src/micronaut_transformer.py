@@ -5,7 +5,6 @@ import os
 import re
 import warnings
 import java
-from typing import Optional, Dict, List, Any, Set
 from micronaut_facades import FacadeRegistry, runtime_facade_annotation_names
 
 PYTHON_KEYWORD_METHOD_ALIASES = {
@@ -67,7 +66,7 @@ from ast import unparse
 JAVA_IO_PACKAGE_PREFIX = 'io.'
 
 
-def is_java_io_package(module_name: Optional[str]) -> bool:
+def is_java_io_package(module_name: str | None) -> bool:
     return bool(module_name) and module_name.startswith(JAVA_IO_PACKAGE_PREFIX)
 
 
@@ -100,7 +99,7 @@ def ast_columns_are_bytes():
     return _ast_columns_are_bytes
 
 
-def decorator_name(decorator: ast.AST) -> Optional[str]:
+def decorator_name(decorator: ast.AST) -> str | None:
     """
     The name a decorator expression is applied under: ``X`` for ``@X``, ``@X(...)``, ``@m.X`` and ``@m.X(...)``.
     """
@@ -113,7 +112,7 @@ def decorator_name(decorator: ast.AST) -> Optional[str]:
     return None
 
 
-def dotted_name(expression: ast.AST) -> Optional[str]:
+def dotted_name(expression: ast.AST) -> str | None:
     """
     The dotted name an expression spells, ``i`` for ``i`` and ``jakarta.inject`` for ``jakarta.inject``, or
     ``None`` when it is not a name.
@@ -157,7 +156,7 @@ def takes_target_directly(function: ast.FunctionDef) -> bool:
     return len(positional) - len(arguments.defaults) == 1
 
 
-def source_file_for_import(source_root: str, package_name: str, level: int, module_name: Optional[str]) -> Optional[str]:
+def source_file_for_import(source_root: str, package_name: str, level: int, module_name: str | None) -> str | None:
     """
     The source file of the module an import statement names, when it belongs to the source root.
     """
@@ -200,17 +199,21 @@ class AnnotationFunctionScanner:
     """
 
     def __init__(self, callback_get_class_element, package_name: str = '', source_root: str = '',
-                 cache: Optional[Dict[str, Dict[str, bool]]] = None, loading: Optional[Set[str]] = None):
+                 cache: dict | None = None, loading: set | None = None,
+                 import_files: dict | None = None):
         self.callback_get_class_element = callback_get_class_element
         self.package_name = package_name or ''
         self.source_root = source_root or ''
         # name -> whether a bare application passes the target directly
-        self.annotation_functions: Dict[str, bool] = {}
-        self.annotation_type_targets: Set[str] = set()
-        self._cache: Dict[str, Dict[str, bool]] = {} if cache is None else cache
-        self._loading: Set[str] = set() if loading is None else loading
+        self.annotation_functions: dict = {}
+        self.annotation_type_targets: set = set()
+        self._cache: dict = {} if cache is None else cache
+        self._loading: set = set() if loading is None else loading
+        # (source root, package, level, module) -> the source file an import names, or None: the
+        # file system is asked once per compilation, not once per importing module
+        self._import_files = {} if import_files is None else import_files
 
-    def scan(self, module: ast.Module) -> Dict[str, bool]:
+    def scan(self, module: ast.Module) -> dict:
         for statement in module.body:
             if isinstance(statement, ast.ImportFrom):
                 self._scan_import(statement)
@@ -243,14 +246,19 @@ class AnnotationFunctionScanner:
                             and _AnnotationTypes.targetsAnnotationType(class_element)):
                         self.annotation_type_targets.add(bound_name)
                     continue
-            module_file = source_file_for_import(self.source_root, self.package_name, statement.level, statement.module)
+            import_key = (self.source_root, self.package_name, statement.level, statement.module)
+            if import_key in self._import_files:
+                module_file = self._import_files[import_key]
+            else:
+                module_file = source_file_for_import(self.source_root, self.package_name, statement.level, statement.module)
+                self._import_files[import_key] = module_file
             if module_file is None:
                 continue
             functions = self._module_annotation_functions(module_file)
             if alias.name in functions:
                 self.annotation_functions[bound_name] = functions[alias.name]
 
-    def _module_annotation_functions(self, module_file: str) -> Dict[str, bool]:
+    def _module_annotation_functions(self, module_file: str) -> dict:
         key = os.path.abspath(module_file)
         cached = self._cache.get(key)
         if cached is not None:
@@ -267,7 +275,8 @@ class AnnotationFunctionScanner:
                 package_name_of_source_file(self.source_root, module_file),
                 self.source_root,
                 self._cache,
-                self._loading
+                self._loading,
+                self._import_files
             )
             names = scanner.scan(module)
         except (OSError, SyntaxError, ValueError):
@@ -302,7 +311,7 @@ class MicronautTransformer(ast.NodeTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, strip_java_interface_bases=False,
-                 package_name='', source_root='', python_source_dirs=None, facades: Optional[FacadeRegistry] = None, source_path=None, source_text=None):
+                 package_name='', source_root='', python_source_dirs=None, facades: FacadeRegistry | None = None, source_path=None, source_text=None, caches=None):
         """
         Initialize the transformer.
 
@@ -319,6 +328,9 @@ class MicronautTransformer(ast.NodeTransformer):
         """
         self.callback_get_class_element = callback_get_class_element
         self.callback_get_class_elements = callback_get_class_elements
+        # the lookups shared by the modules of one compilation: the annotation functions of the
+        # modules they import, the files their imports name, the nested types of the annotations
+        self._caches = caches if caches is not None else {}
         self.strip_java_interface_bases = strip_java_interface_bases
         self.package_name = package_name or ''
         self.source_root = source_root or ''
@@ -328,7 +340,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.generated_decorators = set()
         # Names bound to custom annotation functions, and whether a bare application passes them the target:
         # like the generated decorators, a bare @Ann is @Ann() unless Ann takes the target directly
-        self.annotation_functions: Dict[str, bool] = {}
+        self.annotation_functions: dict = {}
         self.generated_decorator_code = {}
         self.java_class_imports = {}
         self.java_interface_names = set()
@@ -349,7 +361,7 @@ class MicronautTransformer(ast.NodeTransformer):
         self.uses_java_base = False
         self.facades = facades
         # names bound to a facade at run time (``from pyronaut import http``) -> the facade
-        self.facade_bindings: Dict[str, str] = {}
+        self.facade_bindings: dict = {}
 
     def _span_of(self, node):
         """
@@ -611,7 +623,10 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         """
         Record the names the module binds to custom annotation functions before its imports are rewritten.
         """
-        scanner = AnnotationFunctionScanner(self.callback_get_class_element, self.package_name, self.source_root)
+        scanner = AnnotationFunctionScanner(
+            self.callback_get_class_element, self.package_name, self.source_root,
+            self._caches.setdefault("scan", {}), self._caches.setdefault("loading", set()), self._caches.setdefault("imports", {})
+        )
         self.annotation_functions.update(scanner.scan(node))
 
     def _java_interface_defaults_nodes(self):
@@ -819,7 +834,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             node
         )
 
-    def _get_decorator_name(self, decorator) -> Optional[str]:
+    def _get_decorator_name(self, decorator) -> str | None:
         """
         Extract the decorator name from an AST decorator node.
         """
@@ -1090,7 +1105,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def _track_java_keyword_method_aliases(self, variable_name: str):
         self.java_keyword_method_aliases[variable_name] = PYTHON_KEYWORD_METHOD_ALIASES
 
-    def _java_keyword_method_name(self, node: ast.Attribute) -> Optional[str]:
+    def _java_keyword_method_name(self, node: ast.Attribute) -> str | None:
         if not isinstance(node.ctx, ast.Load):
             return None
         if not node.attr.endswith('_'):
@@ -1113,7 +1128,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
     def _is_java_interface_base(self, base: ast.AST) -> bool:
         return self._java_interface_base_name(base) is not None
 
-    def _java_interface_base_name(self, base: ast.AST) -> Optional[str]:
+    def _java_interface_base_name(self, base: ast.AST) -> str | None:
         """The Java name of a base that is a Java interface, or None for any other base."""
         class_name = self._java_type_name(base)
         if class_name:
@@ -1175,7 +1190,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             class_element = self._tracked_java_class_element(base)
         return _JavaTypes.isThrowable(class_element)
 
-    def _java_class_name(self, base: ast.AST) -> Optional[str]:
+    def _java_class_name(self, base: ast.AST) -> str | None:
         """The binary name of a Java class base (not an interface, not a throwable), or None."""
         class_name = self._java_type_name(base)
         class_element = self.callback_get_class_element(class_name) if class_name else None
@@ -1239,7 +1254,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             keywords=[]
         )
 
-    def _java_base_helper_nodes(self) -> List[ast.AST]:
+    def _java_base_helper_nodes(self) -> list:
         """The module-level function resolving the Python base standing in for a Java class."""
         return ast.parse(f'''
 def {self.JAVA_BASE_HELPER}(name):
@@ -1247,7 +1262,7 @@ def {self.JAVA_BASE_HELPER}(name):
     return java.type('io.micronaut.context.python.PythonJavaBases').baseClass(java.type(name))
 ''').body
 
-    def _java_type_name(self, node: ast.AST) -> Optional[str]:
+    def _java_type_name(self, node: ast.AST) -> str | None:
         if not isinstance(node, ast.Call):
             return None
         func = node.func
@@ -1265,7 +1280,7 @@ def {self.JAVA_BASE_HELPER}(name):
             return arg.value
         return None
 
-    def _base_name(self, base: ast.AST) -> Optional[str]:
+    def _base_name(self, base: ast.AST) -> str | None:
         if isinstance(base, ast.Subscript):
             return self._base_name(base.value)
         if isinstance(base, ast.Name):
@@ -1317,7 +1332,7 @@ def {self.JAVA_BASE_HELPER}(name):
 
         return []
 
-    def _star_imported_class_names(self, java_module_name: str) -> List[str]:
+    def _star_imported_class_names(self, java_module_name: str) -> list:
         """
         The simple names of the top-level, non-annotation classes a star import of the package binds.
         """
@@ -1342,7 +1357,7 @@ def {self.JAVA_BASE_HELPER}(name):
         """
         return _AnnotationTypes.targetsAnnotationType(class_element)
 
-    def _generate_decorator_from_class_element(self, class_element, import_name: str) -> Optional[str]:
+    def _generate_decorator_from_class_element(self, class_element, import_name: str) -> str | None:
         """
         Generate the Python decorator standing for a Java annotation type, including decorators for its
         meta-annotations, and register it under the annotation's own name.
@@ -1350,14 +1365,14 @@ def {self.JAVA_BASE_HELPER}(name):
         annotation_name = class_element.getName()
         return self._generate_decorator(class_element, import_name, annotation_name, with_meta_annotations=True)
 
-    def _generate_decorator_from_class_element_with_name(self, class_element, import_name: str, custom_annotation_name: str) -> Optional[str]:
+    def _generate_decorator_from_class_element_with_name(self, class_element, import_name: str, custom_annotation_name: str) -> str | None:
         """
         Generate the decorator for an annotation type referenced from another annotation's members, registered
         under the name that member uses; meta-annotations are not mirrored on it.
         """
         return self._generate_decorator(class_element, import_name, custom_annotation_name, with_meta_annotations=False)
 
-    def _generate_decorator(self, class_element, decorator_name: str, annotation_name: str, with_meta_annotations: bool) -> Optional[str]:
+    def _generate_decorator(self, class_element, decorator_name: str, annotation_name: str, with_meta_annotations: bool) -> str | None:
         if decorator_name in self.generated_decorators:
             return None
         self.generated_decorators.add(decorator_name)
@@ -1499,7 +1514,7 @@ def {decorator_name}({param_signature}):
     def _same_annotation_name(self, left: str, right: str) -> bool:
         return left == right or left.replace('$', '.') == right.replace('$', '.')
 
-    def _get_annotation_parameters(self, class_element) -> Dict[str, str]:
+    def _get_annotation_parameters(self, class_element) -> dict:
         """
         Analyze annotation class to determine parameters and generate function signature.
         """
@@ -1513,7 +1528,7 @@ def {decorator_name}({param_signature}):
 '''
         }
 
-    def _get_repeatable_name(self, annotation_metadata, class_element) -> Optional[str]:
+    def _get_repeatable_name(self, annotation_metadata, class_element) -> str | None:
         """
         The container annotation name of a repeatable annotation, or None; answered by the Java side.
         """
@@ -1606,11 +1621,17 @@ except Exception:
         The types nested in an annotation, each with the facts the generated members need; one
         Java call instead of a walk over the annotation's members from Python.
         """
-        try:
-            return list(_AnnotationTypes.nestedTypes(class_element, self.callback_get_class_element))
-        except Exception as e:
-            warnings.warn(f"Error generating nested members for {class_element.getName()}: {e}")
-            return []
+        cache = self._caches.setdefault("nested", {})
+        name = class_element.getName()
+        nested = cache.get(name)
+        if nested is None:
+            try:
+                nested = list(_AnnotationTypes.nestedTypes(class_element, self.callback_get_class_element))
+            except Exception as e:
+                warnings.warn(f"Error generating nested members for {name}: {e}")
+                nested = []
+            cache[name] = nested
+        return nested
 
     def _to_binary_nested_name(self, parent_name: str, nested_name: str) -> str:
         if '$' in nested_name:
@@ -1717,13 +1738,13 @@ except Exception:
 
 
 
-    def get_generated_decorator_code(self) -> Dict[str, str]:
+    def get_generated_decorator_code(self) -> dict:
         """
         Get the generated decorator code as a dictionary mapping decorator name to code.
         """
         return self.generated_decorator_code
 
-    def get_exported_types(self) -> List[str]:
+    def get_exported_types(self) -> list:
         """
         Get the list of types (classes/functions) that have Micronaut decorators.
         """
@@ -1762,7 +1783,7 @@ class MicronautRuntimeTransformer(MicronautTransformer):
     """
 
     def __init__(self, callback_get_class_element, callback_get_class_elements, missing_decorator_code=None,
-                 package_name='', source_root='', facades: Optional[FacadeRegistry] = None):
+                 package_name='', source_root='', facades: FacadeRegistry | None = None):
         super().__init__(callback_get_class_element, callback_get_class_elements, True, package_name, source_root,
                          facades=facades)
         if missing_decorator_code:
@@ -1780,16 +1801,16 @@ class MicronautRuntimeTransformer(MicronautTransformer):
         self.imported_java_interface_names = set()
         # The annotation names of the Java packages imported as modules, by the name the package is bound to
         # (``import jakarta.inject as i`` -> ``i``): applied qualified, as @i.Singleton, never bare
-        self.package_decorators: Dict[str, Set[str]] = {}
+        self.package_decorators: dict = {}
         # The names the module defines or assigns itself: they shadow the names a star import binds
-        self.locally_bound_names: Set[str] = set()
+        self.locally_bound_names: set = set()
         # The names bound by the statements following each star import (by the id of the import statement): as
         # in Python, a star import rebinds the names defined before it and is shadowed by those defined after it
-        self.names_bound_after_star_import: Dict[int, Set[str]] = {}
+        self.names_bound_after_star_import: dict = {}
 
     def visit_Module(self, node: ast.Module) -> ast.Module:
         self.scan_annotation_functions(node)
-        bound_after: Set[str] = set()
+        bound_after: set = set()
         for statement in reversed(node.body):
             if isinstance(statement, ast.ImportFrom) and any(alias.name == '*' for alias in statement.names):
                 self.names_bound_after_star_import[id(statement)] = set(bound_after)
@@ -1962,7 +1983,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if names:
             self.package_decorators.setdefault(bound_name, set()).update(names)
 
-    def _package_annotation_names(self, java_module: str) -> Set[str]:
+    def _package_annotation_names(self, java_module: str) -> set:
         return {
             str(class_element.getSimpleName())
             for class_element in self.callback_get_class_elements(java_module) or []
@@ -2033,7 +2054,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                 return None
         return self.generic_visit(node)
 
-    def _java_type_assignment_name(self, node: ast.Assign) -> Optional[str]:
+    def _java_type_assignment_name(self, node: ast.Assign) -> str | None:
         if len(node.targets) != 1 or not isinstance(node.targets[0], ast.Name):
             return None
         if self._java_type_name(node.value):

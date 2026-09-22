@@ -106,6 +106,15 @@ class _ModuleRecord:
         self.script = None     # the ScriptDef of the module, once modelled: the generated class of its functions and attributes
         self.visitor = None    # the MicronautAstVisitor that modelled the module: locations and name bindings
         self.span_of = lambda node: None
+        self._class_index = None
+        self._class_count = -1
+
+    def class_index(self):
+        """The classes of the module by name, built once the modelling is over and shared by every check."""
+        if self._class_index is None or self._class_count != len(self.classes):
+            self._class_index = {class_def.name(): class_def for class_def, _ in self.classes}
+            self._class_count = len(self.classes)
+        return self._class_index
 
 
 class TypeChecker:
@@ -180,12 +189,17 @@ class TypeChecker:
         """
         self.facts = TypeFacts(visitor_context)
         self.python_classes = PythonClasses(self)
+        self.inference = {}
+        self._annotation_views = {}
         for unit in self.units():
             if unit.severity is None or unit.node is None:
                 continue
             DecoratorRules(self, unit).check()
             if unit.function_def is not None:
-                JavaReceiverRules(self, unit).check()
+                rules = JavaReceiverRules(self, unit)
+                rules.check()
+                # what the check inferred, for the static planner: the same inference, not a second run
+                self.inference[id(unit.node)] = rules
         return list(self.diagnostics)
 
     def rules_of(self, model, function_def, function_node):
@@ -238,6 +252,16 @@ class TypeChecker:
         if first.kind in (JAVA, PY, BUILTIN) and first.name != "none":
             return first.as_nullable() if any(typed.nullable for typed in returned) else first
         return None
+
+    def annotation_view(self, name):
+        """The description of an annotation and its targets as a list, asked of the Java facts once per compilation."""
+        views = self.__dict__.setdefault("_annotation_views", {})
+        view = views.get(name)
+        if view is None:
+            description = self.facts.describeAnnotation(name)
+            view = (description, list(description.targets()) if description is not None else [])
+            views[name] = view
+        return view
 
     def report(self, unit, rule, message, span, suggestions=()):
         """Record a finding of a rule at the severity of the unit it was found in."""
@@ -353,12 +377,12 @@ class DecoratorRules:
 
     def check(self):
         definition = self.unit.function_def if self.unit.function_def is not None else self.unit.class_def
-        nodes = list(getattr(self.unit.node, "decorator_list", ()))
+        nodes = self._decorator_nodes_by_position(getattr(self.unit.node, "decorator_list", ()))
         for decorator in definition.decorators():
             node = self._decorator_node(decorator, nodes)
             if node is None:
                 continue
-            description = self.facts.describeAnnotation(self._annotation_name(decorator))
+            description, targets = self.checker.annotation_view(self._annotation_name(decorator))
             if description is None:
                 # a plain Python decorator (dataclass, property, a function of the application)
                 continue
@@ -368,7 +392,6 @@ class DecoratorRules:
                              f"[{description.name()}] is not an annotation and cannot decorate {self.kind} [{self.unit.qualified_name}]",
                              node)
                 continue
-            targets = list(description.targets())
             if targets and not self._targets_allow(targets, description):
                 self._report("decorator-target",
                              f"@{simple_name} cannot be applied to {self.kind} [{self.unit.qualified_name}]; its targets are [{', '.join(targets)}]",
@@ -445,12 +468,6 @@ class DecoratorRules:
         # a method-targeted around or introduction binding on a class advises all of its methods
         return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
 
-    def _targets_allow(self, targets, description):
-        if any(target in self.targets for target in targets):
-            return True
-        # a method-targeted around or introduction binding on a class advises all of its methods
-        return self.kind == "class" and description.interceptorBinding() and "METHOD" in targets
-
     def _annotation_name(self, decorator):
         """
         The qualified name a decorator resolves to. A bare name the module bound with java.type()
@@ -462,16 +479,20 @@ class DecoratorRules:
             return getattr(visitor, "java_type_assignments", {}).get(name, name)
         return name
 
-    def _decorator_node(self, decorator, nodes):
-        """The AST decorator expression a DecoratorDef came from, matched by its location."""
-        span = decorator.span()
-        if span is None:
-            return None
+    def _decorator_nodes_by_position(self, nodes):
+        """The decorator expressions of the definition by (line, column): each located once."""
+        by_position = {}
         for node in nodes:
             node_span = self.span_of(node)
-            if node_span is not None and node_span.line() == span.line() and node_span.column() == span.column():
-                return node
-        return None
+            if node_span is not None:
+                by_position.setdefault((node_span.line(), node_span.column()), node)
+        return by_position
+
+    @staticmethod
+    def _decorator_node(decorator, nodes):
+        """The AST decorator expression a DecoratorDef came from, matched by its location."""
+        span = decorator.span()
+        return None if span is None else nodes.get((span.line(), span.column()))
 
     def _report(self, rule, message, node, suggestions=()):
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
@@ -598,7 +619,7 @@ class Bindings:
         self.facts = checker.facts
         self.unit = unit
         self.visitor = unit.module.visitor
-        self.classes = {class_def.name(): class_def for class_def, _ in unit.module.classes}
+        self.classes = unit.module.class_index()
         script = getattr(unit.module, "script", None)
         self.module_attributes = {attribute.name(): attribute for attribute in script.attributes()} if script is not None else {}
         self.locals = {}
@@ -1208,8 +1229,9 @@ class JavaReceiverRules:
         return ", ".join("?" if argument is None else argument.label() for argument in argument_types)
 
     def _report(self, rule, message, node, suggestions=()):
+        # the problems are kept in both modes: the static planner reads them off a reporting run too
+        self.problems.append((rule, message, self.span_of(node)))
         if self.silent:
-            self.problems.append((rule, message, self.span_of(node)))
             return
         self.checker.report(self.unit, rule, message, self.span_of(node), suggestions)
 
