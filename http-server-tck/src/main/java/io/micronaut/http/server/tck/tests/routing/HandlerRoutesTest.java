@@ -30,6 +30,8 @@ import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.client.multipart.MultipartBody;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -43,9 +45,12 @@ import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
+import java.util.function.Supplier;
 
 /**
  * Routes to handler functions, declared by {@link HttpRoutes} beans or published at runtime by a
@@ -175,6 +180,47 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void urlEncodedFormIsReadIntoFormData() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms/7", "name=Fred&age=42&tag=a&tag=b")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("7 Fred 43 [a, b] no-file")
+                .build());
+        }
+    }
+
+    @Test
+    void multipartFormIsReadIntoFormData() throws IOException {
+        try (ServerUnderTest server = server()) {
+            MultipartBody body = MultipartBody.builder()
+                .addPart("name", "Fred")
+                .addPart("age", "42")
+                .addPart("tag", "a")
+                .addPart("avatar", "avatar.txt", MediaType.TEXT_PLAIN_TYPE, "picture".getBytes(StandardCharsets.UTF_8))
+                .build();
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms/8", body).contentType(MediaType.MULTIPART_FORM_DATA_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("8 Fred 43 [a] avatar.txt=picture")
+                .build());
+        }
+    }
+
+    @Test
+    void missingOrInvalidFormFieldIsABadRequest() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms/7", "age=42")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms/7", "name=Fred&age=old")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+        }
+    }
+
+    @Test
     void runtimeRoutesUseHandlers() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/fn-dynamic/x"), HttpResponseAssertion.builder()
@@ -195,6 +241,22 @@ public class HandlerRoutesTest {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
 
+    /**
+     * Completes on an executor of the application, like a service call would: the filter chain
+     * then continues on that thread.
+     */
+    private static <T> CompletableFuture<T> completeLater(ExecutorService executor, Supplier<T> value) {
+        return CompletableFuture.supplyAsync(value, executor);
+    }
+
+    private static byte[] bytes(CompletedFileUpload upload) {
+        try {
+            return upload.getBytes();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
     private static HttpResponse<?> append(HttpRequest<?> request, String step) {
         request.setAttribute(TRACE, request.getAttribute(TRACE, String.class).orElse("") + "," + step);
         return null;
@@ -211,14 +273,14 @@ public class HandlerRoutesTest {
     static class Routes {
         @Singleton
         @Named("fn")
-        HttpRoutes fnRoutes() {
+        HttpRoutes fnRoutes(@Named("handler-filter") ExecutorService executor) {
             return routes -> {
                 routes.GET("/fn/hello/{name}", (request, pathVariables) ->
                     HttpResponse.ok("Hello " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
                 routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
-                    CompletableFuture.supplyAsync(() -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
+                    completeLater(executor, () -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
                 routes.GET("/fn/guarded", (request, pathVariables) -> HttpResponse.ok("guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before(request -> "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.unauthorized());
                 routes.GET("/fn/trace", (request, pathVariables) -> HttpResponse.ok(request.getAttribute(TRACE, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
@@ -227,15 +289,22 @@ public class HandlerRoutesTest {
                     .after((request, response) -> response.getHeaders().set("X-Trace", "after1"))
                     .after((request, response) -> response.getHeaders().set("X-Trace", response.getHeaders().get("X-Trace") + ",after2"));
                 routes.GET("/fn/async-guarded", (request, pathVariables) -> HttpResponse.ok("async guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .beforeAsync(request -> CompletableFuture.supplyAsync(() ->
+                    .beforeAsync(request -> completeLater(executor, () ->
                         "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.status(HttpStatus.FORBIDDEN)))
-                    .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Async-After", "true")));
+                    .afterAsync((request, response) -> completeLater(executor, () -> response.header("X-Async-After", "true")));
                 routes.GET("/fn/filter-executor", (request, pathVariables) ->
                         HttpResponse.ok(request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before("handler-filter", request -> {
                         request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
                         return null;
                     });
+                routes.POST("/fn/forms/{id}", (request, pathVariables, form) -> {
+                    String file = form.findFile("avatar")
+                        .map(upload -> upload.getFilename() + "=" + new String(bytes(upload), StandardCharsets.UTF_8))
+                        .orElse("no-file");
+                    return HttpResponse.ok(pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
+                        + " " + form.getValues("tag") + " " + file).contentType(MediaType.TEXT_PLAIN_TYPE);
+                });
                 routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");
                 });

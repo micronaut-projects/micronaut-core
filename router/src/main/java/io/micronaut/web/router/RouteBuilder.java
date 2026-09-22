@@ -509,6 +509,48 @@ public interface RouteBuilder {
     }
 
     /**
+     * Route a {@code POST} request with a submitted form to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute POST(String uri, FormRequestHandler handler) {
+        return handleForm(HttpMethod.POST, uri, handler);
+    }
+
+    /**
+     * Route a {@code PUT} request with a submitted form to a handler function.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute PUT(String uri, FormRequestHandler handler) {
+        return handleForm(HttpMethod.PUT, uri, handler);
+    }
+
+    /**
+     * Route requests with a submitted form, {@code application/x-www-form-urlencoded} or
+     * {@code multipart/form-data}, to a handler function that receives the whole form as
+     * {@link FormData}. The route consumes both form media types.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    @Experimental
+    default UriRoute handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
+        throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
      * Route requests to a handler function that completes the response later. The executor is
      * selected like for a controller method returning a {@code CompletionStage}.
      *
