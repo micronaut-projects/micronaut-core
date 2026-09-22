@@ -35,6 +35,7 @@ import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ProxyBeanDefinition;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
@@ -580,6 +581,152 @@ public interface RouteBuilder {
     @Experimental
     default UriRoute handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         throw new UnsupportedOperationException("Handler routes are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Route a {@code GET} request to a handler function that completes the response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    @Experimental
+    default UriRoute asyncGET(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.GET, uri, handler);
+    }
+
+    /**
+     * Route a {@code POST} request to a handler function that completes the response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    @Experimental
+    default UriRoute asyncPOST(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.POST, uri, handler);
+    }
+
+    /**
+     * Route a {@code PUT} request to a handler function that completes the response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    @Experimental
+    default UriRoute asyncPUT(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.PUT, uri, handler);
+    }
+
+    /**
+     * Route a {@code PATCH} request to a handler function that completes the response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    @Experimental
+    default UriRoute asyncPATCH(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.PATCH, uri, handler);
+    }
+
+    /**
+     * Route a {@code DELETE} request to a handler function that completes the response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     */
+    @Experimental
+    default UriRoute asyncDELETE(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.DELETE, uri, handler);
+    }
+
+    /**
+     * Route requests of several HTTP methods to one handler function: a route per method, which
+     * the returned route configures together.
+     *
+     * @param methods The HTTP methods
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     * @see #handle(HttpMethod, String, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handle(Set<HttpMethod> methods, String uri, RequestHandler handler) {
+        if (methods.isEmpty()) {
+            throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        List<UriRoute> routes = new ArrayList<>(methods.size());
+        for (HttpMethod method : methods) {
+            routes.add(handle(method, uri, handler));
+        }
+        return routes.size() == 1 ? routes.get(0) : new MultiMethodUriRoute(routes);
+    }
+
+    /**
+     * Route requests of several HTTP methods to one handler function that completes the response
+     * later.
+     *
+     * @param methods The HTTP methods
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     * @see #handle(Set, String, RequestHandler)
+     */
+    @Experimental
+    default UriRoute handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler) {
+        if (methods.isEmpty()) {
+            throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        List<UriRoute> routes = new ArrayList<>(methods.size());
+        for (HttpMethod method : methods) {
+            routes.add(handleAsync(method, uri, handler));
+        }
+        return routes.size() == 1 ? routes.get(0) : new MultiMethodUriRoute(routes);
+    }
+
+    /**
+     * Handle the exceptions of a type, and of its subtypes, with a handler function, like an
+     * {@code @Error(global = true)} method: it answers requests to controller routes and handler
+     * routes that fail with such an exception.
+     *
+     * @param type    The type of the exception
+     * @param handler The handler
+     * @param <E>     The type of the exception
+     * @return The error route
+     * @since 5.3.0
+     */
+    @Experimental
+    default <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+        throw new UnsupportedOperationException("Error handler functions are not supported by " + getClass().getName());
+    }
+
+    /**
+     * Handle the responses of a status with a handler function, like an
+     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}.
+     *
+     * @param status  The status
+     * @param handler The handler
+     * @return The status route
+     * @since 5.3.0
+     */
+    @Experimental
+    default StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+        throw new UnsupportedOperationException("Status handler functions are not supported by " + getClass().getName());
     }
 
     /**

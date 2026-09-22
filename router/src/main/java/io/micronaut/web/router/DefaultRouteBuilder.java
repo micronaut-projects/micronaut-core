@@ -416,6 +416,20 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
     }
 
     @Override
+    public <E extends Throwable> ErrorRoute error(Class<E> type, ErrorRouteHandler<E> handler) {
+        DefaultErrorRoute errorRoute = new DefaultErrorRoute(type, handlerHandle(HandlerMethod.of(type, handler)), conversionService);
+        this.errorRoutes.add(errorRoute);
+        return errorRoute;
+    }
+
+    @Override
+    public StatusRoute status(HttpStatus status, StatusRouteHandler handler) {
+        DefaultStatusRoute statusRoute = new DefaultStatusRoute(status, handlerHandle(HandlerMethod.of(handler)), conversionService);
+        this.statusRoutes.add(statusRoute);
+        return statusRoute;
+    }
+
+    @Override
     public UriRoute handle(RouteDeclaration route, RequestHandler handler) {
         return declare(route, HandlerMethod.of(handler), null);
     }
