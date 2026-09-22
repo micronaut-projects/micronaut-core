@@ -349,6 +349,17 @@ public sealed interface Ir {
     }
 
     /**
+     * A read of an injected attribute of a module: a bean the module's generated class holds in a
+     * static field, set when the bean is injected.
+     *
+     * @param owner The generated class of the module
+     * @param name  The attribute
+     * @param type  The Java type of the bean
+     */
+    record ModuleAttribute(String owner, String name, String type) implements Expression {
+    }
+
+    /**
      * A construction of a Java object with a chosen constructor.
      *
      * @param type           The class

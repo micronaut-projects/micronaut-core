@@ -697,6 +697,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         self.current_script_decorators
                     ).withSpan(self._module_span())
                     self.callback.apply(script_def)
+                    if self.type_checker is not None:
+                        self.type_checker.set_script(self.source_path, script_def)
 
                     # Reset script state
                     self.current_script = None

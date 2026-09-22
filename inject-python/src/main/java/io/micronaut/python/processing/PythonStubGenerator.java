@@ -3219,8 +3219,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
             for (PropertyElement beanProperty : beanProperties) {
                 if (beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
-                    // scripts rely on polyglot value; keep old behavior
-                    addSetterScript(beanProperty, builder, pythonValue);
+                    // the injected bean is a member of the module, and a static field of the
+                    // generated class for the compiled bodies of the module's functions
+                    FieldDef injected = injectedField(builder, beanProperty, propertySourceType(beanProperty));
+                    addSetterScript(beanProperty, builder, pythonValue, thisType.getStaticField(injected.getName(), injected.getType()));
                 }
 
                 if (beanProperty.hasStereotype(Bean.class) || beanProperty.hasStereotype(AnnotationUtil.INJECT)) {
@@ -4391,13 +4393,96 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * The statically compiled body of a method of the class being generated, when the plan holds
      * one for a bridge that can carry it: a plain instance method with its own signature.
      */
-    private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model) {
-        if (model == null || spec.junit5Test() || spec.script() || spec.introduced() || spec.returnTypeOverride() != null
+    private static Ir.@Nullable CompiledBody compiledBody(BridgeMethodSpec spec, @Nullable ClassStubModel model, VisitorContext context) {
+        if (spec.junit5Test() || spec.introduced() || spec.returnTypeOverride() != null
             || spec.signatureMethod() != spec.method() || spec.method().isStatic() || isAsyncPythonMethod(spec.method())) {
             return null;
         }
-        StaticCompilationPlan plan = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get();
-        return plan == null ? null : plan.body(model.element().getName(), spec.method().getName());
+        if (model == null && !spec.script()) {
+            return null;
+        }
+        StaticCompilationPlan plan = staticCompilationPlan(context);
+        // a module-level function is a method of the module's generated class
+        String className = model != null ? model.element().getName() : spec.owner().getName();
+        return plan == null ? null : plan.body(className, spec.method().getName());
+    }
+
+    /**
+     * @param context The visitor context
+     * @return The static compilation plan of the run, or {@code null} when none was made
+     */
+    static @Nullable StaticCompilationPlan staticCompilationPlan(VisitorContext context) {
+        return context instanceof PythonVisitorContext pythonVisitorContext
+            ? pythonVisitorContext.getProcessingEnvironment().staticCompilationPlan().get()
+            : null;
+    }
+
+    /**
+     * How the compiled body of a module-level function reaches Python objects: the module's
+     * generated class has no {@code self}; the objects of the compilation the body holds are
+     * reached through their own Python objects.
+     */
+    private StaticBodyGenerator.SelfAccess scriptSelfAccess(VisitorContext context) {
+        return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
+                throw new IllegalStateException("A module-level function has no self to read [" + property + "] of");
+            }
+
+            @Override
+            public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
+                throw new IllegalStateException("A module-level function has no self to call [" + name + "] on");
+            }
+
+            @Override
+            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                return invokePython(context, value, name, arguments, typeName, type);
+            }
+
+            @Override
+            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+                ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
+                return convertPythonValue(context, member, typeName, type, Optional.empty());
+            }
+
+            @Override
+            public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
+                throw new IllegalStateException("A module-level function has no self to write [" + property + "] of");
+            }
+        };
+    }
+
+    /**
+     * The access of a compiled body of a module served by a context pool: the planner compiles
+     * such a body only when it reaches no Python object, so nothing here is ever called.
+     */
+    static StaticBodyGenerator.SelfAccess pooledScriptAccess() {
+        return new StaticBodyGenerator.SelfAccess() {
+            @Override
+            public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
+                throw new IllegalStateException("A body of a pooled module reaches no Python object");
+            }
+
+            @Override
+            public ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct) {
+                throw new IllegalStateException("A body of a pooled module reaches no Python object");
+            }
+
+            @Override
+            public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+                throw new IllegalStateException("A body of a pooled module reaches no Python object");
+            }
+
+            @Override
+            public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
+                throw new IllegalStateException("A body of a pooled module reaches no Python object");
+            }
+
+            @Override
+            public StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor) {
+                throw new IllegalStateException("A body of a pooled module reaches no Python object");
+            }
+        };
     }
 
     /**
@@ -4448,18 +4533,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             @Override
             public ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor) {
                 ExpressionDef member = self.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
-                return convertPythonValue(model, member, typeName, type, propertyElement(model, property));
+                return convertPythonValue(model.context(), member, typeName, type, propertyElement(model, property));
             }
 
             @Override
             public ExpressionDef readOf(ExpressionDef value, String property, String typeName, TypeDef type) {
                 ExpressionDef member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(property));
-                return convertPythonValue(model, member, typeName, type, Optional.empty());
+                return convertPythonValue(model.context(), member, typeName, type, Optional.empty());
             }
 
             @Override
             public ExpressionDef invokeOn(ExpressionDef value, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
-                return invokePython(model, value, name, arguments, typeName, type);
+                return invokePython(model.context(), value, name, arguments, typeName, type);
             }
 
             @Override
@@ -4467,7 +4552,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 if (direct) {
                     return stub.invoke(name, parameterTypes, type, arguments);
                 }
-                return invokePython(model, self, name, arguments, typeName, type);
+                return invokePython(model.context(), self, name, arguments, typeName, type);
             }
 
             @Override
@@ -4482,7 +4567,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * so its interceptors, its overrides and its default arguments apply; the result converted by a
      * converter so the method is invoked once.
      */
-    private ExpressionDef invokePython(ClassStubModel model, ExpressionDef target, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
+    private ExpressionDef invokePython(VisitorContext context, ExpressionDef target, String name, List<ExpressionDef> arguments, String typeName, TypeDef type) {
         List<ExpressionDef> boxed = new ArrayList<>(arguments.size());
         for (ExpressionDef argument : arguments) {
             boxed.add(boxForPython(argument));
@@ -4491,7 +4576,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (TypeDef.VOID.equals(type) || type instanceof TypeDef.Primitive) {
             // converted by one call on the result: the invocation is evaluated once
             ExpressionDef result = PYTHON_INVOCATION.invokeStatic("invokePythonMethod", POLYGLOT_VALUE, target, ExpressionDef.constant(name), pythonArguments);
-            return TypeDef.VOID.equals(type) ? result : convertPythonValue(model, result, typeName, type, Optional.empty());
+            return TypeDef.VOID.equals(type) ? result : convertPythonValue(context, result, typeName, type, Optional.empty());
         }
         // a reference conversion reads its value more than once (a null check first): the
         // result is handed to a converter, so the method is invoked once
@@ -4501,7 +4586,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .returns(TypeDef.OBJECT)
             .build();
         MethodDef implementation = MethodDef.override(convertMethod)
-            .build((aThis, methodParameters) -> convertPythonValue(model, methodParameters.get(0), typeName, type, Optional.empty()).returning());
+            .build((aThis, methodParameters) -> convertPythonValue(context, methodParameters.get(0), typeName, type, Optional.empty()).returning());
         ExpressionDef converter = new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
         return PYTHON_STATIC.invokeStatic("invoke", TypeDef.OBJECT, target, ExpressionDef.constant(name), pythonArguments, converter).cast(type);
     }
@@ -4521,15 +4606,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * A Python value converted to the Java type a compiled body uses for it: as a property of that
      * type is converted, when one is known, else by the type.
      */
-    private ExpressionDef convertPythonValue(ClassStubModel model, ExpressionDef member, String typeName, TypeDef type, Optional<PropertyElement> element) {
+    private ExpressionDef convertPythonValue(VisitorContext context, ExpressionDef member, String typeName, TypeDef type, Optional<PropertyElement> element) {
         if (element.isPresent()) {
             return convertValueForType(element.get().getGenericType(), member);
         }
         if (!(type instanceof TypeDef.Primitive) && !ClassTypeDef.STRING.equals(type)) {
             // a Java or Python object: converted as a property of that type is converted
-            Optional<ClassElement> propertyType = model.context().getClassElement(typeName.replace('$', '.'));
+            Optional<ClassElement> propertyType = context.getClassElement(typeName.replace('$', '.'));
             if (propertyType.isEmpty()) {
-                propertyType = model.context().getClassElement(typeName);
+                propertyType = context.getClassElement(typeName);
             }
             if (propertyType.isPresent()) {
                 return convertValueForType(propertyType.get(), member);
@@ -4778,15 +4863,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         int receiverOffset = parameters.length - parameterDefs.size();
 
         boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
-        Ir.CompiledBody compiledBody = compiledBody(spec, model);
+        Ir.CompiledBody compiledBody = compiledBody(spec, model, visitorContext);
         if (compiledBody != null && compiledBody.parameterNames().size() == parameterDefs.size()) {
             // the body runs as Java: no crossing into Python for callers of the stub
             if (compiledBody.span() != null) {
                 methodBuilder.addJavadoc("Compiled from " + compiledBody.span().location());
             }
-            boolean trace = model.pythonVisitorContext().getProcessingEnvironment().staticCompilationPlan().get().trace();
+            boolean trace = staticCompilationPlan(visitorContext).trace();
             builder.addMethod(methodBuilder.build((aThis, methodParameters) ->
-                StaticBodyGenerator.generate(compiledBody, methodParameters, selfAccess(model, aThis), trace)));
+                StaticBodyGenerator.generate(compiledBody, methodParameters, model != null ? selfAccess(model, aThis) : scriptSelfAccess(visitorContext), trace)));
             return;
         }
         builder.addMethod(methodBuilder
@@ -6051,7 +6136,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue) {
+    /**
+     * The static field of a script class holding an injected attribute of the module.
+     *
+     * @param builder      The script class
+     * @param beanProperty The injected attribute
+     * @param type         The Java type of the bean
+     * @return The field
+     */
+    static FieldDef injectedField(ClassDef.ClassDefBuilder builder, PropertyElement beanProperty, TypeDef type) {
+        FieldDef field = FieldDef.builder(StaticBodyGenerator.injectedField(beanProperty.getName()))
+            .ofType(type)
+            .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.VOLATILE)
+            .build();
+        builder.addField(field);
+        return field;
+    }
+
+    private static void addSetterScript(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef pythonValue, VariableDef.StaticField injected) {
         TypeDef returnType = beanProperty.getWriteMethod()
             .map(MethodElement::getReturnType)
             .map(TypeDef::of).orElse(TypeDef.VOID);
@@ -6079,10 +6181,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 TypeDef.VOID,
                 parameters
             );
+            StatementDef remember = new StatementDef.PutStaticField(injected, methodParameters.getFirst());
             if (returnType.equals(TypeDef.VOID)) {
-                return result;
+                return StatementDef.multi(remember, result);
             } else {
                 return StatementDef.multi(
+                    remember,
                     result,
                     ExpressionDef.nullValue().returning()
                 );

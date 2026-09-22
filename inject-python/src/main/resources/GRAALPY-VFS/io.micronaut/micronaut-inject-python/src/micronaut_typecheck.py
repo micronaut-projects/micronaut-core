@@ -103,6 +103,7 @@ class _ModuleRecord:
         self.decorators = []
         self.classes = []      # (class_def, node)
         self.functions = []    # (function_def, node)
+        self.script = None     # the ScriptDef of the module, once modelled: the generated class of its functions and attributes
         self.visitor = None    # the MicronautAstVisitor that modelled the module: locations and name bindings
         self.span_of = lambda node: None
 
@@ -142,6 +143,10 @@ class TypeChecker:
     def add_module(self, source_path, decorators):
         """Record the annotations applied at module level, which switch the whole module."""
         self._module(source_path).decorators = list(decorators or ())
+
+    def set_script(self, source_path, script_def):
+        """Record the script modelled for the module: the generated class its functions become methods of."""
+        self._module(source_path).script = script_def
 
     # ---------------------------------------------------------------- pass two
 
@@ -594,6 +599,8 @@ class Bindings:
         self.unit = unit
         self.visitor = unit.module.visitor
         self.classes = {class_def.name(): class_def for class_def, _ in unit.module.classes}
+        script = getattr(unit.module, "script", None)
+        self.module_attributes = {attribute.name(): attribute for attribute in script.attributes()} if script is not None else {}
         self.locals = {}
         self.unknown_locals = set()
         self._parameters()
@@ -648,7 +655,10 @@ class Bindings:
         return typed
 
     def of_name(self, name, instance=False):
-        """The type a (possibly qualified) name denotes in the module: a class, or None."""
+        """The type a (possibly qualified) name denotes in the module: a class, a hinted module attribute's value, or None."""
+        if name in self.module_attributes:
+            hint = self.module_attributes[name].typeName()
+            return self.of_hint(hint) if hint is not None else None
         if name in self.classes:
             return Typed(PY if instance else PY_REF, self.classes[name])
         local_class = self.visitor._resolve_local_type_name(name) if self.visitor is not None else None

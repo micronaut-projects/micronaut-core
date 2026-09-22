@@ -38,7 +38,7 @@ Body, Local, Assign, PutSelf, If, Return, Eval = (_ir(n) for n in ("Body", "Loca
 While, ForRange, ForEach, Break, Continue, Throw, Try, Catch = (_ir(n) for n in ("While", "ForRange", "ForEach", "Break", "Continue", "Throw", "Try", "Catch"))
 Const, Param, LocalRef, SelfProperty = (_ir(n) for n in ("Const", "Param", "LocalRef", "SelfProperty"))
 InvokeJava, NewJava, StaticField, Field, InvokeSibling = (_ir(n) for n in ("InvokeJava", "NewJava", "StaticField", "Field", "InvokeSibling"))
-InvokePython, PythonMember = (_ir(n) for n in ("InvokePython", "PythonMember"))
+InvokePython, PythonMember, ModuleAttribute = (_ir(n) for n in ("InvokePython", "PythonMember", "ModuleAttribute"))
 Binary, Unary, Compare, And, Or, Conditional, Truthy, StrJoin, Helper, Cast = (
     _ir(n) for n in ("Binary", "Unary", "Compare", "And", "Or", "Conditional", "Truthy", "StrJoin", "Helper", "Cast"))
 
@@ -295,7 +295,8 @@ class Lowering:
         if self.reasons:
             return None
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
-        return CompiledBody(self.class_def.qualifiedName(), self.function_def.name(), parameter_names, parameter_types,
+        owner = self.class_def.qualifiedName() if self.class_def is not None else self.module.script.qualifiedName()
+        return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
                             return_type, body, self.function_def.span(), stats, self.checked)
 
     def _shadow_reassigned_parameters(self):
@@ -1166,6 +1167,16 @@ class Lowering:
         if constant is not None:
             # a module-level literal (ROLE_USER = "user"), of this module or imported from another: inlined
             return constant
+        attribute = self._module_attribute(name)
+        if attribute is not None:
+            # an injected bean of the module: a static field of the module's generated class
+            if not any(decorator.annotationName().rsplit(".", 1)[-1] == "Inject" for decorator in attribute.decorators()):
+                self._refuse("unknown-type", f"the module attribute [{name}] is not an injected bean; only the injected beans of a module have a static lowering", node)
+            hint = attribute.typeName()
+            stub_type = self._stub_type(self.bindings.of_hint(hint) if hint is not None else None, hint, node)
+            read = ModuleAttribute(self.module.script.qualifiedName(), name, stub_type)
+            used = JAVA_NUMBERS.get(stub_type, stub_type)
+            return Cast(read, used) if used != stub_type else read
         typed = self._typed(node)
         self._value_type(typed, node)  # a class, a module or a callable refuses with its reason
         self._refuse("unknown-type", f"[{name}] has no static lowering", node)
@@ -1179,6 +1190,16 @@ class Lowering:
         value = values[name]
         if value is None or isinstance(value, (bool, int, float, str)):
             return self._constant(ast.copy_location(ast.Constant(value=value), node))
+        return None
+
+    def _module_attribute(self, name):
+        """The hinted attribute of the module of the name, or None."""
+        script = getattr(self.module, "script", None)
+        if script is None:
+            return None
+        for attribute in script.attributes():
+            if attribute.name() == name:
+                return attribute
         return None
 
     def _attribute(self, node):
