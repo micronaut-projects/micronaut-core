@@ -224,10 +224,11 @@ public class PythonAstParserTest {
         }
     }
 
-    @Test
-    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
-        PythonAstParser pythonProcessor = new PythonAstParser();
-        VisitorContext visitorContext = (VisitorContext) Proxy.newProxyInstance(
+    /**
+     * A visitor context resolving the given Java class and nothing else.
+     */
+    private static VisitorContext visitorContextResolving(Class<?> resolvable) {
+        return (VisitorContext) Proxy.newProxyInstance(
             VisitorContext.class.getClassLoader(),
             new Class<?>[] { VisitorContext.class },
             (proxy, method, args) -> {
@@ -242,8 +243,8 @@ public class PythonAstParserTest {
                 if ("getClassElement".equals(method.getName())
                     && args != null
                     && args.length == 1
-                    && "java.security.Principal".equals(args[0])) {
-                    return Optional.of(ClassElement.of(java.security.Principal.class));
+                    && resolvable.getName().equals(args[0])) {
+                    return Optional.of(ClassElement.of(resolvable));
                 }
                 if ("getClassElements".equals(method.getName())) {
                     return ClassElement.ZERO_CLASS_ELEMENTS;
@@ -260,6 +261,76 @@ public class PythonAstParserTest {
                 return null;
             }
         );
+    }
+
+    @Test
+    void testRuntimeTransformKeepsJavaInterfaceBaseOfClassesDefinedInsideFunctions() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContextResolving(java.security.Principal.class), """
+            from dataclasses import dataclass
+            from java.security import Principal
+
+            class ModulePrincipal(Principal):
+                def getName(self) -> str:
+                    return "module"
+
+            def adapter():
+                class LocalPrincipal(Principal):
+                    def getName(self) -> str:
+                        return "local"
+                return LocalPrincipal()
+
+            def with_parameters(name):
+                class NamedPrincipal(Principal):
+                    def __init__(self, name):
+                        self.name = name
+
+                    def getName(self) -> str:
+                        return self.name
+                return NamedPrincipal(name)
+
+            class Outer:
+                def method(self):
+                    class MethodPrincipal(Principal):
+                        def getName(self) -> str:
+                            return "method"
+                    return MethodPrincipal()
+
+            def parameterized():
+                class TypedPrincipal(Principal[str]):
+                    def getName(self) -> str:
+                        return "typed"
+                return TypedPrincipal()
+
+            def decorated():
+                @dataclass
+                class DataPrincipal(Principal):
+                    name: str
+
+                    def getName(self) -> str:
+                        return self.name
+                return DataPrincipal("data")
+            """);
+
+        String runtimeCode = transformResult.runtimeCode();
+        // a module-level class is stripped of the interface: its generated Java class implements it
+        assertTrue(runtimeCode.contains("@_micronaut_java_interface_defaults('java.security.Principal')\nclass ModulePrincipal:"));
+        // a class defined inside a function keeps the interface: GraalPy's host adapter implements it
+        assertTrue(runtimeCode.contains("    class LocalPrincipal(Principal):"));
+        assertTrue(runtimeCode.contains("        class MethodPrincipal(Principal):"));
+        assertFalse(runtimeCode.contains("_micronaut_java_interface_defaults('java.security.Principal')\n    class LocalPrincipal"));
+        // a class with constructor parameters cannot be an adapter (the adapter constructor takes none): stripped
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    class NamedPrincipal:"));
+        // a type argument has no run time meaning: the raw interface is the base of the adapter
+        assertTrue(runtimeCode.contains("    class TypedPrincipal(Principal):"));
+        // a decorator may generate the constructor (@dataclass): stripped as before
+        assertTrue(runtimeCode.contains("    @_micronaut_java_interface_defaults('java.security.Principal')\n    @dataclass\n    class DataPrincipal:"));
+    }
+
+    @Test
+    void testRuntimeTransformAddsFutureAnnotationsBeforeGeneratedCode() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = visitorContextResolving(java.security.Principal.class);
         PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
             "module docs"
             from java.security import Principal

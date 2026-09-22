@@ -24,4 +24,19 @@ class PythonDescribable(Describable):
 
 On the Python side the instance is a plain Python object: `isinstance`, `==` and `is` behave as for any Python class, whether the object is injected into another Python bean, looked up with `ApplicationContext.getBean` or created with the class itself. The default methods of the interface (and of the interfaces it extends) that the class does not override are available on it all the same. Calling one runs the Java default implementation on the Java view of the object, so the calls a default implementation makes to other interface methods reach the Python definitions.
 
-Only interfaces can be implemented this way: a Python class cannot extend a concrete Java class.
+A Python class extends a Java class, abstract or concrete, as described in <<extendingJavaClasses, Extending Java Classes>>.
+
+== Classes Defined Inside Functions
+
+A class defined inside a function (a factory function, a test method) has no generated Java class. It keeps the Java interface as its base, and the GraalPy host adapter implements the interface: its instances are Java objects of the interface, so a Java method overloaded on several interfaces, such as `subscribe(Subscriber)` next to `subscribe(Consumer)` of a reactive publisher, accepts them, `isinstance(obj, Interface)` is `True`, and the default methods of the interface are inherited.
+
+snippet::micronaut.docs.javabases.LocalEventListenerSpec[tags="imports,factory,publish", indent=0, title="Implementing a Java interface inside a function"]
+
+<1> The class is defined inside a function and keeps the interface as its base
+<2> Its instances are Java objects implementing the interface
+<3> A Java method overloaded on other interfaces accepts the instance
+
+A type argument of the base (`class Sub(Subscriber[str])`) is dropped at run time; the raw interface is the base of the adapter.
+
+The adapter passes the constructor arguments on to the Java constructor, which an interface has none of, and cannot combine the interface with another base. A class defined inside a function that declares an `__init__` with parameters, that is decorated (a decorator such as `@dataclass` may generate the constructor), or that has more than one base, is therefore a plain Python object as described above: Java receives a proxy of the interface, which suffices for a Java method that is not overloaded on other interfaces.
+
