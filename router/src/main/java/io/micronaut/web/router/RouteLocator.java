@@ -21,8 +21,16 @@ import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.filter.GenericHttpFilter;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteCaptures;
+import io.micronaut.http.uri.RoutePattern;
+import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.RouteTemplateSegment;
+import io.micronaut.http.uri.RouteTemplateVariable;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
+import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.builder.AsyncLocatorHandler;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.web.router.builder.HandlerMethod;
@@ -138,6 +146,19 @@ public final class RouteLocator {
             return new String[]{"/", TEMPLATE_SUFFIX};
         }
         return new String[]{normalized, normalized + TEMPLATE_SUFFIX};
+    }
+
+    /**
+     * The template of a locator route whose prefix is a template of an engine other than the
+     * Micronaut one: the prefix, and optionally a slash followed by the rest of the path. The
+     * router composes it, since the language of the engine may have no variable for the rest of
+     * a path. It has the facts of the prefix, and the variable of the rest of the path.
+     *
+     * @param prefix The prefix, parsed, nested or mounted by its engine
+     * @return The template of the locator route
+     */
+    static ParsedRouteTemplate prefixTemplate(ParsedRouteTemplate prefix) {
+        return new PrefixTemplate(prefix);
     }
 
     /**
@@ -601,6 +622,120 @@ public final class RouteLocator {
         @Override
         public Map<String, UriMatchVariable> getVariableMap() {
             return variableMap;
+        }
+    }
+
+    /**
+     * The template of a locator route of an engine other than the Micronaut one, see
+     * {@link #prefixTemplate(ParsedRouteTemplate)}.
+     */
+    static final class PrefixTemplate implements ParsedRouteTemplate {
+        private final ParsedRouteTemplate prefix;
+        private final RouteTemplate template;
+        private final List<RouteTemplateVariable> variables;
+
+        PrefixTemplate(ParsedRouteTemplate prefix) {
+            this.prefix = prefix;
+            RouteTemplate prefixTemplate = prefix.template();
+            String expression = prefixTemplate.expression();
+            while (expression.endsWith("/")) {
+                expression = expression.substring(0, expression.length() - 1);
+            }
+            // for display and identity only: it is not parsed again
+            this.template = RouteTemplate.of(prefixTemplate.engineId(), expression + TEMPLATE_SUFFIX);
+            List<RouteTemplateVariable> all = new ArrayList<>(prefix.variables());
+            all.add(new RouteTemplateVariable(REMAINDER, true, RouteTemplateVariable.Location.PATH, false));
+            this.variables = List.copyOf(all);
+        }
+
+        /**
+         * @return The matcher: the matcher of the prefix, which the engine prepares, applied to
+         * the longest part of the path it matches that ends before a slash or at the end
+         */
+        RoutePattern pattern() {
+            RoutePattern prefixPattern = RouteTemplateEngines.defaults().matcher(prefix);
+            PrefixTemplate self = this;
+            return new RoutePattern() {
+                @Override
+                public ParsedRouteTemplate template() {
+                    return self;
+                }
+
+                @Override
+                public @Nullable RouteCaptures match(String path) {
+                    String normalized = UriTemplateMatcher.normalizeForMatching(path);
+                    if (normalized.isEmpty()) {
+                        normalized = "/";
+                    }
+                    int end = normalized.length();
+                    while (true) {
+                        RouteCaptures captures = prefixPattern.match(end == 0 ? "/" : normalized.substring(0, end));
+                        if (captures != null) {
+                            List<@Nullable String> values = new ArrayList<>(captures.values());
+                            values.add(end >= normalized.length() ? null : normalized.substring(end + 1));
+                            return new RouteCaptures(normalized, variables, values);
+                        }
+                        if (end == 0) {
+                            return null;
+                        }
+                        end = normalized.lastIndexOf('/', end - 1);
+                        if (end < 0) {
+                            return null;
+                        }
+                    }
+                }
+            };
+        }
+
+        @Override
+        public RouteTemplate template() {
+            return template;
+        }
+
+        @Override
+        public String engineVersion() {
+            return prefix.engineVersion();
+        }
+
+        @Override
+        public List<RouteTemplateVariable> variables() {
+            return variables;
+        }
+
+        @Override
+        public String requiredPrefix() {
+            return prefix.requiredPrefix();
+        }
+
+        @Override
+        public int rawLength() {
+            return prefix.rawLength();
+        }
+
+        @Override
+        public int pathVariableCount() {
+            return prefix.pathVariableCount();
+        }
+
+        @Override
+        public int patternVariableCount() {
+            return prefix.patternVariableCount();
+        }
+
+        @Override
+        public @Nullable List<RouteTemplateSegment> pathSegments() {
+            List<RouteTemplateSegment> segments = prefix.pathSegments();
+            if (segments == null) {
+                return null;
+            }
+            List<RouteTemplateSegment> result = new ArrayList<>(segments);
+            result.add(RouteTemplateSegment.ANY);
+            return result;
+        }
+
+        @Override
+        public String toString() {
+            return template.toString();
         }
     }
 }

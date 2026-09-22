@@ -21,6 +21,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
@@ -264,6 +265,32 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
                     grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
                 }
             }
+        }
+    }
+
+    @Override
+    public final <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
+        locate(prefixTemplate, new RouteLocator(locator, tables));
+    }
+
+    private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
+        Objects.requireNonNull(prefixTemplate, "prefix");
+        if (prefixTemplate.isMicronaut()) {
+            locate(prefixTemplate.expression(), locator);
+            return;
+        }
+        checkOpen();
+        RoutePrefix routePrefix = prefix;
+        if (routePrefix != null) {
+            throw new IllegalArgumentException("The locator prefix " + prefixTemplate.expression() + " of the route template engine '"
+                + prefixTemplate.engineId() + "' cannot be declared in the route group with the prefix " + routePrefix
+                + ": the prefix of a group is joined to Micronaut URI templates only. Declare it outside the group, or in a group without a prefix");
+        }
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
+        for (RouteAssembly.DefaultUriRoute route : assembly.addLocatorRoutes(prefixTemplate, DEFAULT_CONSUMES, target)) {
+            // the routes of the target decide which media types they consume and produce
+            // the located route carries the filters of the groups of the locator route
+            grouped(route.settings()).consumesAll();
         }
     }
 
