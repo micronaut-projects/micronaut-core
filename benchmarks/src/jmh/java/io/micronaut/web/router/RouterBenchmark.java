@@ -12,6 +12,7 @@ import io.micronaut.inject.BeanDefinitionReference;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.web.router.naming.HyphenatedUriNamingStrategy;
+import io.micronaut.web.router.spi.RoutePlan;
 import org.openjdk.jmh.annotations.Benchmark;
 import org.openjdk.jmh.annotations.BenchmarkMode;
 import org.openjdk.jmh.annotations.Level;
@@ -38,8 +39,9 @@ import java.util.concurrent.TimeUnit;
  * Builds a router for generated controllers, and matches requests with it. Every controller has
  * ten routes (fourteen with the implicit {@code HEAD} routes).
  *
- * <p>{@code RUNTIME} derives the routes from the bean definitions, as without
- * {@code @PrecompiledHttpRoutes}. {@code PRECOMPILED} uses the routes generated at compile time.
+ * <p>{@code RUNTIME} derives the routes from the bean definitions, as without the route compiler.
+ * {@code COMPILED} uses the route plans the route compiler generated for the controllers: their
+ * slots and parsers.
  */
 @State(Scope.Benchmark)
 @BenchmarkMode(Mode.AverageTime)
@@ -49,12 +51,12 @@ public class RouterBenchmark {
     @Param({"1", "10", "100"})
     int controllers;
 
-    @Param({"RUNTIME", "PRECOMPILED"})
+    @Param({"RUNTIME", "COMPILED"})
     String mode;
 
     private ApplicationContext context;
     private Collection<BeanDefinition<Object>> definitions;
-    private List<PrecompiledHttpRoutesDefinition> precompiled;
+    private List<RoutePlan> plans;
     private DefaultRouter router;
     private HttpRequest<?>[] requests;
     private int next;
@@ -65,13 +67,6 @@ public class RouterBenchmark {
         for (int i = 0; i < controllers; i++) {
             sources.add(source("test.Controller" + i, controller(i)));
         }
-        sources.add(source("test.Application", """
-            package test;
-
-            @io.micronaut.web.router.annotation.PrecompiledHttpRoutes
-            class Application {
-            }
-            """));
         List<JavaFileObject> files = new ArrayList<>();
         try (JavaParser parser = new JavaParser()) {
             // the output is cleared when the parser is closed
@@ -112,9 +107,12 @@ public class RouterBenchmark {
         definitions = context.getBeanDefinitions(Qualifiers.byStereotype(Controller.class)).stream()
             .filter(definition -> definition.getBeanType().getPackageName().equals("test"))
             .toList();
-        precompiled = mode.equals("PRECOMPILED")
-            ? List.of((PrecompiledHttpRoutesDefinition) classLoader.loadClass("test.$Application$PrecompiledHttpRoutes").getDeclaredConstructor().newInstance())
-            : List.of();
+        plans = new ArrayList<>();
+        if (mode.equals("COMPILED")) {
+            for (int i = 0; i < controllers; i++) {
+                plans.add((RoutePlan) classLoader.loadClass("test.$Controller" + i + "$RoutePlan").getDeclaredConstructor().newInstance());
+            }
+        }
         router = buildRouter();
 
         requests = new HttpRequest<?>[64];
@@ -142,7 +140,7 @@ public class RouterBenchmark {
 
     @Benchmark
     public DefaultRouter buildRouter() {
-        AnnotatedMethodRouteBuilder builder = new AnnotatedMethodRouteBuilder(context, new HyphenatedUriNamingStrategy(), ConversionService.SHARED, precompiled);
+        AnnotatedMethodRouteBuilder builder = new AnnotatedMethodRouteBuilder(context, new HyphenatedUriNamingStrategy(), ConversionService.SHARED, plans);
         for (BeanDefinition<Object> definition : definitions) {
             builder.process(definition, context);
         }
