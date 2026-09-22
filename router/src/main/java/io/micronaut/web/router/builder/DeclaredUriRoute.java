@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.MediaType;
@@ -111,6 +112,11 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute consumesAll() {
         return configure(HandlerUriRoute::consumesAll);
+    }
+
+    @Override
+    public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+        return configure(r -> r.annotationMetadata(annotationMetadata));
     }
 
     @Override

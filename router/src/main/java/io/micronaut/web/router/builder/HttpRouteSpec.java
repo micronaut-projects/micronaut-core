@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 
@@ -50,6 +51,18 @@ public interface HttpRouteSpec {
      * @return The route
      */
     HttpRouteSpec produces(MediaType... mediaTypes);
+
+    /**
+     * Give the route annotations: the features that read the annotations of the matched route,
+     * such as security rules, versioning, filter binding and the message body writers, see them
+     * as if they were on a controller method, and so does the return type of the route. Typically
+     * they are the annotations of the bean method the handler implements, from its
+     * {@link io.micronaut.inject.ExecutableMethod}.
+     *
+     * @param annotationMetadata The annotations of the route
+     * @return The route
+     */
+    HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata);
 
     /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It

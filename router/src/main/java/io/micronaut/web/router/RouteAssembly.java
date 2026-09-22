@@ -47,6 +47,7 @@ import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.AsyncRouteRequestFilter;
 import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
+import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -838,6 +839,15 @@ public final class RouteAssembly {
         }
 
         @Override
+        public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
+            }
+            handlerMethod.annotationMetadata(annotationMetadata);
+            return this;
+        }
+
+        @Override
         public HandlerUriRoute executeOn(String executorName) {
             this.executeOn = Objects.requireNonNull(executorName, "executorName");
             this.nonBlocking = false;
@@ -857,7 +867,13 @@ public final class RouteAssembly {
         @Override
         public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
             Objects.requireNonNull(filter, "filter");
-            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
+            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(request -> {
+                try {
+                    return filter.filter(request);
+                } catch (Exception e) {
+                    return ExceptionUtils.sneakyThrow(e);
+                }
+            }));
             return this;
         }
 
@@ -874,7 +890,13 @@ public final class RouteAssembly {
         @Override
         public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
             Objects.requireNonNull(filter, "filter");
-            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
+            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter((request, response) -> {
+                try {
+                    return filter.filter(request, response);
+                } catch (Exception e) {
+                    return ExceptionUtils.sneakyThrow(e);
+                }
+            }));
             return this;
         }
 

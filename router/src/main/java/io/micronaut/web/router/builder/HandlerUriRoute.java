@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 
@@ -54,6 +55,13 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#executeOn(String)
      */
     HandlerUriRoute executeOn(String executorName);
+
+    /**
+     * @param annotationMetadata The annotations of the route
+     * @return The route
+     * @see HttpRouteSpec#annotationMetadata(AnnotationMetadata)
+     */
+    HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata);
 
     /**
      * @return The route

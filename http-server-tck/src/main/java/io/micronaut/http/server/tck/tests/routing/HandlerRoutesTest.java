@@ -15,9 +15,12 @@
  */
 package io.micronaut.http.server.tck.tests.routing;
 
+import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -36,6 +39,8 @@ import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
+import io.micronaut.inject.annotation.MutableAnnotationMetadata;
+import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.builder.FormPart;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteDeclaration;
@@ -51,6 +56,8 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -122,6 +129,34 @@ public class HandlerRoutesTest {
                 .status(HttpStatus.CREATED)
                 .body("{\"saved\":\"apple later\"}")
                 .build());
+        }
+    }
+
+    @Test
+    void handlerRouteHasTheAnnotationsOfTheMethodItImplements() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // a filter that reads the annotations of the matched route, and of its return type, sees them
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/annotated"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("annotated")
+                .headers(Map.of("X-Marked", "from the bean method", "X-Return-Marked", "from the bean method"))
+                .build());
+        }
+    }
+
+    @Test
+    void nullableBodyIsNullWithoutABody() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String path : List.of("/fn/nullable-body", "/fn/nullable-body-async")) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST(path, "text").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("body text")
+                    .build());
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST(path, null).contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("no body")
+                    .build());
+            }
         }
     }
 
@@ -612,6 +647,14 @@ public class HandlerRoutesTest {
             return routes -> {
                 routes.GET("/fn/hello/{name}", (request, pathVariables) ->
                     HttpResponse.ok("Hello " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                MutableAnnotationMetadata nullable = new MutableAnnotationMetadata();
+                nullable.addDeclaredAnnotation(AnnotationUtil.NULLABLE, Map.of());
+                routes.POST("/fn/nullable-body", Argument.of(String.class, "body", nullable), (request, pathVariables, body) ->
+                    HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
+                    .consumesAll();
+                routes.asyncPOST("/fn/nullable-body-async", Argument.of(String.class, "body", nullable), (request, pathVariables, body) ->
+                    completeLater(executor, () -> HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE)))
+                    .consumesAll();
                 routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
                 routes.asyncPOST("/fn/async-items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
@@ -788,6 +831,54 @@ public class HandlerRoutesTest {
 
         private static HttpResponse<?> threadName() {
             return HttpResponse.ok(Thread.currentThread().getName()).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+    }
+
+    @Retention(RetentionPolicy.RUNTIME)
+    @interface Marked {
+        String value();
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class MarkedTarget {
+        @Executable
+        @Marked("from the bean method")
+        String target() {
+            return "annotated";
+        }
+    }
+
+    /**
+     * A handler route that implements a bean method, with the annotations of the method.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class AnnotatedRoutes implements HttpRoutes {
+        private final BeanContext beanContext;
+        private final MarkedTarget target;
+
+        AnnotatedRoutes(BeanContext beanContext, MarkedTarget target) {
+            this.beanContext = beanContext;
+            this.target = target;
+        }
+
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            routes.GET("/fn/annotated", (request, pathVariables) -> HttpResponse.ok(target.target()).contentType(MediaType.TEXT_PLAIN_TYPE))
+                .annotationMetadata(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target").getAnnotationMetadata());
+        }
+    }
+
+    @ServerFilter("/fn/annotated")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class MarkedRouteFilter {
+        @ResponseFilter
+        void mark(RouteInfo<?> routeInfo, MutableHttpResponse<?> response) {
+            routeInfo.getAnnotationMetadata().stringValue(Marked.class).ifPresent(value -> response.header("X-Marked", value));
+            // like the return type of a method, the return type of the route has its annotations
+            routeInfo.getReturnType().asArgument().getAnnotationMetadata().stringValue(Marked.class)
+                .ifPresent(value -> response.header("X-Return-Marked", value));
         }
     }
 

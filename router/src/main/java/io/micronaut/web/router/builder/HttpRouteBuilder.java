@@ -140,6 +140,8 @@ public interface HttpRouteBuilder {
     /**
      * Route requests to a handler function that receives the body decoded to the given type, like
      * a controller method with a {@code @Body} argument.
+     * The body is required, unless the type is {@link Argument#isNullable() nullable}: then a
+     * request without a body is handled with {@code null}.
      *
      * @param method   The HTTP method
      * @param uri      The URI template
@@ -393,6 +395,7 @@ public interface HttpRouteBuilder {
      * Route requests to a handler function that receives the body decoded to the given type and
      * completes the response later: a {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}
      * route whose handler returns a {@code CompletionStage}.
+     * A {@link Argument#isNullable() nullable} body type is {@code null} without a body.
      *
      * @param method   The HTTP method
      * @param uri      The URI template

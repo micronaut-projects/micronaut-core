@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -208,6 +209,14 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         public HttpRouteSpec produces(MediaType... mediaTypes) {
             for (HandlerUriRoute route : routes) {
                 route.produces(mediaTypes);
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata) {
+            for (HandlerUriRoute route : routes) {
+                route.annotationMetadata(annotationMetadata);
             }
             return this;
         }

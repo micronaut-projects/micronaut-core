@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.reflect.ReflectionUtils;
@@ -34,6 +35,7 @@ import org.jspecify.annotations.Nullable;
 import java.lang.reflect.Method;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletionStage;
 import java.util.function.Supplier;
@@ -77,12 +79,27 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         false
     );
 
+    /**
+     * The metadata of a nullable {@code @Body} parameter: a request without a body is handled
+     * with {@code null}.
+     */
+    private static final AnnotationMetadata NULLABLE_BODY = new DefaultAnnotationMetadata(
+        Map.of(Body.class.getName(), Map.of(), AnnotationUtil.NULLABLE, Map.of()),
+        Map.of(Bindable.class.getName(), Map.of()),
+        Map.of(Bindable.class.getName(), Map.of()),
+        Map.of(Body.class.getName(), Map.of(), AnnotationUtil.NULLABLE, Map.of()),
+        Map.of(Bindable.class.getName(), List.of(Body.class.getName())),
+        false
+    );
+
     private final Object handler;
     private final Class<?> handlerType;
     private final Supplier<Method> method;
     private final Argument<?>[] arguments;
     private final ReturnType<R> returnType;
     private final Invoker<R> invoker;
+    private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+    private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
         this.handler = handler;
@@ -121,7 +138,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             handler,
             AsyncBodyRequestHandler.class,
             new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, BODY, bodyType.getTypeParameters())},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters())},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
@@ -154,7 +171,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             handler,
             BodyRequestHandler.class,
             new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, BODY, bodyType.getTypeParameters())},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters())},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
@@ -275,7 +292,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @Override
     public ReturnType<R> getReturnType() {
-        return returnType;
+        ReturnType<R> annotated = annotatedReturnType;
+        return annotated == null ? returnType : annotated;
     }
 
     @Override
@@ -296,7 +314,29 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @Override
     public AnnotationMetadata getAnnotationMetadata() {
-        return AnnotationMetadata.EMPTY_METADATA;
+        return annotationMetadata;
+    }
+
+    /**
+     * Give the route to the handler annotations, see {@link HttpRouteSpec#annotationMetadata}.
+     *
+     * @param annotationMetadata The annotations of the route
+     */
+    @Internal
+    public void annotationMetadata(AnnotationMetadata annotationMetadata) {
+        this.annotationMetadata = Objects.requireNonNull(annotationMetadata, "annotationMetadata");
+        // like the return type of a method, it has the annotations of the method
+        this.annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+    }
+
+    /**
+     * The metadata of the body argument of a handler.
+     *
+     * @param bodyType The body type
+     * @return {@code @Body}, and {@code @Nullable} if the type is nullable
+     */
+    private static AnnotationMetadata bodyMetadata(Argument<?> bodyType) {
+        return bodyType.isNullable() ? NULLABLE_BODY : BODY;
     }
 
     @Override
@@ -328,6 +368,41 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      *
      * @param <R> The result type
      */
+    /**
+     * The return type of a handler route that was given annotations.
+     *
+     * @param returnType         The return type of the handler
+     * @param annotationMetadata The annotations of the route
+     * @param <R>                The type
+     */
+    private record AnnotatedReturnType<R>(ReturnType<R> returnType, AnnotationMetadata annotationMetadata) implements ReturnType<R> {
+
+        @Override
+        public Class<R> getType() {
+            return returnType.getType();
+        }
+
+        @Override
+        public Argument<?>[] getTypeParameters() {
+            return returnType.getTypeParameters();
+        }
+
+        @Override
+        public Map<String, Argument<?>> getTypeVariables() {
+            return returnType.getTypeVariables();
+        }
+
+        @Override
+        public AnnotationMetadata getAnnotationMetadata() {
+            return annotationMetadata;
+        }
+
+        @Override
+        public Argument<R> asArgument() {
+            return Argument.of(getType(), annotationMetadata, getTypeParameters());
+        }
+    }
+
     @FunctionalInterface
     private interface Invoker<R> {
         R invoke(@Nullable Object[] arguments) throws Exception;
