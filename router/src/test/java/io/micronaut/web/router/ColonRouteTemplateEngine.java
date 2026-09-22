@@ -27,12 +27,14 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 /**
  * A route template language for tests only, registered with the service loader of the tests: a
  * segment {@code :name} is a variable of exactly one segment, and everything else, braces
  * included, is literal. {@code /items/{id:3}} is therefore literal text here, while it is a
- * variable of at most three characters for the Micronaut engine.
+ * variable of at most three characters for the Micronaut engine. A segment {@code :name(regex)}
+ * is a variable of one segment that matches the regular expression.
  */
 public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
 
@@ -70,9 +72,15 @@ public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
                 if (part.length() == 1) {
                     throw new IllegalArgumentException("A variable without a name: " + expression);
                 }
-                segments.add(new Segment(part.substring(1), true));
+                int open = part.indexOf('(');
+                if (open > 1 && part.endsWith(")")) {
+                    // :name(regex): a variable of one segment constrained by a regular expression
+                    segments.add(new Segment(part.substring(1, open), true, Pattern.compile(part.substring(open + 1, part.length() - 1))));
+                } else {
+                    segments.add(new Segment(part.substring(1), true, null));
+                }
             } else {
-                segments.add(new Segment(part, false));
+                segments.add(new Segment(part, false, null));
             }
         }
         return new Parsed(template, List.copyOf(segments));
@@ -96,7 +104,7 @@ public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
         List<Segment> segments = new ArrayList<>();
         for (String part : prefix.split("/")) {
             if (!part.isEmpty()) {
-                segments.add(new Segment(part, false));
+                segments.add(new Segment(part, false, null));
             }
         }
         segments.addAll(parsed.segments);
@@ -123,7 +131,7 @@ public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
                 for (int i = 0; i < parts.length; i++) {
                     Segment segment = parsed.segments.get(i);
                     if (segment.variable) {
-                        if (parts[i].isEmpty()) {
+                        if (parts[i].isEmpty() || segment.pattern != null && !segment.pattern.matcher(parts[i]).matches()) {
                             return null;
                         }
                         values.add(parts[i]);
@@ -136,7 +144,7 @@ public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
         };
     }
 
-    private record Segment(String text, boolean variable) {
+    private record Segment(String text, boolean variable, @Nullable Pattern pattern) {
     }
 
     private record Parsed(RouteTemplate template, List<Segment> segments) implements ParsedRouteTemplate {
@@ -185,6 +193,17 @@ public final class ColonRouteTemplateEngine implements RouteTemplateEngine {
         @Override
         public int pathVariableCount() {
             return variables().size();
+        }
+
+        @Override
+        public int patternVariableCount() {
+            int count = 0;
+            for (Segment segment : segments) {
+                if (segment.pattern != null) {
+                    count++;
+                }
+            }
+            return count;
         }
 
         @Override

@@ -260,7 +260,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Internal
     @Override
     public int getPatternVariableCount() {
-        return uriTemplateMatcher != null ? uriTemplateMatcher.getPatternVariableCount() : 0;
+        return uriTemplateMatcher != null ? uriTemplateMatcher.getPatternVariableCount() : parsedTemplate.patternVariableCount();
     }
 
     @Override

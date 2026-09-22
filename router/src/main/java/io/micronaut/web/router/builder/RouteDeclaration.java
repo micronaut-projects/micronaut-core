@@ -116,4 +116,19 @@ public interface RouteDeclaration {
     static RouteDeclaration of(HttpMethod httpMethod, RouteTemplate template) {
         return IndexedRouteDeclaration.of(httpMethod, template);
     }
+
+    /**
+     * Declare a route of a method by its name, including a custom HTTP method such as
+     * {@code PROPFIND}, with a template of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine engine}. A standard name maps to its
+     * {@link HttpMethod}; any other name to {@link HttpMethod#CUSTOM} with that name.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param template       The template
+     * @return The declaration
+     * @since 5.3.0
+     */
+    static RouteDeclaration of(String httpMethodName, RouteTemplate template) {
+        return IndexedRouteDeclaration.of(httpMethodName, template);
+    }
 }

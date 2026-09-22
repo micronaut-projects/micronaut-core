@@ -34,11 +34,13 @@ import java.util.Objects;
 @Internal
 final class EngineRouteDeclaration implements IndexedRouteDeclaration {
     private final HttpMethod httpMethod;
+    private final String httpMethodName;
     private final RouteTemplate template;
     private volatile @Nullable ParsedRouteTemplate parsed;
 
-    EngineRouteDeclaration(HttpMethod httpMethod, RouteTemplate template) {
+    EngineRouteDeclaration(HttpMethod httpMethod, String httpMethodName, RouteTemplate template) {
         this.httpMethod = Objects.requireNonNull(httpMethod, "httpMethod");
+        this.httpMethodName = Objects.requireNonNull(httpMethodName, "httpMethodName");
         this.template = Objects.requireNonNull(template, "template");
     }
 
@@ -54,6 +56,11 @@ final class EngineRouteDeclaration implements IndexedRouteDeclaration {
     @Override
     public HttpMethod httpMethod() {
         return httpMethod;
+    }
+
+    @Override
+    public String httpMethodName() {
+        return httpMethodName;
     }
 
     @Override
@@ -82,17 +89,22 @@ final class EngineRouteDeclaration implements IndexedRouteDeclaration {
     }
 
     @Override
+    public int patternVariableCount() {
+        return parsed().patternVariableCount();
+    }
+
+    @Override
     public boolean equals(Object o) {
-        return o instanceof EngineRouteDeclaration other && httpMethod == other.httpMethod && template.equals(other.template);
+        return o instanceof EngineRouteDeclaration other && httpMethod == other.httpMethod && httpMethodName.equals(other.httpMethodName) && template.equals(other.template);
     }
 
     @Override
     public int hashCode() {
-        return 31 * httpMethod.hashCode() + template.hashCode();
+        return 31 * (31 * httpMethod.hashCode() + httpMethodName.hashCode()) + template.hashCode();
     }
 
     @Override
     public String toString() {
-        return "EngineRouteDeclaration[httpMethod=" + httpMethod + ", template=" + template + ']';
+        return "EngineRouteDeclaration[httpMethod=" + httpMethodName + ", template=" + template + ']';
     }
 }

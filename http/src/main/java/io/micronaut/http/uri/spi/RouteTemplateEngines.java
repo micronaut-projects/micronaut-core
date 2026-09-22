@@ -198,6 +198,11 @@ public final class RouteTemplateEngines {
             if (parsed.pathVariableCount() < 0) {
                 problems.add("a negative path variable count");
             }
+            if (parsed.patternVariableCount() < 0) {
+                problems.add("a negative pattern variable count");
+            } else if (parsed.pathVariableCount() >= 0 && parsed.patternVariableCount() > parsed.pathVariableCount()) {
+                problems.add("a pattern variable count greater than the path variable count");
+            }
         }
         if (!problems.isEmpty()) {
             throw new IllegalStateException("The route template engine '" + engine.id() + "' described the template '"
