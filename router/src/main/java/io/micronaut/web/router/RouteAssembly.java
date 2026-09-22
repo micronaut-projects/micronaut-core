@@ -263,6 +263,38 @@ public final class RouteAssembly {
         return route;
     }
 
+    /**
+     * Add the routes of a locator whose prefix is a template of an engine other than the
+     * Micronaut one, one per standard HTTP method, see {@link RouteLocator}. The prefix is nested
+     * in the current parent route or mounted under the context path by its engine.
+     *
+     * @param prefix           The prefix
+     * @param mediaTypes       The media types the routes consume
+     * @param executableHandle The locator
+     * @return The routes
+     */
+    public List<DefaultUriRoute> addLocatorRoutes(RouteTemplate prefix, List<MediaType> mediaTypes, MethodExecutionHandle<Object, Object> executableHandle) {
+        RouteTemplateEngines engines = RouteTemplateEngines.defaults();
+        ParsedRouteTemplate parsed = engines.parse(prefix);
+        ParsedRouteTemplate composed = RouteLocator.prefixTemplate(currentParentRoute != null
+            ? engines.nest(currentParentRoute.template, parsed)
+            : mount(engines, parsed));
+        List<DefaultUriRoute> routes = new ArrayList<>(HttpMethod.values().length);
+        for (HttpMethod method : HttpMethod.values()) {
+            if (method == HttpMethod.CUSTOM) {
+                continue;
+            }
+            DefaultUriRoute route = new DefaultUriRoute(method, composed, mediaTypes, executableHandle, method.name(), conversionService);
+            if (currentParentRoute != null) {
+                currentParentRoute.nestedRoutes.add(route);
+            }
+            uriRoutes.add(route);
+            routeCreated.accept(route);
+            routes.add(route);
+        }
+        return routes;
+    }
+
     private ParsedRouteTemplate mount(RouteTemplateEngines engines, ParsedRouteTemplate parsed) {
         if (!mountKnown) {
             throw new IllegalArgumentException("The route template " + parsed.template() + " of the engine '" + parsed.engineId()
@@ -916,9 +948,15 @@ public final class RouteAssembly {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
-            RoutePattern pattern = uriMatchTemplate != null
-                ? MicronautRouteTemplateEngine.INSTANCE.matcher(template)
-                : RouteTemplateEngines.defaults().matcher(template);
+            RoutePattern pattern;
+            if (uriMatchTemplate != null) {
+                pattern = MicronautRouteTemplateEngine.INSTANCE.matcher(template);
+            } else if (template instanceof RouteLocator.PrefixTemplate prefix) {
+                // composed by the router, not by the engine
+                pattern = prefix.pattern();
+            } else {
+                pattern = RouteTemplateEngines.defaults().matcher(template);
+            }
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
