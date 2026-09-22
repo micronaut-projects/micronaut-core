@@ -227,6 +227,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return new DefaultUriRouteMatch<>(new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured), this, defaultCharset, conversionService);
     }
 
+    /**
+     * A match of this route located by a {@link RouteLocator}.
+     *
+     * @param matchInfo The match info with the variables of the prefixes and the target
+     * @return The match
+     */
+    UriRouteMatch<T, R> locatedMatch(UriMatchInfo matchInfo) {
+        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+    }
+
     @Override
     public @Nullable Integer getPort() {
         return port;

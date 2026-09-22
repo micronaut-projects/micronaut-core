@@ -131,6 +131,28 @@ public final class RouteTableFactory {
         return table(assembly, List.of(), List.of(() -> assembly));
     }
 
+    /**
+     * Build the route table of a target located by a locator route, see
+     * {@link io.micronaut.web.router.builder.HttpRouteBuilder#locate}: the URIs of its routes
+     * are relative to the prefix of the locator, not under the context path. The table does not
+     * depend on the target, which reaches the handlers through
+     * {@link io.micronaut.web.router.builder.PathVariables#locatedTarget()}: build it once per
+     * type of target.
+     *
+     * @param routes Declares the URI routes of the table, including other locator routes. Status
+     *               and error routes are not supported: they belong to the application router
+     * @return The table
+     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     * @since 5.3.0
+     */
+    public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {
+        Objects.requireNonNull(routes, "routes");
+        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, uri -> uri, route -> { });
+        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        assembly.addImplicitHeadRoutes();
+        return table(assembly, List.of(), List.of(() -> assembly));
+    }
+
     private static RouteTable table(RouteAssembly assembly, List<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         if (!assembly.statusRoutes().isEmpty() || !assembly.errorRoutes().isEmpty()) {
             throw new IllegalArgumentException("A route table can only declare URI routes, not filter, status or error routes");

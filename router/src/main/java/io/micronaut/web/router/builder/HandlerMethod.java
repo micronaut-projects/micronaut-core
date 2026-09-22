@@ -31,6 +31,7 @@ import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
@@ -267,6 +268,26 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{REQUEST},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0])
+        );
+    }
+
+    /**
+     * The target of a locator route: the router resolves the route to a route of the located
+     * target, so the method is never invoked.
+     *
+     * @param locator The locator
+     * @return The method
+     */
+    public static HandlerMethod<Object> of(RouteLocator locator) {
+        return new HandlerMethod<>(
+            locator,
+            RouteLocator.class,
+            new Class<?>[0],
+            new Argument<?>[0],
+            returnType(Object.class),
+            args -> {
+                throw new IllegalStateException("The router resolves a locator route to a route of the located target: " + locator);
+            }
         );
     }
 

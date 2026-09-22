@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Optional;
 import java.util.OptionalDouble;
@@ -365,5 +366,34 @@ public interface PathVariables {
      */
     default Optional<Boolean> findBoolean(String name) {
         return find(name, Boolean.class);
+    }
+
+    /**
+     * The target a locator returned for the route, see
+     * {@link HttpRouteBuilder#locate(String, LocatorHandler, java.util.function.Function)}: the
+     * innermost one when locators locate each other.
+     *
+     * @return The target, or {@code null} for a route that was not located
+     * @since 5.3.0
+     */
+    default @Nullable Object locatedTarget() {
+        return null;
+    }
+
+    /**
+     * The target a locator returned for the route, of a type.
+     *
+     * @param type The type of the target
+     * @param <T>  The type of the target
+     * @return The target
+     * @throws IllegalStateException if the route was not located, or the target is not of the type
+     * @since 5.3.0
+     */
+    default <T> T locatedTarget(Class<T> type) {
+        Object target = locatedTarget();
+        if (!type.isInstance(target)) {
+            throw new IllegalStateException("The located target is not a " + type.getName() + ": " + target);
+        }
+        return type.cast(target);
     }
 }

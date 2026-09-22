@@ -24,6 +24,8 @@ import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.RouteLocator;
+import io.micronaut.web.router.RouteTable;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -192,6 +194,20 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
     @Override
     public HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler) {
         return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
+    @Override
+    public void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+        Objects.requireNonNull(prefixUri, "prefixUri");
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(new RouteLocator(locator, tables)));
+        for (String template : RouteLocator.templates(prefixUri)) {
+            for (HttpMethod method : HttpMethod.values()) {
+                if (method != HttpMethod.CUSTOM) {
+                    // the routes of the target decide which media types they consume and produce
+                    assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).consumesAll();
+                }
+            }
+        }
     }
 
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {

@@ -20,10 +20,12 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.web.router.Route;
+import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 
 import java.util.Set;
+import java.util.function.Function;
 
 /**
  * Builds routes to handler functions: in an {@link HttpRoutes} bean, which adds them to the
@@ -481,6 +483,44 @@ public interface HttpRouteBuilder {
      * @see #handleFormStream(HttpMethod, String, StreamingFormRequestHandler)
      */
     HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler);
+
+    /**
+     * Route the requests under a prefix to the routes of a target located at runtime, like a
+     * JAX-RS sub-resource locator. The prefix, e.g. {@code /orders/{id}}, is matched for every
+     * standard HTTP method, followed by the rest of the path, which is empty or starts with a
+     * slash. When the router selects the locator route, it runs the locator, and matches the rest
+     * of the path, e.g. {@code /items/3} of {@code /orders/5/items/3}, with the routes of the
+     * table of the target: the request is handled by the route of that table, as if the table
+     * were the application routes, with the path variables of the prefix and of the route, and
+     * with the target, see {@link PathVariables#locatedTarget()}. A locator route of the table
+     * locates again, from the rest of the path.
+     *
+     * <pre>{@code
+     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(items -> {
+     *     items.GET("/items/{item}", (request, pathVariables) ->
+     *         HttpResponse.ok(pathVariables.locatedTarget(Order.class).item(pathVariables.getInt("item"))));
+     * });
+     * routes.locate("/orders/{id}", (request, pathVariables) -> orders.find(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>When the table has no route for the rest of the path, the request is answered like a
+     * request that no route of the table matches: {@code 404}, or {@code 405}, {@code 415} or
+     * {@code 406} if a route of the table matches the path with another method or media type.
+     * No other route of the application is tried. The filters of the matched route of the table
+     * apply, and the server filters apply to the full path.</p>
+     *
+     * <p>The locator runs while the request is matched, see {@link LocatorHandler}. Its tables
+     * are built with {@link io.micronaut.web.router.RouteTableFactory#buildLocatedHttpRoutes},
+     * whose URIs are relative to the prefix, and should be built once per type of target, not per
+     * request: the target reaches the handlers through {@link PathVariables#locatedTarget()}.
+     * Requests with a custom HTTP method are not located.</p>
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target, or answers {@code null} for {@code 404}
+     * @param tables    The route table of a located target
+     * @since 5.3.0
+     */
+    void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
 
     /**
      * A body type that is {@code null} when the request has no body, for the handlers that

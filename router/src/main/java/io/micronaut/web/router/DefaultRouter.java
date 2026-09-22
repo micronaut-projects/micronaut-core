@@ -77,6 +77,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * The routes of generated URL parsers, by the ordinal of their declarations.
      */
     private final CompiledRoutes[] compiledRoutes;
+    /**
+     * Whether a route is a locator route, see {@link RouteLocator}.
+     */
+    private final boolean hasLocators;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
@@ -129,6 +133,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         preMatchingAlwaysMatchesFilterRoutes = new ArrayList<>(10);
         preMatchingPreconditionFilterRoutes = new ArrayList<>(10);
         List<RouteSet> routeSets = new ArrayList<>(builders.size() + assembled.size());
+        boolean hasLocators = false;
         for (RouteBuilder builder : builders) {
             routeSets.add(new RouteSet(builder.getUriRoutes(), builder.getStatusRoutes(), builder.getErrorRoutes(), builder.getFilterRoutes(),
                 // precompiled controller routes and declared routes, built when first used
@@ -144,6 +149,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             for (UriRoute route : routeSet.uriRoutes()) {
                 HttpMethod httpMethod = route.getHttpMethod();
                 UriRouteInfo<Object, Object> uriRouteInfo = route.toRouteInfo();
+                hasLocators = hasLocators || RouteLocator.of(uriRouteInfo) != null;
                 if (httpMethod == HttpMethod.CUSTOM) {
                     String key = route.getHttpMethodName();
                     customRoutesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(uriRouteInfo);
@@ -215,6 +221,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             indexes.put(e.getKey(), indexRoutes(e.getValue()));
         }
         this.indexesByMethod = indexes;
+        this.hasLocators = hasLocators;
         this.compiledRoutes = compiled.isEmpty() ? new CompiledRoutes[0] : withExclusivity(compiled.values());
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
@@ -294,6 +301,23 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
+        UriRouteMatch<T, R> match = findClosestRoute(request);
+        if (hasLocators && match != null) {
+            RouteLocator locator = RouteLocator.of(match.getRouteInfo());
+            if (locator != null) {
+                // the rest of the path is matched with the routes of the located target
+                RouteLocator.Located located = locator.locate(request, match);
+                if (located == null) {
+                    return null;
+                }
+                UriRouteMatch<T, R> target = located.router().findClosest(located.request());
+                return target == null ? null : located.wrap(target);
+            }
+        }
+        return match;
+    }
+
+    private @Nullable <T, R> UriRouteMatch<T, R> findClosestRoute(HttpRequest<?> request) throws DuplicateRouteException {
         if (compiledRoutes.length != 0) {
             UriRouteMatch<T, R> compiledMatch = findCompiled(request);
             if (compiledMatch != null) {
@@ -337,6 +361,26 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request);
+        if (!hasLocators || matches.isEmpty()) {
+            return matches;
+        }
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            RouteLocator locator = RouteLocator.of(match.getRouteInfo());
+            if (locator == null) {
+                result.add(match);
+                continue;
+            }
+            RouteLocator.Located located = locator.locate(request, match);
+            if (located != null) {
+                result.addAll(located.wrap(located.router().<T, R>findAllClosest(located.request())));
+            }
+        }
+        return result;
+    }
+
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request) {
         if (compiledRoutes.length != 0) {
             UriRouteMatch<T, R> compiledMatch = findCompiled(request);
             if (compiledMatch != null) {
@@ -797,7 +841,35 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
         }
-        return matchedRoutes;
+        return hasLocators ? locateAny(request, matchedRoutes) : matchedRoutes;
+    }
+
+    /**
+     * Replace the matches of locator routes, one per HTTP method, with the matches of the rest of
+     * the path in the routes of the located target, e.g. to find the allowed methods.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> locateAny(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+        UriRouteMatch<T, R> locatorMatch = null;
+        RouteLocator locator = null;
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            RouteLocator matchLocator = RouteLocator.of(match.getRouteInfo());
+            if (matchLocator == null) {
+                result.add(match);
+            } else if (locatorMatch == null || match.getRouteInfo().compareTo((UriRouteInfo) locatorMatch.getRouteInfo()) < 0) {
+                // the most specific locator locates the target
+                locatorMatch = match;
+                locator = matchLocator;
+            }
+        }
+        if (locator == null || locatorMatch == null) {
+            return matches;
+        }
+        RouteLocator.Located located = locator.locate(request, locatorMatch);
+        if (located != null) {
+            result.addAll(located.wrap(located.router().<T, R>findAny(located.request())));
+        }
+        return result;
     }
 
     /**
