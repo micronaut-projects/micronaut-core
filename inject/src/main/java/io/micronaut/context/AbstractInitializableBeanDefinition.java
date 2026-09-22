@@ -949,6 +949,24 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
     }
 
     /**
+     * Whether {@code @Requires(beanProperty = ...)} constraints allow this definition to load.
+     * Definitions without such constraints are satisfied. A failing constraint disables the bean
+     * the same way {@link #checkIfShouldLoad(BeanResolutionContext, BeanContext)} does at creation.
+     *
+     * @param context The bean context
+     * @return {@code false} when a required bean property disables the bean
+     */
+    @Internal
+    public final boolean satisfiesBeanPropertyRequirements(BeanContext context) {
+        try (BeanResolutionContext resolutionContext = new DefaultBeanResolutionContext(context, this)) {
+            checkIfShouldLoad(resolutionContext, context);
+            return true;
+        } catch (DisabledBeanException ignored) {
+            return false;
+        }
+    }
+
+    /**
      * Check the value of the injected bean property to decide whether the
      * bean should be loaded.
      *
