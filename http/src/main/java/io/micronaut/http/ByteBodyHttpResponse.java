@@ -44,6 +44,19 @@ public interface ByteBodyHttpResponse<B> extends HttpResponse<B>, Closeable {
     void close();
 
     /**
+     * Whether the {@link #byteBody() bytes} still are the body of this response. They are not once
+     * an object body replaced them, e.g. with {@link MutableHttpResponse#body(Object)} on a
+     * {@link MutableByteBodyHttpResponse}: then the bytes are closed, and the response is encoded
+     * from its object body, if any.
+     *
+     * @return {@code true} if the bytes are the body of this response
+     * @since 5.3.0
+     */
+    default boolean hasByteBody() {
+        return getBody().isEmpty();
+    }
+
+    /**
      * Returns a mutable response that keeps the {@link #byteBody() body bytes} of this response.
      * The returned response takes over the ownership of this response: closing it closes this one.
      *

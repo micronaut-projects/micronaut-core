@@ -96,6 +96,13 @@ final class DefaultMutableByteBodyHttpResponse<B> implements MutableByteBodyHttp
         return delegate.getBody();
     }
 
+    @Override
+    public boolean hasByteBody() {
+        // explicit: after body(object) and body(null) there is no object body, but the bytes are
+        // closed all the same
+        return !bytesReplaced;
+    }
+
     @SuppressWarnings("unchecked")
     @Override
     public <T> MutableHttpResponse<T> body(@Nullable T body) {

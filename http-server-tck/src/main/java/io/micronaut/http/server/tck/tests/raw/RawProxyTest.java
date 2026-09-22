@@ -56,6 +56,7 @@ import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
@@ -157,6 +158,27 @@ public class RawProxyTest {
             );
             assertEquals(HttpStatus.OK, response.getStatus());
             assertEquals(UPLOAD_SIZE + ":" + crc(upload), response.body());
+        }
+    }
+
+    @Test
+    void bodyClearedAfterReplacingTheBytesIsEmpty() throws Exception {
+        try (ServerUnderTest server = server()) {
+            // a filter replaced the bytes with an object body, then cleared it: the bytes stay closed
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/cleared"), String.class);
+            assertEquals(HttpStatus.OK, response.getStatus());
+            assertTrue(response.getBody().map(String::isEmpty).orElse(true), () -> "body: " + response.getBody());
+            assertUpstreamCancelled(server, "cleared");
+        }
+    }
+
+    @Test
+    void wrapperBodyReplacesTheWrappedBytes() throws Exception {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(HttpRequest.GET("/raw-proxy/wrapper-replaced"), String.class);
+            assertEquals(HttpStatus.OK, response.getStatus());
+            assertEquals("replacement", response.body());
+            assertUpstreamCancelled(server, "wrapper-replaced");
         }
     }
 
@@ -458,6 +480,24 @@ public class RawProxyTest {
             return relay(request, HttpRequest.GET(upstream("/raw-upstream/endless?key=head")));
         }
 
+        @Get("/cleared")
+        Mono<HttpResponse<?>> cleared(ServerHttpRequest<?> request) {
+            return relay(request, "/raw-upstream/endless?key=cleared");
+        }
+
+        @Get("/wrapper-replaced")
+        @SuppressWarnings("unchecked")
+        Mono<HttpResponse<?>> wrapperReplaced(ServerHttpRequest<?> request) {
+            // a wrapper whose object body supersedes the bytes of the wrapped raw response
+            return relay(request, "/raw-upstream/endless?key=wrapper-replaced")
+                .map(response -> new HttpResponseWrapper<>((HttpResponse<Object>) response) {
+                    @Override
+                    public Optional<Object> getBody() {
+                        return Optional.of("replacement");
+                    }
+                });
+        }
+
         @Get("/endless")
         Mono<HttpResponse<?>> endless(ServerHttpRequest<?> request) {
             return relay(request, "/raw-upstream/endless?key=disconnect");
@@ -495,6 +535,16 @@ public class RawProxyTest {
         void addHeader(MutableHttpResponse<?> response) {
             response.status(HttpStatus.ACCEPTED);
             response.header("X-Raw-Filter", "true");
+        }
+    }
+
+    @ServerFilter("/raw-proxy/cleared")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class ClearFilter {
+        @ResponseFilter
+        void clear(MutableHttpResponse<?> response) {
+            response.body("replacement");
+            response.body(null);
         }
     }
 

@@ -207,16 +207,23 @@ public abstract class ResponseLifecycle {
      * @return The encoded response, or {@code null} if the response does not carry body bytes
      */
     private @Nullable ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeByteBodyResponse(HttpRequest<?> request, HttpResponse<?> response) {
-        HttpResponse<?> current = response;
-        while (!(current instanceof ByteBodyHttpResponse<?>)) {
-            if (current instanceof HttpResponseWrapper<?> wrapper) {
-                current = wrapper.getDelegate();
-            } else {
+        ByteBodyHttpResponse<?> byteBodyResponse;
+        if (response instanceof ByteBodyHttpResponse<?> direct) {
+            byteBodyResponse = direct;
+        } else if (response instanceof HttpResponseWrapper<?> wrapper) {
+            byteBodyResponse = HttpResponseWrapper.wrappedByteBodyResponse(wrapper);
+            if (byteBodyResponse == null) {
                 return null;
             }
+            if (!objectBodyOfWrappers(response).isEmpty()) {
+                // the object body of a wrapper replaces the bytes of the wrapped response
+                byteBodyResponse.close();
+                return null;
+            }
+        } else {
+            return null;
         }
-        ByteBodyHttpResponse<?> byteBodyResponse = (ByteBodyHttpResponse<?>) current;
-        if (byteBodyResponse.getBody().isPresent()) {
+        if (!byteBodyResponse.hasByteBody()) {
             // an object body replaced the bytes, see MutableByteBodyHttpResponse
             return null;
         }
@@ -233,6 +240,25 @@ public abstract class ResponseLifecycle {
             return ExecutionFlow.just(byteBodyResponse);
         }
         return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyResponse.byteBody().move()));
+    }
+
+    /**
+     * The object body of the outermost wrapper that has one, above the wrapped
+     * {@link ByteBodyHttpResponse}.
+     *
+     * @param response The response
+     * @return The body, or empty
+     */
+    private static Optional<?> objectBodyOfWrappers(HttpResponse<?> response) {
+        HttpResponse<?> current = response;
+        while (current instanceof HttpResponseWrapper<?> wrapper) {
+            Optional<?> body = wrapper.getBody();
+            if (body.isPresent()) {
+                return body;
+            }
+            current = wrapper.getDelegate();
+        }
+        return Optional.empty();
     }
 
     /**
