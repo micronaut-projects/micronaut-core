@@ -108,31 +108,31 @@ class HandlerRoutesSpec extends Specification {
         @Singleton
         HttpRoutes handlerRoutes() {
             return { RouteBuilder routes ->
-                routes.GET('/h/items/{id}', { HttpRequest<?> request ->
-                    Long id = PathVariables.of(request).get('id', Long)
+                routes.GET('/h/items/{id}', { HttpRequest<?> request, PathVariables pathVariables ->
+                    Long id = pathVariables.get('id', Long)
                     text("item $id ${id.class.name}")
                 } as RequestHandler)
-                routes.GET('/h/optional{/id}', { HttpRequest<?> request ->
-                    OptionalInt id = PathVariables.of(request).findInt('id')
+                routes.GET('/h/optional{/id}', { HttpRequest<?> request, PathVariables pathVariables ->
+                    OptionalInt id = pathVariables.findInt('id')
                     text(id.present ? String.valueOf(id.asInt) : 'none')
                 } as RequestHandler)
-                routes.GET('/h/typed/{s}/{i}/{l}/{d}/{b}/{c}/{u}', { HttpRequest<?> request ->
-                    PathVariables vars = PathVariables.of(request)
+                routes.GET('/h/typed/{s}/{i}/{l}/{d}/{b}/{c}/{u}', { HttpRequest<?> request, PathVariables pathVariables ->
+                    PathVariables vars = pathVariables
                     text([vars.getString('s'), vars.getInt('i'), vars.getLong('l'), vars.getDouble('d'),
                           vars.getBoolean('b'), vars.getChar('c'), vars.get('u', UUID)].join(','))
                 } as RequestHandler)
-                routes.GET('/h/find/{l}', { HttpRequest<?> request ->
-                    PathVariables vars = PathVariables.of(request)
+                routes.GET('/h/find/{l}', { HttpRequest<?> request, PathVariables pathVariables ->
+                    PathVariables vars = pathVariables
                     text([vars.findLong('l').asLong, vars.findDouble('l').asDouble, vars.findString('l').get(),
                           vars.findInt('missing').present, vars.findBoolean('missing').present].join(','))
                 } as RequestHandler)
-                routes.handleAsync(io.micronaut.http.HttpMethod.GET, '/h/executor', { HttpRequest<?> request ->
+                routes.handleAsync(io.micronaut.http.HttpMethod.GET, '/h/executor', { HttpRequest<?> request, PathVariables pathVariables ->
                     CompletableFuture.completedFuture(text(Thread.currentThread().name))
                 } as AsyncRequestHandler).executeOn('handler-test')
-                routes.GET('/h/blocking', { HttpRequest<?> request ->
+                routes.GET('/h/blocking', { HttpRequest<?> request, PathVariables pathVariables ->
                     text(Thread.currentThread() instanceof FastThreadLocalThread)
                 } as RequestHandler)
-                routes.GET('/h/non-blocking', { HttpRequest<?> request ->
+                routes.GET('/h/non-blocking', { HttpRequest<?> request, PathVariables pathVariables ->
                     text(Thread.currentThread() instanceof FastThreadLocalThread)
                 } as RequestHandler).nonBlocking()
             } as HttpRoutes
@@ -152,7 +152,7 @@ class HandlerRoutesSpec extends Specification {
 
         TableRoutes(RouteTableFactory tables) {
             table = tables.build { RouteBuilder routes ->
-                routes.GET('/table/{+path}', { HttpRequest<?> request -> text("table ${request.path}") } as RequestHandler)
+                routes.GET('/table/{+path}', { HttpRequest<?> request, PathVariables pathVariables -> text("table ${request.path}") } as RequestHandler)
             }
         }
 

@@ -16,16 +16,9 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.core.convert.ConversionContext;
-import io.micronaut.core.convert.ConversionError;
-import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
-import io.micronaut.core.type.Argument;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
-import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalDouble;
 import java.util.OptionalInt;
@@ -33,13 +26,10 @@ import java.util.OptionalLong;
 import java.util.Set;
 
 /**
- * The path variables of the route a request matched, for handler functions:
+ * The path variables of the route a request matched, given to handler functions:
  *
  * <pre>{@code
- * routes.GET("/items/{id}", request -> {
- *     long id = PathVariables.of(request).getLong("id");
- *     return HttpResponse.ok(items.find(id));
- * });
+ * routes.GET("/items/{id}", (request, pathVariables) -> HttpResponse.ok(items.find(pathVariables.getLong("id"))));
  * }</pre>
  *
  * <p>There are accessors for strings and the primitive types, e.g. {@code getLong("id")} or
@@ -52,48 +42,18 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-public final class PathVariables {
-
-    private static final PathVariables NONE = new PathVariables(Map.of(), ConversionService.SHARED);
-
-    private final Map<String, Object> values;
-    private final ConversionService conversionService;
-
-    private PathVariables(Map<String, Object> values, ConversionService conversionService) {
-        this.values = values;
-        this.conversionService = conversionService;
-    }
-
-    /**
-     * The path variables of the route the request matched.
-     *
-     * @param request The request
-     * @return The path variables, empty if the request did not match a URI route
-     */
-    public static PathVariables of(HttpRequest<?> request) {
-        return RouteAttributes.getRouteMatch(request)
-            .filter(UriRouteMatch.class::isInstance)
-            .map(match -> new PathVariables(
-                ((UriRouteMatch<?, ?>) match).getVariableValues(),
-                match instanceof AbstractRouteMatch<?, ?> routeMatch ? routeMatch.conversionService : ConversionService.SHARED
-            ))
-            .orElse(NONE);
-    }
+public interface PathVariables {
 
     /**
      * @return The names of the variables that have a value
      */
-    public Set<String> names() {
-        return values.keySet();
-    }
+    Set<String> names();
 
     /**
      * @param name The name of the variable
      * @return Whether the variable has a value
      */
-    public boolean contains(String name) {
-        return values.containsKey(name);
-    }
+    boolean contains(String name);
 
     /**
      * A required variable converted to a type.
@@ -105,14 +65,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public <T> T get(String name, Class<T> type) {
-        Argument<T> argument = Argument.of(type, name);
-        Object value = values.get(name);
-        if (value == null) {
-            throw new UnsatisfiedPathVariableRouteException(name, argument);
-        }
-        return convert(argument, value);
-    }
+    <T> T get(String name, Class<T> type);
 
     /**
      * An optional variable converted to a type.
@@ -123,13 +76,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public <T> Optional<T> find(String name, Class<T> type) {
-        Object value = values.get(name);
-        if (value == null) {
-            return Optional.empty();
-        }
-        return Optional.of(convert(Argument.of(type, name), value));
-    }
+    <T> Optional<T> find(String name, Class<T> type);
 
     /**
      * A required variable as a string.
@@ -139,7 +86,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public String getString(String name) {
+    default String getString(String name) {
         return get(name, String.class);
     }
 
@@ -151,7 +98,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public int getInt(String name) {
+    default int getInt(String name) {
         return get(name, Integer.class);
     }
 
@@ -163,7 +110,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public long getLong(String name) {
+    default long getLong(String name) {
         return get(name, Long.class);
     }
 
@@ -175,7 +122,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public double getDouble(String name) {
+    default double getDouble(String name) {
         return get(name, Double.class);
     }
 
@@ -187,7 +134,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public float getFloat(String name) {
+    default float getFloat(String name) {
         return get(name, Float.class);
     }
 
@@ -199,7 +146,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public short getShort(String name) {
+    default short getShort(String name) {
         return get(name, Short.class);
     }
 
@@ -211,7 +158,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public byte getByte(String name) {
+    default byte getByte(String name) {
         return get(name, Byte.class);
     }
 
@@ -223,7 +170,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public char getChar(String name) {
+    default char getChar(String name) {
         return get(name, Character.class);
     }
 
@@ -235,7 +182,7 @@ public final class PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    public boolean getBoolean(String name) {
+    default boolean getBoolean(String name) {
         return get(name, Boolean.class);
     }
 
@@ -246,7 +193,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public Optional<String> findString(String name) {
+    default Optional<String> findString(String name) {
         return find(name, String.class);
     }
 
@@ -257,7 +204,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public OptionalInt findInt(String name) {
+    default OptionalInt findInt(String name) {
         Optional<Integer> value = find(name, Integer.class);
         return value.isPresent() ? OptionalInt.of(value.get().intValue()) : OptionalInt.empty();
     }
@@ -269,7 +216,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public OptionalLong findLong(String name) {
+    default OptionalLong findLong(String name) {
         Optional<Long> value = find(name, Long.class);
         return value.isPresent() ? OptionalLong.of(value.get().longValue()) : OptionalLong.empty();
     }
@@ -281,7 +228,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public OptionalDouble findDouble(String name) {
+    default OptionalDouble findDouble(String name) {
         Optional<Double> value = find(name, Double.class);
         return value.isPresent() ? OptionalDouble.of(value.get().doubleValue()) : OptionalDouble.empty();
     }
@@ -293,28 +240,7 @@ public final class PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    public Optional<Boolean> findBoolean(String name) {
+    default Optional<Boolean> findBoolean(String name) {
         return find(name, Boolean.class);
-    }
-
-    private <T> T convert(Argument<T> argument, Object value) {
-        if (argument.getType().isInstance(value)) {
-            return argument.getType().cast(value);
-        }
-        ConversionContext context = ConversionContext.of(argument);
-        Optional<T> result = conversionService.convert(value, argument.getType(), context);
-        if (result.isPresent()) {
-            return result.get();
-        }
-        Optional<ConversionError> error = context.getLastError();
-        if (error.isPresent()) {
-            throw new ConversionErrorException(argument, error.get());
-        }
-        throw UnsatisfiedRouteException.create(argument);
-    }
-
-    @Override
-    public String toString() {
-        return values.toString();
     }
 }

@@ -20,15 +20,15 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
 /**
- * A route handler written as a function of the request. It runs like a controller method that
- * takes the {@link HttpRequest} and returns an {@link HttpResponse}: filters, error routes and
+ * A route handler written as a function of the request and the {@link PathVariables} of the
+ * matched route. It runs like a controller method that returns an {@link HttpResponse}: filters, error routes and
  * body writers apply unchanged, and the executor is selected like for a blocking controller
  * method (see {@code micronaut.server.thread-selection}, {@link UriRoute#executeOn(String)} and
  * {@link UriRoute#nonBlocking()}).
  *
  * <pre>{@code
- * routes.GET("/hello/{name}", request -> HttpResponse.ok("Hello " + PathVariables.of(request).getString("name")));
- * routes.GET("/report", request -> HttpResponse.ok(reports.build())).executeOn(TaskExecutors.BLOCKING);
+ * routes.GET("/hello/{name}", (request, pathVariables) -> HttpResponse.ok("Hello " + pathVariables.getString("name")));
+ * routes.GET("/report", (request, pathVariables) -> HttpResponse.ok(reports.build())).executeOn(TaskExecutors.BLOCKING);
  * }</pre>
  *
  * @author Denis Stepanov
@@ -42,10 +42,11 @@ public interface RequestHandler {
     /**
      * Handle the request.
      *
-     * @param request The request
+     * @param request       The request
+     * @param pathVariables The path variables of the matched route
      * @return The response
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    HttpResponse<?> handle(HttpRequest<?> request) throws Exception;
+    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
 
 }

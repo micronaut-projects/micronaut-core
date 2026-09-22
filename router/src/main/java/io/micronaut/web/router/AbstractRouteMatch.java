@@ -299,6 +299,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 continue;
             }
             Argument<Object> argument = (Argument<Object>) arguments[i];
+            if (arguments[i].getType() == PathVariables.class) {
+                // a handler function's path variables come from the match, not a binder
+                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService));
+                continue;
+            }
             Object value = getVariableValues().get(argumentNames[i]);
             if (value != null) {
                 setValue(i, argument, value);

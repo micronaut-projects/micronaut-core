@@ -53,6 +53,7 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     static final String BODY_ARGUMENT = "body";
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
+    private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -87,10 +88,10 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     static HandlerMethod<HttpResponse<?>> of(RequestHandler handler) {
         return new HandlerMethod<>(
             handler,
-            ReflectionUtils.getRequiredMethod(RequestHandler.class, "handle", HttpRequest.class),
-            new Argument<?>[]{REQUEST},
+            ReflectionUtils.getRequiredMethod(RequestHandler.class, "handle", HttpRequest.class, PathVariables.class),
+            new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
-            args -> handler.handle((HttpRequest<?>) args[0])
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1])
         );
     }
 
@@ -101,10 +102,10 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncRequestHandler handler) {
         return new HandlerMethod<>(
             handler,
-            ReflectionUtils.getRequiredMethod(AsyncRequestHandler.class, "handle", HttpRequest.class),
-            new Argument<?>[]{REQUEST},
+            ReflectionUtils.getRequiredMethod(AsyncRequestHandler.class, "handle", HttpRequest.class, PathVariables.class),
+            new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> handler.handle((HttpRequest<?>) args[0])
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1])
         );
     }
 
@@ -118,10 +119,10 @@ final class HandlerMethod<R> implements ExecutableMethod<Object, R>, MethodExecu
     static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return new HandlerMethod<>(
             handler,
-            ReflectionUtils.getRequiredMethod(BodyRequestHandler.class, "handle", HttpRequest.class, Object.class),
-            new Argument<?>[]{REQUEST, Argument.of(bodyType.getType(), BODY_ARGUMENT, BODY, bodyType.getTypeParameters())},
+            ReflectionUtils.getRequiredMethod(BodyRequestHandler.class, "handle", HttpRequest.class, PathVariables.class, Object.class),
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, BODY, bodyType.getTypeParameters())},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
-            args -> handler.handle((HttpRequest<?>) args[0], (B) args[1])
+            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
     }
 

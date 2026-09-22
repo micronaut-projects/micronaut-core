@@ -40,7 +40,7 @@ import java.util.function.Consumer;
  * {@code GET} route gets an implicit {@code HEAD} route, unless the table has a {@code HEAD}
  * route for the same URI or the method is annotated {@code @Get(headRoute = false)}. Like
  * controller routes, the URIs are under {@code micronaut.server.context-path}. Routes can also
- * target handler functions, e.g. {@code routes.GET("/orders/{id}", request -> ...)}, see
+ * target handler functions, e.g. {@code routes.GET("/orders/{id}", (request, pathVariables) -> ...)}, see
  * {@link RequestHandler}.
  * <p>A table is immutable: changing a route returned by the builder after {@link #build} returned
  * does not change the table.
