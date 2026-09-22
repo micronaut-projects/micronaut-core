@@ -11,10 +11,10 @@ import io.micronaut.http.client.HttpClient;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.server.EmbeddedServer;
-import io.micronaut.web.router.builder.CompiledRouteMatcher;
-import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteInfo;
+import io.micronaut.web.router.spi.CompiledRouteMatcher;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -69,7 +69,7 @@ class CustomWebRoutesTest {
     @Test
     void theIndexKeysAreTheOnesTheRouterComputesAtRuntime() {
         for (PetResourceRoutes route : PetResourceRoutes.values()) {
-            RouteDeclaration runtime = RouteDeclaration.of(route.httpMethod(), route.uriTemplate());
+            IndexedRouteDeclaration runtime = IndexedRouteDeclaration.of(route.httpMethod(), route.uriTemplate());
             assertEquals(runtime.requiredPathPrefix(), route.requiredPathPrefix(), route.name());
             assertEquals(runtime.rawLength(), route.rawLength(), route.name());
             assertEquals(runtime.pathVariableCount(), route.pathVariableCount(), route.name());

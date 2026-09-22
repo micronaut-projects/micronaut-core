@@ -49,6 +49,7 @@ import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerUriRoute;
 import io.micronaut.web.router.builder.RouteDeclaration;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import io.micronaut.web.router.builder.RouteRequestFilter;
 import io.micronaut.web.router.builder.RouteResponseFilter;
 import org.jspecify.annotations.Nullable;
@@ -227,9 +228,9 @@ public final class RouteAssembly {
     }
 
     /**
-     * Bind a target to a declared route: the route is built when the router first uses it. Nested,
-     * or under a context path, the keys of the declaration do not describe the route, and it is
-     * added as a URI route.
+     * Bind a target to a declared route. A declaration with index keys is built when the router
+     * first uses it; without keys, nested, or under a context path, where the keys do not
+     * describe the route, it is added as an ordinary URI route.
      *
      * @param declaration      The declared route
      * @param executableHandle The target of the route
@@ -239,12 +240,13 @@ public final class RouteAssembly {
     public HandlerUriRoute declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
         HttpMethod httpMethod = declaration.httpMethod();
         String uri = declaration.uriTemplate();
-        if (currentParentRoute != null || !routeUri.apply(uri).equals(uri)) {
+        if (!(declaration instanceof IndexedRouteDeclaration indexed) || currentParentRoute != null || !routeUri.apply(uri).equals(uri)) {
+            // no index keys, or they do not describe the route: an ordinary route
             DefaultUriRoute route = addRoute(httpMethod.name(), httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
             return consumes == null ? route : route.consumes(consumes);
         }
         DeclaredUriRoute route = new DeclaredUriRoute(
-            declaration,
+            indexed,
             () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethod.name(), conversionService)
         );
         if (consumes != null) {

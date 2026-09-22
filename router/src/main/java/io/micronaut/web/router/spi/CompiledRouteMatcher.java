@@ -13,16 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.web.router.builder;
+package io.micronaut.web.router.spi;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 
 /**
- * A URL parser generated at compile time for an enum of {@link RouteDeclaration}s: it reads the
- * request path segment by segment with generated code and answers the matched declaration, whose
- * ordinal selects the bound route directly. The router asks it before its own matching, so a
- * request costs one pass over the path and an array index.
+ * A URL parser generated at compile time for an enum of {@link IndexedRouteDeclaration}s: it reads
+ * the request path segment by segment with generated code and answers the matched declaration,
+ * whose ordinal selects the bound route. The router returns that route directly when no other route
+ * of its method can match the same paths; otherwise it selects among all the candidates as usual.
  *
  * <p>A matcher answers only routes it can match exactly as the router would: templates made of
  * literal segments and whole-segment variables such as {@code /pets/{id}/owners/{owner}}. Other
@@ -30,7 +30,7 @@ import io.micronaut.http.HttpMethod;
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see RouteDeclaration#matcher()
+ * @see IndexedRouteDeclaration#matcher()
  */
 @Experimental
 public interface CompiledRouteMatcher {
