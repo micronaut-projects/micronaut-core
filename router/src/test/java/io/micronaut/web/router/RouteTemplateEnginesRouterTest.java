@@ -21,12 +21,14 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.RouteTemplate;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
@@ -186,6 +188,63 @@ class RouteTemplateEnginesRouterTest {
         RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
         assertThrows(IllegalArgumentException.class, () ->
             assembly.addRoute("GET", HttpMethod.GET, COLON_ITEM, List.of(MediaType.APPLICATION_JSON_TYPE), handle()));
+    }
+
+    @Test
+    void aForeignRouteWithFewerPatternVariablesIsSelected() {
+        RouteTemplate plain = ColonRouteTemplateEngine.template("/sel/:id");
+        RouteTemplate pattern = ColonRouteTemplateEngine.template("/sel/:id(.+)");
+        for (String contextPath : new String[] {null, "/ctx"}) {
+            // declared routes without a context path, ordinary routes under it
+            Router router = router(contextPath, routes -> {
+                routes.route(HttpMethod.GET, pattern).handle((request, variables) -> HttpResponse.ok());
+                routes.route(HttpMethod.GET, plain).handle((request, variables) -> HttpResponse.ok());
+            });
+            String prefix = contextPath == null ? "" : contextPath;
+            RouteTemplate expected = contextPath == null ? plain : ColonRouteTemplateEngine.template(prefix + "/sel/:id");
+            assertEquals(expected, findClosest(router, prefix + "/sel/1").getRouteInfo().getRouteTemplate(), prefix);
+            List<UriRouteMatch<Object, Object>> all = router.findAllClosest(HttpRequest.GET(prefix + "/sel/1"));
+            assertEquals(1, all.size(), prefix);
+            assertEquals(expected, all.get(0).getRouteInfo().getRouteTemplate(), prefix);
+        }
+    }
+
+    @Test
+    void foreignRoutesThatTieOnThePatternVariableCountStayAmbiguous() {
+        Router router = router(null, routes -> {
+            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/tie/:id(.+)")).handle((request, variables) -> HttpResponse.ok());
+            routes.route(HttpMethod.GET, ColonRouteTemplateEngine.template("/tie/:id([0-9]+)")).handle((request, variables) -> HttpResponse.ok());
+        });
+        assertThrows(DuplicateRouteException.class, () -> router.findClosest(HttpRequest.GET("/tie/1")));
+    }
+
+    @Test
+    void theColonEngineCountsItsPatternVariables() {
+        assertEquals(0, RouteTemplateEngines.defaults().parse(COLON_ITEM).patternVariableCount());
+        assertEquals(1, RouteTemplateEngines.defaults().parse(ColonRouteTemplateEngine.template("/a/:x/:y([0-9]+)")).patternVariableCount());
+    }
+
+    @Test
+    void aCustomMethodIsDeclaredWithARouteTemplate() {
+        // a standard method by its name is the standard method
+        UriRouteMatch<Object, Object> get = router(null, routes -> routes.route("get", COLON_ITEM).handle((request, variables) -> HttpResponse.ok()))
+            .findClosest(HttpRequest.GET("/items/5"));
+        assertNotNull(get);
+        assertEquals(HttpMethod.GET, get.getRouteInfo().getHttpMethod());
+        assertEquals("GET", get.getRouteInfo().getHttpMethodName());
+        assertEquals(COLON_ITEM, get.getRouteInfo().getRouteTemplate());
+        for (String contextPath : new String[] {null, "/ctx"}) {
+            Router router = router(contextPath, routes ->
+                routes.route("PROPFIND", COLON_ITEM).handle((request, variables) -> HttpResponse.ok(variables.getString("id"))));
+            String prefix = contextPath == null ? "" : contextPath;
+            UriRouteMatch<Object, Object> match = router.findClosest(HttpRequest.create(HttpMethod.CUSTOM, prefix + "/items/5", "PROPFIND"));
+            assertNotNull(match, prefix);
+            assertEquals(HttpMethod.CUSTOM, match.getRouteInfo().getHttpMethod(), prefix);
+            assertEquals("PROPFIND", match.getRouteInfo().getHttpMethodName(), prefix);
+            assertEquals("5", match.getVariableValues().get("id"), prefix);
+            assertNull(router.findClosest(HttpRequest.create(HttpMethod.CUSTOM, prefix + "/items/5", "PROPPATCH")), prefix);
+            assertNull(findClosestOrNull(router, prefix + "/items/5"), prefix);
+        }
     }
 
     @SuppressWarnings("unchecked")

@@ -87,6 +87,16 @@ public interface ParsedRouteTemplate {
     int pathVariableCount();
 
     /**
+     * The number of variables of the path constrained by a regular expression: the third key of
+     * the specificity of routes under the Micronaut route selection policy, where fewer such
+     * variables are more specific when the literal length and the variable count tie. For a
+     * Micronaut template {@link UriTemplateMatcher#getPatternVariableCount()}.
+     *
+     * @return The count
+     */
+    int patternVariableCount();
+
+    /**
      * The segments of the path the template matches, which the router compares to decide
      * whether two templates can match the same path. {@code null} when the engine cannot tell:
      * the template is then assumed to overlap every other template.

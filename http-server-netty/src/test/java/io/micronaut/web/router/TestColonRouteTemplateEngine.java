@@ -188,6 +188,12 @@ public final class TestColonRouteTemplateEngine implements RouteTemplateEngine {
         }
 
         @Override
+        public int patternVariableCount() {
+            // the language has no regular expressions
+            return 0;
+        }
+
+        @Override
         public List<RouteTemplateSegment> pathSegments() {
             List<RouteTemplateSegment> result = new ArrayList<>();
             for (Segment segment : segments) {

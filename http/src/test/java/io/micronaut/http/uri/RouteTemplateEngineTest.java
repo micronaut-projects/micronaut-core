@@ -174,6 +174,33 @@ class RouteTemplateEngineTest {
     }
 
     @Test
+    void theMicronautEngineCountsPatternVariablesLikeTheMatcher() {
+        for (String template : TEMPLATES) {
+            ParsedRouteTemplate parsed = MicronautRouteTemplateEngine.INSTANCE.parse(RouteTemplate.micronaut(template));
+            UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(template).getTemplateString());
+            assertEquals(matcher.getPatternVariableCount(), parsed.patternVariableCount(), template);
+        }
+        // a regular expression counts, the numeric modifier of a maximum length does not
+        assertEquals(1, MicronautRouteTemplateEngine.INSTANCE.parse(RouteTemplate.micronaut("/books/{id:\\d+}")).patternVariableCount());
+        assertEquals(0, MicronautRouteTemplateEngine.INSTANCE.parse(RouteTemplate.micronaut("/books/{id:3}")).patternVariableCount());
+    }
+
+    @Test
+    void anEngineMustDescribeThePatternVariableCount() {
+        StubEngine engine = new StubEngine("test.stub");
+        RouteTemplateEngines engines = RouteTemplateEngines.of(List.of(engine));
+        assertEquals(0, engines.parse(RouteTemplate.of("test.stub", "/a/")).patternVariableCount());
+
+        engine.patternVariableCount = -1;
+        IllegalStateException negative = assertThrows(IllegalStateException.class, () -> engines.parse(RouteTemplate.of("test.stub", "/a/")));
+        assertTrue(negative.getMessage().contains("a negative pattern variable count"), negative.getMessage());
+        // the stub has no path variables, so no pattern variables either
+        engine.patternVariableCount = 1;
+        IllegalStateException greater = assertThrows(IllegalStateException.class, () -> engines.parse(RouteTemplate.of("test.stub", "/a/")));
+        assertTrue(greater.getMessage().contains("greater than the path variable count"), greater.getMessage());
+    }
+
+    @Test
     void nestingAcrossEnginesIsRejected() {
         RouteTemplateEngines engines = RouteTemplateEngines.of(List.of(new StubEngine("test.stub")));
         ParsedRouteTemplate micronaut = engines.parse(RouteTemplate.micronaut("/a"));
@@ -208,6 +235,7 @@ class RouteTemplateEngineTest {
         private final String id;
         String prefix = "/a/";
         int rawLength = 3;
+        int patternVariableCount;
 
         StubEngine(String id) {
             this.id = id;
@@ -255,6 +283,11 @@ class RouteTemplateEngineTest {
                 @Override
                 public int pathVariableCount() {
                     return 0;
+                }
+
+                @Override
+                public int patternVariableCount() {
+                    return engine.patternVariableCount;
                 }
 
                 @Override

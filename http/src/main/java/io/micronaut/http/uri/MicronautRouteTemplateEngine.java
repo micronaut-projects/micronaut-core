@@ -161,6 +161,7 @@ public final class MicronautRouteTemplateEngine implements RouteTemplateEngine {
         private @Nullable List<RouteTemplateSegment> segments;
         private int rawLength = -1;
         private int pathVariableCount = -1;
+        private int patternVariableCount = -1;
 
         /**
          * @param template         The template, or {@code null} for the string of the {@link UriMatchTemplate}
@@ -247,6 +248,16 @@ public final class MicronautRouteTemplateEngine implements RouteTemplateEngine {
             if (c < 0) {
                 c = matcher().getPathVariableCount();
                 pathVariableCount = c;
+            }
+            return c;
+        }
+
+        @Override
+        public int patternVariableCount() {
+            int c = patternVariableCount;
+            if (c < 0) {
+                c = matcher().getPatternVariableCount();
+                patternVariableCount = c;
             }
             return c;
         }
