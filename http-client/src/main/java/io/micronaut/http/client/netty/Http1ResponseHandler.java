@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Inbound message handler for the HTTP/1.1 client. Also used for HTTP/2 and /3 through message
@@ -50,6 +52,15 @@ import java.util.List;
 @Internal
 final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented<HttpObject> {
     private static final Logger LOG = LoggerFactory.getLogger(Http1ResponseHandler.class);
+    /**
+     * A response body that is abandoned before it ended is drained so that the connection can be
+     * reused. Beyond this many bytes, the rest of the body is not drained.
+     */
+    private static final long DISCARD_BYTE_LIMIT = 64L * 1024;
+    /**
+     * A response body that is abandoned before it ended is drained for at most this long.
+     */
+    private static final long DISCARD_TIME_LIMIT_MILLIS = 5000;
 
     private ReaderState<?> state;
 
@@ -340,7 +351,7 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
         private void allowDiscard0() {
             if (state == this) {
-                transitionToState(streamingContext, this, new DiscardingContent(listener, streaming));
+                transitionToState(streamingContext, this, new DiscardingContent(streamingContext, listener, streaming));
                 disregardBackpressure();
             }
             listener.allowDiscard();
@@ -370,18 +381,25 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     private final class DiscardingContent extends ReaderState<HttpContent> {
         private final ResponseListener listener;
         private final StreamingNettyByteBody.SharedBuffer streaming;
+        private final ScheduledFuture<?> timeLimit;
+        private long discarded;
+        private boolean limitReached;
 
-        DiscardingContent(ResponseListener listener, StreamingNettyByteBody.SharedBuffer streaming) {
+        DiscardingContent(ChannelHandlerContext ctx, ResponseListener listener, StreamingNettyByteBody.SharedBuffer streaming) {
             this.listener = listener;
             this.streaming = streaming;
+            this.timeLimit = ctx.executor().schedule(this::discardLimitReached, DISCARD_TIME_LIMIT_MILLIS, TimeUnit.MILLISECONDS);
         }
 
         @Override
         void read(ChannelHandlerContext ctx, HttpContent msg) {
+            discarded += msg.content().readableBytes();
             msg.release();
             if (msg instanceof LastHttpContent) {
                 transitionToState(ctx, this, AfterContent.INSTANCE);
                 listener.finish(ctx);
+            } else if (discarded > DISCARD_BYTE_LIMIT) {
+                discardLimitReached();
             }
         }
 
@@ -390,6 +408,22 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             transitionToState(ctx, this, AfterContent.INSTANCE);
             streaming.error(cause);
             listener.finish(ctx);
+        }
+
+        @Override
+        void leave(ChannelHandlerContext ctx) {
+            timeLimit.cancel(false);
+        }
+
+        /**
+         * The rest of the body is too long, or takes too long, to drain for the connection to be
+         * reused, e.g. an endless stream.
+         */
+        private void discardLimitReached() {
+            if (state == this && !limitReached) {
+                limitReached = true;
+                listener.discardLimitReached();
+            }
         }
     }
 
@@ -507,6 +541,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          * receive unnecessary data.
          */
         default void allowDiscard() {
+        }
+
+        /**
+         * Called when draining a discarded body takes too many bytes or too long, e.g. for an
+         * endless stream. The connection should be closed, which ends the response.
+         */
+        default void discardLimitReached() {
         }
     }
 }

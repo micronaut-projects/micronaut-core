@@ -394,15 +394,28 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         }
         ParameterElement[] pythonParameters = pythonMethod.getParameters();
         ParameterElement[] parameters = inheritedMethod.getParameters().clone();
+        // When the Python hints resolve to the Java method, it is among the overridden methods and the Python
+        // parameters already inherit its annotations (see PythonMethodElement#resolveParameters); inheriting
+        // them again here would only repeat the same metadata in the hierarchy.
+        boolean metadataInherited = pythonMethod.getOverriddenMethods().contains(inheritedMethod);
         if (pythonParameters.length == parameters.length) {
             for (int i = 0; i < parameters.length; i++) {
                 ParameterElement pythonParameter = pythonParameters[i];
-                AnnotationMetadata inheritedMetadata = parameters[i].getAnnotationMetadata();
-                AnnotationMetadata annotationMetadata = inheritedMetadata.isEmpty()
-                    ? pythonParameter.getAnnotationMetadata()
-                    : new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(pythonParameter.getAnnotationMetadata()));
-                parameters[i] = ParameterElement.of(parameters[i].getGenericType(), pythonParameter.getName())
-                    .withAnnotationMetadata(annotationMetadata);
+                AnnotationMetadata inheritedMetadata = metadataInherited ? AnnotationMetadata.EMPTY_METADATA : parameters[i].getAnnotationMetadata();
+                ClassElement inheritedType = parameters[i].getGenericType();
+                if (pythonParameter instanceof PythonParameterElement pythonParameterElement) {
+                    // The parameter stays a parameter of the Python method (its name, its method element, its
+                    // mutable annotation metadata): a visitor that inherits annotations from the overridden Java
+                    // method, as the validation visitor does with constraints, annotates it, which a reflective
+                    // ParameterElement.of() rejects.
+                    PythonParameterElement parameter = pythonParameterElement.withInheritedType(inheritedType);
+                    parameters[i] = inheritedMetadata.isEmpty() ? parameter : parameter.withInheritedAnnotationMetadata(inheritedMetadata);
+                } else {
+                    AnnotationMetadata annotationMetadata = inheritedMetadata.isEmpty()
+                        ? pythonParameter.getAnnotationMetadata()
+                        : new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(pythonParameter.getAnnotationMetadata()));
+                    parameters[i] = ParameterElement.of(inheritedType, pythonParameter.getName()).withAnnotationMetadata(annotationMetadata);
+                }
             }
         }
         ClassElement inheritedReturnType = inheritedMethod.getGenericReturnType();

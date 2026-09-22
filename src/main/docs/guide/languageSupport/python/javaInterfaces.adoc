@@ -40,3 +40,12 @@ A type argument of the base (`class Sub(Subscriber[str])`) is dropped at run tim
 
 The adapter passes the constructor arguments on to the Java constructor, which an interface has none of, and cannot combine the interface with another base. A class defined inside a function that declares an `__init__` with parameters, that is decorated (a decorator such as `@dataclass` may generate the constructor), or that has more than one base, is therefore a plain Python object as described above: Java receives a proxy of the interface, which suffices for a Java method that is not overloaded on other interfaces.
 
+== Inherited Parameter Constraints
+
+A Python override adopts the parameter annotations of the Java method it overrides, the way an overriding Java method does. When the interface declares <<validation, validation>> constraints on its parameters and `micronaut-validation-processor` is on the annotation processor path of the Python sources, the Python bean is validated without any decorator of its own, including the constraints inherited by the methods it does not override:
+
+snippet::micronaut.docs.javainterfaces.PythonMessageSender[tags="imports,class", indent=0, title="Implementing a constrained Java interface"]
+
+<1> A cascaded (`@Valid`) argument is validated through the introspection of the dataclass
+<2> The interface, declared as `interface MessageSender<M> { String send(@NotBlank String recipient, @NotNull @Valid M message); default String broadcast(@NotNull @Valid M message) { ... } }`
+<3> The override needs no constraint of its own: `send("", message)` and `send("bob", None)` raise a `ConstraintViolationException`, as does `broadcast(Message(""))`, the inherited default method
