@@ -464,6 +464,47 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
         }
     }
 
+    /**
+     * A literal that every URI this template matches starts with, once the URI is normalised with
+     * {@link #normalizeForMatching(String)}. Routers use it to skip templates that cannot match.
+     *
+     * @return The prefix, or an empty string if there is none
+     * @since 5.3.0
+     */
+    public String getRequiredPrefix() {
+        if (isRoot) {
+            return "";
+        }
+        if (variables.isEmpty()) {
+            // matched by equality
+            return templateString;
+        }
+        if (segments.length > 0 && segments[0].type == SegmentType.LITERAL) {
+            return segments[0].value;
+        }
+        return "";
+    }
+
+    /**
+     * Normalise a URI the way {@link #tryMatch(String)} does before it matches the segments: the
+     * query and a trailing slash are removed.
+     *
+     * @param uri The URI
+     * @return The normalised URI
+     * @since 5.3.0
+     */
+    public static String normalizeForMatching(String uri) {
+        int parameterIndex = uri.indexOf('?');
+        if (parameterIndex > -1) {
+            uri = uri.substring(0, parameterIndex);
+        }
+        int length = uri.length();
+        if (length > 1 && uri.charAt(length - 1) == '/') {
+            uri = uri.substring(0, length - 1);
+        }
+        return uri;
+    }
+
     private boolean isRoot(String uri) {
         int length = uri.length();
         return length == 0 || length == 1 && uri.charAt(0) == '/';
