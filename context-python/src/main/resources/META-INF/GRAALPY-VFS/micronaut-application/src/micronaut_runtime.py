@@ -479,6 +479,12 @@ def __micronaut_create_scoped_proxy(cls, target_supplier, java_proxy_reference=N
                 java_proxy = object.__getattribute__(self, "_micronaut_java_proxy")
                 if java_proxy is not None:
                     return java_proxy
+                # The host object of the proxy is the Java AOP proxy it stands in for, never the
+                # wrapper of the bean it currently resolves to. Until the Java side is bound the
+                # proxy has no host object: answering the lookup from the target would create the
+                # bean while the proxy is being created, which a bean of a custom scope that is not
+                # active at that point cannot be.
+                raise AttributeError(name)
             overrides = object.__getattribute__(self, "_micronaut_overrides")
             if name in overrides:
                 return overrides[name]
