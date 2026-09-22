@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionStage;
@@ -149,6 +150,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String NEW_INTRODUCTION = "newIntroduction";
     private static final String IS_NONE = "isNone";
     private static final String SUBCLASS_WRAPPER = "subclassWrapper";
+    private static final String BOUND_WRAPPER = "boundWrapper";
+    private static final String BIND_WRAPPER = "bindWrapper";
+    private static final String REFRESH_FROM_PYTHON_OBJECT = "micronautRefreshFromPythonObject";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -1664,6 +1668,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassTypeDef thisType = javaClassType(element);
 
         boolean extendsJavaBase = model.extendsJavaBase();
+        // only the plain factory binds: a stub with a Java base resolves its instance through the base
+        boolean bindWrapper = !extendsJavaBase && !hasJavaBaseAncestor(superType) && bindsWrapperToPythonObject(model);
         if (!isJunit5Test && (!extendsHostClass || extendsJavaBase)) {
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -1671,8 +1677,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .returns(thisType)
                 .build((aThis, methodParameters) -> extendsJavaBase || hasJavaBaseAncestor(superType)
                     ? boundOrNewFromPolyglotValueBody(thisType, methodParameters.get(0))
-                    : fromPolyglotValueBody(thisType, methodParameters.get(0)))
+                    : fromPolyglotValueBody(thisType, methodParameters.get(0), bindWrapper))
             );
+            if (bindWrapper) {
+                addRefreshFromPythonObjectMethod(model);
+            }
         }
 
         // Check if there's a primary constructor with parameters for dependency injection
@@ -5659,26 +5668,118 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * The body of the static {@code fromPolyglotValue} factory of a wrapper that does not mirror the
+     * state of its Python object in fields.
+     */
+    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+        return fromPolyglotValueBody(thisType, value, false);
+    }
+
+    /**
      * The body of the static {@code fromPolyglotValue} factory: {@code None} is {@code null}, an instance
      * of a generated Python subclass is wrapped by that subclass so it keeps its runtime type, and any other
      * value is wrapped by this type.
+     * <p>
+     * {@code bindWrapper} makes the wrapper of a Python object the wrapper of that object from then on
+     * (see {@link #addRefreshFromPythonObjectMethod}), so what Java writes to the fields of a wrapper,
+     * the identifier JPA assigns to an entity it persisted, is still there on the next crossing.
      */
-    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
-        return StatementDef.multi(
-            PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
-                .isTrue()
-                .doIf(ExpressionDef.nullValue().returning()),
-            // a Java object of this class that went to Python and comes back (a wrapper handed over by
-            // reference, or an entry of a Java collection Python worked on) keeps its identity: a new
-            // wrapper around it would be a stale copy the Java side never sees changes of
-            VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal("hostObject", hostObject -> hostObject.isNonNull()
-                    .doIf(hostObject.cast(thisType).returning())),
-            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
-                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
-                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
-            thisType.instantiate(value).returning()
-        );
+    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value, boolean bindWrapper) {
+        List<StatementDef> statements = new ArrayList<>();
+        statements.add(PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
+            .isTrue()
+            .doIf(ExpressionDef.nullValue().returning()));
+        // a Java object of this class that went to Python and comes back (a wrapper handed over by
+        // reference, or an entry of a Java collection Python worked on) keeps its identity: a new
+        // wrapper around it would be a stale copy the Java side never sees changes of
+        statements.add(VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+            .newLocal("hostObject", hostObject -> hostObject.isNonNull()
+                .doIf(hostObject.cast(thisType).returning())));
+        statements.add(PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+            .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
+                subclassWrapper.isNonNull().doIf(subclassWrapper.returning())));
+        if (!bindWrapper) {
+            statements.add(thisType.instantiate(value).returning());
+            return StatementDef.multi(statements);
+        }
+        // the wrapper of this Python object, refreshed with what Python changed on attributes Java did
+        // not write itself
+        statements.add(PYTHON_CONVERSION.invokeStatic(BOUND_WRAPPER, TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+            .newLocal(BOUND_WRAPPER, boundWrapper -> boundWrapper.isNonNull()
+                .doIf(boundWrapper.cast(thisType).newLocal("boundInstance", boundInstance -> StatementDef.multi(
+                    boundInstance.invoke(REFRESH_FROM_PYTHON_OBJECT, TypeDef.VOID, value),
+                    boundInstance.returning()
+                )))));
+        statements.add(thisType.instantiate(value).newLocal("createdWrapper", createdWrapper -> StatementDef.multi(
+            PYTHON_CONVERSION.invokeStatic(BIND_WRAPPER, TypeDef.VOID, value, createdWrapper),
+            createdWrapper.returning()
+        )));
+        return StatementDef.multi(statements);
+    }
+
+    /**
+     * Whether the wrapper of a Python object becomes the wrapper of that object.
+     * <p>
+     * Only a stub that mirrors the attributes of its Python object in Java fields has state Java can
+     * write and a new wrapper would lose: JPA assigns the generated identifier of an entity to the
+     * field of the instance it persisted, and the Python entity came back without it because every
+     * crossing built a new wrapper. A stub that delegates to its Python object has no such state, a
+     * frozen dataclass and a class with dynamic properties cannot be refreshed field by field, and an
+     * AOP proxy stands in for a bean rather than wrapping an object of its own.
+     *
+     * @param model The stub model
+     * @return Whether the wrapper is bound to the Python object
+     */
+    private static boolean bindsWrapperToPythonObject(ClassStubModel model) {
+        return model.isIntrospectedBean()
+            && !model.isAopProxy()
+            && !model.hasDynamicBeanProperties()
+            && !isFrozenPythonDataclass(model.element())
+            && model.pythonValue() != null
+            && !model.propertyFields().isEmpty();
+    }
+
+    /**
+     * Emits the refresh a bound wrapper runs when the Python object crosses to Java again.
+     * <p>
+     * An attribute Java has not written itself is read from the Python object, so a change Python made
+     * since the last crossing arrives, exactly as it did when every crossing built a new wrapper. A
+     * field that differs from its sync snapshot was written by Java, by JPA assigning an identifier for
+     * example, and keeps the Java value, which {@code asPolyglotValue()} writes back to the Python
+     * object on the way out. Without snapshots, for a stub whose properties are not tracked, every
+     * attribute is read, which is the previous behaviour.
+     *
+     * @param model The stub model
+     */
+    private void addRefreshFromPythonObjectMethod(ClassStubModel model) {
+        List<PropertyElement> beanProperties = model.beanProperties();
+        Map<String, FieldDef> propertyFields = model.propertyFields();
+        Map<String, FieldDef> syncSnapshotFields = model.syncSnapshotFields();
+        model.builder().addMethod(MethodDef.builder(REFRESH_FROM_PYTHON_OBJECT)
+            .addModifiers(Modifier.PRIVATE)
+            .addParameter(POLYGLOT_VALUE)
+            .returns(TypeDef.VOID)
+            .build((aThis, methodParameters) -> {
+                ExpressionDef value = methodParameters.getFirst();
+                List<StatementDef> statements = new ArrayList<>();
+                for (PropertyElement beanProperty : beanProperties) {
+                    FieldDef field = propertyFields.get(beanProperty.getName());
+                    if (field == null) {
+                        continue;
+                    }
+                    FieldDef snapshot = syncSnapshotFields.get(beanProperty.getName());
+                    StatementDef read = polyglotValuePropertyAssignment(aThis, value, beanProperty, field, snapshot);
+                    statements.add(snapshot == null
+                        ? read
+                        : ClassTypeDef.of(Objects.class).invokeStatic(
+                            "equals",
+                            TypeDef.Primitive.BOOLEAN,
+                            aThis.field(field).cast(TypeDef.OBJECT),
+                            aThis.field(snapshot).cast(TypeDef.OBJECT)
+                        ).isTrue().doIf(read));
+                }
+                return StatementDef.multi(statements);
+            }));
     }
 
     private StatementDef initializeFromPolyglotValue(

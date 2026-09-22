@@ -19,6 +19,7 @@ import io.micronaut.context.python.annotation.PythonClass;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
+import java.lang.ref.WeakReference;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
@@ -127,6 +128,55 @@ public final class PythonConversion {
      */
     public static boolean isNone(@Nullable Value value) {
         return value == null || value.isNull();
+    }
+
+    /**
+     * The Java wrapper an earlier crossing created for a Python object, when it is of the type the
+     * caller wants.
+     * <p>
+     * A generated wrapper mirrors the attributes of the Python object in its Java fields, and Java
+     * writes to those fields: JPA assigns the generated identifier of an entity to the field of the
+     * managed instance. Building a new wrapper on every crossing threw those writes away, so a Python
+     * entity persisted through {@code EntityManager.persist(entity)} came back without its id. The
+     * wrapper is therefore bound to the Python object (see {@link #bindWrapper(Value, Object)}) and
+     * the next crossing reuses it, after refreshing the fields Java has not changed itself.
+     *
+     * @param value The Python object
+     * @param type The wrapper type the caller wants
+     * @return The bound wrapper, or {@code null} when the object has none of that type
+     * @since 5.2.4
+     */
+    @UsedByGeneratedCode
+    public static @Nullable Object boundWrapper(Value value, Class<?> type) {
+        Context context = value.getContext();
+        PythonContextRegistry.ContextState state = context == null ? null : PythonContextRegistry.existingState(context);
+        if (state == null) {
+            return null;
+        }
+        WeakReference<Object> bound = state.javaWrappers.get(value);
+        Object wrapper = bound == null ? null : bound.get();
+        return type.isInstance(wrapper) ? wrapper : null;
+    }
+
+    /**
+     * Bind a Java wrapper to the Python object it wraps, so the next crossing reuses it instead of
+     * building a copy Java's writes are lost from.
+     * <p>
+     * The binding is kept in the state of the context, not as an attribute of the Python object: an
+     * attribute would be in the object's {@code __dict__} and {@code copy.deepcopy}, {@code pickle}
+     * and {@code dataclasses.asdict} would all try to take the Java wrapper with them.
+     *
+     * @param value The Python object
+     * @param wrapper The wrapper of the object
+     * @since 5.2.4
+     */
+    @UsedByGeneratedCode
+    public static void bindWrapper(Value value, Object wrapper) {
+        Context context = value.getContext();
+        if (context == null) {
+            return;
+        }
+        PythonContextRegistry.state(context).javaWrappers.put(value, new WeakReference<>(wrapper));
     }
 
     /**

@@ -27,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import java.lang.ScopedValue.CallableOp;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.lang.ref.WeakReference;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -796,6 +797,14 @@ final class PythonContextRegistry {
         final Map<String, Value> classes = new ConcurrentHashMap<>();
         /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
         final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
+        /**
+         * The Java wrapper of a Python object of this context, by object: what Java writes to the fields
+         * of a wrapper survives the next crossing of the object it wraps. Keyed by identity, as
+         * {@link Value#equals(Object)} compares the guest objects. Weak on both sides: the key is the
+         * value the wrapper itself holds, so the entry lives exactly as long as the wrapper, which
+         * nothing here keeps alive.
+         */
+        final Map<Value, WeakReference<Object>> javaWrappers = Collections.synchronizedMap(new WeakHashMap<>());
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -810,6 +819,7 @@ final class PythonContextRegistry {
             helpers.clear();
             classes.clear();
             scopedProxies.clear();
+            javaWrappers.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

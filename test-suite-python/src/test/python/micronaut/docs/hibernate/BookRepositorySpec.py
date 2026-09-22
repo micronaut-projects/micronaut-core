@@ -28,6 +28,14 @@ class BookRepositorySpec:
         assert "The Stand" in self.book_repository.find_titles()
 
     @Test
+    def test_python_created_entity_is_assigned_its_generated_id(self):
+        book = self.book_repository.save_python_entity("Pooh", 100)
+        assert book.id is not None, "the generated id was not written back to the Python entity"
+        loaded = self.book_repository.find_by_id(book.id)
+        assert loaded.title == "Pooh"
+        assert loaded.pages == 100
+
+    @Test
     def test_embedded_id(self):
         self.book_repository.save_order("EU", 42, "Fred")
         order = self.book_repository.find_order("EU", 42)

@@ -102,7 +102,30 @@ class Person:
     if (subclassWrapper != null) {
       return subclassWrapper;
     }
-    return new python.Person(arg1);
+    Object boundWrapper = PythonConversion.boundWrapper(arg1, Person.class);
+    if (boundWrapper != null) {
+      Person boundInstance = (Person) boundWrapper;
+      boundInstance.micronautRefreshFromPythonObject(arg1);
+      return boundInstance;
+    }
+    Person createdWrapper = new python.Person(arg1);
+    PythonConversion.bindWrapper(arg1, createdWrapper);
+    return createdWrapper;
+  }
+
+  private void micronautRefreshFromPythonObject(Value arg1) {
+    if (arg1.hasMember("name")) {
+      Value pythonMember_name = arg1.getMember("name");
+      this.name = PythonConversion.isNone(pythonMember_name) ? null : pythonMember_name.asString();
+    }
+    if (arg1.hasMember("age")) {
+      Value pythonMember_age = arg1.getMember("age");
+      this.age = pythonMember_age.asInt();
+    }
+    if (arg1.hasMember("address")) {
+      Value pythonMember_address = arg1.getMember("address");
+      this.address = Address.fromPolyglotValue(pythonMember_address);
+    }
   }
 
   public void setName(String arg1) {

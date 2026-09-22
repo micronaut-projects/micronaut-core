@@ -42,6 +42,14 @@ class BookRepository:
 # end::clazz[]
 
     @Transactional
+    def save_python_entity(self, title: str, pages: int) -> Book:
+        # the Python object itself is persisted: the id Hibernate assigns to the Java wrapper of the
+        # object has to be visible on the Python object and on the wrapper this method returns
+        book = Book(title, pages)
+        self.entity_manager.persist(book)
+        return book
+
+    @Transactional
     def save_order(self, region: str, number: int, customer: str) -> Order:
         order = Order()
         order.id = OrderId(region, number)
