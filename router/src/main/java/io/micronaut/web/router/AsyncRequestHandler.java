@@ -37,8 +37,9 @@ public interface AsyncRequestHandler {
     /**
      * Handle the request.
      *
-     * @param request The request
+     * @param request       The request
+     * @param pathVariables The path variables of the matched route
      * @return The response, completed later
      */
-    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request);
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables);
 }

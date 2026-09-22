@@ -33,7 +33,6 @@ import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.HttpRoutes;
-import io.micronaut.web.router.PathVariables;
 import io.micronaut.web.router.RouteSource;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
@@ -152,13 +151,13 @@ public class HandlerRoutesTest {
         @Named("fn")
         HttpRoutes fnRoutes() {
             return routes -> {
-                routes.GET("/fn/hello/{name}", request ->
-                    HttpResponse.ok("Hello " + PathVariables.of(request).getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, item) ->
+                routes.GET("/fn/hello/{name}", (request, pathVariables) ->
+                    HttpResponse.ok("Hello " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
-                routes.handleAsync(HttpMethod.GET, "/fn/async", request ->
+                routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
                     CompletableFuture.supplyAsync(() -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
-                routes.GET("/fn/fail", request -> {
+                routes.GET("/fn/fail", (request, pathVariables) -> {
                     throw new CheckedFailure("checked failure");
                 });
             };
@@ -176,7 +175,7 @@ public class HandlerRoutesTest {
         }
 
         void enable() {
-            current = tables.build(routes -> routes.GET("/fn-dynamic/{+path}", request ->
+            current = tables.build(routes -> routes.GET("/fn-dynamic/{+path}", (request, pathVariables) ->
                 HttpResponse.ok("dynamic " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE)));
         }
 

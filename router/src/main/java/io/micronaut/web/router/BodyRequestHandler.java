@@ -36,10 +36,11 @@ public interface BodyRequestHandler<B> {
     /**
      * Handle the request.
      *
-     * @param request The request
-     * @param body    The decoded body
+     * @param request       The request
+     * @param pathVariables The path variables of the matched route
+     * @param body          The decoded body
      * @return The response
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    HttpResponse<?> handle(HttpRequest<?> request, B body) throws Exception;
+    HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables, B body) throws Exception;
 }
