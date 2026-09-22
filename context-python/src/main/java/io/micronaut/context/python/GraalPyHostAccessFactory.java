@@ -157,8 +157,20 @@ final class GraalPyHostAccessFactory {
             GraalPyHostAccessFactory::isSequenceOrContainer,
             GraalPyHostAccessFactory::asList);
         builder.targetTypeMapping(Value.class, byte[].class,
-            value -> value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements(),
+            GraalPyHostAccessFactory::isBytesLike,
             GraalPyHostAccessFactory::readBytes);
+    }
+
+    /**
+     * A Python bytes-like value ({@code bytes}, {@code bytearray}, {@code memoryview}, or any object
+     * exposing the buffer protocol). A Java {@code byte[]} that went to Python is a host object and
+     * keeps the default host conversion, so it comes back as the same array.
+     *
+     * @param value The value
+     * @return {@code true} when the value is a Python buffer
+     */
+    private static boolean isBytesLike(@Nullable Value value) {
+        return value != null && !value.isNull() && !value.isHostObject() && value.hasBufferElements();
     }
 
     /**
@@ -369,8 +381,14 @@ final class GraalPyHostAccessFactory {
         builder.targetTypeMapping(
             Value.class,
             Object.class,
-            v -> ValueCoercibles.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
+            v -> isBytesLike(v) || ValueCoercibles.hostObject(v) != null || findMapping(v, pythonClassResolver) != null,
             v -> {
+                // a generic API used with its type arguments erased, RedisCommands<byte[], byte[]> on a
+                // raw-typed bean, takes Object parameters here: a Python bytes value is the byte[] the
+                // declared byte[] parameter of the same API would have received
+                if (isBytesLike(v)) {
+                    return readBytes(v);
+                }
                 ValueCoercible host = ValueCoercibles.hostObject(v);
                 if (host != null) {
                     return host;
