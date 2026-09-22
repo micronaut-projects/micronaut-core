@@ -18,6 +18,7 @@ import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Specification
 
+import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ExecutionException
 import java.util.function.Supplier
@@ -502,6 +503,79 @@ class FilterRunnerSpec extends Specification {
         then:
         resp == resp2
         events == ["terminal", "after"]
+    }
+
+    def 'before returns an empty publisher'(Publisher<?> result) {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(Publisher, Argument.of(HttpResponse))) { HttpRequest<?> req ->
+                    events.add("before")
+                    result
+                }
+        ]
+
+        when:
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp1
+        events == ["before", "terminal"]
+
+        where:
+        result << [Flux.empty(), Mono.empty(), Mono.delay(Duration.ofMillis(10)).then(Mono.empty())]
+    }
+
+    def 'after returns an empty publisher'(Publisher<?> result) {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        List<GenericHttpFilter> filters = [
+                after(ReturnType.of(Publisher, Argument.of(HttpResponse))) { HttpResponse<?> resp ->
+                    events.add("after")
+                    result
+                }
+        ]
+
+        when:
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp1
+        events == ["terminal", "after"]
+
+        where:
+        result << [Flux.empty(), Mono.empty(), Mono.delay(Duration.ofMillis(10)).then(Mono.empty())]
+    }
+
+    def 'around filter returns an empty publisher after proceeding'(boolean flux) {
+        given:
+        def events = []
+        def resp1 = HttpResponse.ok("resp1")
+        List<GenericHttpFilter> filters = [
+                around(false) { request, chain ->
+                    events.add("before")
+                    def downstream = Mono.from(chain.proceed(request)).doOnNext { events.add("after") }
+                    flux ? downstream.flux().then(Mono.empty()).flux() : downstream.then(Mono.empty())
+                }
+        ]
+
+        when:
+        def resp = await(filterRunner(filters, {
+            events.add("terminal")
+            ExecutionFlow.just(resp1)
+        }).run(HttpRequest.GET("/"))).value
+        then:
+        resp == resp1
+        events == ["before", "terminal", "after"]
+
+        where:
+        flux << [false, true]
     }
 
     def 'before returns a null publisher from a non-nullable method'() {

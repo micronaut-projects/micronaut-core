@@ -729,7 +729,9 @@ record MethodFilter<T>(FilterOrder order,
 
         @Override
         public FilterContinuation<Publisher<HttpResponse<?>>> request(HttpRequest<?> request) {
-            return new ReactiveContinuationImpl(downstream, filterContext.withRequest(request), mutablePropagatedContext);
+            // keep this continuation, the method result is processed with its context
+            filterContext = filterContext.withRequest(request);
+            return this;
         }
 
         @Override
