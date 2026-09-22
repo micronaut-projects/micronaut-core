@@ -1,1 +1,2 @@
 io.micronaut.web.router.ColonRouteTemplateEngine
+io.micronaut.web.router.OrderedColonRouteTemplateEngine
