@@ -31,7 +31,7 @@ Nested enums, interfaces (abstract base classes and protocols) and `@ContextPool
 
 An instance of a generated class created through its no-argument constructor, for example a service listed in `META-INF/services` that the framework instantiates, creates its Python object in the Python context of the application running at that time. The instance is not bound to that context: when the application is stopped and another one started in the same JVM, the next use creates the object again in the new context, so a service held in a static holder keeps working across applications and test classes. Instances created with constructor arguments, and instances wrapping an existing Python object, keep the object they were created with.
 
-A class is resolved through the module named after it before its package is imported, so a class instantiated on another thread while its package is being imported (a service the parallel service loader creates for a call made at import time) does not wait for the import of the package.
+A class is resolved through its package, which is imported first: classes of one package instantiated on several threads at once wait for the one import of the package. While the package is being imported, a class of it is resolved through the module named after it instead, so a class instantiated on another thread during that import (a service the parallel service loader creates for a call made at import time) does not wait for the import of the package.
 
 == Runtime Annotations and Reflection Data
 

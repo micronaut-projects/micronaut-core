@@ -52,11 +52,20 @@ __micronaut_inspect_isclass = inspect.isclass
 __micronaut_import_module = importlib.import_module
 
 
-def __micronaut_loaded_module(name):
-    """The imported and initialized module, or None: not imported, or another thread is executing it."""
+def __micronaut_import_package_of_member(name):
+    """The package a member is resolved from: imported, or None while its import runs on any thread.
+
+    A package that was never imported is imported here, before the module named after the member,
+    so the import holds the lock of the package alone: importing the module first would take its
+    lock and then wait for the package, which a second thread importing another module of the
+    package the same way waits for while holding the lock of its module (_DeadlockError, as the
+    initialiser of a generated package imports every module of the package). A package whose
+    import is running is not waited for: the caller imports the module named after the member,
+    which the import system executes without the lock of its package.
+    """
     module = sys.modules.get(name)
     if module is None:
-        return None
+        return importlib.import_module(name)
     spec = getattr(module, "__spec__", None)
     if spec is not None and getattr(spec, "_initializing", False):
         return None
