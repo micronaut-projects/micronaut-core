@@ -32,11 +32,13 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.http.uri.UriTemplateMatcher;
+import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.spi.CompiledRouteMatcher;
+import io.micronaut.web.router.spi.RouteMatchSelector;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
@@ -95,6 +97,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
     private final boolean implicitHead;
+    /**
+     * The route selector of the engine of the template, or {@code null}, see {@link RouteMatchSelector}.
+     */
+    private final @Nullable RouteMatchSelector routeMatchSelector;
 
     @Nullable
     private ExecutorService executorService;
@@ -279,6 +285,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.order = order;
         this.attributes = attributes;
         this.errorScope = errorScope;
+        this.routeMatchSelector = uriTemplateMatcher == null
+            && RouteTemplateEngines.defaults().engine(parsedTemplate.engineId()) instanceof RouteMatchSelector selector ? selector : null;
     }
 
     @Override
@@ -327,6 +335,24 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public int getPatternVariableCount() {
         return uriTemplateMatcher != null ? uriTemplateMatcher.getPatternVariableCount() : parsedTemplate.patternVariableCount();
+    }
+
+    /**
+     * @return The route selector of the engine of the template, or {@code null}
+     */
+    @Nullable RouteMatchSelector routeMatchSelector() {
+        return routeMatchSelector;
+    }
+
+    /**
+     * @return Whether the route selector of the engine of the template selects the matches of
+     * this route, which may have a negotiated media type, see
+     * {@link UriRouteMatch#getSelectedMediaType()}
+     * @since 5.3.0
+     */
+    @Internal
+    public boolean isSelectedByEngine() {
+        return routeMatchSelector != null;
     }
 
     @Override
@@ -395,16 +421,6 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
             }
             matchInfo = new RouteCaptures(path, parsedTemplate.variables(), Arrays.asList(captured)).toUriMatchInfo();
         }
-        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
-    }
-
-    /**
-     * A match of this route located by a {@link RouteLocator}.
-     *
-     * @param matchInfo The match info with the variables of the prefixes and the target
-     * @return The match
-     */
-    UriRouteMatch<T, R> locatedMatch(UriMatchInfo matchInfo) {
         return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
     }
 
