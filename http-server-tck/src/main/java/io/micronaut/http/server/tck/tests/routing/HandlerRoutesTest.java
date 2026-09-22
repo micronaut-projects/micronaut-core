@@ -209,6 +209,26 @@ public class HandlerRoutesTest {
     }
 
     @Test
+    void missingFormFieldCanHaveADefaultValue() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-defaults", "quantity=3")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("3 standard false")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/forms-defaults", "shipping=express&gift=true")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("1 express true")
+                .build());
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms-defaults", "quantity=many")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.BAD_REQUEST)
+                .build());
+        }
+    }
+
+    @Test
     void missingOrInvalidFormFieldIsABadRequest() throws IOException {
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/forms/7", "age=42")
@@ -352,6 +372,9 @@ public class HandlerRoutesTest {
                     return HttpResponse.ok(pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
                         + " " + form.getValues("tag") + " " + file).contentType(MediaType.TEXT_PLAIN_TYPE);
                 });
+                routes.POST("/fn/forms-defaults", (request, pathVariables, form) ->
+                    HttpResponse.ok(form.getInt("quantity", 1) + " " + form.getString("shipping", "standard") + " " + form.getBoolean("gift", false))
+                        .contentType(MediaType.TEXT_PLAIN_TYPE));
                 routes.handleFormAsync(HttpMethod.POST, "/fn/forms-async", (request, pathVariables, form) ->
                     completeLater(executor, () -> HttpResponse.ok("async " + form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE)));
                 routes.handleFormStream(HttpMethod.POST, "/fn/forms-stream", (request, pathVariables, parts) -> {

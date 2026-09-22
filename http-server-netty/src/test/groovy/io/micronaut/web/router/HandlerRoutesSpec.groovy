@@ -78,6 +78,21 @@ class HandlerRoutesSpec extends Specification {
         e.status == HttpStatus.BAD_REQUEST
     }
 
+    void "accessors return a default value for a missing variable"() {
+        expect:
+        get('/ctx/h/defaults') == '5,none,x,false'
+        get('/ctx/h/defaults/7') == '7,none,x,false'
+    }
+
+    void "a present variable that does not convert is not replaced by the default"() {
+        when:
+        get('/ctx/h/defaults/seven')
+
+        then:
+        def e = thrown(HttpClientResponseException)
+        e.status == HttpStatus.BAD_REQUEST
+    }
+
     void "route table routes are under the context path"() {
         expect:
         get('/ctx/table/x') == 'table /ctx/table/x'
@@ -125,6 +140,10 @@ class HandlerRoutesSpec extends Specification {
                     PathVariables vars = pathVariables
                     text([vars.findLong('l').asLong, vars.findDouble('l').asDouble, vars.findString('l').get(),
                           vars.findInt('missing').present, vars.findBoolean('missing').present].join(','))
+                } as RequestHandler)
+                routes.GET('/h/defaults{/n}', { HttpRequest<?> request, PathVariables pathVariables ->
+                    text([pathVariables.getInt('n', 5), pathVariables.getString('missing', 'none'),
+                          pathVariables.get('other', String, 'x'), pathVariables.getBoolean('flag', false)].join(','))
                 } as RequestHandler)
                 routes.handleAsync(io.micronaut.http.HttpMethod.GET, '/h/executor', { HttpRequest<?> request, PathVariables pathVariables ->
                     CompletableFuture.completedFuture(text(Thread.currentThread().name))

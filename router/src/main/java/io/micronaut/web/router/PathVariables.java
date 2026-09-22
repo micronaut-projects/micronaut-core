@@ -33,7 +33,8 @@ import java.util.Set;
  * }</pre>
  *
  * <p>There are accessors for strings and the primitive types, e.g. {@code getLong("id")} or
- * {@code findInt("page")}, and {@link #get(String, Class)} and {@link #find(String, Class)} for
+ * {@code findInt("page")}, with a default value for a missing variable, e.g.
+ * {@code getInt("page", 0)}, and {@link #get(String, Class)} and {@link #find(String, Class)} for
  * any other type, e.g. {@code UUID}. Values convert with the conversion service of the route,
  * like the path variable arguments of a controller method, and fail the same way: a missing
  * variable or a value that does not convert is answered with 400.</p>
@@ -184,6 +185,128 @@ public interface PathVariables {
      */
     default boolean getBoolean(String name) {
         return get(name, Boolean.class);
+    }
+
+    /**
+     * A variable converted to a type, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param type         The type
+     * @param defaultValue The value to return if the variable has no value
+     * @param <T>          The type
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default <T> T get(String name, Class<T> type, T defaultValue) {
+        return find(name, type).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a string, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default String getString(String name, String defaultValue) {
+        return find(name, String.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as an {@code int}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default int getInt(String name, int defaultValue) {
+        return find(name, Integer.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code long}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default long getLong(String name, long defaultValue) {
+        return find(name, Long.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code double}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default double getDouble(String name, double defaultValue) {
+        return find(name, Double.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code float}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default float getFloat(String name, float defaultValue) {
+        return find(name, Float.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code short}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default short getShort(String name, short defaultValue) {
+        return find(name, Short.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code byte}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default byte getByte(String name, byte defaultValue) {
+        return find(name, Byte.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code char}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default char getChar(String name, char defaultValue) {
+        return find(name, Character.class).orElse(defaultValue);
+    }
+
+    /**
+     * A variable as a {@code boolean}, or a default value if it has none.
+     *
+     * @param name         The name of the variable
+     * @param defaultValue The value to return if the variable has no value
+     * @return The value, or the default value
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     */
+    default boolean getBoolean(String name, boolean defaultValue) {
+        return find(name, Boolean.class).orElse(defaultValue);
     }
 
     /**
