@@ -43,7 +43,7 @@ import java.util.function.Function;
  */
 @Experimental
 @SuppressWarnings("MethodName")
-public interface HttpRouteBuilder {
+public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpRouteGroup, LocatedHttpRouteBuilder {
 
     /**
      * Route a {@code GET} request to a handler function, with an implicit {@code HEAD} route

@@ -30,7 +30,7 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Internal
-interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpec<S> {
+sealed interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpec<S> permits DefaultHttpRouteSpec, DefaultHttpRouteGroup, DefaultServerFilterSpec {
 
     @Override
     default S before(RouteRequestFilter filter) {

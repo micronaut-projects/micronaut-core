@@ -41,7 +41,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
+public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> permits DefaultHttpRouteSpec {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method.
