@@ -114,6 +114,11 @@ public final class BasicHttpAttributes {
      * and the conditions of the route are left as they were. Used to bind a value while the
      * route runs, e.g. the body an asynchronous handler reads.
      *
+     * <p>Not thread-safe: the conditions of the route are removed from the attributes of the
+     * request while the binding runs, and restored afterwards. It is called while the value is
+     * bound, on one thread, and never while another binding of the request runs, e.g. the
+     * argument binding of the route or another detached binding.</p>
+     *
      * @param request The request
      * @param binding The binding
      * @return What the binding waits for
