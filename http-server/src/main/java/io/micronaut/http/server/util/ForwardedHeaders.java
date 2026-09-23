@@ -49,6 +49,10 @@ import java.util.function.Predicate;
  *     values of this hop.</li>
  * </ul>
  * By default no peer is trusted.
+ * <p>The trust predicate only evaluates the immediate peer, i.e. the remote address of the
+ * connection the inbound request arrived on. The addresses inside the inbound headers are never
+ * tested. With a chain of proxies in front of this server, e.g. two, trust the nearer one, and
+ * rely on it having applied the same rule to its own peer.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -407,7 +411,9 @@ public final class ForwardedHeaders {
 
         /**
          * Which peers are trusted proxies whose forwarding headers are kept and appended to.
-         * Defaults to none.
+         * Defaults to none. Only the immediate peer (the remote address of the connection) is
+         * tested, not the addresses in the forwarding headers: with a chain of proxies, trust
+         * the nearest one, which must apply the same rule to its own peer.
          *
          * @param trustedProxy Tests the address of the peer that sent the inbound request
          * @return This builder
