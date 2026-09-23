@@ -169,12 +169,12 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     }
 
     @Override
-    public <T> CompletionStage<T> body(Class<T> type) {
+    public <T> CompletionStage<@Nullable T> body(Class<T> type) {
         return body(Argument.of(type));
     }
 
     @Override
-    public <T> CompletionStage<T> body(Argument<T> type) {
+    public <T> CompletionStage<@Nullable T> body(Argument<T> type) {
         Objects.requireNonNull(type, "type");
         if (type.isAsyncOrReactive()) {
             throw new IllegalArgumentException("The body cannot be read as the reactive or asynchronous type " + type.getTypeName()
@@ -187,7 +187,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         claim("body");
         // bound like the @Body argument of a controller, with the binder of the type
         Argument<T> argument = HandlerMethod.bodyArgument(type);
-        CompletableFuture<T> result = new CompletableFuture<>();
+        CompletableFuture<@Nullable T> result = new CompletableFuture<>();
         try {
             ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
                 .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
@@ -250,6 +250,14 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     @Override
     public <T> BodyElements<T> elements(Argument<T> type) {
         Objects.requireNonNull(type, "type");
+        if (type.isAsyncOrReactive()) {
+            throw new IllegalArgumentException("The elements of the body cannot be read as the reactive or asynchronous type " + type.getTypeName()
+                + ": an element is decoded whole, read the elements one at a time instead");
+        }
+        if (InputStream.class.isAssignableFrom(type.getType())) {
+            throw new IllegalArgumentException("The elements of the body cannot be read as InputStreams by an asynchronous handler, as reading them blocks"
+                + ": take the body with takeBody()");
+        }
         claim("elements");
         CloseableByteBody body = server.byteBody().move();
         PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
