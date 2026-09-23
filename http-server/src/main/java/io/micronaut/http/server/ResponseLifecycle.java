@@ -62,6 +62,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -130,6 +131,42 @@ public abstract class ResponseLifecycle {
                 return ExecutionFlow.error(f);
             }
         }
+    }
+
+    /**
+     * Encode the response. If writing the body fails before anything was sent, the given handler
+     * gives the error response for the failure, e.g. from the exception handlers and the error and
+     * status routes, and that response is encoded instead. The handler runs at most once: if the
+     * error response fails to encode too, this falls back like
+     * {@link #encodeHttpResponseSafe(HttpRequest, HttpResponse)}.
+     *
+     * @param httpRequest       The request that triggered this response
+     * @param response          The unencoded response
+     * @param writeErrorHandler Gives the error response for a failure to write the body
+     * @return The encoded response
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(HttpRequest<?> httpRequest,
+                                                                                        HttpResponse<?> response,
+                                                                                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        ExecutionFlow<ByteBodyHttpResponse<?>> flow;
+        try {
+            flow = (ExecutionFlow<ByteBodyHttpResponse<?>>) encodeHttpResponse(httpRequest, response);
+        } catch (Throwable e) {
+            flow = ExecutionFlow.error(e);
+        }
+        // a failure after the first byte was sent does not complete this flow, it fails the body
+        return flow.onErrorResume(e -> {
+            ExecutionFlow<HttpResponse<?>> errorResponse;
+            try {
+                errorResponse = writeErrorHandler.apply(e);
+            } catch (Throwable f) {
+                f.addSuppressed(e);
+                return ExecutionFlow.error(f);
+            }
+            return errorResponse.flatMap(r -> encodeHttpResponseSafe(httpRequest, r));
+        });
     }
 
     @SuppressWarnings("unchecked")
