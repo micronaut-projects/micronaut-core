@@ -1,8 +1,10 @@
 package io.micronaut.context.python;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.ApplicationContextBuilder;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import org.graalvm.polyglot.Context;
+import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.PolyglotException;
 import org.junit.jupiter.api.Test;
 
@@ -148,15 +150,27 @@ final class PythonApplicationRuntimeTest {
      * and a reflective no-arg instantiation all run before the application starts. The runtime
      * bootstraps a default context for them, and the application that starts next adopts it, so the
      * Python objects created before it are the ones the application sees.
+     * <p>
+     * The entry point is the one of an application that is on its way: Micronaut Test creates the
+     * context builder first and calls {@code TestPropertyProvider.getProperties()} while it fills it
+     * in. A call that arrives when no application is starting and none is recorded is a leftover of
+     * the application that shut down and gets nothing, which the first half of this test pins.
      */
     @Test
     void anEntryPointOutsideAnApplicationBootstrapsAContextTheApplicationAdopts() {
+        try (ApplicationContext previous = ApplicationContext.run()) {
+            assertTrue(PythonContextRuntime.isInitialized(), "an application ran in this JVM");
+        }
         assertNull(PythonApplicationRuntime.current(), "no application is running");
+        assertThrows(IllegalStateException.class, PythonContextRuntime::getContext,
+            "the application that shut down leaves no permission to bootstrap a context behind");
+
+        ApplicationContextBuilder builder = ApplicationContext.builder();
         Context bootstrapped = PythonContextRuntime.getContext();
         try {
             assertTrue(PythonContextRuntime.isInitialized(), "the default context is installed");
             assertEquals(3, bootstrapped.eval(PYTHON, "1 + 2").asInt(), "the default context runs Python");
-            try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            try (ApplicationContext applicationContext = builder.start()) {
                 assertSame(bootstrapped, applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON)),
                     "the application adopts the context bootstrapped before it started");
                 assertSame(bootstrapped, PythonContextRuntime.getContext());
@@ -167,6 +181,47 @@ final class PythonApplicationRuntimeTest {
         } finally {
             PythonContextRuntime.resetContext();
         }
+    }
+
+    /**
+     * Generated code reached after the application that owned the runtime closed fails loudly instead
+     * of silently building a Python runtime of its own: a stub held in a JVM-wide singleton, or any
+     * other leftover reference, is not a platform entry point running before an application.
+     */
+    @Test
+    void generatedCodeReachedAfterTheApplicationClosedBootstrapsNothing() {
+        Context applicationGraalPyContext;
+        try (ApplicationContext applicationContext = ApplicationContext.run()) {
+            applicationGraalPyContext = applicationContext.getBean(Context.class, Qualifiers.byName(PYTHON));
+        }
+        assertNull(PythonApplicationRuntime.current(), "closing the application uninstalls its runtime");
+
+        IllegalStateException e = assertThrows(IllegalStateException.class, PythonContextRuntime::getContext);
+
+        assertTrue(e.getMessage().startsWith("GraalPy context has not been initialized"), e.getMessage());
+        assertFalse(PythonContextRuntime.isInitialized(), "no context was bootstrapped for the leftover reference");
+        assertClosed(applicationGraalPyContext, "the context of the application is closed");
+    }
+
+    /**
+     * A context bootstrapped for an entry point outside an application that no application ever
+     * adopts is closed with the engine created for it when it is dropped: nothing else owns either of
+     * them, so the engine (native memory and compiler threads) would otherwise live for the life of
+     * the JVM.
+     */
+    @Test
+    void aBootstrappedContextNoApplicationAdoptsIsClosedWithItsEngineWhenItIsDropped() {
+        ApplicationContext.builder(); // an application is on its way, and its entry point reaches Python
+        Context bootstrapped = PythonContextRuntime.getContext();
+        Engine engine = bootstrapped.getEngine();
+
+        // the application never starts, as for a test whose application fails to start
+        PythonContextRuntime.resetContext();
+
+        assertNull(PythonApplicationRuntime.current());
+        assertClosed(bootstrapped, "the bootstrapped context is closed when it is dropped");
+        assertThrows(IllegalStateException.class, () -> Context.newBuilder(PYTHON).engine(engine).build(),
+            "the engine created for the bootstrapped context is closed with it");
     }
 
     /**

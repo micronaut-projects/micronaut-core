@@ -115,16 +115,13 @@ class StartupListener:
         then:
         !PythonContextRuntime.isInitialized()
 
-        when: "the stopped application context no longer provides its runtime"
-        def bootstrapped = PythonContextRuntime.getContext()
+        when: "the stopped application context no longer provides the runtime"
+        PythonContextRuntime.getContext()
 
-        then: "a default context is bootstrapped instead, the one a platform entry point outside an application gets"
-        bootstrapped != graalPyContext
-        PythonContextRuntime.isInitialized()
-
-        cleanup:
-        PythonContextRuntime.resetContext()
-        bootstrapped?.close()
+        then: "generated code reached after the application closed fails rather than bootstrapping a context of its own"
+        def e = thrown(IllegalStateException)
+        e.message.startsWith("GraalPy context has not been initialized")
+        !PythonContextRuntime.isInitialized()
     }
 
     void "test the bootstrap context of the application is never used to initialize the runtime"() {
@@ -147,18 +144,16 @@ class TemperatureConverter(TypeConverter[str, Temperature]):
         context.getConversionService().convert("21.5", Temperature).get().celsius() == 21.5d
 
         when: "a refresh recreates the bootstrap context while the application is running"
-        def applicationGraalPyContext = context.getBean(Context, Qualifiers.byName("python"))
         context.environment.refresh()
         context.close()
-        def bootstrapped = PythonContextRuntime.getContext()
+        PythonContextRuntime.getContext()
 
-        then: "the stopped application context cleared the record, which the fresh bootstrap context did not replace: a default context is bootstrapped, not one of the bootstrap context"
-        bootstrapped != applicationGraalPyContext
-        PythonContextRuntime.isInitialized()
+        then: "the stopped application context cleared the record, which the fresh bootstrap context did not replace"
+        def e = thrown(IllegalStateException)
+        e.message == "GraalPy context has not been initialized. Make sure micronaut-context-python is on the classpath."
+        !PythonContextRuntime.isInitialized()
 
         cleanup:
-        PythonContextRuntime.resetContext()
-        bootstrapped?.close()
         bootstrapEnvironment = false
     }
 

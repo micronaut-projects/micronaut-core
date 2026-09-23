@@ -23,6 +23,7 @@ import io.micronaut.context.event.BeanDestroyedEventListener;
 import io.micronaut.core.annotation.Order;
 import io.micronaut.core.io.service.SoftServiceLoader;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.runtime.exceptions.ApplicationStartupException;
 import io.micronaut.runtime.graceful.GracefulShutdownCapable;
 import jakarta.inject.Named;
@@ -45,6 +46,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -184,6 +186,20 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * This bean loads on startup due to the @Context annotation; generated Python code that runs
      * before the eager beans are initialized (type converters, beans of {@code processOnStartup}
      * executable methods) creates it earlier through {@link PythonRuntimeBootstrapConfigurer}.
+     * <p>
+     * When a platform entry point reached Python before this application context existed, the context
+     * it was given is adopted as the primary context and the injected {@code hostAccess},
+     * {@code engine} and {@code contextConfiguration} are <em>not</em> applied to it: they describe
+     * beans of an application that did not exist when the context was built. The adopted context
+     * carries the default {@link GraalPyContextConfiguration}, an engine of its own and the host
+     * access of the class loader that bootstrapped it (its {@code TargetTypeMapping} services),
+     * while the {@code GraalPyContextCustomizer} services and the {@link #CONTEXT_ID_PROPERTY}
+     * system property, which are not bean-resolved, do apply to it. An application that configures
+     * {@code graalpy.context.*} or supplies its own {@code @Named("python")} {@code HostAccess} or
+     * {@code Engine} bean therefore behaves differently depending on whether something reached Python
+     * before it started, so the configuration that was not applied is logged as a warning. An
+     * application that reaches Python only from its own beans builds its context here and is
+     * unaffected.
      *
      * @param engine The engine
      * @param hostAccess The host access
@@ -212,6 +228,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
                 // instantiated bean) already created Python objects in a context bootstrapped for it:
                 // adopt that context instead of building a second one the earlier objects do not live in
                 LOG.debug("Adopting the GraalPy context bootstrapped before the application context");
+                warnDiscardedConfiguration(contextConfiguration);
                 runtime.set(adopted);
                 return adopted.context();
             }
@@ -228,6 +245,48 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
             throw new ApplicationStartupException(
                 "Failed to initialize GraalPy context: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * Report the configuration of this application that the context it adopted was not built with: a
+     * context bootstrapped before the application exists cannot be built from the application's beans,
+     * so an application whose configuration is not the default one silently runs with another. The
+     * same application then behaves differently depending on whether a platform entry point reached
+     * Python before it started, which is what this line makes visible.
+     *
+     * @param contextConfiguration The context configuration of this application
+     */
+    private void warnDiscardedConfiguration(GraalPyContextConfiguration contextConfiguration) {
+        List<String> discarded = new ArrayList<>(4);
+        if (!contextConfiguration.getOptions().isEmpty()) {
+            discarded.add(GraalPyContextConfiguration.PREFIX + ".options " + contextConfiguration.getOptions().keySet());
+        }
+        if (!contextConfiguration.getHostClassLookup().isEmpty()) {
+            discarded.add(GraalPyContextConfiguration.PREFIX + ".host-class-lookup " + contextConfiguration.getHostClassLookup());
+        }
+        addUserSupplied(discarded, HostAccess.class, GraalPyHostAccessFactory.class);
+        addUserSupplied(discarded, Engine.class, GraalPyEngineFactory.class);
+        if (!discarded.isEmpty()) {
+            LOG.warn("The GraalPy context adopted from the entry point that reached Python before this application " +
+                "started was built before the application existed, so {} of this application {} not applied to it. " +
+                "Reach Python only from the beans of the application to have its own configuration applied.",
+                String.join(", ", discarded), discarded.size() == 1 ? "is" : "are");
+        }
+    }
+
+    /**
+     * Add the {@code @Named("python")} bean of the given type to the report when the application
+     * supplies it itself, that is when it is not produced by the framework factory.
+     *
+     * @param discarded The report
+     * @param beanType The bean type
+     * @param defaultFactory The factory producing the framework's own bean
+     * @param <T> The bean type
+     */
+    private <T> void addUserSupplied(List<String> discarded, Class<T> beanType, Class<?> defaultFactory) {
+        applicationContext.findBeanDefinition(beanType, Qualifiers.byName(PYTHON))
+            .filter(definition -> !defaultFactory.equals(definition.getDeclaringType().orElse(null)))
+            .ifPresent(definition -> discarded.add("the " + beanType.getSimpleName() + " bean"));
     }
 
     /**
@@ -294,7 +353,7 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
         }
     }
 
-    private static void closeQuietly(Context context) {
+    static void closeQuietly(Context context) {
         try {
             context.close(true);
         } catch (RuntimeException e) {
