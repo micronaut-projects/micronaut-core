@@ -139,6 +139,22 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
         locateAsync(prefixUri, untyped, routesOf);
     }
 
+    @Override
+    public <U> void locate(RouteTemplate prefix, LocatedLocatorHandler<T, ? extends U> locator,
+                           Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        Objects.requireNonNull(locator, "locator");
+        LocatorHandler<U> untyped = (request, pathVariables) -> locator.locate(request, pathVariables, target(pathVariables));
+        locate(prefix, untyped, routesOf);
+    }
+
+    @Override
+    public <U> void locateAsync(RouteTemplate prefix, LocatedAsyncLocatorHandler<T, ? extends U> locator,
+                                Function<? super U, ? extends LocatedRoutes<?>> routesOf) {
+        Objects.requireNonNull(locator, "locator");
+        AsyncLocatorHandler<U> untyped = (request, pathVariables) -> locator.locate(request, pathVariables, target(pathVariables));
+        locateAsync(prefix, untyped, routesOf);
+    }
+
     /**
      * The located target of a located route, of the type of the routes.
      *

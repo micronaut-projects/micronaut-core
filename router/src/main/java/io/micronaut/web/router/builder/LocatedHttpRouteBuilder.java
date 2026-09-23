@@ -212,4 +212,63 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
         Objects.requireNonNull(routes, "routes");
         locateAsync(prefixUri, locator, target -> routes);
     }
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target that a locator locates from the located target of these routes.
+     *
+     * @param prefix   The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator  Locates the target from the target of these routes, or answers {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <U>      The type of the target the locator locates
+     * @see #locate(RouteTemplate, LocatorHandler, Function)
+     */
+    <U> void locate(RouteTemplate prefix, LocatedLocatorHandler<T, ? extends U> locator, Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets that a locator locates from the located target of these routes, see
+     * {@link #locate(RouteTemplate, LocatedLocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator Locates the target from the target of these routes, or answers {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <U>     The type of the target the locator locates
+     */
+    default <U> void locate(RouteTemplate prefix, LocatedLocatorHandler<T, ? extends U> locator, LocatedRoutes<U> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locate(prefix, locator, target -> routes);
+    }
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target that a locator locates later from the located target of these routes.
+     *
+     * @param prefix   The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator  Locates the target later from the target of these routes, or completes with {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <U>      The type of the target the locator locates
+     * @see #locateAsync(RouteTemplate, AsyncLocatorHandler, Function)
+     */
+    <U> void locateAsync(RouteTemplate prefix, LocatedAsyncLocatorHandler<T, ? extends U> locator,
+                         Function<? super U, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets that a locator locates later from the located target of these routes,
+     * see {@link #locateAsync(RouteTemplate, LocatedAsyncLocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix, relative to the prefix of the locator of these routes
+     * @param locator Locates the target later from the target of these routes, or completes with {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <U>     The type of the target the locator locates
+     */
+    default <U> void locateAsync(RouteTemplate prefix, LocatedAsyncLocatorHandler<T, ? extends U> locator, LocatedRoutes<U> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateAsync(prefix, locator, target -> routes);
+    }
 }
