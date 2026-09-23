@@ -243,6 +243,39 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final HttpRouteSpec resources(String uriPrefix, ResourceHandler resources) {
+        Objects.requireNonNull(uriPrefix, "uriPrefix");
+        Objects.requireNonNull(resources, "resources");
+        String pathVariable = Objects.requireNonNull(resources.pathVariable(), "pathVariable");
+        if (pathVariable.isEmpty()) {
+            throw new IllegalArgumentException("The path variable of a resource handler must have a name");
+        }
+        for (int i = 0; i < pathVariable.length(); i++) {
+            char c = pathVariable.charAt(i);
+            if (!Character.isLetterOrDigit(c) && c != '_') {
+                throw new IllegalArgumentException("The path variable of a resource handler must be a plain name: " + pathVariable);
+            }
+        }
+        String prefix = uriPrefix.strip();
+        if (prefix.indexOf('?') >= 0 || prefix.indexOf('#') >= 0) {
+            throw new IllegalArgumentException("The URI prefix of resources is a path, without a query or a fragment: " + uriPrefix);
+        }
+        int end = prefix.length();
+        while (end > 0 && prefix.charAt(end - 1) == '/') {
+            end--;
+        }
+        prefix = prefix.substring(0, end);
+        if (!prefix.isEmpty() && prefix.charAt(0) != '/') {
+            prefix = '/' + prefix;
+        }
+        // the prefix itself, e.g. for the index file, and every path under it
+        return spec(
+            route(HttpMethod.GET, prefix.isEmpty() ? "/" : prefix, HandlerMethod.of(resources), null),
+            route(HttpMethod.GET, prefix + "/{+" + pathVariable + "}", HandlerMethod.of(resources), null)
+        );
+    }
+
+    @Override
     public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
