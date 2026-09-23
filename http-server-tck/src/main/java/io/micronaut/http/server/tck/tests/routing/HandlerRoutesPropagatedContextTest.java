@@ -52,8 +52,8 @@ import java.util.concurrent.ExecutorService;
  * Handler routes run with the propagated context of the request like controller routes: an
  * element an annotation filter with a {@link MutablePropagatedContext} parameter adds, e.g. an MDC
  * context, is in scope in synchronous and asynchronous handlers, in their continuations on a
- * propagating executor and after reading the body, in the route filters, and in error and status
- * routes. Route filters change the context like annotation filters.
+ * propagating executor, in the route filters, and in error and status routes. Route filters
+ * change the context like annotation filters.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -90,7 +90,9 @@ public class HandlerRoutesPropagatedContextTest {
     }
 
     @Test
-    void continuationOfTheBodyReadSeesTheContext() throws IOException {
+    void handlerThatReadsTheBodySeesTheContext() throws IOException {
+        // what the continuation of the read sees depends on when the body arrives, like for the
+        // CompletableFuture body of a controller, see PropagatedContextParityTest
         try (ServerUnderTest server = server()) {
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/propagation/async-body", "hello").contentType(MediaType.TEXT_PLAIN_TYPE).header(TRACE, "t1"),
                 HttpResponseAssertion.builder()
@@ -165,7 +167,7 @@ public class HandlerRoutesPropagatedContextTest {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/propagation/missing").header(TRACE, "t1"),
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.NOT_FOUND)
-                    .body("status:trace=t1,route=none,mdc=t1,request=/propagation/missing")
+                    .body("status:trace=none,route=none,mdc=none,request=/propagation/missing")
                     .build());
         }
     }
@@ -282,8 +284,10 @@ public class HandlerRoutesPropagatedContextTest {
                 // the IO executor propagates the context of the thread that submits the task
                 CompletableFuture.supplyAsync(HandlerRoutesPropagatedContextTest::describe, io)
                     .thenApply(onExecutor -> text(onExecutor + ";" + describe())));
-            routes.asyncPOST("/propagation/async-body", (request, pathVariables) -> request.text()
-                    .thenApply(body -> text(body + ":" + describe())))
+            routes.asyncPOST("/propagation/async-body", (request, pathVariables) -> {
+                String handler = describe();
+                return request.text().thenApply(body -> text(body + ":" + handler));
+            })
                 .consumes(MediaType.TEXT_PLAIN_TYPE);
 
             routes.GET("/propagation/route-filter", (request, pathVariables) -> text(describe()))

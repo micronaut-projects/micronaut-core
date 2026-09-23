@@ -41,16 +41,17 @@ import java.util.concurrent.CompletionStage;
  * <p>Like a controller method, the handler runs with the propagated context of the request in
  * scope: the context the filters produced, e.g. the MDC context a filter added with a
  * {@link io.micronaut.core.propagation.MutablePropagatedContext}, and the request of
- * {@link io.micronaut.http.context.ServerRequestContext}. A read of the whole body, with
- * {@code body}, {@code text}, {@code bytes}, {@code transferTo} or {@code form}, completes with
- * that context in scope, so what the handler continues with once the body arrived sees it, where
- * a controller method receives the body. Like a controller method returning a
+ * {@link io.micronaut.http.context.ServerRequestContext}. Like a controller method returning a
  * {@link CompletionStage}, a continuation of a stage completed by another thread sees the context
  * only if that thread has it, e.g. a task submitted to the {@code TaskExecutors.IO} or
  * {@code TaskExecutors.BLOCKING} executor, which propagates the context of the thread that
  * submits it; see {@link io.micronaut.core.propagation.PropagatedContext#wrap(Runnable)} for
- * other threads. The consumers of {@code parts()} and {@code elements()} run on the thread that
- * delivers the body.</p>
+ * other threads. The reads of the body are no exception, like the {@code CompletableFuture} or
+ * {@code Publisher} body of a controller method: a read, or a consumer of {@code parts()} or
+ * {@code elements()}, that completes once the rest of the body arrives, completes on the thread
+ * that delivers the body, without the context. A handler that needs the context once it has the
+ * body continues with a propagating executor, or is a body or form handler, which is called once
+ * the body arrived, like a controller method with a {@code @Body} argument.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0

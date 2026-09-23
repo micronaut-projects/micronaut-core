@@ -24,6 +24,9 @@ import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
+import io.micronaut.http.annotation.Controller;
+import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.context.ServerRequestContext;
@@ -42,6 +45,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -51,25 +55,36 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An asynchronous handler that reads a body which arrives after the handler returned continues
- * with the propagated context of the route in scope, e.g. the MDC context a filter added: the
- * read completes on the event loop that receives the body, where the handler's continuation runs.
+ * like a controller method whose {@code @Body CompletableFuture} completes once the body arrived:
+ * on the event loop that receives the body, without the propagated context of the route, e.g. the
+ * MDC context a filter added. The handler itself runs with the context.
  */
 class HandlerRouteLateBodyPropagatedContextTest {
     private static final String SPEC_NAME = "HandlerRouteLateBodyPropagatedContextTest";
 
     @Test
-    void continuationOfALateTextReadSeesTheContext() throws Exception {
-        assertEquals("hello:trace=t1,route=r-t1,mdc=t1,request=/late/text", post("/late/text", "text/plain", "hello"));
+    void continuationOfALateBodyOfAControllerDoesNotSeeTheContext() throws Exception {
+        // the reference for the handler routes
+        assertEquals("handler=trace=t1,route=none,mdc=t1,request=/late/controller;hello:trace=none,route=none,mdc=none,request=none",
+            post("/late/controller", "text/plain", "hello"));
     }
 
     @Test
-    void continuationOfALateBodyReadSeesTheContext() throws Exception {
-        assertEquals("hello:trace=t1,route=r-t1,mdc=t1,request=/late/body", post("/late/body", "application/json", "{\"name\":\"hello\"}"));
+    void continuationOfALateTextReadDoesNotSeeTheContext() throws Exception {
+        assertEquals("handler=trace=t1,route=r-t1,mdc=t1,request=/late/text;hello:trace=none,route=none,mdc=none,request=none",
+            post("/late/text", "text/plain", "hello"));
     }
 
     @Test
-    void continuationOfALateFormReadSeesTheContext() throws Exception {
-        assertEquals("hello:trace=t1,route=r-t1,mdc=t1,request=/late/form", post("/late/form", "application/x-www-form-urlencoded", "name=hello"));
+    void continuationOfALateBodyReadDoesNotSeeTheContext() throws Exception {
+        assertEquals("handler=trace=t1,route=r-t1,mdc=t1,request=/late/body;hello:trace=none,route=none,mdc=none,request=none",
+            post("/late/body", "application/json", "{\"name\":\"hello\"}"));
+    }
+
+    @Test
+    void continuationOfALateFormReadDoesNotSeeTheContext() throws Exception {
+        assertEquals("handler=trace=t1,route=r-t1,mdc=t1,request=/late/form;hello:trace=none,route=none,mdc=none,request=none",
+            post("/late/form", "application/x-www-form-urlencoded", "name=hello"));
     }
 
     /**
@@ -151,13 +166,32 @@ class HandlerRouteLateBodyPropagatedContextTest {
 
         private CompletionStage<HttpResponse<String>> reading(CompletionStage<String> read) {
             // the body is sent once the handler returned: the read completes later, on the event loop
+            String handler = describe();
             reading.countDown();
-            return read.thenApply(value -> HttpResponse.ok(value + ":" + describe()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            return read.thenApply(value -> HttpResponse.ok("handler=" + handler + ";" + value + ":" + describe()).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
 
         private static HttpResponse<?> addRouteTrace(HttpRequest<?> request, MutablePropagatedContext propagatedContext) {
             propagatedContext.add(new RouteTrace("r-" + request.getHeaders().get("X-Trace")));
             return null;
+        }
+    }
+
+    @Controller("/late/controller")
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class LateBodyController {
+        private final Routes routes;
+
+        LateBodyController(Routes routes) {
+            this.routes = routes;
+        }
+
+        @Post(consumes = MediaType.TEXT_PLAIN, produces = MediaType.TEXT_PLAIN)
+        CompletableFuture<String> post(@Body CompletableFuture<String> body) {
+            // the body is sent once the method returned: the body completes later, on the event loop
+            String handler = describe();
+            routes.reading.countDown();
+            return body.thenApply(value -> "handler=" + handler + ";" + value + ":" + describe());
         }
     }
 }
