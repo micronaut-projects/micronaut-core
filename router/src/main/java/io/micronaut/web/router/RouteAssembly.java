@@ -398,6 +398,22 @@ public final class RouteAssembly {
     }
 
     /**
+     * The port of a handler route or of a group of handler routes: a port the server can listen
+     * on. Unlike {@code @Controller(port = ...)}, which ignores a negative port, and with
+     * {@code 0} opens a listener on a random port that the route cannot know, it is rejected.
+     *
+     * @param port The port
+     * @return The port
+     * @throws IllegalArgumentException if it is not between {@code 1} and {@code 65535}
+     */
+    public static int port(int port) {
+        if (port < 1 || port > 65_535) {
+            throw new IllegalArgumentException("The port of a route must be between 1 and 65535: " + port);
+        }
+        return port;
+    }
+
+    /**
      * The name of an executor to run a route or a filter on.
      *
      * @param executorName The name
@@ -1160,6 +1176,7 @@ public final class RouteAssembly {
          * @param port The port
          */
         public void port(int port) {
+            RouteAssembly.port(port);
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
@@ -1633,7 +1650,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute port(int port) {
-            exposedPort(port);
+            exposedPort(RouteAssembly.port(port));
             return this;
         }
 

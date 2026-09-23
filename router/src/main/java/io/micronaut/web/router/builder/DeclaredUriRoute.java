@@ -234,7 +234,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute port(int port) {
-        exposePort.accept(port);
+        exposePort.accept(RouteAssembly.port(port));
         return configure(r -> r.port(port));
     }
 

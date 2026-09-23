@@ -120,8 +120,11 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      *
      * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
      *
-     * @param port The port
+     * @param port The port, between {@code 1} and {@code 65535}: unlike
+     *             {@code @Controller(port = ...)}, a negative port or {@code 0}, a random port the
+     *             route could not match, is rejected
      * @return The route
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);

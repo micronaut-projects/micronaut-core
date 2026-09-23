@@ -27,6 +27,7 @@ import io.micronaut.web.router.builder.PathVariables;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.naming.HyphenatedUriNamingStrategy;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.function.Executable;
 
 import java.net.InetSocketAddress;
 import java.util.List;
@@ -146,6 +147,29 @@ class RoutePortTest {
         assertEquals(Set.of(MANAGEMENT_PORT), assembly.exposedPorts());
         assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().add(OTHER_PORT));
         assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().clear());
+    }
+
+    @Test
+    void aPortTheServerCannotListenOnIsRejected() {
+        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
+        Router router = router(routes -> {
+            for (int port : new int[] {-1, 0, 65_536, Integer.MIN_VALUE}) {
+                assertInvalidPort(port, () -> routes.GET("/metrics", RoutePortTest::ok).port(port));
+                assertInvalidPort(port, () -> routes.handle(Set.of(HttpMethod.GET, HttpMethod.POST), "/multi", RoutePortTest::ok).port(port));
+                assertInvalidPort(port, () -> routes.handle(declaration, RoutePortTest::ok).port(port));
+                routes.group(group -> assertInvalidPort(port, () -> group.port(port)));
+            }
+            routes.GET("/lowest", RoutePortTest::ok).port(1);
+            routes.GET("/highest", RoutePortTest::ok).port(65_535);
+        });
+
+        // nothing was exposed by a rejected port
+        assertEquals(Set.of(1, 65_535), router.getExposedPorts());
+    }
+
+    private static void assertInvalidPort(int port, Executable call) {
+        IllegalArgumentException e = assertThrows(IllegalArgumentException.class, call);
+        assertEquals("The port of a route must be between 1 and 65535: " + port, e.getMessage());
     }
 
     @SuppressWarnings("unchecked")
