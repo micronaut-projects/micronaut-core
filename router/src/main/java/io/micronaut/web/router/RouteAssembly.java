@@ -54,8 +54,10 @@ import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import io.micronaut.web.router.builder.RouteRequestFilter;
 import io.micronaut.web.router.builder.RouteResponseFilter;
+import io.micronaut.web.router.exceptions.RoutingException;
 import org.jspecify.annotations.Nullable;
 
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -93,6 +95,7 @@ public final class RouteAssembly {
     final Set<Integer> exposedPorts = new HashSet<>(5);
     @Nullable DefaultUriRoute currentParentRoute;
     private final @Nullable ExecutorSelector executorSelector;
+    private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
     private final UnaryOperator<String> routeUri;
     private final Consumer<DefaultUriRoute> routeCreated;
@@ -116,10 +119,13 @@ public final class RouteAssembly {
             Environment environment = applicationContext.getEnvironment();
             defaultCharset = environment.get("micronaut.application.default-charset", Charset.class, StandardCharsets.UTF_8);
             this.executorSelector = applicationContext.findBean(ExecutorSelector.class).orElse(null);
+            // like HttpServerConfiguration, which the router does not depend on
+            this.threadSelection = environment.get("micronaut.server.thread-selection", ThreadSelection.class).orElse(ThreadSelection.MANUAL);
             this.messageBodyHandlerRegistry = applicationContext.findBean(MessageBodyHandlerRegistry.class).orElse(MessageBodyHandlerRegistry.EMPTY);
         } else {
             defaultCharset = StandardCharsets.UTF_8;
             this.executorSelector = null;
+            this.threadSelection = ThreadSelection.MANUAL;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
         }
     }
@@ -762,6 +768,7 @@ public final class RouteAssembly {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
+            checkBlockingBody();
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
@@ -783,6 +790,25 @@ public final class RouteAssembly {
             );
             routeInfo.routeFilters = routeFilters();
             return routeInfo;
+        }
+
+        /**
+         * A handler that reads the body as an {@link InputStream} blocks until the body arrives:
+         * on the event loop, which delivers the body, it would wait forever. Such a route must
+         * run on an executor.
+         */
+        private void checkBlockingBody() {
+            if (!(targetMethod instanceof HandlerMethod<?>) || executeOn != null) {
+                return;
+            }
+            for (Argument<?> argument : targetMethod.getArguments()) {
+                if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
+                    && InputStream.class.isAssignableFrom(argument.getType())
+                    && new RouteExecutorSelector(null, nonBlocking).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
+                        + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
+                }
+            }
         }
 
         /**

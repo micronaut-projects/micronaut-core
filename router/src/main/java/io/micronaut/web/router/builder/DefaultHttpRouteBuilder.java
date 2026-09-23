@@ -73,22 +73,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
     }
 
     @Override
-    public <B> HttpRouteSpec handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(bodyType, handler), null));
-    }
-
-    @Override
     public HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler) {
         return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
@@ -118,22 +103,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
     }
 
     @Override
-    public <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new Routes(assembly.declare(route, handle(HandlerMethod.of(bodyType, handler)), null));
-    }
-
-    @Override
     public HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler) {
-        return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler) {
         return new Routes(assembly.declare(route, handle(HandlerMethod.of(handler)), FORM_MEDIA_TYPES));
     }
 
@@ -177,22 +147,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
     }
 
     @Override
-    public <B> HttpRouteSpec handleAsync(String httpMethodName, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
-    }
-
-    @Override
     public HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormAsync(String httpMethodName, String uri, AsyncFormRequestHandler handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
-    }
-
-    @Override
-    public HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler) {
         return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
     }
 

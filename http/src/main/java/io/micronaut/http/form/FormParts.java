@@ -27,8 +27,8 @@ import java.util.function.Function;
  *
  * <p>Read every part:</p>
  * <pre>{@code
- * routes.handleFormStream(HttpMethod.POST, "/upload", (request, pathVariables, parts) ->
- *     parts.forEach(part -> part.isFile()
+ * routes.asyncPOST("/upload", (request, pathVariables) -> request.parts()
+ *     .forEach(part -> part.isFile()
  *             ? part.file().transferTo(uploads.resolve(UUID.randomUUID().toString()))
  *             : part.text(8_192).thenAccept(value -> fields.put(part.name(), value)))
  *         .thenApply(done -> HttpResponse.ok()));

@@ -24,6 +24,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
@@ -33,7 +34,6 @@ import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.http.form.FormData;
-import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
@@ -70,8 +70,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
+    private static final Argument<AsyncServerHttpRequest> ASYNC_REQUEST = Argument.of(AsyncServerHttpRequest.class, "request");
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
-    private static final Argument<FormParts> FORM_PARTS = Argument.of(FormParts.class, "parts");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -143,24 +143,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * @param bodyType The body type, which the handler binds like a {@code @Body} argument
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The method that calls it
-     */
-    @SuppressWarnings("unchecked")
-    public static <B> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return new HandlerMethod<>(
-            handler,
-            AsyncBodyRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, bodyArgument(bodyType)},
-            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
-        );
-    }
-
-    /**
      * @param handler The handler
      * @return The method that calls it
      */
@@ -168,10 +150,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES},
+            new Class<?>[]{AsyncServerHttpRequest.class, PathVariables.class},
+            // the request reads the body for the handler: no binder decodes it
+            new Argument<?>[]{ASYNC_REQUEST, PATH_VARIABLES},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1])
+            args -> releaseWhenDone((AsyncServerHttpRequest<?>) args[0], () -> handler.handle((AsyncServerHttpRequest<?>) args[0], (PathVariables) args[1]))
         );
     }
 
@@ -205,36 +188,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])
-        );
-    }
-
-    /**
-     * @param handler The handler
-     * @return The method that calls it
-     */
-    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncFormRequestHandler handler) {
-        return new HandlerMethod<>(
-            handler,
-            AsyncFormRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, FormData.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
-            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])
-        );
-    }
-
-    /**
-     * @param handler The handler
-     * @return The method that calls it
-     */
-    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(StreamingFormRequestHandler handler) {
-        return new HandlerMethod<>(
-            handler,
-            StreamingFormRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, FormParts.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM_PARTS},
-            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> closeWhenDone((FormParts) args[2], () -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormParts) args[2]))
         );
     }
 
@@ -424,50 +377,59 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * Close the form parts when the handler completes, throwing out what it did not read. The
-     * result of the handler is delivered once the parts were closed: a failure to release them
-     * fails a successful result, and is added as suppressed to a failure of the handler.
+     * Release what the handler's read of the body left open when the handler completes, e.g. the
+     * parts of a form it did not read. The result of the handler is delivered once that was
+     * released: a failure to release fails a successful result, and is added as suppressed to a
+     * failure of the handler.
      *
-     * @param parts   The form parts
+     * @param request The request of the handler
      * @param handler Calls the handler
      * @return The stage of the handler
      * @throws Exception If the handler fails
      */
-    private static CompletionStage<? extends HttpResponse<?>> closeWhenDone(FormParts parts, Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
+    private static CompletionStage<? extends HttpResponse<?>> releaseWhenDone(AsyncServerHttpRequest<?> request,
+                                                                             Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
+        if (!(request instanceof AsyncHandlerRequest handlerRequest)) {
+            return handler.call();
+        }
         CompletionStage<? extends HttpResponse<?>> stage;
         try {
             stage = handler.call();
         } catch (Exception e) {
-            parts.close();
+            handlerRequest.releaseBody();
             throw e;
         }
         if (stage == null) {
-            parts.close();
-            throw new NullPointerException("The form handler returned no stage");
+            handlerRequest.releaseBody();
+            throw new NullPointerException("The handler returned no stage");
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
-            CompletionStage<Void> closed;
+            CompletionStage<Void> released;
             try {
-                closed = parts.closeAsync();
+                released = handlerRequest.releaseBody();
             } catch (Throwable e) {
-                closed = CompletableFuture.failedFuture(e);
+                released = CompletableFuture.failedFuture(e);
             }
-            closed.whenComplete((ignored, closeError) -> {
+            released.whenComplete((ignored, releaseError) -> {
                 if (error != null) {
-                    Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-                    if (closeError != null && closeError != cause) {
-                        cause.addSuppressed(closeError);
+                    Throwable cause = unwrap(error);
+                    if (releaseError != null && releaseError != cause) {
+                        cause.addSuppressed(releaseError);
                     }
                     result.completeExceptionally(cause);
-                } else if (closeError != null) {
-                    result.completeExceptionally(closeError instanceof CompletionException && closeError.getCause() != null ? closeError.getCause() : closeError);
+                } else if (releaseError != null) {
+                    result.completeExceptionally(unwrap(releaseError));
                 } else {
                     result.complete(response);
                 }
             });
         });
         return result;
+    }
+
+    private static Throwable unwrap(Throwable error) {
+        return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
     }
 
     /**

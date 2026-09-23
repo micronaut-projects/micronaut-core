@@ -19,10 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
-import io.micronaut.web.router.Route;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
-import io.micronaut.http.form.FormParts;
 
 import java.util.Set;
 import java.util.function.Function;
@@ -191,30 +189,6 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler);
 
     /**
-     * Route requests with a submitted form to a handler function that completes the response
-     * later. The whole form is read before the handler runs, as for
-     * {@link #handleForm(HttpMethod, String, FormRequestHandler)}.
-     *
-     * @param method  The HTTP method
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     */
-    HttpRouteSpec handleFormAsync(HttpMethod method, String uri, AsyncFormRequestHandler handler);
-
-    /**
-     * Route requests with a submitted form to a handler function that reads the form as it
-     * arrives, part by part, with {@link FormParts#forEach}. The route consumes both form media
-     * types.
-     *
-     * @param method  The HTTP method
-     * @param uri     The URI template
-     * @param handler The handler
-     * @return The route
-     */
-    HttpRouteSpec handleFormStream(HttpMethod method, String uri, StreamingFormRequestHandler handler);
-
-    /**
      * Route a {@code GET} request to a handler function that completes the response later.
      *
      * @param uri     The URI template
@@ -365,28 +339,10 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler);
 
     /**
-     * Bind an asynchronous form handler function to a declared route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    HttpRouteSpec handleFormAsync(RouteDeclaration route, AsyncFormRequestHandler handler);
-
-    /**
-     * Bind a streaming form handler function to a declared route.
-     *
-     * @param route   The declared route
-     * @param handler The handler
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    HttpRouteSpec handleFormStream(RouteDeclaration route, StreamingFormRequestHandler handler);
-
-    /**
      * Route requests to a handler function that completes the response later. The executor is
-     * selected like for a controller method returning a {@code CompletionStage}.
+     * selected like for a controller method returning a {@code CompletionStage}. The handler
+     * receives no decoded body: it reads the body with the methods of its
+     * {@link io.micronaut.http.AsyncServerHttpRequest}, see {@link AsyncRequestHandler}.
      *
      * @param method  The HTTP method
      * @param uri     The URI template
@@ -434,20 +390,6 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler);
 
     /**
-     * Route requests of a method by its name, including a custom HTTP method, to a handler function
-     * that receives the decoded body and completes the response later.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param bodyType       The body type
-     * @param handler        The handler
-     * @param <B>            The body type
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
-     */
-    <B> HttpRouteSpec handleAsync(String httpMethodName, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
-
-    /**
      * Route requests of a method by its name, including a custom HTTP method, with a submitted
      * form to a handler function that receives the whole form. The route consumes both form
      * media types.
@@ -459,30 +401,6 @@ public interface HttpRouteBuilder {
      * @see #handleForm(HttpMethod, String, FormRequestHandler)
      */
     HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, with a submitted
-     * form to a handler function that completes the response later.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @see #handleFormAsync(HttpMethod, String, AsyncFormRequestHandler)
-     */
-    HttpRouteSpec handleFormAsync(String httpMethodName, String uri, AsyncFormRequestHandler handler);
-
-    /**
-     * Route requests of a method by its name, including a custom HTTP method, with a submitted
-     * form to a handler function that reads the form as it arrives.
-     *
-     * @param httpMethodName The name of the HTTP method
-     * @param uri            The URI template
-     * @param handler        The handler
-     * @return The route
-     * @see #handleFormStream(HttpMethod, String, StreamingFormRequestHandler)
-     */
-    HttpRouteSpec handleFormStream(String httpMethodName, String uri, StreamingFormRequestHandler handler);
 
     /**
      * Route the requests under a prefix to the routes of a target located at runtime, like a
@@ -524,7 +442,9 @@ public interface HttpRouteBuilder {
 
     /**
      * A body type that is {@code null} when the request has no body, for the handlers that
-     * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)}.
+     * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)},
+     * and for the body an asynchronous handler reads:
+     * {@code request.body(HttpRouteBuilder.nullableBody(Argument.of(Item.class)))}.
      *
      * @param bodyType The body type
      * @param <T>      The type
@@ -544,64 +464,6 @@ public interface HttpRouteBuilder {
      */
     static <T> Argument<T> nullableBody(Class<T> type) {
         return nullableBody(Argument.of(type));
-    }
-
-    /**
-     * Route requests to a handler function that receives the body decoded to the given type and
-     * completes the response later: a {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}
-     * route whose handler returns a {@code CompletionStage}.
-     * A {@link Argument#isNullable() nullable} body type is {@code null} without a body.
-     *
-     * @param method   The HTTP method
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     */
-    <B> HttpRouteSpec handleAsync(HttpMethod method, String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
-
-    /**
-     * Bind a handler function that receives the decoded body and completes the response later to
-     * a declared route.
-     *
-     * @param route    The declared route
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route, to configure further
-     * @see #handle(RouteDeclaration, RequestHandler)
-     */
-    <B> HttpRouteSpec handleAsync(RouteDeclaration route, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler);
-
-    /**
-     * Route a {@code POST} request to a handler function that receives the body decoded to the
-     * given type and completes the response later.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
-     */
-    default <B> HttpRouteSpec asyncPOST(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return handleAsync(HttpMethod.POST, uri, bodyType, handler);
-    }
-
-    /**
-     * Route a {@code PUT} request to a handler function that receives the body decoded to the
-     * given type and completes the response later.
-     *
-     * @param uri      The URI template
-     * @param bodyType The body type
-     * @param handler  The handler
-     * @param <B>      The body type
-     * @return The route
-     * @see #handleAsync(HttpMethod, String, Argument, AsyncBodyRequestHandler)
-     */
-    default <B> HttpRouteSpec asyncPUT(String uri, Argument<B> bodyType, AsyncBodyRequestHandler<B> handler) {
-        return handleAsync(HttpMethod.PUT, uri, bodyType, handler);
     }
 
 }
