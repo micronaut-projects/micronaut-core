@@ -388,6 +388,16 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
 
         @Override
+        public HttpRouteSpec attribute(String name, Object value) {
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(value, "value");
+            for (HandlerUriRoute route : routes) {
+                route.attribute(name, value);
+            }
+            return this;
+        }
+
+        @Override
         public HttpRouteSpec order(int order) {
             for (HandlerUriRoute route : routes) {
                 route.order(order);

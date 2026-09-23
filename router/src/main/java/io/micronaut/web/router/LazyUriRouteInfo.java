@@ -38,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -427,6 +428,11 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public boolean needsRequestBody() {
         return delegate().needsRequestBody();
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return delegate().getAttributes();
     }
 
     @Override

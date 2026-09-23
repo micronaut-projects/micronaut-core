@@ -75,6 +75,12 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
+    public HttpRouteGroup attribute(String name, Object value) {
+        settings.attribute(name, value);
+        return this;
+    }
+
+    @Override
     public HttpRouteGroup before(ContextRouteRequestFilter filter) {
         filters.before(filter, null);
         return this;

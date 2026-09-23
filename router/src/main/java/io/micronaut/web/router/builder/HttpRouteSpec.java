@@ -173,4 +173,35 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      * @since 5.3.0
      */
     HttpRouteSpec order(int order);
+
+    /**
+     * Give the route an attribute: metadata of the route for the code that handles its requests,
+     * which reads it from the matched route with {@link io.micronaut.web.router.RouteInfo#getAttribute(String)},
+     * e.g. a route filter, a server filter or the handler. The attributes of the
+     * {@link HttpRouteGroup#attribute(String, Object) groups} of the route apply too, and an
+     * attribute of the route overrides the attribute of a group with the same name.
+     *
+     * <pre>{@code
+     * routes.path("/admin", admin -> {
+     *     admin.attribute("role", "admin");
+     *     admin.GET("/users", usersHandler);
+     *     admin.GET("/audit", auditHandler).attribute("role", "auditor");
+     * });
+     * routes.filter("/admin/**").before(request -> {
+     *     String role = RouteAttributes.getRouteInfo(request)
+     *         .flatMap(route -> route.getAttribute("role", String.class))
+     *         .orElseThrow();
+     *     return hasRole(request, role) ? null : HttpResponse.forbidden();
+     * });
+     * }</pre>
+     *
+     * <p>They are the attributes of the route, not of the request, see
+     * {@link io.micronaut.web.router.RouteAttributes} for the route of a request.</p>
+     *
+     * @param name  The name of the attribute
+     * @param value The value of the attribute
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec attribute(String name, Object value);
 }

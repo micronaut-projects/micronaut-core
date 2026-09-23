@@ -64,7 +64,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -982,6 +984,7 @@ public final class RouteAssembly {
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
+        private final Map<String, Object> attributes = new LinkedHashMap<>(0);
         private @Nullable Integer port;
         private @Nullable Integer order;
         private boolean closed;
@@ -1003,6 +1006,17 @@ public final class RouteAssembly {
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * An attribute of the routes of the group.
+         *
+         * @param name  The name
+         * @param value The value
+         */
+        public void attribute(String name, Object value) {
+            checkOpen();
+            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
         }
 
         /**
@@ -1043,6 +1057,19 @@ public final class RouteAssembly {
             }
             RouteGroup group = enclosing;
             return group == null ? null : group.order();
+        }
+
+        /**
+         * Add the attributes of the enclosing groups, then of this group, which override them.
+         *
+         * @param routeAttributes The attributes to add to
+         */
+        void addAttributes(Map<String, Object> routeAttributes) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addAttributes(routeAttributes);
+            }
+            routeAttributes.putAll(attributes);
         }
 
         /**
@@ -1094,6 +1121,7 @@ public final class RouteAssembly {
         private boolean implicitHead;
         private @Nullable RouteGroup group;
         private @Nullable Integer order;
+        private Map<String, Object> attributes = new LinkedHashMap<>(0);
 
         /**
          * @param httpMethod The HTTP method
@@ -1204,7 +1232,25 @@ public final class RouteAssembly {
             );
             routeInfo.routeFilters = routeFilters();
             routeInfo.order = effectiveOrder(order, group);
+            routeInfo.attributes = attributes();
             return routeInfo;
+        }
+
+        /**
+         * @return The attributes of the groups of the route, outer group first, then of the route,
+         * each overriding the ones before
+         */
+        private Map<String, Object> attributes() {
+            RouteGroup routeGroup = group;
+            if (routeGroup == null && attributes.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> all = new LinkedHashMap<>();
+            if (routeGroup != null) {
+                routeGroup.addAttributes(all);
+            }
+            all.putAll(attributes);
+            return all.isEmpty() ? Map.of() : Collections.unmodifiableMap(all);
         }
 
         /**
@@ -1286,6 +1332,7 @@ public final class RouteAssembly {
             head.filters.copy(filters);
             head.group = group;
             head.order = order;
+            head.attributes = new LinkedHashMap<>(attributes);
             head.implicitHead = true;
             return head;
         }
@@ -1428,6 +1475,12 @@ public final class RouteAssembly {
         @Override
         public HandlerUriRoute order(int order) {
             this.order = order;
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute attribute(String name, Object value) {
+            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
             return this;
         }
 

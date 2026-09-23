@@ -165,4 +165,12 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#order(int)
      */
     HandlerUriRoute order(int order);
+
+    /**
+     * @param name  The name
+     * @param value The value
+     * @return The route
+     * @see HttpRouteSpec#attribute(String, Object)
+     */
+    HandlerUriRoute attribute(String name, Object value);
 }

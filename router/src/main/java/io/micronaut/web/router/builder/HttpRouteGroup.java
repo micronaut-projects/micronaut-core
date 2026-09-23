@@ -137,4 +137,16 @@ public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRo
      * @since 5.3.0
      */
     HttpRouteGroup order(int order);
+
+    /**
+     * Give the routes of the group an attribute, see {@link HttpRouteSpec#attribute(String, Object)}:
+     * the routes of the group, and of its nested groups, have it, wherever it is declared in the
+     * lambda; the attribute of a nested group or of a route with the same name overrides it.
+     *
+     * @param name  The name of the attribute
+     * @param value The value of the attribute
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup attribute(String name, Object value);
 }

@@ -202,6 +202,13 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
+    public HandlerUriRoute attribute(String name, Object value) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(value, "value");
+        return configure(r -> r.attribute(name, value));
+    }
+
+    @Override
     public HandlerUriRoute order(int order) {
         this.order = order;
         return configure(r -> r.order(order));
