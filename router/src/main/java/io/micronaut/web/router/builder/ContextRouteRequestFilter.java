@@ -17,8 +17,8 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.MutablePropagatedContext;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpMessage;
+import io.micronaut.http.MutableHttpRequest;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -37,7 +37,8 @@ import org.jspecify.annotations.Nullable;
  * }</pre>
  *
  * <p>Like every route filter it runs with the propagated context of the filter chain in scope.
- * The change is taken when it returns: the element is not in scope while the filter itself runs.</p>
+ * The change is taken when it returns: the element is not in scope while the filter itself runs.
+ * It changes or replaces the request like a {@link RouteRequestFilter}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,10 +50,11 @@ public interface ContextRouteRequestFilter {
     /**
      * Filter the request.
      *
-     * @param request           The request
+     * @param request           The request, to change in place for what runs after the filter, see {@link RouteRequestFilter}
      * @param propagatedContext The propagated context, to change for what runs after the filter
-     * @return A response to answer the request with instead of the route, or {@code null} to proceed
+     * @return A response to answer the request with instead of the route, a request to continue
+     * with instead of the request, or {@code null} to proceed with the request
      * @throws Exception An error, handled by the error routes
      */
-    @Nullable HttpResponse<?> filter(HttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
+    @Nullable HttpMessage<?> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
 }

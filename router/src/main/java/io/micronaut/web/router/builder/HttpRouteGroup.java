@@ -16,6 +16,9 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpRequest;
+
+import java.util.function.Predicate;
 
 /**
  * A group of routes, declared with {@link HttpRouteBuilder#group} or, under a prefix, with
@@ -76,4 +79,74 @@ import io.micronaut.core.annotation.Experimental;
  */
 @Experimental
 public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> {
+
+    /**
+     * Route the requests of the routes of the group on this port only, like
+     * {@code @Controller(port = ...)} for the methods of a controller, see
+     * {@link HttpRouteSpec#port(int)}. The routes of the group, including its locator routes and
+     * the routes of its nested groups, inherit it, wherever it is declared in the lambda; a nested
+     * group or a route with its own port overrides it.
+     *
+     * <pre>{@code
+     * routes.path("/management", management -> {
+     *     management.port(9090);
+     *     management.GET("/health", healthHandler);
+     *     management.GET("/metrics", metricsHandler);
+     * });
+     * }</pre>
+     *
+     * @param port The port
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(int port);
+
+    /**
+     * Match the requests of the routes of the group that meet a condition only, see
+     * {@link HttpRouteSpec#where(Predicate)}: a route of the group, including its locator routes
+     * and the routes of its nested groups, matches a request that meets the conditions of its
+     * groups, outer group first, and its own, wherever they are declared in the lambda.
+     *
+     * <pre>{@code
+     * routes.path("/beta", beta -> {
+     *     beta.where(RequestPredicates.header("X-Beta"));
+     *     beta.GET("/search", betaSearchHandler);
+     * });
+     * }</pre>
+     *
+     * @param condition The condition
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * The order of the routes of the group, see {@link HttpRouteSpec#order(int)}: the routes of
+     * the group, and of its nested groups, have it, wherever it is declared in the lambda,
+     * unless they or a nested group have their own.
+     *
+     * <pre>{@code
+     * routes.group(fallbacks -> {
+     *     fallbacks.order(100);
+     *     fallbacks.GET("/{+path}", notFoundPage);
+     * });
+     * }</pre>
+     *
+     * @param order The order, lower wins
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup order(int order);
+
+    /**
+     * Give the routes of the group an attribute, see {@link HttpRouteSpec#attribute(String, Object)}:
+     * the routes of the group, and of its nested groups, have it, wherever it is declared in the
+     * lambda; the attribute of a nested group or of a route with the same name overrides it.
+     *
+     * @param name  The name of the attribute
+     * @param value The value of the attribute
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup attribute(String name, Object value);
 }

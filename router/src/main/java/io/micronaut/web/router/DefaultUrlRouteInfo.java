@@ -44,6 +44,7 @@ import java.nio.charset.Charset;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -65,6 +66,15 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * is built, before the route info is published.
      */
     List<GenericHttpFilter> routeFilters = List.of();
+    /**
+     * The order of the route among equally good routes. Set when the route is built, before the
+     * route info is published.
+     */
+    int order;
+    /**
+     * The attributes of the route. Set when the route is built, before the route info is published.
+     */
+    Map<String, Object> attributes = Map.of();
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     /**
@@ -417,6 +427,16 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public boolean isImplicitHead() {
         return implicitHead;
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return attributes;
     }
 
     @Override

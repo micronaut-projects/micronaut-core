@@ -17,8 +17,11 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
+
+import java.util.function.Predicate;
 
 /**
  * A route to a handler function, to configure after it was added with the {@link HttpRouteBuilder}.
@@ -97,4 +100,108 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      * @return The route
      */
     HttpRouteSpec nonBlocking();
+
+    /**
+     * Route the requests on this port only, like {@code @Controller(port = ...)}: the server opens
+     * the port when it starts, and the route does not match a request on another port, which is
+     * answered as if the route did not exist. A route without a port matches the requests on the
+     * default ports of the server only, once a route of the application has a port. The port of
+     * the route overrides the port of its {@link HttpRouteGroup#port(int) group}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", (request, pathVariables) -> HttpResponse.ok(metrics.scrape()))
+     *     .port(9090);
+     * }</pre>
+     *
+     * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
+     *
+     * @param port The port
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec port(int port);
+
+    /**
+     * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
+     * method: a request the condition rejects is answered as if the route did not exist, by
+     * another route of the same URI and method, e.g. one with another condition, or by
+     * {@code 404}, never by a {@code 405}, {@code 415} or {@code 406} of this route. The
+     * conditions of the groups of the route, outer group first, then those of the route, must
+     * all be met. The conditions are evaluated while the request is matched, for every request
+     * whose path the route matches: they must be fast and must not block, nor read the body.
+     *
+     * <pre>{@code
+     * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))))
+     *     .where(RequestPredicates.header("X-Export", "csv"));
+     * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
+     * }</pre>
+     *
+     * <p>A request both routes of the example match, with the header, is ambiguous: the most
+     * specific route answers it, and the two routes are equally specific, so it is answered with
+     * {@code 400}. {@link RequestPredicates} builds conditions on the headers, query parameters,
+     * media types and method of the request.</p>
+     *
+     * @param condition The condition
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * Break a tie with other routes that are equally good for a request: the route with the
+     * lowest order answers it. The router selects the most specific route by its URI template,
+     * then by the media types, then prefers an explicit {@code HEAD} route over an implicit one;
+     * only the routes still left after that are compared by their order. So the order never
+     * makes a less specific route win over a more specific one: it chooses among routes of the
+     * same URI template whose {@link #where(Predicate) conditions} a request both meets, e.g. a
+     * specialized route and a fallback. Two routes left with the same order still make the
+     * request ambiguous, answered with {@code 400}.
+     *
+     * <pre>{@code
+     * routes.GET("/reports/{id}", csvHandler)
+     *     .where(RequestPredicates.queryParam("format", "csv"))
+     *     .order(-1);
+     * routes.GET("/reports/{id}", reportHandler); // the order 0: answers the other requests
+     * }</pre>
+     *
+     * <p>The default order is {@code 0}, the order of a controller route, or the order of the
+     * {@link HttpRouteGroup#order(int) group} of the route, which the order of the route
+     * overrides. The order of an {@link HttpRoutes} bean orders the beans, not their routes.</p>
+     *
+     * @param order The order, lower wins
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec order(int order);
+
+    /**
+     * Give the route an attribute: metadata of the route for the code that handles its requests,
+     * which reads it from the matched route with {@link io.micronaut.web.router.RouteInfo#getAttribute(String)},
+     * e.g. a route filter, a server filter or the handler. The attributes of the
+     * {@link HttpRouteGroup#attribute(String, Object) groups} of the route apply too, and an
+     * attribute of the route overrides the attribute of a group with the same name.
+     *
+     * <pre>{@code
+     * routes.path("/admin", admin -> {
+     *     admin.attribute("role", "admin");
+     *     admin.GET("/users", usersHandler);
+     *     admin.GET("/audit", auditHandler).attribute("role", "auditor");
+     * });
+     * routes.filter("/admin/**").before(request -> {
+     *     String role = RouteAttributes.getRouteInfo(request)
+     *         .flatMap(route -> route.getAttribute("role", String.class))
+     *         .orElseThrow();
+     *     return hasRole(request, role) ? null : HttpResponse.forbidden();
+     * });
+     * }</pre>
+     *
+     * <p>They are the attributes of the route, not of the request, see
+     * {@link io.micronaut.web.router.RouteAttributes} for the route of a request.</p>
+     *
+     * @param name  The name of the attribute
+     * @param value The value of the attribute
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec attribute(String name, Object value);
 }
