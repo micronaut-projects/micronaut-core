@@ -16,16 +16,21 @@
 package io.micronaut.http.server.tck.tests.routing;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.ReflectiveAccess;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.StreamingFileUpload;
@@ -49,6 +54,7 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -120,6 +126,40 @@ public class FilterInPlaceUriChangeTest {
             assertEquals("completed a.txt=fourth", post(server, HttpRequest.POST("/ipc/target/completed", upload("fourth")).header(REQUERY, "method")));
             assertEquals("streaming a.txt=fifth", post(server, HttpRequest.POST("/ipc/target/streaming", upload("fifth")).header(REQUERY, "method")));
             assertEquals("parts a.txt=sixth", post(server, HttpRequest.POST("/ipc/target/parts", upload("sixth")).header(REQUERY, "method")));
+        }
+    }
+
+    @Test
+    void theUrlEncodedFormOfARequestAFilterChangedTheUriOfIsReadIntoTheBody() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String path : new String[]{"/ipc/target", "/ipc/pre", "/ipc/fn"}) {
+                assertForms(server, path, null);
+            }
+            // changed after the route match, in place or continuing with the mutable view
+            assertForms(server, "/ipc/target", "method");
+            assertForms(server, "/ipc/target", "mutate");
+        }
+    }
+
+    private static void assertForms(ServerUnderTest server, String path, @Nullable String requery) {
+        String message = path + " " + requery;
+        assertEquals("pojo Fred 42", form(server, path + "/form-pojo", requery), message);
+        assertEquals("map Fred 42", form(server, path + "/form-map", requery), message);
+        assertEquals("field Fred 42", form(server, path + "/form-field", requery), message);
+        assertEquals("handler pojo Fred 42", form(server, path + "/form-handler-pojo", requery), message);
+        assertEquals("handler map Fred 42", form(server, path + "/form-handler-map", requery), message);
+    }
+
+    private static String form(ServerUnderTest server, String path, @Nullable String requery) {
+        MutableHttpRequest<String> request = HttpRequest.POST(path, "name=Fred&age=42")
+            .contentType(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+        if (requery != null) {
+            request.header(REQUERY, requery);
+        }
+        try {
+            return get(server, request);
+        } catch (HttpClientResponseException e) {
+            return e.getStatus() + " " + e.getResponse().getBody(String.class).orElse("");
         }
     }
 
@@ -203,6 +243,12 @@ public class FilterInPlaceUriChangeTest {
                 request.uri(URI.create(moved(request.getPath(), "/ipc/fn/")));
                 return null;
             });
+            routes.POST("/ipc/target/form-handler-pojo", Argument.of(Person.class), (request, pathVariables, person) ->
+                HttpResponse.ok("handler pojo " + person.name() + " " + person.age()).contentType(MediaType.TEXT_PLAIN_TYPE)
+            ).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
+            routes.POST("/ipc/target/form-handler-map", Argument.mapOf(String.class, String.class), (request, pathVariables, form) ->
+                HttpResponse.ok("handler map " + form.get("name") + " " + form.get("age")).contentType(MediaType.TEXT_PLAIN_TYPE)
+            ).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE);
             routes.GET("/ipc/target/handler", (request, pathVariables) ->
                 HttpResponse.ok(describe("handler", request)).contentType(MediaType.TEXT_PLAIN_TYPE)
             ).before(request -> {
@@ -214,6 +260,11 @@ public class FilterInPlaceUriChangeTest {
         }
     }
 
+    @Introspected
+    @ReflectiveAccess
+    record Person(String name, int age) {
+    }
+
     @Controller("/ipc/target")
     @Requires(property = "spec.name", value = SPEC_NAME)
     @Produces(MediaType.TEXT_PLAIN)
@@ -222,6 +273,21 @@ public class FilterInPlaceUriChangeTest {
         @Get("/info")
         String info(HttpRequest<?> request) {
             return describe("controller", request);
+        }
+
+        @Post(value = "/form-pojo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        String formPojo(@Body Person person) {
+            return "pojo " + person.name() + " " + person.age();
+        }
+
+        @Post(value = "/form-map", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        String formMap(@Body Map<String, String> form) {
+            return "map " + form.get("name") + " " + form.get("age");
+        }
+
+        @Post(value = "/form-field", consumes = MediaType.APPLICATION_FORM_URLENCODED)
+        String formField(@Body("name") String name, @Body("age") int age) {
+            return "field " + name + " " + age;
         }
 
         @Post(value = "/completed", consumes = MediaType.MULTIPART_FORM_DATA)
