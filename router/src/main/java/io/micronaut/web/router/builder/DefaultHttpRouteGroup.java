@@ -16,10 +16,12 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * The {@link HttpRouteGroup}: the routes it adds carry its filters, which it collects until its
@@ -32,15 +34,18 @@ import java.util.Objects;
 final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements HttpRouteGroup, ContextFilterSpec<HttpRouteGroup> {
 
     private final RouteAssembly.RouteFilters filters;
+    private final RouteAssembly.RouteGroup settings;
 
     /**
      * @param assembly The assembly the routes are added to
      * @param filters  The filters of the group
+     * @param settings The other settings of the group
      * @param prefix   The prefix of the URI templates of the routes, or {@code null}
      */
-    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, @Nullable RoutePrefix prefix) {
-        super(assembly, filters, prefix);
+    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings, @Nullable RoutePrefix prefix) {
+        super(assembly, filters, settings, prefix);
         this.filters = filters;
+        this.settings = settings;
     }
 
     /**
@@ -48,6 +53,31 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
      */
     void close() {
         filters.close();
+        settings.close();
+    }
+
+    @Override
+    public HttpRouteGroup port(int port) {
+        settings.port(port);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup where(Predicate<HttpRequest<?>> condition) {
+        settings.where(condition);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup order(int order) {
+        settings.order(order);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup attribute(String name, Object value) {
+        settings.attribute(name, value);
+        return this;
     }
 
     @Override

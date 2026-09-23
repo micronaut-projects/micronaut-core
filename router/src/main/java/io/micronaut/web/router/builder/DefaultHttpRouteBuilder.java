@@ -34,6 +34,6 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
      * @param assembly The assembly the routes are added to
      */
     public DefaultHttpRouteBuilder(RouteAssembly assembly) {
-        super(assembly, null, null);
+        super(assembly, null, null, null);
     }
 }

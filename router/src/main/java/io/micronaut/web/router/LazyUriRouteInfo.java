@@ -45,6 +45,7 @@ import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
@@ -72,6 +73,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     private final int pathVariableCount;
     private final int patternVariableCount;
     private final boolean implicitHead;
+    private final int order;
     private final String target;
     private final @Nullable IndexedRouteDeclaration declaration;
     private final @Nullable RoutePlan plan;
@@ -85,7 +87,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
      */
     LazyUriRouteInfo(RoutePlan plan, RouteSlot slot, Supplier<UriRouteInfo<Object, Object>> builder) {
         this(slot.httpMethod(), slot.httpMethodName(), slot.template(), null, slot.requiredPrefix(), slot.rawLength(),
-            slot.pathVariableCount(), slot.patternVariableCount(), implicitHead(slot),
+            slot.pathVariableCount(), slot.patternVariableCount(), implicitHead(slot), 0,
             String.valueOf(slot.controller()), null, plan, slot.key(), builder);
     }
 
@@ -99,12 +101,13 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     LazyUriRouteInfo(IndexedRouteDeclaration declaration,
                      HttpMethod httpMethod,
                      boolean implicitHead,
+                     int order,
                      Supplier<ParsedRouteTemplate> parsedTemplate,
                      Supplier<UriRouteInfo<Object, Object>> builder) {
         // the custom name for a custom method, so that the router indexes the route under it
         this(httpMethod, implicitHead ? httpMethod.name() : declaration.httpMethodName(), declaration.template(), parsedTemplate,
             declaration.requiredPathPrefix(), declaration.rawLength(), declaration.pathVariableCount(), declaration.patternVariableCount(), implicitHead,
-            String.valueOf(declaration), declaration,
+            order, String.valueOf(declaration), declaration,
             declaration instanceof PlannedRouteDeclaration planned ? planned.plan() : null,
             declaration instanceof PlannedRouteDeclaration planned ? planned.key() : null,
             builder);
@@ -120,6 +123,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
                              int pathVariableCount,
                              int patternVariableCount,
                              boolean implicitHead,
+                             int order,
                              String target,
                              @Nullable IndexedRouteDeclaration declaration,
                              @Nullable RoutePlan plan,
@@ -137,6 +141,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
         this.pathVariableCount = pathVariableCount;
         this.patternVariableCount = patternVariableCount;
         this.implicitHead = implicitHead;
+        this.order = order;
         this.target = target;
         this.declaration = declaration;
         this.plan = plan;
@@ -309,6 +314,12 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public boolean isImplicitHead() {
         return implicitHead;
+    }
+
+    @Override
+    public int getOrder() {
+        // known without building the route
+        return order;
     }
 
     @Override
@@ -514,6 +525,11 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public boolean needsRequestBody() {
         return delegate().needsRequestBody();
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return delegate().getAttributes();
     }
 
     @Override

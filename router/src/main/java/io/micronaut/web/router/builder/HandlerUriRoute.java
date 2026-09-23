@@ -17,9 +17,12 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
+
+import java.util.function.Predicate;
 
 /**
  * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
@@ -131,4 +134,43 @@ public interface HandlerUriRoute {
      * @see HttpRouteGroup
      */
     HandlerUriRoute inGroup(RouteAssembly.RouteFilters group);
+
+    /**
+     * Declare the route in a group: the route inherits the settings of the group, and of the
+     * groups around it, that it does not set itself.
+     *
+     * @param group The settings of the group
+     * @return The route
+     * @see HttpRouteGroup
+     */
+    HandlerUriRoute inGroup(RouteAssembly.RouteGroup group);
+
+    /**
+     * @param port The port
+     * @return The route
+     * @see HttpRouteSpec#port(int)
+     */
+    HandlerUriRoute port(int port);
+
+    /**
+     * @param condition The condition
+     * @return The route
+     * @see HttpRouteSpec#where(Predicate)
+     */
+    HandlerUriRoute where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * @param order The order
+     * @return The route
+     * @see HttpRouteSpec#order(int)
+     */
+    HandlerUriRoute order(int order);
+
+    /**
+     * @param name  The name
+     * @param value The value
+     * @return The route
+     * @see HttpRouteSpec#attribute(String, Object)
+     */
+    HandlerUriRoute attribute(String name, Object value);
 }

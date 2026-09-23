@@ -30,6 +30,11 @@ import io.micronaut.core.annotation.Experimental;
  * route, e.g. to add headers to a rejected request, when the response filter was declared on the
  * same route or group as the request filter or on an enclosing group.</p>
  *
+ * <p>Like a filter method with a {@code MutableHttpRequest} parameter, a request filter can change
+ * the request in place, e.g. its headers or its URI, for the next filters and the route, and like a
+ * filter method returning a request, it can continue with another request, e.g. with another method
+ * or body, see {@link RouteRequestFilter}.</p>
+ *
  * <p>Like a filter method, a filter runs with the propagated context of the filter chain in scope,
  * e.g. the MDC context an application filter added; to change it, see the variants that receive a
  * {@link io.micronaut.core.propagation.MutablePropagatedContext}.</p>
@@ -47,7 +52,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * first, then those of the inner groups, then those of the route, each in the order they are
      * declared.
      *
-     * @param filter The filter, which can answer the request instead of the route
+     * @param filter The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      */
     S before(RouteRequestFilter filter);
@@ -69,7 +74,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * continues on that executor.
      *
      * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can answer the request instead of the route
+     * @param filter       The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      */
     S before(String executorName, RouteRequestFilter filter);
@@ -88,7 +93,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * Filter the requests asynchronously, like a {@code @RequestFilter} method returning a
      * {@code CompletionStage}: the filter chain continues when the stage completes.
      *
-     * @param filter The filter, which can answer the request instead of the route
+     * @param filter The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      */
     S beforeAsync(AsyncRouteRequestFilter filter);
@@ -107,7 +112,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * is in scope for the next filters, the handler, the error routes and the response filters.
      * Otherwise the same as {@link #before(RouteRequestFilter)}.
      *
-     * @param filter The filter, which can answer the request instead of the route
+     * @param filter The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      * @see ContextRouteRequestFilter
      */
@@ -117,7 +122,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * Filter the requests on the named executor with a filter that changes the propagated context.
      *
      * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can answer the request instead of the route
+     * @param filter       The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      * @see #before(String, RouteRequestFilter)
      * @see ContextRouteRequestFilter
@@ -128,7 +133,7 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * Filter the requests asynchronously with a filter that changes the propagated context until
      * its stage completes.
      *
-     * @param filter The filter, which can answer the request instead of the route
+     * @param filter The filter, which can answer the request instead of the route, or change or replace the request
      * @return This
      * @see #beforeAsync(AsyncRouteRequestFilter)
      * @see AsyncContextRouteRequestFilter

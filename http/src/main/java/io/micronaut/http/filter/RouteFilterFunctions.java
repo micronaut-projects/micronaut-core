@@ -17,8 +17,9 @@ package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.propagation.MutablePropagatedContext;
+import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
@@ -45,12 +46,13 @@ public final class RouteFilterFunctions {
     @FunctionalInterface
     public interface Request {
         /**
-         * @param request           The request
+         * @param request           The request, to change for what runs after the filter
          * @param propagatedContext The propagated context, to change for what runs after the filter
-         * @return A response to answer the request with, or {@code null} to proceed
+         * @return A response to answer the request with, a request to continue with, or {@code null}
+         * to proceed
          * @throws Exception An error
          */
-        @Nullable HttpResponse<?> filter(HttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
+        @Nullable HttpMessage<?> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
     }
 
     /**
@@ -59,12 +61,13 @@ public final class RouteFilterFunctions {
     @FunctionalInterface
     public interface AsyncRequest {
         /**
-         * @param request           The request
+         * @param request           The request, to change for what runs after the filter
          * @param propagatedContext The propagated context, to change until the stage completes
-         * @return Completes with a response to answer the request with, or with {@code null} to proceed
+         * @return Completes with a response to answer the request with, with a request to continue
+         * with, or with {@code null} to proceed
          * @throws Exception An error
          */
-        CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
+        CompletionStage<? extends @Nullable HttpMessage<?>> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
     }
 
     /**

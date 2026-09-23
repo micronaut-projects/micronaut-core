@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
+import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.RouteTemplate;
@@ -133,5 +134,22 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
      */
     default boolean isImplicitHead() {
         return false;
+    }
+
+    /**
+     * The order of the route among the routes that are equally good for a request, e.g. two
+     * routes of the same URI template whose conditions a request both meets: the one with the
+     * lowest order answers it. The order only breaks such a tie: it is consulted after the
+     * specificity of the URI templates, the media types and the preference of an explicit
+     * {@code HEAD} route over an implicit one, and two routes with the same order still make the
+     * request ambiguous. A controller route has the order {@code 0}.
+     *
+     * @return The order of the route, {@code 0} by default
+     * @see io.micronaut.web.router.builder.HttpRouteSpec#order(int)
+     * @since 5.3.0
+     */
+    @Experimental
+    default int getOrder() {
+        return 0;
     }
 }

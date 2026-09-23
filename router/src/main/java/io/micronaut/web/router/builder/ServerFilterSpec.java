@@ -46,6 +46,10 @@ import io.micronaut.http.filter.FilterPatternStyle;
  * order they are declared, and so do its response filters; they also filter the response a request
  * filter of the same server filter answered with.</p>
  *
+ * <p>Like the request filters of a {@code @ServerFilter} bean annotated {@code @PreMatching}, its
+ * request filters can run before the route is matched, and change the request that is matched,
+ * see {@link #preMatching()}.</p>
+ *
  * <p>Like the patterns of a {@code @ServerFilter}, the patterns are under
  * {@code micronaut.server.context-path}, unless they start with it or
  * {@link #appendContextPath(boolean)} says otherwise. Each call of
@@ -91,4 +95,30 @@ public interface ServerFilterSpec extends RouteFilterSpec<ServerFilterSpec> {
      * @return This
      */
     ServerFilterSpec appendContextPath(boolean appendContextPath);
+
+    /**
+     * Run the request filters before the route is matched, like {@code @RequestFilter} methods
+     * annotated {@code @PreMatching}: the route is matched with the request they continue with,
+     * e.g. with the URI they changed in place or the method of the request they returned, see
+     * {@link RouteRequestFilter}. They run with the pre-matching filter beans, ordered by
+     * {@link #order(int)}, before the filters that run once the route is matched, and they filter
+     * the requests of the patterns and methods, as they were received, including those no route
+     * matches. The patterns and methods select the filter before the request filters run.
+     *
+     * <pre>{@code
+     * routes.filter("/legacy/**").preMatching().before(request -> {
+     *     request.uri(URI.create(request.getPath().replaceFirst("/legacy", "/api")));
+     *     return null;
+     * });
+     * }</pre>
+     *
+     * <p>Its response filters filter every response: the response a request filter answered
+     * with before the route was matched, like {@code @ResponseFilter} methods annotated
+     * {@code @PreMatching}, and otherwise the response of the route, like {@code @ResponseFilter}
+     * methods, ordered by {@link #order(int)} with the filter beans. They filter each response
+     * once.</p>
+     *
+     * @return This
+     */
+    ServerFilterSpec preMatching();
 }
