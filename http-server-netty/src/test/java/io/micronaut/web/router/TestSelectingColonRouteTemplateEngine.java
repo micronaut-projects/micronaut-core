@@ -26,7 +26,8 @@ import java.util.List;
 /**
  * The colon language with a simple route selector, like JAX-RS: the first accepted type, by
  * quality, that a route produces, in the order of the routes. Without an {@code Accept} header
- * every type is accepted.
+ * every type is accepted. A route whose template has a variable named {@code rejected} is never
+ * selected, as JAX-RS does not select the method of a less specific root resource class.
  */
 public final class TestSelectingColonRouteTemplateEngine extends TestColonRouteTemplateEngine implements RouteMatchSelector {
 
@@ -48,6 +49,9 @@ public final class TestSelectingColonRouteTemplateEngine extends TestColonRouteT
         }
         for (MediaType accept : accepted) {
             for (UriRouteMatch<?, ?> match : matches) {
+                if (isRejected(match)) {
+                    continue;
+                }
                 List<MediaType> produces = match.getRouteInfo().getProduces();
                 for (MediaType produced : produces.isEmpty() ? List.of(MediaType.APPLICATION_JSON_TYPE) : produces) {
                     if (accept.matches(produced)) {
@@ -57,5 +61,13 @@ public final class TestSelectingColonRouteTemplateEngine extends TestColonRouteT
             }
         }
         return List.of();
+    }
+
+    /**
+     * @param match A match
+     * @return Whether the route of the match is never selected
+     */
+    public static boolean isRejected(UriRouteMatch<?, ?> match) {
+        return match.getRouteInfo().getRouteTemplate().expression().contains(":rejected");
     }
 }

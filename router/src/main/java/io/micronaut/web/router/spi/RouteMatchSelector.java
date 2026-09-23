@@ -45,6 +45,13 @@ import java.util.Objects;
  * content type of the request against {@code @Consumes} and the accepted types, with their
  * quality, against {@code @Produces}, with their {@code qs}.</p>
  *
+ * <p>When the router finds the routes of the path of every HTTP method
+ * ({@link io.micronaut.web.router.Router#findAny(HttpRequest)}), e.g. for the {@code 405} status
+ * and its {@code Allow} header, or a CORS preflight request, it calls the selector for the matches
+ * of each method, given as above for a request of that method, and a route of the engine counts only
+ * when it is selected. A route the selector does not select for the method of the request is not
+ * found, and a method none of whose routes is selected is not allowed.</p>
+ *
  * <p>The matches are normal route matches: filters, argument binding and the annotations of the
  * route apply to the selected match as to any other. The negotiated media type of a selection
  * reaches the handler as {@link UriRouteMatch#getSelectedMediaType()} and
