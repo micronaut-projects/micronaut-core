@@ -22,8 +22,8 @@ import java.util.Objects;
 /**
  * The filter methods of a {@link RouteFilterSpec} implemented with the variants that receive the
  * propagated context: a filter that does not change the context is one that ignores it. The
- * response filters are implemented with the variants that can replace the response: a filter
- * that does not replace it is one that returns {@code null}.
+ * request and response filters are implemented with the variants that can replace the request or
+ * the response: a filter that does not replace it is one that returns {@code null}.
  *
  * @param <S> The type that declares the filters
  * @author Denis Stepanov
@@ -33,21 +33,72 @@ import java.util.Objects;
 sealed interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpec<S> permits DefaultHttpRouteSpec, DefaultHttpRouteGroup, DefaultServerFilterSpec {
 
     @Override
+    default S beforeReplacing(ReplacingRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacing((ContextReplacingRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+    }
+
+    @Override
+    default S beforeReplacing(String executorName, ReplacingRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacing(executorName, (ContextReplacingRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+    }
+
+    @Override
+    default S beforeReplacingAsync(AsyncReplacingRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacingAsync((AsyncContextReplacingRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+    }
+
+    @Override
     default S before(RouteRequestFilter filter) {
         Objects.requireNonNull(filter, "filter");
-        return before((ContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        return beforeReplacing((ContextReplacingRouteRequestFilter) (request, propagatedContext) -> {
+            filter.filter(request);
+            return null;
+        });
     }
 
     @Override
     default S before(String executorName, RouteRequestFilter filter) {
         Objects.requireNonNull(filter, "filter");
-        return before(executorName, (ContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        return beforeReplacing(executorName, (ContextReplacingRouteRequestFilter) (request, propagatedContext) -> {
+            filter.filter(request);
+            return null;
+        });
     }
 
     @Override
     default S beforeAsync(AsyncRouteRequestFilter filter) {
         Objects.requireNonNull(filter, "filter");
-        return beforeAsync((AsyncContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        return beforeReplacingAsync((AsyncContextReplacingRouteRequestFilter) (request, propagatedContext) ->
+            Objects.requireNonNull(filter.filter(request), "The asynchronous request filter returned no stage").thenApply(ignored -> null));
+    }
+
+    @Override
+    default S before(ContextRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacing((ContextReplacingRouteRequestFilter) (request, propagatedContext) -> {
+            filter.filter(request, propagatedContext);
+            return null;
+        });
+    }
+
+    @Override
+    default S before(String executorName, ContextRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacing(executorName, (ContextReplacingRouteRequestFilter) (request, propagatedContext) -> {
+            filter.filter(request, propagatedContext);
+            return null;
+        });
+    }
+
+    @Override
+    default S beforeAsync(AsyncContextRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return beforeReplacingAsync((AsyncContextReplacingRouteRequestFilter) (request, propagatedContext) ->
+            Objects.requireNonNull(filter.filter(request, propagatedContext), "The asynchronous request filter returned no stage")
+                .thenApply(ignored -> null));
     }
 
     @Override

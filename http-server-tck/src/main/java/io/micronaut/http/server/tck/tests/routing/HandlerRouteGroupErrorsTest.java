@@ -145,7 +145,7 @@ public class HandlerRouteGroupErrorsTest {
                     throw new GroupErrorsFailure();
                 });
                 api.GET("/filter-fails", (request, pathVariables) -> text(HttpStatus.OK, "not failed"))
-                    .before(request -> {
+                    .beforeReplacing(request -> {
                         throw new GroupErrorsFailure();
                     });
                 api.GET("/missing", (request, pathVariables) -> HttpResponse.notFound());

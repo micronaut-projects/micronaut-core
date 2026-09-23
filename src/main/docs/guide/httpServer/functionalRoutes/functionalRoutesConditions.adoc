@@ -32,4 +32,6 @@ snippet::io.micronaut.docs.server.functional.ConditionRoutes[tags="port", indent
 
 <1> The routes of the group match the requests on the management port only.
 
+`port(String)` takes the port like the `port` member of `@Controller`: a number, or property placeholders with defaults, e.g. `port("${my.admin.port:8081}")`, resolved with the environment of the application when the routes are declared. A placeholder that cannot be resolved fails the startup, like for a controller, and a port that is not a number between `1` and `65535` is rejected.
+
 Once a route of the application has a port, the routes without one match the requests on the default ports of the server only. A route table built at runtime cannot open a port, so its routes cannot have one.

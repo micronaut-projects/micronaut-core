@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router;
 
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import org.jspecify.annotations.Nullable;
@@ -90,6 +91,41 @@ public final class RouteArguments {
             throw new IllegalArgumentException("The port of a route must be between 1 and 65535: " + port);
         }
         return port;
+    }
+
+    /**
+     * The port of a handler route or of a group of handler routes given as a string, like
+     * {@code @Controller(port = "${my.admin.port}")}: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * placeholder resolver of the environment like the port of a controller, then checked like
+     * {@link #port(int)}.
+     *
+     * @param port                The port or the expression
+     * @param placeholderResolver The placeholder resolver of the environment, or {@code null} if
+     *                            there is none, e.g. for a route table built at runtime
+     * @return The port
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and
+     *                                  {@code 65535}, or has a placeholder and there is no resolver
+     */
+    public static int port(String port, @Nullable PropertyPlaceholderResolver placeholderResolver) {
+        Objects.requireNonNull(port, "port");
+        String resolved;
+        if (placeholderResolver != null) {
+            resolved = placeholderResolver.resolveRequiredPlaceholders(port);
+        } else if (port.contains("${")) {
+            throw new IllegalArgumentException("The port of a route has a placeholder, and there is no environment to resolve it with: " + port);
+        } else {
+            resolved = port;
+        }
+        int value;
+        try {
+            value = Integer.parseInt(resolved.strip());
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException("The port of a route is not a number: " + port
+                + (resolved.equals(port) ? "" : ", resolved to: " + resolved), e);
+        }
+        return port(value);
     }
 
     /**

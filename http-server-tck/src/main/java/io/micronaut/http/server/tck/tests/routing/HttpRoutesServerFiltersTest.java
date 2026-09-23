@@ -183,7 +183,6 @@ public class HttpRoutesServerFiltersTest {
             routes.filter("/sf/only/**").after((request, response) -> response.header("X-Only", "true"));
             routes.filter("/sf/**").before(TaskExecutors.IO, (request, propagatedContext) -> {
                 propagatedContext.add(new FilterTrace("fn"));
-                return null;
             });
             routes.path("/group", group -> {
                 group.filter("/sf/**").after((request, response) -> response.header("X-In-Group", "true"));

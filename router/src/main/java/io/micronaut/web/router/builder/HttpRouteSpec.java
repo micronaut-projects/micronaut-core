@@ -16,12 +16,17 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -98,6 +103,101 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
     HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
+     * Annotate the route with an annotation, like an annotation on a controller method, with
+     * the {@code annotate} methods of the compile-time elements, e.g.
+     * {@code io.micronaut.inject.ast.Element#annotate}: the features that read the annotations of
+     * the matched route see it, e.g. a {@code @FilterMatcher} annotation binds its filters to the
+     * route, and {@code @Version} selects the route by the version of the request. Several
+     * annotations are chained calls.
+     *
+     * <pre>{@code
+     * routes.POST("/payments/{amount}", payHandler)
+     *     .annotate(Audited.class)
+     *     .annotate(Version.class, version -> version.value("2"));
+     * }</pre>
+     *
+     * <p>If the route already has the annotation, the members of the given one are merged with,
+     * and override, the existing ones; a repeatable annotation is added to the existing ones. The
+     * annotations of the route are layered like the annotations of a controller method over the
+     * ones of its class: the annotations of the element given with
+     * {@link #annotationMetadata(AnnotationMetadataProvider)}, then of the
+     * {@link HttpRouteGroup#annotate(AnnotationValue) groups} of the route, outer group first,
+     * then of the route, each overriding the members of the same annotation before it.</p>
+     *
+     * <p>The meta-annotations of an annotation type are not known at runtime: a feature that
+     * looks up an annotation by its own type sees it, like the ones above, {@code @CrossOrigin},
+     * {@code @ExecuteOn} or a security annotation, but a feature that looks up a stereotype of
+     * the annotation needs the stereotype in the annotation value, see
+     * {@link AnnotationValueBuilder#stereotype(AnnotationValue)}. The expressions of an
+     * annotation, e.g. of {@code @RouteCondition}, are compiled with the annotated code: a route
+     * condition is declared with {@link #where(Predicate)}.</p>
+     *
+     * @param annotationValue The annotation
+     * @param <T>             The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue);
+
+    /**
+     * Annotate the route, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteSpec annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the route with an annotation without members, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec annotate(String annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+
+    /**
+     * Annotate the route, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteSpec annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the route with an annotation without members, e.g. a {@code @FilterMatcher}
+     * annotation, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param <T>            The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteSpec annotate(Class<T> annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+
+    /**
      * Declare the type of the body of the responses of the route, like the return type
      * {@code HttpResponse<R>} of a controller method: the message body writer is selected for the
      * declared type, with its type arguments and annotations, instead of the runtime class of the
@@ -122,6 +222,18 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
      * @since 5.3.0
      */
     HttpRouteSpec responseType(Argument<?> responseType);
+
+    /**
+     * Declare the type of the body of the responses as a class: {@code responseType(Argument.of(responseType))},
+     * see {@link #responseType(Argument)}.
+     *
+     * @param responseType The type of the body of the response
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec responseType(Class<?> responseType) {
+        return responseType(Argument.of(Objects.requireNonNull(responseType, "responseType")));
+    }
 
     /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
@@ -162,6 +274,25 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);
+
+    /**
+     * Route the requests on the port of a property, like {@code @Controller(port = "${my.admin.port}")},
+     * whose {@code port} member is a string: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * environment of the application like the port of a controller, when the routes are declared.
+     * Otherwise the same as {@link #port(int)}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * }</pre>
+     *
+     * @param port The port, or an expression that resolves to it
+     * @return The route
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteSpec port(String port);
 
     /**
      * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
@@ -229,7 +360,7 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
      *     admin.GET("/users", usersHandler);
      *     admin.GET("/audit", auditHandler).attribute("role", "auditor");
      * });
-     * routes.filter("/admin/**").before(request -> {
+     * routes.filter("/admin/**").beforeReplacing(request -> {
      *     String role = RouteAttributes.getRouteInfo(request)
      *         .flatMap(route -> route.getAttribute("role", String.class))
      *         .orElseThrow();

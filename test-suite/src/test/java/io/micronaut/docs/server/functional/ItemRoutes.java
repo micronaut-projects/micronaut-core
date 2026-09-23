@@ -3,7 +3,6 @@ package io.micronaut.docs.server.functional;
 // tag::imports[]
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
-import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -25,7 +24,7 @@ public class ItemRoutes {
         return routes -> {
             routes.GET("/items/{id}", (request, pathVariables) -> // <2>
                 HttpResponse.ok(items.find(pathVariables.getLong("id"))));
-            routes.POST("/items", Argument.of(Item.class), (request, pathVariables, item) -> // <3>
+            routes.POST("/items", Item.class, (request, pathVariables, item) -> // <3>
                 HttpResponse.created(items.save(item)));
             routes.GET("/items/{id}/name", (request, pathVariables) ->
                     HttpResponse.ok(items.find(pathVariables.getLong("id")).name()))

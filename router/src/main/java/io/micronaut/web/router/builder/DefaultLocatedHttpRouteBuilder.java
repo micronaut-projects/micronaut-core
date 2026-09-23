@@ -43,7 +43,8 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
      * @param targetType The type of the located targets
      */
     public DefaultLocatedHttpRouteBuilder(RouteAssembly assembly, Argument<T> targetType) {
-        super(assembly, null, null, null);
+        // a route table built at runtime cannot open a port: no placeholder to resolve
+        super(assembly, null, null, null, null);
         this.targetType = Objects.requireNonNull(targetType, "targetType");
     }
 

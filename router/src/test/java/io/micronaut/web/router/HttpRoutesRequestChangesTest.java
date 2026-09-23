@@ -61,7 +61,6 @@ class HttpRoutesRequestChangesTest {
                 if (request.getPath().equals("/old")) {
                     request.uri(URI.create("/new?q=1"));
                 }
-                return null;
             });
         });
 
@@ -75,7 +74,7 @@ class HttpRoutesRequestChangesTest {
         Router router = router(routes -> {
             routes.POST("/item", OK);
             routes.PUT("/item", OK);
-            routes.filter("/**").preMatching().before(request -> {
+            routes.filter("/**").preMatching().beforeReplacing(request -> {
                 String override = request.getHeaders().get("X-Method");
                 return override == null ? null : withMethod(request, HttpMethod.parse(override));
             });
@@ -92,7 +91,6 @@ class HttpRoutesRequestChangesTest {
             routes.GET("/new", OK);
             routes.filter("/**").before(request -> {
                 request.uri(URI.create("/new"));
-                return null;
             });
         });
 
@@ -106,7 +104,6 @@ class HttpRoutesRequestChangesTest {
             routes.GET("/b", OK);
             routes.filter("/a").preMatching().before(request -> {
                 request.uri(URI.create("/b"));
-                return null;
             });
             routes.filter("/b").preMatching().before(request -> trace(request, "b"));
         });
@@ -119,15 +116,13 @@ class HttpRoutesRequestChangesTest {
     @Test
     void theRouteTheGroupAndTheServerFiltersChangeTheHeadersOfTheRequest() {
         Router router = router(routes -> {
-            routes.filter("/**").before(request -> request.header("X-Server", "server"));
+            routes.filter("/**").beforeReplacing(request -> request.header("X-Server", "server"));
             routes.group(group -> {
                 group.before(request -> {
                     request.getHeaders().set("X-Client", "group");
-                    return null;
                 });
                 group.GET("/headers", OK).before(request -> {
                     request.getHeaders().add("X-Route", request.getHeaders().get("X-Client") + "-route");
-                    return null;
                 });
             });
         });
@@ -145,7 +140,6 @@ class HttpRoutesRequestChangesTest {
     void aMutableRequestIsChangedInPlace() {
         Router router = router(routes -> routes.GET("/x", OK).before(request -> {
             request.header("X-Changed", "true");
-            return null;
         }));
         MutableHttpRequest<?> request = HttpRequest.GET("/x");
 
@@ -158,7 +152,7 @@ class HttpRoutesRequestChangesTest {
     void aRequestFilterContinuesWithTheRequestItReturns() {
         List<HttpRequest<?>> replacements = new ArrayList<>();
         Router router = router(routes -> routes.GET("/x", OK)
-            .before(request -> {
+            .beforeReplacing(request -> {
                 HttpRequest<?> replacement = new HttpRequestWrapper<>(request);
                 replacements.add(replacement);
                 return replacement;
@@ -169,7 +163,7 @@ class HttpRoutesRequestChangesTest {
                 request.header("X-Async", "true");
                 return CompletableFuture.completedFuture(null);
             })
-            .before((request, propagatedContext) -> {
+            .beforeReplacing((request, propagatedContext) -> {
                 assertEquals("true", request.getHeaders().get("X-Async"));
                 HttpRequest<?> replacement = withMethod(request, HttpMethod.PATCH);
                 replacements.add(replacement);
@@ -185,8 +179,8 @@ class HttpRoutesRequestChangesTest {
     @Test
     void aRequestFilterThatAnswersStopsTheChainLikeBefore() {
         Router router = router(routes -> routes.GET("/x", OK)
-            .before(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED))
-            .before(request -> {
+            .beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED))
+            .beforeReplacing(request -> {
                 throw new AssertionError("not called");
             }));
 
