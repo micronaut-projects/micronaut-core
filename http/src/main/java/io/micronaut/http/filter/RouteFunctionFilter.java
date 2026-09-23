@@ -199,6 +199,9 @@ record RouteFunctionFilter(
      * client; otherwise the response it was given continues, with what the filter changed in place.
      * The replacement is {@link HttpResponse#toMutableResponse() mutable}, like the response of a
      * route, so a filter method after it with a {@link MutableHttpResponse} parameter can change it.
+     * A filter that continues with the response of the context, changed in place or not, and does
+     * not change the propagated context, continues with the context, like a void
+     * {@code @ResponseFilter} method, so the response is not processed again as a new one.
      *
      * @param context  The context after the filter, with the propagated context it changed
      * @param response The mutable response the filter was given
@@ -206,7 +209,8 @@ record RouteFunctionFilter(
      * @return The context
      */
     private static FilterContext next(FilterContext context, MutableHttpResponse<?> response, @Nullable HttpResponse<?> result) {
-        return context.withResponse(result == null ? response : result.toMutableResponse());
+        HttpResponse<?> next = result == null ? response : result.toMutableResponse();
+        return next == context.response() ? context : context.withResponse(next);
     }
 
     /**
