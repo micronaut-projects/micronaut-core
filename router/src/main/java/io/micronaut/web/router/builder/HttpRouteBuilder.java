@@ -655,7 +655,7 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * is declared: the prefix and the filters of a {@link HttpRouteGroup} do not apply to it.
      *
      * <pre>{@code
-     * routes.filter("/**").order(100).before((request, propagatedContext) -> {
+     * routes.filter("/**").order(100).beforeReplacing((request, propagatedContext) -> {
      *     propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
      *     return null;
      * });
@@ -679,7 +679,7 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      *
      * <pre>{@code
      * routes.group(all -> {
-     *     all.before((request, propagatedContext) -> {
+     *     all.beforeReplacing((request, propagatedContext) -> {
      *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
      *         return null;
      *     });

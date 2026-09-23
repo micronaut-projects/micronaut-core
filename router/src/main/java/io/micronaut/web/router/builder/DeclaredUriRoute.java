@@ -171,7 +171,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute before(ContextRouteRequestFilter filter) {
+    public HandlerUriRoute before(ContextReplacingRouteRequestFilter filter) {
         Objects.requireNonNull(filter, "filter");
         return configure(r -> r.before(filter));
     }
@@ -183,7 +183,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
+    public HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter) {
         RouteArguments.executorName(executorName);
         Objects.requireNonNull(filter, "filter");
         return configure(r -> r.before(executorName, filter));
@@ -197,7 +197,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
         Objects.requireNonNull(filter, "filter");
         return configure(r -> r.beforeAsync(filter));
     }

@@ -253,7 +253,7 @@ public class RouteGroupsTest {
                     inner.after((request, response) -> trace(response, "inner"));
                 });
                 groups.GET("/rejected", (request, pathVariables) -> text("not rejected"))
-                    .before(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
+                    .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
                     .after((request, response) -> trace(response, "route-after"));
                 groups.GET("/fails", (request, pathVariables) -> {
                     throw new GroupFailure();
@@ -275,7 +275,6 @@ public class RouteGroupsTest {
             routes.path("/groups/context", outer -> {
                 outer.before((request, propagatedContext) -> {
                     propagatedContext.add(new OuterTrace("o"));
-                    return null;
                 });
                 outer.group(inner -> {
                     inner.beforeAsync((request, propagatedContext) -> {
@@ -284,7 +283,6 @@ public class RouteGroupsTest {
                     });
                     inner.before(TaskExecutors.IO, (request, propagatedContext) -> {
                         propagatedContext.add(new BlockingTrace("b"));
-                        return null;
                     });
                     inner.after((request, response, propagatedContext) -> response.header("X-Context-After", describeContext()));
                     inner.afterAsync((request, response) -> CompletableFuture.completedFuture(response.header("X-Async-After", "true")));

@@ -90,19 +90,19 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
-    public HttpRouteGroup before(ContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacing(ContextReplacingRouteRequestFilter filter) {
         filters.before(filter, null);
         return this;
     }
 
     @Override
-    public HttpRouteGroup before(String executorName, ContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
         filters.before(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
     @Override
-    public HttpRouteGroup beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
         filters.beforeAsync(filter);
         return this;
     }

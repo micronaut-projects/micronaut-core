@@ -47,9 +47,9 @@ import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.AsyncContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.AsyncContextRouteRequestFilter;
+import io.micronaut.web.router.builder.AsyncContextReplacingRouteRequestFilter;
 import io.micronaut.web.router.builder.ContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.ContextRouteRequestFilter;
+import io.micronaut.web.router.builder.ContextReplacingRouteRequestFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
@@ -905,7 +905,7 @@ public final class RouteAssembly {
          * @param filter       The filter
          * @param executorName The name of the executor to run the filter on, or {@code null}
          */
-        public void before(ContextRouteRequestFilter filter, @Nullable String executorName) {
+        public void before(ContextReplacingRouteRequestFilter filter, @Nullable String executorName) {
             Objects.requireNonNull(filter, "filter");
             add(requestFilters, GenericHttpFilter.createRouteRequestFilter(filter::filter, executor(executorName)));
         }
@@ -913,7 +913,7 @@ public final class RouteAssembly {
         /**
          * @param filter The filter
          */
-        public void beforeAsync(AsyncContextRouteRequestFilter filter) {
+        public void beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
             Objects.requireNonNull(filter, "filter");
             add(requestFilters, GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
         }
@@ -1577,19 +1577,19 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute before(ContextRouteRequestFilter filter) {
+        public HandlerUriRoute before(ContextReplacingRouteRequestFilter filter) {
             filters.before(filter, null);
             return this;
         }
 
         @Override
-        public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
+        public HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter) {
             filters.before(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
         @Override
-        public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
+        public HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
             filters.beforeAsync(filter);
             return this;
         }

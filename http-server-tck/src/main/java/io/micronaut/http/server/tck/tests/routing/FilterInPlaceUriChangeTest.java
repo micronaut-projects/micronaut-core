@@ -264,7 +264,6 @@ public class FilterInPlaceUriChangeTest {
         public void routes(HttpRouteBuilder routes) {
             routes.filter("/ipc/fn/**").preMatching().before(request -> {
                 request.uri(URI.create(moved(request.getPath(), "/ipc/fn/")));
-                return null;
             });
             routes.POST("/ipc/target/form-handler-pojo", Argument.of(Person.class), (request, pathVariables, person) ->
                 HttpResponse.ok("handler pojo " + person.name() + " " + person.age()).contentType(MediaType.TEXT_PLAIN_TYPE)
@@ -278,7 +277,6 @@ public class FilterInPlaceUriChangeTest {
                 if ("route".equals(request.getHeaders().get(REQUERY))) {
                     request.uri(URI.create(request.getPath() + "?changed=route"));
                 }
-                return null;
             });
         }
     }

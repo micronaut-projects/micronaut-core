@@ -150,7 +150,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec before(ContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacing(ContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.before(filter);
         }
@@ -158,7 +158,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec before(String executorName, ContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.before(executorName, filter);
         }
@@ -166,7 +166,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.beforeAsync(filter);
         }

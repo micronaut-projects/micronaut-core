@@ -341,7 +341,7 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
      *     admin.GET("/users", usersHandler);
      *     admin.GET("/audit", auditHandler).attribute("role", "auditor");
      * });
-     * routes.filter("/admin/**").before(request -> {
+     * routes.filter("/admin/**").beforeReplacing(request -> {
      *     String role = RouteAttributes.getRouteInfo(request)
      *         .flatMap(route -> route.getAttribute("role", String.class))
      *         .orElseThrow();

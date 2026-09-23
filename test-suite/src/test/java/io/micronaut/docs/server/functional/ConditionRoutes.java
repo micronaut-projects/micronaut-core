@@ -36,7 +36,7 @@ public class ConditionRoutes implements HttpRoutes {
         // tag::attributes[]
         routes.path("/reports", reports -> {
             reports.attribute("role", "auditor"); // <1>
-            reports.before(request -> {
+            reports.beforeReplacing(request -> {
                 String role = RouteAttributes.getRouteInfo(request) // <2>
                     .flatMap(route -> route.getAttribute("role", String.class))
                     .orElseThrow();

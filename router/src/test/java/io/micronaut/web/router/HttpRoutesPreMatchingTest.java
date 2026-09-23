@@ -69,7 +69,7 @@ class HttpRoutesPreMatchingTest {
         Router router = router(routes -> {
             routes.GET("/ok", OK);
             routes.filter("/**").preMatching()
-                .before(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .after((request, response) -> response.header("X-After", response.getHeaders().get("X-After") == null ? "1" : "2"));
         });
 

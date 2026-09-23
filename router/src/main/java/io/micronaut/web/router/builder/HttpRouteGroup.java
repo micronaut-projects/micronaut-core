@@ -35,9 +35,9 @@ import java.util.function.Predicate;
  *     api.GET("/orders", (request, pathVariables) -> HttpResponse.ok(orders.all()));
  *     api.path("/admin", admin -> {
  *         admin.GET("/users", (request, pathVariables) -> HttpResponse.ok(users.all()));
- *         admin.before(request -> isAdmin(request) ? null : HttpResponse.forbidden());
+ *         admin.beforeReplacing(request -> isAdmin(request) ? null : HttpResponse.forbidden());
  *     });
- *     api.before((request, propagatedContext) -> {
+ *     api.beforeReplacing((request, propagatedContext) -> {
  *         propagatedContext.add(new MdcPropagationContext(Map.of("tenant", tenantOf(request))));
  *         return null;
  *     });

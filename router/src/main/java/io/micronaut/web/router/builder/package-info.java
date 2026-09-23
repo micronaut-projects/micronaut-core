@@ -34,7 +34,7 @@
  *     @Override
  *     public void routes(HttpRouteBuilder routes) {
  *         routes.path("/orders", group -> {
- *             group.before(request -> request.getHeaders().contains("X-Tenant") ? null : HttpResponse.badRequest());
+ *             group.beforeReplacing(request -> request.getHeaders().contains("X-Tenant") ? null : HttpResponse.badRequest());
  *             group.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(orders.find(pathVariables.getLong("id"))));
  *             group.POST("/", Order.class, (request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
  *             group.asyncPOST("/import", (request, pathVariables) -> request.elements(Order.class)

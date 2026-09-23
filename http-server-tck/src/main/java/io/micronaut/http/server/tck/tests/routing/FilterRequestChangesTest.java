@@ -274,7 +274,7 @@ public class FilterRequestChangesTest {
     static class Filters implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.filter("/rc/**").preMatching().before(request -> {
+            routes.filter("/rc/**").preMatching().beforeReplacing(request -> {
                 String path = request.getPath();
                 if (path.startsWith("/rc/old/")) {
                     // in place, like a void filter method changing its mutable request
@@ -288,11 +288,11 @@ public class FilterRequestChangesTest {
             routes.filter("/rc/**").preMatching().order(5).before(request -> trace(request, "fn5"));
             routes.filter("/rc/**").preMatching().order(20).before(request -> trace(request, "fn20"));
             routes.filter("/rc/blocked", "/rc/echo/**").preMatching()
-                .before(request -> request.getPath().equals("/rc/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .beforeReplacing(request -> request.getPath().equals("/rc/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .after((request, response) -> response.header("X-Pre-After", response.getHeaders().contains("X-Pre-After") ? "2" : "1"));
             // a request filter returning the request it changed
-            routes.filter("/rc/headers/**").before(request -> request.header("X-Server", "server"));
-            routes.filter("/rc/replace/**").beforeAsync(request -> ((ServerHttpRequest<?>) request).byteBody()
+            routes.filter("/rc/headers/**").beforeReplacing(request -> request.header("X-Server", "server"));
+            routes.filter("/rc/replace/**").beforeReplacingAsync(request -> ((ServerHttpRequest<?>) request).byteBody()
                 .split(ByteBody.SplitBackpressureMode.FASTEST)
                 .buffer()
                 .thenApply(bytes -> {
@@ -300,8 +300,8 @@ public class FilterRequestChangesTest {
                         return withBody(request, null, bytes.toString(StandardCharsets.UTF_8).toUpperCase(Locale.ROOT));
                     }
                 }));
-            routes.filter("/rc/charset/**").preMatching().before(request -> withCharset(request, StandardCharsets.ISO_8859_1));
-            routes.filter("/rc/whole").preMatching().before(request -> {
+            routes.filter("/rc/charset/**").preMatching().beforeReplacing(request -> withCharset(request, StandardCharsets.ISO_8859_1));
+            routes.filter("/rc/whole").preMatching().beforeReplacing(request -> {
                 request.uri(URI.create("/rc/whole/target?from=filter"));
                 request.header("X-Replaced", "yes");
                 return withBody(request, HttpMethod.PUT, "whole body");
@@ -337,14 +337,12 @@ public class FilterRequestChangesTest {
             routes.path("/rc/headers", group -> {
                 group.before(request -> {
                     request.getHeaders().set("X-Client", "group");
-                    return null;
                 });
                 group.GET("/handler", (request, pathVariables) -> textResponse(request.getHeaders().get("X-Server")
                     + " " + request.getHeaders().get("X-Client")
                     + " " + request.getHeaders().get("X-Route"))
                 ).before(request -> {
                     request.getHeaders().add("X-Route", request.getHeaders().get("X-Client") + "-route");
-                    return null;
                 });
             });
         }

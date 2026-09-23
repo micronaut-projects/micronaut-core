@@ -177,7 +177,6 @@ public class HandlerRouteAsyncLocatorTest {
             }, target -> shows);
             routes.filter("/async-context/**").preMatching().before((request, propagatedContext) -> {
                 propagatedContext.add(new Trace("trace-" + request.getPath().split("/")[2]));
-                return null;
             });
         }
     }

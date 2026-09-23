@@ -92,24 +92,24 @@ public interface HandlerUriRoute {
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#before(ContextRouteRequestFilter)
+     * @see HttpRouteSpec#beforeReplacing(ContextReplacingRouteRequestFilter)
      */
-    HandlerUriRoute before(ContextRouteRequestFilter filter);
+    HandlerUriRoute before(ContextReplacingRouteRequestFilter filter);
 
     /**
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see HttpRouteSpec#before(String, ContextRouteRequestFilter)
+     * @see HttpRouteSpec#beforeReplacing(String, ContextReplacingRouteRequestFilter)
      */
-    HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter);
+    HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#beforeAsync(AsyncContextRouteRequestFilter)
+     * @see HttpRouteSpec#beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter)
      */
-    HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter);
+    HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter);
 
     /**
      * @param filter The filter
