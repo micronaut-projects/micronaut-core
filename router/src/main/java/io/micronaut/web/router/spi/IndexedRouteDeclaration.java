@@ -82,7 +82,9 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
 
     /**
      * The URL parser generated for the enum this declaration is a constant of, if any: the
-     * ordinal it answers selects the route bound to the constant with that ordinal.
+     * ordinal it answers selects the route bound to the constant with that ordinal. Every constant
+     * of the enum must return the same instance, on every call, e.g. a {@code static final}
+     * singleton: the router groups the routes of a parser by its identity.
      *
      * @return The matcher, or {@code null}
      */

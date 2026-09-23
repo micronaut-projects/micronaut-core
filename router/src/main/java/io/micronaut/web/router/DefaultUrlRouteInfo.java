@@ -25,6 +25,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
@@ -236,10 +237,15 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      *
      * @param path     The matched path
      * @param captured The raw values of the path variables, in the order of the template
-     * @return The match
+     * @return The match, or the match of the template if the route has more variables than were
+     * captured: the matcher answered a route it cannot match, see {@link CompiledRouteMatcher}
      */
-    UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
-        return new DefaultUriRouteMatch<>(new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured), this, defaultCharset, conversionService);
+    @Nullable UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
+        List<UriMatchVariable> variables = uriMatchTemplate.getVariables();
+        if (variables.size() > captured.length) {
+            return tryMatch(path);
+        }
+        return new DefaultUriRouteMatch<>(new CapturedUriMatchInfo(path, variables, captured), this, defaultCharset, conversionService);
     }
 
     /**
