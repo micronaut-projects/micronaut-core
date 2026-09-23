@@ -19,20 +19,19 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.client.RawRequestOptions;
 import io.netty.channel.Channel;
 import io.netty.handler.timeout.ReadTimeoutException;
-import io.netty.util.Attribute;
 import io.netty.util.AttributeKey;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The response timeout of one request, see {@link RawRequestOptions#getResponseTimeout()}. It
- * replaces the configured read timeout of the connection until the response arrives, and fails
- * the request with a read timeout if the response does not arrive in time. <b>Event loop
- * only.</b>
+ * replaces the configured read timeout of the request until the response arrives, and fails
+ * the request with a read timeout if the response does not arrive in time. The configured read
+ * timeout belongs to the connection of an HTTP/1 request, and to the stream of an HTTP/2 or
+ * HTTP/3 request, see {@link StreamReadTimeoutHandler}. <b>Event loop only.</b>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -40,20 +39,18 @@ import java.util.concurrent.atomic.AtomicInteger;
 @Internal
 final class ResponseDeadline implements Runnable {
     /**
-     * The number of live requests of a connection that have a response timeout of their own, and
-     * are not failed by the configured read timeout of the connection.
+     * The deadline of the request on a channel (the connection of an HTTP/1 request, the stream
+     * of an HTTP/2 or HTTP/3 request), while the configured read timeout does not apply to it.
      */
-    private static final AttributeKey<AtomicInteger> READ_TIMEOUT_OVERRIDES = AttributeKey.valueOf(ResponseDeadline.class, "readTimeoutOverrides");
+    private static final AttributeKey<ResponseDeadline> ACTIVE = AttributeKey.valueOf(ResponseDeadline.class, "active");
 
     private final ConnectionManager.PoolHandle poolHandle;
-    private final AtomicInteger overrides;
     @Nullable
     private ScheduledFuture<?> timer;
     private boolean done;
 
     private ResponseDeadline(ConnectionManager.PoolHandle poolHandle) {
         this.poolHandle = poolHandle;
-        this.overrides = overrides(connection(poolHandle));
     }
 
     /**
@@ -65,28 +62,27 @@ final class ResponseDeadline implements Runnable {
      */
     static ResponseDeadline start(ConnectionManager.PoolHandle poolHandle, Duration timeout) {
         ResponseDeadline deadline = new ResponseDeadline(poolHandle);
-        deadline.overrides.incrementAndGet();
+        poolHandle.channel().attr(ACTIVE).set(deadline);
         deadline.timer = poolHandle.channel().eventLoop().schedule(deadline, timeout.toNanos(), TimeUnit.NANOSECONDS);
         return deadline;
     }
 
     /**
-     * Whether the configured read timeout of a connection fails its requests: not if every live
+     * Whether the configured read timeout fails the request on the given channel: not while the
      * request has a response timeout of its own.
      *
-     * @param connection   The connection
-     * @param liveRequests The number of live requests of the connection
+     * @param channel The channel of the request: the connection of an HTTP/1 request, the stream
+     *                of an HTTP/2 or HTTP/3 request
      * @return Whether the read timeout applies
      */
-    static boolean readTimeoutApplies(Channel connection, int liveRequests) {
-        AtomicInteger overrides = connection.attr(READ_TIMEOUT_OVERRIDES).get();
-        return overrides == null || liveRequests > overrides.get();
+    static boolean readTimeoutApplies(Channel channel) {
+        return channel.attr(ACTIVE).get() == null;
     }
 
     @Override
     public void run() {
         if (!done) {
-            // fail the request like the read timeout of the connection does
+            // fail the request like the configured read timeout does
             poolHandle.taint();
             Channel channel = poolHandle.channel();
             channel.pipeline().fireExceptionCaught(ReadTimeoutException.INSTANCE);
@@ -106,27 +102,7 @@ final class ResponseDeadline implements Runnable {
             if (timer != null) {
                 timer.cancel(false);
             }
-            overrides.decrementAndGet();
+            poolHandle.channel().attr(ACTIVE).compareAndSet(this, null);
         }
-    }
-
-    private static Channel connection(ConnectionManager.PoolHandle poolHandle) {
-        Channel channel = poolHandle.channel();
-        // an HTTP/2 or HTTP/3 request has a stream channel of its own
-        Channel parent = channel.parent();
-        return poolHandle.http2() && parent != null ? parent : channel;
-    }
-
-    private static AtomicInteger overrides(Channel connection) {
-        Attribute<AtomicInteger> attribute = connection.attr(READ_TIMEOUT_OVERRIDES);
-        AtomicInteger overrides = attribute.get();
-        if (overrides == null) {
-            overrides = new AtomicInteger();
-            AtomicInteger existing = attribute.setIfAbsent(overrides);
-            if (existing != null) {
-                overrides = existing;
-            }
-        }
-        return overrides;
     }
 }
