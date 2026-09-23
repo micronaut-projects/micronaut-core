@@ -593,6 +593,24 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
         @Nullable Class<?> originatingClass,
         Throwable error, HttpRequest<?> request) {
+        return findErrorRoute(errorRoutes, originatingClass, error, request);
+    }
+
+    /**
+     * The error route of the closest exception type among error routes, e.g. the global ones or
+     * the ones of a group of handler routes.
+     *
+     * @param errorRoutes      The error routes
+     * @param originatingClass The class the error routes are local to, or {@code null} for the global ones
+     * @param error            The error
+     * @param request          The request
+     * @param <R>              The result type
+     * @return The match of the error route, if one handles the error
+     */
+    static <R> Optional<RouteMatch<R>> findErrorRoute(ErrorRouteInfo<Object, Object>[] errorRoutes,
+                                                      @Nullable Class<?> originatingClass,
+                                                      Throwable error,
+                                                      HttpRequest<?> request) {
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
@@ -665,6 +683,24 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, int status, HttpRequest<?> request) {
+        return findStatusRoute(statusRoutes, originatingClass, status, request);
+    }
+
+    /**
+     * The status route of a status among status routes, e.g. the global ones or the ones of a
+     * group of handler routes.
+     *
+     * @param statusRoutes     The status routes
+     * @param originatingClass The class the status routes are local to, or {@code null} for the global ones
+     * @param status           The status
+     * @param request          The request
+     * @param <R>              The result type
+     * @return The match of the status route, if one handles the status
+     */
+    static <R> Optional<RouteMatch<R>> findStatusRoute(StatusRouteInfo<Object, Object>[] statusRoutes,
+                                                       @Nullable Class<?> originatingClass,
+                                                       int status,
+                                                       HttpRequest<?> request) {
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
@@ -1152,7 +1188,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return routes.toArray(EMPTY);
     }
 
-    private <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
+    private static <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
         if (matchedRoutes.size() == 1) {
             return matchedRoutes.stream().findFirst();
         } else if (matchedRoutes.size() > 1) {

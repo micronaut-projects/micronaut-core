@@ -161,8 +161,17 @@ public final class RouteLocator {
         if (request instanceof LocatedRequest<?> located) {
             filters.addAll(located.filters);
         }
+        // the groups with error routes of this locator route, then of the locator routes that located it
+        List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
         if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
             filters.addAll(locatorRoute.routeFilters);
+            RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
+            if (errorScope != null) {
+                errorScopes.add(errorScope);
+            }
+        }
+        if (request instanceof LocatedRequest<?> located) {
+            errorScopes.addAll(located.errorScopes);
         }
         Object target;
         try {
@@ -178,7 +187,8 @@ public final class RouteLocator {
         if (!(table instanceof DefaultRouteTable defaultTable)) {
             throw new IllegalStateException("No route table for the located target: " + target);
         }
-        return new Located(defaultTable.router(null), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables, List.copyOf(filters)), target);
+        return new Located(defaultTable.router(null), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables,
+            List.copyOf(filters), List.copyOf(errorScopes)), target);
     }
 
     @Override
@@ -218,7 +228,7 @@ public final class RouteLocator {
             values.putAll(inner.getVariableValues());
             List<UriMatchVariable> variables = new ArrayList<>(request.variables);
             variables.addAll(inner.getVariables());
-            LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters);
+            LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters, request.errorScopes);
             return (UriRouteMatch<T, R>) route.locatedMatch(info);
         }
 
@@ -250,11 +260,13 @@ public final class RouteLocator {
         private final Map<String, Object> decodedValues;
         private final List<UriMatchVariable> variables;
         private final List<GenericHttpFilter> filters;
+        private final List<RouteAssembly.RouteGroup> errorScopes;
         private @Nullable URI uri;
 
         @SuppressWarnings("ParameterNumber")
         LocatedRequest(HttpRequest<B> original, String path, Object target, Map<String, Object> rawValues,
-                       Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters) {
+                       Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
+                       List<RouteAssembly.RouteGroup> errorScopes) {
             super(original);
             this.original = original;
             this.path = path;
@@ -263,6 +275,7 @@ public final class RouteLocator {
             this.decodedValues = decodedValues;
             this.variables = variables;
             this.filters = filters;
+            this.errorScopes = errorScopes;
         }
 
         @Override
@@ -293,14 +306,16 @@ public final class RouteLocator {
         private final Map<String, UriMatchVariable> variableMap;
         private final Object target;
         private final List<GenericHttpFilter> filters;
+        private final List<RouteAssembly.RouteGroup> errorScopes;
 
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
-                            List<GenericHttpFilter> filters) {
+                            List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes) {
             this.uri = uri;
             this.values = values;
             this.variables = variables;
             this.target = target;
             this.filters = filters;
+            this.errorScopes = errorScopes;
             this.variableMap = LinkedHashMap.newLinkedHashMap(variables.size());
             for (UriMatchVariable variable : variables) {
                 variableMap.put(variable.getName(), variable);
@@ -320,6 +335,14 @@ public final class RouteLocator {
          */
         List<GenericHttpFilter> filters() {
             return filters;
+        }
+
+        /**
+         * @return The groups with error or status routes of the locator routes that located the
+         * route, the closest locator first
+         */
+        List<RouteAssembly.RouteGroup> errorScopes() {
+            return errorScopes;
         }
 
         @Override

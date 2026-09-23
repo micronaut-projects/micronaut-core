@@ -259,8 +259,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private ErrorRouteSpec errorRoute(Class<? extends Throwable> type, HandlerMethod<?> handler) {
         checkOpen();
-        // global, also when declared in a group
-        RouteAssembly.DefaultErrorRoute route = assembly.addErrorRoute(null, type, handle(handler));
+        // global on the builder, local to the routes of the group in a group
+        RouteAssembly.RouteGroup settings = groupSettings;
+        RouteAssembly.DefaultErrorRoute route = settings == null
+            ? assembly.addErrorRoute(null, type, handle(handler))
+            : settings.addErrorRoute(type, handle(handler));
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
@@ -272,8 +275,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private StatusRouteSpec statusRoute(HttpStatus status, HandlerMethod<?> handler) {
         checkOpen();
-        // global, also when declared in a group
-        RouteAssembly.DefaultStatusRoute route = assembly.addStatusRoute(null, status, handle(handler));
+        // global on the builder, local to the routes of the group in a group
+        RouteAssembly.RouteGroup settings = groupSettings;
+        RouteAssembly.DefaultStatusRoute route = settings == null
+            ? assembly.addStatusRoute(null, status, handle(handler))
+            : settings.addStatusRoute(status, handle(handler));
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {

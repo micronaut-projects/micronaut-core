@@ -235,10 +235,12 @@ class RouteGroupsTest {
     }
 
     @Test
-    void errorAndStatusRoutesDeclaredInAGroupAreGlobal() {
+    void errorAndStatusRoutesDeclaredInAGroupAreLocalToTheRoutesOfTheGroup() {
+        // changed: the error and status routes of a group were global, they are local to the group now
         Router router = router(routes -> {
             routes.path("/api", api -> {
                 api.before(request -> null);
+                api.GET("/inside", RouteGroupsTest::ok);
                 api.error(IllegalStateException.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT));
                 api.status(HttpStatus.NOT_FOUND, request -> HttpResponse.notFound("none"));
             });
@@ -246,9 +248,21 @@ class RouteGroupsTest {
         });
 
         HttpRequest<?> outside = HttpRequest.GET("/outside");
-        RouteMatch<Object> error = router.<Object>findErrorRoute(new IllegalStateException(), outside).orElseThrow();
-        assertTrue(router.findFilters(outside, error).isEmpty(), "the group does not filter its error routes");
-        assertTrue(router.findStatusRoute(HttpStatus.NOT_FOUND, HttpRequest.GET("/missing")).isPresent());
+        assertTrue(router.findErrorRoute(new IllegalStateException(), outside).isEmpty(), "not global");
+        assertTrue(router.findStatusRoute(HttpStatus.NOT_FOUND, HttpRequest.GET("/missing")).isEmpty(), "not global");
+        UriRouteMatch<Object, Object> outsideMatch = router.findClosest(outside);
+        assertNotNull(outsideMatch);
+        RouteAttributes.setRouteMatch(outside, outsideMatch);
+        assertNull(GroupErrorRoutes.findErrorRoute(outside, outsideMatch.getRouteInfo(), new IllegalStateException()));
+
+        HttpRequest<?> inside = HttpRequest.GET("/api/inside");
+        UriRouteMatch<Object, Object> insideMatch = router.findClosest(inside);
+        assertNotNull(insideMatch);
+        RouteAttributes.setRouteMatch(inside, insideMatch);
+        RouteMatch<Object> error = GroupErrorRoutes.findErrorRoute(inside, insideMatch.getRouteInfo(), new IllegalStateException());
+        assertNotNull(error);
+        assertTrue(router.findFilters(inside, error).isEmpty(), "the group does not filter its error routes");
+        assertNotNull(GroupErrorRoutes.findStatusRoute(inside, insideMatch.getRouteInfo(), HttpStatus.NOT_FOUND.getCode()));
     }
 
     @Test

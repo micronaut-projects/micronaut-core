@@ -61,10 +61,14 @@ import java.util.function.Predicate;
  * group is global: the prefix and the filters of the group do not apply to it.</p>
  *
  * <p><b>Errors.</b> An exception of a route of the group is answered by the error routes, and the
- * response filters of the group, like those of the route, filter the response of the error route. The error and status routes declared on a group,
- * {@link #error}, {@link #errorAsync}, {@link #status} and {@link #statusAsync}, are global, like
- * the ones declared on the builder of the {@link HttpRoutes} bean: they answer the requests of
- * every route, and the group neither prefixes nor filters them.</p>
+ * response filters of the group, like those of the route, filter the response of the error route.
+ * The error and status routes declared on a group, {@link #error}, {@link #errorAsync},
+ * {@link #status} and {@link #statusAsync}, are local to the routes of the group and of its
+ * nested groups, like the {@code @Error} methods of a controller that are not global: the error
+ * of a route is answered by an error route of its innermost group, then of the groups around it,
+ * then by a global one, declared on the builder of an {@link HttpRoutes} bean or on a controller
+ * with {@code global = true}. A request no route of the group matched, e.g. a {@code 404} under
+ * the prefix of the group, is answered by the global error and status routes only.</p>
  *
  * <p><b>Locators.</b> A {@link #locate locator route} declared in a group is under the prefix of
  * the group, and the filters of the group apply to every route of the located tables, before the
