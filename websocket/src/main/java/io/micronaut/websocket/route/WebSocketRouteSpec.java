@@ -54,7 +54,7 @@ import io.micronaut.websocket.WebSocketPongMessage;
  * @since 5.3.0
  */
 @Experimental
-public interface WebSocketRouteSpec {
+public sealed interface WebSocketRouteSpec permits WebSocketRouteEndpoint.Spec {
 
     /**
      * Handle the opening of a connection.
