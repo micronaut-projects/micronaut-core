@@ -21,6 +21,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
+import io.micronaut.websocket.route.WebSocketRouteSpec;
 
 import java.util.Objects;
 import java.util.Set;
@@ -795,6 +796,45 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @since 5.3.0
      */
     ServerFilterSpec filter(String... patterns);
+
+    /**
+     * Route WebSocket connections to handler functions, the functional counterpart of a
+     * {@link io.micronaut.websocket.annotation.ServerWebSocket} bean: the server upgrades a
+     * {@code GET} request to the URI template to a WebSocket connection, and calls the handlers
+     * the lambda declares, see {@link WebSocketRouteSpec}. Requires {@code micronaut-websocket}.
+     *
+     * <pre>{@code
+     * routes.webSocket("/chat/{room}", ws -> ws
+     *     .onOpen((session, request) -> session.sendAsync("joined " + session.getUriVariables().get("room", String.class).orElseThrow()))
+     *     .onMessage(Argument.of(ChatMessage.class), (message, session) -> session.sendAsync(reply(message))))
+     *     .beforeReplacing(request -> authorized(request) ? null : HttpResponse.forbidden());
+     * }</pre>
+     *
+     * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
+     * and attributes apply to the upgrade request, e.g. a filter that answers with a response
+     * rejects the upgrade, and a request that is not an upgrade is answered with an error. Its
+     * executor, see {@link HttpRouteSpec#executeOn(String)}, runs the handlers of the connections;
+     * by default they run like a controller method that returns a stage.</p>
+     *
+     * @param uri      The URI template
+     * @param endpoint Declares the handlers of the WebSocket connections
+     * @return The route of the upgrade request
+     * @since 5.3.0
+     */
+    HttpRouteSpec webSocket(String uri, Consumer<WebSocketRouteSpec> endpoint);
+
+    /**
+     * Like {@link #webSocket(String, Consumer)}, at the path of the scope, like a controller
+     * method mapped without a URI: the prefix of the group, the prefix of the locator in a route
+     * table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param endpoint Declares the handlers of the WebSocket connections
+     * @return The route of the upgrade request
+     * @since 5.3.0
+     */
+    default HttpRouteSpec webSocket(Consumer<WebSocketRouteSpec> endpoint) {
+        return webSocket("/", endpoint);
+    }
 
     /**
      * Declare a group of routes, whose filters apply to every route declared in the lambda,

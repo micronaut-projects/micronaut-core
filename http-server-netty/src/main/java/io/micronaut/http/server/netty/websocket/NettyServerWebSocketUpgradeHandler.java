@@ -19,7 +19,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpRequest;
@@ -50,9 +49,9 @@ import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.websocket.CloseReason;
 import io.micronaut.websocket.annotation.OnMessage;
 import io.micronaut.websocket.annotation.OnOpen;
-import io.micronaut.websocket.annotation.ServerWebSocket;
 import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.context.WebSocketBeanRegistry;
+import io.micronaut.websocket.route.WebSocketRouteEndpoint;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelHandlerContext;
@@ -71,6 +70,7 @@ import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -176,7 +176,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             Optional<UriRouteMatch<Object, Object>> optionalRoute = router.find(HttpMethod.GET, msg.getPath(), msg)
                 .filter(rm -> rm.isAnnotationPresent(OnMessage.class) || rm.isAnnotationPresent(OnOpen.class))
-                .findFirst();
+                // the conditions of the route, e.g. the where predicates of a route of the route builder
+                .filter(rm -> rm.getRouteInfo().matching(msg))
+                // the first of the lowest order
+                .min(Comparator.comparingInt(rm -> rm.getRouteInfo().getOrder()));
 
             WebsocketRequestLifecycle requestLifecycle = new WebsocketRequestLifecycle(routeExecutor, optionalRoute.orElse(null));
             ExecutionFlow<HttpResponse<?>> responseFlow = ExecutionFlow.async(
@@ -226,7 +229,13 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                 .map(rm -> (UriRouteMatch<Object, Object>) rm)
                 .orElseThrow(() -> new IllegalStateException("Route match is required!"));
             //Adding new handler to the existing pipeline to handle WebSocket Messages
-            WebSocketBean<?> webSocketBean = webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
+            // a WebSocket route of handler functions carries its endpoint, a @ServerWebSocket route is to a bean
+            WebSocketRouteEndpoint routeEndpoint = routeMatch.getRouteInfo()
+                .getAttribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, WebSocketRouteEndpoint.class)
+                .orElse(null);
+            WebSocketBean<?> webSocketBean = routeEndpoint != null
+                ? routeEndpoint
+                : webSocketBeanRegistry.getWebSocket(routeMatch.getTarget().getClass());
 
             handleHandshake(ctx, msg, webSocketBean, actualResponse);
 
@@ -244,7 +253,10 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
                     ctx,
                     serverConfiguration,
                     routeExecutor.getExecutorSelector(),
-                    routeExecutor.getCoroutineHelper().orElse(null));
+                    routeExecutor.getCoroutineHelper().orElse(null),
+                    routeEndpoint,
+                    // the handlers of a WebSocket route run on the executor of the route
+                    routeEndpoint == null ? null : routeMatch.getRouteInfo().getExecutor(serverConfiguration));
                 pipeline.addBefore(ctx.name(), NettyServerWebSocketHandler.ID, webSocketHandler);
 
                 pipeline.remove(ctx.name());
@@ -279,9 +291,7 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
         int maxFramePayloadLength = webSocketBean.messageMethod()
                 .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
-        String subprotocols = webSocketBean.getBeanDefinition().stringValue(ServerWebSocket.class, "subprotocols")
-                                           .filter(s -> !StringUtils.isEmpty(s))
-                                           .orElse(null);
+        String subprotocols = webSocketBean.getSubprotocols().orElse(null);
         WebSocketServerHandshakerFactory wsFactory =
                 new WebSocketServerHandshakerFactory(
                         getWebSocketURL(ctx, req),
@@ -357,7 +367,8 @@ public final class NettyServerWebSocketUpgradeHandler implements RequestHandler 
 
             ExecutionFlow<HttpResponse<?>> response;
             if (route != null) {
-                response = runWithFilters(request, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
+                // the filters of the matched route too, e.g. of a route of the route builder and its groups
+                response = runWithFilters(request, route, (filteredRequest, propagatedContext) -> ExecutionFlow.just(proceed));
             } else {
                 response = onError(request, new HttpStatusException(HttpStatus.NOT_FOUND, "WebSocket Not Found"))
                     .putInContext(ServerRequestContext.KEY, request);

@@ -112,7 +112,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private final Argument<?>[] arguments;
     private ReturnType<R> returnType;
     private final Invoker<R> invoker;
-    private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+    /**
+     * The annotations the route has whatever annotations it is given, see {@link #webSocket}.
+     */
+    private final AnnotationMetadata baseAnnotationMetadata;
+    private AnnotationMetadata annotationMetadata;
     private @Nullable AnnotationMetadataProvider annotationMetadataProvider;
     /**
      * The annotations given to the route itself, see {@link HttpRouteSpec#annotate(AnnotationValue)}.
@@ -125,11 +129,18 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
+        this(handler, handlerType, arguments, returnType, invoker, AnnotationMetadata.EMPTY_METADATA);
+    }
+
+    private HandlerMethod(Object handler, Class<?> handlerType, Argument<?>[] arguments, ReturnType<R> returnType,
+                          Invoker<R> invoker, AnnotationMetadata baseAnnotationMetadata) {
         this.handler = Objects.requireNonNull(handler, "handler");
         this.handlerType = handlerType;
         this.arguments = arguments;
         this.returnType = returnType;
         this.invoker = invoker;
+        this.baseAnnotationMetadata = baseAnnotationMetadata;
+        this.annotationMetadata = baseAnnotationMetadata;
     }
 
     /**
@@ -269,6 +280,29 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{REQUEST},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0])
+        );
+    }
+
+    /**
+     * The target of a WebSocket route: the server upgrades a request to the route and hands the
+     * connection to the endpoint, so the method is never invoked. The route has the given
+     * annotations, which make it a WebSocket route, whatever annotations it is given too.
+     *
+     * @param endpoint         The endpoint of the route
+     * @param endpointMetadata The annotations of a WebSocket route
+     * @return The method
+     */
+    public static HandlerMethod<CompletionStage<Object>> webSocket(Object endpoint, AnnotationMetadata endpointMetadata) {
+        return new HandlerMethod<>(
+            endpoint,
+            endpoint.getClass(),
+            new Argument<?>[0],
+            // the executor of the route runs the handlers of the endpoint, which may return a stage
+            returnType(CompletionStage.class, Argument.OBJECT_ARGUMENT),
+            args -> {
+                throw new IllegalStateException("The server upgrades a request to the WebSocket route " + endpoint + ", and hands the connection to its handlers");
+            },
+            Objects.requireNonNull(endpointMetadata, "endpointMetadata")
         );
     }
 
@@ -416,13 +450,17 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         levels.add(annotations);
         AnnotationMetadata metadata = DefaultRouteAnnotations.layered(base, levels);
         if (provider == null && metadata.isEmpty()) {
-            this.annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
+            this.annotationMetadata = baseAnnotationMetadata;
             this.annotatedReturnType = null;
             return;
         }
-        this.annotationMetadata = metadata;
+        AnnotationMetadata effective = baseAnnotationMetadata == AnnotationMetadata.EMPTY_METADATA
+            ? metadata
+            // the given annotations override the ones the route has whatever it is given, see #webSocket
+            : new AnnotationMetadataHierarchy(baseAnnotationMetadata, metadata);
+        this.annotationMetadata = effective;
         // like the return type of a method, it has the annotations of the method
-        this.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+        this.annotatedReturnType = new AnnotatedReturnType<>(returnType, effective);
     }
 
     /**
