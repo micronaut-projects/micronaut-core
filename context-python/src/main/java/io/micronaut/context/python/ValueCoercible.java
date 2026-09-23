@@ -45,7 +45,7 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
     /**
      * The accessors of the Java exception a generated exception wrapper exposes to Python.
      */
-    List<String> THROWABLE_MEMBERS = List.of("getMessage", "getLocalizedMessage", "getCause", "getStackTrace");
+    List<String> THROWABLE_MEMBERS = List.of("getMessage", "getLocalizedMessage", "getCause", "getStackTrace", "getSuppressed");
 
     /** The prefix of the attributes the runtime stores on a Python object, hidden from member enumeration. */
     String RUNTIME_MEMBER_PREFIX = "__micronaut_";
@@ -251,9 +251,11 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
          * @param name The Java method name
          * @param arguments The Python arguments
          * @return The result, or {@code null} for a void method
+         * @throws Exception The checked exception the base method declares
          */
+        @SuppressWarnings("java:S112") // the base method may declare any checked exception
         @Transient
-        @Nullable Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments);
+        @Nullable Object micronautInvokeJavaBaseMethod(String name, List<Value> arguments) throws Exception;
     }
 
     private @Nullable Object generatedGetter(String key) {
@@ -291,6 +293,8 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
             case "getLocalizedMessage" -> (ProxyExecutable) arguments -> throwable.getLocalizedMessage();
             case "getCause" -> (ProxyExecutable) arguments -> throwable.getCause();
             case "getStackTrace" -> (ProxyExecutable) arguments -> throwable.getStackTrace();
+            // without Truffle's guest stack trace, which is not an exception the application suppressed
+            case "getSuppressed" -> (ProxyExecutable) arguments -> PythonExceptions.suppressed(throwable);
             default -> null;
         };
     }
