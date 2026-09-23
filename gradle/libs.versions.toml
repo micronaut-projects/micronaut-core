@@ -81,14 +81,14 @@ jackson2 = "2.21.6"
 # that they will appear in the Micronaut BOM as <properties>
 #
 # be sure to update graal version in gradle.properties as well
-managed-graal = "25.3.4.1"
+managed-graal = "25.4.4.1.1"
 managed-groovy = "5.0.8"
 managed-jakarta-annotation-api = "2.1.1"
 managed-jackson = "3.2.2"
 managed-jackson-annotations = "2.22"
 managed-kotlin = "2.4.10"
 managed-kotlin-coroutines = "1.10.2"
-managed-graalpy = "25.3.4.1"
+managed-graalpy = "25.4.4.1.1"
 managed-methvin-directory-watcher = "0.19.1"
 managed-netty = "4.2.18.Final"
 managed-netty-tcnative = "2.0.84.Final"

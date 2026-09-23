@@ -88,6 +88,42 @@ final class GraalPyExceptionHandler {
     }
 
     private static @Nullable RuntimeException toGeneratedRuntimeException(PolyglotException exception) {
+        return toGeneratedException(exception, RuntimeException.class, Thread.currentThread().getContextClassLoader());
+    }
+
+    /**
+     * The exception a bridge method declaring checked exceptions rethrows for a Python exception:
+     * a host exception of one of the declared types, raised in Python as is or thrown by a Java
+     * call the Python code did not catch, or the generated Java exception of a Python exception
+     * class extending one of the declared types.
+     *
+     * @param exception The exception of the Python call
+     * @param classLoader The class loader of the generated classes (the context class loader of the thread
+     * is the loader of the polyglot context only while Python code runs)
+     * @param declaredTypes The checked exception types the bridge method declares
+     * @return The exception to rethrow, or {@code null} when the Python exception is none of them
+     */
+    static @Nullable Throwable toDeclaredException(PolyglotException exception, ClassLoader classLoader, Class<?>[] declaredTypes) {
+        if (exception.isHostException()) {
+            Throwable hostException = exception.asHostException();
+            for (Class<?> declaredType : declaredTypes) {
+                if (declaredType.isInstance(hostException)) {
+                    return hostException;
+                }
+            }
+        }
+        for (Class<?> declaredType : declaredTypes) {
+            if (Throwable.class.isAssignableFrom(declaredType)) {
+                Throwable generated = toGeneratedException(exception, declaredType.asSubclass(Throwable.class), classLoader);
+                if (generated != null) {
+                    return generated;
+                }
+            }
+        }
+        return null;
+    }
+
+    private static <T extends Throwable> @Nullable T toGeneratedException(PolyglotException exception, Class<T> exceptionType, ClassLoader classLoader) {
         Value guestObject = null;
         try {
             guestObject = exception.getGuestObject();
@@ -100,12 +136,12 @@ final class GraalPyExceptionHandler {
         if (guestObject == null || guestObject.isNull()) {
             return null;
         }
-        RuntimeException mappedException = mappedRuntimeException(guestObject);
+        T mappedException = mappedException(guestObject, exceptionType);
         if (mappedException != null) {
             return mappedException;
         }
         for (String className : generatedWrapperCandidates(guestObject)) {
-            RuntimeException generatedException = instantiateGeneratedException(className, guestObject);
+            T generatedException = instantiateGeneratedException(className, guestObject, exceptionType, classLoader);
             if (generatedException != null) {
                 return generatedException;
             }
@@ -113,11 +149,11 @@ final class GraalPyExceptionHandler {
         return null;
     }
 
-    private static @Nullable RuntimeException mappedRuntimeException(Value guestObject) {
+    private static <T extends Throwable> @Nullable T mappedException(Value guestObject, Class<T> exceptionType) {
         try {
             Object mappedObject = guestObject.as(Object.class);
-            if (mappedObject instanceof RuntimeException runtimeException && mappedObject instanceof ValueCoercible) {
-                return runtimeException;
+            if (exceptionType.isInstance(mappedObject) && mappedObject instanceof ValueCoercible) {
+                return exceptionType.cast(mappedObject);
             }
         } catch (ClassCastException | IllegalArgumentException | IllegalStateException | UnsupportedOperationException e) {
             return null;
@@ -149,14 +185,14 @@ final class GraalPyExceptionHandler {
         return candidates;
     }
 
-    private static @Nullable RuntimeException instantiateGeneratedException(String className, Value guestObject) {
+    private static <T extends Throwable> @Nullable T instantiateGeneratedException(String className, Value guestObject, Class<T> exceptionType, ClassLoader classLoader) {
         try {
-            Class<?> exceptionClass = Class.forName(className, false, Thread.currentThread().getContextClassLoader());
-            if (!RuntimeException.class.isAssignableFrom(exceptionClass) || !ValueCoercible.class.isAssignableFrom(exceptionClass)) {
+            Class<?> exceptionClass = Class.forName(className, false, classLoader);
+            if (!exceptionType.isAssignableFrom(exceptionClass) || !ValueCoercible.class.isAssignableFrom(exceptionClass)) {
                 return null;
             }
             Constructor<?> constructor = exceptionClass.getConstructor(Value.class);
-            return (RuntimeException) constructor.newInstance(guestObject);
+            return exceptionType.cast(constructor.newInstance(guestObject));
         } catch (InvocationTargetException e) {
             // the generated constructor failed to call the Java super constructor: a programming
             // error of the Python class, not a Python exception to report as is
