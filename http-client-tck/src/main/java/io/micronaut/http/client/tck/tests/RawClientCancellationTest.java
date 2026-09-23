@@ -184,8 +184,12 @@ class RawClientCancellationTest {
 
     private static ServerUnderTest server() {
         // HTTP/1.1 only: the JDK client does not send a request body while it waits for the answer
-        // to its h2c upgrade
-        return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of("micronaut.http.client.alpn-modes", "http/1.1"));
+        // to its h2c upgrade. A long read timeout, so that it does not close the connection of an
+        // exchange that is still running within the timeouts of the test
+        return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME, Map.of(
+            "micronaut.http.client.alpn-modes", "http/1.1",
+            "micronaut.http.client.read-timeout", "60s"
+        ));
     }
 
     /**
