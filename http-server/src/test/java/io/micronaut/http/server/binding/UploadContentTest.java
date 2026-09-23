@@ -394,6 +394,49 @@ class UploadContentTest {
     }
 
     @Test
+    void aWriteTheExecutorRejectsReleasesItsBuffer() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        ManualExecutor limited = new ManualExecutor();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(limited, Long.MAX_VALUE)));
+        Path destination = directory.resolve("rejected-write.txt");
+        CompletionStage<Void> transfer = part.file().transferTo(destination);
+        limited.runAll();
+        limited.reject = true;
+        UnwritableBuffer buffer = new UnwritableBuffer();
+        publisher.emit(buffer);
+        assertInstanceOf(RejectedExecutionException.class, failure(transfer));
+        assertTrue(buffer.closed, "the buffer of the write that never ran is released");
+        join(part.closeAsync());
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
+    void aStoredUploadTheExecutorRejectsIsStillDeletedFromAnIoThread() throws Exception {
+        Executor rejecting = command -> {
+            throw new RejectedExecutionException("no I/O thread");
+        };
+        Path readTemporary = temporary("read");
+        CompletedFileUpload readUpload = CompletedFileUpload.ofFile(FILE, new TemporaryFileResource(readTemporary), Files.size(readTemporary));
+        FileUpload read = new DefaultFileUpload(new StoredUploadContent(readUpload, context(rejecting, Long.MAX_VALUE)));
+        Path closedTemporary = temporary("closed");
+        CompletedFileUpload closedUpload = CompletedFileUpload.ofFile(FILE, new TemporaryFileResource(closedTemporary), Files.size(closedTemporary));
+        FileUpload closed = new DefaultFileUpload(new StoredUploadContent(closedUpload, context(rejecting, Long.MAX_VALUE)));
+        Scheduler nonBlocking = Schedulers.newSingle("non-blocking");
+        try {
+            // an I/O thread cannot delete the file itself
+            CompletionStage<byte[]> bytes = CompletableFuture.supplyAsync(() -> read.bytes(100), nonBlocking::schedule).get();
+            assertInstanceOf(RejectedExecutionException.class, failure(bytes));
+            CompletionStage<Void> released = CompletableFuture.supplyAsync(closed::closeAsync, nonBlocking::schedule).get();
+            join(released);
+        } finally {
+            nonBlocking.dispose();
+        }
+        join(read.closeAsync());
+        assertFalse(Files.exists(readTemporary), "the file of the rejected read is deleted");
+        assertFalse(Files.exists(closedTemporary), "the file of the rejected release is deleted");
+    }
+
+    @Test
     void closingThePartAbortsAStreamingTransfer() throws IOException {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));

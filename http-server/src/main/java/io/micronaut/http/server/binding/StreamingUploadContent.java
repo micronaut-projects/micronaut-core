@@ -472,7 +472,10 @@ final class StreamingUploadContent extends UploadContent {
         // start() subscribes, or subscribed: only onSubscribe may cancel the upstream, and the
         // field must not be closed while the body is claimed on another thread
         private boolean subscribes;
-        // only used by the disk tasks, which run in sequence
+        // only used by the disk tasks, which run in sequence, holding the disk lock, and by the
+        // cleanup after a rejection, which holds it too: a task queued after the rejected one
+        // can still run
+        private final Object disk = new Object();
         private @Nullable Path staging;
         private @Nullable OutputStream out;
 
@@ -489,29 +492,36 @@ final class StreamingUploadContent extends UploadContent {
                     return;
                 }
                 subscribes = true;
-                // queued before a failure can queue the cleanup, which then deletes the file
-                enqueue(() -> {
-                    synchronized (this) {
-                        if (stopped) {
-                            return;
-                        }
-                    }
-                    try {
-                        staging = createStaging(destination);
-                        out = Files.newOutputStream(staging);
-                    } catch (IOException | RuntimeException e) {
-                        fail(e, true);
-                    }
-                });
             }
+            enqueue(() -> {
+                synchronized (this) {
+                    if (stopped) {
+                        // stopped before the file exists: the cleanup may have run already
+                        return;
+                    }
+                }
+                try {
+                    staging = createStaging(destination);
+                    out = Files.newOutputStream(staging);
+                } catch (IOException | RuntimeException e) {
+                    fail(e, true);
+                }
+            }, null);
             subscribe(this);
         }
 
-        private void enqueue(Runnable task) {
+        /**
+         * Queue a disk task after the previous one.
+         *
+         * @param task   The task
+         * @param buffer The buffer the task consumes: closed if the executor rejects the task
+         */
+        private void enqueue(Runnable task, @Nullable ReadBuffer buffer) {
+            DiskTask diskTask = new DiskTask(task);
             CompletableFuture<?> next;
             synchronized (this) {
                 next = tail.handleAsync((ignored, error) -> {
-                    task.run();
+                    diskTask.run();
                     return null;
                 }, executor);
                 tail = next;
@@ -519,6 +529,9 @@ final class StreamingUploadContent extends UploadContent {
             // the tasks handle their own failures: a failed task means the executor rejected it
             next.whenComplete((ignored, error) -> {
                 if (error != null) {
+                    if (buffer != null && !diskTask.ran()) {
+                        buffer.close();
+                    }
                     rejected(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
                 }
             });
@@ -536,7 +549,7 @@ final class StreamingUploadContent extends UploadContent {
                 return;
             }
             // the first buffer is requested once the staging file is open
-            enqueue(() -> request(s));
+            enqueue(() -> request(s), null);
         }
 
         private void request(Subscription s) {
@@ -591,7 +604,7 @@ final class StreamingUploadContent extends UploadContent {
                 if (s != null) {
                     request(s);
                 }
-            });
+            }, buffer);
         }
 
         @Override
@@ -640,7 +653,7 @@ final class StreamingUploadContent extends UploadContent {
                     completeSize = size;
                 }
                 settleOnce(null, error, cleanupError);
-            });
+            }, null);
         }
 
         @Override
@@ -676,7 +689,7 @@ final class StreamingUploadContent extends UploadContent {
             if (cancel && !upstreamWasDone) {
                 cancelUpstream(s, subscribing);
             }
-            enqueue(() -> settleOnce(null, error, releaseStaging(null)));
+            enqueue(() -> settleOnce(null, error, releaseStaging(null)), null);
         }
 
         /**
@@ -701,7 +714,12 @@ final class StreamingUploadContent extends UploadContent {
             if (!upstreamWasDone) {
                 cancelUpstream(s, subscribing);
             }
-            settleOnce(null, error, releaseStaging(null));
+            Throwable cleanupError;
+            synchronized (disk) {
+                // after the task that ran last; a task that still runs later skips its work
+                cleanupError = releaseStaging(null);
+            }
+            settleOnce(null, error, cleanupError);
         }
 
         /**
@@ -742,6 +760,33 @@ final class StreamingUploadContent extends UploadContent {
                 settling = true;
             }
             settle(value, error, cleanupError);
+        }
+
+        /**
+         * A disk task: runs holding the disk lock, and records that it ran.
+         */
+        private final class DiskTask implements Runnable {
+            private final Runnable work;
+            // guarded by disk
+            private boolean ran;
+
+            DiskTask(Runnable work) {
+                this.work = work;
+            }
+
+            @Override
+            public void run() {
+                synchronized (disk) {
+                    ran = true;
+                    work.run();
+                }
+            }
+
+            boolean ran() {
+                synchronized (disk) {
+                    return ran;
+                }
+            }
         }
     }
 }

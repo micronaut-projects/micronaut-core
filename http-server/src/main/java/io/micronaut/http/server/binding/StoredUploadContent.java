@@ -181,9 +181,36 @@ final class StoredUploadContent extends UploadContent {
                 }
             });
         } catch (RejectedExecutionException e) {
-            released.completeExceptionally(e);
+            return closeRejected();
         }
         return released;
+    }
+
+    /**
+     * Close the upload when the I/O executor rejected the work: on this thread if it may block,
+     * otherwise on a new thread, so that the temporary file is still deleted.
+     *
+     * @return Completes when the upload was closed
+     */
+    private CompletableFuture<Void> closeRejected() {
+        if (upload.isInMemory() || !Schedulers.isInNonBlockingThread()) {
+            try {
+                upload.close();
+                return CompletableFuture.completedFuture(null);
+            } catch (Throwable e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+        CompletableFuture<Void> closed = new CompletableFuture<>();
+        Thread.ofVirtual().name("upload-cleanup").start(() -> {
+            try {
+                upload.close();
+                closed.complete(null);
+            } catch (Throwable e) {
+                closed.completeExceptionally(e);
+            }
+        });
+        return closed;
     }
 
     private void closeUpload() {
@@ -220,7 +247,8 @@ final class StoredUploadContent extends UploadContent {
             try {
                 context.ioExecutor().execute(this::runTask);
             } catch (RejectedExecutionException e) {
-                finish(null, e);
+                // nothing ran, and the caller may be an I/O thread, which cannot delete the file
+                closeRejected().whenComplete((ignored, closeError) -> settle(null, e, closeError));
             }
         }
 
