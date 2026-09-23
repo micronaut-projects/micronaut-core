@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
@@ -70,29 +71,39 @@ public final class RouteLocator {
      */
     private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
 
-    private final @Nullable LocatorHandler locator;
-    private final @Nullable AsyncLocatorHandler asyncLocator;
+    private final @Nullable LocatorHandler<?> locator;
+    private final @Nullable AsyncLocatorHandler<?> asyncLocator;
     private final Function<Object, RouteTable> tables;
 
     /**
      * @param locator Locates the target
      * @param tables  The route table of a target
+     * @param <T>     The type of the target
      */
-    public RouteLocator(LocatorHandler locator, Function<Object, RouteTable> tables) {
+    public <T> RouteLocator(LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         this.locator = Objects.requireNonNull(locator, "locator");
         this.asyncLocator = null;
-        this.tables = Objects.requireNonNull(tables, "tables");
+        this.tables = tables(tables);
     }
 
     /**
      * @param locator Locates the target later
      * @param tables  The route table of a target
+     * @param <T>     The type of the target
      * @since 5.3.0
      */
-    public RouteLocator(AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+    public <T> RouteLocator(AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         this.locator = null;
         this.asyncLocator = Objects.requireNonNull(locator, "locator");
-        this.tables = Objects.requireNonNull(tables, "tables");
+        this.tables = tables(tables);
+    }
+
+    /**
+     * The route table function, applied to the targets of the locator only.
+     */
+    @SuppressWarnings("unchecked")
+    private static <T> Function<Object, RouteTable> tables(Function<? super T, RouteTable> tables) {
+        return (Function<Object, RouteTable>) Objects.requireNonNull(tables, "tables");
     }
 
     /**
@@ -211,7 +222,7 @@ public final class RouteLocator {
         Object target;
         DefaultPathVariables pathVariables = new DefaultPathVariables(decoded, locatorMatch.conversionService, owner);
         try {
-            LocatorHandler syncLocator = locator;
+            LocatorHandler<?> syncLocator = locator;
             target = syncLocator != null ? syncLocator.locate(original, pathVariables) : locateAsync(original, request.getPath(), pathVariables);
         } catch (Exception e) {
             // like a controller method: the error routes see the exception the locator threw
@@ -223,6 +234,12 @@ public final class RouteLocator {
         RouteTable table = tables.apply(target);
         if (!(table instanceof DefaultRouteTable defaultTable)) {
             throw new IllegalStateException("No route table for the located target: " + target);
+        }
+        Argument<?> targetType = defaultTable.locatedTargetType();
+        if (targetType != null && !targetType.getWrapperType().isInstance(target)) {
+            // the handlers of the table receive the target as an instance of its type
+            throw new IllegalStateException("The route table for located targets of type " + targetType.getTypeName()
+                + " cannot route the located target " + target + " of type " + target.getClass().getName());
         }
         return new Located(defaultTable.router(null), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables,
             List.copyOf(filters), List.copyOf(errorScopes)), target);

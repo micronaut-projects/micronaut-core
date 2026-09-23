@@ -111,7 +111,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private final Class<?> handlerType;
     private final Supplier<Method> method;
     private final Argument<?>[] arguments;
-    private final ReturnType<R> returnType;
+    private ReturnType<R> returnType;
     private final Invoker<R> invoker;
     private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
     private @Nullable ExecutableMethod<?, ?> implemented;
@@ -355,6 +355,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         this.annotationMetadata = Objects.requireNonNull(annotationMetadata, "annotationMetadata");
         // like the return type of a method, it has the annotations of the method
         this.annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+    }
+
+    /**
+     * Declare the type of the body of the response of the handler, see
+     * {@link HttpRouteSpec#responseType(Argument)}: the return type of the handler becomes
+     * {@code HttpResponse<R>}, or {@code CompletionStage<HttpResponse<R>>} for a handler that
+     * completes the response later, like the return type of a controller method.
+     *
+     * @param responseType The type of the body of the response
+     */
+    @Internal
+    public void responseType(Argument<?> responseType) {
+        Objects.requireNonNull(responseType, "responseType");
+        Class<?> type = returnType.getType();
+        if (type == CompletionStage.class) {
+            returnType = returnType(CompletionStage.class, Argument.of(HttpResponse.class, responseType));
+        } else if (type == HttpResponse.class) {
+            returnType = returnType(HttpResponse.class, responseType);
+        } else {
+            throw new IllegalStateException("The handler has no response body type: " + this);
+        }
+        if (annotatedReturnType != null) {
+            annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+        }
     }
 
     /**

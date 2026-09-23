@@ -47,7 +47,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
@@ -180,12 +180,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
     @Override
-    public final void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
@@ -296,6 +296,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
                 route.produces(mediaTypes(mediaTypes));
                 return this;
             }
+
+            @Override
+            public ErrorRouteSpec responseType(Argument<?> responseType) {
+                handler.responseType(responseType);
+                return this;
+            }
         };
     }
 
@@ -310,6 +316,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {
                 route.produces(mediaTypes(mediaTypes));
+                return this;
+            }
+
+            @Override
+            public StatusRouteSpec responseType(Argument<?> responseType) {
+                handler.responseType(responseType);
                 return this;
             }
         };
@@ -424,6 +436,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         public HttpRouteSpec implementing(ExecutableMethod<?, ?> method) {
             for (HandlerUriRoute route : routes) {
                 route.implementing(method);
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec responseType(Argument<?> responseType) {
+            Objects.requireNonNull(responseType, "responseType");
+            for (HandlerUriRoute route : routes) {
+                route.responseType(responseType);
             }
             return this;
         }
