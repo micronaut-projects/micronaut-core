@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -67,6 +68,13 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#annotationMetadata(AnnotationMetadataProvider)
      */
     HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata);
+
+    /**
+     * @param annotation The annotation
+     * @return The route
+     * @see HttpRouteSpec#annotate(AnnotationValue)
+     */
+    HandlerUriRoute annotate(AnnotationValue<?> annotation);
 
     /**
      * @param responseType The type of the body of the response

@@ -1,4 +1,10 @@
-A lambda has no annotations. The features that read the annotations of the matched route, such as filter binding with a ann:http.annotation.FilterMatcher[] annotation, route versioning with `@Version`, `@CrossOrigin`, `@RouteCondition`, the message body writers, and security rules such as `@Secured` from Micronaut Security, need the route to carry them. `annotationMetadata(AnnotationMetadataProvider)` gives a handler route the annotations of an annotated element, and what else the route gets depends on the element:
+A lambda has no annotations. The features that read the annotations of the matched route, such as filter binding with a ann:http.annotation.FilterMatcher[] annotation, route versioning with `@Version`, `@CrossOrigin`, `@RouteCondition`, the message body writers, and security rules such as `@Secured` from Micronaut Security, need the route to carry them.
+
+`annotate(...)` puts annotations on a route, or on the routes of a group, like annotations on a controller method: `annotate(Audited.class)` for an annotation without members, `annotate(AnnotationValue)` for one with members, e.g. `annotate(AnnotationValue.builder(Version.class).value("2").build())`, and `annotate(annotations -> annotations.add(...).add(...))` for several at once. A later annotation of the same type replaces an earlier one; the annotations of a group apply to its routes and nested groups, which override the members they set, like the annotations of a controller method override those of its class.
+
+The meta-annotations of an annotation type are not known at runtime. The features that look up an annotation by its own type see it, such as the binding of a ann:http.annotation.FilterMatcher[] annotation, `@Version`, `@CrossOrigin`, `@ExecuteOn` and security annotations. A feature that looks up a stereotype needs it in the annotation value, see `AnnotationValueBuilder.stereotype(...)`. The expressions of an annotation, e.g. of `@RouteCondition`, are compiled with the annotated code: declare a condition of a handler route with `where(...)`.
+
+`annotationMetadata(AnnotationMetadataProvider)` gives a handler route the annotations of an annotated element, under the annotations given with `annotate(...)`, and what else the route gets depends on the element:
 
 * an `ExecutableMethod` makes the route implement that bean method: the route has the annotations of the method, and its target method, declaring type and method name are those of the bean method, e.g. for the local `@Error` methods of the bean class. The arguments of the route stay those of the handler;
 * any other element, e.g. a `BeanDefinition`, gives the route its annotations only.
@@ -10,12 +16,13 @@ snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", i
 <1> A filter matcher annotation.
 <2> A filter bean that only filters the routes annotated with `@Audited`.
 <3> A bean method with the annotation. It must be executable to be looked up.
-<4> A bean class with the annotation.
 
 snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotationRoutes", indent=0, title="Handler routes with annotations"]
 
-<5> The route implements the bean method and has its annotations: the filter applies.
-<6> The route has the annotations of the bean class only: the filter applies too.
+<4> The route implements the bean method and has its annotations: the filter applies.
+<5> The route has the annotation: the filter applies too.
+<6> A route with a version, see <<apiVersioning, API Versioning>>.
+<7> Several annotations at once: the version and the annotation that binds the filter.
 
 The route of `/prices` has no annotation, and the filter does not apply to it.
 

@@ -71,7 +71,7 @@
  *     its handler, e.g. generated at compile time.</li>
  * </ul>
  *
- * <p>The builders, the route, group, error, status and server filter specs and the path
+ * <p>The builders, the route, group, error, status and server filter specs, the route annotations and the path
  * variables are sealed: Micronaut implements them, the application uses them. The application
  * implements {@link io.micronaut.web.router.builder.HttpRoutes}, the handler and filter
  * functions, usually as lambdas, and may implement

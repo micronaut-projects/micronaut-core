@@ -16,12 +16,16 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -96,6 +100,75 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
      * @return The route
      */
     HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata);
+
+    /**
+     * Put an annotation on the route, like an annotation on a controller method: the features
+     * that read the annotations of the matched route see it, e.g. a {@code @FilterMatcher}
+     * annotation binds its filters to the route, and {@code @Version} selects the route by the
+     * version of the request.
+     *
+     * <pre>{@code
+     * routes.POST("/payments/{amount}", payHandler).annotate(Audited.class);
+     * routes.GET("/ping", pingV2).annotate(AnnotationValue.builder(Version.class).value("2").build());
+     * }</pre>
+     *
+     * <p>The annotations of the route are layered like the annotations of a controller method
+     * over the ones of its class: the annotations of the element given with
+     * {@link #annotationMetadata(AnnotationMetadataProvider)}, then of the
+     * {@link HttpRouteGroup#annotate(AnnotationValue) groups} of the route, outer group first,
+     * then of the route, each overriding the members of the same annotation before it. A later
+     * annotation of the same type on the route replaces an earlier one, and a repeatable
+     * annotation is added to the earlier ones.</p>
+     *
+     * <p>The meta-annotations of an annotation type are not known at runtime: a feature that
+     * looks up an annotation by its own type sees it, like the ones above, {@code @CrossOrigin},
+     * {@code @ExecuteOn} or a security annotation, but a feature that looks up a stereotype of
+     * the annotation needs the stereotype in the annotation value, see
+     * {@link io.micronaut.core.annotation.AnnotationValueBuilder#stereotype(AnnotationValue)}.
+     * The expressions of an annotation, e.g. of {@code @RouteCondition}, are compiled with the
+     * annotated code: a route condition is declared with {@link #where(Predicate)}.</p>
+     *
+     * @param annotation The annotation
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec annotate(AnnotationValue<?> annotation);
+
+    /**
+     * Put an annotation without members on the route, e.g. a {@code @FilterMatcher} annotation,
+     * see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The type of the annotation
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec annotate(Class<? extends Annotation> annotationType) {
+        return annotate(AnnotationValue.builder(Objects.requireNonNull(annotationType, "annotationType")).build());
+    }
+
+    /**
+     * Put several annotations on the route at once, in order, as if each was given with
+     * {@link #annotate(AnnotationValue)}.
+     *
+     * <pre>{@code
+     * annotate(annotations -> annotations
+     *     .add(Audited.class)
+     *     .add(Version.class, version -> version.value("2")));
+     * }</pre>
+     *
+     * @param annotations Adds the annotations
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec annotate(Consumer<RouteAnnotations> annotations) {
+        Objects.requireNonNull(annotations, "annotations");
+        DefaultRouteAnnotations added = new DefaultRouteAnnotations();
+        annotations.accept(added);
+        for (AnnotationValue<?> annotation : added.values()) {
+            annotate(annotation);
+        }
+        return this;
+    }
 
     /**
      * Declare the type of the body of the responses of the route, like the return type

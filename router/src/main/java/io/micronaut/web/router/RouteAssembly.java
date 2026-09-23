@@ -53,6 +53,7 @@ import io.micronaut.web.router.builder.ContextRouteRequestFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
+import io.micronaut.web.router.builder.DefaultRouteAnnotations;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -1033,6 +1034,7 @@ public final class RouteAssembly {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
+        private final DefaultRouteAnnotations annotations = new DefaultRouteAnnotations();
         private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
         private final List<DefaultStatusRoute> statusRoutes = new ArrayList<>(0);
         private final Supplier<ErrorRouteInfo<Object, Object>[]> errorRouteInfos = SupplierUtil.memoized(this::buildErrorRoutes);
@@ -1161,6 +1163,36 @@ public final class RouteAssembly {
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * An annotation of the routes of the group.
+         *
+         * @param annotation The annotation
+         */
+        public void annotate(AnnotationValue<?> annotation) {
+            Objects.requireNonNull(annotation, "annotation");
+            checkOpen();
+            annotations.add(annotation);
+        }
+
+        /**
+         * @return The annotations of the enclosing groups, outer group first, then of this group
+         */
+        List<DefaultRouteAnnotations> annotations() {
+            List<DefaultRouteAnnotations> all = new ArrayList<>(2);
+            addAnnotations(all);
+            return all;
+        }
+
+        private void addAnnotations(List<DefaultRouteAnnotations> all) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addAnnotations(all);
+            }
+            if (!annotations.isEmpty()) {
+                all.add(annotations);
+            }
         }
 
         /**
@@ -1364,6 +1396,11 @@ public final class RouteAssembly {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
+            RouteGroup annotatedGroup = group;
+            if (annotatedGroup != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
+                // before anything reads the annotations of the route, e.g. its executor
+                handlerMethod.groupAnnotations(annotatedGroup.annotations());
+            }
             checkBlockingBody();
             Integer effectivePort = effectivePort();
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
@@ -1537,6 +1574,16 @@ public final class RouteAssembly {
                 throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
             }
             handlerMethod.annotationMetadata(annotationMetadata);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute annotate(AnnotationValue<?> annotation) {
+            Objects.requireNonNull(annotation, "annotation");
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
+            }
+            handlerMethod.annotate(annotation);
             return this;
         }
 

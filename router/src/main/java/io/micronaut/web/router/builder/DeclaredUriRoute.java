@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.SupplierUtil;
@@ -145,6 +146,12 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     public HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
         Objects.requireNonNull(annotationMetadata, "annotationMetadata");
         return configure(r -> r.annotationMetadata(annotationMetadata));
+    }
+
+    @Override
+    public HandlerUriRoute annotate(AnnotationValue<?> annotation) {
+        Objects.requireNonNull(annotation, "annotation");
+        return configure(r -> r.annotate(annotation));
     }
 
     @Override

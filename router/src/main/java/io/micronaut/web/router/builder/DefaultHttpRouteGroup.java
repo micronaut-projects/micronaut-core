@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteArguments;
@@ -71,6 +72,12 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     @Override
     public HttpRouteGroup order(int order) {
         settings.order(order);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup annotate(AnnotationValue<?> annotation) {
+        settings.annotate(annotation);
         return this;
     }
 

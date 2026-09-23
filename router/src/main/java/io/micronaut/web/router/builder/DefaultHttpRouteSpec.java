@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -74,6 +75,15 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     public HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
         for (HandlerUriRoute route : routes) {
             route.annotationMetadata(annotationMetadata);
+        }
+        return this;
+    }
+
+    @Override
+    public HttpRouteSpec annotate(AnnotationValue<?> annotation) {
+        Objects.requireNonNull(annotation, "annotation");
+        for (HandlerUriRoute route : routes) {
+            route.annotate(annotation);
         }
         return this;
     }

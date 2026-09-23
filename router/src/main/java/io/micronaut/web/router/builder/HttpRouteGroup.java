@@ -15,9 +15,13 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -154,4 +158,58 @@ public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec
      * @since 5.3.0
      */
     HttpRouteGroup attribute(String name, Object value);
+
+    /**
+     * Put an annotation on the routes of the group, see {@link HttpRouteSpec#annotate(AnnotationValue)}:
+     * the routes of the group, and of its nested groups, have it, wherever it is declared in the
+     * lambda; the annotation of a nested group or of a route overrides the members it sets.
+     *
+     * <pre>{@code
+     * routes.path("/payments", payments -> {
+     *     payments.annotate(Audited.class);
+     *     payments.POST("/{amount}", payHandler);
+     * });
+     * }</pre>
+     *
+     * @param annotation The annotation
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup annotate(AnnotationValue<?> annotation);
+
+    /**
+     * Put an annotation without members on the routes of the group, see
+     * {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The type of the annotation
+     * @return This group
+     * @since 5.3.0
+     */
+    default HttpRouteGroup annotate(Class<? extends Annotation> annotationType) {
+        return annotate(AnnotationValue.builder(Objects.requireNonNull(annotationType, "annotationType")).build());
+    }
+
+    /**
+     * Put several annotations on the routes of the group at once, in order, as if each was given with
+     * {@link #annotate(AnnotationValue)}.
+     *
+     * <pre>{@code
+     * annotate(annotations -> annotations
+     *     .add(Audited.class)
+     *     .add(Version.class, version -> version.value("2")));
+     * }</pre>
+     *
+     * @param annotations Adds the annotations
+     * @return This group
+     * @since 5.3.0
+     */
+    default HttpRouteGroup annotate(Consumer<RouteAnnotations> annotations) {
+        Objects.requireNonNull(annotations, "annotations");
+        DefaultRouteAnnotations added = new DefaultRouteAnnotations();
+        annotations.accept(added);
+        for (AnnotationValue<?> annotation : added.values()) {
+            annotate(annotation);
+        }
+        return this;
+    }
 }
