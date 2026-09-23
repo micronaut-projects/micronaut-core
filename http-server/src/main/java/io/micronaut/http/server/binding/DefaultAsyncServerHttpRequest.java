@@ -261,8 +261,15 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public CompletionStage<FormData> form() {
         claim("form");
         try {
+            FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(binder.formFactory(), binder.conversionService, formRequest());
+            // a form the handler did not wait for is not read after the handler completed, nor
+            // after the request ended; the files stored so far are owned by the request
+            owned(() -> {
+                collection.cancel();
+                return CompletableFuture.completedStage(null);
+            }, collection::cancel);
             // a view: the caller cannot complete or cancel the collection
-            return FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest()).minimalCompletionStage();
+            return collection.result().minimalCompletionStage();
         } catch (Throwable e) {
             return CompletableFuture.failedStage(e);
         }

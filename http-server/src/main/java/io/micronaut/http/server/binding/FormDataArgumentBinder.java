@@ -38,15 +38,16 @@ import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CompletableFuture;
 
@@ -110,19 +111,34 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
      * @return Completes with the form
      */
     static CompletableFuture<FormData> collect(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
+        return start(factory, conversionService, request).result();
+    }
+
+    /**
+     * Start reading every field of the form of a request, like {@link #collect}, in a collection
+     * that can be cancelled: the fields that were not read yet are discarded.
+     *
+     * @param factory           The form factory
+     * @param conversionService The conversion service of the form
+     * @param request           The request, with a form body
+     * @return The collection
+     */
+    static Collection start(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
         UploadContext uploadContext = UploadContext.of(factory, request);
         Map<String, List<String>> fields = new LinkedHashMap<>();
         Map<String, List<FileUpload>> files = new LinkedHashMap<>();
-        List<FileUpload> owned = Collections.synchronizedList(new ArrayList<>());
+        OwnedUploads owned = new OwnedUploads();
         // the request releases the files that were not consumed, also when collecting the form
         // fails part way, or the handler is never called
-        request.addDisposalResource(() -> closeOwned(owned));
+        request.addDisposalResource(owned::dispose);
         AtomicLong textBytes = new AtomicLong();
+        CompletableFuture<FormData> result = new CompletableFuture<>();
         // the parts of a form arrive in order: each one is read or stored before the next
-        return Flux.from(request.getRawFormFields())
+        Disposable subscription = Flux.from(request.getRawFormFields())
             .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
             .then(Mono.fromSupplier(() -> form(fields, files, conversionService)))
-            .toFuture();
+            .subscribe(result::complete, result::completeExceptionally);
+        return new Collection(result, subscription);
     }
 
     private static FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files, ConversionService conversionService) {
@@ -131,14 +147,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         return new DefaultFormData(fields, immutable, conversionService);
     }
 
-    private static void closeOwned(List<FileUpload> owned) {
-        List<FileUpload> uploads;
-        synchronized (owned) {
-            if (owned.isEmpty()) {
-                return;
-            }
-            uploads = List.copyOf(owned);
-        }
+    private static void closeAll(List<FileUpload> uploads) {
         DefaultFormData.closeAll(List.of(uploads)).whenComplete((ignored, error) -> {
             if (error != null) {
                 LOG.warn("Failed to release the uploaded files of a form", error);
@@ -152,7 +161,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                                                    RawFormField field,
                                                    Map<String, List<String>> fields,
                                                    Map<String, List<FileUpload>> files,
-                                                   List<FileUpload> owned,
+                                                   OwnedUploads owned,
                                                    AtomicLong textBytes) {
         String name = field.metadata().name();
         if (name == null) {
@@ -180,5 +189,61 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             }
             return Boolean.TRUE;
         });
+    }
+
+    /**
+     * A collection of a form that is running, or completed.
+     *
+     * @param result       Completes with the form
+     * @param subscription The subscription to the fields of the form
+     */
+    record Collection(CompletableFuture<FormData> result, Disposable subscription) {
+
+        /**
+         * Stop reading the form, if it was not completely read: the rest of the body is
+         * discarded, and the result fails. The files stored so far stay owned by the request.
+         */
+        void cancel() {
+            if (result.isDone()) {
+                return;
+            }
+            subscription.dispose();
+            result.completeExceptionally(new CancellationException("The form was not read completely before the handler completed"));
+        }
+    }
+
+    /**
+     * The files of a form the request owns: those stored after the request was disposed of, by a
+     * collection that was still running, are released at once.
+     */
+    private static final class OwnedUploads {
+        // guarded by this
+        private final List<FileUpload> uploads = new ArrayList<>();
+        private boolean disposed;
+
+        void add(FileUpload upload) {
+            synchronized (this) {
+                if (!disposed) {
+                    uploads.add(upload);
+                    return;
+                }
+            }
+            closeAll(List.of(upload));
+        }
+
+        void dispose() {
+            List<FileUpload> owned;
+            synchronized (this) {
+                if (disposed) {
+                    return;
+                }
+                disposed = true;
+                owned = List.copyOf(uploads);
+                uploads.clear();
+            }
+            if (!owned.isEmpty()) {
+                closeAll(owned);
+            }
+        }
     }
 }

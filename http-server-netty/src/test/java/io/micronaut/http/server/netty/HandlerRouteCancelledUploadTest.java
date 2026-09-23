@@ -41,6 +41,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
@@ -51,6 +52,7 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
@@ -137,6 +139,36 @@ class HandlerRouteCancelledUploadTest {
         abandonMultipart("/cancel/sync-form", () -> !multipartFiles().isEmpty());
         assertClean();
         assertFalse(outcomes.started.containsKey("sync-form"), "the handler is not called with a form that never arrived");
+    }
+
+    @Test
+    void formTheHandlerDidNotWaitFor() throws Exception {
+        byte[] head = multipartHead();
+        byte[] tail = ("\r\n--" + BOUNDARY + "--\r\n").getBytes(StandardCharsets.US_ASCII);
+        try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+            socket.setSoTimeout(30_000);
+            OutputStream out = socket.getOutputStream();
+            out.write(requestHead("/cancel/form-unawaited", "multipart/form-data; boundary=" + BOUNDARY, head.length + FILE_SIZE + tail.length));
+            out.write(head);
+            out.write(new byte[SENT]);
+            out.flush();
+            String response = readHead(socket.getInputStream());
+            assertTrue(response.startsWith("HTTP/1.1 200 "), response);
+            // the client keeps sending: the form is not read after the handler completed
+            try {
+                for (int sent = SENT; sent < FILE_SIZE; sent += SENT) {
+                    out.write(new byte[SENT]);
+                }
+                out.write(tail);
+                out.flush();
+            } catch (IOException e) {
+                // the server may close the connection instead of reading the rest
+            }
+        }
+        CompletionStage<Object> form = outcomes.outcome("form-unawaited");
+        Object outcome = form.toCompletableFuture().get(TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
+        assertInstanceOf(CancellationException.class, outcome, "the collection stopped when the handler completed");
+        assertClean();
     }
 
     private void abandonMultipart(String path, BooleanSupplier inProgress) throws Exception {
@@ -288,6 +320,10 @@ class HandlerRouteCancelledUploadTest {
                         : part.text()))).consumesAll();
                 routes.asyncPOST("/cancel/form", (request, pathVariables) ->
                     outcomes.record("form", request.form())).consumesAll();
+                routes.asyncPOST("/cancel/form-unawaited", (request, pathVariables) -> {
+                    outcomes.record("form-unawaited", request.form());
+                    return CompletableFuture.completedFuture(HttpResponse.ok());
+                }).consumesAll();
                 routes.asyncPOST("/cancel/transfer", (request, pathVariables) ->
                     outcomes.record("transfer", request.transferTo(directory.resolve(UUID.randomUUID() + ".bin")))).consumesAll();
                 routes.asyncPOST("/cancel/bytes", (request, pathVariables) ->
