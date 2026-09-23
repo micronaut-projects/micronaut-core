@@ -31,7 +31,7 @@ public final class ReadTimeoutException extends HttpClientException {
      * that the stack trace points to the request that actually timed out and so the exception
      * can carry per-request metadata such as the service id.
      */
-    @Deprecated(since = "4.9.0")
+    @Deprecated(since = "5.3.0")
     public static final ReadTimeoutException TIMEOUT_EXCEPTION = new ReadTimeoutException(true);
 
     /**

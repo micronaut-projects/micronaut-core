@@ -178,6 +178,7 @@ import java.net.URISyntaxException;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -423,9 +424,13 @@ final class NettyHttpClient implements
                         here.""");
                 }
                 BlockHint blockHint = BlockHint.willBlockThisThread();
-                return Objects.requireNonNull(NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block(),
-                    "The blocking HTTP client returned a null response");
-                // We don't have to release client response buffer
+                try {
+                    return Objects.requireNonNull(NettyHttpClient.this.exchange(request, bodyType, errorType, blockHint).block(),
+                        "The blocking HTTP client returned a null response");
+                    // We don't have to release client response buffer
+                } catch (HttpClientException e) {
+                    throw customizeBlockingException(e);
+                }
             }
 
             @Override
@@ -1890,6 +1895,49 @@ final class NettyHttpClient implements
 
     private <E extends HttpClientException> E decorate(E exc) {
         return HttpClientExceptionUtils.populateServiceId(exc, informationalServiceId, configuration);
+    }
+
+    /**
+     * Rewrite the stack trace of an exception thrown from a blocking client call so that it points
+     * to the code that made the call rather than to the Netty event loop (or the request-timeout
+     * scheduler) where the exception was actually constructed. Without this, exceptions such as
+     * {@link ReadTimeoutException} carry a stack trace that does not mention the caller at all.
+     *
+     * <p>This method is only ever called on the thread that performed the blocking call, right
+     * after {@link reactor.core.publisher.Mono#block()} has unwound, so the current thread's stack
+     * trace is exactly the caller chain. The original execution stack trace is preserved as a
+     * suppressed exception for debugging.
+     *
+     * @param exception the exception thrown from the blocking call
+     * @param <E>        the exception type
+     * @return the same exception, with its stack trace pointing at the caller
+     * @see <a href="https://github.com/micronaut-projects/micronaut-core/issues/12655">gh-12655</a>
+     */
+    private static <E extends HttpClientException> E customizeBlockingException(E exception) {
+        StackTraceElement[] origin = exception.getStackTrace();
+        if (origin.length > 0) {
+            BlockingClientExecutionTrace originTrace = new BlockingClientExecutionTrace();
+            originTrace.setStackTrace(origin);
+            exception.addSuppressed(originTrace);
+        }
+        // We are back on the thread that made the blocking call; its stack points to the caller.
+        // Drop Thread.getStackTrace() (index 0) and this method's frame (index 1).
+        StackTraceElement[] caller = Thread.currentThread().getStackTrace();
+        if (caller.length > 2) {
+            exception.setStackTrace(Arrays.copyOfRange(caller, 2, caller.length));
+        }
+        return exception;
+    }
+
+    /**
+     * Marker carrying the original execution stack trace of a blocking client failure (the point
+     * on the event loop where the exception was constructed), attached as a suppressed exception
+     * by {@link #customizeBlockingException(HttpClientException)}.
+     */
+    private static final class BlockingClientExecutionTrace extends Throwable {
+        BlockingClientExecutionTrace() {
+            super("Client request execution failed on a background thread; stack trace of the failure follows", null, false, true);
+        }
     }
 
     private HttpClientException handleResponseError(io.micronaut.http.HttpRequest<?> finalRequest, Throwable cause) {
