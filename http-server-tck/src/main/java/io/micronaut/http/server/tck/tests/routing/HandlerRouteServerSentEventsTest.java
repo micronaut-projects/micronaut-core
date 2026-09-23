@@ -378,7 +378,7 @@ public class HandlerRouteServerSentEventsTest {
     static SSLContext trustAll() throws IOException {
         try {
             SSLContext context = SSLContext.getInstance("TLS");
-            context.init(null, new TrustManager[]{new X509TrustManager() {
+            TrustManager trustAll = new X509TrustManager() {
                 @Override
                 public void checkClientTrusted(X509Certificate[] chain, String authType) {
                 }
@@ -392,11 +392,16 @@ public class HandlerRouteServerSentEventsTest {
                 public X509Certificate[] getAcceptedIssuers() {
                     return new X509Certificate[0];
                 }
-            }}, null);
+            };
+            context.init(null, new TrustManager[]{trustAll}, null);
             return context;
         } catch (GeneralSecurityException e) {
             throw new IOException(e);
         }
+    }
+
+    static String trace() {
+        return PropagatedContext.getOrEmpty().find(Trace.class).map(Trace::id).orElse("none");
     }
 
     /**
@@ -426,10 +431,6 @@ public class HandlerRouteServerSentEventsTest {
     }
 
     record Trace(String id) implements PropagatedContextElement {
-    }
-
-    static String trace() {
-        return PropagatedContext.getOrEmpty().find(Trace.class).map(Trace::id).orElse("none");
     }
 
     static final class Refused extends RuntimeException {
