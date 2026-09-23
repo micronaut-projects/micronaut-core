@@ -1730,6 +1730,15 @@ public final class RouteAssembly {
         }
 
         @Override
+        public HandlerUriRoute responseType(Argument<?> responseType) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the return type of the method: " + this);
+            }
+            handlerMethod.responseType(responseType);
+            return this;
+        }
+
+        @Override
         public HandlerUriRoute executeOn(String executorName) {
             this.executeOn = Objects.requireNonNull(executorName, "executorName");
             this.nonBlocking = false;

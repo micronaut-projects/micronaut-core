@@ -20,32 +20,36 @@ import io.micronaut.http.HttpRequest;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Locates the target of the rest of a path, for
- * {@link HttpRouteBuilder#locate(String, LocatorHandler, java.util.function.Function)}: like a
- * JAX-RS sub-resource locator, it returns the object whose routes match the rest of the path.
+ * A locator of the route table of a located target that receives the target, which owns the
+ * locator, see {@link LocatedHttpRouteBuilder}: otherwise the same as a {@link LocatorHandler}.
  *
- * <p>The router runs the locator while it matches the request, on the thread that matches it,
- * typically an event loop thread, before the body is read: it must not block, and it receives
- * the request and the path variables of the prefix only. It may run more than once for a
- * request, e.g. again to find the methods allowed for the path when no route matched.</p>
+ * <pre>{@code
+ * RouteTable[] folders = new RouteTable[1];
+ * folders[0] = tables.buildLocatedHttpRoutes(Folder.class, folder -> {
+ *     folder.handle(HttpMethod.GET, "/", (request, pathVariables, current) -> HttpResponse.ok(current.name()));
+ *     folder.locate("/{name}", (request, pathVariables, parent) -> parent.child(pathVariables.getString("name")), child -> folders[0]);
+ * });
+ * }</pre>
  *
- * @param <T> The type of the target, which the route table function of the locator receives
+ * @param <T> The type of the located target that owns the locator
+ * @param <U> The type of the target the locator locates
  * @author Denis Stepanov
  * @since 5.3.0
+ * @see LocatedHttpRouteBuilder#locate(String, LocatedLocatorHandler, java.util.function.Function)
  */
 @Experimental
 @FunctionalInterface
-public interface LocatorHandler<T> {
+public interface LocatedLocatorHandler<T, U> {
 
     /**
      * Locate the target.
      *
      * @param request       The request
      * @param pathVariables The path variables of the prefix, and of the prefixes of the locators
-     *                      that located this one; {@link PathVariables#locatedTarget()} is the
-     *                      target that owns this locator, if any
+     *                      that located this one
+     * @param target        The located target that owns the locator
      * @return The target, or {@code null} if there is none: the request is not found
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    @Nullable T locate(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
+    @Nullable U locate(HttpRequest<?> request, PathVariables pathVariables, T target) throws Exception;
 }

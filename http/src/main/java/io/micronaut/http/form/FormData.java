@@ -16,7 +16,12 @@
 package io.micronaut.http.form;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.convert.ConversionContext;
+import io.micronaut.core.convert.ConversionError;
+import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.type.Argument;
 
 import java.util.List;
 import java.util.Optional;
@@ -104,6 +109,57 @@ public interface FormData extends AutoCloseable {
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
     <T> Optional<T> find(String name, Class<T> type);
+
+    /**
+     * A required text field converted to a type, with its type arguments: a collection or an
+     * array type, e.g. {@code Argument.listOf(Integer.class)}, gets every value of the field, in
+     * the submitted order; any other type gets the first value, like {@link #get(String, Class)}.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value
+     * @throws FormFieldException if the field has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     * @since 5.3.0
+     */
+    default <T> T get(String name, Argument<T> type) {
+        return find(name, type).orElseThrow(() -> FormFieldException.missingField(name));
+    }
+
+    /**
+     * An optional text field converted to a type, with its type arguments, see
+     * {@link #get(String, Argument)}.
+     *
+     * @param name The name of the field
+     * @param type The type
+     * @param <T>  The type
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     * @since 5.3.0
+     */
+    default <T> Optional<T> find(String name, Argument<T> type) {
+        List<String> values = getValues(name);
+        if (values.isEmpty()) {
+            return Optional.empty();
+        }
+        Class<T> rawType = type.getType();
+        boolean all = Iterable.class.isAssignableFrom(rawType) || rawType.isArray();
+        if (!all && type.getTypeParameters().length == 0) {
+            return find(name, rawType);
+        }
+        Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
+        ArgumentConversionContext<T> context = ConversionContext.of(named);
+        Optional<T> result = ConversionService.SHARED.convert(all ? values : values.get(0), context);
+        if (result.isPresent()) {
+            return result;
+        }
+        Optional<ConversionError> error = context.getLastError();
+        if (error.isPresent()) {
+            throw new ConversionErrorException(named, error.get());
+        }
+        throw new FormFieldException(name, "Form field [" + name + "] cannot be converted to " + named.getTypeName());
+    }
 
     /**
      * All the files uploaded in a field. Every call returns the same handles.

@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
@@ -162,6 +163,11 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
         return configure(r -> r.implementing(method));
+    }
+
+    @Override
+    public HandlerUriRoute responseType(Argument<?> responseType) {
+        return configure(r -> r.responseType(responseType));
     }
 
     @Override
