@@ -61,6 +61,7 @@ public class FilterMutatedBodyTest {
     public static final String SPEC_NAME = "FilterMutatedBodyTest";
     private static final String BODY = "X-Body";
     private static final String BAD_REQUEST = "400";
+    private static final String MUTATED = "X-Mutated";
 
     @Test
     void aFilterMethodThatContinuesWithTheMutatedRequest() throws IOException {
@@ -75,20 +76,39 @@ public class FilterMutatedBodyTest {
     @Test
     void anAsynchronousHandlerReadsTheBodyAFilterSet() throws IOException {
         try (ServerUnderTest server = server()) {
-            // cleared: no body, read once
-            assertEquals("|read-once", post(server, "/mb/async/text-body", "function-clear"));
-            assertEquals("missing|read-once", post(server, "/mb/async/body-text", "function-clear"));
-            assertEquals("false", post(server, "/mb/async/has-body", "function-clear"));
-            // replaced with an object: converted by body(Type), not readable as bytes
-            assertEquals("replacement|decoded", post(server, "/mb/async/body-text", "function-replace"));
-            assertEquals("decoded|replacement", post(server, "/mb/async/text-body", "function-replace"));
-            assertEquals("true", post(server, "/mb/async/has-body", "function-replace"));
-            // untouched: the bytes of the request
-            for (String body : new String[]{"function-untouched", null}) {
-                assertEquals("original|read-once", post(server, "/mb/async/text-body", body));
-                assertEquals("original|read-once", post(server, "/mb/async/body-text", body));
-                assertEquals("true", post(server, "/mb/async/has-body", body));
+            // a filter function continues with the mutable server request, a filter method with
+            // the mutable view of the request
+            for (String filter : new String[]{"function", "method"}) {
+                // cleared: no body, read once
+                assertEquals("|read-once", post(server, "/mb/async/text-body", filter + "-clear"), filter);
+                assertEquals("missing|read-once", post(server, "/mb/async/body-text", filter + "-clear"), filter);
+                assertEquals("false", post(server, "/mb/async/has-body", filter + "-clear"), filter);
+                // replaced with an object: converted by body(Type), not readable as bytes
+                assertEquals("replacement|decoded", post(server, "/mb/async/body-text", filter + "-replace"), filter);
+                assertEquals("decoded|replacement", post(server, "/mb/async/text-body", filter + "-replace"), filter);
+                assertEquals("true", post(server, "/mb/async/has-body", filter + "-replace"), filter);
+                // untouched: the bytes of the request
+                assertEquals("original|read-once", post(server, "/mb/async/text-body", filter + "-untouched"), filter);
+                assertEquals("original|read-once", post(server, "/mb/async/body-text", filter + "-untouched"), filter);
+                assertEquals("true", post(server, "/mb/async/has-body", filter + "-untouched"), filter);
             }
+            assertEquals("original|read-once", post(server, "/mb/async/text-body", null));
+            assertEquals("original|read-once", post(server, "/mb/async/body-text", null));
+            assertEquals("true", post(server, "/mb/async/has-body", null));
+        }
+    }
+
+    @Test
+    void anAsynchronousHandlerReadsTheBodyOfTheMutableViewAFilterMethodContinuedWith() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // request.mutate(), and request.mutate() with another header: the bytes of the request
+            assertEquals("none original", post(server, "/mb/async/header-text", "method-untouched"));
+            assertEquals("none original", post(server, "/mb/async/header-body", "method-untouched"));
+            assertEquals("yes original", post(server, "/mb/async/header-text", "method-header"));
+            assertEquals("yes original", post(server, "/mb/async/header-body", "method-header"));
+            // like a controller
+            assertEquals("none original", post(server, "/mb/header", "method-untouched"));
+            assertEquals("yes original", post(server, "/mb/header", "method-header"));
         }
     }
 
@@ -141,6 +161,7 @@ public class FilterMutatedBodyTest {
                 case "method-clear" -> request.mutate().body(null);
                 case "method-replace" -> request.mutate().body("replacement");
                 case "method-untouched" -> request.mutate();
+                case "method-header" -> request.mutate().header(MUTATED, "yes");
                 default -> null;
             };
         }
@@ -167,6 +188,10 @@ public class FilterMutatedBodyTest {
                 .thenCompose(text -> read(() -> request.body(String.class)).thenApply(body -> textResponse(text + "|" + body)))).consumesAll();
             routes.asyncPOST("/mb/async/body-text", (request, pathVariables) -> read(() -> request.body(String.class))
                 .thenCompose(body -> read(request::text).thenApply(text -> textResponse(body + "|" + text)))).consumesAll();
+            routes.asyncPOST("/mb/async/header-text", (request, pathVariables) -> read(request::text)
+                .thenApply(text -> textResponse(header(request) + " " + text))).consumesAll();
+            routes.asyncPOST("/mb/async/header-body", (request, pathVariables) -> read(() -> request.body(String.class))
+                .thenApply(body -> textResponse(header(request) + " " + body))).consumesAll();
             routes.asyncPOST("/mb/async/has-body", (request, pathVariables) -> {
                 String hasBody = String.valueOf(request.hasBody());
                 return request.discardBody().thenApply(ignored -> textResponse(hasBody));
@@ -175,6 +200,11 @@ public class FilterMutatedBodyTest {
                 HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE)
             ).consumes(MediaType.TEXT_PLAIN_TYPE);
         }
+    }
+
+    private static String header(HttpRequest<?> request) {
+        String value = request.getHeaders().get(MUTATED);
+        return value == null ? "none" : value;
     }
 
     private static HttpResponse<?> textResponse(String body) {
@@ -218,6 +248,11 @@ public class FilterMutatedBodyTest {
         @Post("/required")
         String required(@Body String body) {
             return body;
+        }
+
+        @Post("/header")
+        String header(HttpRequest<?> request, @Body String body) {
+            return FilterMutatedBodyTest.header(request) + " " + body;
         }
 
         @Post("/nullable")

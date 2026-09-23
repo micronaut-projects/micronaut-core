@@ -48,6 +48,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
 import io.micronaut.http.filter.BodyChangeAwareRequest;
+import io.micronaut.http.filter.ServerRequestView;
 import io.micronaut.http.filter.UriChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
@@ -843,7 +844,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, UriChangeAwareRequest, BodyChangeAwareRequest {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, UriChangeAwareRequest, BodyChangeAwareRequest, ServerRequestView {
 
         @Nullable
         private URI uri;
@@ -916,6 +917,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public boolean isBodySet() {
             return bodySet;
+        }
+
+        @Override
+        public ServerHttpRequest<?> serverRequest() {
+            return NettyHttpRequest.this;
         }
 
         @Override
