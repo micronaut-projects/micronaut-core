@@ -42,6 +42,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -94,7 +95,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
      * The server request whose bytes are the body of the request a route is bound with: the Netty
      * request itself, the server request that a request a filter continued with is or wraps,
      * see {@link ServerRequestBody}, or the Netty request of its mutable view, unless the filter
-     * set the body to an object, which the default binder converts, like before.
+     * set the body to an object, which the default binder converts, like before, or to
+     * {@code null}, which is no body.
      *
      * @param source The request
      * @return The server request, or {@code null} if the body is not read from bytes
@@ -103,7 +105,8 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (source instanceof NettyHttpRequest<?> nhr) {
             return nhr;
         }
-        if (source.getBody().isPresent()) {
+        if (source.getBody().isPresent() || BodyChangeAwareRequest.isBodySet(source)) {
+            // the body a filter set, even none when it cleared it
             return null;
         }
         ServerHttpRequest<?> server = ServerRequestBody.of(source);

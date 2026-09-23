@@ -16,6 +16,7 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
@@ -58,7 +59,7 @@ import java.util.Optional;
  * @since 5.3.0
  */
 @Internal
-sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>
+sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>, BodyChangeAwareRequest
     permits MutableServerRequest.Form {
 
     private final ServerHttpRequest<B> request;
@@ -164,6 +165,12 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     public <T> MutableHttpRequest<T> body(@Nullable T body) {
         mutable().body(body);
         return (MutableHttpRequest<T>) this;
+    }
+
+    @Override
+    public boolean isBodySet() {
+        // the bytes of the request are the body unless the body of the view was set
+        return BodyChangeAwareRequest.isBodySet(mutable());
     }
 
     @Override
@@ -276,9 +283,15 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
      *
      * @param <B> The body type
      */
-    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> implements UriChangeAwareRequest {
+    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> implements UriChangeAwareRequest, BodyChangeAwareRequest {
 
         private boolean uriSet;
+        private boolean bodySet;
+        /**
+         * Whether the body was set to {@code null}: the request has no body then, whatever the
+         * body of the request it wraps.
+         */
+        private boolean cleared;
 
         private Overlay(HttpRequest<B> request) {
             super(ConversionService.SHARED, request);
@@ -293,6 +306,34 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
         @Override
         public boolean isUriSet() {
             return uriSet;
+        }
+
+        @Override
+        public <T> MutableHttpRequest<T> body(@Nullable T body) {
+            bodySet = true;
+            cleared = body == null;
+            return super.body(body);
+        }
+
+        @Override
+        public boolean isBodySet() {
+            return bodySet;
+        }
+
+        @Override
+        public Optional<B> getBody() {
+            // none if it was cleared
+            return cleared ? Optional.empty() : super.getBody();
+        }
+
+        @Override
+        public <T> Optional<T> getBody(Class<T> type) {
+            return cleared ? Optional.empty() : super.getBody(type);
+        }
+
+        @Override
+        public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+            return cleared ? Optional.empty() : super.getBody(conversionContext);
         }
 
         @Override
