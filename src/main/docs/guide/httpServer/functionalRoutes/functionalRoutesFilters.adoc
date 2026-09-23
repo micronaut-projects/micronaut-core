@@ -11,12 +11,17 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", i
 
 === Filter methods
 
+The request and the response filters come in the same four families, so that their lambdas are never ambiguous:
+
 [cols="1,2"]
 |===
 |Method |Filter
 
 |`before(RouteRequestFilter)`
-|A request filter: returns `null` to continue, a response to answer instead of the route, or a request to continue with.
+|A request filter that changes the request in place and returns nothing: the request continues.
+
+|`beforeReplacing(ReplacingRouteRequestFilter)`
+|A request filter that returns a response to answer instead of the route, a request to continue with, or `null` to continue with the request.
 
 |`after(RouteResponseFilter)`
 |A response filter that changes the response in place.
@@ -24,11 +29,11 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", i
 |`afterReplacing(ReplacingRouteResponseFilter)`
 |A response filter that returns a replacement response, or `null` to keep the response.
 
-|`before(String executorName, ...)`, `after(String executorName, ...)`, `afterReplacing(String executorName, ...)`
+|`before(String executorName, ...)`, `beforeReplacing(String executorName, ...)`, `after(String executorName, ...)`, `afterReplacing(String executorName, ...)`
 |The same, run on a named executor, like `@ExecuteOn` on a filter method.
 
-|`beforeAsync(...)`, `afterAsync(...)`, `afterReplacingAsync(...)`
-|The same, returning a `CompletionStage` that completes with the result.
+|`beforeAsync(...)`, `beforeReplacingAsync(...)`, `afterAsync(...)`, `afterReplacingAsync(...)`
+|The same, returning a `CompletionStage`: the filter chain continues when it completes, for the replacing filters with what it completes with.
 |===
 
 Each method has a variant whose lambda also receives a api:core.propagation.MutablePropagatedContext[], selected by the number of parameters: `before((request, propagatedContext) -> ...)`. An element the filter adds is in scope for the filters after it, the handler and the error routes, as for a filter method with a `MutablePropagatedContext` parameter. An asynchronous filter's changes are taken when its stage completes.
@@ -37,8 +42,8 @@ Each method has a variant whose lambda also receives a api:core.propagation.Muta
 
 A request filter receives a `MutableHttpRequest`:
 
-* Headers and attributes changed in place, and a URI set with `uri(...)`, are seen by the rest of the chain. Other changes, such as a new body, need a request to be returned.
-* To continue with another request, return it: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncServerHttpRequest` read.
+* Headers and attributes changed in place, and a URI set with `uri(...)`, are seen by the rest of the chain: a `before` filter is enough. Other changes, such as a new body, need a request to be returned by a `beforeReplacing` filter.
+* To answer the request instead of the route, a `beforeReplacing` filter returns a response. To continue with another request, it returns the request: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncServerHttpRequest` read.
 * A new URI or method only changes the matched route in a pre-matching server filter. The other filters run after the route was matched.
 
 A response filter declared with `after` changes the response in place; one declared with `afterReplacing` can return a new response, which the response filters after it and the client see.

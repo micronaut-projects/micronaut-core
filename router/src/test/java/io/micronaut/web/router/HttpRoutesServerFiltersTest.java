@@ -149,7 +149,7 @@ class HttpRoutesServerFiltersTest {
         RouteTableFactory tables = new RouteTableFactory(ExecutionHandleLocator.EMPTY, new HyphenatedUriNamingStrategy(), ConversionService.SHARED, null);
         IllegalArgumentException error = assertThrows(IllegalArgumentException.class, () -> tables.buildHttpRoutes(routes -> {
             routes.GET("/x", (request, pathVariables) -> HttpResponse.ok());
-            routes.filter("/**").before(request -> null);
+            routes.filter("/**").before(request -> { });
         }));
         assertTrue(error.getMessage().contains("filter"), error.getMessage());
     }

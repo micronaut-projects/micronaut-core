@@ -52,12 +52,13 @@ import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.AsyncContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.AsyncContextRouteRequestFilter;
+import io.micronaut.web.router.builder.AsyncContextReplacingRouteRequestFilter;
 import io.micronaut.web.router.builder.ContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.ContextRouteRequestFilter;
+import io.micronaut.web.router.builder.ContextReplacingRouteRequestFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
+import io.micronaut.web.router.builder.DefaultRouteAnnotations;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -1069,7 +1070,7 @@ public final class RouteAssembly {
          * @param filter       The filter
          * @param executorName The name of the executor to run the filter on, or {@code null}
          */
-        public void before(ContextRouteRequestFilter filter, @Nullable String executorName) {
+        public void before(ContextReplacingRouteRequestFilter filter, @Nullable String executorName) {
             Objects.requireNonNull(filter, "filter");
             add(requestFilters, GenericHttpFilter.createRouteRequestFilter(filter::filter, executor(executorName)));
         }
@@ -1077,7 +1078,7 @@ public final class RouteAssembly {
         /**
          * @param filter The filter
          */
-        public void beforeAsync(AsyncContextRouteRequestFilter filter) {
+        public void beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
             Objects.requireNonNull(filter, "filter");
             add(requestFilters, GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
         }
@@ -1198,6 +1199,7 @@ public final class RouteAssembly {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
+        private final DefaultRouteAnnotations annotations;
         private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
         private final List<DefaultStatusRoute> statusRoutes = new ArrayList<>(0);
         private final Supplier<ErrorRouteInfo<Object, Object>[]> errorRouteInfos = SupplierUtil.memoized(this::buildErrorRoutes);
@@ -1211,6 +1213,7 @@ public final class RouteAssembly {
          */
         RouteGroup(@Nullable RouteGroup enclosing) {
             this.enclosing = enclosing;
+            this.annotations = new DefaultRouteAnnotations(enclosing == null ? null : enclosing.annotations);
         }
 
         /**
@@ -1326,6 +1329,14 @@ public final class RouteAssembly {
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * @param annotation An annotation of the routes of the group
+         */
+        public void annotate(AnnotationValue<?> annotation) {
+            checkOpen();
+            annotations.add(annotation);
         }
 
         /**
@@ -1554,6 +1565,9 @@ public final class RouteAssembly {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
+            if (group != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
+                handlerMethod.groupAnnotations(group.annotations); // before the executor reads them
+            }
             checkBlockingBody();
             RoutePattern pattern;
             if (uriMatchTemplate != null) {
@@ -1731,21 +1745,27 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-            Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
-            }
-            handlerMethod.annotationMetadata(annotationMetadata);
+            handlerMethod("annotations").annotationMetadata(annotationMetadata);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute annotate(AnnotationValue<?> annotation) {
+            handlerMethod("annotations").annotate(annotation);
             return this;
         }
 
         @Override
         public HandlerUriRoute responseType(Argument<?> responseType) {
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the return type of the method: " + this);
-            }
-            handlerMethod.responseType(responseType);
+            handlerMethod("return type").responseType(responseType);
             return this;
+        }
+
+        private HandlerMethod<?> handlerMethod(String what) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the " + what + " of the method: " + this);
+            }
+            return handlerMethod;
         }
 
         @Override
@@ -1756,19 +1776,19 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute before(ContextRouteRequestFilter filter) {
+        public HandlerUriRoute before(ContextReplacingRouteRequestFilter filter) {
             filters.before(filter, null);
             return this;
         }
 
         @Override
-        public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
+        public HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter) {
             filters.before(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
         @Override
-        public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
+        public HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
             filters.beforeAsync(filter);
             return this;
         }

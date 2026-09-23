@@ -220,7 +220,7 @@ public class FilterResponseReplacementTest {
                     PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none")));
             routes.GET("/rr/pre/ok", ROUTE);
             routes.filter("/rr/pre/**").preMatching()
-                .before(request -> request.getPath().equals("/rr/pre/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .beforeReplacing(request -> request.getPath().equals("/rr/pre/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .afterReplacing((request, response) -> response.code() == HttpStatus.FORBIDDEN.getCode()
                     ? HttpResponse.status(HttpStatus.UNAUTHORIZED).header("X-Pre-Replaced", String.valueOf(response.code()))
                     : null);

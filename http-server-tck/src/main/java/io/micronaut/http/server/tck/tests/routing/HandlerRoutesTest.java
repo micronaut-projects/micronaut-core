@@ -840,7 +840,7 @@ public class HandlerRoutesTest {
             Router router = server.getApplicationContext().getBean(Router.class);
             assertTrue(router.uriRoutes().anyMatch(route -> route.toString().startsWith("GET /fn/declared/{id}")));
             // changed after the router took the route: ignored
-            server.getApplicationContext().getBean(DeclaredRoutes.class).route.consumes(MediaType.TEXT_XML_TYPE).before(request -> HttpResponse.serverError());
+            server.getApplicationContext().getBean(DeclaredRoutes.class).route.consumes(MediaType.TEXT_XML_TYPE).beforeReplacing(request -> HttpResponse.serverError());
             AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/declared/6"), HttpResponseAssertion.builder()
                 .status(HttpStatus.OK)
                 .build());
@@ -990,21 +990,20 @@ public class HandlerRoutesTest {
                 routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
                 routes.GET("/fn/guarded", (request, pathVariables) -> HttpResponse.ok("guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .before(request -> "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.unauthorized());
+                    .beforeReplacing(request -> "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.unauthorized());
                 routes.GET("/fn/trace", (request, pathVariables) -> HttpResponse.ok(request.getAttribute(TRACE, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before(request -> append(request, "before1"))
                     .before(request -> append(request, "before2"))
                     .after((request, response) -> response.getHeaders().set("X-Trace", "after1"))
                     .after((request, response) -> response.getHeaders().set("X-Trace", response.getHeaders().get("X-Trace") + ",after2"));
                 routes.GET("/fn/async-guarded", (request, pathVariables) -> HttpResponse.ok("async guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .beforeAsync(request -> completeLater(executor, () ->
+                    .beforeReplacingAsync(request -> completeLater(executor, () ->
                         "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.status(HttpStatus.FORBIDDEN)))
                     .afterAsync((request, response) -> completeLater(executor, () -> response.header("X-Async-After", "true")));
                 routes.GET("/fn/filter-executor", (request, pathVariables) ->
                         HttpResponse.ok(request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before("handler-filter", request -> {
                         request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
-                        return null;
                     });
                 routes.asyncPOST("/fn/forms/{id}", (request, pathVariables) -> request.form().thenCompose(form -> {
                     String fields = pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
@@ -1201,7 +1200,7 @@ public class HandlerRoutesTest {
                 })
                     .consumes(FORM_MEDIA_TYPES);
                 routes.GET("/fn/rejected", (request, pathVariables) -> HttpResponse.ok("accepted").contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .before(request -> request.getHeaders().contains("X-Token") ? null : HttpResponse.status(HttpStatus.FORBIDDEN))
+                    .beforeReplacing(request -> request.getHeaders().contains("X-Token") ? null : HttpResponse.status(HttpStatus.FORBIDDEN))
                     .after((request, response) -> response.header("X-After", "after1"))
                     .after((request, response) -> response.getHeaders().set("X-After", response.getHeaders().get("X-After") + ",after2"));
                 routes.asyncGET("/fn/async-get", (request, pathVariables) ->
@@ -1373,7 +1372,6 @@ public class HandlerRoutesTest {
                     + request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                 .before("handler-filter", request -> {
                     request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
-                    return null;
                 })
                 .after((request, response) -> response.header("X-Declared", "true"));
         }
@@ -1420,7 +1418,6 @@ public class HandlerRoutesTest {
                         text("filtered order " + pathVariables.locatedTarget(Order.class).id() + " " + request.getAttribute("located-filter", String.class).orElse("")))
                     .before(request -> {
                         request.setAttribute("located-filter", "before");
-                        return null;
                     })
                     .after((request, response) -> response.header("X-Located", "after"));
                 order.locate("/customers/{name}",

@@ -17,28 +17,25 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.MutablePropagatedContext;
-import io.micronaut.http.HttpMessage;
 import io.micronaut.http.MutableHttpRequest;
-import org.jspecify.annotations.Nullable;
 
 /**
- * A filter of one route's requests that changes the propagated context, declared with
- * {@link HttpRouteSpec#before(ContextRouteRequestFilter)}: the {@link RouteRequestFilter} that
- * receives a {@link MutablePropagatedContext}, like a {@code @RequestFilter} method with a
- * {@code MutablePropagatedContext} parameter. An element it adds, e.g. an MDC context, a tracing
- * span or a security context, is in scope for what runs after it: the next filters, the route
- * handler, synchronous or not, the error and status routes, and the response filters.
+ * A filter of one route's requests that changes the request and the propagated context in place,
+ * declared with {@link HttpRouteSpec#before(ContextRouteRequestFilter)}: the
+ * {@link RouteRequestFilter} that receives a {@link MutablePropagatedContext}, like a
+ * {@code @RequestFilter} method with a {@code MutablePropagatedContext} parameter. An element it
+ * adds, e.g. an MDC context, a tracing span or a security context, is in scope for what runs after
+ * it: the next filters, the route handler, synchronous or not, the error and status routes, and
+ * the response filters.
  *
  * <pre>{@code
- * routes.GET("/orders", handler).before((request, propagatedContext) -> {
- *     propagatedContext.add(new MdcPropagationContext(Map.of("trackingId", request.getHeaders().get("X-TrackingId"))));
- *     return null;
- * });
+ * routes.GET("/orders", handler).before((request, propagatedContext) ->
+ *     propagatedContext.add(new MdcPropagationContext(Map.of("trackingId", request.getHeaders().get("X-TrackingId")))));
  * }</pre>
  *
  * <p>Like every route filter it runs with the propagated context of the filter chain in scope.
  * The change is taken when it returns: the element is not in scope while the filter itself runs.
- * It changes or replaces the request like a {@link RouteRequestFilter}.</p>
+ * A filter that also answers or replaces the request is a {@link ContextReplacingRouteRequestFilter}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -50,11 +47,9 @@ public interface ContextRouteRequestFilter {
     /**
      * Filter the request.
      *
-     * @param request           The request, to change in place for what runs after the filter, see {@link RouteRequestFilter}
+     * @param request           The request, to change in place for what runs after the filter
      * @param propagatedContext The propagated context, to change for what runs after the filter
-     * @return A response to answer the request with instead of the route, a request to continue
-     * with instead of the request, or {@code null} to proceed with the request
      * @throws Exception An error, handled by the error routes
      */
-    @Nullable HttpMessage<?> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
+    void filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
 }
