@@ -151,6 +151,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
@@ -250,6 +251,8 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
     private final CustomScopeRegistry customScopeRegistry;
     private final BeanResolutionCustomizer beanResolutionCustomizer;
     private final UnscopedRegistrationIndex unscopedRegistrations = new UnscopedRegistrationIndex();
+    // the interceptors of a target this context holds no registration for, by the definition of the target
+    private final Map<BeanDefinition<?>, Object> unownedInterceptors = new ConcurrentHashMap<>();
 
     private @Nullable BeanDefinitionValidator beanValidator;
     private @Nullable List<BeanConfiguration> beanConfigurationsList;
@@ -3911,6 +3914,31 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
                                                                     Argument<I> interceptorType,
                                                                     @Nullable Qualifier<I> binding) {
         return getBeanRegistrations(resolutionContext, interceptorType, binding, true);
+    }
+
+    /**
+     * Returns the state this context keeps for a bean definition, computing it once. See
+     * {@link RegisteredBeanInterceptors#getUnownedState(BeanContext, BeanDefinition, Supplier)}.
+     *
+     * @param definition The definition
+     * @param supplier   Computes the state when absent
+     * @param <S>        The state type
+     * @return The state
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings("unchecked")
+    <S> S getUnownedInterceptorState(BeanDefinition<?> definition, Supplier<S> supplier) {
+        Object state = unownedInterceptors.get(definition);
+        if (state == null) {
+            // computed outside the map: it creates beans, and so may ask for the state of another definition
+            state = supplier.get();
+            Object kept = unownedInterceptors.putIfAbsent(definition, state);
+            if (kept != null) {
+                return (S) kept;
+            }
+        }
+        return (S) state;
     }
 
     /**

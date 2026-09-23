@@ -16,7 +16,7 @@
 package io.micronaut.aop.internal;
 
 import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.InterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.context.BeanResolutionContext;
 import io.micronaut.context.ProxyTargetInterceptorResolver;
 import io.micronaut.context.Qualifier;
@@ -68,7 +68,7 @@ public final class AroundInterceptorsOfTarget implements ProxyTargetInterceptorR
             return List.of();
         }
         // the binding the proxy selects the interceptors of the target with
-        Qualifier<Interceptor<?, ?>> binding = InterceptorChain.targetBinding(target);
+        Qualifier<Interceptor<?, ?>> binding = LifecycleInterception.targetBinding(target);
         if (binding == null) {
             return List.of();
         }

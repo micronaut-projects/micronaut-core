@@ -19,6 +19,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.chain.InterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
@@ -158,7 +159,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         if (targetDefinition.isSingleton() && !lazy && (!perTarget || !hasScopedInterceptors(resolutionContext, methods))) {
             BeanRegistration<T> target = resolutionContext.getProxyTargetBeanRegistration(targetDefinition, argument, qualifier);
             for (ExecutableMethod<T, ?> method : methods) {
-                Interceptor<?, ?>[] interceptors = InterceptorChain.resolveTargetInterceptors(beanContext, targetDefinition, target, method, false);
+                Interceptor<?, ?>[] interceptors = LifecycleInterception.resolveTargetInterceptors(beanContext, targetDefinition, target, method, false);
                 if (interceptors.length > 0) {
                     interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) method, (Interceptor[]) interceptors));
                 }
@@ -169,7 +170,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
         // no non-singleton is bound, and a creator that asks per target gets the target's own on top; a creator
         // that reads the methods alone gets them all, resolved as the proxy's own and destroyed with it, as in 5.2,
         // rather than losing the non-singletons
-        Interceptor<?, ?>[][] shared = perTarget ? singletons(resolutionContext, methods) : InterceptorChain.resolveInterceptors(resolutionContext, methods, false);
+        Interceptor<?, ?>[][] shared = perTarget ? singletons(resolutionContext, methods) : LifecycleInterception.resolveInterceptors(resolutionContext, methods, false);
         for (int i = 0; i < methods.length; i++) {
             if (shared[i].length > 0 || !beanContext.getBeanDefinitions(Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(methods[i].getAnnotationMetadata())).isEmpty()) {
                 interceptedMethods.add(new InterceptedMethod<>((ExecutableMethod) methods[i], (Interceptor[]) shared[i]));
@@ -252,7 +253,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
                                                                     BeanResolutionContext resolutionContext,
                                                                     boolean introduction) {
         ExecutableMethod<T, ?>[] methods = proxyBeanDefinition.getExecutableMethods().toArray(new ExecutableMethod[0]);
-        Interceptor<?, ?>[][] interceptors = InterceptorChain.resolveInterceptors(resolutionContext, methods, introduction);
+        Interceptor<?, ?>[][] interceptors = LifecycleInterception.resolveInterceptors(resolutionContext, methods, introduction);
         List<InterceptedMethod<T>> interceptedMethods = new ArrayList<>(methods.length);
         for (int i = 0; i < methods.length; i++) {
             if (interceptors[i].length > 0) {
@@ -306,7 +307,7 @@ public record DefaultRuntimeProxyDefinition<T>(BeanDefinition<T> proxyBeanDefini
 
         @SuppressWarnings("unchecked")
         Interceptor<T, Object>[] interceptors(BeanContext beanContext, InterceptedMethod<T> method, T target) {
-            return (Interceptor<T, Object>[]) InterceptorChain.resolveTargetInterceptors(beanContext, targetDefinition, null, target, method.executableMethod(), false);
+            return (Interceptor<T, Object>[]) LifecycleInterception.resolveTargetInterceptors(beanContext, targetDefinition, null, target, method.executableMethod(), false);
         }
     }
 }

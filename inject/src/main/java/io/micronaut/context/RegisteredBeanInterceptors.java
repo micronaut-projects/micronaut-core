@@ -102,6 +102,27 @@ public final class RegisteredBeanInterceptors {
     }
 
     /**
+     * Returns state the context keeps for a bean definition, computing it once.
+     *
+     * <p>The interceptors of a target the context holds no registration for are kept here: they belong to no target,
+     * so they are the same for every such target of the definition, and they live as long as the context that
+     * created them rather than for the life of the application. Two threads asking at once may each compute one, and
+     * the first to be kept is the one handed out from then on; nothing owns the instances either way.</p>
+     *
+     * @param beanContext The bean context
+     * @param definition  The definition the state is kept for
+     * @param supplier    Computes the state when absent
+     * @param <S>         The state type
+     * @return The state
+     */
+    public static <S> S getUnownedState(BeanContext beanContext, BeanDefinition<?> definition, Supplier<S> supplier) {
+        if (beanContext instanceof DefaultBeanContext defaultBeanContext) {
+            return defaultBeanContext.getUnownedInterceptorState(definition, supplier);
+        }
+        return supplier.get();
+    }
+
+    /**
      * Whether an interceptor of the given definition belongs to a registered scope of its own, so that the instance
      * is obtained from that scope for every call rather than kept.
      *

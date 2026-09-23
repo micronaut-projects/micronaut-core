@@ -22,6 +22,7 @@ import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
 import io.micronaut.aop.Introduced;
 import io.micronaut.aop.chain.InterceptorChain;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.aop.chain.MethodInterceptorChain;
 import io.micronaut.aop.internal.intercepted.InterceptedMethodUtil;
 import io.micronaut.context.BeanContext;
@@ -178,7 +179,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String FIELD_WRITE_LOCK = "$target_wl";
 
     private static final Method RESOLVE_INTERCEPTORS_METHOD = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
+        LifecycleInterception.class,
         "resolveInterceptors",
         BeanResolutionContext.class,
         ExecutableMethod[].class,
@@ -210,7 +211,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     private static final String LOCAL_TARGET_REGISTRATION = "targetRegistration";
 
     private static final Method METHOD_RESOLVE_TARGET_INTERCEPTORS = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
+        LifecycleInterception.class,
         "resolveTargetInterceptors",
         BeanContext.class,
         BeanDefinition.class,
@@ -220,7 +221,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
     );
 
     private static final Method METHOD_RESOLVE_TARGET_INTERCEPTORS_FOR_TARGET = ReflectionUtils.getRequiredInternalMethod(
-        InterceptorChain.class,
+        LifecycleInterception.class,
         "resolveTargetInterceptors",
         BeanContext.class,
         BeanDefinition.class,
@@ -491,7 +492,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         return proceed(
                             methodElement,
                             methodParameters,
-                            ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                            ClassTypeDef.of(LifecycleInterception.class).invokeStatic(
                                 METHOD_RESOLVE_TARGET_INTERCEPTORS,
                                 beanContext, targetDefinition, aThis.field(Objects.requireNonNull(fields.targetRegistration())), method, introduction
                             ),
@@ -508,7 +509,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                         ).newLocal(LOCAL_TARGET_REGISTRATION, targetRegistration -> proceed(
                             methodElement,
                             methodParameters,
-                            ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                            ClassTypeDef.of(LifecycleInterception.class).invokeStatic(
                                 METHOD_RESOLVE_TARGET_INTERCEPTORS,
                                 beanContext, targetDefinition, targetRegistration, method, introduction
                             ),
@@ -523,7 +524,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
                     return aThis.invoke(METHOD_INTERCEPTED_TARGET).newLocal(LOCAL_TARGET, target -> proceed(
                         methodElement,
                         methodParameters,
-                        ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                        ClassTypeDef.of(LifecycleInterception.class).invokeStatic(
                             METHOD_RESOLVE_TARGET_INTERCEPTORS_FOR_TARGET,
                             beanContext,
                             targetDefinition,
@@ -986,7 +987,7 @@ public class AopProxyWriter extends ProxyingBeanDefinitionWriter {
             ),
             // the bean's own interceptors, resolved through the context creating it and selected per method
             aThis.field(interceptorsField).assign(
-                ClassTypeDef.of(InterceptorChain.class).invokeStatic(
+                ClassTypeDef.of(LifecycleInterception.class).invokeStatic(
                     RESOLVE_INTERCEPTORS_METHOD,
                     // 1st argument: the resolution context
                     parameters.get(constructor.findParameterIndex(BEAN_RESOLUTION_CONTEXT_PARAMETER)),
