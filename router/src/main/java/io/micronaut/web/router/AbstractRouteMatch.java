@@ -37,9 +37,11 @@ import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 
@@ -294,6 +296,10 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             throw new IllegalStateException("Argument before filters already processed!");
         }
         RequestArgumentBinder<Object>[] argumentBinders = routeInfo.resolveArgumentBinders(requestBinderRegistry);
+        // the locale and the character encoding are the same for each argument, so they are resolved once
+        Locale locale = null;
+        Charset characterEncoding = null;
+        boolean conversionResolved = false;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
@@ -313,12 +319,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 }
             }
             if (argumentBinder != null) {
-                fulfillValue(
-                    i,
-                    argumentBinder,
-                    argument,
-                    request
-                );
+                if (!conversionResolved) {
+                    locale = request.getLocale().orElse(null);
+                    characterEncoding = request.getCharacterEncoding();
+                    conversionResolved = true;
+                }
+                ArgumentConversionContext<Object> conversionContext = ConversionContext.of(argument, locale, characterEncoding);
+                fulfillValue(i, argument, argumentBinder.bind(conversionContext, request));
             }
         }
         checkIfFulfilled();
@@ -333,6 +340,9 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         if (afterBindersApplied) {
             throw new IllegalStateException("Argument binders after filters already processed!");
         }
+        Locale locale = null;
+        Charset characterEncoding = null;
+        boolean conversionResolved = false;
         for (int i = 0; i < arguments.length; i++) {
             if (fulfilledArguments[i]) {
                 continue;
@@ -340,42 +350,17 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
             Argument<Object> argument = (Argument<Object>) arguments[i];
             PostponedRequestArgumentBinder<Object> argumentBinder = postponedArgumentBinders[i];
             if (argumentBinder != null) {
-                fulfillValuePostponed(
-                    i,
-                    argumentBinder,
-                    argument,
-                    request
-                );
+                if (!conversionResolved) {
+                    locale = request.getLocale().orElse(null);
+                    characterEncoding = request.getCharacterEncoding();
+                    conversionResolved = true;
+                }
+                ArgumentConversionContext<Object> conversionContext = ConversionContext.of(argument, locale, characterEncoding);
+                fulfillValue(i, argument, argumentBinder.bindPostponed(conversionContext, request));
             }
         }
         checkIfFulfilled();
         afterBindersApplied = true;
-    }
-
-    private <E> void fulfillValue(int index,
-                                  RequestArgumentBinder<E> argumentBinder,
-                                  Argument<E> argument,
-                                  HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
-        ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bind(conversionContext, request);
-        fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> void fulfillValuePostponed(int index,
-                                           PostponedRequestArgumentBinder<E> argumentBinder,
-                                           Argument<E> argument,
-                                           HttpRequest<?> request) {
-        ArgumentConversionContext<E> conversionContext = newContext(argument, request);
-        ArgumentBinder.BindingResult<E> bindingResult = argumentBinder.bindPostponed(conversionContext, request);
-        fulfillValue(index, argument, bindingResult);
-    }
-
-    private <E> ArgumentConversionContext<E> newContext(Argument<E> argument, HttpRequest<?> request) {
-        return ConversionContext.of(
-            argument,
-            request.getLocale().orElse(null),
-            request.getCharacterEncoding()
-        );
     }
 
     private <E> void fulfillValue(int index, Argument<E> argument, ArgumentBinder.BindingResult<E> bindingResult) {

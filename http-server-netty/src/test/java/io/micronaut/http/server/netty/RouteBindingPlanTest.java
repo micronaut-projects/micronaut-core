@@ -5,6 +5,9 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.convert.ArgumentConversionContext;
+import io.micronaut.core.type.Argument;
+import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -32,6 +35,7 @@ import reactor.core.publisher.Flux;
 
 import java.io.IOException;
 import java.net.http.HttpClient;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ExecutorService;
@@ -195,6 +199,16 @@ public class RouteBindingPlanTest {
     }
 
     @Test
+    void everyBinderGetsTheLocaleOfTheRequest() throws Exception {
+        var response = get("/binding-plan/locale", "Accept-Language", "de-DE");
+        assertEquals(200, response.statusCode());
+        assertEquals("de-DE de-DE", response.body());
+        response = get("/binding-plan/locale");
+        String defaultLocale = Locale.getDefault().toLanguageTag();
+        assertEquals(defaultLocale + " " + defaultLocale, response.body());
+    }
+
+    @Test
     void streamedBodyIsPublishedOnTheRouteExecutor() throws Exception {
         for (int i = 0; i < 2; i++) {
             var response = get("/binding-plan/stream");
@@ -249,6 +263,11 @@ public class RouteBindingPlanTest {
         @Post("/unmatched")
         String unmatched(String name) {
             return name;
+        }
+
+        @Get("/locale")
+        String locale(LocaleTag first, LocaleTag second) {
+            return first.tag() + " " + second.tag();
         }
 
         @Get("/unmatched-get")
@@ -339,6 +358,27 @@ public class RouteBindingPlanTest {
             if (attribute != null) {
                 request.setAttribute("name", attribute);
             }
+        }
+    }
+
+    record LocaleTag(String tag) {
+    }
+
+    /**
+     * Binds the locale of the conversion context the binder gets.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC)
+    static class LocaleTagBinder implements TypedRequestArgumentBinder<LocaleTag> {
+        @Override
+        public Argument<LocaleTag> argumentType() {
+            return Argument.of(LocaleTag.class);
+        }
+
+        @Override
+        public BindingResult<LocaleTag> bind(ArgumentConversionContext<LocaleTag> context, HttpRequest<?> source) {
+            LocaleTag tag = new LocaleTag(context.getLocale().toLanguageTag());
+            return () -> Optional.of(tag);
         }
     }
 
