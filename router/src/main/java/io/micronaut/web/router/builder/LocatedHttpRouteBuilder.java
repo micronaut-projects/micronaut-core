@@ -20,6 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.web.router.RouteTable;
 
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -84,6 +85,21 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, LocatedBodyRequestHandler<T, B> handler);
 
     /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, String uri, Class<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(method, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
      * Route requests with a submitted form to a handler function that receives the located target
      * and the whole form.
      *
@@ -129,6 +145,20 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
      * @see #handle(RouteDeclaration, Argument, BodyRequestHandler)
      */
     <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, LocatedBodyRequestHandler<T, B> handler);
+
+    /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param route    The declaration of the route
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(RouteDeclaration route, Class<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(route, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
 
     /**
      * Bind a form handler function that receives the located target to a declared route.

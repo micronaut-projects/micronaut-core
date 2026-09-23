@@ -224,6 +224,18 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
     HttpRouteSpec responseType(Argument<?> responseType);
 
     /**
+     * Declare the type of the body of the responses as a class: {@code responseType(Argument.of(responseType))},
+     * see {@link #responseType(Argument)}.
+     *
+     * @param responseType The type of the body of the response
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec responseType(Class<?> responseType) {
+        return responseType(Argument.of(Objects.requireNonNull(responseType, "responseType")));
+    }
+
+    /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
      * applies whatever the thread selection of the server.
      *

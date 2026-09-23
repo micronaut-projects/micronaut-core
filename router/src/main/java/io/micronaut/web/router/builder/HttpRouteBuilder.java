@@ -22,6 +22,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -115,6 +116,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec POST(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return POST(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
      * Route a {@code PUT} request to a handler function that receives the decoded body.
      *
      * @param uri      The URI template
@@ -125,6 +140,48 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      */
     default <B> HttpRouteSpec PUT(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         return handle(HttpMethod.PUT, uri, bodyType, handler);
+    }
+
+    /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PUT(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return PUT(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
+     * Route a {@code PATCH} request to a handler function that receives the decoded body.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PATCH(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(HttpMethod.PATCH, uri, bodyType, handler);
+    }
+
+    /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PATCH(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return PATCH(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
     }
 
     /**
@@ -157,6 +214,21 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @return The route
      */
     <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
+
+    /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(method, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
 
     /**
      * Route a {@code POST} request with a submitted form to a handler function.
@@ -385,6 +457,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler);
 
     /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param route    The declaration of the route
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(RouteDeclaration route, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(route, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
      * Bind a handler function that completes the response later to a declared route.
      *
      * @param route   The declared route
@@ -443,6 +529,21 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #handle(HttpMethod, String, Argument, BodyRequestHandler)
      */
     <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
+
+    /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(String httpMethodName, String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(httpMethodName, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
 
     /**
      * Route requests of a method by its name, including a custom HTTP method, to a handler function

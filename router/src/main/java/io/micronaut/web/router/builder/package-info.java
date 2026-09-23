@@ -36,7 +36,7 @@
  *         routes.path("/orders", group -> {
  *             group.before(request -> request.getHeaders().contains("X-Tenant") ? null : HttpResponse.badRequest());
  *             group.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(orders.find(pathVariables.getLong("id"))));
- *             group.POST("/", Argument.of(Order.class), (request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
+ *             group.POST("/", Order.class, (request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
  *             group.asyncPOST("/import", (request, pathVariables) -> request.elements(Order.class)
  *                 .forEach(orders::saveAsync)
  *                 .thenApply(done -> HttpResponse.accepted()));
