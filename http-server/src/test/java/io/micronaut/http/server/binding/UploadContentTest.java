@@ -365,6 +365,33 @@ class UploadContentTest {
     }
 
     @Test
+    void aStagingFailureBeforeTheSubscriptionFailsWithItsCause() throws IOException {
+        // the disk thread fails to create the staging file before the caller subscribed: the
+        // caller still claims the body, and the upstream is cancelled when it subscribes
+        TestPublisher publisher = new TestPublisher();
+        ManualExecutor racing = new ManualExecutor();
+        racing.runInline = 1;
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(racing, Long.MAX_VALUE)));
+        Path existing = Files.writeString(directory.resolve("existing.txt"), "keep");
+        CompletionStage<Void> transfer = part.file().transferTo(existing);
+        assertTrue(publisher.cancelled, "the subscription is cancelled once it arrives");
+        racing.runAll();
+        assertInstanceOf(FileAlreadyExistsException.class, failure(transfer));
+        assertEquals("keep", Files.readString(existing));
+        join(part.closeAsync());
+        assertEquals(List.of(), leftovers());
+
+        TestPublisher second = new TestPublisher();
+        racing.runInline = 1;
+        FormPart missing = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(second)), context(racing, Long.MAX_VALUE)));
+        CompletionStage<Void> noDirectory = missing.file().transferTo(directory.resolve("missing").resolve("file.txt"));
+        racing.runAll();
+        assertInstanceOf(NoSuchFileException.class, failure(noDirectory));
+        assertTrue(second.cancelled);
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
     void closingThePartAbortsAStreamingTransfer() throws IOException {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
@@ -537,13 +564,22 @@ class UploadContentTest {
     private static final class ManualExecutor implements Executor {
         private final Queue<Runnable> tasks = new ArrayDeque<>();
         volatile boolean reject;
+        // the next tasks that run at once, like on another thread that is faster than the caller
+        volatile int runInline;
 
         @Override
-        public synchronized void execute(Runnable command) {
-            if (reject) {
-                throw new RejectedExecutionException("shut down");
+        public void execute(Runnable command) {
+            synchronized (this) {
+                if (reject) {
+                    throw new RejectedExecutionException("shut down");
+                }
+                if (runInline <= 0) {
+                    tasks.add(command);
+                    return;
+                }
+                runInline--;
             }
-            tasks.add(command);
+            command.run();
         }
 
         void runAll() {
