@@ -600,6 +600,29 @@ public interface HttpRouteBuilder {
     void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
+     * Route {@code GET} requests for the URI prefix and every path under it to a handler of
+     * resources, e.g. the static resources of the HTTP server:
+     * {@code routes.resources("/assets", StaticResources.classpath("public"))} serves
+     * {@code GET /assets/css/site.css} from {@code public/css/site.css} on the classpath, and
+     * {@code GET /assets} from the index file.
+     *
+     * <p>It routes {@code GET prefix/{+path}}, where {@code path} is the
+     * {@link ResourceHandler#pathVariable()}, the path of the resource relative to the prefix, and
+     * {@code GET prefix}, without the variable, to the handler. The routes have implicit
+     * {@code HEAD} routes, like any {@code GET} route, and are ordinary routes: the more specific
+     * routes of controllers and handlers under the prefix take precedence. Their filters,
+     * conditions, order and attributes are declared on the returned route, which configures both.
+     * In a group, the prefix follows the prefix of the group, and the filters of the group
+     * apply.</p>
+     *
+     * @param uriPrefix The URI prefix, e.g. {@code /assets}; empty or {@code /} for the root
+     * @param resources The handler of the resources
+     * @return The routes
+     * @since 5.3.0
+     */
+    HttpRouteSpec resources(String uriPrefix, ResourceHandler resources);
+
+    /**
      * A body type that is {@code null} when the request has no body, for the handlers that
      * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)},
      * and for the body an asynchronous handler reads:
