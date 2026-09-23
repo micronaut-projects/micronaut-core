@@ -504,6 +504,36 @@ public interface HttpRouteBuilder {
     void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
 
     /**
+     * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
+     * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
+     * the locator returns a stage of the target, and the router matches the rest of the path with
+     * the routes of the table of the target when the stage completes, without blocking the thread
+     * that matches the request. See {@link AsyncLocatorHandler}.
+     *
+     * <pre>{@code
+     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(items ->
+     *     items.GET("/items/{item}", (request, pathVariables) ->
+     *         HttpResponse.ok(pathVariables.locatedTarget(Order.class).item(pathVariables.getInt("item")))));
+     * routes.locateAsync("/orders/{id}",
+     *     (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), // completes with null: 404
+     *     order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>The filters of the located route, the error routes and the server filters apply like
+     * for {@link #locate(String, LocatorHandler, Function)}; a table of a located target may
+     * locate again, synchronously or asynchronously. The target is located once per request.
+     * {@link io.micronaut.web.router.Router#findClosest} of an application with an asynchronous
+     * locator that has not located its target yet fails: the server matches such a request
+     * again when the stage completes.</p>
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
+     * @param tables    The route table of a located target
+     * @since 5.3.0
+     */
+    void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
      * every request whose path matches one of the patterns, e.g. {@code /**} or {@code /api/**},
      * whatever answers it, a controller, a handler route or a static resource, including the

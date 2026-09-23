@@ -921,7 +921,16 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (locator == null || locatorMatch == null) {
             return matches;
         }
-        RouteLocator.Located located = locator.locate(request, locatorMatch);
+        RouteLocator.Located located;
+        try {
+            located = locator.locate(request, locatorMatch);
+        } catch (RuntimeException e) {
+            if (RouteLocator.pendingLocation(e) == null) {
+                throw e;
+            }
+            // an asynchronous locator that has not located its target: no route of it is known
+            return result;
+        }
         if (located != null) {
             result.addAll(located.wrap(located.router().<T, R>findAny(located.request())));
         }

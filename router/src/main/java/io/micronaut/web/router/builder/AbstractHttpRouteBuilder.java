@@ -175,9 +175,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixUri, new RouteLocator(locator, tables));
+    }
+
+    @Override
+    public final void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixUri, new RouteLocator(locator, tables));
+    }
+
+    private void locate(String prefixUri, RouteLocator locator) {
         Objects.requireNonNull(prefixUri, "prefixUri");
         checkOpen();
-        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(new RouteLocator(locator, tables)));
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
         for (String template : RouteLocator.templates(uri(prefixUri))) {
             for (HttpMethod method : HttpMethod.values()) {
                 if (method != HttpMethod.CUSTOM) {
