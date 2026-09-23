@@ -1071,9 +1071,19 @@ final class NettyHttpClient implements
         Objects.requireNonNull(options, "options");
         setupConversionService(request);
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        return Mono.defer(() -> {
+            // the body bytes of a server request are claimed when the exchange starts, and
+            // released when it ends, unless they were sent: e.g. when the upstream refuses the
+            // connection, a streaming server request can then discard the rest of its body
+            MutableHttpRequest<?> httpRequest = toProxyRequest(request);
+            Mono<MutableHttpResponse<?>> response = proxy(propagatedContext, request, httpRequest, options);
+            return httpRequest instanceof RawHttpRequestWrapper<?> claimed ? response.doFinally(signal -> claimed.close()) : response;
+        });
+    }
+
+    private Mono<MutableHttpResponse<?>> proxy(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, MutableHttpRequest<?> httpRequest, ProxyRequestOptions options) {
         return toMono(resolveRequestURI(request)
             .flatMap(requestURI -> {
-                MutableHttpRequest<?> httpRequest = toProxyRequest(request);
                 if (!options.isRetainHostHeader()) {
                     httpRequest.headers(headers -> headers.remove(HttpHeaderNames.HOST));
                 }

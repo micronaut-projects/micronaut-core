@@ -79,7 +79,17 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        return exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody), null);
+        Flux<HttpResponse<Object>> response;
+        try {
+            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody), null);
+        } catch (RuntimeException | Error e) {
+            if (requestBody != null) {
+                requestBody.close();
+            }
+            throw e;
+        }
+        // released unless they were sent, e.g. when the connection is refused
+        return requestBody == null ? response : response.doFinally(signal -> requestBody.close());
     }
 
     @Override
@@ -115,17 +125,19 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         RawRequestOptions rawOptions = RawRequestOptions.builder()
             .retainHostHeader(options.isRetainHostHeader())
             .build();
-        CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
-        MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, rawOptions);
-        MutableHttpRequest<?> proxyRequest;
-        if (serverBody != null) {
-            proxyRequest = new RawHttpRequestWrapper<>(conversionService, copy, serverBody);
-        } else {
-            request.getBody().ifPresent(copy::body);
-            proxyRequest = copy;
-        }
-        return Flux.from(exchangeWithOptions(proxyRequest, serverBody, rawOptions))
-            .map(HttpResponse::toMutableResponse);
+        // the body bytes of a server request are claimed when the exchange starts
+        return Mono.defer(() -> {
+            MutableHttpRequest<Object> copy = RawHttpClientSupport.copyRequest(request, rawOptions);
+            CloseableByteBody serverBody = RawHttpClientSupport.claimServerRequestBody(request);
+            MutableHttpRequest<?> proxyRequest;
+            if (serverBody != null) {
+                proxyRequest = new RawHttpRequestWrapper<>(conversionService, copy, serverBody);
+            } else {
+                request.getBody().ifPresent(copy::body);
+                proxyRequest = copy;
+            }
+            return exchangeWithOptions(proxyRequest, serverBody, rawOptions);
+        }).map(HttpResponse::toMutableResponse);
     }
 
     private Mono<MutableHttpResponse<?>> exchangeWithOptions(MutableHttpRequest<?> request, @Nullable CloseableByteBody requestBody, RawRequestOptions options) {
@@ -151,7 +163,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             flow.map(r -> RawHttpClientSupport.toMutableResponse(r, options))
         ));
         if (requestBody != null) {
-            response = response.doOnTerminate(requestBody::close);
+            // released unless they were sent, e.g. when the connection is refused, also when the
+            // exchange is cancelled
+            response = response.doFinally(signal -> requestBody.close());
         }
         return response;
     }
