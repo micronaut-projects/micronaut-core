@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
@@ -27,7 +28,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -44,14 +48,20 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     private final IndexedRouteDeclaration declaration;
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
+    private final IntConsumer exposePort;
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
+    private @Nullable Integer order;
+    private RouteAssembly.@Nullable RouteGroup group;
 
     /**
      * @param declaration The declaration
      * @param factory     Creates the route, not added to the assembly
+     * @param exposePort  Exposes the port of the route when it is declared: the server opens the
+     *                    exposed ports before the route is built
      */
-    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory) {
+    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory, IntConsumer exposePort) {
         this.declaration = declaration;
+        this.exposePort = exposePort;
         this.route = SupplierUtil.memoized(() -> {
             RouteAssembly.DefaultUriRoute built = factory.get();
             List<Consumer<HandlerUriRoute>> steps = fixedConfiguration != null ? fixedConfiguration : configuration;
@@ -76,6 +86,21 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
         if (fixedConfiguration == null) {
             fixedConfiguration = List.copyOf(configuration);
         }
+    }
+
+    /**
+     * @return The order of the route, or {@code null} if it has none of its own: the router orders
+     * the route before it is built
+     */
+    public @Nullable Integer order() {
+        return order;
+    }
+
+    /**
+     * @return The settings of the group of the route, or {@code null}
+     */
+    public RouteAssembly.@Nullable RouteGroup group() {
+        return group;
     }
 
     /**
@@ -168,6 +193,37 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteFilters group) {
         return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute inGroup(RouteAssembly.RouteGroup group) {
+        this.group = group;
+        return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute attribute(String name, Object value) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(value, "value");
+        return configure(r -> r.attribute(name, value));
+    }
+
+    @Override
+    public HandlerUriRoute order(int order) {
+        this.order = order;
+        return configure(r -> r.order(order));
+    }
+
+    @Override
+    public HandlerUriRoute where(Predicate<HttpRequest<?>> condition) {
+        Objects.requireNonNull(condition, "condition");
+        return configure(r -> r.where(condition));
+    }
+
+    @Override
+    public HandlerUriRoute port(int port) {
+        exposePort.accept(port);
+        return configure(r -> r.port(port));
     }
 
     @Override

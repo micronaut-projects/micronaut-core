@@ -144,7 +144,9 @@ public final class RawRequestOptions {
 
     /**
      * The maximum time to wait for the response headers, or {@code null} to use the client's
-     * read timeout. When it elapses, the exchange fails with a
+     * read timeout. It replaces the read timeout of the client while the response headers are
+     * awaited, so it may be longer or shorter than the read timeout; the read timeout still
+     * applies to the reads of the response body. When it elapses, the exchange fails with a
      * {@link io.micronaut.http.client.exceptions.ReadTimeoutException}.
      *
      * @return The response timeout

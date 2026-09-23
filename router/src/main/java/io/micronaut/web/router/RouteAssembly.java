@@ -64,7 +64,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -305,7 +307,8 @@ public final class RouteAssembly {
         }
         DeclaredUriRoute route = new DeclaredUriRoute(
             indexed,
-            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService)
+            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService),
+            exposedPorts::add
         );
         if (consumes != null) {
             route.consumes(consumes);
@@ -328,10 +331,12 @@ public final class RouteAssembly {
         List<LazyUriRouteInfo> infos = new ArrayList<>(declaredRoutes.size() + implicitHeadDeclaredRoutes.size());
         for (DeclaredUriRoute route : declaredRoutes) {
             route.fix();
-            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false, route::toRouteInfo));
+            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false,
+                effectiveOrder(route.order(), route.group()), route::toRouteInfo));
         }
         for (DeclaredUriRoute route : implicitHeadDeclaredRoutes) {
-            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true, route::implicitHeadRouteInfo));
+            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true,
+                effectiveOrder(route.order(), route.group()), route::implicitHeadRouteInfo));
         }
         return infos;
     }
@@ -378,6 +383,21 @@ public final class RouteAssembly {
     }
 
     /**
+     * The order of a route: its own, or the one of its group, or {@code 0}.
+     *
+     * @param order The order of the route, or {@code null}
+     * @param group The settings of the group of the route, or {@code null}
+     * @return The order
+     */
+    private static int effectiveOrder(@Nullable Integer order, @Nullable RouteGroup group) {
+        if (order != null) {
+            return order;
+        }
+        Integer groupOrder = group == null ? null : group.order();
+        return groupOrder == null ? 0 : groupOrder;
+    }
+
+    /**
      * A URI template under a context path.
      *
      * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
@@ -401,6 +421,17 @@ public final class RouteAssembly {
     public RouteFilters groupFilters(@Nullable RouteFilters enclosing) {
         return new RouteFilters(enclosing, executorName -> new ConfigurationException(
             "No executor configured for name: " + executorName + ", of a filter of a route group"));
+    }
+
+    /**
+     * The settings of a group of handler routes other than its filters, see
+     * {@link io.micronaut.web.router.builder.HttpRouteGroup}.
+     *
+     * @param enclosing The settings of the enclosing group, or {@code null}
+     * @return The settings of the group
+     */
+    public RouteGroup routeGroup(@Nullable RouteGroup enclosing) {
+        return new RouteGroup(enclosing);
     }
 
     /**
@@ -976,6 +1007,134 @@ public final class RouteAssembly {
     }
 
     /**
+     * The settings of a group of handler routes other than its filters, which the routes of the
+     * group, and of the groups nested in it, inherit when they are built: a route overrides them.
+     */
+    @Internal
+    public final class RouteGroup {
+        private final @Nullable RouteGroup enclosing;
+        private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
+        private final Map<String, Object> attributes = new LinkedHashMap<>(0);
+        private @Nullable Integer port;
+        private @Nullable Integer order;
+        private boolean closed;
+
+        /**
+         * @param enclosing The settings of the enclosing group, or {@code null}
+         */
+        RouteGroup(@Nullable RouteGroup enclosing) {
+            this.enclosing = enclosing;
+        }
+
+        /**
+         * The port of the routes of the group: exposed now, as the server opens the exposed ports
+         * when it starts.
+         *
+         * @param port The port
+         */
+        public void port(int port) {
+            checkOpen();
+            this.port = port;
+            RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * An attribute of the routes of the group.
+         *
+         * @param name  The name
+         * @param value The value
+         */
+        public void attribute(String name, Object value) {
+            checkOpen();
+            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
+        }
+
+        /**
+         * The order of the routes of the group among equally good routes.
+         *
+         * @param order The order
+         */
+        public void order(int order) {
+            checkOpen();
+            this.order = order;
+        }
+
+        /**
+         * A condition the requests of the routes of the group must meet.
+         *
+         * @param condition The condition
+         */
+        public void where(Predicate<HttpRequest<?>> condition) {
+            Objects.requireNonNull(condition, "condition");
+            checkOpen();
+            predicates.add(condition);
+        }
+
+        /**
+         * Close the group: its lambda returned.
+         */
+        public void close() {
+            closed = true;
+        }
+
+        /**
+         * @return The order of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer order() {
+            Integer own = order;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.order();
+        }
+
+        /**
+         * Add the attributes of the enclosing groups, then of this group, which override them.
+         *
+         * @param routeAttributes The attributes to add to
+         */
+        void addAttributes(Map<String, Object> routeAttributes) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addAttributes(routeAttributes);
+            }
+            routeAttributes.putAll(attributes);
+        }
+
+        /**
+         * Add the conditions of the enclosing groups, then of this group.
+         *
+         * @param conditions The conditions to add to
+         */
+        void addPredicates(List<Predicate<HttpRequest<?>>> conditions) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addPredicates(conditions);
+            }
+            conditions.addAll(predicates);
+        }
+
+        /**
+         * @return The port of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer port() {
+            Integer own = port;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.port();
+        }
+
+        private void checkOpen() {
+            if (closed) {
+                throw new IllegalStateException("The route group is closed: declare the settings of a group in its lambda");
+            }
+        }
+    }
+
+    /**
      * The default route impl.
      */
     @Internal
@@ -990,6 +1149,9 @@ public final class RouteAssembly {
         private final RouteFilters filters = new RouteFilters(null, executorName -> new SchedulerConfigurationException(
             targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
         private boolean implicitHead;
+        private @Nullable RouteGroup group;
+        private @Nullable Integer order;
+        private Map<String, Object> attributes = new LinkedHashMap<>(0);
 
         /**
          * @param httpMethod The HTTP method
@@ -1073,17 +1235,12 @@ public final class RouteAssembly {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
-            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
-                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
-                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
-                    where(request -> annotation.booleanValue().orElse(false));
-                }
-            }
         }
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
             checkBlockingBody();
+            Integer effectivePort = effectivePort();
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
@@ -1095,8 +1252,8 @@ public final class RouteAssembly {
                 consumesMediaTypes,
                 producesMediaTypes,
                 // a copy: the route info must not change with the route it was built from
-                List.copyOf(conditions),
-                port,
+                predicates(effectivePort),
+                effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
                 new RouteExecutorSelector(executeOn, nonBlocking),
@@ -1104,7 +1261,67 @@ public final class RouteAssembly {
                 implicitHead
             );
             routeInfo.routeFilters = routeFilters();
+            routeInfo.order = effectiveOrder(order, group);
+            routeInfo.attributes = attributes();
             return routeInfo;
+        }
+
+        /**
+         * @return The attributes of the groups of the route, outer group first, then of the route,
+         * each overriding the ones before
+         */
+        private Map<String, Object> attributes() {
+            RouteGroup routeGroup = group;
+            if (routeGroup == null && attributes.isEmpty()) {
+                return Map.of();
+            }
+            Map<String, Object> all = new LinkedHashMap<>();
+            if (routeGroup != null) {
+                routeGroup.addAttributes(all);
+            }
+            all.putAll(attributes);
+            return all.isEmpty() ? Map.of() : Collections.unmodifiableMap(all);
+        }
+
+        /**
+         * @return The port of the route, or of its group, or {@code null}
+         */
+        private @Nullable Integer effectivePort() {
+            Integer own = port;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup routeGroup = group;
+            return routeGroup == null ? null : routeGroup.port();
+        }
+
+        /**
+         * The conditions of the route info: the conditions of the groups of the route, outer group
+         * first, the {@link RouteCondition} of the target method, the conditions of the route, and
+         * a request on the port of the route if it has one. They are read when the route info is
+         * built: the annotations of a handler route may be given after the route is added.
+         *
+         * @param effectivePort The port of the route, or {@code null}
+         * @return The conditions
+         */
+        private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 2);
+            RouteGroup routeGroup = group;
+            if (routeGroup != null) {
+                routeGroup.addPredicates(predicates);
+            }
+            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+                    predicates.add(request -> annotation.booleanValue().orElse(false));
+                }
+            }
+            predicates.addAll(conditions);
+            if (effectivePort != null) {
+                int routePort = effectivePort;
+                predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
+            }
+            return List.copyOf(predicates);
         }
 
         /**
@@ -1143,6 +1360,9 @@ public final class RouteAssembly {
             head.executeOn = executeOn;
             head.nonBlocking = nonBlocking;
             head.filters.copy(filters);
+            head.group = group;
+            head.order = order;
+            head.attributes = new LinkedHashMap<>(attributes);
             head.implicitHead = true;
             return head;
         }
@@ -1247,6 +1467,12 @@ public final class RouteAssembly {
             return this;
         }
 
+        @Override
+        public HandlerUriRoute inGroup(RouteGroup group) {
+            this.group = Objects.requireNonNull(group, "group");
+            return this;
+        }
+
         /**
          * @return The filters of the route in the order the filter chain runs them: the filters of
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
@@ -1264,9 +1490,27 @@ public final class RouteAssembly {
 
         @Override
         public UriRoute exposedPort(int port) {
+            // the route info matches the requests on the port only, see predicates(Integer)
             this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
             RouteAssembly.this.exposedPorts.add(port);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute port(int port) {
+            exposedPort(port);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute order(int order) {
+            this.order = order;
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute attribute(String name, Object value) {
+            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
             return this;
         }
 
@@ -1306,8 +1550,9 @@ public final class RouteAssembly {
         }
 
         @Override
-        public UriRoute where(Predicate<HttpRequest<?>> condition) {
-            return (UriRoute) super.where(condition);
+        public DefaultUriRoute where(Predicate<HttpRequest<?>> condition) {
+            super.where(condition);
+            return this;
         }
 
         @Override
