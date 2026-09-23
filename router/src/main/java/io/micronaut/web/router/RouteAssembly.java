@@ -1034,7 +1034,7 @@ public final class RouteAssembly {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
-        private final DefaultRouteAnnotations annotations = new DefaultRouteAnnotations();
+        private final DefaultRouteAnnotations annotations;
         private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
         private final List<DefaultStatusRoute> statusRoutes = new ArrayList<>(0);
         private final Supplier<ErrorRouteInfo<Object, Object>[]> errorRouteInfos = SupplierUtil.memoized(this::buildErrorRoutes);
@@ -1048,6 +1048,7 @@ public final class RouteAssembly {
          */
         RouteGroup(@Nullable RouteGroup enclosing) {
             this.enclosing = enclosing;
+            this.annotations = new DefaultRouteAnnotations(enclosing == null ? null : enclosing.annotations);
         }
 
         /**
@@ -1166,33 +1167,11 @@ public final class RouteAssembly {
         }
 
         /**
-         * An annotation of the routes of the group.
-         *
-         * @param annotation The annotation
+         * @param annotation An annotation of the routes of the group
          */
         public void annotate(AnnotationValue<?> annotation) {
-            Objects.requireNonNull(annotation, "annotation");
             checkOpen();
             annotations.add(annotation);
-        }
-
-        /**
-         * @return The annotations of the enclosing groups, outer group first, then of this group
-         */
-        List<DefaultRouteAnnotations> annotations() {
-            List<DefaultRouteAnnotations> all = new ArrayList<>(2);
-            addAnnotations(all);
-            return all;
-        }
-
-        private void addAnnotations(List<DefaultRouteAnnotations> all) {
-            RouteGroup group = enclosing;
-            if (group != null) {
-                group.addAnnotations(all);
-            }
-            if (!annotations.isEmpty()) {
-                all.add(annotations);
-            }
         }
 
         /**
@@ -1396,10 +1375,8 @@ public final class RouteAssembly {
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
-            RouteGroup annotatedGroup = group;
-            if (annotatedGroup != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
-                // before anything reads the annotations of the route, e.g. its executor
-                handlerMethod.groupAnnotations(annotatedGroup.annotations());
+            if (group != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
+                handlerMethod.groupAnnotations(group.annotations); // before the executor reads them
             }
             checkBlockingBody();
             Integer effectivePort = effectivePort();
@@ -1569,31 +1546,27 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-            Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
-            }
-            handlerMethod.annotationMetadata(annotationMetadata);
+            handlerMethod("annotations").annotationMetadata(annotationMetadata);
             return this;
         }
 
         @Override
         public HandlerUriRoute annotate(AnnotationValue<?> annotation) {
-            Objects.requireNonNull(annotation, "annotation");
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
-            }
-            handlerMethod.annotate(annotation);
+            handlerMethod("annotations").annotate(annotation);
             return this;
         }
 
         @Override
         public HandlerUriRoute responseType(Argument<?> responseType) {
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the return type of the method: " + this);
-            }
-            handlerMethod.responseType(responseType);
+            handlerMethod("return type").responseType(responseType);
             return this;
+        }
+
+        private HandlerMethod<?> handlerMethod(String what) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the " + what + " of the method: " + this);
+            }
+            return handlerMethod;
         }
 
         @Override

@@ -123,9 +123,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private final DefaultRouteAnnotations annotations = new DefaultRouteAnnotations();
     /**
-     * The annotations of the groups of the route, outer group first.
+     * The annotations of the innermost group of the route, which has those of the enclosing groups.
      */
-    private List<DefaultRouteAnnotations> groupAnnotations = List.of();
+    private @Nullable DefaultRouteAnnotations groupAnnotations;
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
@@ -386,11 +386,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * The annotations of the groups of the route, which the annotations of the route override,
      * see {@link HttpRouteGroup#annotate(AnnotationValue)}.
      *
-     * @param groupAnnotations The annotations of the groups, outer group first
+     * @param groupAnnotations The annotations of the innermost group, which has those of the enclosing groups
      */
     @Internal
-    public void groupAnnotations(List<DefaultRouteAnnotations> groupAnnotations) {
-        this.groupAnnotations = List.copyOf(groupAnnotations);
+    public void groupAnnotations(DefaultRouteAnnotations groupAnnotations) {
+        this.groupAnnotations = Objects.requireNonNull(groupAnnotations, "groupAnnotations");
         updateAnnotationMetadata();
     }
 
@@ -400,8 +400,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private void updateAnnotationMetadata() {
         AnnotationMetadataProvider provider = annotationMetadataProvider;
         AnnotationMetadata base = provider == null ? AnnotationMetadata.EMPTY_METADATA : provider.getAnnotationMetadata();
-        List<DefaultRouteAnnotations> levels = new ArrayList<>(groupAnnotations.size() + 1);
-        levels.addAll(groupAnnotations);
+        DefaultRouteAnnotations group = groupAnnotations;
+        List<DefaultRouteAnnotations> levels = group == null ? new ArrayList<>(1) : group.levels();
         levels.add(annotations);
         AnnotationMetadata metadata = DefaultRouteAnnotations.layered(base, levels);
         if (provider == null && metadata.isEmpty()) {

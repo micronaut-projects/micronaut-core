@@ -50,7 +50,33 @@ import java.util.Objects;
 public final class DefaultRouteAnnotations implements RouteAnnotations {
 
     private final Map<String, List<AnnotationValue<?>>> annotations = new LinkedHashMap<>(4);
+    private final @Nullable DefaultRouteAnnotations enclosing;
     private @Nullable AnnotationMetadata metadata;
+
+    /**
+     * The annotations of a route, or collected to be added to a route or a group.
+     */
+    public DefaultRouteAnnotations() {
+        this(null);
+    }
+
+    /**
+     * @param enclosing The annotations of the enclosing group, which these override, or {@code null}
+     */
+    public DefaultRouteAnnotations(@Nullable DefaultRouteAnnotations enclosing) {
+        this.enclosing = enclosing;
+    }
+
+    /**
+     * @return The annotations of the enclosing groups, outer group first, then these, a new mutable list
+     */
+    public List<DefaultRouteAnnotations> levels() {
+        List<DefaultRouteAnnotations> levels = new ArrayList<>(3);
+        for (DefaultRouteAnnotations level = this; level != null; level = level.enclosing) {
+            levels.addFirst(level);
+        }
+        return levels;
+    }
 
     @Override
     public DefaultRouteAnnotations add(AnnotationValue<?> annotation) {
