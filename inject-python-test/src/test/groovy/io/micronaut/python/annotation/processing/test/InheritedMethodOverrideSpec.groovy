@@ -387,4 +387,49 @@ class ProductRepository(CrudRepository[Product, int]):
         where:
         hint << ["int", "int | None"]
     }
+
+    void "test python Protocol repository override of findById with a UUID id and a nullable return"() {
+        given: "the shape the full-stack template uses: Protocol, two repository interfaces, a UUID id"
+        def pythonCode = """
+from dataclasses import dataclass
+from typing import Annotated, Protocol
+
+from java.util import UUID
+from micronaut.data.annotation import GeneratedValue, Id, Join, MappedEntity
+from micronaut.data.jdbc.annotation import JdbcRepository
+from micronaut.data.repository import CrudRepository, PageableRepository
+
+
+@dataclass
+@MappedEntity
+class Owner:
+    id: Annotated[UUID | None, Id, GeneratedValue]
+    name: str
+
+
+@dataclass
+@MappedEntity
+class Widget:
+    id: Annotated[UUID | None, Id, GeneratedValue]
+    name: str
+    owner: Owner
+
+
+@JdbcRepository(dialect="H2")
+class WidgetRepository(CrudRepository[Widget, UUID], PageableRepository[Widget, UUID], Protocol):
+
+    @Join("owner")
+    def findById(self, id: UUID) -> Widget | None: ...
+"""
+
+        when:
+        def definition = buildBeanDefinition("python", "WidgetRepository\$Intercepted", pythonCode)
+        def findById = definition.executableMethods.findAll { it.methodName == "findById" }
+
+        then:
+        findById.size() == 1
+        findById[0].arguments[0].type == UUID
+        findById[0].stringValue(DataMethod, DataMethod.META_MEMBER_INTERCEPTOR).get() == FindOptionalInterceptor.name
+        findById[0].getAnnotationValuesByType(Join)*.stringValue().collect { it.get() } == ["owner"]
+    }
 }
