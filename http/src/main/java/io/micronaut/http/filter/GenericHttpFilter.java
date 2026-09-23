@@ -64,7 +64,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     /**
      * Create a filter of one route's requests.
      *
-     * @param filter   Returns a response to answer the request with instead of the route, or {@code null} to proceed
+     * @param filter   Returns a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
      * @param executor The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
      * @return The filter
      * @since 5.3.0
@@ -78,7 +78,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     /**
      * Create an asynchronous filter of one route's requests.
      *
-     * @param filter Completes with a response to answer the request with instead of the route, or {@code null} to proceed
+     * @param filter Completes with a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
      * @return The filter
      * @since 5.3.0
      */

@@ -64,6 +64,9 @@ import java.util.function.Supplier;
  * owns the one read of its body. Everything but the body is the request's, so the view works
  * over any server request, and filters see the same request.
  *
+ * <p>The request can be one a filter continued with, e.g. with another method: the body is that of
+ * the server request it is or wraps, see {@link ServerRequestBody}.</p>
+ *
  * <p>The body is read from the {@link ServerHttpRequest#byteBody()} of the request: decoded
  * through the {@code @Body} binders, outside the argument binding of the route, or moved to the
  * reader that was asked for.</p>
@@ -78,27 +81,34 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
 
-    private final ServerHttpRequest<B> request;
+    private final HttpRequest<B> request;
+    private final ServerHttpRequest<?> server;
     private final AsyncServerHttpRequestArgumentBinder binder;
 
     // guarded by this
     private @Nullable String reader;
     private @Nullable Supplier<CompletionStage<Void>> release;
 
-    DefaultAsyncServerHttpRequest(ServerHttpRequest<B> request, AsyncServerHttpRequestArgumentBinder binder) {
+    /**
+     * @param request The request of the route
+     * @param server  The server request whose bytes are the body of the request, see {@link ServerRequestBody}
+     * @param binder  The binder
+     */
+    DefaultAsyncServerHttpRequest(HttpRequest<B> request, ServerHttpRequest<?> server, AsyncServerHttpRequestArgumentBinder binder) {
         super(request);
         this.request = request;
+        this.server = server;
         this.binder = binder;
     }
 
     @Override
     public ByteBody byteBody() {
-        return request.byteBody();
+        return server.byteBody();
     }
 
     @Override
     public ByteBodyFactory byteBodyFactory() {
-        return request.byteBodyFactory();
+        return server.byteBodyFactory();
     }
 
     @Override
@@ -149,13 +159,13 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
 
     @Override
     public boolean hasBody() {
-        OptionalLong length = request.byteBody().expectedLength();
+        OptionalLong length = server.byteBody().expectedLength();
         return length.isEmpty() || length.getAsLong() != 0;
     }
 
     @Override
     public OptionalLong expectedBodySize() {
-        return request.byteBody().expectedLength();
+        return server.byteBody().expectedLength();
     }
 
     @Override
@@ -240,7 +250,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public <T> BodyElements<T> elements(Argument<T> type) {
         Objects.requireNonNull(type, "type");
         claim("elements");
-        CloseableByteBody body = request.byteBody().move();
+        CloseableByteBody body = server.byteBody().move();
         PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
         owned(elements::closeAsync, elements::close);
         return elements;
@@ -268,13 +278,13 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     @Override
     public CloseableByteBody takeBody() {
         claim("takeBody");
-        return request.byteBody().move();
+        return server.byteBody().move();
     }
 
     @Override
     public CompletionStage<Void> discardBody() {
         claim("discardBody");
-        request.byteBody().move().close();
+        server.byteBody().move().close();
         return CompletableFuture.completedStage(null);
     }
 
@@ -319,26 +329,26 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         synchronized (this) {
             release = closeAsync;
         }
-        if (request instanceof LifecycleHttpRequest<?> lifecycle) {
+        if (server instanceof LifecycleHttpRequest<?> lifecycle) {
             lifecycle.addDisposalResource(close);
         }
     }
 
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), request);
+        return UploadContext.of(binder.formFactory(), server);
     }
 
     /**
      * The body, moved to content read like a form field: in memory with a limit, or to a file.
      */
     private UploadContent content(UploadContext context) {
-        StreamingUploadContent content = StreamingUploadContent.requestBody(request.byteBody().move(), request.getContentType().orElse(null), context);
+        StreamingUploadContent content = StreamingUploadContent.requestBody(server.byteBody().move(), request.getContentType().orElse(null), context);
         owned(content::closeAsync, content::closeAsync);
         return content;
     }
 
     private FormCapableHttpRequest<?> formRequest() {
-        if (request instanceof FormCapableHttpRequest<?> formRequest && formRequest.hasFormBody()) {
+        if (server instanceof FormCapableHttpRequest<?> formRequest && formRequest.hasFormBody()) {
             return formRequest;
         }
         throw new UnsupportedMediaException(String.valueOf(request.getContentType().orElse(null)), FORM_MEDIA_TYPES);
