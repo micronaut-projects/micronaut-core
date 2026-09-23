@@ -10,10 +10,14 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Error;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.annotation.RequestFilter;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.exceptions.HttpStatusException;
@@ -66,6 +70,7 @@ public class WriterErrorHandlingTest {
     @BeforeEach
     void reset() {
         ctx.getBean(AlwaysFailingHandler.class).calls.set(0);
+        ctx.getBean(WriterErrorFilter.class).requests.set(0);
     }
 
     private static java.net.http.HttpResponse<String> get(String path) throws IOException, InterruptedException {
@@ -125,6 +130,28 @@ public class WriterErrorHandlingTest {
     }
 
     @Test
+    void responseFiltersRunOnTheErrorResponseAndRequestFiltersDoNotRunAgain() throws Exception {
+        var response = get("/writer-errors/custom");
+        assertEquals(418, response.statusCode());
+        assertEquals("true", response.headers().firstValue("X-Filtered").orElse(null));
+        assertEquals(1, ctx.getBean(WriterErrorFilter.class).requests.get());
+    }
+
+    @Test
+    void responseFilterReplacesTheErrorResponse() throws Exception {
+        var response = get("/writer-errors/replaced");
+        assertEquals(202, response.statusCode());
+        assertEquals("replaced by filter", response.body());
+    }
+
+    @Test
+    void responseFilterFailingOnTheErrorResponse() throws Exception {
+        var response = get("/writer-errors/filter-fails");
+        assertEquals(503, response.statusCode());
+        assertEquals("filter failure handled", response.body());
+    }
+
+    @Test
     void streamingFailureAfterFirstChunkAborts() {
         assertThrows(IOException.class, () -> get("/writer-errors/stream"));
     }
@@ -171,6 +198,16 @@ public class WriterErrorHandlingTest {
         @Get(value = "/always", produces = MediaType.TEXT_PLAIN)
         AlwaysFailingBody always() {
             return new AlwaysFailingBody();
+        }
+
+        @Get(value = "/replaced", produces = MediaType.TEXT_PLAIN)
+        CustomBody replaced() {
+            return new CustomBody("custom writer failure");
+        }
+
+        @Get(value = "/filter-fails", produces = MediaType.TEXT_PLAIN)
+        CustomBody filterFails() {
+            return new CustomBody("custom writer failure");
         }
 
         @Get(value = "/stream", produces = MediaType.TEXT_PLAIN)
@@ -224,6 +261,45 @@ public class WriterErrorHandlingTest {
         FunctionalRoutes(ExecutionHandleLocator executionHandleLocator, UriNamingStrategy uriNamingStrategy) {
             super(executionHandleLocator, uriNamingStrategy);
             GET("/writer-errors-functional/custom", FunctionalTarget.class, "custom").produces(MediaType.TEXT_PLAIN_TYPE);
+        }
+    }
+
+    static final class FilterFailure extends RuntimeException {
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @ServerFilter("/writer-errors/**")
+    static class WriterErrorFilter {
+        final AtomicInteger requests = new AtomicInteger();
+
+        @RequestFilter
+        void request() {
+            requests.incrementAndGet();
+        }
+
+        @ResponseFilter
+        HttpResponse<?> response(HttpRequest<?> request, MutableHttpResponse<?> response) {
+            response.header("X-Filtered", "true");
+            if (response.code() == HttpStatus.I_AM_A_TEAPOT.getCode()) {
+                String path = request.getPath();
+                if (path.endsWith("/replaced")) {
+                    return HttpResponse.<String>status(HttpStatus.ACCEPTED).body("replaced by filter").contentType(MediaType.TEXT_PLAIN_TYPE);
+                }
+                if (path.endsWith("/filter-fails")) {
+                    throw new FilterFailure();
+                }
+            }
+            return response;
+        }
+    }
+
+    @Requires(property = "spec.name", value = SPEC)
+    @Singleton
+    @Produces(MediaType.TEXT_PLAIN)
+    static class FilterFailureHandler implements ExceptionHandler<FilterFailure, HttpResponse<String>> {
+        @Override
+        public HttpResponse<String> handle(HttpRequest request, FilterFailure exception) {
+            return HttpResponse.<String>status(HttpStatus.SERVICE_UNAVAILABLE).body("filter failure handled");
         }
     }
 
