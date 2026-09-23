@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -41,7 +41,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
+public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> permits DefaultHttpRouteSpec {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method.
@@ -67,28 +67,35 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
     HttpRouteSpec produces(MediaType... mediaTypes);
 
     /**
-     * Give the route annotations: the features that read the annotations of the matched route,
-     * such as security rules, versioning, filter binding and the message body writers, see them
-     * as if they were on a controller method, and so does the return type of the route. Typically
-     * they are the annotations of the bean method the handler implements, from its
-     * {@link io.micronaut.inject.ExecutableMethod}.
+     * Give the route the annotations of an annotated element: the features that read the
+     * annotations of the matched route, such as security rules, versioning, filter binding, route
+     * conditions and the message body writers, see them as if they were on a controller method,
+     * and so does the return type of the route.
      *
-     * @param annotationMetadata The annotations of the route
+     * <p>When the element is an {@link ExecutableMethod}, e.g. a method of a resource that a
+     * framework integration routes with handler functions, the route implements that bean
+     * method: besides its annotations, the target method, declaring type and method name of the
+     * route are the ones of the bean method, so the local {@code @Error} methods of the bean class
+     * apply to the route, and the route is described as the bean method. The arguments of the
+     * route stay those of the handler. Any other element, e.g. a
+     * {@link io.micronaut.inject.BeanDefinition}, gives the route its annotations only.</p>
+     *
+     * <pre>{@code
+     * ExecutableMethod<Payments, String> pay = beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class);
+     * routes.POST("/payments/{amount}", (request, pathVariables) -> HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))))
+     *     .annotationMetadata(pay);
+     * }</pre>
+     *
+     * <p>The route keeps the element: an integration finds it back on the matched route with
+     * {@link io.micronaut.web.router.MethodBasedRouteInfo#getAnnotationMetadataProvider()}, and
+     * the bean method of the route with {@code instanceof ExecutableMethod}. The last element
+     * given to the route wins.</p>
+     *
+     * @param annotationMetadata The annotated element whose annotations the route has, an
+     *                           {@link ExecutableMethod} for a route that implements a bean method
      * @return The route
      */
-    HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata);
-
-    /**
-     * The route implements a bean method, e.g. a method of a resource that a framework
-     * integration routes with handler functions: the route has the annotations of the method, see
-     * {@link #annotationMetadata(AnnotationMetadata)}, and its target method, declaring type and
-     * method name are the ones of the bean method. The arguments of the route stay those of the
-     * handler.
-     *
-     * @param method The bean method
-     * @return The route
-     */
-    HttpRouteSpec implementing(ExecutableMethod<?, ?> method);
+    HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
      * Declare the type of the body of the responses of the route, like the return type

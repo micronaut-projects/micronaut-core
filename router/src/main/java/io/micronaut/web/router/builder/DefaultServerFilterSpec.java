@@ -25,22 +25,14 @@ import java.util.Objects;
 
 /**
  * The {@link ServerFilterSpec}: a server filter of the {@link RouteAssembly}, whose filter routes
- * the router reads with the routes.
+ * the router reads with the routes. The server filter holds the configuration.
  *
+ * @param serverFilters The server filter
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSpec<ServerFilterSpec> {
-
-    private final RouteAssembly.ServerFilters serverFilters;
-
-    /**
-     * @param serverFilters The server filter
-     */
-    DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) {
-        this.serverFilters = serverFilters;
-    }
+record DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) implements ServerFilterSpec, ContextFilterSpec<ServerFilterSpec> {
 
     @Override
     public ServerFilterSpec methods(HttpMethod... methods) {

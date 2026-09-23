@@ -27,23 +27,15 @@ import java.util.Objects;
  * template of a group is prefixed here, so a template syntax that cannot be joined as a string is
  * rejected, or joined its own way, in this one place.
  *
+ * @param value The prefix: starts with a slash and does not end with one
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class RoutePrefix {
+record RoutePrefix(String value) {
 
     private static final char SLASH = '/';
     private static final char VARIABLE_START = '{';
-
-    /**
-     * The prefix: starts with a slash and does not end with one.
-     */
-    private final String prefix;
-
-    private RoutePrefix(String prefix) {
-        this.prefix = prefix;
-    }
 
     /**
      * The prefix of a group, nested in the group of the enclosing prefix.
@@ -82,27 +74,27 @@ final class RoutePrefix {
         Objects.requireNonNull(uri, "uri");
         if (uri.isEmpty() || uri.equals("/")) {
             // like @Get("/") of a controller: the URI of the controller
-            return prefix;
+            return value;
         }
         char first = uri.charAt(0);
         if (first == '?' || first == '#') {
-            throw new IllegalArgumentException("The URI template of a route in a group with the prefix " + prefix + " must be a path: " + uri);
+            throw new IllegalArgumentException("The URI template of a route in a group with the prefix " + value + " must be a path: " + uri);
         }
         if (first == SLASH) {
-            return prefix + uri;
+            return value + uri;
         }
         if (first == VARIABLE_START && uri.length() > 1) {
             char operator = uri.charAt(1);
             if (operator == SLASH || operator == '?' || operator == '&' || operator == '#') {
                 // an expression that expands with its own separator, e.g. {/segment} or {?query}
-                return prefix + uri;
+                return value + uri;
             }
         }
-        return prefix + SLASH + uri;
+        return value + SLASH + uri;
     }
 
     @Override
     public String toString() {
-        return prefix;
+        return value;
     }
 }

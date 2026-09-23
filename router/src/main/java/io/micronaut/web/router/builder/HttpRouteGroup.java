@@ -82,7 +82,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> {
+public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
 
     /**
      * Route the requests of the routes of the group on this port only, like
