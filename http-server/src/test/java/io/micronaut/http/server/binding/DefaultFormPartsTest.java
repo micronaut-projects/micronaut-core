@@ -66,6 +66,26 @@ class DefaultFormPartsTest {
         parts.close();
     }
 
+    @Test
+    void completingTheReturnedStageDoesNotEndTheOperation() {
+        FieldPublisher publisher = new FieldPublisher();
+        FormParts parts = new DefaultFormParts(request(() -> publisher), CONTEXT);
+        List<String> visited = new ArrayList<>();
+        CompletionStage<Void> forEach = parts.forEach(part -> part.text().thenAccept(visited::add));
+        // a caller cannot complete or cancel the operation: it ends with the form
+        assertTrue(forEach.toCompletableFuture().complete(null));
+        assertTrue(forEach.toCompletableFuture().cancel(true));
+        assertFalse(forEach.toCompletableFuture().isDone());
+        publisher.emit(field("a", "1"));
+        publisher.emit(field("b", "2"));
+        publisher.complete();
+        forEach.toCompletableFuture().join();
+        assertEquals(List.of("1", "2"), visited);
+        // the next operation starts
+        assertEquals(Boolean.FALSE, parts.part("c", part -> CompletableFuture.completedStage(null)).toCompletableFuture().join());
+        parts.close();
+    }
+
     /**
      * Emits the fields the test gives it, one per request.
      */

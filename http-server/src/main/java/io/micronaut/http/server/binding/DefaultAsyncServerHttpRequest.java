@@ -210,7 +210,8 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         } catch (Throwable e) {
             result.completeExceptionally(e);
         }
-        return result;
+        // a view: the caller cannot complete or cancel the read
+        return result.minimalCompletionStage();
     }
 
     @Override
@@ -260,9 +261,10 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public CompletionStage<FormData> form() {
         claim("form");
         try {
-            return FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest());
+            // a view: the caller cannot complete or cancel the collection
+            return FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest()).minimalCompletionStage();
         } catch (Throwable e) {
-            return CompletableFuture.failedFuture(e);
+            return CompletableFuture.failedStage(e);
         }
     }
 

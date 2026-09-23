@@ -136,10 +136,10 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     private <T> CompletionStage<T> walk(Function<DefaultFormPart, @Nullable CompletionStage<?>> visitor, boolean once, @Nullable T ended, @Nullable T visited) {
         synchronized (this) {
             if (closed != null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("The form parts were closed"));
+                return CompletableFuture.failedStage(new IllegalStateException("The form parts were closed"));
             }
             if (busy) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Another operation on the form parts is in progress"));
+                return CompletableFuture.failedStage(new IllegalStateException("Another operation on the form parts is in progress"));
             }
             busy = true;
         }
@@ -148,7 +148,8 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             walking = walk;
         }
         walk.run();
-        return walk.result;
+        // a view: the caller cannot complete or cancel the operation, which ends with the form
+        return walk.result.minimalCompletionStage();
     }
 
     /**
