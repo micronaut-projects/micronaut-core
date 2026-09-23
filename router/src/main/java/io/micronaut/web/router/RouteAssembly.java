@@ -436,7 +436,7 @@ public final class RouteAssembly {
      * @return Whether it is a {@code tchar} of RFC 9110
      */
     private static boolean isTokenChar(int c) {
-        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
     }
 
     /**

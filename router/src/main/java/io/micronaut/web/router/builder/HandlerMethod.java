@@ -505,7 +505,8 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         try {
             request.releaseBody();
         } catch (Throwable releaseError) {
-            if (releaseError != failure) {
+            // a Throwable is equal to itself only: a failure cannot suppress itself
+            if (!releaseError.equals(failure)) {
                 failure.addSuppressed(releaseError);
             }
         }
