@@ -290,8 +290,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public String toString() {
         return getHttpMethodName() + ' '
-                + uriMatchTemplate + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
-                + '#' + getTargetMethod().getName()
+                + uriMatchTemplate + " -> " + RouteAssembly.target(getTargetMethod())
                 + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 

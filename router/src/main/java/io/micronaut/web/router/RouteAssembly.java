@@ -487,6 +487,20 @@ public final class RouteAssembly {
     }
 
     /**
+     * The target of a route, for its description: the declaring type and the name of a method,
+     * or the description of a handler function, whose type is a generated lambda class.
+     *
+     * @param targetMethod The target of the route
+     * @return The description
+     */
+    static String target(MethodExecutionHandle<?, ?> targetMethod) {
+        if (targetMethod instanceof HandlerMethod<?> handlerMethod) {
+            return handlerMethod.toString();
+        }
+        return targetMethod.getDeclaringType().getSimpleName() + '#' + targetMethod.getName();
+    }
+
+    /**
      * The filters of a group of handler routes, see {@link io.micronaut.web.router.builder.HttpRouteGroup}.
      *
      * @param enclosing The filters of the enclosing group, or {@code null}
@@ -716,8 +730,7 @@ public final class RouteAssembly {
         @Override
         public String toString() {
             return ' ' + error.getSimpleName()
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod;
+                    + " -> " + target(targetMethod);
         }
     }
 
@@ -1577,8 +1590,7 @@ public final class RouteAssembly {
         public String toString() {
             return getHttpMethodName() + ' '
                     + uriMatchTemplate
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod.getName()
+                    + " -> " + target(targetMethod)
                     + " (" + String.join(",", consumesMediaTypes) + ')';
         }
 

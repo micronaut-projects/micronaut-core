@@ -407,9 +407,32 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return bodyType.isNullable() ? NULLABLE_BODY : BODY;
     }
 
+    /**
+     * Describes the handler for the messages that name a route, e.g.
+     * {@code RequestHandler lambda in ItemRoutes}: the class of a lambda is a generated name, which
+     * does not identify it. A handler route that implements a bean method is that method.
+     *
+     * @return The description of the handler
+     */
     @Override
     public String toString() {
-        return "handler " + handler;
+        ExecutableMethod<?, ?> target = implemented;
+        if (target != null) {
+            return withoutPackage(target.getDeclaringType().getName()) + '#' + target.getMethodName();
+        }
+        if (handlerType == RouteLocator.class) {
+            return "locator " + handler;
+        }
+        String name = handler.getClass().getName();
+        int lambda = name.indexOf("$$Lambda");
+        String description = lambda < 0
+            ? withoutPackage(name)
+            : "lambda in " + withoutPackage(name.substring(0, lambda));
+        return withoutPackage(handlerType.getName()) + ' ' + description;
+    }
+
+    private static String withoutPackage(String className) {
+        return className.substring(className.lastIndexOf('.') + 1);
     }
 
     /**
