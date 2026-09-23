@@ -36,4 +36,14 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
     public DefaultHttpRouteBuilder(RouteAssembly assembly) {
         super(assembly, null, null, null);
     }
+
+    /**
+     * Close the builder once the routes were declared on it, e.g. when
+     * {@link HttpRoutes#routes(HttpRouteBuilder)} returned: a route, a group, an error, status or
+     * locator route or a server filter declared on it later fails with an
+     * {@link IllegalStateException}, instead of being dropped.
+     */
+    public void close() {
+        closeBuilder();
+    }
 }

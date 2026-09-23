@@ -129,7 +129,7 @@ public final class RouteTableFactory {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
             uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
-        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));
     }
@@ -154,9 +154,25 @@ public final class RouteTableFactory {
     public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, uri -> uri, route -> { });
-        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));
+    }
+
+    /**
+     * Declare the routes on a builder that is closed when they returned: a route declared on it
+     * later, which the table would not have, fails.
+     *
+     * @param routes   Declares the routes
+     * @param assembly The assembly the routes are added to
+     */
+    private static void declare(HttpRoutes routes, RouteAssembly assembly) {
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        try {
+            routes.routes(builder);
+        } finally {
+            builder.close();
+        }
     }
 
     private static RouteTable table(RouteAssembly assembly, List<RouteBuilder> builders, List<AssembledRoutes> assembled) {

@@ -65,6 +65,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * The prefix of the URI templates of the routes, or {@code null}.
      */
     private final @Nullable RoutePrefix prefix;
+    /**
+     * Whether the routes of the builder were read: see {@link DefaultHttpRouteBuilder#close()}.
+     */
+    private boolean closed;
 
     /**
      * @param assembly     The assembly the routes are added to
@@ -229,7 +233,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
     }
 
+    /**
+     * Close the builder: its routes were read. A later declaration would be dropped, so it fails.
+     */
+    final void closeBuilder() {
+        closed = true;
+    }
+
     private void checkOpen() {
+        if (closed) {
+            throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
+                + "or inside the callback that builds the route table, not after it returned");
+        }
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null && filters.isClosed()) {
             throw new IllegalStateException("The route group is closed: declare the routes of a group in its lambda");
