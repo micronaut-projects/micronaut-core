@@ -146,6 +146,43 @@ public class FilterMutatedBodyTest {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
 
+    private static String header(HttpRequest<?> request) {
+        String value = request.getHeaders().get(MUTATED);
+        return value == null ? "none" : value;
+    }
+
+    private static HttpResponse<?> textResponse(String body) {
+        return HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE);
+    }
+
+    /**
+     * Read the body, and describe how the read failed.
+     */
+    private static CompletionStage<String> read(Supplier<CompletionStage<String>> reader) {
+        CompletionStage<String> stage;
+        try {
+            stage = reader.get();
+        } catch (RuntimeException e) {
+            stage = CompletableFuture.failedFuture(e);
+        }
+        return stage.handle((value, error) -> error == null ? value : describe(error));
+    }
+
+    private static String describe(Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        String message = String.valueOf(cause.getMessage());
+        if (cause instanceof IllegalStateException && message.contains("can be read once")) {
+            return "read-once";
+        }
+        if (cause instanceof IllegalStateException && message.contains("decoded object")) {
+            return "decoded";
+        }
+        if (cause instanceof UnsatisfiedRouteException) {
+            return "missing";
+        }
+        return cause.toString();
+    }
+
     @ServerFilter("/mb/**")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class BodyFilter {
@@ -200,43 +237,6 @@ public class FilterMutatedBodyTest {
                 HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE)
             ).consumes(MediaType.TEXT_PLAIN_TYPE);
         }
-    }
-
-    private static String header(HttpRequest<?> request) {
-        String value = request.getHeaders().get(MUTATED);
-        return value == null ? "none" : value;
-    }
-
-    private static HttpResponse<?> textResponse(String body) {
-        return HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE);
-    }
-
-    /**
-     * Read the body, and describe how the read failed.
-     */
-    private static CompletionStage<String> read(Supplier<CompletionStage<String>> reader) {
-        CompletionStage<String> stage;
-        try {
-            stage = reader.get();
-        } catch (RuntimeException e) {
-            stage = CompletableFuture.failedFuture(e);
-        }
-        return stage.handle((value, error) -> error == null ? value : describe(error));
-    }
-
-    private static String describe(Throwable error) {
-        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
-        String message = String.valueOf(cause.getMessage());
-        if (cause instanceof IllegalStateException && message.contains("can be read once")) {
-            return "read-once";
-        }
-        if (cause instanceof IllegalStateException && message.contains("decoded object")) {
-            return "decoded";
-        }
-        if (cause instanceof UnsatisfiedRouteException) {
-            return "missing";
-        }
-        return cause.toString();
     }
 
     @Controller("/mb")
