@@ -19,7 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
-import io.micronaut.web.router.RouteAssembly;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import org.jspecify.annotations.Nullable;
 
@@ -103,7 +103,7 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
     static IndexedRouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
-        RouteAssembly.standardMethod(httpMethod, "RouteDeclaration.of(\"PROPFIND\", uriTemplate)");
+        RouteArguments.standardMethod(httpMethod, "RouteDeclaration.of(\"PROPFIND\", uriTemplate)");
         return of(httpMethod, httpMethod.name(), uriTemplate);
     }
 
@@ -118,7 +118,7 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
      */
     static IndexedRouteDeclaration of(String httpMethodName, String uriTemplate) {
-        RouteAssembly.httpMethodName(httpMethodName);
+        RouteArguments.httpMethodName(httpMethodName);
         HttpMethod httpMethod = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         return of(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), uriTemplate);

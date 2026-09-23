@@ -398,80 +398,6 @@ public final class RouteAssembly {
     }
 
     /**
-     * A standard HTTP method of a route: {@link HttpMethod#CUSTOM} stands for any custom method,
-     * which a route declares by its name.
-     *
-     * @param httpMethod The HTTP method
-     * @param byName     How to declare the route by the name of the method, for the message
-     * @return The HTTP method
-     * @throws NullPointerException     if it is {@code null}
-     * @throws IllegalArgumentException if it is {@link HttpMethod#CUSTOM}
-     */
-    public static HttpMethod standardMethod(@Nullable HttpMethod httpMethod, String byName) {
-        Objects.requireNonNull(httpMethod, "httpMethod");
-        if (httpMethod == HttpMethod.CUSTOM) {
-            throw new IllegalArgumentException("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, e.g. " + byName);
-        }
-        return httpMethod;
-    }
-
-    /**
-     * The name of the HTTP method of a route: a token, as the method of a request is.
-     *
-     * @param httpMethodName The name
-     * @return The name
-     * @throws NullPointerException     if it is {@code null}
-     * @throws IllegalArgumentException if it is empty or not a token, e.g. blank
-     */
-    public static String httpMethodName(@Nullable String httpMethodName) {
-        Objects.requireNonNull(httpMethodName, "httpMethodName");
-        if (httpMethodName.isEmpty() || !httpMethodName.chars().allMatch(RouteAssembly::isTokenChar)) {
-            throw new IllegalArgumentException("The name of an HTTP method must be a token, e.g. PROPFIND: '" + httpMethodName + "'");
-        }
-        return httpMethodName;
-    }
-
-    /**
-     * @param c A character
-     * @return Whether it is a {@code tchar} of RFC 9110
-     */
-    private static boolean isTokenChar(int c) {
-        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
-    }
-
-    /**
-     * The port of a handler route or of a group of handler routes: a port the server can listen
-     * on. Unlike {@code @Controller(port = ...)}, which ignores a negative port, and with
-     * {@code 0} opens a listener on a random port that the route cannot know, it is rejected.
-     *
-     * @param port The port
-     * @return The port
-     * @throws IllegalArgumentException if it is not between {@code 1} and {@code 65535}
-     */
-    public static int port(int port) {
-        if (port < 1 || port > 65_535) {
-            throw new IllegalArgumentException("The port of a route must be between 1 and 65535: " + port);
-        }
-        return port;
-    }
-
-    /**
-     * The name of an executor to run a route or a filter on.
-     *
-     * @param executorName The name
-     * @return The name
-     * @throws NullPointerException     if it is {@code null}
-     * @throws IllegalArgumentException if it is blank
-     */
-    public static String executorName(@Nullable String executorName) {
-        Objects.requireNonNull(executorName, "executorName");
-        if (executorName.isBlank()) {
-            throw new IllegalArgumentException("The name of an executor must not be blank");
-        }
-        return executorName;
-    }
-
-    /**
      * A URI template under a context path.
      *
      * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
@@ -1087,7 +1013,7 @@ public final class RouteAssembly {
             if (executorName == null) {
                 return null;
             }
-            RouteAssembly.executorName(executorName);
+            RouteArguments.executorName(executorName);
             return SupplierUtil.memoized(() -> {
                 ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
@@ -1231,7 +1157,7 @@ public final class RouteAssembly {
          * @param port The port
          */
         public void port(int port) {
-            RouteAssembly.port(port);
+            RouteArguments.port(port);
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
@@ -1635,7 +1561,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute executeOn(String executorName) {
-            this.executeOn = RouteAssembly.executorName(executorName);
+            this.executeOn = RouteArguments.executorName(executorName);
             this.nonBlocking = false;
             return this;
         }
@@ -1648,7 +1574,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
-            filters.before(filter, RouteAssembly.executorName(executorName));
+            filters.before(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
@@ -1666,7 +1592,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-            filters.after(filter, RouteAssembly.executorName(executorName));
+            filters.after(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
@@ -1713,7 +1639,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute port(int port) {
-            exposedPort(RouteAssembly.port(port));
+            exposedPort(RouteArguments.port(port));
             return this;
         }
 

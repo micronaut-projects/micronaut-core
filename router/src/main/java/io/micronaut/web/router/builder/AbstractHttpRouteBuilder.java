@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
@@ -328,7 +329,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
-        RouteAssembly.httpMethodName(httpMethodName);
+        RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
@@ -369,7 +370,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      */
     private static void standardMethod(HttpMethod method) {
         Objects.requireNonNull(method, "method");
-        RouteAssembly.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
+        RouteArguments.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
     }
 
     /**

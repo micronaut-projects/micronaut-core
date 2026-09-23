@@ -22,6 +22,7 @@ import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -160,7 +161,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute executeOn(String executorName) {
-        RouteAssembly.executorName(executorName);
+        RouteArguments.executorName(executorName);
         return configure(r -> r.executeOn(executorName));
     }
 
@@ -183,14 +184,14 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
-        RouteAssembly.executorName(executorName);
+        RouteArguments.executorName(executorName);
         Objects.requireNonNull(filter, "filter");
         return configure(r -> r.before(executorName, filter));
     }
 
     @Override
     public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-        RouteAssembly.executorName(executorName);
+        RouteArguments.executorName(executorName);
         Objects.requireNonNull(filter, "filter");
         return configure(r -> r.after(executorName, filter));
     }
@@ -240,7 +241,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute port(int port) {
-        exposePort.accept(RouteAssembly.port(port));
+        exposePort.accept(RouteArguments.port(port));
         return configure(r -> r.port(port));
     }
 
