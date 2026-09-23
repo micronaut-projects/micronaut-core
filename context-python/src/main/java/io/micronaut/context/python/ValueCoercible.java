@@ -56,6 +56,10 @@ public interface ValueCoercible extends Boxed<Value>, ProxyObject {
      * The returned value belongs to the runtime context that created this wrapper, except for
      * pooled wrappers where {@link PooledValueCoercible#asPolyglotValue(org.graalvm.polyglot.Context)}
      * can resolve an equivalent value for a specific event-loop context.
+     * <p>
+     * A generated wrapper that does not hold a Python object yet creates one on the first call, so
+     * the value is never {@code null}: the default methods of this interface and the generated
+     * accessors read it without a null check.
      *
      * @return The wrapped Python polyglot value.
      */

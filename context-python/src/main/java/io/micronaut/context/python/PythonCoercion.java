@@ -224,7 +224,7 @@ public final class PythonCoercion {
             }
             case ValueCoercible valueCoercible -> {
                 Value polyglotValue = valueCoercible.asPolyglotValue();
-                if (polyglotValue == null || isValueInContext(polyglotValue, context)) {
+                if (isValueInContext(polyglotValue, context)) {
                     return polyglotValue;
                 }
                 throw new IllegalArgumentException(

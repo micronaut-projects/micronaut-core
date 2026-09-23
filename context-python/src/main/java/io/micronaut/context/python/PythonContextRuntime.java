@@ -346,7 +346,7 @@ public final class PythonContextRuntime {
      */
     static @Nullable Value asyncBeanValue(ValueCoercible bean, Context targetContext) {
         Value source = bean.asPolyglotValue();
-        if (source == null || PythonConversion.isNone(source)) {
+        if (PythonConversion.isNone(source)) {
             return null;
         }
         PythonClassReference classReference = PYTHON_CLASS_REFERENCES.get(bean.getClass()).orElse(null);
