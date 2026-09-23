@@ -15,14 +15,13 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
@@ -426,17 +425,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
 
         @Override
-        public HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata) {
+        public HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
             for (HandlerUriRoute route : routes) {
                 route.annotationMetadata(annotationMetadata);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec implementing(ExecutableMethod<?, ?> method) {
-            for (HandlerUriRoute route : routes) {
-                route.implementing(method);
             }
             return this;
         }

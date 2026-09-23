@@ -301,8 +301,8 @@ public interface HttpRouteBuilder {
      * controllers and of {@link HttpRoutes} beans; within each level, the error route of the
      * closest exception type answers. So a group's error route for a supertype wins over a global
      * error route for the exact type, like the local error route of a controller does. A route
-     * that {@link HttpRouteSpec#implementing implements} a bean method first has the local
-     * error routes of the bean class. An error of a request no route matched, e.g. a
+     * that implements a bean method, see {@link HttpRouteSpec#annotationMetadata}, first has the
+     * local error routes of the bean class. An error of a request no route matched, e.g. a
      * {@code 404} or a {@code 405}, is answered by the global error routes only. A route table
      * built at runtime can declare error routes in its groups only.</p>
      *

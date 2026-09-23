@@ -19,6 +19,7 @@ import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpHeaders;
@@ -67,8 +68,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Framework features driven by the annotations of a route, on handler routes that get their annotations with
- * {@link io.micronaut.web.router.builder.HttpRouteSpec#annotationMetadata(AnnotationMetadata)} or
- * {@link io.micronaut.web.router.builder.HttpRouteSpec#implementing(io.micronaut.inject.ExecutableMethod)}:
+ * {@link io.micronaut.web.router.builder.HttpRouteSpec#annotationMetadata(AnnotationMetadataProvider)}, from the
+ * annotations of a method only, or from the bean method the route implements:
  * route versioning ({@link Version}), CORS ({@link CrossOrigin}) and its preflight, {@code OPTIONS} with
  * {@code Allow}, filter binding with a {@link FilterMatcher} annotation, and a security-style annotation read by a
  * server filter from the matched route. Each is checked against the equivalent controller.
@@ -341,8 +342,15 @@ public class HandlerRouteAnnotationsTest {
             this.targets = targets;
         }
 
-        private AnnotationMetadata metadataOf(String method) {
-            return beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod(method).getAnnotationMetadata();
+        private AnnotationMetadataProvider metadataOf(String method) {
+            // the annotations of the method, not the method: the route does not implement it
+            AnnotationMetadata metadata = beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod(method).getAnnotationMetadata();
+            return new AnnotationMetadataProvider() {
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return metadata;
+                }
+            };
         }
 
         @Override
@@ -365,11 +373,11 @@ public class HandlerRouteAnnotationsTest {
             });
             routes.path("/fn-implementing", group -> {
                 group.GET("/ping", (request, pathVariables) -> text(targets.pingV1()))
-                    .implementing(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV1"));
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV1"));
                 group.GET("/ping", (request, pathVariables) -> text(targets.pingV2()))
-                    .implementing(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV2"));
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("pingV2"));
                 group.GET("/admin", (request, pathVariables) -> text(targets.admin()))
-                    .implementing(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("admin"));
+                    .annotationMetadata(beanContext.getBeanDefinition(AnnotatedTargets.class).getRequiredMethod("admin"));
             });
         }
     }
