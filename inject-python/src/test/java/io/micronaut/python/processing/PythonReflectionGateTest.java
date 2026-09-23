@@ -164,6 +164,12 @@ final class PythonReflectionGateTest {
     }
 
     @Test
+    void theStubGeneratorClaimsTheOptionsSoJavacDoesNotReportThemAsUnrecognized() {
+        assertTrue(new PythonStubGenerator().getSupportedOptions().contains(PythonReflectionGate.OPTION));
+        assertTrue(new PythonStubGenerator().getSupportedOptions().contains(PythonReflectionGate.WARNINGS_OPTION));
+    }
+
+    @Test
     void refusedTypesAreSilentUnlessTheWarningsOptionAsksForTheNotes() {
         List<String> messages = new ArrayList<>();
         Element element = ClassElement.of(String.class);

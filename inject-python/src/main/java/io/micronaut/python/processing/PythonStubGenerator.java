@@ -294,6 +294,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return TypeElementQuery.onlyClass();
     }
 
+    /**
+     * The annotation processor options this visitor reads, so that javac does not report them as options
+     * no processor recognized - a warning, and with {@code -Werror} a compilation error, for a user who
+     * passes one of them.
+     *
+     * @return The names of the {@code -A} options of the reflection gate
+     */
+    @Override
+    public Set<String> getSupportedOptions() {
+        return Set.of(PythonReflectionGate.OPTION, PythonReflectionGate.WARNINGS_OPTION);
+    }
+
     @Override
     public void finish(VisitorContext visitorContext) {
         if (reflectionGate != null) {
