@@ -20,6 +20,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.web.router.RouteTable;
 
+import java.util.Objects;
 import java.util.function.Function;
 
 /**
@@ -84,6 +85,21 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, LocatedBodyRequestHandler<T, B> handler);
 
     /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param method   The HTTP method
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, String uri, Class<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(method, uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
      * Route requests with a submitted form to a handler function that receives the located target
      * and the whole form.
      *
@@ -131,6 +147,20 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, LocatedBodyRequestHandler<T, B> handler);
 
     /**
+     * Like the variant taking an {@link Argument}, with the body type as a class: {@code Argument.of(bodyType)}.
+     *
+     * @param route    The declaration of the route
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(RouteDeclaration route, Class<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(route, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
      * Bind a form handler function that receives the located target to a declared route.
      *
      * @param route   The declared route, relative to the prefix of the locator
@@ -150,6 +180,70 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
      * @see #handleAsync(RouteDeclaration, AsyncRequestHandler)
      */
     HttpRouteSpec handleAsync(RouteDeclaration route, LocatedAsyncRequestHandler<T> handler);
+
+    /**
+     * Like {@link #handle(HttpMethod, String, LocatedRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handle(HttpMethod method, LocatedRequestHandler<T> handler) {
+        return handle(method, "/", handler);
+    }
+
+    /**
+     * Like {@link #handle(HttpMethod, String, Argument, LocatedBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, Argument<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(method, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handle(HttpMethod, String, Class, LocatedBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, Class<B> bodyType, LocatedBodyRequestHandler<T, B> handler) {
+        return handle(method, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handleForm(HttpMethod, String, LocatedFormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleForm(HttpMethod method, LocatedFormRequestHandler<T> handler) {
+        return handleForm(method, "/", handler);
+    }
+
+    /**
+     * Like {@link #handleAsync(HttpMethod, String, LocatedAsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(HttpMethod method, LocatedAsyncRequestHandler<T> handler) {
+        return handleAsync(method, "/", handler);
+    }
 
     /**
      * Route the requests under a prefix to the routes of a target that a locator locates from the

@@ -524,10 +524,10 @@ class HandlerRouteWebSocketTest {
 
                 routes.webSocket("/ws/guarded", ws -> ws
                         .onOpen((session, request) -> session.sendAsync("allowed")))
-                    .before(request -> request.getHeaders().contains("X-Allow") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
+                    .beforeReplacing(request -> request.getHeaders().contains("X-Allow") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
 
                 routes.path("/ws/group", group -> {
-                    group.before(request -> request.getHeaders().contains("X-Group") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
+                    group.beforeReplacing(request -> request.getHeaders().contains("X-Group") ? null : HttpResponse.status(HttpStatus.FORBIDDEN));
                     group.webSocket("/{id}", ws -> ws
                             .onOpen((session, request) -> session.sendAsync("group " + session.getUriVariables().get("id", String.class).orElseThrow()
                                 + " " + RouteAttributes.getRouteInfo(request).flatMap(route -> route.getAttribute("kind", String.class)).orElse("-"))))

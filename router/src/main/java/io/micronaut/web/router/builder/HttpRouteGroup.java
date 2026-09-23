@@ -15,9 +15,14 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
 
 /**
@@ -30,9 +35,9 @@ import java.util.function.Predicate;
  *     api.GET("/orders", (request, pathVariables) -> HttpResponse.ok(orders.all()));
  *     api.path("/admin", admin -> {
  *         admin.GET("/users", (request, pathVariables) -> HttpResponse.ok(users.all()));
- *         admin.before(request -> isAdmin(request) ? null : HttpResponse.forbidden());
+ *         admin.beforeReplacing(request -> isAdmin(request) ? null : HttpResponse.forbidden());
  *     });
- *     api.before((request, propagatedContext) -> {
+ *     api.beforeReplacing((request, propagatedContext) -> {
  *         propagatedContext.add(new MdcPropagationContext(Map.of("tenant", tenantOf(request))));
  *         return null;
  *     });
@@ -107,6 +112,25 @@ public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec
     HttpRouteGroup port(int port);
 
     /**
+     * Route the requests on the port of a property, like {@code @Controller(port = "${my.admin.port}")},
+     * whose {@code port} member is a string: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * environment of the application like the port of a controller, when the routes are declared.
+     * Otherwise the same as {@link #port(int)}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * }</pre>
+     *
+     * @param port The port, or an expression that resolves to it
+     * @return This group
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(String port);
+
+    /**
      * Match the requests of the routes of the group that meet a condition only, see
      * {@link HttpRouteSpec#where(Predicate)}: a route of the group, including its locator routes
      * and the routes of its nested groups, matches a request that meets the conditions of its
@@ -154,4 +178,82 @@ public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec
      * @since 5.3.0
      */
     HttpRouteGroup attribute(String name, Object value);
+
+    /**
+     * Annotate the routes of the group, see {@link HttpRouteSpec#annotate(AnnotationValue)}:
+     * the routes of the group, and of its nested groups, have the annotation, wherever it is
+     * declared in the lambda; the annotation of a nested group or of a route overrides the members
+     * it sets.
+     *
+     * <pre>{@code
+     * routes.path("/payments", payments -> {
+     *     payments.annotate(Audited.class);
+     *     payments.POST("/{amount}", payHandler);
+     * });
+     * }</pre>
+     *
+     * @param annotationValue The annotation
+     * @param <T>             The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue);
+
+    /**
+     * Annotate the routes of the group, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the routes of the group with an annotation without members, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default HttpRouteGroup annotate(String annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+
+    /**
+     * Annotate the routes of the group, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the routes of the group with an annotation without members, e.g. a {@code @FilterMatcher}
+     * annotation, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(Class<T> annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
 }

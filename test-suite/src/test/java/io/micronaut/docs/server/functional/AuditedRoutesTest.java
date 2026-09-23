@@ -22,7 +22,10 @@ class AuditedRoutesTest {
 
     @BeforeAll
     static void start() {
-        server = ApplicationContext.run(EmbeddedServer.class, Map.of("spec.name", "AuditedRoutesTest"));
+        server = ApplicationContext.run(EmbeddedServer.class, Map.of(
+            "spec.name", "AuditedRoutesTest",
+            "micronaut.router.versioning.enabled", "true",
+            "micronaut.router.versioning.header.enabled", "true"));
         client = server.getApplicationContext().createBean(HttpClient.class, server.getURL());
     }
 
@@ -50,6 +53,18 @@ class AuditedRoutesTest {
         HttpResponse<String> prices = http.exchange(HttpRequest.GET("/prices"), String.class);
         assertEquals("prices", prices.body());
         assertNull(prices.getHeaders().get("X-Audited"));
+    }
+
+    @Test
+    void theVersionAnnotationOfARouteSelectsIt() {
+        BlockingHttpClient http = client.toBlocking();
+        HttpResponse<String> v1 = http.exchange(HttpRequest.GET("/receipts/7").header("X-API-VERSION", "1"), String.class);
+        assertEquals("receipt v1 7", v1.body());
+        assertNull(v1.getHeaders().get("X-Audited"));
+
+        HttpResponse<String> v2 = http.exchange(HttpRequest.GET("/receipts/7").header("X-API-VERSION", "2"), String.class);
+        assertEquals("receipt v2 7", v2.body());
+        assertEquals("true", v2.getHeaders().get("X-Audited"));
     }
 
     @Test

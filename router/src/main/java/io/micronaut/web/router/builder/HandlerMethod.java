@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -38,6 +39,7 @@ import io.micronaut.http.form.FormData;
 import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -120,6 +122,14 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private final AnnotationMetadata baseAnnotationMetadata;
     private AnnotationMetadata annotationMetadata;
     private @Nullable AnnotationMetadataProvider annotationMetadataProvider;
+    /**
+     * The annotations given to the route itself, see {@link HttpRouteSpec#annotate(AnnotationValue)}.
+     */
+    private final DefaultRouteAnnotations annotations = new DefaultRouteAnnotations();
+    /**
+     * The annotations of the innermost group of the route, which has those of the enclosing groups.
+     */
+    private @Nullable DefaultRouteAnnotations groupAnnotations;
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
@@ -394,13 +404,53 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     @Internal
     public void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
         Objects.requireNonNull(annotationMetadata, "annotationMetadata");
-        AnnotationMetadata metadata = Objects.requireNonNull(annotationMetadata.getAnnotationMetadata(), "annotationMetadata");
-        AnnotationMetadata base = baseAnnotationMetadata;
-        AnnotationMetadata effective = base == AnnotationMetadata.EMPTY_METADATA
-            ? metadata
-            // the given annotations override the ones of the base
-            : new AnnotationMetadataHierarchy(base, metadata);
+        Objects.requireNonNull(annotationMetadata.getAnnotationMetadata(), "annotationMetadata");
         this.annotationMetadataProvider = annotationMetadata;
+        updateAnnotationMetadata();
+    }
+
+    /**
+     * Give the route to the handler an annotation, see {@link HttpRouteSpec#annotate(AnnotationValue)}.
+     *
+     * @param annotation The annotation
+     */
+    @Internal
+    public void annotate(AnnotationValue<?> annotation) {
+        annotations.add(annotation);
+        updateAnnotationMetadata();
+    }
+
+    /**
+     * The annotations of the groups of the route, which the annotations of the route override,
+     * see {@link HttpRouteGroup#annotate(AnnotationValue)}.
+     *
+     * @param groupAnnotations The annotations of the innermost group, which has those of the enclosing groups
+     */
+    @Internal
+    public void groupAnnotations(DefaultRouteAnnotations groupAnnotations) {
+        this.groupAnnotations = Objects.requireNonNull(groupAnnotations, "groupAnnotations");
+        updateAnnotationMetadata();
+    }
+
+    /**
+     * The annotations of the route: of its element, then of its groups, then its own.
+     */
+    private void updateAnnotationMetadata() {
+        AnnotationMetadataProvider provider = annotationMetadataProvider;
+        AnnotationMetadata base = provider == null ? AnnotationMetadata.EMPTY_METADATA : provider.getAnnotationMetadata();
+        DefaultRouteAnnotations group = groupAnnotations;
+        List<DefaultRouteAnnotations> levels = group == null ? new ArrayList<>(1) : group.levels();
+        levels.add(annotations);
+        AnnotationMetadata metadata = DefaultRouteAnnotations.layered(base, levels);
+        if (provider == null && metadata.isEmpty()) {
+            this.annotationMetadata = baseAnnotationMetadata;
+            this.annotatedReturnType = null;
+            return;
+        }
+        AnnotationMetadata effective = baseAnnotationMetadata == AnnotationMetadata.EMPTY_METADATA
+            ? metadata
+            // the given annotations override the ones the route has whatever it is given, see #webSocket
+            : new AnnotationMetadataHierarchy(baseAnnotationMetadata, metadata);
         this.annotationMetadata = effective;
         // like the return type of a method, it has the annotations of the method
         this.annotatedReturnType = new AnnotatedReturnType<>(returnType, effective);

@@ -8,6 +8,9 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groups", indent=0
 <4> A nested group adds its prefix and its filters.
 <5> Filters of a single route, see the next section.
 <6> A response filter that replaces the response.
+<7> A route without a path is at the prefix of the group, `GET /api`, like a controller method mapped without a URI, e.g. `@Get`, is at the URI of its controller.
+
+Every shortcut has a form without a path: `GET(handler)`, `POST(Item.class, handler)`, `asyncGET(handler)`, `handle(HttpMethod.OPTIONS, handler)` and so on. The route is at the prefix of its group, at `/` outside of a group, under the context path, and at the prefix of the locator in the route table of a <<functionalRoutesLocators, located target>>.
 
 The rules of a group:
 

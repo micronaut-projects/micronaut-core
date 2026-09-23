@@ -169,6 +169,18 @@ class WebSocketRoutesTest {
     }
 
     @Test
+    void aWebSocketRouteWithoutAPathIsAtThePrefixOfItsGroupAndKeepsItsAnnotationsWhenAnnotated() {
+        Router router = router(routes -> routes.path("/chat", chat -> {
+            chat.annotate(Produces.class, produces -> produces.value("text/plain"));
+            chat.webSocket(ws -> ws.onOpen((session, request) -> null));
+        }));
+        UriRouteInfo<?, ?> route = route(router, HttpRequest.GET("/chat"));
+        assertEquals("/chat", route.getUriMatchTemplate().toString());
+        assertTrue(route.isWebSocketRoute());
+        assertTrue(route.getAnnotationMetadata().hasAnnotation(Produces.class));
+    }
+
+    @Test
     void theHandlersAreDeclaredOnceAndInTheLambda() {
         assertThrows(IllegalStateException.class, () -> router(routes -> routes.webSocket("/twice", ws -> ws
             .onMessage(String.class, (message, session) -> null)

@@ -17,34 +17,29 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.propagation.MutablePropagatedContext;
-import io.micronaut.http.HttpMessage;
 import io.micronaut.http.MutableHttpRequest;
-import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * An asynchronous filter of one route's requests that changes the propagated context, declared
- * with {@link HttpRouteSpec#beforeAsync(AsyncContextRouteRequestFilter)}: the
- * {@link AsyncRouteRequestFilter} that receives a {@link MutablePropagatedContext}. The change is
- * taken when the returned stage completes, so the filter can add an element once it looked
+ * An asynchronous filter of one route's requests that changes the request and the propagated
+ * context in place, declared with {@link HttpRouteSpec#beforeAsync(AsyncContextRouteRequestFilter)}:
+ * the {@link AsyncRouteRequestFilter} that receives a {@link MutablePropagatedContext}. The change
+ * is taken when the returned stage completes, so the filter can add an element once it looked
  * something up, e.g. the security context of a token it verified:
  *
  * <pre>{@code
  * routes.GET("/orders", handler).beforeAsync((request, propagatedContext) -> tokens.verify(request)
- *     .thenApply(user -> {
- *         propagatedContext.add(new UserContext(user));
- *         return null;
- *     }));
+ *     .thenAccept(user -> propagatedContext.add(new UserContext(user))));
  * }</pre>
  *
  * <p>The filter chain continues when the stage completes, possibly on another thread, with the
  * changed context in scope for the next filters, the route handler and the response filters.
- * It changes or replaces the request like a {@link RouteRequestFilter}.</p>
+ * A filter that also answers or replaces the request is an
+ * {@link AsyncContextReplacingRouteRequestFilter}.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
- * @see ContextRouteRequestFilter
  */
 @Experimental
 @FunctionalInterface
@@ -55,10 +50,8 @@ public interface AsyncContextRouteRequestFilter {
      *
      * @param request           The request, to change in place until the returned stage completes, see {@link RouteRequestFilter}
      * @param propagatedContext The propagated context, to change until the returned stage completes
-     * @return Completes with a response to answer the request with instead of the route, with a
-     * request to continue with instead of the request, or with {@code null} to proceed with the
-     * request; completing exceptionally is handled by the error routes
+     * @return Completes when the request continues; completing exceptionally is handled by the error routes
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends @Nullable HttpMessage<?>> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
+    CompletionStage<?> filter(MutableHttpRequest<?> request, MutablePropagatedContext propagatedContext) throws Exception;
 }
