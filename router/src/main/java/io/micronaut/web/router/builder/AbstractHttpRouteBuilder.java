@@ -27,6 +27,8 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
+import io.micronaut.websocket.route.WebSocketRouteEndpoint;
+import io.micronaut.websocket.route.WebSocketRouteSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -171,6 +173,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     @Override
     public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
         return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+    }
+
+    @Override
+    public final HttpRouteSpec webSocket(String uri, Consumer<WebSocketRouteSpec> endpoint) {
+        Objects.requireNonNull(endpoint, "endpoint");
+        String template = uri(uri);
+        WebSocketRouteEndpoint webSocket = WebSocketRouteEndpoint.of(template, endpoint);
+        // the route of the upgrade request: the server finds the endpoint in its attribute
+        HandlerUriRoute route = grouped(assembly.addRoute(HttpMethod.GET.name(), HttpMethod.GET, template, DEFAULT_CONSUMES,
+            handle(HandlerMethod.webSocket(webSocket, WebSocketRouteEndpoint.ROUTE_METADATA))));
+        route.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
+        return new Routes(route);
     }
 
     @Override

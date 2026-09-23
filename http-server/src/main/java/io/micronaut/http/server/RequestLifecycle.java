@@ -376,7 +376,37 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request, BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
         try {
-            List<GenericHttpFilter> httpFilters = routeExecutor.router.findFilters(request);
+            return runWithFilters(request, routeExecutor.router.findFilters(request), responseProvider);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * Run the filters for this request and its matched route, the filters of the route included
+     * (e.g. the filters of a route of the route builder and of its groups), and then run the
+     * given flow.
+     *
+     * @param request          The request
+     * @param routeMatch       The matched route
+     * @param responseProvider Downstream flow, runs inside the filters
+     * @return Execution flow that completes after the all the filters and the downstream flow
+     * @since 5.3.0
+     */
+    protected final ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request,
+                                                                  RouteMatch<?> routeMatch,
+                                                                  BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+        try {
+            return runWithFilters(request, routeExecutor.router.findFilters(request, routeMatch), responseProvider);
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    private ExecutionFlow<HttpResponse<?>> runWithFilters(HttpRequest<?> request,
+                                                          List<GenericHttpFilter> httpFilters,
+                                                          BiFunction<HttpRequest<?>, PropagatedContext, ExecutionFlow<HttpResponse<?>>> responseProvider) {
+        try {
             FilterRunner filterRunner = new FilterRunner(httpFilters, responseProvider) {
                 @Override
                 protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
