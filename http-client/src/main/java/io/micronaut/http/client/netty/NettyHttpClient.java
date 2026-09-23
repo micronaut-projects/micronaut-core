@@ -1386,21 +1386,55 @@ final class NettyHttpClient implements
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
+        return rawExchange(request, requestBody, blockedThread, null);
+    }
+
+    @Override
+    public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
+        Objects.requireNonNull(options, "options");
+        return rawExchange(request, requestBody, blockedThread, options);
+    }
+
+    private Mono<HttpResponse<?>> rawExchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> mono;
+        ExecutionFlow<HttpResponse<?>> flow = rawExchangeFlow(propagatedContext, request, body, blockedThread, options);
+        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
+        return toMono(flow, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * The flow of a raw exchange. Cancelling it before the response arrives aborts the request.
+     * The caller closes the request body when the flow completes or is cancelled.
+     *
+     * @param propagatedContext The propagated context
+     * @param request           The request metadata
+     * @param requestBody       The request body
+     * @param blockedThread     The thread that blocks on the response, if any
+     * @param options           The per-exchange options, or {@code null} for none
+     * @return The response flow
+     */
+    ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         try {
-            mono = sendRawExchange(
+            BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
+            if (options == null) {
+                return sendRawExchange(
+                    propagatedContext,
+                    blockHint,
+                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
+                );
+            }
+            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            applyOptions(rawRequest, options);
+            return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
                 propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body)
-            );
+                blockHint,
+                rawRequest
+            ), options.getResponseTimeout()).map(response -> RawHttpClientSupport.toMutableResponse(response, options));
         } catch (RuntimeException | Error e) {
-            body.close();
+            requestBody.close();
             throw e;
         }
-        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
-        return toMono(mono, propagatedContext).doFinally(signal -> body.close());
     }
 
     /**
@@ -1422,31 +1456,6 @@ final class NettyHttpClient implements
             rawRequest.uri(uri),
             (req, resp) -> ExecutionFlow.just(resp)
         ));
-    }
-
-    @Override
-    public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
-        Objects.requireNonNull(options, "options");
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> flow;
-        try {
-            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
-            applyOptions(rawRequest, options);
-            flow = RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
-                propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
-                rawRequest,
-                (req, resp) -> ExecutionFlow.just(resp)
-            ), options.getResponseTimeout());
-        } catch (RuntimeException | Error e) {
-            requestBody.close();
-            throw e;
-        }
-        return toMono(flow.map(response -> RawHttpClientSupport.toMutableResponse(response, options)), propagatedContext)
-            .doOnTerminate(requestBody::close);
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
