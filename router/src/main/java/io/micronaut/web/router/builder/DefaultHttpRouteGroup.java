@@ -15,12 +15,16 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -41,9 +45,11 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
      * @param filters  The filters of the group
      * @param settings The other settings of the group
      * @param prefix   The prefix of the URI templates of the routes, or {@code null}
+     * @param placeholderResolver Resolves the placeholders of the ports given as strings, or {@code null}
      */
-    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings, @Nullable RoutePrefix prefix) {
-        super(assembly, filters, settings, prefix);
+    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings, @Nullable RoutePrefix prefix,
+                          @Nullable PropertyPlaceholderResolver placeholderResolver) {
+        super(assembly, filters, settings, prefix, placeholderResolver);
         this.filters = filters;
         this.settings = settings;
     }
@@ -54,6 +60,11 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     void close() {
         filters.close();
         settings.close();
+    }
+
+    @Override
+    public HttpRouteGroup port(String port) {
+        return port(resolvePort(port));
     }
 
     @Override
@@ -75,25 +86,31 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
+    public <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue) {
+        settings.annotate(Objects.requireNonNull(annotationValue, "annotationValue"));
+        return this;
+    }
+
+    @Override
     public HttpRouteGroup attribute(String name, Object value) {
         settings.attribute(name, value);
         return this;
     }
 
     @Override
-    public HttpRouteGroup before(ContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacing(ContextReplacingRouteRequestFilter filter) {
         filters.before(filter, null);
         return this;
     }
 
     @Override
-    public HttpRouteGroup before(String executorName, ContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
         filters.before(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
     @Override
-    public HttpRouteGroup beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public HttpRouteGroup beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
         filters.beforeAsync(filter);
         return this;
     }

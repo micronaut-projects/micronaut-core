@@ -98,7 +98,11 @@ class NoStageTest {
     @Test
     void anAsynchronousFilterThatReturnsNoStageFailsWithAMessage() {
         assertFilterFails("The asynchronous request filter returned no stage",
+            routes -> routes.filter("/**").beforeReplacingAsync((AsyncReplacingRouteRequestFilter) request -> null));
+        assertFilterFails("The asynchronous request filter returned no stage",
             routes -> routes.filter("/**").beforeAsync((AsyncRouteRequestFilter) request -> null));
+        assertFilterFails("The asynchronous request filter returned no stage",
+            routes -> routes.filter("/**").beforeAsync((AsyncContextRouteRequestFilter) (request, context) -> null));
         assertFilterFails("The asynchronous response filter returned no stage",
             routes -> routes.filter("/**").afterReplacingAsync((AsyncReplacingRouteResponseFilter) (request, response) -> null));
         assertFilterFails("The asynchronous response filter returned no stage",

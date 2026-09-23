@@ -16,33 +16,29 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
+import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 /**
  * The {@link HttpRouteSpec}: the routes of a handler, one, or one per HTTP method, configured
  * together. The spec holds no state of its own, the routes do: it compares by its routes.
  *
  * @param routes The routes of the handler
+ * @param ports  Resolves a port given as a string, see {@link #port(String)}
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
-
-    /**
-     * @param route The route of the handler
-     * @return The spec of the route
-     */
-    static DefaultHttpRouteSpec of(HandlerUriRoute route) {
-        return new DefaultHttpRouteSpec(List.of(route));
-    }
+record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> ports) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
 
     @Override
     public HttpRouteSpec consumes(MediaType... mediaTypes) {
@@ -79,6 +75,15 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
+    public <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue) {
+        Objects.requireNonNull(annotationValue, "annotationValue");
+        for (HandlerUriRoute route : routes) {
+            route.annotate(annotationValue);
+        }
+        return this;
+    }
+
+    @Override
     public HttpRouteSpec responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
         for (HandlerUriRoute route : routes) {
@@ -101,6 +106,11 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
             route.nonBlocking();
         }
         return this;
+    }
+
+    @Override
+    public HttpRouteSpec port(String port) {
+        return port(ports.applyAsInt(port));
     }
 
     @Override
@@ -139,7 +149,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec before(ContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacing(ContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.before(filter);
         }
@@ -147,7 +157,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec before(String executorName, ContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.before(executorName, filter);
         }
@@ -155,7 +165,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public HttpRouteSpec beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
         for (HandlerUriRoute route : routes) {
             route.beforeAsync(filter);
         }

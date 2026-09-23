@@ -209,7 +209,7 @@ public class FilterMutatedBodyTest {
     static class Routes implements HttpRoutes {
         @Override
         public void routes(HttpRouteBuilder routes) {
-            routes.filter("/mb/**").before(request -> {
+            routes.filter("/mb/**").beforeReplacing(request -> {
                 String body = request.getHeaders().get(BODY);
                 if (body == null) {
                     return null;

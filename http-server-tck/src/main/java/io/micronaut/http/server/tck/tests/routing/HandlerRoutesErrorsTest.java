@@ -208,7 +208,7 @@ public class HandlerRoutesErrorsTest {
                     throw new CheckedFailure("checked failure");
                 });
             routes.GET("/errors/handler/filtered", (request, pathVariables) -> HttpResponse.ok("not reached"))
-                .before(request -> {
+                .beforeReplacing(request -> {
                     throw new CheckedFailure("checked failure");
                 });
 

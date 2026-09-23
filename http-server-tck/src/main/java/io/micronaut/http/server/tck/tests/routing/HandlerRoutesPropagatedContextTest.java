@@ -38,7 +38,6 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.slf4j.MDC;
 
@@ -294,13 +293,11 @@ public class HandlerRoutesPropagatedContextTest {
                 .before(request -> {
                     // a route filter runs with the context of the filters before it in scope
                     request.setAttribute("before", describeContext());
-                    return null;
                 })
                 .before((request, propagatedContext) -> {
                     String trace = request.getHeaders().get(TRACE);
                     propagatedContext.add(new RouteTrace("r-" + trace));
                     propagatedContext.add(new MdcPropagationContext(Map.of("trace", "route-" + trace)));
-                    return null;
                 })
                 .after((request, response) -> response
                     .header("X-Before", request.getAttribute("before", String.class).orElse("missing"))
@@ -319,7 +316,6 @@ public class HandlerRoutesPropagatedContextTest {
             routes.GET("/propagation/route-filter-blocking", (request, pathVariables) -> text(describe()))
                 .before(TaskExecutors.BLOCKING, (request, propagatedContext) -> {
                     propagatedContext.add(new RouteTrace("blocking-" + request.getHeaders().get(TRACE)));
-                    return null;
                 });
 
             routes.GET("/propagation/response-filter", (request, pathVariables) -> text(describe()))
@@ -352,9 +348,8 @@ public class HandlerRoutesPropagatedContextTest {
         private RouteFilters() {
         }
 
-        static @Nullable HttpResponse<?> addRouteTrace(HttpRequest<?> request, MutablePropagatedContext propagatedContext) {
+        static void addRouteTrace(HttpRequest<?> request, MutablePropagatedContext propagatedContext) {
             propagatedContext.add(new RouteTrace("r-" + request.getHeaders().get(TRACE)));
-            return null;
         }
     }
 }

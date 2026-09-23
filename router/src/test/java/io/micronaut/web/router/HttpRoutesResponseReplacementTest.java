@@ -182,7 +182,7 @@ class HttpRoutesResponseReplacementTest {
         Router router = router(routes -> {
             routes.GET("/ok", OK);
             routes.filter("/**").preMatching()
-                .before(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
                 .afterReplacing((request, response) -> response.code() == HttpStatus.OK.getCode()
                     ? null
                     : HttpResponse.status(HttpStatus.UNAUTHORIZED).header("X-Replaced", String.valueOf(response.code())));
