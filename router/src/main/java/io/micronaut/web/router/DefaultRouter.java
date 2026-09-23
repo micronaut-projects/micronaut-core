@@ -53,6 +53,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -1186,7 +1187,84 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 }
             }
         }
-        return hasLocators ? locateAny(request, matchedRoutes) : matchedRoutes;
+        List<UriRouteMatch<T, R>> selected = hasEngineSelectors && !matchedRoutes.isEmpty() ? selectAny(request, matchedRoutes) : matchedRoutes;
+        return hasLocators ? locateAny(request, selected) : selected;
+    }
+
+    /**
+     * Remove the matches that the route selector of their engine does not select, for each HTTP
+     * method: the allowed methods of a path, and whether a method is allowed, count only the routes
+     * the engine would route a request of that method to. As when the router finds the routes of a
+     * method, the selector is given the matches of the method whose content type and accepted
+     * types are compatible with the request, when they are all of its engine; otherwise the
+     * Micronaut policy selects and every match is kept. The matches whose types are not compatible
+     * are kept: they are the unsupported or not acceptable types of the path.
+     *
+     * @param request The request
+     * @param matches The matches of the path, of every method
+     * @return The matches, without the ones a route selector did not select
+     */
+    private <T, R> List<UriRouteMatch<T, R>> selectAny(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+        Map<String, List<UriRouteMatch<T, R>>> byMethod = new LinkedHashMap<>();
+        MediaType contentType = request.getContentType().orElse(null);
+        Collection<MediaType> accepted = request.accept();
+        for (UriRouteMatch<T, R> match : matches) {
+            if (isCompatible(match.getRouteInfo(), contentType, accepted)) {
+                byMethod.computeIfAbsent(match.getRouteInfo().getHttpMethodName(), method -> new ArrayList<>()).add(match);
+            }
+        }
+        List<UriRouteMatch<?, ?>> rejected = null;
+        for (List<UriRouteMatch<T, R>> candidates : byMethod.values()) {
+            RouteMatchSelector selector = sameEngineSelector(candidates);
+            if (selector == null) {
+                continue;
+            }
+            List<UriRouteMatch<T, R>> selected = select(selector, request, candidates);
+            for (UriRouteMatch<T, R> candidate : candidates) {
+                if (!isSelected(selected, candidate)) {
+                    if (rejected == null) {
+                        rejected = new ArrayList<>();
+                    }
+                    rejected.add(candidate);
+                }
+            }
+        }
+        if (rejected == null) {
+            return matches;
+        }
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (!containsIdentical(rejected, match)) {
+                result.add(match);
+            }
+        }
+        return result;
+    }
+
+    /**
+     * The checks of the types of {@link #findInternal(HttpRequest, String, String[])}, for a
+     * request of the method of the route.
+     */
+    private static boolean isCompatible(UriRouteInfo<?, ?> route, @Nullable MediaType contentType, Collection<MediaType> accepted) {
+        if (route.getHttpMethod().permitsRequestBody()
+            && (!route.isPermitsRequestBody() || (!route.consumesAll() && !route.doesConsume(contentType)))) {
+            return false;
+        }
+        return route.producesAll() || route.doesProduce(accepted);
+    }
+
+    /**
+     * @param selected The selected matches, possibly copies with a negotiated media type
+     * @param match    A candidate
+     * @return Whether the candidate was selected
+     */
+    private static boolean isSelected(List<? extends UriRouteMatch<?, ?>> selected, UriRouteMatch<?, ?> match) {
+        for (UriRouteMatch<?, ?> candidate : selected) {
+            if (candidate == match || candidate.getRouteInfo() == match.getRouteInfo()) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
