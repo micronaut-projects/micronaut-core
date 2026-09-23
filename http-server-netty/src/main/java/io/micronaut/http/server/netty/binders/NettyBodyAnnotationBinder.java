@@ -203,7 +203,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         NettyHttpRequest<?> formRequest = server instanceof NettyHttpRequest<?> netty ? netty : NettyHttpRequest.findBodyRequest(server);
         // the decoded body is kept by the Netty request it is read from, not by a request a filter
         // continued with
-        NettyHttpRequest<?> nhr = request == server ? formRequest : null;
+        NettyHttpRequest<?> nhr = request == server && formRequest == server ? formRequest : null;
         MessageBodyReader<T> reader = null;
         final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(request).orElse(null);
         if (routeInfo != null) {
