@@ -220,6 +220,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final Set<String> MICRONAUT_ANNOTATIONS_TO_COPY = Set.of("io.micronaut.context.annotation.PropertySource");
     private static final String MICRONAUT_PACKAGE_PREFIX = "io.micronaut.";
     /**
+     * The Micronaut annotations the compiler and the Java processing round act on, and the stereotypes
+     * that make an annotation one of them: a bean, a scope, a qualifier, an introspection, an advice or
+     * a configuration reader. They are served by the annotation metadata of the Python element and stay
+     * off the generated source, so that the visitors of the following Java round do not process the
+     * generated class a second time. Every other Micronaut annotation is reflection data of the type like
+     * a third-party one, copied when the {@link PythonReflectionGate} allows it.
+     *
+     * @see #MICRONAUT_PROCESSED_ANNOTATION_PACKAGES
+     */
+    private static final Set<String> MICRONAUT_PROCESSED_ANNOTATIONS = Set.of(
+        AnnotationUtil.SCOPE,
+        AnnotationUtil.QUALIFIER,
+        AnnotationUtil.ANN_AROUND,
+        AnnotationUtil.ANN_INTRODUCTION,
+        "io.micronaut.aop.InterceptorBinding",
+        "io.micronaut.context.annotation.Bean",
+        "io.micronaut.context.annotation.DefaultScope",
+        "io.micronaut.context.annotation.Executable",
+        "io.micronaut.context.annotation.Factory",
+        "io.micronaut.context.annotation.Requires",
+        "io.micronaut.core.annotation.Introspected",
+        ANN_CONFIGURATION_READER
+    );
+    /**
+     * The packages of the Micronaut annotations that describe the element to the compiler rather than
+     * the run time: the nullability, the visibility and the hints of {@code io.micronaut.core.annotation}
+     * ({@code @Introspected}, {@code @ReflectiveAccess}, {@code @Vetoed}, {@code @AllowsReflection}).
+     * They belong to the source the compiler reads, not to the source it writes.
+     */
+    private static final Set<String> MICRONAUT_PROCESSED_ANNOTATION_PACKAGES = Set.of("io.micronaut.core.annotation.");
+    /**
      * The dependency injection and common annotations Micronaut processes itself ({@code @Singleton},
      * {@code @Inject}, {@code @Named}, {@code @PostConstruct}, ...): served by the annotation metadata like
      * the Micronaut annotations, and kept off the generated source so that the vetoed generated class is
@@ -4069,15 +4100,50 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             || (copy == PythonReflectionGate.Copy.REFLECTIVE && reflectionGate(visitorContext).allows(typeName, annotationName, element));
     }
 
+    /**
+     * Whether a Micronaut annotation is one the compiler and the Java processing round act on, by being
+     * one of {@link #MICRONAUT_PROCESSED_ANNOTATIONS}, by belonging to one of
+     * {@link #MICRONAUT_PROCESSED_ANNOTATION_PACKAGES} or by carrying one of the former as a stereotype
+     * ({@code @Controller} is {@code @Executable}, {@code @Serdeable} is {@code @Introspected}).
+     *
+     * @param annotationName The annotation
+     * @param visitorContext The visitor context
+     * @return Whether the annotation stays off the generated source
+     */
+    private static boolean isMicronautProcessedAnnotation(String annotationName, VisitorContext visitorContext) {
+        if (MICRONAUT_PROCESSED_ANNOTATIONS.contains(annotationName)
+            || MICRONAUT_PROCESSED_ANNOTATION_PACKAGES.stream().anyMatch(annotationName::startsWith)) {
+            return true;
+        }
+        ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
+        if (annotationType == null) {
+            return true;
+        }
+        for (String stereotype : MICRONAUT_PROCESSED_ANNOTATIONS) {
+            if (annotationType.hasStereotype(stereotype)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
-            // Micronaut annotations are served by the annotation metadata, except the ones JUnit reads
-            // reflectively on the test class: @MicronautTest and the module test annotations that
-            // register their own extension through @ExtendWith
-            boolean copied = MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
+            // The ones a test framework reads reflectively on the test class are always copied:
+            // @MicronautTest and the module test annotations that register their own extension
+            // through @ExtendWith
+            if (MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
                 || MICRONAUT_ANNOTATION_PACKAGES_TO_COPY.stream().anyMatch(annotationName::startsWith)
-                || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext));
-            return copied ? PythonReflectionGate.Copy.ALWAYS : PythonReflectionGate.Copy.NEVER;
+                || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext))) {
+                return PythonReflectionGate.Copy.ALWAYS;
+            }
+            // The Micronaut annotations Micronaut itself processes are served by the annotation metadata;
+            // the rest is read reflectively from the class by the module that declares it
+            // (@TestResourcesProperties of micronaut-test-resources), so it is reflection data of the
+            // generated type and falls through to the gate like a third-party annotation
+            if (isMicronautProcessedAnnotation(annotationName, visitorContext)) {
+                return PythonReflectionGate.Copy.NEVER;
+            }
         }
         if (annotationName.startsWith(JAVA_LANG_PACKAGE_PREFIX)
             || TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)
