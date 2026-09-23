@@ -935,6 +935,41 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located asynchronously: {@link #locate(RouteTemplate, LocatorHandler, Function)}
+     * with the locator of {@link #locateAsync(String, AsyncLocatorHandler, Function)}.
+     *
+     * <pre>{@code
+     * routes.locateAsync(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * @param prefix   The template of the prefix
+     * @param locator  Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routesOf The routes of a located target
+     * @param <T>      The type of the target
+     * @since 5.3.0
+     */
+    <T> void locateAsync(RouteTemplate prefix, AsyncLocatorHandler<? extends T> locator, Function<? super T, ? extends LocatedRoutes<?>> routesOf);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to one set of
+     * routes of the targets a locator locates asynchronously, see
+     * {@link #locateAsync(RouteTemplate, AsyncLocatorHandler, Function)}.
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target later, or completes with {@code null} for {@code 404}
+     * @param routes  The routes of every located target
+     * @param <T>     The type of the target
+     * @since 5.3.0
+     */
+    default <T> void locateAsync(RouteTemplate prefix, AsyncLocatorHandler<? extends T> locator, LocatedRoutes<T> routes) {
+        Objects.requireNonNull(routes, "routes");
+        locateAsync(prefix, locator, target -> routes);
+    }
+
+    /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
      * every request whose path matches one of the patterns, e.g. {@code /**} or {@code /api/**},
      * whatever answers it, a controller, a handler route or a static resource, including the

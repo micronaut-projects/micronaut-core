@@ -338,6 +338,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables()));
     }
 
+    @Override
+    public final <T> void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler<? extends T> locator,
+                                      Function<? super T, ? extends LocatedRoutes<?>> routesOf) {
+        locate(prefixTemplate, new RouteLocator(locator, routesOf, assembly.locatedTables()));
+    }
+
     private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
         Objects.requireNonNull(prefixTemplate, "prefix");
         if (prefixTemplate.isMicronaut()) {

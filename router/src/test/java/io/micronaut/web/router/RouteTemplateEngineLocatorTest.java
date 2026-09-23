@@ -105,6 +105,26 @@ class RouteTemplateEngineLocatorTest {
     }
 
     @Test
+    void anAsynchronousLocatorOfAnotherEngineLocatesWhenItsStageCompletes() {
+        java.util.concurrent.CompletableFuture<Object> order = new java.util.concurrent.CompletableFuture<>();
+        Router router = RouteTemplateEngineOrderTest.router(null, routes -> {
+            routes.locateAsync(ColonRouteTemplateEngine.template("/orders/:id"), (request, variables) -> order, target -> items);
+            routes.locateAsync(RouteTemplate.micronaut("/done/{id}"), (request, variables) ->
+                java.util.concurrent.CompletableFuture.completedFuture("done"), target -> items);
+        });
+        HttpRequest<?> request = HttpRequest.GET("/orders/5/items/3");
+        RuntimeException pending = org.junit.jupiter.api.Assertions.assertThrows(RuntimeException.class, () -> router.findClosest(request));
+        java.util.concurrent.CompletionStage<?> stage = RouteLocator.pendingLocation(pending);
+        assertNotNull(stage);
+        order.complete("order-5");
+        UriRouteMatch<Object, Object> match = router.findClosest(request);
+        assertNotNull(match);
+        assertEquals(ColonRouteTemplateEngine.template("/items/:item"), match.getRouteInfo().getRouteTemplate());
+        assertEquals("5", match.getVariableValues().get("id"));
+        assertNotNull(router.findClosest(HttpRequest.GET("/done/1/items/3")));
+    }
+
+    @Test
     void aMicronautTemplateIsTheSameAsTheStringPrefix() {
         Router router = RouteTemplateEngineOrderTest.router(null, routes ->
             routes.locate(RouteTemplate.micronaut("/orders/{id}"), (request, variables) -> "order", target -> items));
