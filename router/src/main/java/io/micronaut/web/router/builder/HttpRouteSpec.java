@@ -132,13 +132,14 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      *
      * <pre>{@code
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))))
-     *     .where(request -> "csv".equals(request.getHeaders().get("X-Export")));
+     *     .where(RequestPredicates.header("X-Export", "csv"));
      * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
      * }</pre>
      *
      * <p>A request both routes of the example match, with the header, is ambiguous: the most
      * specific route answers it, and the two routes are equally specific, so it is answered with
-     * {@code 400}.</p>
+     * {@code 400}. {@link RequestPredicates} builds conditions on the headers, query parameters,
+     * media types and method of the request.</p>
      *
      * @param condition The condition
      * @return The route

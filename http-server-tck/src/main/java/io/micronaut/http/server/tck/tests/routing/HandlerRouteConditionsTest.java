@@ -18,6 +18,7 @@ package io.micronaut.http.server.tck.tests.routing;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
@@ -29,14 +30,17 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.RequestPredicates;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.function.Predicate;
 
 /**
  * The conditions of handler routes, {@link io.micronaut.web.router.builder.HttpRouteSpec#where}
- * and {@link io.micronaut.web.router.builder.HttpRouteGroup#where}, and the
+ * and {@link io.micronaut.web.router.builder.HttpRouteGroup#where}, built with
+ * {@link RequestPredicates} or not, and the
  * {@link RouteCondition} of the bean method a handler route implements: a request that does not
  * meet the conditions of a route is answered by another route, or as if the route did not exist.
  */
@@ -105,6 +109,28 @@ public class HandlerRouteConditionsTest {
         }
     }
 
+    @Test
+    void theRequestPredicatesSelectByQueryParameterHeaderAndAcceptedType() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/conditions/export?format=csv"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("csv export")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/conditions/export").accept(MediaType.TEXT_CSV_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("csv export")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/conditions/export?format=json").accept(MediaType.APPLICATION_JSON_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("default export")
+                .build());
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/conditions/export").header("X-Mode", "debug"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("debug export")
+                .build());
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -155,6 +181,12 @@ public class HandlerRouteConditionsTest {
                 .implementing(beanContext.getBeanDefinition(VariantTarget.class).getRequiredMethod("variantB"));
             routes.GET("/conditions/variant", (request, pathVariables) -> text("a"))
                 .where(request -> !"b".equals(request.getHeaders().get("X-Variant")));
+            Predicate<HttpRequest<?>> csv = RequestPredicates.queryParam("format", "csv")
+                .or(RequestPredicates.all(RequestPredicates.accept(MediaType.TEXT_CSV_TYPE), RequestPredicates.header(HttpHeaders.ACCEPT)));
+            Predicate<HttpRequest<?>> debug = RequestPredicates.header("X-Mode", value -> value.startsWith("debug"));
+            routes.GET("/conditions/export", (request, pathVariables) -> text("csv export")).where(csv);
+            routes.GET("/conditions/export", (request, pathVariables) -> text("debug export")).where(debug.and(csv.negate()));
+            routes.GET("/conditions/export", (request, pathVariables) -> text("default export")).where(RequestPredicates.any(csv, debug).negate());
         }
     }
 }

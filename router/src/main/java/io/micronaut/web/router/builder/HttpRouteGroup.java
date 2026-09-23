@@ -109,7 +109,7 @@ public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRo
      *
      * <pre>{@code
      * routes.path("/beta", beta -> {
-     *     beta.where(request -> request.getHeaders().contains("X-Beta"));
+     *     beta.where(RequestPredicates.header("X-Beta"));
      *     beta.GET("/search", betaSearchHandler);
      * });
      * }</pre>
