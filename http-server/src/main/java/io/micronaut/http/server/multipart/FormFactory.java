@@ -35,6 +35,7 @@ import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.multipart.StreamingFileUpload;
 import io.micronaut.http.server.HttpServerConfiguration;
+import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.scheduling.TaskExecutors;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
@@ -120,6 +121,8 @@ public final class FormFactory {
         if (completer != null) {
             return completer;
         }
+        // the fields cannot be read by name when a FormData or FormParts argument reads the form
+        FormBinding.checkFieldsCanBeRead(fchr);
         completer = new FormRouteCompleter(fchr);
         request.setAttribute(COMPLETER, completer);
         return completer;

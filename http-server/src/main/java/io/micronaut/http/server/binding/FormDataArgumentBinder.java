@@ -19,10 +19,8 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
@@ -37,6 +35,7 @@ import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.Disposable;
@@ -83,9 +82,8 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         if (!(source instanceof FormCapableHttpRequest<?> request) || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<FormData> future = collect(formFactory.get(), conversionService, request);
-
-        BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
+        // one form for the request, shared with the arguments taken from it
+        CompletableFuture<FormData> future = FormBinding.of(request).form(formFactory.get(), conversionService);
 
         return new PendingRequestBindingResult<>() {
 
@@ -130,8 +128,9 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         Map<String, List<FileUpload>> files = new LinkedHashMap<>();
         OwnedUploads owned = new OwnedUploads();
         // the request releases the files that were not consumed, also when collecting the form
-        // fails part way, or the handler is never called
-        request.addDisposalResource(owned::dispose);
+        // fails part way, or the handler is never called; it stops reading a form it no longer
+        // needs, and releases the files stored after it ended
+        request.addDisposalResource(owned::close);
         AtomicLong textBytes = new AtomicLong();
         CompletableFuture<FormData> result = new CompletableFuture<>();
         // the parts of a form arrive in order: each one is read or stored before the next
@@ -139,6 +138,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
             .then(Mono.fromSupplier(() -> form(fields, files, conversionService)))
             .subscribe(result::complete, result::completeExceptionally);
+        owned.reading(subscription);
         return new Collection(result, subscription);
     }
 
@@ -148,7 +148,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         return new DefaultFormData(fields, immutable, conversionService);
     }
 
-    private static void closeAll(List<FileUpload> uploads) {
+    private static void release(List<FileUpload> uploads) {
         DefaultFormData.closeAll(List.of(uploads)).whenComplete((ignored, error) -> {
             if (error != null) {
                 LOG.warn("Failed to release the uploaded files of a form", error);
@@ -174,7 +174,10 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             return factory.completeFileUpload(request, field).map(upload -> {
                 // the request disposes of the upload it completed: this takes over the content
                 FileUpload file = new DefaultFileUpload(new StoredUploadContent(upload.moveResource(), context));
-                owned.add(file);
+                if (!owned.add(file)) {
+                    // stored after the request ended
+                    release(List.of(file));
+                }
                 files.computeIfAbsent(name, k -> new ArrayList<>(1)).add(file);
                 return Boolean.TRUE;
             });
@@ -214,36 +217,50 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
     }
 
     /**
-     * The files of a form the request owns: those stored after the request was disposed of, by a
-     * collection that was still running, are released at once.
+     * The files of a form the request owns until it ends, and the reading of the form.
      */
     private static final class OwnedUploads {
         // guarded by this
         private final List<FileUpload> uploads = new ArrayList<>();
-        private boolean disposed;
+        private boolean closed;
+        private @Nullable Disposable reading;
 
-        void add(FileUpload upload) {
-            synchronized (this) {
-                if (!disposed) {
-                    uploads.add(upload);
-                    return;
-                }
+        synchronized boolean add(FileUpload upload) {
+            if (closed) {
+                return false;
             }
-            closeAll(List.of(upload));
+            uploads.add(upload);
+            return true;
         }
 
-        void dispose() {
-            List<FileUpload> owned;
+        void reading(Disposable subscription) {
+            boolean dispose;
             synchronized (this) {
-                if (disposed) {
+                dispose = closed;
+                reading = subscription;
+            }
+            if (dispose) {
+                subscription.dispose();
+            }
+        }
+
+        void close() {
+            List<FileUpload> owned;
+            Disposable subscription;
+            synchronized (this) {
+                if (closed) {
                     return;
                 }
-                disposed = true;
+                closed = true;
                 owned = List.copyOf(uploads);
-                uploads.clear();
+                subscription = reading;
+            }
+            if (subscription != null) {
+                // a form the request no longer needs: nothing to do once it was read
+                subscription.dispose();
             }
             if (!owned.isEmpty()) {
-                closeAll(owned);
+                release(owned);
             }
         }
     }

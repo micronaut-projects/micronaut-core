@@ -30,6 +30,7 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -70,6 +71,10 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         if (nettyRequest == null || !nettyRequest.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
+        if (FormBinding.isBound(context.getArgument())) {
+            // FileUpload, List<FileUpload>, FormPart and their Optional
+            return FormBinding.bind(context, nettyRequest, formFactory.get(), conversionService);
+        }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
             return completedFileUploadBinder.bind((ArgumentConversionContext) context, request);
         }
@@ -84,6 +89,11 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
     }
 
     static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, FormFactory formFactory, FormCapableHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
+        BindingResult<T> fromForm = FormBinding.bindField(conversionService, context, nettyRequest, formFactory, inputName);
+        if (fromForm != null) {
+            // the form is read whole by a FormData or FormParts argument of the route
+            return fromForm;
+        }
         FormRouteCompleter completer = formFactory.getOrCreateCompleter(nettyRequest);
         if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();
