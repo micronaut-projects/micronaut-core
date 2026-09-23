@@ -39,6 +39,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -48,7 +49,8 @@ import java.util.function.BooleanSupplier;
 
 /**
  * What cancelling a {@link RawHttpClient} exchange does, observed on the wire of a raw upstream:
- * cancelling the subscription to the exchange publisher.
+ * cancelling the subscription to the exchange publisher, or cancelling the future of the
+ * {@link io.micronaut.http.client.AsyncRawHttpClient} exchange. Both APIs behave the same.
  */
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -119,7 +121,7 @@ class RawClientCancellationTest {
             connection.write("HTTP/1.1 200 OK\r\nContent-Length: 10\r\n\r\nhello body");
             await(() -> exchange.response() != null, "No response");
 
-            // the subscription is already done
+            // the stage has already completed, the subscription is already done
             Assertions.assertFalse(exchange.cancel());
 
             try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) exchange.response()) {
@@ -213,6 +215,23 @@ class RawClientCancellationTest {
                     @Override
                     HttpResponse<?> response() {
                         return received.get();
+                    }
+                };
+            }
+        },
+        COMPLETION_STAGE {
+            @Override
+            Exchange start(RawHttpClient client, HttpRequest<?> request, CloseableByteBody body) {
+                CompletableFuture<HttpResponse<?>> future = client.toAsyncRaw().exchange(request, body).toCompletableFuture();
+                return new Exchange() {
+                    @Override
+                    boolean cancel() {
+                        return future.cancel(false);
+                    }
+
+                    @Override
+                    HttpResponse<?> response() {
+                        return future.isDone() && !future.isCompletedExceptionally() ? future.join() : null;
                     }
                 };
             }
