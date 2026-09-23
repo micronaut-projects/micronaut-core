@@ -173,7 +173,7 @@ public class HandlerRouteGroupErrorsTest {
                     throw new GroupErrorsFailure();
                 });
                 async.errorAsync(GroupErrorsFailure.class, (request, error) ->
-                    CompletableFuture.supplyAsync(() -> text(HttpStatus.CONFLICT, "async group")));
+                    CompletableFuture.completedFuture(text(HttpStatus.CONFLICT, "async group")));
             });
         }
     }
