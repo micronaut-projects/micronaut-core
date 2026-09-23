@@ -112,20 +112,20 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
      * @return Completes with the form
      */
     static CompletableFuture<FormData> collect(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
-        return start(factory, conversionService, request).result();
+        return start(UploadContext.of(factory, request), factory, conversionService, request).result();
     }
 
     /**
      * Start reading every field of the form of a request, like {@link #collect}, in a collection
      * that can be cancelled: the fields that were not read yet are discarded.
      *
+     * @param uploadContext     The context of the content of the fields
      * @param factory           The form factory
      * @param conversionService The conversion service of the form
      * @param request           The request, with a form body
      * @return The collection
      */
-    static Collection start(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
-        UploadContext uploadContext = UploadContext.of(factory, request);
+    static Collection start(UploadContext uploadContext, FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
         Map<String, List<String>> fields = new LinkedHashMap<>();
         Map<String, List<FileUpload>> files = new LinkedHashMap<>();
         OwnedUploads owned = new OwnedUploads();

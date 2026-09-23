@@ -269,7 +269,9 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public CompletionStage<FormData> form() {
         claim("form");
         try {
-            FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(binder.formFactory(), binder.conversionService, formRequest());
+            FormCapableHttpRequest<?> formRequest = formRequest();
+            FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(
+                UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding()), binder.formFactory(), binder.conversionService, formRequest);
             // a form the handler did not wait for is not read after the handler completed, nor
             // after the request ended; the files stored so far are owned by the request
             owned(() -> {
@@ -287,7 +289,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public FormParts parts() {
         claim("parts");
         FormCapableHttpRequest<?> formRequest = formRequest();
-        DefaultFormParts parts = new DefaultFormParts(formRequest, UploadContext.of(binder.formFactory(), formRequest));
+        DefaultFormParts parts = new DefaultFormParts(formRequest, UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding()));
         owned(parts::closeAsync, parts::close);
         return parts;
     }
@@ -351,8 +353,12 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         }
     }
 
+    /**
+     * @return The context of the body: the text is in the charset of the request of the route,
+     * like its content type
+     */
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), server);
+        return UploadContext.of(binder.formFactory(), server, request.getCharacterEncoding());
     }
 
     /**
