@@ -53,11 +53,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * An exception of a body writer, thrown before the response was sent, is handled once like an
- * exception of the route, without running the filters again. A writer that fails on the
- * response of that error answers a plain {@code 500}, and a writer that fails after the response
+ * exception of the route, without running the request filters again; the response filters run
+ * on the response of that error. A writer that fails on the response of that error answers the
+ * default {@code 500} error response, and a writer that fails after the response
  * was committed aborts it.
  */
 class BodyWriterExceptionTest {
@@ -91,7 +93,7 @@ class BodyWriterExceptionTest {
     }
 
     @Test
-    void writerExceptionIsHandledOnceWithoutRunningTheFiltersAgain() throws Exception {
+    void writerExceptionIsHandledOnceWithoutRunningTheRequestFiltersAgain() throws Exception {
         for (String source : SOURCES) {
             int handled = HANDLED.get();
             int requestFilter = REQUEST_FILTER.get();
@@ -102,21 +104,23 @@ class BodyWriterExceptionTest {
             assertEquals(HttpStatus.UNPROCESSABLE_ENTITY.getCode(), response.statusCode(), source);
             assertEquals("handled writer failure", response.body(), source);
             assertEquals(handled + 1, HANDLED.get(), source);
-            // the filters ran once, for the response the writer failed on
+            // the request filters ran once, for the response the writer failed on
             assertEquals(requestFilter + 1, REQUEST_FILTER.get(), source);
-            assertEquals(responseFilter + 1, RESPONSE_FILTER.get(), source);
+            // the response filters ran for the response the writer failed on and again for the
+            // response of the error that replaces it
+            assertEquals(responseFilter + 2, RESPONSE_FILTER.get(), source);
         }
     }
 
     @Test
-    void writerFailingOnTheErrorResponseAnswersAPlainInternalServerError() throws Exception {
+    void writerFailingOnTheErrorResponseAnswersTheDefaultInternalServerError() throws Exception {
         for (String source : SOURCES) {
             int handled = HANDLED.get();
 
             java.net.http.HttpResponse<String> response = get(source + "/error-response-fails");
 
             assertEquals(HttpStatus.INTERNAL_SERVER_ERROR.getCode(), response.statusCode(), source);
-            assertEquals("", response.body(), source);
+            assertTrue(response.body().contains("Internal Server Error"), source + ": " + response.body());
             // handled once, not again for the failure of writing the response of the handler
             assertEquals(handled + 1, HANDLED.get(), source);
         }
