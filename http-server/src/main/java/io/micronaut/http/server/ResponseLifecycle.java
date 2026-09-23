@@ -25,12 +25,14 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -134,6 +136,10 @@ public abstract class ResponseLifecycle {
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse) {
+        ExecutionFlow<? extends ByteBodyHttpResponse<?>> byteBodyResponse = encodeByteBodyResponse(nettyRequest, httpResponse);
+        if (byteBodyResponse != null) {
+            return byteBodyResponse;
+        }
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() != HttpMethod.HEAD && body != null) {
@@ -189,6 +195,70 @@ public abstract class ResponseLifecycle {
 
             return encodeNoBody(response);
         }
+    }
+
+    /**
+     * Pass through a response that already carries its body bytes, e.g. a response of the raw HTTP
+     * client returned by a route. The response may be wrapped in {@link HttpResponseWrapper}s, in
+     * which case the outermost wrapper provides the status and headers.
+     *
+     * @param request  The request
+     * @param response The response
+     * @return The encoded response, or {@code null} if the response does not carry body bytes
+     */
+    private @Nullable ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeByteBodyResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        ByteBodyHttpResponse<?> byteBodyResponse;
+        if (response instanceof ByteBodyHttpResponse<?> direct) {
+            byteBodyResponse = direct;
+        } else if (response instanceof HttpResponseWrapper<?> wrapper) {
+            byteBodyResponse = HttpResponseWrapper.wrappedByteBodyResponse(wrapper);
+            if (byteBodyResponse == null) {
+                return null;
+            }
+            if (!objectBodyOfWrappers(response).isEmpty()) {
+                // the object body of a wrapper replaces the bytes of the wrapped response
+                byteBodyResponse.close();
+                return null;
+            }
+        } else {
+            return null;
+        }
+        if (!byteBodyResponse.hasByteBody()) {
+            // an object body replaced the bytes, see MutableByteBodyHttpResponse
+            return null;
+        }
+        if (response.getHeaders() instanceof MutableHttpHeaders headers) {
+            // the transfer coding of the connection the bytes were received on (e.g. from an
+            // upstream server) does not apply to this one, whose framing the server decides
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        }
+        if (request.getMethod() == HttpMethod.HEAD) {
+            byteBodyResponse.close();
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyFactory.createEmpty()));
+        }
+        if (byteBodyResponse == response) {
+            return ExecutionFlow.just(byteBodyResponse);
+        }
+        return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyResponse.byteBody().move()));
+    }
+
+    /**
+     * The object body of the outermost wrapper that has one, above the wrapped
+     * {@link ByteBodyHttpResponse}.
+     *
+     * @param response The response
+     * @return The body, or empty
+     */
+    private static Optional<?> objectBodyOfWrappers(HttpResponse<?> response) {
+        HttpResponse<?> current = response;
+        while (current instanceof HttpResponseWrapper<?> wrapper) {
+            Optional<?> body = wrapper.getBody();
+            if (body.isPresent()) {
+                return body;
+            }
+            current = wrapper.getDelegate();
+        }
+        return Optional.empty();
     }
 
     /**
