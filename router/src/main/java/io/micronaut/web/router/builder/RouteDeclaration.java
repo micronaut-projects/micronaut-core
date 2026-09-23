@@ -81,9 +81,11 @@ public interface RouteDeclaration {
      * Declare a route in code. The route is registered like a generated declaration, built the
      * first time the router uses it.
      *
-     * @param httpMethod  The HTTP method
+     * @param httpMethod  The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom
+     *                    method is declared by its name, see {@link #of(String, String)}
      * @param uriTemplate The URI template
      * @return The declaration
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
     static RouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
         return IndexedRouteDeclaration.of(httpMethod, uriTemplate);
@@ -94,9 +96,10 @@ public interface RouteDeclaration {
      * {@code PROPFIND}. A standard name maps to its {@link HttpMethod}; any other name to
      * {@link HttpMethod#CUSTOM} with that name.
      *
-     * @param httpMethodName The name of the HTTP method
+     * @param httpMethodName The name of the HTTP method, a token
      * @param uriTemplate    The URI template
      * @return The declaration
+     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
      */
     static RouteDeclaration of(String httpMethodName, String uriTemplate) {
         return IndexedRouteDeclaration.of(httpMethodName, uriTemplate);

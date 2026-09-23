@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
+import io.micronaut.http.filter.ServerRequestView;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -44,14 +45,18 @@ public final class ServerRequestBody {
      * The server request whose bytes are the body of the given request.
      *
      * @param request The request
-     * @return The request itself if it is a server request, the server request it wraps, or
-     * {@code null} if there is none
+     * @return The request itself if it is a server request, the server request it wraps or is
+     * a mutable view of, see {@link ServerRequestView}, or {@code null} if there is none
      */
     public static @Nullable ServerHttpRequest<?> of(HttpRequest<?> request) {
         HttpRequest<?> current = request;
         while (true) {
             if (current instanceof ServerHttpRequest<?> server) {
                 return server;
+            }
+            if (current instanceof ServerRequestView view) {
+                // e.g. the mutable view of the request that a filter method continued with
+                return view.serverRequest();
             }
             if (current instanceof HttpRequestWrapper<?> wrapper) {
                 current = wrapper.getDelegate();

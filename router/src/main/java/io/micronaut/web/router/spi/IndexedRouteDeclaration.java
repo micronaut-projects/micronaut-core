@@ -22,7 +22,10 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.builder.RouteDeclaration;
+
+import java.util.Objects;
 
 /**
  * A {@link RouteDeclaration} generated at compile time, with the keys the router indexes and
@@ -91,11 +94,14 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * A declaration with the keys computed from the template, as the router computes them for a
      * route built at runtime.
      *
-     * @param httpMethod  The HTTP method
+     * @param httpMethod  The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom
+     *                    method is declared by its name, see {@link #of(String, String)}
      * @param uriTemplate The URI template
      * @return The declaration
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
     static IndexedRouteDeclaration of(HttpMethod httpMethod, String uriTemplate) {
+        RouteArguments.standardMethod(httpMethod, "RouteDeclaration.of(\"PROPFIND\", uriTemplate)");
         return of(httpMethod, httpMethod.name(), uriTemplate);
     }
 
@@ -104,17 +110,20 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
      * computed from the template. A standard name maps to its {@link HttpMethod}; any other name
      * to {@link HttpMethod#CUSTOM} with that name.
      *
-     * @param httpMethodName The name of the HTTP method
+     * @param httpMethodName The name of the HTTP method, a token
      * @param uriTemplate    The URI template
      * @return The declaration
+     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
      */
     static IndexedRouteDeclaration of(String httpMethodName, String uriTemplate) {
+        RouteArguments.httpMethodName(httpMethodName);
         HttpMethod httpMethod = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         return of(httpMethod, httpMethod == HttpMethod.CUSTOM ? httpMethodName : httpMethod.name(), uriTemplate);
     }
 
     private static IndexedRouteDeclaration of(HttpMethod httpMethod, String httpMethodName, String uriTemplate) {
+        Objects.requireNonNull(uriTemplate, "uriTemplate");
         UriTemplateMatcher matcher = new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString());
         return new DefaultRouteDeclaration(httpMethod, httpMethodName, uriTemplate, matcher.getRequiredPrefix(), matcher.getRawLength(), matcher.getPathVariableCount(), matcher.getPatternVariableCount());
     }

@@ -90,7 +90,8 @@ interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpe
     default S afterAsync(AsyncContextRouteResponseFilter filter) {
         Objects.requireNonNull(filter, "filter");
         return afterReplacingAsync((AsyncContextReplacingRouteResponseFilter) (request, response, propagatedContext) ->
-            filter.filter(request, response, propagatedContext).thenApply(ignored -> null));
+            Objects.requireNonNull(filter.filter(request, response, propagatedContext),
+                "The asynchronous response filter returned no stage").thenApply(ignored -> null));
     }
 
     @Override

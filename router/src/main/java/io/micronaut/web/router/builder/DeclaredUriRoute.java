@@ -23,6 +23,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -140,13 +141,13 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute consumes(MediaType... mediaType) {
         // a copy: changing the caller's array must not change the recorded configuration
-        MediaType[] mediaTypes = mediaType.clone();
+        MediaType[] mediaTypes = AbstractHttpRouteBuilder.mediaTypes(mediaType);
         return configure(r -> r.consumes(mediaTypes));
     }
 
     @Override
     public HandlerUriRoute produces(MediaType... mediaType) {
-        MediaType[] mediaTypes = mediaType.clone();
+        MediaType[] mediaTypes = AbstractHttpRouteBuilder.mediaTypes(mediaType);
         return configure(r -> r.produces(mediaTypes));
     }
 
@@ -157,11 +158,13 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+        Objects.requireNonNull(annotationMetadata, "annotationMetadata");
         return configure(r -> r.annotationMetadata(annotationMetadata));
     }
 
     @Override
     public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
+        Objects.requireNonNull(method, "method");
         return configure(r -> r.implementing(method));
     }
 
@@ -172,6 +175,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute executeOn(String executorName) {
+        RouteArguments.executorName(executorName);
         return configure(r -> r.executeOn(executorName));
     }
 
@@ -182,42 +186,51 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute before(ContextRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.before(filter));
     }
 
     @Override
     public HandlerUriRoute after(ContextReplacingRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.after(filter));
     }
 
     @Override
     public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
+        RouteArguments.executorName(executorName);
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.before(executorName, filter));
     }
 
     @Override
     public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
+        RouteArguments.executorName(executorName);
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.after(executorName, filter));
     }
 
     @Override
     public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.beforeAsync(filter));
     }
 
     @Override
     public HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
         return configure(r -> r.afterAsync(filter));
     }
 
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteFilters group) {
+        Objects.requireNonNull(group, "group");
         return configure(r -> r.inGroup(group));
     }
 
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteGroup group) {
-        this.group = group;
+        this.group = Objects.requireNonNull(group, "group");
         return configure(r -> r.inGroup(group));
     }
 
@@ -242,7 +255,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute port(int port) {
-        exposePort.accept(port);
+        exposePort.accept(RouteArguments.port(port));
         return configure(r -> r.port(port));
     }
 

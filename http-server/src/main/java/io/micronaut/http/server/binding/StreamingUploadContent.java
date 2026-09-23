@@ -142,8 +142,21 @@ final class StreamingUploadContent extends UploadContent {
         return CompletableFuture.completedFuture(null);
     }
 
-    private Publisher<ReadBuffer> source() {
-        return field.byteBody().toReadBufferPublisher();
+    /**
+     * Subscribe an operation to the content. A body that cannot be read fails the operation like
+     * the upstream would.
+     *
+     * @param subscriber The operation
+     */
+    private void subscribe(Subscriber<ReadBuffer> subscriber) {
+        Publisher<ReadBuffer> source;
+        try {
+            source = field.byteBody().toReadBufferPublisher();
+        } catch (Throwable e) {
+            subscriber.onError(e);
+            return;
+        }
+        source.subscribe(subscriber);
     }
 
     private static void closeAll(@Nullable List<ReadBuffer> buffers) {
@@ -164,6 +177,9 @@ final class StreamingUploadContent extends UploadContent {
         private @Nullable List<ReadBuffer> buffers = new ArrayList<>();
         private long total;
         private boolean done;
+        // start() subscribes, or subscribed: only onSubscribe may cancel the upstream, and the
+        // field must not be closed while the body is claimed
+        private boolean subscribes;
 
         Collect(long limit) {
             this.limit = limit;
@@ -175,8 +191,9 @@ final class StreamingUploadContent extends UploadContent {
                 if (done) {
                     return;
                 }
+                subscribes = true;
             }
-            source().subscribe(this);
+            subscribe(this);
         }
 
         @Override
@@ -270,6 +287,7 @@ final class StreamingUploadContent extends UploadContent {
         void abort() {
             List<ReadBuffer> discard;
             Subscription s;
+            boolean subscribing;
             synchronized (this) {
                 if (done) {
                     return;
@@ -278,11 +296,12 @@ final class StreamingUploadContent extends UploadContent {
                 discard = buffers;
                 buffers = null;
                 s = subscription;
+                subscribing = subscribes;
             }
             if (s != null) {
                 s.cancel();
-            } else {
-                // never subscribed: discard the content
+            } else if (!subscribing) {
+                // never subscribes: discard the content. Otherwise onSubscribe cancels
                 field.close();
             }
             closeAll(discard);
@@ -302,6 +321,8 @@ final class StreamingUploadContent extends UploadContent {
         private @Nullable Subscription subscription;
         private long total;
         private boolean done;
+        // see Collect
+        private boolean subscribes;
 
         StreamTransfer(OutputStream out, long limit) {
             this.out = out;
@@ -314,8 +335,9 @@ final class StreamingUploadContent extends UploadContent {
                 if (done) {
                     return;
                 }
+                subscribes = true;
             }
-            source().subscribe(this);
+            subscribe(this);
         }
 
         @Override
@@ -408,17 +430,19 @@ final class StreamingUploadContent extends UploadContent {
         @Override
         void abort() {
             Subscription s;
+            boolean subscribing;
             synchronized (this) {
                 if (done) {
                     return;
                 }
                 done = true;
                 s = subscription;
+                subscribing = subscribes;
             }
             if (s != null) {
                 s.cancel();
-            } else {
-                // never subscribed: discard the content
+            } else if (!subscribing) {
+                // never subscribes: discard the content. Otherwise onSubscribe cancels
                 field.close();
             }
             settle(null, new CancellationException("The " + describe() + " was closed"), null);
@@ -445,7 +469,13 @@ final class StreamingUploadContent extends UploadContent {
         private boolean stopped;
         // the one outcome of the transfer is being settled
         private boolean settling;
-        // only used by the disk tasks, which run in sequence
+        // start() subscribes, or subscribed: only onSubscribe may cancel the upstream, and the
+        // field must not be closed while the body is claimed on another thread
+        private boolean subscribes;
+        // only used by the disk tasks, which run in sequence, holding the disk lock, and by the
+        // cleanup after a rejection, which holds it too: a task queued after the rejected one
+        // can still run
+        private final Object disk = new Object();
         private @Nullable Path staging;
         private @Nullable OutputStream out;
 
@@ -461,23 +491,37 @@ final class StreamingUploadContent extends UploadContent {
                 if (stopped) {
                     return;
                 }
+                subscribes = true;
             }
             enqueue(() -> {
+                synchronized (this) {
+                    if (stopped) {
+                        // stopped before the file exists: the cleanup may have run already
+                        return;
+                    }
+                }
                 try {
                     staging = createStaging(destination);
                     out = Files.newOutputStream(staging);
                 } catch (IOException | RuntimeException e) {
                     fail(e, true);
                 }
-            });
-            source().subscribe(this);
+            }, null);
+            subscribe(this);
         }
 
-        private void enqueue(Runnable task) {
+        /**
+         * Queue a disk task after the previous one.
+         *
+         * @param task   The task
+         * @param buffer The buffer the task consumes: closed if the executor rejects the task
+         */
+        private void enqueue(Runnable task, @Nullable ReadBuffer buffer) {
+            DiskTask diskTask = new DiskTask(task);
             CompletableFuture<?> next;
             synchronized (this) {
                 next = tail.handleAsync((ignored, error) -> {
-                    task.run();
+                    diskTask.run();
                     return null;
                 }, executor);
                 tail = next;
@@ -485,6 +529,9 @@ final class StreamingUploadContent extends UploadContent {
             // the tasks handle their own failures: a failed task means the executor rejected it
             next.whenComplete((ignored, error) -> {
                 if (error != null) {
+                    if (buffer != null && !diskTask.ran()) {
+                        buffer.close();
+                    }
                     rejected(error instanceof CompletionException && error.getCause() != null ? error.getCause() : error);
                 }
             });
@@ -502,7 +549,7 @@ final class StreamingUploadContent extends UploadContent {
                 return;
             }
             // the first buffer is requested once the staging file is open
-            enqueue(() -> request(s));
+            enqueue(() -> request(s), null);
         }
 
         private void request(Subscription s) {
@@ -557,7 +604,7 @@ final class StreamingUploadContent extends UploadContent {
                 if (s != null) {
                     request(s);
                 }
-            });
+            }, buffer);
         }
 
         @Override
@@ -606,7 +653,7 @@ final class StreamingUploadContent extends UploadContent {
                     completeSize = size;
                 }
                 settleOnce(null, error, cleanupError);
-            });
+            }, null);
         }
 
         @Override
@@ -628,6 +675,7 @@ final class StreamingUploadContent extends UploadContent {
         private void fail(Throwable error, boolean cancel) {
             Subscription s;
             boolean upstreamWasDone;
+            boolean subscribing;
             synchronized (this) {
                 if (stopped) {
                     return;
@@ -636,11 +684,12 @@ final class StreamingUploadContent extends UploadContent {
                 upstreamWasDone = upstreamDone;
                 upstreamDone = true;
                 s = subscription;
+                subscribing = subscribes;
             }
             if (cancel && !upstreamWasDone) {
-                cancelUpstream(s);
+                cancelUpstream(s, subscribing);
             }
-            enqueue(() -> settleOnce(null, error, releaseStaging(null)));
+            enqueue(() -> settleOnce(null, error, releaseStaging(null)), null);
         }
 
         /**
@@ -651,6 +700,7 @@ final class StreamingUploadContent extends UploadContent {
         private void rejected(Throwable error) {
             Subscription s;
             boolean upstreamWasDone;
+            boolean subscribing;
             synchronized (this) {
                 if (settling) {
                     return;
@@ -659,17 +709,30 @@ final class StreamingUploadContent extends UploadContent {
                 upstreamWasDone = upstreamDone;
                 upstreamDone = true;
                 s = subscription;
+                subscribing = subscribes;
             }
             if (!upstreamWasDone) {
-                cancelUpstream(s);
+                cancelUpstream(s, subscribing);
             }
-            settleOnce(null, error, releaseStaging(null));
+            Throwable cleanupError;
+            synchronized (disk) {
+                // after the task that ran last; a task that still runs later skips its work
+                cleanupError = releaseStaging(null);
+            }
+            settleOnce(null, error, cleanupError);
         }
 
-        private void cancelUpstream(@Nullable Subscription s) {
+        /**
+         * @param s           The subscription, if there is one yet
+         * @param subscribing Whether start() subscribes or subscribed: then onSubscribe cancels,
+         *                    as the upstream is done, and closing the field here would race
+         *                    with the claim of its body
+         */
+        private void cancelUpstream(@Nullable Subscription s, boolean subscribing) {
             if (s != null) {
                 s.cancel();
-            } else {
+            } else if (!subscribing) {
+                // never subscribes: discard the content
                 field.close();
             }
         }
@@ -697,6 +760,33 @@ final class StreamingUploadContent extends UploadContent {
                 settling = true;
             }
             settle(value, error, cleanupError);
+        }
+
+        /**
+         * A disk task: runs holding the disk lock, and records that it ran.
+         */
+        private final class DiskTask implements Runnable {
+            private final Runnable work;
+            // guarded by disk
+            private boolean ran;
+
+            DiskTask(Runnable work) {
+                this.work = work;
+            }
+
+            @Override
+            public void run() {
+                synchronized (disk) {
+                    ran = true;
+                    work.run();
+                }
+            }
+
+            boolean ran() {
+                synchronized (disk) {
+                    return ran;
+                }
+            }
         }
     }
 }

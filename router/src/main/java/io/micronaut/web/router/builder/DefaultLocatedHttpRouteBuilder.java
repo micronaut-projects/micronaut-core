@@ -52,6 +52,14 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
         return targetType;
     }
 
+    /**
+     * Close the builder once the routes of the table were declared on it: a route declared on it
+     * later fails with an {@link IllegalStateException}, instead of being dropped.
+     */
+    public void close() {
+        closeBuilder();
+    }
+
     @Override
     public HttpRouteSpec handle(HttpMethod method, String uri, LocatedRequestHandler<T> handler) {
         Objects.requireNonNull(handler, "handler");

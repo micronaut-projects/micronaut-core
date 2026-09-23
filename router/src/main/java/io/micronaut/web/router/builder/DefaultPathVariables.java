@@ -26,6 +26,7 @@ import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Collections;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -34,7 +35,8 @@ import java.util.Set;
  * The {@link PathVariables} of a route match: its variable values, converted with its
  * conversion service.
  *
- * @param values            The variable values
+ * @param values            The variable values, a read-only view: the map of the match is shared
+ *                          with the other arguments bound from it
  * @param conversionService The conversion service of the route
  * @param locatedTarget     The target a locator returned for the route, or {@code null}
  * @param selectedMediaType The media type of the response a route selector negotiated, or {@code null}
@@ -46,6 +48,15 @@ public record DefaultPathVariables(Map<String, Object> values,
                                    ConversionService conversionService,
                                    @Nullable Object locatedTarget,
                                    @Nullable MediaType selectedMediaType) implements PathVariables {
+
+    /**
+     * @param values            The variable values, viewed read-only
+     * @param conversionService The conversion service of the route
+     * @param locatedTarget     The target a locator returned for the route, or {@code null}
+     */
+    public DefaultPathVariables {
+        values = Collections.unmodifiableMap(values);
+    }
 
     /**
      * @param values            The variable values
@@ -117,6 +128,7 @@ public record DefaultPathVariables(Map<String, Object> values,
 
     @Override
     public String toString() {
-        return values.toString();
+        Object target = locatedTarget;
+        return target == null ? "PathVariables" + values : "PathVariables" + values + " of " + target;
     }
 }

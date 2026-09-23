@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,11 @@ import java.util.function.Predicate;
  * <p>The filters of the route, see {@link RouteFilterSpec}, run after the application's filters and
  * the filters of the groups the route is declared in, closest to the route, and are resolved when
  * the route is built.</p>
+ *
+ * <p>The configuration of the route is read when the router is built, once the routes were
+ * declared: configure the route where it is declared, in {@link HttpRoutes#routes(HttpRouteBuilder)}
+ * or in the callback that builds a route table. A change made to a route kept after that is
+ * ignored.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -142,8 +147,11 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      *
      * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
      *
-     * @param port The port
+     * @param port The port, between {@code 1} and {@code 65535}: unlike
+     *             {@code @Controller(port = ...)}, a negative port or {@code 0}, a random port the
+     *             route could not match, is rejected
      * @return The route
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);

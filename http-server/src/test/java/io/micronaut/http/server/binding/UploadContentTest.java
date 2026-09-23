@@ -20,6 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -365,6 +367,76 @@ class UploadContentTest {
     }
 
     @Test
+    void aStagingFailureBeforeTheSubscriptionFailsWithItsCause() throws IOException {
+        // the disk thread fails to create the staging file before the caller subscribed: the
+        // caller still claims the body, and the upstream is cancelled when it subscribes
+        TestPublisher publisher = new TestPublisher();
+        ManualExecutor racing = new ManualExecutor();
+        racing.runInline = 1;
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(racing, Long.MAX_VALUE)));
+        Path existing = Files.writeString(directory.resolve("existing.txt"), "keep");
+        CompletionStage<Void> transfer = part.file().transferTo(existing);
+        assertTrue(publisher.cancelled, "the subscription is cancelled once it arrives");
+        racing.runAll();
+        assertInstanceOf(FileAlreadyExistsException.class, failure(transfer));
+        assertEquals("keep", Files.readString(existing));
+        join(part.closeAsync());
+        assertEquals(List.of(), leftovers());
+
+        TestPublisher second = new TestPublisher();
+        racing.runInline = 1;
+        FormPart missing = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(second)), context(racing, Long.MAX_VALUE)));
+        CompletionStage<Void> noDirectory = missing.file().transferTo(directory.resolve("missing").resolve("file.txt"));
+        racing.runAll();
+        assertInstanceOf(NoSuchFileException.class, failure(noDirectory));
+        assertTrue(second.cancelled);
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
+    void aWriteTheExecutorRejectsReleasesItsBuffer() throws IOException {
+        TestPublisher publisher = new TestPublisher();
+        ManualExecutor limited = new ManualExecutor();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(limited, Long.MAX_VALUE)));
+        Path destination = directory.resolve("rejected-write.txt");
+        CompletionStage<Void> transfer = part.file().transferTo(destination);
+        limited.runAll();
+        limited.reject = true;
+        UnwritableBuffer buffer = new UnwritableBuffer();
+        publisher.emit(buffer);
+        assertInstanceOf(RejectedExecutionException.class, failure(transfer));
+        assertTrue(buffer.closed, "the buffer of the write that never ran is released");
+        join(part.closeAsync());
+        assertEquals(List.of(), leftovers());
+    }
+
+    @Test
+    void aStoredUploadTheExecutorRejectsIsStillDeletedFromAnIoThread() throws Exception {
+        Executor rejecting = command -> {
+            throw new RejectedExecutionException("no I/O thread");
+        };
+        Path readTemporary = temporary("read");
+        CompletedFileUpload readUpload = CompletedFileUpload.ofFile(FILE, new TemporaryFileResource(readTemporary), Files.size(readTemporary));
+        FileUpload read = new DefaultFileUpload(new StoredUploadContent(readUpload, context(rejecting, Long.MAX_VALUE)));
+        Path closedTemporary = temporary("closed");
+        CompletedFileUpload closedUpload = CompletedFileUpload.ofFile(FILE, new TemporaryFileResource(closedTemporary), Files.size(closedTemporary));
+        FileUpload closed = new DefaultFileUpload(new StoredUploadContent(closedUpload, context(rejecting, Long.MAX_VALUE)));
+        Scheduler nonBlocking = Schedulers.newSingle("non-blocking");
+        try {
+            // an I/O thread cannot delete the file itself
+            CompletionStage<byte[]> bytes = CompletableFuture.supplyAsync(() -> read.bytes(100), nonBlocking::schedule).get();
+            assertInstanceOf(RejectedExecutionException.class, failure(bytes));
+            CompletionStage<Void> released = CompletableFuture.supplyAsync(closed::closeAsync, nonBlocking::schedule).get();
+            join(released);
+        } finally {
+            nonBlocking.dispose();
+        }
+        join(read.closeAsync());
+        assertFalse(Files.exists(readTemporary), "the file of the rejected read is deleted");
+        assertFalse(Files.exists(closedTemporary), "the file of the rejected release is deleted");
+    }
+
+    @Test
     void closingThePartAbortsAStreamingTransfer() throws IOException {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
@@ -500,6 +572,50 @@ class UploadContentTest {
     }
 
     @Test
+    void aDiskUploadIsNotReadBlockingOnAnIoThread() throws Exception {
+        Path temporary = temporary("on disk");
+        FileUpload disk = disk(temporary);
+        FileUpload memory = memory("in memory");
+        Scheduler nonBlocking = Schedulers.newSingle("non-blocking");
+        try {
+            CompletableFuture<Throwable> refused = CompletableFuture.supplyAsync(() -> {
+                try {
+                    disk.readString();
+                    return null;
+                } catch (Throwable e) {
+                    return e;
+                }
+            }, nonBlocking::schedule);
+            IllegalStateException e = assertInstanceOf(IllegalStateException.class, refused.get());
+            assertTrue(e.getMessage().contains("bytes(int)"), e.getMessage());
+            assertTrue(e.getSuppressed().length == 0, "one clear failure");
+            // content in memory does not block
+            CompletableFuture<String> read = CompletableFuture.supplyAsync(memory::readString, nonBlocking::schedule);
+            assertEquals("in memory", read.get());
+        } finally {
+            nonBlocking.dispose();
+        }
+        // the refused read did not claim the upload, nor release its file
+        assertTrue(Files.exists(temporary));
+        CompletionStage<byte[]> bytes = disk.bytes(100);
+        executor.runAll();
+        assertEquals("on disk", new String(join(bytes), StandardCharsets.UTF_8));
+        assertEquals(List.of(), temporaryFiles(), "the temporary file of the upload was released");
+    }
+
+    @Test
+    void aFailedBlockingReadReleasesTheUploadAndKeepsItsCause() throws IOException {
+        Path temporary = temporary("on disk");
+        FileUpload disk = disk(temporary);
+        // the file disappears: the read fails, and the failure of the release does not hide it
+        Files.delete(temporary);
+        UncheckedIOException e = assertThrows(UncheckedIOException.class, disk::readAllBytes);
+        assertInstanceOf(NoSuchFileException.class, e.getCause());
+        assertThrows(IllegalStateException.class, disk::readAllBytes);
+        join(disk.closeAsync());
+    }
+
+    @Test
     void anUploadThatIsStillArrivingIsNotReadBlocking() {
         TestPublisher publisher = new TestPublisher();
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
@@ -537,13 +653,22 @@ class UploadContentTest {
     private static final class ManualExecutor implements Executor {
         private final Queue<Runnable> tasks = new ArrayDeque<>();
         volatile boolean reject;
+        // the next tasks that run at once, like on another thread that is faster than the caller
+        volatile int runInline;
 
         @Override
-        public synchronized void execute(Runnable command) {
-            if (reject) {
-                throw new RejectedExecutionException("shut down");
+        public void execute(Runnable command) {
+            synchronized (this) {
+                if (reject) {
+                    throw new RejectedExecutionException("shut down");
+                }
+                if (runInline <= 0) {
+                    tasks.add(command);
+                    return;
+                }
+                runInline--;
             }
-            tasks.add(command);
+            command.run();
         }
 
         void runAll() {
