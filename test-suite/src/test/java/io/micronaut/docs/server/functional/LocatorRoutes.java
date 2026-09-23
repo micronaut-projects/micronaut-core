@@ -2,6 +2,7 @@ package io.micronaut.docs.server.functional;
 
 // tag::imports[]
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.RouteTable;
 import io.micronaut.web.router.RouteTableFactory;
@@ -33,6 +34,7 @@ public class LocatorRoutes implements HttpRoutes {
         "south", new Shop("south", List.of("juice")));
 
     private final RouteTable shopRoutes;
+    private final RouteTable typedShopRoutes;
 
     LocatorRoutes(RouteTableFactory tables) {
         shopRoutes = tables.buildLocatedHttpRoutes(shop -> { // <1>
@@ -41,6 +43,9 @@ public class LocatorRoutes implements HttpRoutes {
             shop.GET("/items/{index}", (request, pathVariables) ->
                 HttpResponse.ok(pathVariables.locatedTarget(Shop.class).items().get(pathVariables.getInt("index"))));
         });
+        typedShopRoutes = tables.buildLocatedHttpRoutes(Shop.class, shop -> // <5>
+            shop.handle(HttpMethod.GET, "/items/{index}", (request, pathVariables, located) ->
+                HttpResponse.ok(located.items().get(pathVariables.getInt("index")))));
     }
 
     @Override
@@ -50,6 +55,9 @@ public class LocatorRoutes implements HttpRoutes {
 
         routes.locateAsync("/remote-shops/{shop}", (request, pathVariables) -> // <4>
             CompletableFuture.supplyAsync(() -> SHOPS.get(pathVariables.getString("shop"))), shop -> shopRoutes);
+
+        routes.locate("/typed-shops/{shop}", (request, pathVariables) ->
+            SHOPS.get(pathVariables.getString("shop")), shop -> typedShopRoutes);
     }
 }
 // end::clazz[]

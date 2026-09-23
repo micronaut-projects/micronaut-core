@@ -6,6 +6,7 @@ snippet::io.micronaut.docs.server.functional.LocatorRoutes[tags="imports,clazz",
 <2> The handler reads the located target from its path variables.
 <3> `locate(prefix, locator, tables)`: the locator finds the target of the request, here from a path variable of the prefix, and the function selects the table of the target. `GET /shops/north/items/1` is answered by the route `/items/{index}` of the table, with the path variables of the prefix and of the route.
 <4> `locateAsync` takes a locator that returns a `CompletionStage` of the target, e.g. loaded from a database: the request is matched with the table when the stage completes, without blocking the thread that matched it.
+<5> A table for the targets of a type: its handlers receive the located target as an argument, see api:web.router.builder.LocatedHttpRouteBuilder[]. A located target of another type fails the request.
 
 A locator that answers `null`, or a stage that completes with `null`, is a `404`. A locator that throws, or a failed stage, is handled by the error routes. When the table has no route for the rest of the path, the request is answered like a request no route of the table matches: `404`, or `405`, `415` or `406` if a route of the table matches the path with another method or media type. No other route of the application is tried.
 

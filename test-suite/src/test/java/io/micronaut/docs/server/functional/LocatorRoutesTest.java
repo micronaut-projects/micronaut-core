@@ -52,5 +52,6 @@ class LocatorRoutesTest {
                 () -> http.retrieve(HttpRequest.DELETE(prefix + "/north/items/0")));
             assertEquals(HttpStatus.METHOD_NOT_ALLOWED, notAllowed.getStatus());
         }
+        assertEquals("tea", http.retrieve(HttpRequest.GET("/typed-shops/north/items/0")));
     }
 }
