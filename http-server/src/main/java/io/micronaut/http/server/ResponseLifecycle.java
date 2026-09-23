@@ -217,6 +217,9 @@ public abstract class ResponseLifecycle {
         if (routeInfo != null) {
             if (mediaType == null) {
                 mediaType = routeExecutor.resolveDefaultResponseContentType(request, routeInfo);
+                // the pieces are written in this type, so the response announces it, as it does when the
+                // route declares a Publisher body (RouteExecutor.processPublisherBody)
+                response.contentType(mediaType);
             }
             boolean isJsonRoute = mediaType.getExtension().equals(MediaType.EXTENSION_JSON) && routeInfo.isResponseBodyJsonFormattable();
             isJson = () -> isJsonRoute;
