@@ -44,7 +44,10 @@ import java.util.concurrent.CompletionStage;
  *
  * <p>Backpressure: {@link #next()} is called again only after the stage it returned completed,
  * and only while the bytes the connection has not taken yet stay below a high-water mark. A slow
- * client therefore pauses the source instead of buffering its elements.</p>
+ * client therefore pauses the source instead of buffering its elements. {@link #next()} is called
+ * on a thread of the server, usually the event loop of the connection, or on the thread that
+ * completed the previous stage: it must not block, and should return a stage that another thread
+ * completes if producing the element takes time.</p>
  *
  * <p>{@link #close()} is called once when the response ends: after the end, after a failure,
  * when the client disconnects, and when the body is not written at all (a {@code HEAD} request).
