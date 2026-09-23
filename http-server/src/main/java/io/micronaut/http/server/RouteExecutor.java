@@ -57,6 +57,7 @@ import io.micronaut.context.propagation.instrument.execution.ContextPropagatingE
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -389,6 +390,22 @@ public final class RouteExecutor {
             executor = null;
         }
         return executor;
+    }
+
+    /**
+     * The executor a streamed response body is published on. A URI route caches the executor its
+     * method selects, so this avoids selecting it (for {@code @ExecuteOn}, a bean lookup by name)
+     * for every streamed response. Other routes select it as before.
+     *
+     * @param routeInfo The route
+     * @return The executor, or {@code null}
+     */
+    @Nullable
+    private ExecutorService findStreamExecutor(RouteInfo<?> routeInfo) {
+        if (routeInfo instanceof DefaultUrlRouteInfo<?, ?> urlRouteInfo) {
+            return urlRouteInfo.getExecutor(serverConfiguration.getThreadSelection());
+        }
+        return findExecutor(routeInfo);
     }
 
     private <T> Flux<T> applyExecutorToPublisher(Publisher<T> publisher, @Nullable ExecutorService executor, PropagatedContext propagatedContext) {
@@ -781,7 +798,7 @@ public final class RouteExecutor {
 
         bodyPublisher = applyExecutorToPublisher(
             bodyPublisher,
-            findExecutor(routeInfo),
+            findStreamExecutor(routeInfo),
             propagatedContext
         ).contextWrite(cv -> ReactorPropagation.addPropagatedContext(cv, propagatedContext).put(ServerRequestContext.KEY, request));
 
