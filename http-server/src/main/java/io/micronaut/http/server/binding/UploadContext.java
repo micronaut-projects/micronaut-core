@@ -16,8 +16,8 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBodyFactory;
-import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.multipart.FormFactory;
 
@@ -43,7 +43,7 @@ record UploadContext(Executor ioExecutor,
                      int maxBufferSize,
                      long maxFileSize) {
 
-    static UploadContext of(FormFactory formFactory, FormCapableHttpRequest<?> request) {
+    static UploadContext of(FormFactory formFactory, ServerHttpRequest<?> request) {
         HttpServerConfiguration configuration = formFactory.getConfiguration();
         return new UploadContext(
             formFactory.getDiskWriteExecutor(),

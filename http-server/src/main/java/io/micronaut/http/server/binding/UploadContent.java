@@ -76,6 +76,13 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
         return Optional.ofNullable(metadata.mediaType());
     }
 
+    /**
+     * @return What the content is, in messages: the form field and its name
+     */
+    String describe() {
+        return "form field " + name();
+    }
+
     abstract OptionalLong size();
 
     abstract OptionalLong expectedSize();
@@ -181,10 +188,10 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
     // called holding the lock
     private void checkAvailable() {
         if (state == CLOSED) {
-            throw new IllegalStateException("The form field " + name() + " was closed");
+            throw new IllegalStateException("The " + describe() + " was closed");
         }
         if (state != AVAILABLE) {
-            throw new IllegalStateException("The content of form field " + name() + " was already consumed");
+            throw new IllegalStateException("The content of " + describe() + " was already consumed");
         }
     }
 

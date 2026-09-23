@@ -154,7 +154,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             handler,
             AsyncBodyRequestHandler.class,
             new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters())},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, bodyArgument(bodyType)},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
@@ -187,7 +187,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             handler,
             BodyRequestHandler.class,
             new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
-            new Argument<?>[]{REQUEST, PATH_VARIABLES, Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters())},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, bodyArgument(bodyType)},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
         );
@@ -393,6 +393,19 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
         return Argument.of(bodyType.getType(), bodyType.getName(),
             new AnnotationMetadataHierarchy(bodyType.getAnnotationMetadata(), NULLABLE), bodyType.getTypeParameters());
+    }
+
+    /**
+     * The body argument of a handler, bound like a {@code @Body} argument: annotated
+     * {@code @Body}, and {@code @Nullable} if the type is nullable.
+     *
+     * @param bodyType The body type
+     * @param <T>      The type
+     * @return The argument
+     */
+    @Internal
+    public static <T> Argument<T> bodyArgument(Argument<T> bodyType) {
+        return Argument.of(bodyType.getType(), BODY_ARGUMENT, bodyMetadata(bodyType), bodyType.getTypeParameters());
     }
 
     /**

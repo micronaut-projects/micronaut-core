@@ -81,20 +81,7 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         if (!(source instanceof FormCapableHttpRequest<?> request) || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
-        FormFactory factory = formFactory.get();
-        UploadContext uploadContext = UploadContext.of(factory, request);
-        Map<String, List<String>> fields = new LinkedHashMap<>();
-        Map<String, List<FileUpload>> files = new LinkedHashMap<>();
-        List<FileUpload> owned = Collections.synchronizedList(new ArrayList<>());
-        // the request releases the files that were not consumed, also when collecting the form
-        // fails part way, or the handler is never called
-        request.addDisposalResource(() -> closeOwned(owned));
-        AtomicLong textBytes = new AtomicLong();
-        // the parts of a form arrive in order: each one is read or stored before the next
-        CompletableFuture<FormData> future = Flux.from(request.getRawFormFields())
-            .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
-            .then(Mono.fromSupplier(() -> form(fields, files)))
-            .toFuture();
+        CompletableFuture<FormData> future = collect(formFactory.get(), conversionService, request);
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
 
@@ -112,7 +99,33 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         };
     }
 
-    private FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files) {
+    /**
+     * Read every field of the form of a request, keeping text fields as strings and storing file
+     * parts as {@link CompletedFileUpload}s. The request owns the files: it releases the files
+     * that were not consumed when it ends, also when collecting the form fails part way.
+     *
+     * @param factory           The form factory
+     * @param conversionService The conversion service of the form
+     * @param request           The request, with a form body
+     * @return Completes with the form
+     */
+    static CompletableFuture<FormData> collect(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
+        UploadContext uploadContext = UploadContext.of(factory, request);
+        Map<String, List<String>> fields = new LinkedHashMap<>();
+        Map<String, List<FileUpload>> files = new LinkedHashMap<>();
+        List<FileUpload> owned = Collections.synchronizedList(new ArrayList<>());
+        // the request releases the files that were not consumed, also when collecting the form
+        // fails part way, or the handler is never called
+        request.addDisposalResource(() -> closeOwned(owned));
+        AtomicLong textBytes = new AtomicLong();
+        // the parts of a form arrive in order: each one is read or stored before the next
+        return Flux.from(request.getRawFormFields())
+            .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
+            .then(Mono.fromSupplier(() -> form(fields, files, conversionService)))
+            .toFuture();
+    }
+
+    private static FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files, ConversionService conversionService) {
         Map<String, List<FileUpload>> immutable = new LinkedHashMap<>();
         files.forEach((name, list) -> immutable.put(name, List.copyOf(list)));
         return new DefaultFormData(fields, immutable, conversionService);

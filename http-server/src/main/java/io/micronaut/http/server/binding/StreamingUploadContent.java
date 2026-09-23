@@ -17,7 +17,10 @@ package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.multipart.FormFieldMetadata;
 import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -47,12 +50,48 @@ import java.util.concurrent.Executor;
 @Internal
 final class StreamingUploadContent extends UploadContent {
 
+    private static final String REQUEST_BODY = "request body";
+
     private final RawFormField field;
+    private final boolean requestBody;
     private volatile long completeSize = -1;
 
     StreamingUploadContent(RawFormField field, UploadContext context) {
+        this(field, context, false);
+    }
+
+    private StreamingUploadContent(RawFormField field, UploadContext context, boolean requestBody) {
         super(field.metadata(), context);
         this.field = field;
+        this.requestBody = requestBody;
+    }
+
+    /**
+     * The whole body of a request, read like the content of a form field: into memory with a
+     * limit, or to a file. It has no limit of its own.
+     *
+     * @param body        The body, owned by the content
+     * @param contentType The content type of the request
+     * @param context     The context
+     * @return The content
+     */
+    static StreamingUploadContent requestBody(CloseableByteBody body, @Nullable MediaType contentType, UploadContext context) {
+        return new StreamingUploadContent(new RawFormField(new FormFieldMetadata(REQUEST_BODY, null, contentType), body), context, true);
+    }
+
+    @Override
+    String describe() {
+        return requestBody ? REQUEST_BODY : super.describe();
+    }
+
+    /**
+     * @param limit    The limit
+     * @param received The bytes received so far
+     * @return The failure for content over the limit: like a buffered request body that is too
+     * large for the request body, and naming the field for a form field
+     */
+    private ContentLengthExceededException tooLarge(long limit, long received) {
+        return requestBody ? new ContentLengthExceededException(limit, received) : tooLarge(name(), limit);
     }
 
     @Override
@@ -164,7 +203,7 @@ final class StreamingUploadContent extends UploadContent {
                 if (s != null) {
                     s.cancel();
                 }
-                settle(null, tooLarge(name(), limit), null);
+                settle(null, tooLarge(limit, total), null);
             } else if (s != null) {
                 s.request(1);
             }
@@ -232,7 +271,7 @@ final class StreamingUploadContent extends UploadContent {
                 field.close();
             }
             closeAll(discard);
-            settle(null, new CancellationException("The form field " + name() + " was closed"), null);
+            settle(null, new CancellationException("The " + describe() + " was closed"), null);
         }
     }
 
@@ -342,7 +381,7 @@ final class StreamingUploadContent extends UploadContent {
             }
             if (tooLarge) {
                 buffer.close();
-                fail(tooLarge(name(), limit), true);
+                fail(tooLarge(limit, total), true);
                 return;
             }
             enqueue(() -> {
@@ -400,7 +439,7 @@ final class StreamingUploadContent extends UploadContent {
                     OutputStream o = out;
                     Path file = staging;
                     if (o == null || file == null) {
-                        throw new IOException("The staging file of form field " + name() + " was not created");
+                        throw new IOException("The staging file of " + describe() + " was not created");
                     }
                     out = null;
                     o.close();
@@ -428,7 +467,7 @@ final class StreamingUploadContent extends UploadContent {
                     return;
                 }
             }
-            fail(new CancellationException("The form field " + name() + " was closed"), true);
+            fail(new CancellationException("The " + describe() + " was closed"), true);
         }
 
         /**

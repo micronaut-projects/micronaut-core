@@ -16,6 +16,8 @@
 package io.micronaut.http;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.uri.UriMatchInfo;
 
@@ -103,6 +105,34 @@ public final class BasicHttpAttributes {
             request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));
         } else {
             request.setAttribute(ROUTE_WAITS_FOR, flowToAdd);
+        }
+    }
+
+    /**
+     * Run a binding outside the argument binding of a route: the conditions the binding adds
+     * with {@link #addRouteWaitsFor} are returned to the caller instead of delaying the route,
+     * and the conditions of the route are left as they were. Used to bind a value while the
+     * route runs, e.g. the body an asynchronous handler reads.
+     *
+     * @param request The request
+     * @param binding The binding
+     * @return What the binding waits for
+     * @since 5.3.0
+     */
+    @Internal
+    public static ExecutionFlow<?> detachRouteWaitsFor(HttpRequest<?> request, Runnable binding) {
+        MutableConvertibleValues<Object> attributes = request.getAttributes();
+        Object previous = attributes.getValue(ROUTE_WAITS_FOR);
+        attributes.remove(ROUTE_WAITS_FOR);
+        try {
+            binding.run();
+            return getRouteWaitsFor(request);
+        } finally {
+            if (previous == null) {
+                attributes.remove(ROUTE_WAITS_FOR);
+            } else {
+                attributes.put(ROUTE_WAITS_FOR, previous);
+            }
         }
     }
 }

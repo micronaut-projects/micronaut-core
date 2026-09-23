@@ -61,10 +61,20 @@ final class JsonChunkedProcessor {
                     s.error(e);
                 }
             }))
-            .doOnTerminate(this::releaseBuffers);
+            // also when the subscriber cancels, e.g. a reader that stops before the last element:
+            // the partial element and the elements and input not delivered yet are released
+            .doFinally(signal -> releaseBuffers())
+            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
+            .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 
-    private void releaseBuffers() {
+    private static void release(ByteBuffer<?> buffer) {
+        if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
+            buf.release();
+        }
+    }
+
+    private synchronized void releaseBuffers() {
         if (this.singleBuffer != null) {
             this.singleBuffer.release();
             this.singleBuffer = null;
