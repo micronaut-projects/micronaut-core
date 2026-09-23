@@ -16,6 +16,7 @@
 package io.micronaut.http.server.netty;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.propagation.PropagatedContext;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.execution.ImperativeExecutionFlow;
@@ -41,6 +42,7 @@ import java.net.URL;
 import java.nio.file.Paths;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.function.Function;
 
 @Internal
 final class NettyRequestLifecycle extends RequestLifecycle {
@@ -95,14 +97,17 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
         }
 
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler =
+            e -> propagatedContext.propagate(() -> onWriteError(request, e));
         ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
         if (imperativeFlow != null) {
             Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
             // usually this is a MutableHttpResponse, avoid scalability issues here
             HttpResponse<?> response = value instanceof NettyMutableHttpResponse<?> mut ? mut : (HttpResponse<?>) value;
-            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError());
+            rib.writeResponse(outboundAccess, request, response, imperativeFlow.getError(), writeErrorHandler);
         } else {
-            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable));
+            result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
     }
 

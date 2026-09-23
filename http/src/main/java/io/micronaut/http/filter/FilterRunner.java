@@ -254,6 +254,38 @@ public class FilterRunner {
         return flow.flatMap(context -> filterResponse(context, iterator, null));
     }
 
+    /**
+     * Run only the response filters, the pre-matching ones and then the others, in reverse order,
+     * on the given response, e.g. a response that replaces one the filters already ran for.
+     * Request filters and filters that wrap the downstream, like a filter method with a
+     * continuation or a legacy filter, do not run. May only be called once.
+     *
+     * @param request           The request
+     * @param response          The response to filter
+     * @param propagatedContext The propagated context
+     * @return The flow that completes after the response filters, with the final response
+     * @since 5.3.0
+     */
+    public final ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                                   HttpResponse<?> response,
+                                                                   PropagatedContext propagatedContext) {
+        List<InternalHttpFilter> filtersToRun = new ArrayList<>();
+        if (preMatchingFilters != null) {
+            filtersToRun.addAll(filterFilters(preMatchingFilters, request));
+        }
+        if (filters != null) {
+            filtersToRun.addAll(filterFilters(filters, request));
+        }
+        if (filtersToRun.isEmpty()) {
+            return ExecutionFlow.just(response);
+        }
+        return filterResponse(
+            new FilterContext(request, propagatedContext).withResponse(response),
+            filtersToRun.listIterator(filtersToRun.size()),
+            null
+        );
+    }
+
     private List<InternalHttpFilter> filterFilters(List<InternalHttpFilter> filters, HttpRequest<?> request) {
         // 1 free spot for the RouteMatchResolverHttpFilter
         List<InternalHttpFilter> filtersToRun = new ArrayList<>(filters.size() + 1);
