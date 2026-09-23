@@ -38,6 +38,11 @@ public sealed interface NettyRequestArgumentBinder<T> extends RequestArgumentBin
         if (source instanceof NettyHttpRequest<?> nettyHttpRequest) {
             return bindForNettyRequest(context, nettyHttpRequest);
         }
+        // e.g. the mutable view of the request that a filter changed the URI of in place
+        NettyHttpRequest<?> nettyHttpRequest = NettyHttpRequest.findBodyRequest(source);
+        if (nettyHttpRequest != null) {
+            return bindForNettyRequest(context, nettyHttpRequest);
+        }
         return BindingResult.EMPTY;
     }
 

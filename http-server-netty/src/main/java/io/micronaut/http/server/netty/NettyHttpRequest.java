@@ -31,6 +31,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -235,6 +236,41 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public MutableHttpRequest<T> mutate() {
         return new NettyMutableHttpRequest();
+    }
+
+    /**
+     * The Netty request whose body is the body of the given request, e.g. of the request a filter
+     * continued with after it changed the URI in place: the given request itself, the Netty request
+     * a {@link HttpRequestWrapper} wraps, or the Netty request of a {@link #mutate() mutable view}
+     * whose body the filter did not set. A request whose bytes are not those of the Netty request,
+     * e.g. a server request with another body, has none.
+     *
+     * @param request The request
+     * @return The Netty request, or {@code null} if the body of the request is not the body of one
+     * @since 5.3.0
+     */
+    @Internal
+    public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        // the first server request: its bytes are the body of the request
+        ServerHttpRequest<?> server = null;
+        while (true) {
+            if (current instanceof NettyHttpRequest<?> nettyRequest) {
+                return server == null || server.byteBody() == nettyRequest.byteBody() ? nettyRequest : null;
+            }
+            if (current instanceof NettyHttpRequest<?>.NettyMutableHttpRequest view) {
+                NettyHttpRequest<?> nettyRequest = view.request();
+                return view.body == null && (server == null || server.byteBody() == nettyRequest.byteBody()) ? nettyRequest : null;
+            }
+            if (server == null && current instanceof ServerHttpRequest<?> serverRequest) {
+                server = serverRequest;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return null;
+            }
+        }
     }
 
     @Override
@@ -808,6 +844,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         private MutableHttpParameters httpParameters;
         @Nullable
         private Object body;
+
+        /**
+         * @return The request this is the mutable view of
+         */
+        NettyHttpRequest<T> request() {
+            return NettyHttpRequest.this;
+        }
 
         @Override
         public void setConversionService(ConversionService conversionService) {
