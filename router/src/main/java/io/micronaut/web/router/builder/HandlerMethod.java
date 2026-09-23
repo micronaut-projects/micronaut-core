@@ -480,11 +480,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * Calls the handler.
-     *
-     * @param <R> The result type
-     */
-    /**
      * The return type of a handler route that was given annotations.
      *
      * @param returnType         The return type of the handler
@@ -519,6 +514,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
     }
 
+    /**
+     * Calls the handler.
+     *
+     * @param <R> The result type
+     */
     @FunctionalInterface
     private interface Invoker<R> {
         R invoke(@Nullable Object[] arguments) throws Exception;

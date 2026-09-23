@@ -117,10 +117,13 @@ public final class RouteTableFactory {
      * Build a route table of routes to handler functions, declared like the routes of an
      * {@link HttpRoutes} bean.
      *
-     * @param routes Declares the URI routes of the table. Status and error routes are not
-     *               supported: they belong to the application router
+     * @param routes Declares the URI routes of the table. Error and status routes declared in a
+     *               group are local to its routes and supported; global ones, declared on the
+     *               builder itself, server filters and ports are not: they belong to the
+     *               application router
      * @return The table
-     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     * @throws IllegalArgumentException if the routes declare global error or status routes,
+     *                                  server filters or ports
      */
     public RouteTable buildHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
@@ -139,10 +142,13 @@ public final class RouteTableFactory {
      * {@link io.micronaut.web.router.builder.PathVariables#locatedTarget()}: build it once per
      * type of target.
      *
-     * @param routes Declares the URI routes of the table, including other locator routes. Status
-     *               and error routes are not supported: they belong to the application router
+     * @param routes Declares the URI routes of the table, including other locator routes. Error
+     *               and status routes declared in a group are local to its routes and supported;
+     *               global ones, declared on the builder itself, server filters and ports are
+     *               not: they belong to the application router
      * @return The table
-     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     * @throws IllegalArgumentException if the routes declare global error or status routes,
+     *                                  server filters or ports
      * @since 5.3.0
      */
     public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {

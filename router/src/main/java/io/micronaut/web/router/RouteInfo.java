@@ -36,6 +36,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -363,6 +364,7 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     @Experimental
     default Optional<Object> getAttribute(String name) {
+        Objects.requireNonNull(name, "name");
         return Optional.ofNullable(getAttributes().get(name));
     }
 
@@ -377,6 +379,8 @@ public interface RouteInfo<R> extends AnnotationMetadataProvider {
      */
     @Experimental
     default <T> Optional<T> getAttribute(String name, Class<T> type) {
+        Objects.requireNonNull(name, "name");
+        Objects.requireNonNull(type, "type");
         Object value = getAttributes().get(name);
         return type.isInstance(value) ? Optional.of(type.cast(value)) : Optional.empty();
     }
