@@ -20,9 +20,9 @@ import io.micronaut.web.router.RouteAssembly;
 
 /**
  * The {@link HttpRouteBuilder}: adds the routes to handler functions to a {@link RouteAssembly},
- * like the legacy route builder adds its routes, without depending on it. It has no filter methods:
- * it is shared by the {@link HttpRoutes} beans, and a group, see {@link #group}, is the scope of
- * filters.
+ * like the legacy route builder adds its routes, without depending on it. It has no route filter
+ * methods: it is shared by the {@link HttpRoutes} beans, and a group, see {@link #group}, is the
+ * scope of route filters.
  *
  * @author Denis Stepanov
  * @since 5.3.0

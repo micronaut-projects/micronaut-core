@@ -179,6 +179,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final ServerFilterSpec filter(String... patterns) {
+        checkOpen();
+        // global: the prefix and the filters of a group do not apply
+        return new DefaultServerFilterSpec(assembly.addServerFilter(patterns));
+    }
+
+    @Override
     public final void group(Consumer<HttpRouteGroup> routes) {
         Objects.requireNonNull(routes, "routes");
         declareGroup(prefix, routes);

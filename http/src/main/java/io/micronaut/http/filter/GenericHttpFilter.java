@@ -114,6 +114,23 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     }
 
     /**
+     * A filter of one route, created with the methods above, as a server filter: sorted with the
+     * server filters by the given order, like a filter method of a {@code @ServerFilter} bean.
+     *
+     * @param routeFilter The filter of a route
+     * @param order       The order
+     * @return The server filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter withOrder(GenericHttpFilter routeFilter, int order) {
+        if (!(routeFilter instanceof RouteFunctionFilter filter)) {
+            throw new IllegalArgumentException("Not a filter of a route: " + routeFilter);
+        }
+        return filter.withOrder(order);
+    }
+
+    /**
      * Check if the filter is enabled.
      * @param filter The filter
      * @return true if enabled

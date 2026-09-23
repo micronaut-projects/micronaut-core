@@ -34,6 +34,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.RouteCondition;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.FilterPatternStyle;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
@@ -102,6 +103,8 @@ public final class RouteAssembly {
     private final Consumer<DefaultUriRoute> routeCreated;
     private final List<DeclaredUriRoute> declaredRoutes = new ArrayList<>(0);
     private final List<DeclaredUriRoute> implicitHeadDeclaredRoutes = new ArrayList<>(0);
+    private final List<ServerFilters> serverFilters = new ArrayList<>(0);
+    private final @Nullable String contextPath;
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
@@ -113,6 +116,22 @@ public final class RouteAssembly {
                          ConversionService conversionService,
                          UnaryOperator<String> routeUri,
                          Consumer<DefaultUriRoute> routeCreated) {
+        this(beanLocator, conversionService, routeUri, routeCreated, null);
+    }
+
+    /**
+     * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
+     * @param conversionService The conversion service
+     * @param routeUri          The URI template of a route that is not nested in another route, e.g. under the context path
+     * @param routeCreated      Called for every URI route when it is created, before any further configuration of it
+     * @param contextPath       The context path the patterns of the server filters are under, or {@code null}
+     */
+    public RouteAssembly(@Nullable Object beanLocator,
+                         ConversionService conversionService,
+                         UnaryOperator<String> routeUri,
+                         Consumer<DefaultUriRoute> routeCreated,
+                         @Nullable String contextPath) {
+        this.contextPath = contextPath;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
         this.routeCreated = routeCreated;
@@ -150,6 +169,35 @@ public final class RouteAssembly {
      */
     public List<ErrorRoute> errorRoutes() {
         return Collections.unmodifiableList(errorRoutes);
+    }
+
+    /**
+     * The server filters declared with {@link #addServerFilter(String...)}, one filter route per
+     * filter, as they are declared now.
+     *
+     * @return The filter routes
+     */
+    public List<FilterRoute> filterRoutes() {
+        if (serverFilters.isEmpty()) {
+            return List.of();
+        }
+        List<FilterRoute> routes = new ArrayList<>();
+        for (ServerFilters filters : serverFilters) {
+            filters.addFilterRoutes(routes);
+        }
+        return routes;
+    }
+
+    /**
+     * Add a server filter, like a {@code @ServerFilter} bean.
+     *
+     * @param patterns The patterns of the paths it filters
+     * @return The server filter, to add its filters to
+     */
+    public ServerFilters addServerFilter(String... patterns) {
+        ServerFilters filters = new ServerFilters(patterns);
+        serverFilters.add(filters);
+        return filters;
     }
 
     /**
@@ -669,6 +717,94 @@ public final class RouteAssembly {
         @Override
         public int hashCode() {
             return ObjectUtils.hash(super.hashCode(), statusCode, originatingClass);
+        }
+    }
+
+    /**
+     * A server filter declared in code, like a {@code @ServerFilter} bean: its request and
+     * response filters are filter routes with its patterns, methods and order.
+     */
+    @Internal
+    public final class ServerFilters {
+        private final List<String> patterns;
+        private final RouteFilters filters = new RouteFilters(null, executorName -> new ConfigurationException(
+            "No executor configured for name: " + executorName + ", of a server filter"));
+        private HttpMethod @Nullable [] methods;
+        private int order;
+        private FilterPatternStyle patternStyle = FilterPatternStyle.ANT;
+        private boolean appendContextPath = true;
+
+        ServerFilters(String... patterns) {
+            Objects.requireNonNull(patterns, "patterns");
+            if (patterns.length == 0) {
+                throw new IllegalArgumentException("A filter pattern is required");
+            }
+            for (String pattern : patterns) {
+                if (pattern == null || pattern.isEmpty()) {
+                    throw new IllegalArgumentException("A filter pattern must not be empty");
+                }
+            }
+            this.patterns = List.of(patterns);
+        }
+
+        /**
+         * @return The filters, to add the request and response filters to
+         */
+        public RouteFilters filters() {
+            return filters;
+        }
+
+        /**
+         * @param methods The methods of the requests to filter
+         */
+        public void methods(HttpMethod... methods) {
+            this.methods = methods.clone();
+        }
+
+        /**
+         * @param order The order among the server filters
+         */
+        public void order(int order) {
+            this.order = order;
+        }
+
+        /**
+         * @param patternStyle The style of the patterns
+         */
+        public void patternStyle(FilterPatternStyle patternStyle) {
+            this.patternStyle = Objects.requireNonNull(patternStyle, "patternStyle");
+        }
+
+        /**
+         * @param appendContextPath Whether the patterns are under the context path
+         */
+        public void appendContextPath(boolean appendContextPath) {
+            this.appendContextPath = appendContextPath;
+        }
+
+        private void addFilterRoutes(List<FilterRoute> routes) {
+            String path = RouteAssembly.this.contextPath;
+            List<String> resolved = patterns;
+            if (appendContextPath && path != null) {
+                resolved = patterns.stream()
+                    .map(pattern -> ServerFilterRouteBuilder.prependContextPath(path, pattern))
+                    .toList();
+            }
+            // like the filter methods of a filter bean: a filter route per filter, all with the same
+            // order, which the stable sort of the server filters keeps in the order of the chain
+            for (GenericHttpFilter filter : filters.chain()) {
+                GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
+                DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, false);
+                route.patternStyle(patternStyle);
+                for (String pattern : resolved) {
+                    route.pattern(pattern);
+                }
+                HttpMethod[] httpMethods = methods;
+                if (httpMethods != null) {
+                    route.methods(httpMethods);
+                }
+                routes.add(route);
+            }
         }
     }
 

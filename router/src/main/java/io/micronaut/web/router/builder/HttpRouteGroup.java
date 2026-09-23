@@ -41,7 +41,8 @@ import io.micronaut.core.annotation.Experimental;
  * The filters are resolved when the routes are built. The group is closed when its lambda
  * returns: declaring a route or a filter on it afterwards fails.</p>
  *
- * <p><b>Order.</b> The application's filters, the {@code @ServerFilter} beans, run first. Then the
+ * <p><b>Order.</b> The server filters, the {@code @ServerFilter} beans and the filters declared
+ * with {@link #filter(String...)}, run first. Then the
  * filters of the outer group, then those of the inner groups, then those of the route, then the
  * handler. Response filters run the other way: the filters of the route, then those of the inner
  * groups, then those of the outer group, then the application's response filters. Within a group
@@ -52,7 +53,9 @@ import io.micronaut.core.annotation.Experimental;
  * matched the request. A request under the prefix of the group that no route answers, a
  * {@code 404}, or one that a route of the group would answer with another method or media type, a
  * {@code 405}, {@code 415} or {@code 406}, does not run the filters of the group; a
- * {@code @ServerFilter("/api/**")} bean filters every request under a prefix.</p>
+ * {@code @ServerFilter("/api/**")} bean, or a server filter declared with
+ * {@code filter("/api/**")}, filters every request under a prefix. A server filter declared on a
+ * group is global: the prefix and the filters of the group do not apply to it.</p>
  *
  * <p><b>Errors.</b> An exception of a route of the group is answered by the error routes, and the
  * response filters of the group, like those of the route, filter the response of the error route. The error and status routes declared on a group,

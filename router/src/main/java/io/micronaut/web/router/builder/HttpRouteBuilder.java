@@ -472,10 +472,34 @@ public interface HttpRouteBuilder {
     void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
 
     /**
+     * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
+     * every request whose path matches one of the patterns, e.g. {@code /**} or {@code /api/**},
+     * whatever answers it, a controller, a handler route or a static resource, including the
+     * requests no route matches, ordered together with the filter beans. It is global wherever it
+     * is declared: the prefix and the filters of a {@link HttpRouteGroup} do not apply to it.
+     *
+     * <pre>{@code
+     * routes.filter("/**").order(100).before((request, propagatedContext) -> {
+     *     propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
+     *     return null;
+     * });
+     * }</pre>
+     *
+     * <p>Each call declares a new server filter. The server filters of an {@link HttpRoutes} bean
+     * are read when the router is built. A route table built at runtime cannot declare them.</p>
+     *
+     * @param patterns The patterns of the paths to filter, in the {@link ServerFilterSpec#patternStyle style} of the filter, {@code ANT} by default
+     * @return The server filter, to declare its filters on
+     * @see ServerFilterSpec
+     * @since 5.3.0
+     */
+    ServerFilterSpec filter(String... patterns);
+
+    /**
      * Declare a group of routes, whose filters apply to every route declared in the lambda,
      * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
-     * {@link HttpRoutes} bean has no filter methods of its own, as it is shared by the beans: the
-     * group is the scope of the filters.
+     * {@link HttpRoutes} bean has no route filter methods of its own, as it is shared by the beans:
+     * the group is the scope of the filters, see {@link #filter(String...)} for a server filter.
      *
      * <pre>{@code
      * routes.group(all -> {

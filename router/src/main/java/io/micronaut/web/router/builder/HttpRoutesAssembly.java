@@ -56,7 +56,7 @@ final class HttpRoutesAssembly implements AssembledRoutes {
                        List<HttpRoutes> routes,
                        @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         this.assembly = new RouteAssembly(executionHandleLocator, conversionService,
-            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath);
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         List<HttpRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);

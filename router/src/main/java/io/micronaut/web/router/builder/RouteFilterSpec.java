@@ -18,10 +18,12 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 
 /**
- * Filter methods of handler routes: the filters of one route, see {@link HttpRouteSpec}, and of
- * every route of a group, see {@link HttpRouteGroup}. A filter applies to the routes of what
- * declares it: the filter of a route to that route, the filter of a group to every route declared
- * in the group.
+ * Filter methods of handler routes: the filters of one route, see {@link HttpRouteSpec}, of
+ * every route of a group, see {@link HttpRouteGroup}, and of a server filter, see
+ * {@link ServerFilterSpec}. What declares a filter decides which requests it filters and when it
+ * runs among the other filters: the filter of a route filters the requests of that route, the
+ * filter of a group those of every route declared in the group, both after the server filters,
+ * and a server filter the requests its patterns match, ordered with the filter beans.
  *
  * <p>Request filters run in the order they are declared, and so do response filters, after the
  * route. A response filter also filters a response a request filter answered with instead of the
@@ -40,10 +42,10 @@ import io.micronaut.core.annotation.Experimental;
 public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
 
     /**
-     * Filter the requests, like a {@code @RequestFilter} method that applies to these routes only.
-     * The filters of a route and of its groups run after the application's filters, closest to the
-     * route: the filters of the outer group first, then those of the inner groups, then those of
-     * the route, each in the order they are declared.
+     * Filter the requests, like a {@code @RequestFilter} method. The filters of a route and of its
+     * groups run after the server filters, closest to the route: the filters of the outer group
+     * first, then those of the inner groups, then those of the route, each in the order they are
+     * declared.
      *
      * @param filter The filter, which can answer the request instead of the route
      * @return This
@@ -51,9 +53,9 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
     S before(RouteRequestFilter filter);
 
     /**
-     * Filter the responses, like a {@code @ResponseFilter} method that applies to these routes only.
-     * Response filters run after the route and before the application's response filters: the
-     * filters of the route first, then those of the inner groups, then those of the outer group,
+     * Filter the responses, like a {@code @ResponseFilter} method. The response filters of a route
+     * and of its groups run after the route and before the response filters of the server filters:
+     * the filters of the route first, then those of the inner groups, then those of the outer group,
      * each in the order they are declared.
      *
      * @param filter The filter

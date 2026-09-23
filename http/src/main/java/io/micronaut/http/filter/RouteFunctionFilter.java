@@ -44,6 +44,7 @@ import java.util.function.Supplier;
  * @param requestStep  The request filter
  * @param responseStep The response filter
  * @param executor     The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
+ * @param order        The order of the filter among the server filters, when it is one, see {@link #withOrder(int)}
  * @author Denis Stepanov
  * @since 5.3.0
  */
@@ -51,8 +52,29 @@ import java.util.function.Supplier;
 record RouteFunctionFilter(
     @Nullable RequestStep requestStep,
     @Nullable ResponseStep responseStep,
-    @Nullable Supplier<? extends Executor> executor
+    @Nullable Supplier<? extends Executor> executor,
+    int order
 ) implements InternalHttpFilter {
+
+    /**
+     * @param requestStep  The request filter
+     * @param responseStep The response filter
+     * @param executor     The executor to run the filter on, or {@code null}
+     */
+    RouteFunctionFilter(@Nullable RequestStep requestStep, @Nullable ResponseStep responseStep, @Nullable Supplier<? extends Executor> executor) {
+        // route filters are not sorted: they run after the application's filters, in the order declared
+        this(requestStep, responseStep, executor, Ordered.LOWEST_PRECEDENCE);
+    }
+
+    /**
+     * The filter as a server filter, sorted with the server filters by its order.
+     *
+     * @param order The order
+     * @return The filter
+     */
+    RouteFunctionFilter withOrder(int order) {
+        return new RouteFunctionFilter(requestStep, responseStep, executor, order);
+    }
 
     /**
      * A synchronous request filter.
@@ -205,8 +227,7 @@ record RouteFunctionFilter(
 
     @Override
     public int getOrder() {
-        // route filters are not sorted: they run after the application's filters, in the order declared
-        return Ordered.LOWEST_PRECEDENCE;
+        return order;
     }
 
     /**

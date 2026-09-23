@@ -142,7 +142,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         for (AssembledRoutes routes : assembled) {
             RouteAssembly assembly = routes.routes();
-            routeSets.add(new RouteSet(assembly.uriRoutes(), assembly.statusRoutes(), assembly.errorRoutes(), List.of(),
+            routeSets.add(new RouteSet(assembly.uriRoutes(), assembly.statusRoutes(), assembly.errorRoutes(), assembly.filterRoutes(),
                 assembly.lazyRouteInfos(), assembly.exposedPorts()));
         }
         for (RouteSet routeSet : routeSets) {
