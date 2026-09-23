@@ -71,7 +71,8 @@ public final class HttpRequestFactory {
             builder.GET();
         } else {
             HttpRequest.BodyPublisher bodyPublisher = publisherForRequest(mutableHttpRequest, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
-            builder.method(mutableHttpRequest.getMethod().toString(), bodyPublisher);
+            // the name of a custom method, e.g. PROPFIND, not CUSTOM
+            builder.method(mutableHttpRequest.getMethodName(), bodyPublisher);
         }
         mutableHttpRequest.getHeaders().forEach((name, values) -> values.forEach(value -> builder.header(name, value)));
         if (mutableHttpRequest.getContentType().isEmpty()) {
