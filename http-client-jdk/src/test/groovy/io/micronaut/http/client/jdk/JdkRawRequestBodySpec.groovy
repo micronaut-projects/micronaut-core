@@ -4,6 +4,7 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.Nullable
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
+import io.micronaut.core.io.buffer.ReadBufferFactory
 import io.micronaut.http.ByteBodyHttpResponse
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.MediaType
@@ -17,6 +18,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody
 import io.micronaut.http.client.RawHttpClient
 import io.micronaut.http.client.exceptions.HttpClientException
 import io.micronaut.runtime.server.EmbeddedServer
+import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.AutoCleanup
 import spock.lang.Shared
@@ -105,9 +107,55 @@ class JdkRawRequestBodySpec extends Specification {
         client?.close()
     }
 
+    void "the request body is released when the exchange cannot be built"() {
+        given:
+        RawHttpClient client = server.applicationContext.createBean(RawHttpClient)
+        Map body = body("unsent")
+        HttpRequest<?> request = Stub(HttpRequest) {
+            toMutableRequest() >> { throw new IllegalStateException("cannot build") }
+        }
+
+        when:
+        client.exchange(request, body.body, null)
+
+        then:
+        IllegalStateException e = thrown()
+        e.message == "cannot build"
+        body.closed()
+
+        cleanup:
+        client?.close()
+    }
+
+    void "a request body of unknown length is streamed and released"() {
+        given:
+        RawHttpClient client = server.applicationContext.createBean(RawHttpClient)
+        Map body = body(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(
+            Flux.just(ReadBufferFactory.getJdkFactory().copyOf("streamed", StandardCharsets.UTF_8))))
+
+        expect:
+        !body.body.expectedLength().present
+
+        when:
+        ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) Mono.from(client.exchange(
+            HttpRequest.POST(server.URI.toString() + "/raw-body/length", null).contentType(MediaType.TEXT_PLAIN_TYPE), body.body, null)).block()
+
+        then:
+        response.code() == 200
+        response.byteBody().buffer().get().toString(StandardCharsets.UTF_8) == "length=8"
+        body.closed()
+
+        cleanup:
+        response?.close()
+        client?.close()
+    }
+
     private static Map body(String content) {
+        return body(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(content.getBytes(StandardCharsets.UTF_8)))
+    }
+
+    private static Map body(CloseableByteBody delegate) {
         boolean closed = false
-        CloseableByteBody delegate = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(content.getBytes(StandardCharsets.UTF_8))
         CloseableByteBody tracked = new CloseableByteBody() {
             @Delegate(excludes = ['close'])
             CloseableByteBody wrapped = delegate

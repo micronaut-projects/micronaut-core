@@ -16,7 +16,7 @@
 package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
@@ -50,17 +50,20 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
         // null is equivalent to an empty body
-        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]) : requestBody;
-        Flux<? extends HttpResponse<?>> response;
+        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
+        boolean built = false;
         try {
-            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
-        } catch (RuntimeException | Error e) {
-            body.close();
-            throw e;
+            Flux<? extends HttpResponse<?>> response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
+            built = true;
+            // the body is released however the exchange ends, also when the JDK client never reads
+            // it, e.g. because the connection was refused or the request is a GET
+            return response.doFinally(signal -> body.close());
+        } finally {
+            if (!built) {
+                // building the exchange failed, so nothing else releases the body
+                body.close();
+            }
         }
-        // the body is released however the exchange ends, also when the JDK client never reads
-        // it, e.g. because the connection was refused or the request is a GET
-        return response.doFinally(signal -> body.close());
     }
 
     @Override
