@@ -450,6 +450,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     private <R> Optional<RouteMatch<R>> findErrorRouteInternal(
         @Nullable Class<?> originatingClass,
         Throwable error, HttpRequest<?> request) {
+        if (errorRoutes.length == 0) {
+            return Optional.empty();
+        }
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
@@ -522,6 +525,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     private <R> Optional<RouteMatch<R>> findStatusInternal(@Nullable Class<?> originatingClass, int status, HttpRequest<?> request) {
+        if (statusRoutes.length == 0) {
+            // most applications have none, and every 4xx or 5xx response looks for them
+            return Optional.empty();
+        }
         Collection<MediaType> accept = request.accept();
         final boolean hasAcceptHeader = CollectionUtils.isNotEmpty(accept);
         if (hasAcceptHeader) {
