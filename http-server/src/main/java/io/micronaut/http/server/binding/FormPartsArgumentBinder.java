@@ -29,8 +29,9 @@ import jakarta.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Binds the {@link FormParts} of a streaming form handler route. Nothing is read until the handler
- * consumes the parts.
+ * Binds the {@link FormParts} argument of a controller method. Nothing is read until the method
+ * consumes the parts, which are closed when the request ends. A handler route reads the parts
+ * with {@link io.micronaut.http.AsyncServerHttpRequest#parts()} instead.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -58,8 +59,8 @@ final class FormPartsArgumentBinder implements TypedRequestArgumentBinder<FormPa
         }
         FormFactory factory = formFactory.get();
         DefaultFormParts parts = new DefaultFormParts(request, UploadContext.of(factory, request));
-        // the handler closes the parts when it completes; this is the safety net for handlers
-        // that do not, failures before the handler is called, and disconnects
+        // closed when the request ends: the method may return before it read them, and failures
+        // before it is called and disconnects end the request too
         request.addDisposalResource(parts::close);
         return () -> Optional.of(parts);
     }

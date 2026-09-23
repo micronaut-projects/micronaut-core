@@ -194,7 +194,7 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
      * @param type The type of an element
      * @param <T>  The type of an element
      * @return The elements, read as they are asked for. They are closed when the stage returned
-     * by the handler completes
+     * by the handler route completes, or for a controller method, when the request ends
      * @throws IllegalStateException if the body was already read
      */
     <T> BodyElements<T> elements(Argument<T> type);
@@ -224,7 +224,7 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
 
     /**
      * Read the submitted form part by part, as it arrives. The parts are closed when the stage
-     * returned by the handler completes.
+     * returned by the handler route completes, or for a controller method, when the request ends.
      *
      * @return The parts of the form
      * @throws IllegalStateException if the body was already read
