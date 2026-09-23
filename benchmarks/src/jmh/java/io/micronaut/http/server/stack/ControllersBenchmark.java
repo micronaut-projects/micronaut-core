@@ -1,7 +1,26 @@
 package io.micronaut.http.server.stack;
 
 import io.micronaut.context.ApplicationContext;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.Introspected;
+import io.micronaut.core.annotation.Order;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
+import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.annotation.Error;
+import io.micronaut.http.annotation.Filter;
+import io.micronaut.http.annotation.FilterMatcher;
+import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.PathVariable;
+import io.micronaut.http.annotation.RequestBean;
+import io.micronaut.http.annotation.ResponseFilter;
+import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.server.exceptions.ExceptionHandler;
+import io.micronaut.scheduling.annotation.ExecuteOn;
+import jakarta.inject.Named;
+import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.async.annotation.SingleResult;
 import io.micronaut.http.MediaType;
@@ -11,6 +30,16 @@ import io.micronaut.http.annotation.Produces;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.runtime.server.EmbeddedServer;
+import org.openjdk.jmh.annotations.BenchmarkMode;
+import org.openjdk.jmh.annotations.OutputTimeUnit;
+import reactor.core.publisher.Flux;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+import java.util.concurrent.AbstractExecutorService;
+import java.util.concurrent.ExecutorService;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -66,6 +95,8 @@ public class ControllersBenchmark {
     }
 
     @Benchmark
+    @BenchmarkMode(Mode.AverageTime)
+    @OutputTimeUnit(TimeUnit.NANOSECONDS)
     public void test(Holder holder) {
         ByteBuf response = holder.exchange();
         BenchOptions.verifyResponse(holder.responseBytes, response);
@@ -84,7 +115,9 @@ public class ControllersBenchmark {
 
         @Setup
         public void setUp(Blackhole blackhole) {
-            ctx = ApplicationContext.run(BenchOptions.serverProperties("ControllersBenchmark"));
+            Map<String, Object> properties = BenchOptions.serverProperties("ControllersBenchmark");
+            properties.putAll(request.properties());
+            ctx = ApplicationContext.run(properties);
             ctx.registerSingleton(Blackhole.class, blackhole);
             EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
             channel = ((NettyHttpServer) server).buildEmbeddedChannel(false);
@@ -298,11 +331,179 @@ public class ControllersBenchmark {
                 Assertions.assertEquals(expectedResponseBody, response.content().toString(StandardCharsets.UTF_8));
                 Assertions.assertEquals(expectedResponseBody.length(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
             }
+        },
+        /**
+         * A path variable, a header and a query value bound to one method.
+         */
+        PATH_HEADER_QUERY {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/books/42?page=3");
+                request.headers().add(HttpHeaderNames.ACCEPT, "application/json");
+                request.headers().add("X-Tenant", "acme");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyJson(response, """
+{"id":42,"tenant":"acme","page":3}""");
+            }
+        },
+        /**
+         * Arguments without binding annotations, bound from the query by the unmatched binder chain.
+         */
+        UNANNOTATED_QUERY {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/unannotated?a=x&b=y&c=3");
+                request.headers().add(HttpHeaderNames.ACCEPT, "text/plain");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyText(response, HttpResponseStatus.OK, "xy3");
+            }
+        },
+        /**
+         * A {@code @RequestBean} with a path variable, a header and a query value.
+         */
+        REQUEST_BEAN {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/bean/42?page=3");
+                request.headers().add(HttpHeaderNames.ACCEPT, "application/json");
+                request.headers().add("X-Tenant", "acme");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyJson(response, """
+{"id":42,"tenant":"acme","page":3}""");
+            }
+        },
+        /**
+         * A request that matches no route, in an application without status routes.
+         */
+        NOT_FOUND {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/missing");
+                request.headers().add(HttpHeaderNames.ACCEPT, "application/json");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                Assertions.assertEquals(HttpResponseStatus.NOT_FOUND, response.status());
+                Assertions.assertEquals("application/json", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
+            }
+        },
+        /**
+         * A streamed {@code Flux} from a route with {@code @ExecuteOn}. The executor runs tasks
+         * inline, so the benchmark measures the executor lookup and wrapping, not a thread hop.
+         */
+        STREAM_EXECUTE_ON {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/stream");
+                request.headers().add(HttpHeaderNames.ACCEPT, "application/json");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                Assertions.assertEquals(HttpResponseStatus.OK, response.status());
+                Assertions.assertEquals("application/json", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
+                Assertions.assertEquals("""
+[{"id":1,"message":"A"},{"id":2,"message":"B"},{"id":3,"message":"C"}]""", response.content().toString(StandardCharsets.UTF_8));
+            }
+        },
+        /**
+         * A route under five pattern filters (three that match, one on another path and one on
+         * another method) and one {@code @FilterMatcher} filter.
+         */
+        FILTERED {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/api/filtered");
+                request.headers().add(HttpHeaderNames.ACCEPT, "text/plain");
+                return request;
+            }
+
+            @Override
+            Map<String, Object> properties() {
+                return Map.of("bench.filters", true);
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyText(response, HttpResponseStatus.OK, "filtered");
+                Assertions.assertEquals(List.of("1", "2", "3"), response.headers().getAll("X-Api-Filter").stream().sorted().toList());
+                Assertions.assertEquals("true", response.headers().get("X-Matched"));
+                Assertions.assertNull(response.headers().get("X-Admin"));
+                Assertions.assertNull(response.headers().get("X-Post"));
+            }
+        },
+        /**
+         * An exception handled by a local {@code @Error} route.
+         */
+        ERROR_ROUTE {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/error");
+                request.headers().add(HttpHeaderNames.ACCEPT, "text/plain");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyText(response, HttpResponseStatus.CONFLICT, "error route");
+            }
+        },
+        /**
+         * An exception handled by an {@code ExceptionHandler} bean.
+         */
+        EXCEPTION_HANDLER {
+            @Override
+            FullHttpRequest request() {
+                FullHttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/ctrl/handled");
+                request.headers().add(HttpHeaderNames.ACCEPT, "text/plain");
+                return request;
+            }
+
+            @Override
+            void verifyResponse(FullHttpResponse response) {
+                verifyText(response, HttpResponseStatus.CONFLICT, "exception handler");
+            }
         };
 
         abstract FullHttpRequest request();
 
         abstract void verifyResponse(FullHttpResponse response);
+
+        /**
+         * @return Extra application properties for this scenario
+         */
+        Map<String, Object> properties() {
+            return Map.of();
+        }
+
+        static void verifyJson(FullHttpResponse response, String expectedResponseBody) {
+            Assertions.assertEquals(HttpResponseStatus.OK, response.status());
+            Assertions.assertEquals("application/json", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
+            Assertions.assertEquals(expectedResponseBody, response.content().toString(StandardCharsets.UTF_8));
+            Assertions.assertEquals(expectedResponseBody.length(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        }
+
+        static void verifyText(FullHttpResponse response, HttpResponseStatus status, String expectedResponseBody) {
+            Assertions.assertEquals(status, response.status());
+            Assertions.assertEquals("text/plain", response.headers().get(HttpHeaderNames.CONTENT_TYPE));
+            Assertions.assertEquals(expectedResponseBody, response.content().toString(StandardCharsets.UTF_8));
+            Assertions.assertEquals(expectedResponseBody.length(), response.headers().getInt(HttpHeaderNames.CONTENT_LENGTH));
+        }
     }
 
     @Controller("/tfblike")
@@ -384,6 +585,198 @@ public class ControllersBenchmark {
             blackhole.consume(firstParameter);
             blackhole.consume(secondParameter);
             return text;
+        }
+
+        @Get("/books/{id}")
+        Book book(Long id, @Header("X-Tenant") String tenant, @QueryValue int page) {
+            return new Book(id, tenant, page);
+        }
+
+        @Get(value = "/unannotated", produces = MediaType.TEXT_PLAIN)
+        String unannotated(String a, String b, int c) {
+            return a + b + c;
+        }
+
+        @Get("/bean/{id}")
+        Book bean(@RequestBean BookRequest request) {
+            return new Book(request.id(), request.tenant(), request.page());
+        }
+
+        @ExecuteOn(InlineExecutorFactory.NAME)
+        @Get("/stream")
+        Flux<SomeBean1> stream() {
+            return Flux.fromIterable(TfbLikeController.BEANS1);
+        }
+
+        @Get(value = "/error", produces = MediaType.TEXT_PLAIN)
+        String error() {
+            throw new BenchException();
+        }
+
+        @Get(value = "/handled", produces = MediaType.TEXT_PLAIN)
+        String handled() {
+            throw new BenchHandledException();
+        }
+
+        @Error(BenchException.class)
+        @Produces(MediaType.TEXT_PLAIN)
+        HttpResponse<String> onError(BenchException e) {
+            return HttpResponse.status(HttpStatus.CONFLICT).body("error route");
+        }
+    }
+
+    public record Book(Long id, String tenant, int page) {
+    }
+
+    @Introspected
+    public record BookRequest(@PathVariable Long id, @Header("X-Tenant") String tenant, @QueryValue int page) {
+    }
+
+    /**
+     * An exception without a stack trace, so that creating it does not dominate the benchmark.
+     */
+    static final class BenchException extends RuntimeException {
+        BenchException() {
+            super(null, null, false, false);
+        }
+    }
+
+    /**
+     * An exception without a stack trace, handled by {@link BenchExceptionHandler}.
+     */
+    static final class BenchHandledException extends RuntimeException {
+        BenchHandledException() {
+            super(null, null, false, false);
+        }
+    }
+
+    @Singleton
+    @Requires(property = "spec.name", value = "ControllersBenchmark")
+    static final class BenchExceptionHandler implements ExceptionHandler<BenchHandledException, HttpResponse<String>> {
+        @Override
+        public HttpResponse<String> handle(HttpRequest request, BenchHandledException exception) {
+            return HttpResponse.status(HttpStatus.CONFLICT).contentType(MediaType.TEXT_PLAIN_TYPE).body("exception handler");
+        }
+    }
+
+    @Factory
+    @Requires(property = "spec.name", value = "ControllersBenchmark")
+    static class InlineExecutorFactory {
+        static final String NAME = "bench-inline";
+
+        @Singleton
+        @Named(NAME)
+        ExecutorService inlineExecutor() {
+            return new AbstractExecutorService() {
+                private volatile boolean shutdown;
+
+                @Override
+                public void execute(Runnable command) {
+                    command.run();
+                }
+
+                @Override
+                public void shutdown() {
+                    shutdown = true;
+                }
+
+                @Override
+                public List<Runnable> shutdownNow() {
+                    shutdown = true;
+                    return List.of();
+                }
+
+                @Override
+                public boolean isShutdown() {
+                    return shutdown;
+                }
+
+                @Override
+                public boolean isTerminated() {
+                    return shutdown;
+                }
+
+                @Override
+                public boolean awaitTermination(long timeout, TimeUnit unit) {
+                    return true;
+                }
+            };
+        }
+    }
+
+    /**
+     * The route of the {@link Request#FILTERED} scenario carries this, so {@link MatchedFilter} applies to it.
+     */
+    @FilterMatcher
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target({ElementType.TYPE, ElementType.METHOD})
+    public @interface BenchFiltered {
+    }
+
+    @Controller("/api")
+    @BenchFiltered
+    @Requires(property = "spec.name", value = "ControllersBenchmark")
+    static class FilteredController {
+        @Get(value = "/filtered", produces = MediaType.TEXT_PLAIN)
+        String filtered() {
+            return "filtered";
+        }
+    }
+
+    @ServerFilter("/api/**")
+    @Requires(property = "bench.filters", value = "true")
+    static class ApiFilter1 {
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Api-Filter", "1");
+        }
+    }
+
+    @ServerFilter("/api/**")
+    @Requires(property = "bench.filters", value = "true")
+    static class ApiFilter2 {
+        @Order(1)
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Api-Filter", "2");
+        }
+    }
+
+    @ServerFilter("/api/**")
+    @Requires(property = "bench.filters", value = "true")
+    static class ApiFilter3 {
+        @Order(2)
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Api-Filter", "3");
+        }
+    }
+
+    @ServerFilter("/admin/**")
+    @Requires(property = "bench.filters", value = "true")
+    static class AdminFilter {
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Admin", "true");
+        }
+    }
+
+    @ServerFilter(value = "/api/**", methods = io.micronaut.http.HttpMethod.POST)
+    @Requires(property = "bench.filters", value = "true")
+    static class PostFilter {
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Post", "true");
+        }
+    }
+
+    @BenchFiltered
+    @ServerFilter(Filter.MATCH_ALL_PATTERN)
+    @Requires(property = "bench.filters", value = "true")
+    static class MatchedFilter {
+        @ResponseFilter
+        void filter(MutableHttpResponse<?> response) {
+            response.header("X-Matched", "true");
         }
     }
 
