@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.RouteAssembly;
 
 /**
  * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
@@ -120,4 +121,14 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#afterAsync(AsyncContextRouteResponseFilter)
      */
     HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter);
+
+    /**
+     * Declare the route in a group: the filters of the group, and of the groups around it, run
+     * before the filters of the route.
+     *
+     * @param group The filters of the group
+     * @return The route
+     * @see HttpRouteGroup
+     */
+    HandlerUriRoute inGroup(RouteAssembly.RouteFilters group);
 }

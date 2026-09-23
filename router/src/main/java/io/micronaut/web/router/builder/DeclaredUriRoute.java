@@ -166,6 +166,11 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
+    public HandlerUriRoute inGroup(RouteAssembly.RouteFilters group) {
+        return configure(r -> r.inGroup(group));
+    }
+
+    @Override
     public String toString() {
         return declaration.httpMethodName() + " " + declaration.uriTemplate() + " (declared)";
     }

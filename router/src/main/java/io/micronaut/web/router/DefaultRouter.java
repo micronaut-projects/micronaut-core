@@ -741,9 +741,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public List<GenericHttpFilter> findFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
-        List<GenericHttpFilter> routeFilters = routeMatch != null && routeMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> routeInfo
-            ? routeInfo.routeFilters
-            : List.of();
+        List<GenericHttpFilter> routeFilters = routeFilters(routeMatch);
         if (!routeFilters.isEmpty()) {
             // the filters of the route run after the application's filters, closest to the route
             List<GenericHttpFilter> applicationFilters = findApplicationFilters(request, routeMatch);
@@ -753,6 +751,25 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return filters;
         }
         return findApplicationFilters(request, routeMatch);
+    }
+
+    /**
+     * The filters of the matched route: of its groups and its own, and for a located route, first
+     * the filters of the groups of the locator routes that located it.
+     */
+    private static List<GenericHttpFilter> routeFilters(@Nullable RouteMatch<?> routeMatch) {
+        if (routeMatch == null || !(routeMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> routeInfo)) {
+            return List.of();
+        }
+        if (routeMatch instanceof DefaultUriRouteMatch<?, ?> uriRouteMatch
+            && uriRouteMatch.matchInfo() instanceof RouteLocator.LocatedUriMatchInfo located
+            && !located.filters().isEmpty()) {
+            List<GenericHttpFilter> filters = new ArrayList<>(located.filters().size() + routeInfo.routeFilters.size());
+            filters.addAll(located.filters());
+            filters.addAll(routeInfo.routeFilters);
+            return filters;
+        }
+        return routeInfo.routeFilters;
     }
 
     private List<GenericHttpFilter> findApplicationFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {

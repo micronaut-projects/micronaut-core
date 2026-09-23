@@ -23,6 +23,7 @@ import io.micronaut.web.router.RouteTable;
 import io.micronaut.http.form.FormData;
 
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -275,7 +276,8 @@ public interface HttpRouteBuilder {
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function, like an
      * {@code @Error(global = true)} method: it answers requests to controller routes and handler
-     * routes that fail with such an exception.
+     * routes that fail with such an exception. An error route declared in a {@link HttpRouteGroup}
+     * is global too: the group neither prefixes nor filters it.
      *
      * @param type    The type of the exception
      * @param handler The handler
@@ -286,7 +288,9 @@ public interface HttpRouteBuilder {
 
     /**
      * Handle the responses of a status with a handler function, like an
-     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}.
+     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}. A status
+     * route declared in a {@link HttpRouteGroup} is global too: the group neither prefixes nor
+     * filters it.
      *
      * @param status  The status
      * @param handler The handler
@@ -466,6 +470,48 @@ public interface HttpRouteBuilder {
      * @since 5.3.0
      */
     void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
+     * Declare a group of routes, whose filters apply to every route declared in the lambda,
+     * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
+     * {@link HttpRoutes} bean has no filter methods of its own, as it is shared by the beans: the
+     * group is the scope of the filters.
+     *
+     * <pre>{@code
+     * routes.group(all -> {
+     *     all.before((request, propagatedContext) -> {
+     *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
+     *         return null;
+     *     });
+     *     all.GET("/orders", ordersHandler);
+     *     all.GET("/customers", customersHandler);
+     * });
+     * }</pre>
+     *
+     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.</p>
+     *
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void group(Consumer<HttpRouteGroup> routes);
+
+    /**
+     * Declare a group of routes under a prefix: the URI template of every route of the group,
+     * including its locator routes and the routes of its nested groups, is the prefix followed by
+     * the URI template of the route, like the URI of a controller method under the URI of the
+     * controller: {@code path("/api", api -> api.GET("/orders", handler))} routes
+     * {@code GET /api/orders}. The prefixes of nested groups add up. The filters of the group apply
+     * to every route declared in the lambda, see {@link HttpRouteGroup}.
+     *
+     * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
+     * query or fragment. A {@link RouteDeclaration}, whose index keys are computed for its own URI
+     * template, cannot be bound in a group with a prefix.</p>
+     *
+     * @param prefix The prefix of the URI templates of the routes of the group
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
      * A body type that is {@code null} when the request has no body, for the handlers that
