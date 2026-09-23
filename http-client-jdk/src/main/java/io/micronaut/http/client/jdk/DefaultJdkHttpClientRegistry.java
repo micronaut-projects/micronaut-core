@@ -45,6 +45,7 @@ import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
+import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
@@ -175,6 +176,29 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         BeanContext beanContext
     ) {
         return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext));
+    }
+
+    /**
+     * Creates an {@link AsyncRawHttpClient} based on the {@literal java.net.http.*} HTTP Client.
+     *
+     * @param injectionPoint The injection point
+     * @param loadBalancer   The load balancer
+     * @param configuration  The configuration
+     * @param beanContext    The bean context
+     * @return An async raw HTTP client
+     * @since 5.3.0
+     */
+    @Bean
+    @BootstrapContextCompatible
+    @Primary
+    @Order(2) // If both this and the netty client are present, netty is the default.
+    AsyncRawHttpClient asyncRawHttpClient(
+        @Nullable InjectionPoint<?> injectionPoint,
+        @Parameter @Nullable LoadBalancer loadBalancer,
+        @Parameter @Nullable HttpClientConfiguration configuration,
+        BeanContext beanContext
+    ) {
+        return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext)).toAsyncRaw();
     }
 
     /**
