@@ -1,0 +1,19 @@
+The builder has a method per HTTP method (`GET`, `POST`, `PUT`, `PATCH`, `DELETE`), the method-generic `handle` and `handleAsync`, and variants for a decoded body and for forms. Each returns an api:web.router.builder.HttpRouteSpec[] to configure the route further.
+
+snippet::io.micronaut.docs.server.functional.ItemRoutes[tags="imports,clazz", indent=0, title="Declaring handler routes"]
+
+<1> An `HttpRoutes` bean, here returned as a lambda by a factory method, which can inject the beans the handlers use.
+<2> A api:web.router.builder.RequestHandler[] receives the request and the api:web.router.builder.PathVariables[] of the matched route. Their typed accessors (`getString`, `getInt`, `getLong`, `get(name, UUID.class)`, ... with a default value overload, and `findInt`, `findString`, ...) convert the values like controller arguments: a missing or unconvertible value is answered with `400`. An api:http.exceptions.HttpStatusException[] thrown by the handler sets the status, here `404` for an unknown item.
+<3> A api:web.router.builder.BodyRequestHandler[] also receives the body, decoded like a `@Body` argument of a controller method: with the message body readers of the content type, a `400` for an invalid body and a `415` for an unsupported content type.
+<4> `produces` and `consumes` declare the media types of the route, like `@Produces` and `@Consumes`. `consumesAll()` accepts any content type. A route consumes and produces JSON by default.
+<5> `executeOn` runs the handler on a named executor, like `@ExecuteOn`; `nonBlocking()` keeps it on the event loop, like `@NonBlocking`. Without either, the thread is selected like for a controller method.
+<6> `handle(Set<HttpMethod>, ...)` declares the route for several methods at once. The configuration of the returned `HttpRouteSpec` applies to all of them.
+<7> A custom HTTP method is routed by its name, like `@CustomHttpMethod`.
+<8> An api:web.router.builder.AsyncRequestHandler[] returns a `CompletionStage` of the response, like a controller method returning a `CompletableFuture`. It receives an api:http.AsyncServerHttpRequest[] and reads the body itself, see <<functionalRoutesBody, Reading the Request Body>>. The builder has `asyncGET`, `asyncPOST`, `asyncPUT`, `asyncPATCH` and `asyncDELETE` shortcuts.
+<9> A body type made with `HttpRouteBuilder.nullableBody(...)` is `null` when the request has no body, instead of a `400`.
+
+A `GET` route gets an implicit `HEAD` route, and a request with another method is answered with `405` and an `Allow` header listing the methods of the path, as for a controller. `OPTIONS` requests and CORS preflight requests are answered for handler routes as for controllers, see <<cors, Configuring CORS>>.
+
+A handler that throws, a checked exception included, is answered by the error routes, see <<functionalRoutesErrors, Error and Status Routes>>. A synchronous handler that returns `null` is answered like a controller method returning `null`.
+
+A handler can also answer with a `Publisher` body, e.g. a stream of server-sent events with `.produces(MediaType.TEXT_EVENT_STREAM_TYPE)`, or of JSON objects written as a JSON array. The elements are written as they are emitted, as for a controller returning a `Publisher`.

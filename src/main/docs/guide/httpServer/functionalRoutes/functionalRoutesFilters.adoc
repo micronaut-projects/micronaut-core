@@ -1,0 +1,57 @@
+Functional routes declare filters at three levels, with the same methods, from api:web.router.builder.RouteFilterSpec[]:
+
+* *route filters*, on the api:web.router.builder.HttpRouteSpec[] a route returns: `routes.GET(...).before(...)`;
+* *group filters*, on an api:web.router.builder.HttpRouteGroup[], for every route of the group;
+* *server filters*, declared with `routes.filter(patterns...)`: the functional form of a `@ServerFilter` bean, see api:web.router.builder.ServerFilterSpec[].
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", indent=0, title="Server filters"]
+
+<1> A server filter filters every request whose path matches one of its patterns, whatever answers it: a controller, a handler route, a static resource, or no route at all (`404`, `405`, ...). `methods(...)`, `order(int)`, `patternStyle(...)` and `appendContextPath(boolean)` correspond to the members of `@ServerFilter` and to `@Order`. A server filter is global wherever it is declared, also in a group: the prefix and the filters of the group do not apply to it.
+<2> A pre-matching server filter, like a `@PreMatching` filter bean, runs before the route is matched, and the route is matched with the request it continues with: here a URI rewritten in place.
+
+=== Filter methods
+
+[cols="1,2"]
+|===
+|Method |Filter
+
+|`before(RouteRequestFilter)`
+|A request filter: returns `null` to continue, a response to answer instead of the route, or a request to continue with.
+
+|`after(RouteResponseFilter)`
+|A response filter that changes the response in place.
+
+|`afterReplacing(ReplacingRouteResponseFilter)`
+|A response filter that returns a replacement response, or `null` to keep the response.
+
+|`before(String executorName, ...)`, `after(String executorName, ...)`, `afterReplacing(String executorName, ...)`
+|The same, run on a named executor, like `@ExecuteOn` on a filter method.
+
+|`beforeAsync(...)`, `afterAsync(...)`, `afterReplacingAsync(...)`
+|The same, returning a `CompletionStage` that completes with the result.
+|===
+
+Each method has a variant whose lambda also receives a api:core.propagation.MutablePropagatedContext[], selected by the number of parameters: `before((request, propagatedContext) -> ...)`. An element the filter adds is in scope for the filters after it, the handler and the error routes, as for a filter method with a `MutablePropagatedContext` parameter. An asynchronous filter's changes are taken when its stage completes.
+
+=== Changing the request and the response
+
+A request filter receives a `MutableHttpRequest`:
+
+* Headers and attributes changed in place, and a URI set with `uri(...)`, are seen by the rest of the chain. Other changes, such as a new body, need a request to be returned.
+* To continue with another request, return it: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncServerHttpRequest` read.
+* A new URI or method only changes the matched route in a pre-matching server filter. The other filters run after the route was matched.
+
+A response filter declared with `after` changes the response in place; one declared with `afterReplacing` can return a new response, which the response filters after it and the client see.
+
+=== Order
+
+Request filters run in this order, and response filters in the reverse order:
+
+. the server filters: `@ServerFilter` beans and the filters declared with `routes.filter(...)`, sorted together by their order (`0` by default); pre-matching filters run before the route is matched;
+. the filters of the outer group, then those of the inner groups;
+. the filters of the route;
+. the handler.
+
+Within a group or a route, request filters and response filters each run in the order they are declared. A response filter also sees the answer of a request filter of its own level or of an inner level.
+
+Exceptions thrown by a filter, or failed stages of an asynchronous filter, are handled like the exceptions of a filter method: by the error routes, the exception handlers, or with `500`.
