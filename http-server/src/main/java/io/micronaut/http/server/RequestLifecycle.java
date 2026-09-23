@@ -237,6 +237,31 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Handle an error thrown while the body of the response was written, before anything was
+     * sent. This runs the exception handlers and the error and status routes like
+     * {@link #onError(HttpRequest, Throwable)}, but not the filters: they already ran for the
+     * response whose body failed.
+     *
+     * @param request   The request
+     * @param throwable The error
+     * @return The response for the error
+     * @since 5.3.0
+     */
+    protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        try {
+            return onErrorNoFilter(request, throwable, propagatedContext)
+                .flatMap(response -> {
+                    RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext);
+                })
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
+        } catch (Throwable e) {
+            return createDefaultErrorResponseFlow(request, e, propagatedContext);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> onErrorNoFilter(HttpRequest<?> request, Throwable t, PropagatedContext propagatedContext) {
 
         if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
