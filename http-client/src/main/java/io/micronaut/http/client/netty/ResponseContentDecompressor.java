@@ -36,6 +36,7 @@ import java.util.List;
  * @since 5.3.0
  */
 @Internal
+@SuppressWarnings("java:S110") // the hierarchy depth comes from Netty
 final class ResponseContentDecompressor extends HttpContentDecompressor {
     private boolean bodiless;
 
