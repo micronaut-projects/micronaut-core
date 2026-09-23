@@ -105,6 +105,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -882,6 +883,43 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public HttpMethod getMethod() {
             return NettyHttpRequest.this.getMethod();
+        }
+
+        // the connection is the connection of the request, whatever the URI of the view
+
+        @Override
+        public HttpVersion getHttpVersion() {
+            return NettyHttpRequest.this.getHttpVersion();
+        }
+
+        @Override
+        public InetSocketAddress getRemoteAddress() {
+            return NettyHttpRequest.this.getRemoteAddress();
+        }
+
+        @Override
+        public InetSocketAddress getServerAddress() {
+            return NettyHttpRequest.this.getServerAddress();
+        }
+
+        @Override
+        public String getServerName() {
+            return NettyHttpRequest.this.getServerName();
+        }
+
+        @Override
+        public boolean isSecure() {
+            return NettyHttpRequest.this.isSecure();
+        }
+
+        @Override
+        public Optional<SSLSession> getSslSession() {
+            return NettyHttpRequest.this.getSslSession();
+        }
+
+        @Override
+        public Optional<Certificate> getCertificate() {
+            return NettyHttpRequest.this.getCertificate();
         }
 
         @Override

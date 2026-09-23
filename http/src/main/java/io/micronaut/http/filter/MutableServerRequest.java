@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
@@ -32,7 +33,11 @@ import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import javax.net.ssl.SSLSession;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.security.cert.Certificate;
+import java.util.Optional;
 
 /**
  * The mutable request a filter declared as a function is given for a server request: the
@@ -41,7 +46,9 @@ import java.net.URI;
  * continues with this request, e.g. after it changed the URI.
  *
  * <p>Like the mutable view, it shares the headers and the attributes of the request, and it has
- * its own URI, parameters and body object. The bytes of the body are those of the request.</p>
+ * its own URI, parameters and body object. The bytes of the body are those of the request, and so
+ * is the connection: the remote and server addresses, the HTTP version and whether the request is
+ * secure.</p>
  *
  * <p>A request that cannot be mutated, e.g. a {@link HttpRequestWrapper} another filter continued
  * with, is given a mutable wrapper, which keeps what the wrapper changed.</p>
@@ -183,6 +190,43 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     @Override
     public ByteBody byteBody() {
         return request.byteBody();
+    }
+
+    // the connection is the connection of the server request, whatever the URI of the view
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        return request.getHttpVersion();
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+        return request.getRemoteAddress();
+    }
+
+    @Override
+    public InetSocketAddress getServerAddress() {
+        return request.getServerAddress();
+    }
+
+    @Override
+    public @Nullable String getServerName() {
+        return request.getServerName();
+    }
+
+    @Override
+    public boolean isSecure() {
+        return request.isSecure();
+    }
+
+    @Override
+    public Optional<SSLSession> getSslSession() {
+        return request.getSslSession();
+    }
+
+    @Override
+    public Optional<Certificate> getCertificate() {
+        return request.getCertificate();
     }
 
     @Override
