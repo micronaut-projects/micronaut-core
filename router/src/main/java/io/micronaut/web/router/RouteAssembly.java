@@ -19,6 +19,7 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -43,7 +44,6 @@ import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriTemplate;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.inject.annotation.EvaluatedAnnotationValue;
@@ -1730,22 +1730,12 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+        public HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
             Objects.requireNonNull(annotationMetadata, "annotationMetadata");
             if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
                 throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
             }
             handlerMethod.annotationMetadata(annotationMetadata);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
-            Objects.requireNonNull(method, "method");
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method already implements the method: " + this);
-            }
-            handlerMethod.implementing(method);
             return this;
         }
 

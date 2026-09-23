@@ -15,7 +15,7 @@
  */
 package io.micronaut.web.router;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -23,7 +23,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.builder.AsyncContextReplacingRouteResponseFilter;
 import io.micronaut.web.router.builder.AsyncContextRouteRequestFilter;
 import io.micronaut.web.router.builder.BodyRequestHandler;
@@ -170,7 +169,6 @@ class HandlerRouteArgumentsTest {
         assertMissing("mediaTypes", () -> route.produces((MediaType[]) null));
         assertMissing("mediaTypes must not contain null", () -> route.produces((MediaType) null));
         assertMissing("annotationMetadata", () -> route.annotationMetadata(null));
-        assertMissing("method", () -> route.implementing((ExecutableMethod<?, ?>) null));
         assertMissing("executorName", () -> route.executeOn(null));
         assertBlankExecutor(() -> route.executeOn(""));
         assertBlankExecutor(() -> route.executeOn("  "));
@@ -187,7 +185,7 @@ class HandlerRouteArgumentsTest {
         assertMissing("name", () -> route.attribute(null, "value"));
         assertMissing("value", () -> route.attribute("name", null));
         // the route is still usable
-        route.consumes(MediaType.APPLICATION_JSON_TYPE).annotationMetadata(AnnotationMetadata.EMPTY_METADATA);
+        route.consumes(MediaType.APPLICATION_JSON_TYPE).annotationMetadata(new AnnotationMetadataProvider() { });
     }
 
     private static void assertMissing(String name, Executable call) {

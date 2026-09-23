@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.Bean;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -1291,12 +1293,24 @@ public class HandlerRoutesTest {
             return HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE);
         }
 
+        /**
+         * The annotations of a method without the method: the route does not implement it.
+         */
+        private static AnnotationMetadataProvider annotationsOf(AnnotationMetadata metadata) {
+            return new AnnotationMetadataProvider() {
+                @Override
+                public AnnotationMetadata getAnnotationMetadata() {
+                    return metadata;
+                }
+            };
+        }
+
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.GET("/fn/annotated", (request, pathVariables) -> HttpResponse.ok(target.target()).contentType(MediaType.TEXT_PLAIN_TYPE))
-                .annotationMetadata(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target").getAnnotationMetadata());
+                .annotationMetadata(annotationsOf(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target").getAnnotationMetadata()));
             routes.GET("/fn/implementing", (request, pathVariables) -> HttpResponse.ok(target.target()).contentType(MediaType.TEXT_PLAIN_TYPE))
-                .implementing(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target"));
+                .annotationMetadata(beanContext.getBeanDefinition(MarkedTarget.class).getRequiredMethod("target"));
             routes.handle("PROPFIND", "/fn/custom", (request, pathVariables) ->
                 HttpResponse.ok(request.getMethodName() + " " + request.getPath()).contentType(MediaType.TEXT_PLAIN_TYPE));
             routes.handle("PROPFIND", "/fn/custom-body", Argument.of(String.class), (request, pathVariables, body) ->

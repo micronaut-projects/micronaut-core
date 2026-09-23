@@ -60,7 +60,7 @@ import io.micronaut.http.filter.FilterPatternStyle;
  * @since 5.3.0
  */
 @Experimental
-public interface ServerFilterSpec extends RouteFilterSpec<ServerFilterSpec> {
+public sealed interface ServerFilterSpec extends RouteFilterSpec<ServerFilterSpec> permits DefaultServerFilterSpec {
 
     /**
      * Filter the requests of these methods only, like {@code @ServerFilter(methods = ...)}.

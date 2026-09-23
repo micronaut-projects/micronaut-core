@@ -49,6 +49,12 @@ public class AuditedRoutes implements HttpRoutes {
             return "paid " + amount;
         }
     }
+
+    @Singleton
+    @Audited
+    @Requires(property = "spec.name", value = "AuditedRoutesTest")
+    public static class Refunds { // <4>
+    }
     // end::annotations[]
 
     // tag::declaration[]
@@ -68,10 +74,10 @@ public class AuditedRoutes implements HttpRoutes {
         // tag::annotationRoutes[]
         routes.POST("/payments/{amount}", (request, pathVariables) ->
                 HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .implementing(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <4>
+            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <5>
         routes.POST("/refunds/{amount}", (request, pathVariables) ->
                 HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class).getAnnotationMetadata()); // <5>
+            .annotationMetadata(beanContext.getBeanDefinition(Refunds.class)); // <6>
         routes.GET("/prices", (request, pathVariables) -> HttpResponse.ok("prices").contentType(MediaType.TEXT_PLAIN_TYPE));
         // end::annotationRoutes[]
 

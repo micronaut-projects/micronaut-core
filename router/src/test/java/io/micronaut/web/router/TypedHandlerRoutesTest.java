@@ -16,6 +16,8 @@
 package io.micronaut.web.router;
 
 import io.micronaut.context.ExecutionHandleLocator;
+import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.type.Argument;
@@ -92,9 +94,15 @@ class TypedHandlerRoutesTest {
     void theDeclaredResponseTypeKeepsTheAnnotationsOfTheRoute() {
         MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
         metadata.addDeclaredAnnotation(Produces.class.getName(), Map.of("value", new String[]{"application/x-items"}));
+        AnnotationMetadataProvider annotated = new AnnotationMetadataProvider() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return metadata;
+            }
+        };
         Router router = router(routes -> {
-            routes.GET("/before", (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS).annotationMetadata(metadata);
-            routes.GET("/after", (request, pathVariables) -> HttpResponse.ok()).annotationMetadata(metadata).responseType(ITEMS);
+            routes.GET("/before", (request, pathVariables) -> HttpResponse.ok()).responseType(ITEMS).annotationMetadata(annotated);
+            routes.GET("/after", (request, pathVariables) -> HttpResponse.ok()).annotationMetadata(annotated).responseType(ITEMS);
         });
         for (String path : List.of("/before", "/after")) {
             RouteInfo<?> route = route(router, HttpRequest.GET(path));

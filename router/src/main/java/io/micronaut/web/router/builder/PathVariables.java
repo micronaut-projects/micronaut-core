@@ -48,7 +48,7 @@ import java.util.Set;
  * @since 5.3.0
  */
 @Experimental
-public interface PathVariables {
+public sealed interface PathVariables permits DefaultPathVariables {
 
     /**
      * @return The names of the variables that have a value
