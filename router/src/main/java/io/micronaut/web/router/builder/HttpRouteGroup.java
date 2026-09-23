@@ -76,4 +76,25 @@ import io.micronaut.core.annotation.Experimental;
  */
 @Experimental
 public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> {
+
+    /**
+     * Route the requests of the routes of the group on this port only, like
+     * {@code @Controller(port = ...)} for the methods of a controller, see
+     * {@link HttpRouteSpec#port(int)}. The routes of the group, including its locator routes and
+     * the routes of its nested groups, inherit it, wherever it is declared in the lambda; a nested
+     * group or a route with its own port overrides it.
+     *
+     * <pre>{@code
+     * routes.path("/management", management -> {
+     *     management.port(9090);
+     *     management.GET("/health", healthHandler);
+     *     management.GET("/metrics", metricsHandler);
+     * });
+     * }</pre>
+     *
+     * @param port The port
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(int port);
 }

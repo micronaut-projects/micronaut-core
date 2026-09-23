@@ -305,7 +305,8 @@ public final class RouteAssembly {
         }
         DeclaredUriRoute route = new DeclaredUriRoute(
             indexed,
-            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService)
+            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService),
+            exposedPorts::add
         );
         if (consumes != null) {
             route.consumes(consumes);
@@ -401,6 +402,17 @@ public final class RouteAssembly {
     public RouteFilters groupFilters(@Nullable RouteFilters enclosing) {
         return new RouteFilters(enclosing, executorName -> new ConfigurationException(
             "No executor configured for name: " + executorName + ", of a filter of a route group"));
+    }
+
+    /**
+     * The settings of a group of handler routes other than its filters, see
+     * {@link io.micronaut.web.router.builder.HttpRouteGroup}.
+     *
+     * @param enclosing The settings of the enclosing group, or {@code null}
+     * @return The settings of the group
+     */
+    public RouteGroup routeGroup(@Nullable RouteGroup enclosing) {
+        return new RouteGroup(enclosing);
     }
 
     /**
@@ -946,6 +958,61 @@ public final class RouteAssembly {
     }
 
     /**
+     * The settings of a group of handler routes other than its filters, which the routes of the
+     * group, and of the groups nested in it, inherit when they are built: a route overrides them.
+     */
+    @Internal
+    public final class RouteGroup {
+        private final @Nullable RouteGroup enclosing;
+        private @Nullable Integer port;
+        private boolean closed;
+
+        /**
+         * @param enclosing The settings of the enclosing group, or {@code null}
+         */
+        RouteGroup(@Nullable RouteGroup enclosing) {
+            this.enclosing = enclosing;
+        }
+
+        /**
+         * The port of the routes of the group: exposed now, as the server opens the exposed ports
+         * when it starts.
+         *
+         * @param port The port
+         */
+        public void port(int port) {
+            checkOpen();
+            this.port = port;
+            RouteAssembly.this.exposedPorts.add(port);
+        }
+
+        /**
+         * Close the group: its lambda returned.
+         */
+        public void close() {
+            closed = true;
+        }
+
+        /**
+         * @return The port of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer port() {
+            Integer own = port;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.port();
+        }
+
+        private void checkOpen() {
+            if (closed) {
+                throw new IllegalStateException("The route group is closed: declare the settings of a group in its lambda");
+            }
+        }
+    }
+
+    /**
      * The default route impl.
      */
     @Internal
@@ -960,6 +1027,7 @@ public final class RouteAssembly {
         private final RouteFilters filters = new RouteFilters(null, executorName -> new SchedulerConfigurationException(
             targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
         private boolean implicitHead;
+        private @Nullable RouteGroup group;
 
         /**
          * @param httpMethod The HTTP method
@@ -1054,6 +1122,7 @@ public final class RouteAssembly {
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
             checkBlockingBody();
+            Integer effectivePort = effectivePort();
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
@@ -1065,8 +1134,8 @@ public final class RouteAssembly {
                 consumesMediaTypes,
                 producesMediaTypes,
                 // a copy: the route info must not change with the route it was built from
-                List.copyOf(conditions),
-                port,
+                predicates(effectivePort),
+                effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
                 new RouteExecutorSelector(executeOn, nonBlocking),
@@ -1075,6 +1144,36 @@ public final class RouteAssembly {
             );
             routeInfo.routeFilters = routeFilters();
             return routeInfo;
+        }
+
+        /**
+         * @return The port of the route, or of its group, or {@code null}
+         */
+        private @Nullable Integer effectivePort() {
+            Integer own = port;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup routeGroup = group;
+            return routeGroup == null ? null : routeGroup.port();
+        }
+
+        /**
+         * The conditions of the route info: the conditions of the route, and a request on the port
+         * of the route if it has one.
+         *
+         * @param effectivePort The port of the route, or {@code null}
+         * @return The conditions
+         */
+        private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
+            if (effectivePort == null) {
+                return List.copyOf(conditions);
+            }
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 1);
+            predicates.addAll(conditions);
+            int routePort = effectivePort;
+            predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
+            return List.copyOf(predicates);
         }
 
         /**
@@ -1113,6 +1212,7 @@ public final class RouteAssembly {
             head.executeOn = executeOn;
             head.nonBlocking = nonBlocking;
             head.filters.copy(filters);
+            head.group = group;
             head.implicitHead = true;
             return head;
         }
@@ -1217,6 +1317,12 @@ public final class RouteAssembly {
             return this;
         }
 
+        @Override
+        public HandlerUriRoute inGroup(RouteGroup group) {
+            this.group = Objects.requireNonNull(group, "group");
+            return this;
+        }
+
         /**
          * @return The filters of the route in the order the filter chain runs them: the filters of
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
@@ -1234,9 +1340,15 @@ public final class RouteAssembly {
 
         @Override
         public UriRoute exposedPort(int port) {
+            // the route info matches the requests on the port only, see predicates(Integer)
             this.port = port;
-            where(httpRequest -> httpRequest.getServerAddress().getPort() == port);
             RouteAssembly.this.exposedPorts.add(port);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute port(int port) {
+            exposedPort(port);
             return this;
         }
 

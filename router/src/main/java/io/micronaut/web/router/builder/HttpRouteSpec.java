@@ -97,4 +97,24 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      * @return The route
      */
     HttpRouteSpec nonBlocking();
+
+    /**
+     * Route the requests on this port only, like {@code @Controller(port = ...)}: the server opens
+     * the port when it starts, and the route does not match a request on another port, which is
+     * answered as if the route did not exist. A route without a port matches the requests on the
+     * default ports of the server only, once a route of the application has a port. The port of
+     * the route overrides the port of its {@link HttpRouteGroup#port(int) group}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", (request, pathVariables) -> HttpResponse.ok(metrics.scrape()))
+     *     .port(9090);
+     * }</pre>
+     *
+     * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
+     *
+     * @param port The port
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec port(int port);
 }

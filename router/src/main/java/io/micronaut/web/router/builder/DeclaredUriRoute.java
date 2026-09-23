@@ -28,6 +28,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.IntConsumer;
 import java.util.function.Supplier;
 
 /**
@@ -44,14 +45,18 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     private final IndexedRouteDeclaration declaration;
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
+    private final IntConsumer exposePort;
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
 
     /**
      * @param declaration The declaration
      * @param factory     Creates the route, not added to the assembly
+     * @param exposePort  Exposes the port of the route when it is declared: the server opens the
+     *                    exposed ports before the route is built
      */
-    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory) {
+    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Supplier<RouteAssembly.DefaultUriRoute> factory, IntConsumer exposePort) {
         this.declaration = declaration;
+        this.exposePort = exposePort;
         this.route = SupplierUtil.memoized(() -> {
             RouteAssembly.DefaultUriRoute built = factory.get();
             List<Consumer<HandlerUriRoute>> steps = fixedConfiguration != null ? fixedConfiguration : configuration;
@@ -168,6 +173,17 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteFilters group) {
         return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute inGroup(RouteAssembly.RouteGroup group) {
+        return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute port(int port) {
+        exposePort.accept(port);
+        return configure(r -> r.port(port));
     }
 
     @Override

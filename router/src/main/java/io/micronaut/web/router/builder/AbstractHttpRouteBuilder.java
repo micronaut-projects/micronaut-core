@@ -56,18 +56,27 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      */
     final RouteAssembly.@Nullable RouteFilters groupFilters;
     /**
+     * The other settings of the group the routes are declared in, or {@code null} outside a group.
+     */
+    final RouteAssembly.@Nullable RouteGroup groupSettings;
+    /**
      * The prefix of the URI templates of the routes, or {@code null}.
      */
     private final @Nullable RoutePrefix prefix;
 
     /**
      * @param assembly     The assembly the routes are added to
-     * @param groupFilters The filters of the group the routes are declared in, or {@code null}
-     * @param prefix       The prefix of the URI templates of the routes, or {@code null}
+     * @param groupFilters  The filters of the group the routes are declared in, or {@code null}
+     * @param groupSettings The other settings of the group the routes are declared in, or {@code null}
+     * @param prefix        The prefix of the URI templates of the routes, or {@code null}
      */
-    AbstractHttpRouteBuilder(RouteAssembly assembly, RouteAssembly.@Nullable RouteFilters groupFilters, @Nullable RoutePrefix prefix) {
+    AbstractHttpRouteBuilder(RouteAssembly assembly,
+                             RouteAssembly.@Nullable RouteFilters groupFilters,
+                             RouteAssembly.@Nullable RouteGroup groupSettings,
+                             @Nullable RoutePrefix prefix) {
         this.assembly = assembly;
         this.groupFilters = groupFilters;
+        this.groupSettings = groupSettings;
         this.prefix = prefix;
     }
 
@@ -199,7 +208,8 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private void declareGroup(@Nullable RoutePrefix groupPrefix, Consumer<HttpRouteGroup> routes) {
         checkOpen();
-        DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters), groupPrefix);
+        DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters),
+            assembly.routeGroup(groupSettings), groupPrefix);
         try {
             routes.accept(group);
         } finally {
@@ -224,7 +234,14 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private HandlerUriRoute grouped(HandlerUriRoute route) {
         RouteAssembly.RouteFilters filters = groupFilters;
-        return filters == null ? route : route.inGroup(filters);
+        if (filters != null) {
+            route.inGroup(filters);
+        }
+        RouteAssembly.RouteGroup settings = groupSettings;
+        if (settings != null) {
+            route.inGroup(settings);
+        }
+        return route;
     }
 
     private HandlerUriRoute declare(RouteDeclaration route, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
@@ -356,6 +373,14 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         public HttpRouteSpec nonBlocking() {
             for (HandlerUriRoute route : routes) {
                 route.nonBlocking();
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec port(int port) {
+            for (HandlerUriRoute route : routes) {
+                route.port(port);
             }
             return this;
         }

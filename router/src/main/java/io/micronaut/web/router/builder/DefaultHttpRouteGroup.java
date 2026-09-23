@@ -32,15 +32,18 @@ import java.util.Objects;
 final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements HttpRouteGroup, ContextFilterSpec<HttpRouteGroup> {
 
     private final RouteAssembly.RouteFilters filters;
+    private final RouteAssembly.RouteGroup settings;
 
     /**
      * @param assembly The assembly the routes are added to
      * @param filters  The filters of the group
+     * @param settings The other settings of the group
      * @param prefix   The prefix of the URI templates of the routes, or {@code null}
      */
-    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, @Nullable RoutePrefix prefix) {
-        super(assembly, filters, prefix);
+    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings, @Nullable RoutePrefix prefix) {
+        super(assembly, filters, settings, prefix);
         this.filters = filters;
+        this.settings = settings;
     }
 
     /**
@@ -48,6 +51,13 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
      */
     void close() {
         filters.close();
+        settings.close();
+    }
+
+    @Override
+    public HttpRouteGroup port(int port) {
+        settings.port(port);
+        return this;
     }
 
     @Override

@@ -131,4 +131,21 @@ public interface HandlerUriRoute {
      * @see HttpRouteGroup
      */
     HandlerUriRoute inGroup(RouteAssembly.RouteFilters group);
+
+    /**
+     * Declare the route in a group: the route inherits the settings of the group, and of the
+     * groups around it, that it does not set itself.
+     *
+     * @param group The settings of the group
+     * @return The route
+     * @see HttpRouteGroup
+     */
+    HandlerUriRoute inGroup(RouteAssembly.RouteGroup group);
+
+    /**
+     * @param port The port
+     * @return The route
+     * @see HttpRouteSpec#port(int)
+     */
+    HandlerUriRoute port(int port);
 }
