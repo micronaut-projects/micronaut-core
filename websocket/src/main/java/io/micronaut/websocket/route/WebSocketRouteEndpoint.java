@@ -177,7 +177,7 @@ public final class WebSocketRouteEndpoint implements WebSocketBean<Object> {
     /**
      * Declares the handlers of the endpoint.
      */
-    private final class Spec implements WebSocketRouteSpec {
+    final class Spec implements WebSocketRouteSpec {
 
         private boolean closed;
         private @Nullable WebSocketOpenHandler openHandler;
