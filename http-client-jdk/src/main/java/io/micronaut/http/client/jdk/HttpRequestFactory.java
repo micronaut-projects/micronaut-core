@@ -90,8 +90,16 @@ public final class HttpRequestFactory {
     ) {
         if (request instanceof RawHttpRequestWrapper<?> raw) {
             OptionalLong length = raw.byteBody().expectedLength();
+            if (length.isPresent() && length.getAsLong() == 0) {
+                // BodyPublishers.fromPublisher only takes a positive length. There is nothing to
+                // send, so the empty bytes are released now
+                raw.close();
+                return HttpRequest.BodyPublishers.noBody();
+            }
+            // the bytes are only claimed when the JDK client sends the body: if it never does,
+            // e.g. when the connection is refused, the exchange releases them
             Flow.Publisher<ByteBuffer> buffers = JdkFlowAdapter.publisherToFlowPublisher(
-                Flux.from(raw.byteBody().toByteArrayPublisher()).map(ByteBuffer::wrap));
+                Flux.defer(() -> raw.byteBody().toByteArrayPublisher()).map(ByteBuffer::wrap));
             if (length.isPresent()) {
                 return HttpRequest.BodyPublishers.fromPublisher(buffers, length.getAsLong());
             } else {
