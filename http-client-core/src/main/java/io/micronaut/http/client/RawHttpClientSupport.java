@@ -100,8 +100,10 @@ public final class RawHttpClientSupport {
     }
 
     /**
-     * Copy the metadata (method, URI and headers) of a request that is sent with options, so that
-     * the options can be applied without changing the given request.
+     * Copy the metadata (method, URI, headers and attributes) of a request that is sent with
+     * options, so that the options can be applied without changing the given request. Like
+     * {@link HttpRequest#toMutableRequest()}, the copy has the attributes of the request, e.g. for
+     * the client filters. The body is not copied.
      *
      * @param request The request
      * @param options The options
@@ -115,6 +117,7 @@ public final class RawHttpClientSupport {
                 headers.add(name, value);
             }
         });
+        copy.getAttributes().putAll(request.getAttributes());
         if (!options.isRetainHostHeader()) {
             headers.remove(HttpHeaders.HOST);
         }
