@@ -167,7 +167,7 @@ public class HandlerRoutesPropagatedContextTest {
             AssertionUtils.assertThrows(server, HttpRequest.GET("/propagation/missing").header(TRACE, "t1"),
                 HttpResponseAssertion.builder()
                     .status(HttpStatus.NOT_FOUND)
-                    .body("status:trace=none,route=none,mdc=none,request=/propagation/missing")
+                    .body("status:trace=t1,route=none,mdc=t1,request=/propagation/missing")
                     .build());
         }
     }
