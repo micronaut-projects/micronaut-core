@@ -38,6 +38,7 @@ import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
 import io.micronaut.http.server.netty.handler.OutboundAccess;
 import io.micronaut.http.server.netty.handler.RequestHandler;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
@@ -372,6 +373,9 @@ public final class RoutingInBoundHandler implements RequestHandler {
                             encodedResponse.code(),
                             nettyHttpRequest.getMethodName(),
                             nettyHttpRequest.getUri());
+                    }
+                    if (encodedResponse.getAttribute(ResponseStreams.COMPRESSION_DISABLED).isPresent()) {
+                        outboundAccess.disableCompression();
                     }
                     io.netty.handler.codec.http.HttpResponse noBodyResponse = NettyMutableHttpResponse.toNoBodyResponse(encodedResponse);
                     if (nettyHttpRequest.getMethod() == HttpMethod.HEAD) {

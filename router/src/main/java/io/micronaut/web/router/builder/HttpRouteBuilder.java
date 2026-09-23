@@ -265,6 +265,38 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler);
 
     /**
+     * Route a {@code GET} request to a server-sent events handler: the response is a
+     * {@code text/event-stream} of the events the handler pushes to its
+     * {@link io.micronaut.http.sse.SseEmitter}. The route produces {@code text/event-stream}.
+     *
+     * <pre>{@code
+     * routes.sse("/ticks", (request, pathVariables, events) -> {
+     *     events.heartbeat(Duration.ofSeconds(15));
+     *     ticker.onTick(tick -> events.send(Event.of(tick).id(String.valueOf(tick.sequence()))));
+     * });
+     * }</pre>
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see SseHandler
+     */
+    HttpRouteSpec sse(String uri, SseHandler handler);
+
+    /**
+     * Like {@link #sse(String, SseHandler)}, at the path of the scope, like a controller method
+     * mapped without a URI: the prefix of the group, the prefix of the locator in a route table of
+     * a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec sse(SseHandler handler) {
+        return sse("/", handler);
+    }
+
+    /**
      * Route a {@code GET} request to a handler function that completes the response later.
      *
      * @param uri     The URI template

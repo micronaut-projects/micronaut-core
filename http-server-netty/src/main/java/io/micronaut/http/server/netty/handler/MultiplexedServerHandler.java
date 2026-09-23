@@ -107,6 +107,7 @@ abstract class MultiplexedServerHandler {
         private boolean reset;
         private boolean closed;
         private Compressor. @Nullable Session compressionSession;
+        private boolean compressionDisabled;
 
         MultiplexedStream(int streamId) {
             if (NativeImageUtils.JFR_AVAILABLE && Http2RequestEvent.isTurnedOn()) {
@@ -527,8 +528,13 @@ abstract class MultiplexedServerHandler {
         public final void closeAfterWrite() {
         }
 
+        @Override
+        public final void disableCompression() {
+            compressionDisabled = true;
+        }
+
         private void prepareCompression(HttpResponse headers, long contentLength) {
-            if (compressor != null) {
+            if (compressor != null && !compressionDisabled) {
                 Compressor.Session session = compressor.prepare(requiredCtx(), Objects.requireNonNull(request), headers, contentLength);
                 if (session != null) {
                     headers.headers().remove(HttpHeaderNames.CONTENT_LENGTH);

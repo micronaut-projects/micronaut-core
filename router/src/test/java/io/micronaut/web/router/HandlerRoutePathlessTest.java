@@ -71,6 +71,13 @@ class HandlerRoutePathlessTest {
     }
 
     @Test
+    void aServerSentEventsRouteWithoutAPathIsAtThePrefixOfItsGroup() {
+        Router router = router(routes -> routes.path("/ticks", ticks -> ticks.sse((request, pathVariables, events) -> events.complete())),
+            uri -> uri);
+        assertEquals("/ticks", route(router, HttpRequest.GET("/ticks")).getUriMatchTemplate().toString());
+    }
+
+    @Test
     void aRouteWithoutAPathIsAtTheRoot() {
         Router router = router(routes -> routes.GET((request, pathVariables) -> HttpResponse.ok("root")), uri -> uri);
         assertEquals("/", route(router, HttpRequest.GET("/")).getUriMatchTemplate().toString());
