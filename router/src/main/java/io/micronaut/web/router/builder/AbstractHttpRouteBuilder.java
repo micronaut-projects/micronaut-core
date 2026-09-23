@@ -176,9 +176,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixUri, new RouteLocator(locator, tables));
+    }
+
+    @Override
+    public final void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixUri, new RouteLocator(locator, tables));
+    }
+
+    private void locate(String prefixUri, RouteLocator locator) {
         Objects.requireNonNull(prefixUri, "prefixUri");
         checkOpen();
-        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(new RouteLocator(locator, tables)));
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
         for (String template : RouteLocator.templates(uri(prefixUri))) {
             for (HttpMethod method : HttpMethod.values()) {
                 if (method != HttpMethod.CUSTOM) {
@@ -192,9 +201,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final void locate(RouteTemplate prefixTemplate, LocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixTemplate, new RouteLocator(locator, tables));
+    }
+
+    @Override
+    public final void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+        locate(prefixTemplate, new RouteLocator(locator, tables));
+    }
+
+    private void locate(RouteTemplate prefixTemplate, RouteLocator locator) {
         Objects.requireNonNull(prefixTemplate, "prefix");
         if (prefixTemplate.isMicronaut()) {
-            locate(prefixTemplate.expression(), locator, tables);
+            locate(prefixTemplate.expression(), locator);
             return;
         }
         checkOpen();
@@ -204,7 +222,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
                 + prefixTemplate.engineId() + "' cannot be declared in the route group with the prefix " + routePrefix
                 + ": the prefix of a group is joined to Micronaut URI templates only. Declare it outside the group, or in a group without a prefix");
         }
-        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(new RouteLocator(locator, tables)));
+        MethodExecutionHandle<Object, Object> target = handle(HandlerMethod.of(locator));
         for (RouteAssembly.DefaultUriRoute route : assembly.addLocatorRoutes(prefixTemplate, DEFAULT_CONSUMES, target)) {
             // the routes of the target decide which media types they consume and produce
             // the located route carries the filters of the groups of the locator route
@@ -282,8 +300,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private ErrorRouteSpec errorRoute(Class<? extends Throwable> type, HandlerMethod<?> handler) {
         checkOpen();
-        // global, also when declared in a group
-        RouteAssembly.DefaultErrorRoute route = assembly.addErrorRoute(null, type, handle(handler));
+        // global on the builder, local to the routes of the group in a group
+        RouteAssembly.RouteGroup settings = groupSettings;
+        RouteAssembly.DefaultErrorRoute route = settings == null
+            ? assembly.addErrorRoute(null, type, handle(handler))
+            : settings.addErrorRoute(type, handle(handler));
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
@@ -295,8 +316,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private StatusRouteSpec statusRoute(HttpStatus status, HandlerMethod<?> handler) {
         checkOpen();
-        // global, also when declared in a group
-        RouteAssembly.DefaultStatusRoute route = assembly.addStatusRoute(null, status, handle(handler));
+        // global on the builder, local to the routes of the group in a group
+        RouteAssembly.RouteGroup settings = groupSettings;
+        RouteAssembly.DefaultStatusRoute route = settings == null
+            ? assembly.addStatusRoute(null, status, handle(handler))
+            : settings.addStatusRoute(status, handle(handler));
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {

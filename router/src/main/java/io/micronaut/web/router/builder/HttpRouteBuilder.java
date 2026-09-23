@@ -275,10 +275,34 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler);
 
     /**
-     * Handle the exceptions of a type, and of its subtypes, with a handler function, like an
-     * {@code @Error(global = true)} method: it answers requests to controller routes and handler
-     * routes that fail with such an exception. An error route declared in a {@link HttpRouteGroup}
-     * is global too: the group neither prefixes nor filters it.
+     * Handle the exceptions of a type, and of its subtypes, with a handler function. Where it is
+     * declared decides which routes it answers for:
+     * <ul>
+     *     <li>declared on the builder of an {@link HttpRoutes} bean, it is global, like an
+     *     {@code @Error(global = true)} method: it answers requests to controller routes and
+     *     handler routes that fail with such an exception;</li>
+     *     <li>declared in a {@link HttpRouteGroup group}, it is local to the routes of the group
+     *     and of its nested groups, including the routes they locate, like an {@code @Error}
+     *     method of a controller is local to the routes of the controller.</li>
+     * </ul>
+     *
+     * <pre>{@code
+     * routes.error(NoSuchFileException.class, (request, error) -> HttpResponse.notFound()); // global
+     * routes.path("/api", api -> {
+     *     api.error(IllegalArgumentException.class, (request, error) -> HttpResponse.badRequest(error.getMessage())); // /api routes only
+     *     api.GET("/orders/{id}", ordersHandler);
+     * });
+     * }</pre>
+     *
+     * <p>The error route of a failed handler route is looked up in its innermost group first,
+     * then in the groups around it, then among the global error routes, the error routes of
+     * controllers and of {@link HttpRoutes} beans; within each level, the error route of the
+     * closest exception type answers. So a group's error route for a supertype wins over a global
+     * error route for the exact type, like the local error route of a controller does. A route
+     * that {@link HttpRouteSpec#implementing implements} a bean method first has the local
+     * error routes of the bean class. An error of a request no route matched, e.g. a
+     * {@code 404} or a {@code 405}, is answered by the global error routes only. A route table
+     * built at runtime can declare error routes in its groups only.</p>
      *
      * @param type    The type of the exception
      * @param handler The handler
@@ -288,10 +312,16 @@ public interface HttpRouteBuilder {
     <E extends Throwable> ErrorRouteSpec error(Class<E> type, ErrorRouteHandler<E> handler);
 
     /**
-     * Handle the responses of a status with a handler function, like an
-     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}. A status
-     * route declared in a {@link HttpRouteGroup} is global too: the group neither prefixes nor
-     * filters it.
+     * Handle the responses of a status with a handler function, e.g. to answer {@code 404}.
+     * Declared on the builder of an {@link HttpRoutes} bean, it is global, like an
+     * {@code @Error(status = ..., global = true)} method; declared in a
+     * {@link HttpRouteGroup group}, it is local to the routes of the group, like an
+     * {@code @Error(status = ...)} method of a controller: it answers the responses of that
+     * status that a route of the group produces, or an {@link io.micronaut.http.exceptions.HttpStatusException}
+     * of that status a route of the group throws, see {@link #error(Class, ErrorRouteHandler)}
+     * for the order of the lookup. A request under the prefix of a group that no route matches,
+     * a {@code 404}, is answered by the global status routes only, as no route of the group
+     * matched it.
      *
      * @param status  The status
      * @param handler The handler
@@ -301,8 +331,9 @@ public interface HttpRouteBuilder {
 
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function that completes
-     * the response later, like an {@code @Error(global = true)} method returning a
-     * {@code CompletionStage}. The error route is selected like one added with
+     * the response later, like an {@code @Error} method returning a {@code CompletionStage}:
+     * global on the builder, local to the routes of the group in a {@link HttpRouteGroup}. The
+     * error route is selected like one added with
      * {@link #error(Class, ErrorRouteHandler)}: the error route of the closest exception type
      * answers, whether its handler is synchronous or not.
      *
@@ -316,8 +347,9 @@ public interface HttpRouteBuilder {
 
     /**
      * Handle the responses of a status with a handler function that completes the response later,
-     * like an {@code @Error(status = ..., global = true)} method returning a
-     * {@code CompletionStage}.
+     * like an {@code @Error(status = ...)} method returning a {@code CompletionStage}: global on
+     * the builder, local to the routes of the group in a {@link HttpRouteGroup}, see
+     * {@link #status(HttpStatus, StatusRouteHandler)}.
      *
      * @param status  The status
      * @param handler The handler
@@ -499,6 +531,53 @@ public interface HttpRouteBuilder {
      * @since 5.3.0
      */
     void locate(RouteTemplate prefix, LocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
+     * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
+     * loaded from a database: the same as {@link #locate(String, LocatorHandler, Function)}, but
+     * the locator returns a stage of the target, and the router matches the rest of the path with
+     * the routes of the table of the target when the stage completes, without blocking the thread
+     * that matches the request. See {@link AsyncLocatorHandler}.
+     *
+     * <pre>{@code
+     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(items ->
+     *     items.GET("/items/{item}", (request, pathVariables) ->
+     *         HttpResponse.ok(pathVariables.locatedTarget(Order.class).item(pathVariables.getInt("item")))));
+     * routes.locateAsync("/orders/{id}",
+     *     (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), // completes with null: 404
+     *     order -> itemRoutes);
+     * }</pre>
+     *
+     * <p>The filters of the located route, the error routes and the server filters apply like
+     * for {@link #locate(String, LocatorHandler, Function)}; a table of a located target may
+     * locate again, synchronously or asynchronously. The target is located once per request.
+     * {@link io.micronaut.web.router.Router#findClosest} of an application with an asynchronous
+     * locator that has not located its target yet fails: the server matches such a request
+     * again when the stage completes.</p>
+     *
+     * @param prefixUri The URI template of the prefix
+     * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
+     * @param tables    The route table of a located target
+     * @since 5.3.0
+     */
+    void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target located asynchronously: {@link #locate(RouteTemplate, LocatorHandler, Function)}
+     * with the locator of {@link #locateAsync(String, AsyncLocatorHandler, Function)}.
+     *
+     * <pre>{@code
+     * routes.locateAsync(RouteTemplate.of("jaxrs", "/orders/{id: [0-9]+}"), (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), order -> itemRoutes);
+     * }</pre>
+     *
+     * @param prefix  The template of the prefix
+     * @param locator Locates the target later, or completes with {@code null} for {@code 404}
+     * @param tables  The route table of a located target
+     * @since 5.3.0
+     */
+    void locateAsync(RouteTemplate prefix, AsyncLocatorHandler locator, Function<Object, RouteTable> tables);
 
     /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
