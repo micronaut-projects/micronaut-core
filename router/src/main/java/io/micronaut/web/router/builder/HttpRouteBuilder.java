@@ -536,9 +536,10 @@ public interface HttpRouteBuilder {
      * @param prefix  The template of the prefix
      * @param locator Locates the target, or answers {@code null} for {@code 404}
      * @param tables  The route table of a located target
+     * @param <T>     The type of the target
      * @since 5.3.0
      */
-    void locate(RouteTemplate prefix, LocatorHandler locator, Function<Object, RouteTable> tables);
+    <T> void locate(RouteTemplate prefix, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables);
 
     /**
      * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
@@ -584,9 +585,10 @@ public interface HttpRouteBuilder {
      * @param prefix  The template of the prefix
      * @param locator Locates the target later, or completes with {@code null} for {@code 404}
      * @param tables  The route table of a located target
+     * @param <T>     The type of the target
      * @since 5.3.0
      */
-    void locateAsync(RouteTemplate prefix, AsyncLocatorHandler locator, Function<Object, RouteTable> tables);
+    <T> void locateAsync(RouteTemplate prefix, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables);
 
     /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters

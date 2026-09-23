@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.web.router.RouteTable;
 
 import java.util.function.Function;
@@ -174,4 +175,30 @@ public interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder {
      * @see #locateAsync(String, AsyncLocatorHandler, Function)
      */
     <U> void locateAsync(String prefixUri, LocatedAsyncLocatorHandler<T, ? extends U> locator, Function<? super U, RouteTable> tables);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target that a locator locates from the located target of this table.
+     *
+     * @param prefix  The template of the prefix, relative to the prefix of the locator of this table
+     * @param locator Locates the target from the target of this table, or answers {@code null} for {@code 404}
+     * @param tables  The route table of a located target
+     * @param <U>     The type of the target the locator locates
+     * @see #locate(RouteTemplate, LocatorHandler, Function)
+     */
+    <U> void locate(RouteTemplate prefix, LocatedLocatorHandler<T, ? extends U> locator, Function<? super U, RouteTable> tables);
+
+    /**
+     * Route the requests under a prefix of any registered
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine route template engine} to the routes
+     * of a target that a locator locates later from the located target of this table.
+     *
+     * @param prefix  The template of the prefix, relative to the prefix of the locator of this table
+     * @param locator Locates the target later from the target of this table, or completes with {@code null} for {@code 404}
+     * @param tables  The route table of a located target
+     * @param <U>     The type of the target the locator locates
+     * @see #locateAsync(RouteTemplate, AsyncLocatorHandler, Function)
+     */
+    <U> void locateAsync(RouteTemplate prefix, LocatedAsyncLocatorHandler<T, ? extends U> locator, Function<? super U, RouteTable> tables);
 }

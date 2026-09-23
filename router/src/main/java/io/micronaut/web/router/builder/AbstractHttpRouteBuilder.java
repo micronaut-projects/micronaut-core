@@ -200,12 +200,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final void locate(RouteTemplate prefixTemplate, LocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locate(RouteTemplate prefixTemplate, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixTemplate, new RouteLocator(locator, tables));
     }
 
     @Override
-    public final void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locateAsync(RouteTemplate prefixTemplate, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixTemplate, new RouteLocator(locator, tables));
     }
 
