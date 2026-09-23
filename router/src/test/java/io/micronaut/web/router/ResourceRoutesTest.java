@@ -127,6 +127,15 @@ class ResourceRoutesTest {
     }
 
     @Test
+    void theResourcesWithoutAPrefixAreAtThePrefixOfTheGroup() {
+        Router router = router(routes -> routes.path("/app", app -> app.resources(resources("app", "path"))));
+
+        assertEquals("/app", route(router, HttpRequest.GET("/app")).getUriMatchTemplate().toString());
+        assertEquals("/app/{+path}", route(router, HttpRequest.GET("/app/main.js")).getUriMatchTemplate().toString());
+        assertEquals("main.js", path(router, "/app/main.js"));
+    }
+
+    @Test
     void theMoreSpecificRoutesUnderThePrefixTakePrecedence() {
         Router router = router(routes -> {
             routes.resources("/assets", resources("assets", "path"));

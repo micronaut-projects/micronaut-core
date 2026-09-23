@@ -54,6 +54,11 @@ class GroupRoutesTest {
     }
 
     @Test
+    void aRouteWithoutAPathIsAtThePrefixOfTheGroup() {
+        assertEquals("api of acme", client.toBlocking().retrieve(HttpRequest.GET("/api").header("X-Tenant", "acme")));
+    }
+
+    @Test
     void aNestedGroupAddsItsFilters() {
         BlockingHttpClient http = client.toBlocking();
         HttpClientResponseException forbidden = assertThrows(HttpClientResponseException.class,

@@ -4,6 +4,8 @@ package io.micronaut.docs.server.functional;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.version.annotation.Version;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
@@ -49,12 +51,6 @@ public class AuditedRoutes implements HttpRoutes {
             return "paid " + amount;
         }
     }
-
-    @Singleton
-    @Audited
-    @Requires(property = "spec.name", value = "AuditedRoutesTest")
-    public static class Refunds { // <4>
-    }
     // end::annotations[]
 
     // tag::declaration[]
@@ -74,10 +70,17 @@ public class AuditedRoutes implements HttpRoutes {
         // tag::annotationRoutes[]
         routes.POST("/payments/{amount}", (request, pathVariables) ->
                 HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <5>
+            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <4>
         routes.POST("/refunds/{amount}", (request, pathVariables) ->
                 HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotationMetadata(beanContext.getBeanDefinition(Refunds.class)); // <6>
+            .annotate(Audited.class); // <5>
+        routes.GET("/receipts/{id}", (request, pathVariables) ->
+                HttpResponse.ok("receipt v1 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
+            .annotate(AnnotationValue.builder(Version.class).value("1").build()); // <6>
+        routes.GET("/receipts/{id}", (request, pathVariables) ->
+                HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
+            .annotate(Version.class, version -> version.value("2")) // <7>
+            .annotate(Audited.class);
         routes.GET("/prices", (request, pathVariables) -> HttpResponse.ok("prices").contentType(MediaType.TEXT_PLAIN_TYPE));
         // end::annotationRoutes[]
 

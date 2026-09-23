@@ -160,10 +160,10 @@ class RouteGroupsTest {
         Router router = router(routes -> routes.path("/api", api -> {
             api.after((request, response) -> trace.add("api-after " + response.code()));
             api.GET("/route-rejects", RouteGroupsTest::ok)
-                .before(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
+                .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
                 .after((request, response) -> trace.add("route-after " + response.code()));
             api.path("/inner", inner -> {
-                inner.before(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED));
+                inner.beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED));
                 inner.after((request, response) -> trace.add("inner-after " + response.code()));
                 inner.GET("/group-rejects", RouteGroupsTest::ok)
                     .after((request, response) -> trace.add("route-after " + response.code()));
@@ -194,7 +194,7 @@ class RouteGroupsTest {
                 .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")));
             assertTrue(same == group);
             HttpRouteSpec route = group.GET("/all", RouteGroupsTest::ok)
-                .before(request -> null)
+                .before(request -> { })
                 .after((request, response) -> { })
                 .produces(MediaType.TEXT_PLAIN_TYPE);
             assertNotNull(route);
@@ -206,12 +206,45 @@ class RouteGroupsTest {
     }
 
     @Test
+    void everyReplacingRequestFilterVariantAppliesInAGroupAndCanAnswer() {
+        List<String> trace = new ArrayList<>();
+        Router router = router(routes -> {
+            routes.group(group -> {
+                // the four families of request filters line up with the response filters
+                group.beforeReplacing(request -> record(trace, "replacing"))
+                    .beforeReplacing((request, propagatedContext) -> record(trace, "context-replacing"))
+                    .beforeReplacingAsync(request -> CompletableFuture.completedFuture(record(trace, "async-replacing")))
+                    .beforeReplacingAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-replacing")))
+                    .before(request -> {
+                        trace.add("in-place");
+                        request.setAttribute("in-place", true);
+                    })
+                    .beforeAsync(request -> CompletableFuture.completedFuture(trace.add("async-in-place")));
+                group.GET("/replacing", RouteGroupsTest::ok);
+            });
+            routes.group(group -> {
+                group.beforeReplacingAsync(request -> CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.FORBIDDEN)));
+                group.before(request -> trace.add("not reached"));
+                group.GET("/answered", RouteGroupsTest::ok);
+            });
+        });
+
+        run(router, HttpRequest.GET("/replacing"), trace);
+        assertEquals(List.of("replacing", "context-replacing", "async-replacing", "async-context-replacing", "in-place",
+            "async-in-place", "handler"), trace);
+
+        trace.clear();
+        assertEquals(HttpStatus.FORBIDDEN, run(router, HttpRequest.GET("/answered"), trace).getStatus());
+        assertEquals(List.of(), trace);
+    }
+
+    @Test
     void aGroupIsClosedWhenItsLambdaReturns() {
         AtomicReference<HttpRouteGroup> leaked = new AtomicReference<>();
         router(routes -> routes.path("/api", leaked::set));
         HttpRouteGroup group = leaked.get();
 
-        assertThrows(IllegalStateException.class, () -> group.before(request -> null));
+        assertThrows(IllegalStateException.class, () -> group.before(request -> { }));
         assertThrows(IllegalStateException.class, () -> group.afterAsync((request, response) -> CompletableFuture.completedFuture(null)));
         assertThrows(IllegalStateException.class, () -> group.GET("/late", RouteGroupsTest::ok));
         assertThrows(IllegalStateException.class, () -> group.group(nested -> { }));
@@ -239,7 +272,7 @@ class RouteGroupsTest {
         // changed: the error and status routes of a group were global, they are local to the group now
         Router router = router(routes -> {
             routes.path("/api", api -> {
-                api.before(request -> null);
+                api.before(request -> { });
                 api.GET("/inside", RouteGroupsTest::ok);
                 api.error(IllegalStateException.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT));
                 api.status(HttpStatus.NOT_FOUND, request -> HttpResponse.notFound("none"));

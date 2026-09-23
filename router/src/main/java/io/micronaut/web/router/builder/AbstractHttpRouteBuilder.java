@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
@@ -63,6 +64,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      */
     private final @Nullable RoutePrefix prefix;
     /**
+     * Resolves the placeholders of the ports given as strings, or {@code null} without an environment.
+     */
+    private final @Nullable PropertyPlaceholderResolver placeholderResolver;
+    /**
      * Whether the routes of the builder were read: see {@link DefaultHttpRouteBuilder#close()}.
      */
     private boolean closed;
@@ -72,36 +77,55 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * @param groupFilters  The filters of the group the routes are declared in, or {@code null}
      * @param groupSettings The other settings of the group the routes are declared in, or {@code null}
      * @param prefix        The prefix of the URI templates of the routes, or {@code null}
+     * @param placeholderResolver Resolves the placeholders of the ports given as strings, or {@code null}
      */
     AbstractHttpRouteBuilder(RouteAssembly assembly,
                              RouteAssembly.@Nullable RouteFilters groupFilters,
                              RouteAssembly.@Nullable RouteGroup groupSettings,
-                             @Nullable RoutePrefix prefix) {
+                             @Nullable RoutePrefix prefix,
+                             @Nullable PropertyPlaceholderResolver placeholderResolver) {
         this.assembly = assembly;
         this.groupFilters = groupFilters;
         this.groupSettings = groupSettings;
         this.prefix = prefix;
+        this.placeholderResolver = placeholderResolver;
+    }
+
+    /**
+     * @param port A port given as a string, e.g. {@code ${my.admin.port}}
+     * @return The port, see {@link RouteArguments#port(String, PropertyPlaceholderResolver)}
+     */
+    final int resolvePort(String port) {
+        return RouteArguments.port(port, placeholderResolver);
+    }
+
+    /**
+     * @param routes The routes of a handler
+     * @return Their spec
+     */
+    private HttpRouteSpec spec(HandlerUriRoute... routes) {
+        return new DefaultHttpRouteSpec(List.of(routes), this::resolvePort);
     }
 
     @Override
     public final HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), null));
+        return spec(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         // the body argument is annotated @Body
-        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(bodyType, handler), null));
+        return spec(route(method, uri, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), null));
+        return spec(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return spec(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -116,22 +140,22 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
-        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), null));
+        return spec(declare(route, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(bodyType, handler), null));
+        return spec(declare(route, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), null));
+        return spec(declare(route, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return spec(declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -158,22 +182,22 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)));
+        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
+        return spec(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)));
+        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
     }
 
     @Override
     public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -203,10 +227,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
             prefix = '/' + prefix;
         }
         // the prefix itself, e.g. for the index file, and every path under it
-        return new DefaultHttpRouteSpec(List.of(
+        return spec(
             route(HttpMethod.GET, prefix.isEmpty() ? "/" : prefix, HandlerMethod.of(resources), null),
             route(HttpMethod.GET, prefix + "/{+" + pathVariable + "}", HandlerMethod.of(resources), null)
-        ));
+        );
     }
 
     @Override
@@ -256,7 +280,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     private void declareGroup(@Nullable RoutePrefix groupPrefix, Consumer<HttpRouteGroup> routes) {
         checkOpen();
         DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters),
-            assembly.routeGroup(groupSettings), groupPrefix);
+            assembly.routeGroup(groupSettings), groupPrefix, placeholderResolver);
         try {
             routes.accept(group);
         } finally {
@@ -352,7 +376,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return (MethodExecutionHandle<Object, Object>) method;
     }
 
-    private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+    private HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
         Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
@@ -365,7 +389,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
-        return new DefaultHttpRouteSpec(List.copyOf(routes));
+        return spec(routes.toArray(new HandlerUriRoute[0]));
     }
 
     /**

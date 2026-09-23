@@ -19,6 +19,8 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.MediaType;
 
+import java.util.Objects;
+
 /**
  * An error route to a handler function, to configure after it was added with the
  * {@link HttpRouteBuilder}.
@@ -48,4 +50,16 @@ public sealed interface ErrorRouteSpec permits DefaultErrorRouteSpec {
      * @since 5.3.0
      */
     ErrorRouteSpec responseType(Argument<?> responseType);
+
+    /**
+     * Declare the type of the body of the responses as a class: {@code responseType(Argument.of(responseType))},
+     * see {@link #responseType(Argument)}.
+     *
+     * @param responseType The type of the body of the response
+     * @return The route
+     * @since 5.3.0
+     */
+    default ErrorRouteSpec responseType(Class<?> responseType) {
+        return responseType(Argument.of(Objects.requireNonNull(responseType, "responseType")));
+    }
 }

@@ -30,7 +30,7 @@ public class GroupRoutes implements HttpRoutes {
     public void routes(HttpRouteBuilder routes) {
         // tag::groups[]
         routes.path("/api", api -> { // <1>
-            api.before((request, propagatedContext) -> { // <2>
+            api.beforeReplacing((request, propagatedContext) -> { // <2>
                 String tenant = request.getHeaders().get("X-Tenant");
                 if (tenant == null) {
                     return HttpResponse.badRequest("Missing tenant");
@@ -44,7 +44,7 @@ public class GroupRoutes implements HttpRoutes {
                 text("orders of " + PropagatedContext.get().get(Tenant.class).id()));
 
             api.path("/admin", admin -> { // <4>
-                admin.before(request -> "admin".equals(request.getHeaders().get("X-Role"))
+                admin.beforeReplacing(request -> "admin".equals(request.getHeaders().get("X-Role"))
                     ? null
                     : HttpResponse.status(HttpStatus.FORBIDDEN));
                 admin.GET("/users", (request, pathVariables) -> text("users"));
@@ -54,12 +54,13 @@ public class GroupRoutes implements HttpRoutes {
                     text("report " + pathVariables.getInt("id") + " as " + request.getHeaders().get("X-Report-Format")))
                 .before(request -> { // <5>
                     request.getHeaders().add("X-Report-Format", "summary");
-                    return null;
                 })
                 .afterReplacing((request, response) -> // <6>
                     response.getStatus() == HttpStatus.OK && request.getHeaders().contains("X-Legacy")
                         ? HttpResponse.status(HttpStatus.GONE)
                         : null);
+
+            api.GET((request, pathVariables) -> text("api of " + PropagatedContext.get().get(Tenant.class).id())); // <7>
         });
         // end::groups[]
 
@@ -70,7 +71,6 @@ public class GroupRoutes implements HttpRoutes {
         routes.filter("/v1/**").preMatching() // <2>
             .before(request -> {
                 request.uri(URI.create(request.getUri().toString().replaceFirst("^/v1", "/api")));
-                return null;
             });
         // end::serverFilters[]
     }

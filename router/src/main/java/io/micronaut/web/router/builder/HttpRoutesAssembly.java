@@ -15,6 +15,7 @@
  */
 package io.micronaut.web.router.builder;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
@@ -57,7 +58,9 @@ final class HttpRoutesAssembly implements AssembledRoutes {
                        @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
         this.assembly = new RouteAssembly(executionHandleLocator, conversionService,
             uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath);
-        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        // the ports given as strings are resolved like the port of a @Controller
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly,
+            executionHandleLocator instanceof ApplicationContext context ? context.getEnvironment().getPlaceholderResolver() : null);
         List<HttpRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
         try {
