@@ -91,6 +91,17 @@ public interface RawHttpClient extends Closeable {
     }
 
     /**
+     * The {@link AsyncRawHttpClient} view of this client, with {@link java.util.concurrent.CompletionStage}
+     * results instead of reactive streams. Closing it closes this client.
+     *
+     * @return The async client
+     * @since 5.3.0
+     */
+    default AsyncRawHttpClient toAsyncRaw() {
+        return new DefaultAsyncOverRawHttpClient(this);
+    }
+
+    /**
      * Create a new {@link RawHttpClient}.
      * Note that this method should only be used outside the context of a Micronaut application.
      * The returned {@link RawHttpClient} is not subject to dependency injection.
