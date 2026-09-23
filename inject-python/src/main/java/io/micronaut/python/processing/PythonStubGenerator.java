@@ -1314,14 +1314,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement element = model.element();
         final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
         final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
-        if (hasDynamicBeanProperties && pythonValueFinal != null) {
-            ExpressionDef storedValue = aThis.field(pythonValueField(model));
-            return storedValue.isNonNull().doIfElse(
-                storedValue.returning(),
-                ExpressionDef.nullValue().returning()
-            );
-        }
-        if (beanProperties.isEmpty() && pythonValueFinal != null) {
+        // A bean with custom Python properties keeps its state in Python, and a bean without properties
+        // has no state of its own: neither is reconstructed from the Java fields, the Python object is
+        // created through the Python class when the lazy no-argument constructor left it uncreated.
+        if ((hasDynamicBeanProperties || beanProperties.isEmpty()) && pythonValueFinal != null) {
             ExpressionDef storedValue = aThis.field(pythonValueField(model));
             ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                 isAbstractIntro ? NEW_INTRODUCTION : NEW_INSTANCE,
