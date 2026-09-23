@@ -33,7 +33,9 @@ import java.util.Optional;
 
 /**
  * Binds the {@link AsyncServerHttpRequest} of an asynchronous handler: a view of the request,
- * created for the route invocation, that owns the one read of the body.
+ * created for the route invocation, that owns the one read of the body. What a read left open,
+ * e.g. the parts of a form, is released when the stage returned by a handler route completes,
+ * and for a controller method that declares the request, when the request ends.
  *
  * @author Denis Stepanov
  * @since 5.3.0

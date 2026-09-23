@@ -1,0 +1,19 @@
+A lambda has no annotations. The features that read the annotations of the matched route, such as filter binding with a ann:http.annotation.FilterMatcher[] annotation, route versioning with `@Version`, `@CrossOrigin`, `@RouteCondition`, the message body writers, and security rules such as `@Secured` from Micronaut Security, need the route to carry them. A handler route gets annotations in two ways:
+
+* `annotationMetadata(AnnotationMetadata)` gives the route the given annotations;
+* `implementing(ExecutableMethod)` makes the route implement a bean method: the route has the annotations of the method, and its target method, declaring type and method name are those of the bean method, e.g. for the local `@Error` methods of the bean class. The arguments of the route stay those of the handler.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", indent=0, title="An annotation that binds a filter"]
+
+<1> A filter matcher annotation.
+<2> A filter bean that only filters the routes annotated with `@Audited`.
+<3> A bean method with the annotation. It must be executable to be looked up.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotationRoutes", indent=0, title="Handler routes with annotations"]
+
+<4> The route implements the bean method and has its annotations: the filter applies.
+<5> The route has the annotations of the method only.
+
+The route of `/prices` has no annotation, and the filter does not apply to it.
+
+This is mostly meant for framework integrations that route the methods of their own resource classes with handler functions, e.g. a JAX-RS implementation, and for generated code.

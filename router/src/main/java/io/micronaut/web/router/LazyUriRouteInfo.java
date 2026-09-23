@@ -98,6 +98,7 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
             declaration.rawLength(), declaration.pathVariableCount(), declaration.patternVariableCount(), implicitHead, order, String.valueOf(declaration), declaration, builder);
     }
 
+    @SuppressWarnings("ParameterNumber")
     private LazyUriRouteInfo(HttpMethod httpMethod,
                              String methodKey,
                              RouteTemplate template,

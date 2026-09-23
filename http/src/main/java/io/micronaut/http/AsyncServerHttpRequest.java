@@ -22,6 +22,7 @@ import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.OptionalLong;
@@ -76,6 +77,19 @@ import java.util.concurrent.CompletionStage;
  * <p>A filter that reads the body, e.g. with a {@code @Body} argument, reads a copy, and is not
  * the handler's read. It buffers the body before the handler can read it.</p>
  *
+ * <p>A filter that continues with a mutable request whose body it set, see
+ * {@link MutableHttpRequest#body(Object)}, replaces the bytes of the request with that body. A
+ * body set to {@code null} is no body: {@link #hasBody()} is {@code false}, {@link #body(Argument)}
+ * completes like it does for a request without a body, with {@code null} for a nullable type and
+ * otherwise with the error of a missing {@code @Body} argument, {@link #text()} is empty,
+ * {@link #bytes(int)} is an empty array, and {@link #takeBody()} is an empty body. A body set to an
+ * object is read with {@link #body(Argument)}, which converts it like a {@code @Body} argument of
+ * a controller: the readers of the bytes, {@link #text()}, {@link #bytes(int)},
+ * {@link #elements(Argument)}, {@link #transferTo(Path)}, {@link #form()}, {@link #parts()} and
+ * {@link #takeBody()}, fail with an {@link IllegalStateException}. A
+ * filter that continues with another {@link ServerHttpRequest} replaces the bytes with its
+ * {@link ServerHttpRequest#byteBody() byteBody()}. The body is read once either way.</p>
+ *
  * <h2>{@code 100 Continue}</h2>
  * <p>A request that expects {@code 100 Continue} is answered with {@code 100 Continue} when the
  * body is first read. A handler that answers without reading the body, e.g. with {@code 401},
@@ -113,7 +127,7 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
      * @throws IllegalArgumentException if the type is a reactive type
      * @see #body(Argument)
      */
-    <T> CompletionStage<T> body(Class<T> type);
+    <T> CompletionStage<@Nullable T> body(Class<T> type);
 
     /**
      * Decode the whole body to a type, like a {@code @Body} argument of a controller: with the
@@ -128,12 +142,13 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
      *
      * @param type The type
      * @param <T>  The type
-     * @return Completes with the body, or exceptionally with the exception a controller's body
-     * binding fails with
+     * @return Completes with the body, {@code null} for a nullable type and a request without a
+     * body, or exceptionally with the exception a controller's body binding fails with
      * @throws IllegalStateException    if the body was already read
-     * @throws IllegalArgumentException if the type is a reactive type
+     * @throws IllegalArgumentException if the type is a reactive or asynchronous type, or an
+     * {@link java.io.InputStream}
      */
-    <T> CompletionStage<T> body(Argument<T> type);
+    <T> CompletionStage<@Nullable T> body(Argument<T> type);
 
     /**
      * Read the whole body as text, in the charset of the request, with the limit of the server
@@ -175,7 +190,9 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
      * @param type The type of an element
      * @param <T>  The type of an element
      * @return The elements, read as they are asked for
-     * @throws IllegalStateException if the body was already read
+     * @throws IllegalStateException    if the body was already read
+     * @throws IllegalArgumentException if the type of an element is a reactive or asynchronous
+     * type, or an {@link java.io.InputStream}
      * @see #elements(Argument)
      */
     <T> BodyElements<T> elements(Class<T> type);
@@ -194,8 +211,10 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
      * @param type The type of an element
      * @param <T>  The type of an element
      * @return The elements, read as they are asked for. They are closed when the stage returned
-     * by the handler completes
-     * @throws IllegalStateException if the body was already read
+     * by the handler route completes, or for a controller method, when the request ends
+     * @throws IllegalStateException    if the body was already read
+     * @throws IllegalArgumentException if the type of an element is a reactive or asynchronous
+     * type, or an {@link java.io.InputStream}: an element is decoded whole
      */
     <T> BodyElements<T> elements(Argument<T> type);
 
@@ -224,7 +243,7 @@ public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
 
     /**
      * Read the submitted form part by part, as it arrives. The parts are closed when the stage
-     * returned by the handler completes.
+     * returned by the handler route completes, or for a controller method, when the request ends.
      *
      * @return The parts of the form
      * @throws IllegalStateException if the body was already read

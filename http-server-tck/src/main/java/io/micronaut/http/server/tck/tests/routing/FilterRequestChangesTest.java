@@ -51,6 +51,7 @@ import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.net.URI;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Map;
@@ -155,6 +156,17 @@ public class FilterRequestChangesTest {
     }
 
     @Test
+    void theTextOfTheBodyIsDecodedInTheCharsetOfTheRequestAFilterContinuedWith() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // the client sends UTF-8 and declares no charset, the filter continues with a request
+            // in ISO-8859-1: the handler decodes the bytes in ISO-8859-1
+            String text = "caf\u00e9";
+            String asLatin1 = new String(text.getBytes(StandardCharsets.UTF_8), StandardCharsets.ISO_8859_1);
+            assertOk(server, HttpRequest.POST("/rc/charset/async", text).contentType(MediaType.TEXT_PLAIN_TYPE), asLatin1);
+        }
+    }
+
+    @Test
     void aPreMatchingFilterReplacesTheWholeRequest() throws IOException {
         try (ServerUnderTest server = server()) {
             assertOk(server, text(HttpRequest.POST("/rc/whole", "original")), "PUT /rc/whole/target from=filter replaced=yes body=whole body");
@@ -200,6 +212,21 @@ public class FilterRequestChangesTest {
             @Override
             public String getMethodName() {
                 return method.name();
+            }
+        };
+    }
+
+    private static <B> HttpRequest<B> withCharset(HttpRequest<B> request, Charset charset) {
+        MediaType contentType = new MediaType(MediaType.TEXT_PLAIN, Map.of(MediaType.CHARSET_PARAMETER, charset.name()));
+        return new HttpRequestWrapper<>(request) {
+            @Override
+            public Charset getCharacterEncoding() {
+                return charset;
+            }
+
+            @Override
+            public Optional<MediaType> getContentType() {
+                return Optional.of(contentType);
             }
         };
     }
@@ -273,6 +300,7 @@ public class FilterRequestChangesTest {
                         return withBody(request, null, bytes.toString(StandardCharsets.UTF_8).toUpperCase(Locale.ROOT));
                     }
                 }));
+            routes.filter("/rc/charset/**").preMatching().before(request -> withCharset(request, StandardCharsets.ISO_8859_1));
             routes.filter("/rc/whole").preMatching().before(request -> {
                 request.uri(URI.create("/rc/whole/target?from=filter"));
                 request.header("X-Replaced", "yes");
@@ -297,6 +325,8 @@ public class FilterRequestChangesTest {
                 routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async-body", (request, pathVariables) ->
                     request.body(String.class).thenApply(text -> textResponse(request.getMethodName() + " async-body " + text))).consumesAll();
             }
+            routes.asyncPOST("/rc/charset/async", (request, pathVariables) ->
+                request.text().thenApply(FilterRequestChangesTest::textResponse)).consumesAll();
             routes.POST("/rc/replace/json", Argument.mapOf(String.class, String.class), (request, pathVariables, body) ->
                 textResponse(body.get("NAME")));
             routes.PUT("/rc/whole/target", Argument.STRING, (request, pathVariables, body) -> textResponse(request.getMethodName()

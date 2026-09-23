@@ -44,16 +44,19 @@ import java.util.function.Function;
  * }</pre>
  *
  * <p>One operation at a time: start the next one when the stage of the previous one completed;
- * an operation started while another one is in progress fails with an
- * {@link IllegalStateException}. A consumer callback owns its part until the stage it returned
- * completes; then what it did not consume is discarded, and the next part is only read once that
- * is done. A callback that returns {@code null} fails the operation.</p>
+ * the stage of an operation started while another one is in progress fails with an
+ * {@link IllegalStateException}: the operations report every failure through their stage, and
+ * do not throw. A consumer callback owns its part until the stage it returned completes; then
+ * what it did not consume is discarded, and the next part is only read once that is done. A
+ * callback that returns {@code null} fails the operation.</p>
  *
  * <p>The end of the form and closing are different: at the end of the form, {@link #part} completes
  * with {@code false} and {@link #forEach} completes normally, while closing the parts during an
  * operation completes that operation with a {@link java.util.concurrent.CancellationException},
- * and an operation started after closing fails with an {@link IllegalStateException}. The parts
- * are closed when the stage returned by the handler completes, and when the request ends.</p>
+ * and the stage of an operation started after closing fails with an
+ * {@link IllegalStateException}. The parts read by an asynchronous handler route are closed when
+ * the stage returned by the handler completes; the parts bound to a controller method are closed
+ * when the request ends.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -68,7 +71,9 @@ public interface FormParts extends AutoCloseable {
      *
      * @param consumer Consumes a part, completing when it is done with it
      * @return Completes when every remaining part is consumed, or exceptionally when reading the
-     * form or a consumer fails
+     * form or a consumer fails, with an {@link IllegalStateException} when another operation is
+     * in progress or the parts were closed, and with the cause when the form cannot be read, e.g.
+     * a body that was already read
      */
     CompletionStage<Void> forEach(Function<? super FormPart, ? extends CompletionStage<?>> consumer);
 
@@ -80,7 +85,8 @@ public interface FormParts extends AutoCloseable {
      * @param name     The name of the part
      * @param consumer Consumes the part, completing when it is done with it
      * @return Completes with {@code true} when the part was consumed, {@code false} when the form
-     * ended without it, or exceptionally when reading the form or the consumer fails
+     * ended without it, or exceptionally when reading the form or the consumer fails, like
+     * {@link #forEach}
      */
     CompletionStage<Boolean> part(String name, Function<? super FormPart, ? extends CompletionStage<?>> consumer);
 

@@ -1379,7 +1379,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         String path = UriTemplateMatcher.normalizeForMatching(request.getPath());
         for (CompiledRoutes compiled : compiledRoutes) {
-            String[] captured = new String[compiled.matcher.maxVariables()];
+            String[] captured = new String[compiled.capturedSize];
             UriRouteInfo<Object, Object> route = null;
             boolean exclusive = false;
             int ordinal = compiled.matcher.match(method, path, captured);
@@ -1429,7 +1429,19 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             for (int ordinal = 0; ordinal < headExclusive.length; ordinal++) {
                 headExclusive[ordinal] = isExclusive(routes.headByOrdinal[ordinal], segments);
             }
-            result[i++] = new CompiledRoutes(routes.matcher, routes.byOrdinal, routes.headByOrdinal, exclusive, headExclusive);
+            // room for the variables of every bound route, even if the matcher under-reports them
+            int capturedSize = routes.matcher.maxVariables();
+            for (UriRouteInfo<Object, Object> route : routes.byOrdinal) {
+                if (route instanceof IndexedRoute indexed) {
+                    capturedSize = Math.max(capturedSize, indexed.getPathVariableCount());
+                }
+            }
+            for (UriRouteInfo<Object, Object> route : routes.headByOrdinal) {
+                if (route instanceof IndexedRoute indexed) {
+                    capturedSize = Math.max(capturedSize, indexed.getPathVariableCount());
+                }
+            }
+            result[i++] = new CompiledRoutes(routes.matcher, routes.byOrdinal, routes.headByOrdinal, exclusive, headExclusive, capturedSize);
         }
         return result;
     }
@@ -1530,6 +1542,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         CompiledRouteMatcher matcher = declaration.matcher();
         if (matcher == null) {
             return;
+        }
+        if (matcher.maxVariables() < 0) {
+            throw new IllegalStateException("The compiled route matcher " + matcher + " of the route declaration "
+                + constant.getDeclaringClass().getName() + "." + constant.name() + " has a negative maxVariables(): " + matcher.maxVariables());
         }
         int ordinal = constant.ordinal();
         CompiledRoutes routes = compiled.get(matcher);
@@ -1826,15 +1842,19 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * @param headByOrdinal The implicit {@code HEAD} routes of the bound {@code GET} routes, by ordinal
      * @param exclusive     Whether the route of an ordinal is the only route that can match its paths
      * @param headExclusive Whether the implicit {@code HEAD} route of an ordinal is the only route that can match its paths
+     * @param capturedSize  The size of the array the matcher captures the path variables into: at
+     *                      least its {@link CompiledRouteMatcher#maxVariables()} and the number of
+     *                      path variables of every bound route
      */
     private record CompiledRoutes(CompiledRouteMatcher matcher,
                                   UriRouteInfo<Object, Object>[] byOrdinal,
                                   UriRouteInfo<Object, Object>[] headByOrdinal,
                                   boolean[] exclusive,
-                                  boolean[] headExclusive) {
+                                  boolean[] headExclusive,
+                                  int capturedSize) {
 
         CompiledRoutes(CompiledRouteMatcher matcher, UriRouteInfo<Object, Object>[] byOrdinal, UriRouteInfo<Object, Object>[] headByOrdinal) {
-            this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length]);
+            this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length], matcher.maxVariables());
         }
     }
 

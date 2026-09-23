@@ -120,16 +120,19 @@ public final class RouteTableFactory {
      * Build a route table of routes to handler functions, declared like the routes of an
      * {@link HttpRoutes} bean.
      *
-     * @param routes Declares the URI routes of the table. Status and error routes are not
-     *               supported: they belong to the application router
+     * @param routes Declares the URI routes of the table. Error and status routes declared in a
+     *               group are local to its routes and supported; global ones, declared on the
+     *               builder itself, server filters and ports are not: they belong to the
+     *               application router
      * @return The table
-     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     * @throws IllegalArgumentException if the routes declare global error or status routes,
+     *                                  server filters or ports
      */
     public RouteTable buildHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
             contextPath, route -> { });
-        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));
     }
@@ -142,19 +145,38 @@ public final class RouteTableFactory {
      * {@link io.micronaut.web.router.builder.PathVariables#locatedTarget()}: build it once per
      * type of target.
      *
-     * @param routes Declares the URI routes of the table, including other locator routes. Status
-     *               and error routes are not supported: they belong to the application router
+     * @param routes Declares the URI routes of the table, including other locator routes. Error
+     *               and status routes declared in a group are local to its routes and supported;
+     *               global ones, declared on the builder itself, server filters and ports are
+     *               not: they belong to the application router
      * @return The table
-     * @throws IllegalArgumentException if the routes declare anything but URI routes
+     * @throws IllegalArgumentException if the routes declare global error or status routes,
+     *                                  server filters or ports
      * @since 5.3.0
      */
     public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         // relative to the prefix of the locator: no context path, so templates of every engine are supported
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, (String) null, route -> { });
-        routes.routes(new DefaultHttpRouteBuilder(assembly));
+        declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly));
+    }
+
+    /**
+     * Declare the routes on a builder that is closed when they returned: a route declared on it
+     * later, which the table would not have, fails.
+     *
+     * @param routes   Declares the routes
+     * @param assembly The assembly the routes are added to
+     */
+    private static void declare(HttpRoutes routes, RouteAssembly assembly) {
+        DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
+        try {
+            routes.routes(builder);
+        } finally {
+            builder.close();
+        }
     }
 
     /**
@@ -196,7 +218,12 @@ public final class RouteTableFactory {
         Objects.requireNonNull(routes, "routes");
         // relative to the prefix of the locator: no context path, so templates of every engine are supported
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, (String) null, route -> { });
-        routes.accept(new DefaultLocatedHttpRouteBuilder<>(assembly, targetType));
+        DefaultLocatedHttpRouteBuilder<T> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, targetType);
+        try {
+            routes.accept(builder);
+        } finally {
+            builder.close();
+        }
         assembly.addImplicitHeadRoutes();
         return table(assembly, List.of(), List.of(() -> assembly), targetType);
     }

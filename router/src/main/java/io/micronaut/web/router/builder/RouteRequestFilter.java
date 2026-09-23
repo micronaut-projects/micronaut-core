@@ -36,6 +36,9 @@ import org.jspecify.annotations.Nullable;
  *     <li>A URI it changes replaces the request with the mutable request, like a {@code void}
  *     filter method that changed the URI of its mutable request: e.g. a pre-matching filter that
  *     rewrites the path changes the route that is matched.</li>
+ *     <li>The parameters and the body object of the view, see {@link MutableHttpRequest#getParameters()}
+ *     and {@link MutableHttpRequest#body(Object)}, are its own: a change to them is lost unless the
+ *     filter continues with the view, by returning it or by changing its URI.</li>
  *     <li>To change anything else, e.g. the method or the bytes of the body, it returns the request
  *     to continue with, like a filter method returning a request. A request that wraps the request
  *     it was given, e.g. an {@link io.micronaut.http.HttpRequestWrapper} with another method, keeps

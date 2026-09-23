@@ -1278,10 +1278,6 @@ public class HandlerRoutesTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class AnnotatedRoutes implements HttpRoutes {
-        private static HttpResponse<?> text(String text) {
-            return HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE);
-        }
-
         static final RouteDeclaration DECLARED_CUSTOM = RouteDeclaration.of("PROPFIND", "/fn/declared-custom/{id}");
         private final BeanContext beanContext;
         private final MarkedTarget target;
@@ -1289,6 +1285,10 @@ public class HandlerRoutesTest {
         AnnotatedRoutes(BeanContext beanContext, MarkedTarget target) {
             this.beanContext = beanContext;
             this.target = target;
+        }
+
+        private static HttpResponse<?> text(String text) {
+            return HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE);
         }
 
         @Override

@@ -29,6 +29,7 @@ import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -122,8 +123,10 @@ record RouteFunctionFilter(
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
             MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
             URI uri = request.getUri();
+            CompletionStage<? extends @Nullable HttpMessage<?>> stage = Objects.requireNonNull(filter.filter(request, propagatedContext),
+                "The asynchronous request filter returned no stage");
             return CompletableFutureExecutionFlow.just(
-                filter.filter(request, propagatedContext).thenApply(result ->
+                stage.thenApply(result ->
                     next(withChangedContext(context, propagatedContext), request, uri, result))
             );
         }, null, null);
@@ -182,9 +185,10 @@ record RouteFunctionFilter(
     static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter) {
         return new RouteFunctionFilter(null, (context, response) -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            CompletionStage<? extends @Nullable HttpResponse<?>> stage = Objects.requireNonNull(filter.filter(context.request(), response, propagatedContext),
+                "The asynchronous response filter returned no stage");
             return CompletableFutureExecutionFlow.just(
-                filter.filter(context.request(), response, propagatedContext)
-                    .thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
+                stage.thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
             );
         }, null);
     }
@@ -195,14 +199,19 @@ record RouteFunctionFilter(
      * client; otherwise the response it was given continues, with what the filter changed in place.
      * The replacement is {@link HttpResponse#toMutableResponse() mutable}, like the response of a
      * route, so a filter method after it with a {@link MutableHttpResponse} parameter can change it.
+     * A filter that continues with the response of the context, changed in place or not, and does
+     * not change the propagated context, continues with the context, like a void
+     * {@code @ResponseFilter} method, so the response is not processed again as a new one.
      *
      * @param context  The context after the filter, with the propagated context it changed
      * @param response The mutable response the filter was given
      * @param result   The result of the filter
      * @return The context
      */
+    @SuppressWarnings("ReferenceEquality") // the same response instance
     private static FilterContext next(FilterContext context, MutableHttpResponse<?> response, @Nullable HttpResponse<?> result) {
-        return context.withResponse(result == null ? response : result.toMutableResponse());
+        HttpResponse<?> next = result == null ? response : result.toMutableResponse();
+        return next == context.response() ? context : context.withResponse(next);
     }
 
     /**

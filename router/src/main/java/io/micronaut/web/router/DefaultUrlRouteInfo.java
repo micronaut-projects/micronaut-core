@@ -30,6 +30,7 @@ import io.micronaut.http.uri.RoutePattern;
 import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.inject.MethodExecutionHandle;
@@ -415,12 +416,23 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      *
      * @param path     The matched path
      * @param captured The raw values of the path variables, in the order of the template
-     * @return The match
+     * @return The match, or the match of the template if the route has more variables than were
+     * captured: the matcher answered a route it cannot match, see {@link CompiledRouteMatcher}
      */
-    UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
-        UriMatchInfo matchInfo = uriMatchTemplate != null
-            ? new CapturedUriMatchInfo(path, uriMatchTemplate.getVariables(), captured)
-            : new RouteCaptures(path, parsedTemplate.variables(), Arrays.asList(captured)).toUriMatchInfo();
+    @Nullable UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
+        UriMatchInfo matchInfo;
+        if (uriMatchTemplate != null) {
+            List<UriMatchVariable> variables = uriMatchTemplate.getVariables();
+            if (variables.size() > captured.length) {
+                return tryMatch(path);
+            }
+            matchInfo = new CapturedUriMatchInfo(path, variables, captured);
+        } else {
+            if (parsedTemplate.variables().size() > captured.length) {
+                return tryMatch(path);
+            }
+            matchInfo = new RouteCaptures(path, parsedTemplate.variables(), Arrays.asList(captured)).toUriMatchInfo();
+        }
         return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
     }
 
@@ -456,8 +468,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public String toString() {
         return getHttpMethodName() + ' '
-                + (uriMatchTemplate != null ? uriMatchTemplate : parsedTemplate.template()) + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
-                + '#' + getTargetMethod().getName()
+                + (uriMatchTemplate != null ? uriMatchTemplate : parsedTemplate.template()) + " -> " + RouteAssembly.target(getTargetMethod())
                 + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 
