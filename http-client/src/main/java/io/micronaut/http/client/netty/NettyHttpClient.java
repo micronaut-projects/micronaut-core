@@ -229,6 +229,11 @@ final class NettyHttpClient implements
      * {@link RawRequestOptions#isDecompress()}.
      */
     private static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
+    /**
+     * Request attribute with the {@link Duration} that replaces the configured read timeout for
+     * one exchange, see {@link RawRequestOptions#getResponseTimeout()}.
+     */
+    private static final String RESPONSE_TIMEOUT = "micronaut.http.client.raw.response-timeout";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1426,6 +1431,9 @@ final class NettyHttpClient implements
         if (!options.isDecompress()) {
             request.setAttribute(NO_DECOMPRESSION, Boolean.TRUE);
         }
+        if (options.getResponseTimeout() != null) {
+            request.setAttribute(RESPONSE_TIMEOUT, options.getResponseTimeout());
+        }
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
@@ -1562,6 +1570,7 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
+                    request.getAttribute(RESPONSE_TIMEOUT).ifPresent(responseTimeout -> redirectRequest.setAttribute(RESPONSE_TIMEOUT, responseTimeout));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> {
                             setRedirectHeaders(request, redirectRequest.uri(uri), preserveBody);
@@ -1645,11 +1654,18 @@ final class NettyHttpClient implements
             }
         }
 
+        // a response timeout of the exchange replaces the read timeout until the response arrives
+        Duration responseTimeout = request.getAttribute(RESPONSE_TIMEOUT, Duration.class).orElse(null);
+        ResponseDeadline responseDeadline = responseTimeout == null ? null : ResponseDeadline.start(poolHandle, responseTimeout);
+
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
+                if (responseDeadline != null) {
+                    responseDeadline.stop();
+                }
                 poolHandle.taint();
                 completeExceptionallySafe(sink, handleResponseError(request, cause));
             }
@@ -1668,6 +1684,10 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                if (responseDeadline != null) {
+                    // the configured read timeout applies to the response body
+                    responseDeadline.stop();
+                }
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
@@ -1696,6 +1716,9 @@ final class NettyHttpClient implements
 
             @Override
             public void finish(ChannelHandlerContext ctx) {
+                if (responseDeadline != null) {
+                    responseDeadline.stop();
+                }
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
                 if (streamWriter != null) {
                     if (!streamWriter.isCompleted()) {
