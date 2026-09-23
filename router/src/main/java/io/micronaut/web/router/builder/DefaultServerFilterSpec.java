@@ -79,7 +79,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec before(String executorName, ContextRouteRequestFilter filter) {
-        serverFilters.filters().before(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().before(filter, RouteAssembly.executorName(executorName));
         return this;
     }
 
@@ -97,7 +97,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().after(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().after(filter, RouteAssembly.executorName(executorName));
         return this;
     }
 

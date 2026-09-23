@@ -20,7 +20,6 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -88,7 +87,7 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
 
     @Override
     public HttpRouteGroup before(String executorName, ContextRouteRequestFilter filter) {
-        filters.before(filter, Objects.requireNonNull(executorName, "executorName"));
+        filters.before(filter, RouteAssembly.executorName(executorName));
         return this;
     }
 
@@ -106,7 +105,7 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
 
     @Override
     public HttpRouteGroup afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        filters.after(filter, Objects.requireNonNull(executorName, "executorName"));
+        filters.after(filter, RouteAssembly.executorName(executorName));
         return this;
     }
 

@@ -149,11 +149,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
@@ -291,7 +293,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
+                route.produces(mediaTypes(mediaTypes));
                 return this;
             }
         };
@@ -307,7 +309,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
+                route.produces(mediaTypes(mediaTypes));
                 return this;
             }
         };
@@ -322,6 +324,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+        Objects.requireNonNull(method, "method");
         RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler));
         return grouped(consumes == null ? route : route.consumes(consumes));
     }
@@ -332,14 +335,34 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+        Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        for (HttpMethod method : methods) {
+            // before any route is added
+            Objects.requireNonNull(method, "methods must not contain null");
         }
         List<HandlerUriRoute> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
         return new Routes(routes.toArray(new HandlerUriRoute[0]));
+    }
+
+    /**
+     * The media types given to a route: a copy, without {@code null}.
+     *
+     * @param mediaTypes The media types
+     * @return A copy
+     */
+    static MediaType[] mediaTypes(MediaType[] mediaTypes) {
+        Objects.requireNonNull(mediaTypes, "mediaTypes");
+        MediaType[] copy = mediaTypes.clone();
+        for (MediaType mediaType : copy) {
+            Objects.requireNonNull(mediaType, "mediaTypes must not contain null");
+        }
+        return copy;
     }
 
     /**
@@ -355,8 +378,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
         @Override
         public HttpRouteSpec consumes(MediaType... mediaTypes) {
+            MediaType[] checked = mediaTypes(mediaTypes);
             for (HandlerUriRoute route : routes) {
-                route.consumes(mediaTypes);
+                route.consumes(checked);
             }
             return this;
         }
@@ -371,8 +395,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
         @Override
         public HttpRouteSpec produces(MediaType... mediaTypes) {
+            MediaType[] checked = mediaTypes(mediaTypes);
             for (HandlerUriRoute route : routes) {
-                route.produces(mediaTypes);
+                route.produces(checked);
             }
             return this;
         }

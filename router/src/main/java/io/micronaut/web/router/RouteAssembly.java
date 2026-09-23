@@ -398,6 +398,22 @@ public final class RouteAssembly {
     }
 
     /**
+     * The name of an executor to run a route or a filter on.
+     *
+     * @param executorName The name
+     * @return The name
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is blank
+     */
+    public static String executorName(@Nullable String executorName) {
+        Objects.requireNonNull(executorName, "executorName");
+        if (executorName.isBlank()) {
+            throw new IllegalArgumentException("The name of an executor must not be blank");
+        }
+        return executorName;
+    }
+
+    /**
      * A URI template under a context path.
      *
      * @param contextPath The context path, e.g. the {@code micronaut.server.context-path} property
@@ -790,7 +806,11 @@ public final class RouteAssembly {
          * @param methods The methods of the requests to filter
          */
         public void methods(HttpMethod... methods) {
-            this.methods = methods.clone();
+            HttpMethod[] copy = Objects.requireNonNull(methods, "methods").clone();
+            for (HttpMethod method : copy) {
+                Objects.requireNonNull(method, "methods must not contain null");
+            }
+            this.methods = copy;
         }
 
         /**
@@ -996,6 +1016,7 @@ public final class RouteAssembly {
             if (executorName == null) {
                 return null;
             }
+            RouteAssembly.executorName(executorName);
             return SupplierUtil.memoized(() -> {
                 ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
@@ -1514,6 +1535,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+            Objects.requireNonNull(annotationMetadata, "annotationMetadata");
             if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
                 throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
             }
@@ -1523,6 +1545,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
+            Objects.requireNonNull(method, "method");
             if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
                 throw new IllegalStateException("A route to a bean method already implements the method: " + this);
             }
@@ -1532,7 +1555,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute executeOn(String executorName) {
-            this.executeOn = Objects.requireNonNull(executorName, "executorName");
+            this.executeOn = RouteAssembly.executorName(executorName);
             this.nonBlocking = false;
             return this;
         }
@@ -1545,7 +1568,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
-            filters.before(filter, Objects.requireNonNull(executorName, "executorName"));
+            filters.before(filter, RouteAssembly.executorName(executorName));
             return this;
         }
 
@@ -1563,7 +1586,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-            filters.after(filter, Objects.requireNonNull(executorName, "executorName"));
+            filters.after(filter, RouteAssembly.executorName(executorName));
             return this;
         }
 

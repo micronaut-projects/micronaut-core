@@ -118,7 +118,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
-        this.handler = handler;
+        this.handler = Objects.requireNonNull(handler, "handler");
         this.handlerType = handlerType;
         // looked up only if asked for: routing never needs the method itself
         this.method = SupplierUtil.memoized(() -> ReflectionUtils.getRequiredMethod(handlerType, HANDLE, parameterTypes));
@@ -166,6 +166,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        Objects.requireNonNull(bodyType, "bodyType");
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
@@ -199,6 +200,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <E extends Throwable> HandlerMethod<HttpResponse<?>> of(Class<E> errorType, ErrorRouteHandler<E> handler) {
+        Objects.requireNonNull(errorType, "type");
         return new HandlerMethod<>(
             handler,
             ErrorRouteHandler.class,
@@ -217,6 +219,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <E extends Throwable> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(Class<E> errorType, AsyncErrorRouteHandler<E> handler) {
+        Objects.requireNonNull(errorType, "type");
         return new HandlerMethod<>(
             handler,
             AsyncErrorRouteHandler.class,
