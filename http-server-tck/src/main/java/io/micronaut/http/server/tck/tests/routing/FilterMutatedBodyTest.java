@@ -33,12 +33,17 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -65,6 +70,26 @@ public class FilterMutatedBodyTest {
     @Test
     void aFilterFunctionThatContinuesWithTheMutableRequest() throws IOException {
         assertBodies("function");
+    }
+
+    @Test
+    void anAsynchronousHandlerReadsTheBodyAFilterSet() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // cleared: no body, read once
+            assertEquals("|read-once", post(server, "/mb/async/text-body", "function-clear"));
+            assertEquals("missing|read-once", post(server, "/mb/async/body-text", "function-clear"));
+            assertEquals("false", post(server, "/mb/async/has-body", "function-clear"));
+            // replaced with an object: converted by body(Type), not readable as bytes
+            assertEquals("replacement|decoded", post(server, "/mb/async/body-text", "function-replace"));
+            assertEquals("decoded|replacement", post(server, "/mb/async/text-body", "function-replace"));
+            assertEquals("true", post(server, "/mb/async/has-body", "function-replace"));
+            // untouched: the bytes of the request
+            for (String body : new String[]{"function-untouched", null}) {
+                assertEquals("original|read-once", post(server, "/mb/async/text-body", body));
+                assertEquals("original|read-once", post(server, "/mb/async/body-text", body));
+                assertEquals("true", post(server, "/mb/async/has-body", body));
+            }
+        }
     }
 
     private static void assertBodies(String filter) throws IOException {
@@ -138,10 +163,50 @@ public class FilterMutatedBodyTest {
                     default -> null;
                 };
             });
+            routes.asyncPOST("/mb/async/text-body", (request, pathVariables) -> read(request::text)
+                .thenCompose(text -> read(() -> request.body(String.class)).thenApply(body -> textResponse(text + "|" + body)))).consumesAll();
+            routes.asyncPOST("/mb/async/body-text", (request, pathVariables) -> read(() -> request.body(String.class))
+                .thenCompose(body -> read(request::text).thenApply(text -> textResponse(body + "|" + text)))).consumesAll();
+            routes.asyncPOST("/mb/async/has-body", (request, pathVariables) -> {
+                String hasBody = String.valueOf(request.hasBody());
+                return request.discardBody().thenApply(ignored -> textResponse(hasBody));
+            }).consumesAll();
             routes.POST("/mb/handler", Argument.STRING, (request, pathVariables, body) ->
                 HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE)
             ).consumes(MediaType.TEXT_PLAIN_TYPE);
         }
+    }
+
+    private static HttpResponse<?> textResponse(String body) {
+        return HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE);
+    }
+
+    /**
+     * Read the body, and describe how the read failed.
+     */
+    private static CompletionStage<String> read(Supplier<CompletionStage<String>> reader) {
+        CompletionStage<String> stage;
+        try {
+            stage = reader.get();
+        } catch (RuntimeException e) {
+            stage = CompletableFuture.failedFuture(e);
+        }
+        return stage.handle((value, error) -> error == null ? value : describe(error));
+    }
+
+    private static String describe(Throwable error) {
+        Throwable cause = error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
+        String message = String.valueOf(cause.getMessage());
+        if (cause instanceof IllegalStateException && message.contains("can be read once")) {
+            return "read-once";
+        }
+        if (cause instanceof IllegalStateException && message.contains("decoded object")) {
+            return "decoded";
+        }
+        if (cause instanceof UnsatisfiedRouteException) {
+            return "missing";
+        }
+        return cause.toString();
     }
 
     @Controller("/mb")

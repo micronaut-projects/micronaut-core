@@ -77,6 +77,19 @@ import java.util.concurrent.CompletionStage;
  * <p>A filter that reads the body, e.g. with a {@code @Body} argument, reads a copy, and is not
  * the handler's read. It buffers the body before the handler can read it.</p>
  *
+ * <p>A filter that continues with a mutable request whose body it set, see
+ * {@link MutableHttpRequest#body(Object)}, replaces the bytes of the request with that body. A
+ * body set to {@code null} is no body: {@link #hasBody()} is {@code false}, {@link #body(Argument)}
+ * completes like it does for a request without a body, with {@code null} for a nullable type and
+ * otherwise with the error of a missing {@code @Body} argument, {@link #text()} is empty,
+ * {@link #bytes(int)} is an empty array, and {@link #takeBody()} is an empty body. A body set to an
+ * object is read with {@link #body(Argument)}, which converts it like a {@code @Body} argument of
+ * a controller: the readers of the bytes, {@link #text()}, {@link #bytes(int)},
+ * {@link #elements(Argument)}, {@link #transferTo(Path)}, {@link #form()}, {@link #parts()} and
+ * {@link #takeBody()}, fail with an {@link IllegalStateException}. A
+ * filter that continues with another {@link ServerHttpRequest} replaces the bytes with its
+ * {@link ServerHttpRequest#byteBody() byteBody()}. The body is read once either way.</p>
+ *
  * <h2>{@code 100 Continue}</h2>
  * <p>A request that expects {@code 100 Continue} is answered with {@code 100 Continue} when the
  * body is first read. A handler that answers without reading the body, e.g. with {@code 401},
