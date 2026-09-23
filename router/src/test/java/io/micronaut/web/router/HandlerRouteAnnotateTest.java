@@ -74,6 +74,25 @@ class HandlerRouteAnnotateTest {
     }
 
     @Test
+    void theMembersOfAnAnnotationGivenAgainAreMergedLikeOnAnElement() {
+        Router router = router(routes -> {
+            routes.GET("/merged", (request, pathVariables) -> HttpResponse.ok())
+                .annotate(CUSTOM, custom -> custom.member("first", 1).member("second", 1))
+                .annotate(CUSTOM, custom -> custom.member("second", 2));
+            routes.group(group -> {
+                group.annotate(CUSTOM, custom -> custom.member("first", 1).member("second", 1));
+                group.GET("/grouped-merged", (request, pathVariables) -> HttpResponse.ok())
+                    .annotate(CUSTOM, custom -> custom.member("second", 2));
+            });
+        });
+        for (String path : List.of("/merged", "/grouped-merged")) {
+            AnnotationMetadata metadata = route(router, path).getAnnotationMetadata();
+            assertEquals(1, metadata.intValue(CUSTOM, "first").orElseThrow(), path);
+            assertEquals(2, metadata.intValue(CUSTOM, "second").orElseThrow(), path);
+        }
+    }
+
+    @Test
     void theRoutesOfAGroupHaveItsAnnotationsWhichNestedGroupsAndRoutesOverride() {
         Router router = router(routes -> routes.path("/g", group -> {
             group.GET("/declared-before", (request, pathVariables) -> HttpResponse.ok());
@@ -99,18 +118,18 @@ class HandlerRouteAnnotateTest {
     }
 
     @Test
-    void severalAnnotationsAtOnceIncludingAStereotype() {
+    void severalChainedAnnotationsIncludingAStereotype() {
         AnnotationValue<?> custom = AnnotationValue.builder(CUSTOM)
             .stereotype(AnnotationValue.builder(FilterMatcher.class).build())
             .build();
         Router router = router(routes -> {
-            routes.GET("/several", (request, pathVariables) -> HttpResponse.ok()).annotate(annotations -> annotations
-                .add(Marker.class)
-                .add(Version.class, version -> version.value("1"))
-                .add(custom)
-                .add(Version.class, version -> version.value("2")));
+            routes.GET("/several", (request, pathVariables) -> HttpResponse.ok())
+                .annotate(Marker.class)
+                .annotate(Version.class, version -> version.value("1"))
+                .annotate(custom)
+                .annotate(Version.class.getName(), version -> version.value("2"));
             routes.group(group -> {
-                group.annotate(annotations -> annotations.add(Marker.class).add(custom));
+                group.annotate(Marker.class.getName()).annotate(custom);
                 group.GET("/grouped", (request, pathVariables) -> HttpResponse.ok());
             });
         });
@@ -180,7 +199,8 @@ class HandlerRouteAnnotateTest {
             var route = routes.GET("/x", (request, pathVariables) -> HttpResponse.ok());
             assertThrows(NullPointerException.class, () -> route.annotate((AnnotationValue<?>) null));
             assertThrows(NullPointerException.class, () -> route.annotate((Class<Marker>) null));
-            assertThrows(NullPointerException.class, () -> route.annotate((Consumer<io.micronaut.web.router.builder.RouteAnnotations>) null));
+            assertThrows(NullPointerException.class, () -> route.annotate((String) null));
+            assertThrows(NullPointerException.class, () -> route.annotate(Marker.class, null));
         });
     }
 

@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -102,72 +103,98 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
     HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
-     * Put an annotation on the route, like an annotation on a controller method: the features
-     * that read the annotations of the matched route see it, e.g. a {@code @FilterMatcher}
-     * annotation binds its filters to the route, and {@code @Version} selects the route by the
-     * version of the request.
+     * Annotate the route with an annotation, like an annotation on a controller method, with
+     * the {@code annotate} methods of the compile-time elements, e.g.
+     * {@code io.micronaut.inject.ast.Element#annotate}: the features that read the annotations of
+     * the matched route see it, e.g. a {@code @FilterMatcher} annotation binds its filters to the
+     * route, and {@code @Version} selects the route by the version of the request. Several
+     * annotations are chained calls.
      *
      * <pre>{@code
-     * routes.POST("/payments/{amount}", payHandler).annotate(Audited.class);
-     * routes.GET("/ping", pingV2).annotate(AnnotationValue.builder(Version.class).value("2").build());
+     * routes.POST("/payments/{amount}", payHandler)
+     *     .annotate(Audited.class)
+     *     .annotate(Version.class, version -> version.value("2"));
      * }</pre>
      *
-     * <p>The annotations of the route are layered like the annotations of a controller method
-     * over the ones of its class: the annotations of the element given with
+     * <p>If the route already has the annotation, the members of the given one are merged with,
+     * and override, the existing ones; a repeatable annotation is added to the existing ones. The
+     * annotations of the route are layered like the annotations of a controller method over the
+     * ones of its class: the annotations of the element given with
      * {@link #annotationMetadata(AnnotationMetadataProvider)}, then of the
      * {@link HttpRouteGroup#annotate(AnnotationValue) groups} of the route, outer group first,
-     * then of the route, each overriding the members of the same annotation before it. A later
-     * annotation of the same type on the route replaces an earlier one, and a repeatable
-     * annotation is added to the earlier ones.</p>
+     * then of the route, each overriding the members of the same annotation before it.</p>
      *
      * <p>The meta-annotations of an annotation type are not known at runtime: a feature that
      * looks up an annotation by its own type sees it, like the ones above, {@code @CrossOrigin},
      * {@code @ExecuteOn} or a security annotation, but a feature that looks up a stereotype of
      * the annotation needs the stereotype in the annotation value, see
-     * {@link io.micronaut.core.annotation.AnnotationValueBuilder#stereotype(AnnotationValue)}.
-     * The expressions of an annotation, e.g. of {@code @RouteCondition}, are compiled with the
-     * annotated code: a route condition is declared with {@link #where(Predicate)}.</p>
+     * {@link AnnotationValueBuilder#stereotype(AnnotationValue)}. The expressions of an
+     * annotation, e.g. of {@code @RouteCondition}, are compiled with the annotated code: a route
+     * condition is declared with {@link #where(Predicate)}.</p>
      *
-     * @param annotation The annotation
+     * @param annotationValue The annotation
+     * @param <T>             The annotation type
      * @return The route
      * @since 5.3.0
      */
-    HttpRouteSpec annotate(AnnotationValue<?> annotation);
+    <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue);
 
     /**
-     * Put an annotation without members on the route, e.g. a {@code @FilterMatcher} annotation,
-     * see {@link #annotate(AnnotationValue)}.
+     * Annotate the route, see {@link #annotate(AnnotationValue)}.
      *
-     * @param annotationType The type of the annotation
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
      * @return The route
      * @since 5.3.0
      */
-    default HttpRouteSpec annotate(Class<? extends Annotation> annotationType) {
-        return annotate(AnnotationValue.builder(Objects.requireNonNull(annotationType, "annotationType")).build());
+    default <T extends Annotation> HttpRouteSpec annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
     }
 
     /**
-     * Put several annotations on the route at once, in order, as if each was given with
-     * {@link #annotate(AnnotationValue)}.
+     * Annotate the route with an annotation without members, see {@link #annotate(AnnotationValue)}.
      *
-     * <pre>{@code
-     * annotate(annotations -> annotations
-     *     .add(Audited.class)
-     *     .add(Version.class, version -> version.value("2")));
-     * }</pre>
-     *
-     * @param annotations Adds the annotations
+     * @param annotationType The annotation type
      * @return The route
      * @since 5.3.0
      */
-    default HttpRouteSpec annotate(Consumer<RouteAnnotations> annotations) {
-        Objects.requireNonNull(annotations, "annotations");
-        DefaultRouteAnnotations added = new DefaultRouteAnnotations();
-        annotations.accept(added);
-        for (AnnotationValue<?> annotation : added.values()) {
-            annotate(annotation);
-        }
-        return this;
+    default HttpRouteSpec annotate(String annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+
+    /**
+     * Annotate the route, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteSpec annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the route with an annotation without members, e.g. a {@code @FilterMatcher}
+     * annotation, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param <T>            The annotation type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteSpec annotate(Class<T> annotationType) {
+        return annotate(annotationType, builder -> { });
     }
 
     /**

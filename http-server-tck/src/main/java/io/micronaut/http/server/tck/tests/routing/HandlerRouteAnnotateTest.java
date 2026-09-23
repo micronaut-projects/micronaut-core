@@ -203,15 +203,14 @@ public class HandlerRouteAnnotateTest {
             routes.GET("/annotate/ping", (request, pathVariables) -> text("pong v1"))
                 .annotate(AnnotationValue.builder(Version.class).value("1").build());
             routes.GET("/annotate/ping", (request, pathVariables) -> text("pong v2"))
-                .annotate(annotations -> annotations.add(Version.class, version -> version.value("2")));
+                .annotate(Version.class, version -> version.value("2"));
             routes.GET("/annotate/replaced", (request, pathVariables) -> version(request))
                 .annotate(AnnotationValue.builder(Version.class).value("1").build())
                 .annotate(AnnotationValue.builder(Version.class).value("2").build());
             routes.GET("/annotate/several", (request, pathVariables) -> version(request))
-                .annotate(annotations -> annotations
-                    .add(Version.class, version -> version.value("1"))
-                    .add(Audited.class)
-                    .add(Version.class, version -> version.value("2")));
+                .annotate(Version.class, version -> version.value("1"))
+                .annotate(Audited.class.getName())
+                .annotate(Version.class.getName(), version -> version.value("2"));
             // the meta-annotations of an annotation type are not known at runtime: the value carries the stereotype
             routes.GET("/annotate/stereotype", (request, pathVariables) -> text("payment"))
                 .annotate(AnnotationValue.builder(Payment.class).stereotype(AnnotationValue.builder(Audited.class).build()).build());

@@ -22,6 +22,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 
+import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
@@ -80,10 +81,10 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
     }
 
     @Override
-    public HttpRouteSpec annotate(AnnotationValue<?> annotation) {
-        Objects.requireNonNull(annotation, "annotation");
+    public <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue) {
+        Objects.requireNonNull(annotationValue, "annotationValue");
         for (HandlerUriRoute route : routes) {
-            route.annotate(annotation);
+            route.annotate(annotationValue);
         }
         return this;
     }

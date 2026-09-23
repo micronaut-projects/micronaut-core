@@ -79,9 +79,8 @@ public class AuditedRoutes implements HttpRoutes {
             .annotate(AnnotationValue.builder(Version.class).value("1").build()); // <6>
         routes.GET("/receipts/{id}", (request, pathVariables) ->
                 HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotate(annotations -> annotations // <7>
-                .add(Version.class, version -> version.value("2"))
-                .add(Audited.class));
+            .annotate(Version.class, version -> version.value("2")) // <7>
+            .annotate(Audited.class);
         routes.GET("/prices", (request, pathVariables) -> HttpResponse.ok("prices").contentType(MediaType.TEXT_PLAIN_TYPE));
         // end::annotationRoutes[]
 

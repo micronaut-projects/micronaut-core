@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
 import io.micronaut.inject.annotation.AnnotationMetadataSupport;
@@ -31,10 +32,11 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * The {@link RouteAnnotations}, and the annotations given to a handler route or a group of routes with
+ * The annotations given to a handler route or a group of routes with
  * {@link HttpRouteSpec#annotate(AnnotationValue)} and {@link HttpRouteGroup#annotate(AnnotationValue)}:
- * a later annotation of a type replaces an earlier one of the same type, except a repeatable
- * annotation, which is added to the earlier ones. The stereotypes of an annotation are the ones
+ * the members of a later annotation of a type are merged with, and override, the ones of an
+ * earlier annotation of the same type, like {@code Element#annotate}, and a repeatable annotation
+ * is added to the earlier ones. The stereotypes of an annotation are the ones
  * of its {@link AnnotationValue#getStereotypes() value}: the meta-annotations of an annotation
  * type are not known at runtime.
  *
@@ -47,7 +49,7 @@ import java.util.Objects;
  * @since 5.3.0
  */
 @Internal
-public final class DefaultRouteAnnotations implements RouteAnnotations {
+public final class DefaultRouteAnnotations {
 
     private final Map<String, List<AnnotationValue<?>>> annotations = new LinkedHashMap<>(4);
     private final @Nullable DefaultRouteAnnotations enclosing;
@@ -78,32 +80,38 @@ public final class DefaultRouteAnnotations implements RouteAnnotations {
         return levels;
     }
 
-    @Override
-    public DefaultRouteAnnotations add(AnnotationValue<?> annotation) {
+    /**
+     * Add an annotation.
+     *
+     * @param annotation The annotation
+     */
+    public void add(AnnotationValue<?> annotation) {
         Objects.requireNonNull(annotation, "annotation");
         String name = annotation.getAnnotationName();
         if (AnnotationMetadataSupport.getRepeatableAnnotation(name) != null) {
             annotations.computeIfAbsent(name, n -> new ArrayList<>(2)).add(annotation);
         } else {
-            List<AnnotationValue<?>> values = new ArrayList<>(1);
-            values.add(annotation);
-            // replaces an earlier one, in the position of the latest
-            annotations.remove(name);
-            annotations.put(name, values);
+            List<AnnotationValue<?>> existing = annotations.get(name);
+            annotations.put(name, List.of(existing == null ? annotation : merge(existing.get(0), annotation)));
         }
         metadata = null;
-        return this;
     }
 
     /**
-     * @return The annotations, in the order they were added
+     * @param existing   The annotation the route has
+     * @param annotation The annotation given to it
+     * @return The annotation with the members of both, the given ones overriding the existing ones
      */
-    public List<AnnotationValue<?>> values() {
-        List<AnnotationValue<?>> all = new ArrayList<>(annotations.size());
-        for (List<AnnotationValue<?>> values : annotations.values()) {
-            all.addAll(values);
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private static AnnotationValue<?> merge(AnnotationValue<?> existing, AnnotationValue<?> annotation) {
+        AnnotationValueBuilder builder = AnnotationValue.builder(existing).members(annotation.getValues());
+        List<AnnotationValue<?>> stereotypes = annotation.getStereotypes();
+        if (stereotypes != null) {
+            for (AnnotationValue<?> stereotype : stereotypes) {
+                builder.stereotype(stereotype);
+            }
         }
-        return all;
+        return builder.build();
     }
 
     /**

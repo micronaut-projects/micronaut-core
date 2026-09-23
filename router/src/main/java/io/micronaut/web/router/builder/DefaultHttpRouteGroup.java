@@ -22,6 +22,8 @@ import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.annotation.Annotation;
+import java.util.Objects;
 import java.util.function.Predicate;
 
 /**
@@ -76,8 +78,8 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
-    public HttpRouteGroup annotate(AnnotationValue<?> annotation) {
-        settings.annotate(annotation);
+    public <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue) {
+        settings.annotate(Objects.requireNonNull(annotationValue, "annotationValue"));
         return this;
     }
 
