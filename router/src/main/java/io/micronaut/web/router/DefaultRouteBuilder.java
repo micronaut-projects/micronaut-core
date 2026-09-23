@@ -106,7 +106,8 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     @Override
     public Set<Integer> getExposedPorts() {
-        return assembly.exposedPorts();
+        // the set itself, as before the routes were assembled
+        return assembly.exposedPorts;
     }
 
     @Override

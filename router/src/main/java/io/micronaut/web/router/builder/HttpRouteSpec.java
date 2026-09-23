@@ -31,6 +31,11 @@ import java.util.function.Predicate;
  * the filters of the groups the route is declared in, closest to the route, and are resolved when
  * the route is built.</p>
  *
+ * <p>The configuration of the route is read when the router is built, once the routes were
+ * declared: configure the route where it is declared, in {@link HttpRoutes#routes(HttpRouteBuilder)}
+ * or in the callback that builds a route table. A change made to a route kept after that is
+ * ignored.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */

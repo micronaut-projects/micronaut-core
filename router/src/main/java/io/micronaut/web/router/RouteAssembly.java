@@ -203,10 +203,10 @@ public final class RouteAssembly {
     }
 
     /**
-     * @return The ports the routes are exposed on
+     * @return The ports the routes are exposed on, a read-only view
      */
     public Set<Integer> exposedPorts() {
-        return exposedPorts;
+        return Collections.unmodifiableSet(exposedPorts);
     }
 
     /**

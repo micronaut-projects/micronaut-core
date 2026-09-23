@@ -138,6 +138,16 @@ class RoutePortTest {
         })));
     }
 
+    @Test
+    void theExposedPortsOfAnAssemblyAreReadOnly() {
+        RouteAssembly assembly = new RouteAssembly(null, ConversionService.SHARED, uri -> uri, route -> { });
+        new DefaultHttpRouteBuilder(assembly).GET("/metrics", RoutePortTest::ok).port(MANAGEMENT_PORT);
+
+        assertEquals(Set.of(MANAGEMENT_PORT), assembly.exposedPorts());
+        assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().add(OTHER_PORT));
+        assertThrows(UnsupportedOperationException.class, () -> assembly.exposedPorts().clear());
+    }
+
     @SuppressWarnings("unchecked")
     static HttpRequest<?> onPort(HttpRequest<?> request, int port) {
         InetSocketAddress address = new InetSocketAddress("localhost", port);
