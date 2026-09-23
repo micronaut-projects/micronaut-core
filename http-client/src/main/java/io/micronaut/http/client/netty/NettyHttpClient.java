@@ -1434,25 +1434,44 @@ final class NettyHttpClient implements
         try {
             BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
             if (options == null) {
-                return sendRequestWithRedirects(
+                return sendRawExchange(
                     propagatedContext,
                     blockHint,
-                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
-                    (req, resp) -> ExecutionFlow.just(resp)
+                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
                 );
             }
             MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
-            return RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
+            return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
                 propagatedContext,
                 blockHint,
-                rawRequest,
-                (req, resp) -> ExecutionFlow.just(resp)
+                rawRequest
             ), options.getResponseTimeout()).map(response -> RawHttpClientSupport.toMutableResponse(response, options));
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
         }
+    }
+
+    /**
+     * Send a raw request. A relative request URI is resolved against the URL of this client
+     * first, like the URI of any other request.
+     *
+     * @param propagatedContext The propagated context
+     * @param blockHint         The block hint, if any
+     * @param rawRequest        The raw request
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(uri -> sendRequestWithRedirects(
+            propagatedContext,
+            blockHint,
+            rawRequest.uri(uri),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {

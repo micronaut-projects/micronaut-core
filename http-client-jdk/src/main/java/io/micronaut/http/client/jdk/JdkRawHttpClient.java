@@ -17,6 +17,7 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -31,6 +32,7 @@ import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientException;
@@ -79,17 +81,18 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        Flux<HttpResponse<Object>> response;
+        // null is equivalent to an empty body
+        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]) : requestBody;
+        Flux<? extends HttpResponse<?>> response;
         try {
-            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody), null);
+            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
         } catch (RuntimeException | Error e) {
-            if (requestBody != null) {
-                requestBody.close();
-            }
+            body.close();
             throw e;
         }
-        // released unless they were sent, e.g. when the connection is refused
-        return requestBody == null ? response : response.doFinally(signal -> requestBody.close());
+        // the body is released however the exchange ends, also when the JDK client never reads
+        // it, e.g. because the connection was refused or the request is a GET
+        return response.doFinally(signal -> body.close());
     }
 
     @Override
