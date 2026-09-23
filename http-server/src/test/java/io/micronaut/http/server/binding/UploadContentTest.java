@@ -20,6 +20,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
+import reactor.core.scheduler.Scheduler;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -524,6 +526,50 @@ class UploadContentTest {
         FileUpload closed = memory("closed");
         join(closed.closeAsync());
         assertThrows(IllegalStateException.class, closed::readAllBytes);
+    }
+
+    @Test
+    void aDiskUploadIsNotReadBlockingOnAnIoThread() throws Exception {
+        Path temporary = temporary("on disk");
+        FileUpload disk = disk(temporary);
+        FileUpload memory = memory("in memory");
+        Scheduler nonBlocking = Schedulers.newSingle("non-blocking");
+        try {
+            CompletableFuture<Throwable> refused = CompletableFuture.supplyAsync(() -> {
+                try {
+                    disk.readString();
+                    return null;
+                } catch (Throwable e) {
+                    return e;
+                }
+            }, nonBlocking::schedule);
+            IllegalStateException e = assertInstanceOf(IllegalStateException.class, refused.get());
+            assertTrue(e.getMessage().contains("bytes(int)"), e.getMessage());
+            assertTrue(e.getSuppressed().length == 0, "one clear failure");
+            // content in memory does not block
+            CompletableFuture<String> read = CompletableFuture.supplyAsync(memory::readString, nonBlocking::schedule);
+            assertEquals("in memory", read.get());
+        } finally {
+            nonBlocking.dispose();
+        }
+        // the refused read did not claim the upload, nor release its file
+        assertTrue(Files.exists(temporary));
+        CompletionStage<byte[]> bytes = disk.bytes(100);
+        executor.runAll();
+        assertEquals("on disk", new String(join(bytes), StandardCharsets.UTF_8));
+        assertEquals(List.of(), temporaryFiles(), "the temporary file of the upload was released");
+    }
+
+    @Test
+    void aFailedBlockingReadReleasesTheUploadAndKeepsItsCause() throws IOException {
+        Path temporary = temporary("on disk");
+        FileUpload disk = disk(temporary);
+        // the file disappears: the read fails, and the failure of the release does not hide it
+        Files.delete(temporary);
+        UncheckedIOException e = assertThrows(UncheckedIOException.class, disk::readAllBytes);
+        assertInstanceOf(NoSuchFileException.class, e.getCause());
+        assertThrows(IllegalStateException.class, disk::readAllBytes);
+        join(disk.closeAsync());
     }
 
     @Test

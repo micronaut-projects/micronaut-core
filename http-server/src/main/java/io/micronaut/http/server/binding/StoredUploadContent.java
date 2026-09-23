@@ -20,6 +20,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import org.jspecify.annotations.Nullable;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -123,12 +124,29 @@ final class StoredUploadContent extends UploadContent {
     }
 
     @Override
-    byte[] readComplete() throws IOException {
-        try {
-            return upload.getBytes();
-        } finally {
-            upload.close();
+    void checkBlockingRead() {
+        if (!upload.isInMemory() && Schedulers.isInNonBlockingThread()) {
+            throw new IllegalStateException("The " + describe() + " is stored on disk, and reading it would block this I/O thread"
+                + ": read it with bytes(int) or transferTo(...), or on an executor, e.g. with @ExecuteOn(TaskExecutors.BLOCKING)");
         }
+    }
+
+    @Override
+    byte[] readComplete() throws IOException {
+        byte[] bytes;
+        try {
+            bytes = upload.getBytes();
+        } catch (IOException | RuntimeException e) {
+            // the upload is consumed: release it, without hiding why the read failed
+            try {
+                upload.close();
+            } catch (IOException | RuntimeException closeError) {
+                e.addSuppressed(closeError);
+            }
+            throw e;
+        }
+        upload.close();
+        return bytes;
     }
 
     @Override

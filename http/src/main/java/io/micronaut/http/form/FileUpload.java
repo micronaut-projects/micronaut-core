@@ -155,11 +155,13 @@ public interface FileUpload extends AutoCloseable {
      * a {@link FormData}, which are stored in memory or on disk before the handler runs, for a
      * handler that runs on an executor. The content is consumed, like with {@link #bytes(int)}.
      * It is not available for an upload that is still arriving, e.g. the file of a
-     * {@link FormPart}: read it with {@link #bytes(int)}.
+     * {@link FormPart}: read it with {@link #bytes(int)}. Content stored on disk is not read on an
+     * I/O thread of the server, which must not block: read it with {@link #bytes(int)} there.
      *
      * @return The content
-     * @throws IllegalStateException if the upload is still arriving, the content was already
-     * consumed, or the upload closed
+     * @throws IllegalStateException if the upload is still arriving, the content is stored on disk
+     * and this is an I/O thread of the server (the content is not consumed then), the content was
+     * already consumed, or the upload closed
      * @throws java.io.UncheckedIOException if reading the stored content fails
      */
     byte[] readAllBytes();
@@ -169,8 +171,9 @@ public interface FileUpload extends AutoCloseable {
      * of the request, blocking, like {@link #readAllBytes()}.
      *
      * @return The content
-     * @throws IllegalStateException if the upload is still arriving, the content was already
-     * consumed, or the upload closed
+     * @throws IllegalStateException if the upload is still arriving, the content is stored on disk
+     * and this is an I/O thread of the server, the content was already consumed, or the upload
+     * closed
      * @throws java.io.UncheckedIOException if reading the stored content fails
      */
     String readString();
