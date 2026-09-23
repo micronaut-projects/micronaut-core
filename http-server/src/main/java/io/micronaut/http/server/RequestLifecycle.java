@@ -16,12 +16,10 @@
 package io.micronaut.http.server;
 
 import io.micronaut.context.exceptions.ConfigurationException;
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
-import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.ByteBodyHttpResponse;
@@ -31,7 +29,6 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpResponse;
-import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.http.filter.GenericHttpFilter;
@@ -46,10 +43,8 @@ import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.types.files.FileCustomizableResponseType;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.qualifiers.Qualifiers;
 import io.micronaut.json.JsonSyntaxException;
-import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -60,7 +55,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -322,22 +316,8 @@ public class RequestLifecycle {
     }
 
     private ExecutionFlow<HttpResponse<?>> handlerExceptionHandler(HttpRequest<?> request, PropagatedContext propagatedContext, BeanDefinition<ExceptionHandler> handlerDefinition, Throwable cause) {
-        final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
-        RouteInfo<Object> routeInfo;
-        if (optionalMethod.isPresent()) {
-            routeInfo = new ExecutableRouteInfo<>(optionalMethod.get(), true);
-        } else {
-            routeInfo = new DefaultRouteInfo<>(
-                AnnotationMetadata.EMPTY_METADATA,
-                ReturnType.of(Object.class),
-                List.of(),
-                MediaType.fromType(handlerDefinition.getBeanType()).map(Collections::singletonList).orElse(Collections.emptyList()),
-                handlerDefinition.getBeanType(),
-                true,
-                false,
-                MessageBodyHandlerRegistry.EMPTY
-            );
-        }
+        RouteExecutor.ExceptionHandlerRoute handlerRoute = routeExecutor.exceptionHandlerRoute(handlerDefinition);
+        RouteInfo<Object> routeInfo = handlerRoute.routeInfo();
         Supplier<ExecutionFlow<HttpResponse<?>>> responseSupplier = () -> {
             ExceptionHandler<Throwable, ?> handler = routeExecutor.beanContext.getBean(handlerDefinition);
             try {
@@ -352,7 +332,7 @@ public class RequestLifecycle {
                 return createDefaultErrorResponseFlow(request, e, propagatedContext);
             }
         };
-        final Executor executor = routeExecutor.findExecutor(routeInfo);
+        final Executor executor = handlerRoute.executor();
         final ExecutionFlow<HttpResponse<?>> responseFlow = executor == null
             ? responseSupplier.get()
             : ExecutionFlow.async(executor, responseSupplier);

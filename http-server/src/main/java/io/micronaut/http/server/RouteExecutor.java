@@ -17,6 +17,7 @@ package io.micronaut.http.server;
 
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.exceptions.BeanCreationException;
+import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.async.propagation.ReactivePropagation;
 import io.micronaut.core.async.propagation.ReactorPropagation;
@@ -40,6 +41,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
@@ -48,10 +50,13 @@ import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
+import io.micronaut.http.server.exceptions.ExceptionHandler;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
 import io.micronaut.http.server.util.HttpDateHeader;
+import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanType;
+import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
@@ -80,11 +85,14 @@ import reactor.util.context.ContextView;
 
 import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.function.Supplier;
@@ -108,6 +116,10 @@ public final class RouteExecutor {
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+    /**
+     * Bounds the cache of exception handler routes, in case definitions are registered at runtime.
+     */
+    private static final int MAX_CACHED_EXCEPTION_HANDLER_ROUTES = 128;
 
     final Router router;
     final BeanContext beanContext;
@@ -117,6 +129,7 @@ public final class RouteExecutor {
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
     private final ConversionService conversionService;
+    private final Map<BeanDefinition<ExceptionHandler>, ExceptionHandlerRoute> exceptionHandlerRoutes = new ConcurrentHashMap<>();
 
     /**
      * Default constructor.
@@ -377,6 +390,48 @@ public final class RouteExecutor {
                 .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
         }
         return statusRoute;
+    }
+
+    /**
+     * The route of an exception handler: its route info and the executor it runs on. Both depend
+     * only on the definition, so they are created once per definition instead of for every
+     * handled exception.
+     *
+     * @param handlerDefinition The definition of the exception handler
+     * @return The route of the handler
+     */
+    ExceptionHandlerRoute exceptionHandlerRoute(BeanDefinition<ExceptionHandler> handlerDefinition) {
+        ExceptionHandlerRoute route = exceptionHandlerRoutes.get(handlerDefinition);
+        if (route == null) {
+            route = createExceptionHandlerRoute(handlerDefinition);
+            if (exceptionHandlerRoutes.size() < MAX_CACHED_EXCEPTION_HANDLER_ROUTES) {
+                ExceptionHandlerRoute existing = exceptionHandlerRoutes.putIfAbsent(handlerDefinition, route);
+                if (existing != null) {
+                    route = existing;
+                }
+            }
+        }
+        return route;
+    }
+
+    private ExceptionHandlerRoute createExceptionHandlerRoute(BeanDefinition<ExceptionHandler> handlerDefinition) {
+        final Optional<ExecutableMethod<ExceptionHandler, Object>> optionalMethod = handlerDefinition.findPossibleMethods("handle").findFirst();
+        RouteInfo<Object> routeInfo;
+        if (optionalMethod.isPresent()) {
+            routeInfo = new ExecutableRouteInfo<>(optionalMethod.get(), true);
+        } else {
+            routeInfo = new DefaultRouteInfo<>(
+                AnnotationMetadata.EMPTY_METADATA,
+                ReturnType.of(Object.class),
+                List.of(),
+                MediaType.fromType(handlerDefinition.getBeanType()).map(Collections::singletonList).orElse(Collections.emptyList()),
+                handlerDefinition.getBeanType(),
+                true,
+                false,
+                MessageBodyHandlerRegistry.EMPTY
+            );
+        }
+        return new ExceptionHandlerRoute(routeInfo, findExecutor(routeInfo));
     }
 
     @Nullable
@@ -842,4 +897,12 @@ public final class RouteExecutor {
         return ReactiveExecutionFlow.fromPublisher(publisher);
     }
 
+    /**
+     * The route of an exception handler.
+     *
+     * @param routeInfo The route info
+     * @param executor  The executor the handler runs on, or {@code null} to run it on the caller
+     */
+    record ExceptionHandlerRoute(RouteInfo<Object> routeInfo, @Nullable ExecutorService executor) {
+    }
 }
