@@ -589,9 +589,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
+        var routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
+        List<GenericHttpFilter> routeFilters = findRouteFilters(request, routeMatch);
+        if (routeFilters != null) {
+            return routeFilters;
+        }
         var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
-        var routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
         HttpMethod method = request.getMethod();
         String path = request.getPath();
         for (FilterRoute filterRoute : preconditionFilterRoutes) {
@@ -614,6 +618,10 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             ArrayList<GenericHttpFilter> always = alwaysMatchesHttpFilters.get();
             return always;
         }
+        List<GenericHttpFilter> routeFilters = findRouteFilters(request, routeMatch);
+        if (routeFilters != null) {
+            return routeFilters;
+        }
         var httpFilters = new ArrayList<GenericHttpFilter>(alwaysMatchesFilterRoutes.size() + preconditionFilterRoutes.size());
         httpFilters.addAll(alwaysMatchesHttpFilters.get());
         HttpMethod method = request.getMethod();
@@ -626,6 +634,31 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         FilterRunner.sort(httpFilters);
         return Collections.unmodifiableList(httpFilters);
+    }
+
+    /**
+     * The filters for a request that matched a URI route, from the filter plan of the route.
+     *
+     * @param request    The request
+     * @param routeMatch The route match
+     * @return The filters, or {@code null} when the plan of the route does not apply to the request
+     */
+    @SuppressWarnings("ReferenceEquality") // the plan belongs to this router instance
+    private @Nullable List<GenericHttpFilter> findRouteFilters(HttpRequest<?> request, @Nullable RouteMatch<?> routeMatch) {
+        // avoid type pollution: the match of a URI route is a DefaultUriRouteMatch
+        if (routeMatch instanceof DefaultUriRouteMatch<?, ?> uriRouteMatch
+            && uriRouteMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> routeInfo) {
+            RouteFilterPlan plan = routeInfo.filterPlan;
+            if (plan == null || plan.owner != this) {
+                // Allow concurrent access, the plan is immutable
+                plan = new RouteFilterPlan(this, routeInfo, alwaysMatchesFilterRoutes, alwaysMatchesHttpFilters.get(), preconditionFilterRoutes);
+                routeInfo.filterPlan = plan;
+            }
+            if (plan.appliesTo(request)) {
+                return plan.filters(request, alwaysMatchesHttpFilters.get(), preconditionFilterRoutes);
+            }
+        }
+        return null;
     }
 
     @Override
