@@ -81,6 +81,7 @@ final class PythonReflectionGateTest {
     void theGateReadsTheProcessorOptionAndTheSystemPropertyOfTheCompilation() {
         assertEquals("micronaut.introspection.allowReflection", PythonReflectionGate.OPTION);
         assertEquals("micronaut.introspection.allow-reflection", PythonReflectionGate.PROPERTY);
+        assertEquals("micronaut.python.reflection.warnings", PythonReflectionGate.WARNINGS_OPTION);
 
         VisitorContext context = visitorContext(Map.of(PythonReflectionGate.OPTION, "com.example.model.*"), new ArrayList<>());
         assertTrue(PythonReflectionGate.of(context).allows("com.example.model.Order"));
@@ -101,7 +102,7 @@ final class PythonReflectionGateTest {
     @Test
     void aRefusedTypeIsReportedOnceListingItsAnnotationsAndNamingTheOption() {
         List<String> messages = new ArrayList<>();
-        VisitorContext context = visitorContext(Map.of(), messages);
+        VisitorContext context = visitorContext(Map.of(PythonReflectionGate.WARNINGS_OPTION, "true"), messages);
         Element element = ClassElement.of(String.class);
         PythonReflectionGate gate = PythonReflectionGate.of("com.example.model.*");
 
@@ -127,7 +128,7 @@ final class PythonReflectionGateTest {
     @Test
     void beanValidationConstraintsAreLeftOffWithoutANote() {
         List<String> messages = new ArrayList<>();
-        VisitorContext context = visitorContext(Map.of(), messages);
+        VisitorContext context = visitorContext(Map.of(PythonReflectionGate.WARNINGS_OPTION, "true"), messages);
         Element element = ClassElement.of(String.class);
         PythonReflectionGate gate = PythonReflectionGate.of("");
 
@@ -145,7 +146,7 @@ final class PythonReflectionGateTest {
     @Test
     void theHintAllowsTheElementWhateverThePatterns() {
         List<String> messages = new ArrayList<>();
-        VisitorContext context = visitorContext(Map.of(), messages);
+        VisitorContext context = visitorContext(Map.of(PythonReflectionGate.WARNINGS_OPTION, "true"), messages);
         PythonReflectionGate gate = PythonReflectionGate.of("");
         MutableAnnotationMetadata hinted = new MutableAnnotationMetadata();
         hinted.addDeclaredAnnotation(AllowsReflection.class.getName(), Map.of());
@@ -160,6 +161,26 @@ final class PythonReflectionGateTest {
         gate.report(context);
         assertEquals(1, messages.size());
         assertTrue(messages.get(0).contains("[com.example.Plain]"));
+    }
+
+    @Test
+    void refusedTypesAreSilentUnlessTheWarningsOptionAsksForTheNotes() {
+        List<String> messages = new ArrayList<>();
+        Element element = ClassElement.of(String.class);
+        PythonReflectionGate gate = PythonReflectionGate.of("");
+
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element));
+        gate.report(visitorContext(Map.of(), messages));
+        assertTrue(messages.isEmpty());
+
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element));
+        gate.report(visitorContext(Map.of(PythonReflectionGate.WARNINGS_OPTION, "false"), messages));
+        assertTrue(messages.isEmpty());
+
+        assertFalse(gate.allows("com.example.Order", "jakarta.persistence.Entity", element));
+        gate.report(visitorContext(Map.of(PythonReflectionGate.WARNINGS_OPTION, "true"), messages));
+        assertEquals(1, messages.size());
+        assertTrue(messages.get(0).contains("[com.example.Order] (@Entity) are not copied"));
     }
 
     /**
