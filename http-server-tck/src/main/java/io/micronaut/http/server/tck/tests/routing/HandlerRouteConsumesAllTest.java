@@ -45,6 +45,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
@@ -84,6 +85,8 @@ public class HandlerRouteConsumesAllTest {
             Optional<Integer> port = server.getPort();
             // the HTTP client of the TCK sends a content type: a request without one needs a socket
             assumeTrue(port.isPresent(), "The server has no port");
+            // the JDK client of this case trusts no self-signed certificate of a TLS server
+            assumeFalse(server.getApplicationContext().getProperty("micronaut.server.ssl.enabled", Boolean.class).orElse(false), "The server speaks plain HTTP");
             String base = server.getScheme().orElse("http") + "://localhost:" + port.get();
             try (HttpClient client = HttpClient.newHttpClient()) {
                 assertEquals("pojo Fred", postWithoutContentType(client, base + "/fn-all/pojo", "{\"name\":\"Fred\"}"));
