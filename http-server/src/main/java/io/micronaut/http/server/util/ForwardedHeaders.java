@@ -23,7 +23,11 @@ import io.micronaut.http.MutableHttpRequest;
 import org.jspecify.annotations.Nullable;
 
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.function.Predicate;
 
@@ -37,7 +41,10 @@ import java.util.function.Predicate;
  * <ul>
  *     <li>From a trusted proxy, this hop is appended to {@code X-Forwarded-For} and
  *     {@code Forwarded}, and the {@code X-Forwarded-Proto}, {@code -Host}, {@code -Port} and
- *     {@code -Prefix} values the first proxy set are kept.</li>
+ *     {@code -Prefix} values the first proxy set are kept. If the trusted chain only comes in
+ *     one of the two formats, it is translated to the other one before this hop is appended
+ *     (RFC 7239 section 7.4), so that both headers describe the same chain: a downstream server
+ *     that prefers {@code Forwarded} must not see this hop as the client.</li>
  *     <li>From any other peer, the inbound values could be forged, so they are replaced with the
  *     values of this hop.</li>
  * </ul>
@@ -73,6 +80,7 @@ public final class ForwardedHeaders {
     private static final List<String> X_FORWARDED_HEADERS = List.of(X_FORWARDED_FOR, X_FORWARDED_PROTO, X_FORWARDED_HOST, X_FORWARDED_PORT, X_FORWARDED_PREFIX);
     private static final int HTTP_PORT = 80;
     private static final int HTTPS_PORT = 443;
+    private static final String UNKNOWN = "unknown";
 
     private final Predicate<? super InetSocketAddress> trustedProxy;
     private final boolean xForwarded;
@@ -143,6 +151,40 @@ public final class ForwardedHeaders {
         String inboundPort = trusted ? in.get(X_FORWARDED_PORT) : null;
         String inboundPrefix = trusted ? in.get(X_FORWARDED_PREFIX) : null;
         String inboundForwarded = trusted ? join(in.getAll(HttpHeaders.FORWARDED)) : null;
+        if (trusted) {
+            boolean hasXForwarded = inboundFor != null || inboundProto != null || inboundHost != null || inboundPort != null;
+            if (inboundForwarded == null && hasXForwarded) {
+                // keep the chain when this hop is appended to a Forwarded header of its own
+                inboundForwarded = toForwarded(inboundFor, inboundProto, inboundHost, inboundPort);
+            } else if (inboundForwarded != null && !hasXForwarded) {
+                // keep the chain when this hop is appended to X-Forwarded-* headers of its own
+                List<Map<String, String>> elements = parseForwarded(inboundForwarded);
+                List<String> addresses = new ArrayList<>(elements.size());
+                String firstHost = null;
+                for (Map<String, String> element : elements) {
+                    String address = element.get("for");
+                    addresses.add(address == null ? UNKNOWN : toXForwardedFor(address));
+                    if (inboundProto == null) {
+                        inboundProto = element.get("proto");
+                    }
+                    if (firstHost == null) {
+                        firstHost = element.get("host");
+                    }
+                }
+                inboundFor = addresses.isEmpty() ? null : String.join(", ", addresses);
+                if (firstHost != null) {
+                    int portSeparator = portSeparator(firstHost);
+                    if (portSeparator >= 0) {
+                        inboundHost = firstHost.substring(0, portSeparator);
+                        inboundPort = firstHost.substring(portSeparator + 1);
+                    } else {
+                        inboundHost = firstHost;
+                        Integer defaultPort = defaultPort(inboundProto);
+                        inboundPort = defaultPort == null ? null : String.valueOf(defaultPort);
+                    }
+                }
+            }
+        }
 
         for (String name : X_FORWARDED_HEADERS) {
             out.remove(name);
@@ -171,6 +213,150 @@ public final class ForwardedHeaders {
             }
             out.set(HttpHeaders.FORWARDED, inboundForwarded == null ? element.toString() : inboundForwarded + ", " + element);
         }
+    }
+
+    /**
+     * Translate a chain of {@code X-Forwarded-*} headers to {@code Forwarded} elements: one per
+     * {@code X-Forwarded-For} address, the first one also carrying the scheme and host the first
+     * proxy received.
+     */
+    private static String toForwarded(@Nullable String forwardedFor, @Nullable String proto, @Nullable String host, @Nullable String port) {
+        List<String> elements = new ArrayList<>();
+        if (forwardedFor != null) {
+            for (String address : forwardedFor.split(",", -1)) {
+                String trimmed = address.trim();
+                elements.add("for=" + forwardedNode(trimmed.isEmpty() ? UNKNOWN : trimmed));
+            }
+        }
+        StringBuilder first = new StringBuilder(elements.isEmpty() ? "" : elements.get(0));
+        if (proto != null) {
+            first.append(first.isEmpty() ? "" : ";").append("proto=").append(quoteIfNeeded(proto.trim()));
+        }
+        if (host != null) {
+            String hostWithPort = host.trim();
+            if (port != null && portSeparator(hostWithPort) < 0 && !port.trim().equals(String.valueOf(defaultPort(proto)))) {
+                hostWithPort = hostWithPort + ":" + port.trim();
+            }
+            first.append(first.isEmpty() ? "" : ";").append("host=").append(quoteIfNeeded(hostWithPort));
+        }
+        if (elements.isEmpty()) {
+            elements.add(first.toString());
+        } else {
+            elements.set(0, first.toString());
+        }
+        return String.join(", ", elements);
+    }
+
+    /**
+     * Format an {@code X-Forwarded-For} address as a {@code Forwarded} node: an IPv6 address is
+     * bracketed, and a value that is no token (e.g. with a port) is quoted.
+     */
+    private static String forwardedNode(String address) {
+        if (!address.startsWith("[") && address.indexOf(':') != address.lastIndexOf(':')) {
+            return '"' + "[" + address + "]" + '"';
+        }
+        return quoteIfNeeded(address);
+    }
+
+    /**
+     * Format a {@code Forwarded} node as an {@code X-Forwarded-For} address: the brackets of an
+     * IPv6 address without a port are removed.
+     */
+    private static String toXForwardedFor(String node) {
+        if (node.startsWith("[") && node.endsWith("]")) {
+            return node.substring(1, node.length() - 1);
+        }
+        return node;
+    }
+
+    /**
+     * Parse the elements of a {@code Forwarded} header (RFC 7239 section 4). Parameter names are
+     * lower case, quoted values are unquoted.
+     */
+    private static List<Map<String, String>> parseForwarded(String header) {
+        List<Map<String, String>> elements = new ArrayList<>();
+        Map<String, String> element = new LinkedHashMap<>();
+        StringBuilder pair = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < header.length(); i++) {
+            char c = header.charAt(i);
+            if (quoted) {
+                if (c == '\\' && i + 1 < header.length()) {
+                    pair.append(c).append(header.charAt(++i));
+                    continue;
+                }
+                if (c == '"') {
+                    quoted = false;
+                }
+                pair.append(c);
+            } else if (c == '"') {
+                quoted = true;
+                pair.append(c);
+            } else if (c == ';' || c == ',') {
+                addPair(element, pair);
+                if (c == ',') {
+                    if (!element.isEmpty()) {
+                        elements.add(element);
+                    }
+                    element = new LinkedHashMap<>();
+                }
+            } else {
+                pair.append(c);
+            }
+        }
+        addPair(element, pair);
+        if (!element.isEmpty()) {
+            elements.add(element);
+        }
+        return elements;
+    }
+
+    private static void addPair(Map<String, String> element, StringBuilder pair) {
+        String text = pair.toString().trim();
+        pair.setLength(0);
+        int separator = text.indexOf('=');
+        if (separator <= 0) {
+            return;
+        }
+        String name = text.substring(0, separator).trim().toLowerCase(Locale.ROOT);
+        String value = text.substring(separator + 1).trim();
+        if (value.length() >= 2 && value.startsWith("\"") && value.endsWith("\"")) {
+            StringBuilder unquoted = new StringBuilder(value.length());
+            for (int i = 1; i < value.length() - 1; i++) {
+                char c = value.charAt(i);
+                if (c == '\\' && i + 1 < value.length() - 1) {
+                    c = value.charAt(++i);
+                }
+                unquoted.append(c);
+            }
+            value = unquoted.toString();
+        }
+        element.putIfAbsent(name, value);
+    }
+
+    /**
+     * @return The index of the separator of the port of a host, or {@code -1} if it has none
+     */
+    private static int portSeparator(String host) {
+        int portSeparator = host.lastIndexOf(':');
+        if (portSeparator > host.lastIndexOf(']') && host.indexOf(':') == portSeparator) {
+            return portSeparator;
+        }
+        if (host.startsWith("[") && portSeparator > host.lastIndexOf(']')) {
+            return portSeparator;
+        }
+        return -1;
+    }
+
+    private static @Nullable Integer defaultPort(@Nullable String proto) {
+        if (proto == null) {
+            return null;
+        }
+        return switch (proto.trim().toLowerCase(Locale.ROOT)) {
+            case "http", "ws" -> HTTP_PORT;
+            case "https", "wss" -> HTTPS_PORT;
+            default -> null;
+        };
     }
 
     private static @Nullable String join(List<String> values) {
