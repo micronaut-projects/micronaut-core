@@ -24,6 +24,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
@@ -47,7 +48,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
@@ -65,6 +66,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * The prefix of the URI templates of the routes, or {@code null}.
      */
     private final @Nullable RoutePrefix prefix;
+    /**
+     * Whether the routes of the builder were read: see {@link DefaultHttpRouteBuilder#close()}.
+     */
+    private boolean closed;
 
     /**
      * @param assembly     The assembly the routes are added to
@@ -145,11 +150,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
@@ -174,12 +181,12 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
-    public final void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
     @Override
-    public final void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
@@ -229,7 +236,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
     }
 
+    /**
+     * Close the builder: its routes were read. A later declaration would be dropped, so it fails.
+     */
+    final void closeBuilder() {
+        closed = true;
+    }
+
     private void checkOpen() {
+        if (closed) {
+            throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
+                + "or inside the callback that builds the route table, not after it returned");
+        }
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null && filters.isClosed()) {
             throw new IllegalStateException("The route group is closed: declare the routes of a group in its lambda");
@@ -276,7 +294,13 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
+                route.produces(mediaTypes(mediaTypes));
+                return this;
+            }
+
+            @Override
+            public ErrorRouteSpec responseType(Argument<?> responseType) {
+                handler.responseType(responseType);
                 return this;
             }
         };
@@ -292,14 +316,20 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
+                route.produces(mediaTypes(mediaTypes));
+                return this;
+            }
+
+            @Override
+            public StatusRouteSpec responseType(Argument<?> responseType) {
+                handler.responseType(responseType);
                 return this;
             }
         };
     }
 
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
-        Objects.requireNonNull(httpMethodName, "httpMethodName");
+        RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
@@ -307,6 +337,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+        standardMethod(method);
         RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler));
         return grouped(consumes == null ? route : route.consumes(consumes));
     }
@@ -317,14 +348,44 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+        Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        for (HttpMethod method : methods) {
+            // before any route is added
+            standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
         }
         List<HandlerUriRoute> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
         return new Routes(routes.toArray(new HandlerUriRoute[0]));
+    }
+
+    /**
+     * @param method The HTTP method of a route
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is {@link HttpMethod#CUSTOM}, which has no name
+     */
+    private static void standardMethod(HttpMethod method) {
+        Objects.requireNonNull(method, "method");
+        RouteArguments.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
+    }
+
+    /**
+     * The media types given to a route: a copy, without {@code null}.
+     *
+     * @param mediaTypes The media types
+     * @return A copy
+     */
+    static MediaType[] mediaTypes(MediaType[] mediaTypes) {
+        Objects.requireNonNull(mediaTypes, "mediaTypes");
+        MediaType[] copy = mediaTypes.clone();
+        for (MediaType mediaType : copy) {
+            Objects.requireNonNull(mediaType, "mediaTypes must not contain null");
+        }
+        return copy;
     }
 
     /**
@@ -340,8 +401,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
         @Override
         public HttpRouteSpec consumes(MediaType... mediaTypes) {
+            MediaType[] checked = mediaTypes(mediaTypes);
             for (HandlerUriRoute route : routes) {
-                route.consumes(mediaTypes);
+                route.consumes(checked);
             }
             return this;
         }
@@ -356,8 +418,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
         @Override
         public HttpRouteSpec produces(MediaType... mediaTypes) {
+            MediaType[] checked = mediaTypes(mediaTypes);
             for (HandlerUriRoute route : routes) {
-                route.produces(mediaTypes);
+                route.produces(checked);
             }
             return this;
         }
@@ -374,6 +437,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         public HttpRouteSpec implementing(ExecutableMethod<?, ?> method) {
             for (HandlerUriRoute route : routes) {
                 route.implementing(method);
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec responseType(Argument<?> responseType) {
+            Objects.requireNonNull(responseType, "responseType");
+            for (HandlerUriRoute route : routes) {
+                route.responseType(responseType);
             }
             return this;
         }

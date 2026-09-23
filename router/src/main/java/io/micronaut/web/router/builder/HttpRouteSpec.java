@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
@@ -30,6 +31,11 @@ import java.util.function.Predicate;
  * <p>The filters of the route, see {@link RouteFilterSpec}, run after the application's filters and
  * the filters of the groups the route is declared in, closest to the route, and are resolved when
  * the route is built.</p>
+ *
+ * <p>The configuration of the route is read when the router is built, once the routes were
+ * declared: configure the route where it is declared, in {@link HttpRoutes#routes(HttpRouteBuilder)}
+ * or in the callback that builds a route table. A change made to a route kept after that is
+ * ignored.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -85,6 +91,32 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
     HttpRouteSpec implementing(ExecutableMethod<?, ?> method);
 
     /**
+     * Declare the type of the body of the responses of the route, like the return type
+     * {@code HttpResponse<R>} of a controller method: the message body writer is selected for the
+     * declared type, with its type arguments and annotations, instead of the runtime class of the
+     * body, e.g. a writer or a JSON view for {@code List<Item>} instead of one for
+     * {@code ArrayList}. The handler still returns an {@code HttpResponse}, or a stage of one;
+     * a body that is not an instance of the declared type is written as its runtime class, like
+     * the body of a controller route.
+     *
+     * <pre>{@code
+     * routes.GET("/items", (request, pathVariables) -> HttpResponse.ok(items.findAll()))
+     *     .responseType(Argument.listOf(Item.class));
+     * }</pre>
+     *
+     * <p>A response without a body, and a handler that returns no response, are answered like
+     * those of a controller route. The route has the declared type for every handler kind,
+     * e.g. {@code CompletionStage<HttpResponse<R>>} for a handler that completes the response
+     * later, and for the features that read the return type of the matched route, see
+     * {@link io.micronaut.web.router.RouteInfo#getResponseBodyType()}.</p>
+     *
+     * @param responseType The type of the body of the response
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec responseType(Argument<?> responseType);
+
+    /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
      * applies whatever the thread selection of the server.
      *
@@ -115,8 +147,11 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      *
      * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
      *
-     * @param port The port
+     * @param port The port, between {@code 1} and {@code 65535}: unlike
+     *             {@code @Controller(port = ...)}, a negative port or {@code 0}, a random port the
+     *             route could not match, is rejected
      * @return The route
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);

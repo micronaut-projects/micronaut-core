@@ -60,8 +60,13 @@ final class HttpRoutesAssembly implements AssembledRoutes {
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly);
         List<HttpRoutes> ordered = new ArrayList<>(routes);
         OrderUtil.sort(ordered);
-        for (HttpRoutes httpRoutes : ordered) {
-            httpRoutes.routes(builder);
+        try {
+            for (HttpRoutes httpRoutes : ordered) {
+                httpRoutes.routes(builder);
+            }
+        } finally {
+            // the routes are read now: a route a bean declares later would be dropped
+            builder.close();
         }
         assembly.addImplicitHeadRoutes();
     }

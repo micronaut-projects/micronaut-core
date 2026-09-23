@@ -16,9 +16,11 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
+import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpParameters;
 import io.micronaut.http.MutableHttpRequest;
@@ -32,7 +34,11 @@ import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 
+import javax.net.ssl.SSLSession;
+import java.net.InetSocketAddress;
 import java.net.URI;
+import java.security.cert.Certificate;
+import java.util.Optional;
 
 /**
  * The mutable request a filter declared as a function is given for a server request: the
@@ -41,7 +47,9 @@ import java.net.URI;
  * continues with this request, e.g. after it changed the URI.
  *
  * <p>Like the mutable view, it shares the headers and the attributes of the request, and it has
- * its own URI, parameters and body object. The bytes of the body are those of the request.</p>
+ * its own URI, parameters and body object. The bytes of the body are those of the request, and so
+ * is the connection: the remote and server addresses, the HTTP version and whether the request is
+ * secure.</p>
  *
  * <p>A request that cannot be mutated, e.g. a {@link HttpRequestWrapper} another filter continued
  * with, is given a mutable wrapper, which keeps what the wrapper changed.</p>
@@ -51,7 +59,7 @@ import java.net.URI;
  * @since 5.3.0
  */
 @Internal
-sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>
+sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements MutableHttpRequest<B>, ServerHttpRequest<B>, BodyChangeAwareRequest
     permits MutableServerRequest.Form {
 
     private final ServerHttpRequest<B> request;
@@ -160,6 +168,12 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     }
 
     @Override
+    public boolean isBodySet() {
+        // the bytes of the request are the body unless the body of the view was set
+        return BodyChangeAwareRequest.isBodySet(mutable());
+    }
+
+    @Override
     public MutableHttpHeaders getHeaders() {
         return mutable().getHeaders();
     }
@@ -183,6 +197,43 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
     @Override
     public ByteBody byteBody() {
         return request.byteBody();
+    }
+
+    // the connection is the connection of the server request, whatever the URI of the view
+
+    @Override
+    public HttpVersion getHttpVersion() {
+        return request.getHttpVersion();
+    }
+
+    @Override
+    public InetSocketAddress getRemoteAddress() {
+        return request.getRemoteAddress();
+    }
+
+    @Override
+    public InetSocketAddress getServerAddress() {
+        return request.getServerAddress();
+    }
+
+    @Override
+    public @Nullable String getServerName() {
+        return request.getServerName();
+    }
+
+    @Override
+    public boolean isSecure() {
+        return request.isSecure();
+    }
+
+    @Override
+    public Optional<SSLSession> getSslSession() {
+        return request.getSslSession();
+    }
+
+    @Override
+    public Optional<Certificate> getCertificate() {
+        return request.getCertificate();
     }
 
     @Override
@@ -232,10 +283,57 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
      *
      * @param <B> The body type
      */
-    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> {
+    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> implements UriChangeAwareRequest, BodyChangeAwareRequest {
+
+        private boolean uriSet;
+        private boolean bodySet;
+        /**
+         * Whether the body was set to {@code null}: the request has no body then, whatever the
+         * body of the request it wraps.
+         */
+        private boolean cleared;
 
         private Overlay(HttpRequest<B> request) {
             super(ConversionService.SHARED, request);
+        }
+
+        @Override
+        public MutableHttpRequest<B> uri(URI uri) {
+            uriSet = true;
+            return super.uri(uri);
+        }
+
+        @Override
+        public boolean isUriSet() {
+            return uriSet;
+        }
+
+        @Override
+        public <T> MutableHttpRequest<T> body(@Nullable T body) {
+            bodySet = true;
+            cleared = body == null;
+            return super.body(body);
+        }
+
+        @Override
+        public boolean isBodySet() {
+            return bodySet;
+        }
+
+        @Override
+        public Optional<B> getBody() {
+            // none if it was cleared
+            return cleared ? Optional.empty() : super.getBody();
+        }
+
+        @Override
+        public <T> Optional<T> getBody(Class<T> type) {
+            return cleared ? Optional.empty() : super.getBody(type);
+        }
+
+        @Override
+        public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+            return cleared ? Optional.empty() : super.getBody(conversionContext);
         }
 
         @Override

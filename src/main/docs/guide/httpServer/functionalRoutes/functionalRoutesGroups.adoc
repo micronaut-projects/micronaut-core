@@ -1,0 +1,17 @@
+`routes.path(prefix, group -> ...)` declares a group of routes under a path prefix, and `routes.group(group -> ...)` a group without one. An api:web.router.builder.HttpRouteGroup[] is a builder itself, so groups nest, and it declares filters, error routes, conditions, a port, an order and attributes for all of its routes.
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groups", indent=0, title="A group with a prefix and filters"]
+
+<1> Every route declared in the group is under `/api`: `GET /api/orders`. The prefix and the URI of a route are joined like the URI of a controller and the URI of its methods; a prefix may have path variables (`/tenants/{tenant}`), but no query or fragment.
+<2> A request filter of the group runs for every route of the group, including the routes of nested groups. Here it answers `400` when a header is missing, and otherwise adds an element to the propagated context, which the handler reads. See <<functionalRoutesFilters, Filters>>.
+<3> A response filter of the group, which also filters the answers of the request filters.
+<4> A nested group adds its prefix and its filters.
+<5> Filters of a single route, see the next section.
+<6> A response filter that replaces the response.
+
+The rules of a group:
+
+* A filter of a group applies to every route declared in the lambda of the group, wherever it is declared in the lambda: before the routes, after them or in between. This includes the implicit `HEAD` routes, the routes declared for several methods and the routes located by a <<functionalRoutesLocators, locator route>> of the group.
+* The filters of a group run only when a route of the group matched the request. A request under the prefix of the group that no route answers (`404`), or that a route would answer with another method or media type (`405`, `415`, `406`), does not run them. Use a <<functionalRoutesFilters, server filter>> to filter every request under a path.
+* The group is closed when its lambda returns: declaring a route or a filter on it afterwards throws an `IllegalStateException`.
+* The builder of an `HttpRoutes` bean has no filter methods of its own. It is shared by the `HttpRoutes` beans of the application, so wrap the routes of a bean in `routes.group(all -> ...)` to filter all of them.

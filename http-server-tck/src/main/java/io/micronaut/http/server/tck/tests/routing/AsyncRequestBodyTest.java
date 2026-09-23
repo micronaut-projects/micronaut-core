@@ -43,9 +43,11 @@ import org.reactivestreams.Publisher;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
@@ -194,6 +196,21 @@ public class AsyncRequestBodyTest {
             assertEquals(HttpStatus.OK, response.status());
             assertTrue(response.body().contains("elements()"), response.body());
             assertTrue(response.body().endsWith("|still readable"), response.body());
+        }
+    }
+
+    @Test
+    void reactiveAndBlockingElementTypesAreRejected() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Response response = call(server, HttpRequest.POST("/fn/async-body/reactive-elements", "still readable").contentType(MediaType.TEXT_PLAIN_TYPE));
+            assertEquals(HttpStatus.OK, response.status());
+            String[] refusals = response.body().split("\\|", -1);
+            assertEquals(4, refusals.length, response.body());
+            assertTrue(refusals[0].contains("reactive or asynchronous type"), refusals[0]);
+            assertTrue(refusals[1].contains("reactive or asynchronous type"), refusals[1]);
+            assertTrue(refusals[2].contains("InputStream"), refusals[2]);
+            // a refused type did not claim the body
+            assertEquals("still readable", refusals[3]);
         }
     }
 
@@ -379,6 +396,18 @@ public class AsyncRequestBodyTest {
                     }
                     String message = refused;
                     return request.text().thenApply(text -> HttpResponse.ok(message + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
+                }).consumesAll();
+                routes.asyncPOST("/fn/async-body/reactive-elements", (request, pathVariables) -> {
+                    List<String> refused = new ArrayList<>();
+                    for (Argument<?> type : List.of(Argument.of(Publisher.class, String.class), Argument.of(CompletableFuture.class, String.class), Argument.of(InputStream.class))) {
+                        try {
+                            request.elements(type);
+                            refused.add("accepted");
+                        } catch (IllegalArgumentException e) {
+                            refused.add(e.getMessage());
+                        }
+                    }
+                    return request.text().thenApply(text -> HttpResponse.ok(String.join("|", refused) + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumesAll();
                 routes.asyncPOST("/fn/async-body/items", (request, pathVariables) -> {
                     List<String> names = new CopyOnWriteArrayList<>();

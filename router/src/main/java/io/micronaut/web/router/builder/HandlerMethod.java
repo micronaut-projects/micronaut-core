@@ -111,14 +111,14 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private final Class<?> handlerType;
     private final Supplier<Method> method;
     private final Argument<?>[] arguments;
-    private final ReturnType<R> returnType;
+    private ReturnType<R> returnType;
     private final Invoker<R> invoker;
     private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
     private @Nullable ExecutableMethod<?, ?> implemented;
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
-        this.handler = handler;
+        this.handler = Objects.requireNonNull(handler, "handler");
         this.handlerType = handlerType;
         // looked up only if asked for: routing never needs the method itself
         this.method = SupplierUtil.memoized(() -> ReflectionUtils.getRequiredMethod(handlerType, HANDLE, parameterTypes));
@@ -166,6 +166,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <B> HandlerMethod<HttpResponse<?>> of(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        Objects.requireNonNull(bodyType, "bodyType");
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
@@ -199,6 +200,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <E extends Throwable> HandlerMethod<HttpResponse<?>> of(Class<E> errorType, ErrorRouteHandler<E> handler) {
+        Objects.requireNonNull(errorType, "type");
         return new HandlerMethod<>(
             handler,
             ErrorRouteHandler.class,
@@ -217,6 +219,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @SuppressWarnings("unchecked")
     public static <E extends Throwable> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(Class<E> errorType, AsyncErrorRouteHandler<E> handler) {
+        Objects.requireNonNull(errorType, "type");
         return new HandlerMethod<>(
             handler,
             AsyncErrorRouteHandler.class,
@@ -355,6 +358,30 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * Declare the type of the body of the response of the handler, see
+     * {@link HttpRouteSpec#responseType(Argument)}: the return type of the handler becomes
+     * {@code HttpResponse<R>}, or {@code CompletionStage<HttpResponse<R>>} for a handler that
+     * completes the response later, like the return type of a controller method.
+     *
+     * @param responseType The type of the body of the response
+     */
+    @Internal
+    public void responseType(Argument<?> responseType) {
+        Objects.requireNonNull(responseType, "responseType");
+        Class<?> type = returnType.getType();
+        if (type == CompletionStage.class) {
+            returnType = returnType(CompletionStage.class, Argument.of(HttpResponse.class, responseType));
+        } else if (type == HttpResponse.class) {
+            returnType = returnType(HttpResponse.class, responseType);
+        } else {
+            throw new IllegalStateException("The handler has no response body type: " + this);
+        }
+        if (annotatedReturnType != null) {
+            annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+        }
+    }
+
+    /**
      * The route to the handler implements a bean method, see {@link HttpRouteSpec#implementing}.
      *
      * @param method The bean method
@@ -404,9 +431,32 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return bodyType.isNullable() ? NULLABLE_BODY : BODY;
     }
 
+    /**
+     * Describes the handler for the messages that name a route, e.g.
+     * {@code RequestHandler lambda in ItemRoutes}: the class of a lambda is a generated name, which
+     * does not identify it. A handler route that implements a bean method is that method.
+     *
+     * @return The description of the handler
+     */
     @Override
     public String toString() {
-        return "handler " + handler;
+        ExecutableMethod<?, ?> target = implemented;
+        if (target != null) {
+            return withoutPackage(target.getDeclaringType().getName()) + '#' + target.getMethodName();
+        }
+        if (handlerType == RouteLocator.class) {
+            return "locator " + handler;
+        }
+        String name = handler.getClass().getName();
+        int lambda = name.indexOf("$$Lambda");
+        String description = lambda < 0
+            ? withoutPackage(name)
+            : "lambda in " + withoutPackage(name.substring(0, lambda));
+        return withoutPackage(handlerType.getName()) + ' ' + description;
+    }
+
+    private static String withoutPackage(String className) {
+        return className.substring(className.lastIndexOf('.') + 1);
     }
 
     /**
@@ -422,19 +472,26 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static CompletionStage<? extends HttpResponse<?>> releaseWhenDone(AsyncServerHttpRequest<?> request,
                                                                              Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
-        if (!(request instanceof AsyncHandlerRequest handlerRequest)) {
-            return handler.call();
-        }
+        AsyncHandlerRequest handlerRequest = request instanceof AsyncHandlerRequest r ? r : null;
         CompletionStage<? extends HttpResponse<?>> stage;
         try {
             stage = handler.call();
-        } catch (Exception e) {
-            handlerRequest.releaseBody();
+        } catch (Throwable e) {
+            // an Error too: the body is released now, not when the request ends
+            if (handlerRequest != null) {
+                release(handlerRequest, e);
+            }
             throw e;
         }
         if (stage == null) {
-            handlerRequest.releaseBody();
-            throw new NullPointerException("The handler returned no stage");
+            NullPointerException noStage = new NullPointerException("The asynchronous handler returned no stage");
+            if (handlerRequest != null) {
+                release(handlerRequest, noStage);
+            }
+            throw noStage;
+        }
+        if (handlerRequest == null) {
+            return stage;
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
@@ -462,6 +519,24 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * Release the body when the handler failed without a stage: a failure to release is added as
+     * suppressed to the failure of the handler, which it does not replace.
+     *
+     * @param request The request of the handler
+     * @param failure The failure of the handler
+     */
+    private static void release(AsyncHandlerRequest request, Throwable failure) {
+        try {
+            request.releaseBody();
+        } catch (Throwable releaseError) {
+            // a Throwable is equal to itself only: a failure cannot suppress itself
+            if (!releaseError.equals(failure)) {
+                failure.addSuppressed(releaseError);
+            }
+        }
+    }
+
+    /**
      * The stage of an asynchronous error or status handler: an error route that answers with no
      * stage fails, like one that throws, instead of answering {@code 404} or {@code 204}.
      *
@@ -470,7 +545,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static CompletionStage<? extends HttpResponse<?>> stage(@Nullable CompletionStage<? extends HttpResponse<?>> stage) {
         if (stage == null) {
-            throw new NullPointerException("The handler returned no stage");
+            throw new NullPointerException("The asynchronous error or status handler returned no stage");
         }
         return stage;
     }
@@ -479,11 +554,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return error instanceof CompletionException && error.getCause() != null ? error.getCause() : error;
     }
 
-    /**
-     * Calls the handler.
-     *
-     * @param <R> The result type
-     */
     /**
      * The return type of a handler route that was given annotations.
      *
@@ -519,6 +589,11 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         }
     }
 
+    /**
+     * Calls the handler.
+     *
+     * @param <R> The result type
+     */
     @FunctionalInterface
     private interface Invoker<R> {
         R invoke(@Nullable Object[] arguments) throws Exception;

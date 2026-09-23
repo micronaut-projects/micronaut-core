@@ -29,8 +29,9 @@ import jakarta.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Binds the {@link FormParts} of a streaming form handler route. Nothing is read until the handler
- * consumes the parts.
+ * Binds the {@link FormParts} argument of a controller method. Nothing is read until the method
+ * consumes the parts, which are closed when the request ends. A handler route reads the parts
+ * with {@link io.micronaut.http.AsyncServerHttpRequest#parts()} instead.
  *
  * @author Denis Stepanov
  * @since 5.3.0

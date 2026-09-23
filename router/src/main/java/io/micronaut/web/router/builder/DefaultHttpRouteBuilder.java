@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,5 +35,15 @@ public final class DefaultHttpRouteBuilder extends AbstractHttpRouteBuilder {
      */
     public DefaultHttpRouteBuilder(RouteAssembly assembly) {
         super(assembly, null, null, null);
+    }
+
+    /**
+     * Close the builder once the routes were declared on it, e.g. when
+     * {@link HttpRoutes#routes(HttpRouteBuilder)} returned: a route, a group, an error, status or
+     * locator route or a server filter declared on it later fails with an
+     * {@link IllegalStateException}, instead of being dropped.
+     */
+    public void close() {
+        closeBuilder();
     }
 }

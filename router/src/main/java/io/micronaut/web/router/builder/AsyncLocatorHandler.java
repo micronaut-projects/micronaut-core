@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 
@@ -40,12 +41,13 @@ import java.util.concurrent.CompletionStage;
  * the request with {@code 404}; a stage that fails, or a locator that throws, is answered by the
  * error routes, like a failed controller method.</p>
  *
+ * @param <T> The type of the target, which the route table function of the locator receives
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncLocatorHandler {
+public interface AsyncLocatorHandler<T> {
 
     /**
      * Locate the target.
@@ -58,5 +60,5 @@ public interface AsyncLocatorHandler {
      * request is not found
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<?> locate(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
+    CompletionStage<? extends @Nullable T> locate(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
 }

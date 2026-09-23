@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
@@ -74,6 +75,13 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#implementing(ExecutableMethod)
      */
     HandlerUriRoute implementing(ExecutableMethod<?, ?> method);
+
+    /**
+     * @param responseType The type of the body of the response
+     * @return The route
+     * @see HttpRouteSpec#responseType(Argument)
+     */
+    HandlerUriRoute responseType(Argument<?> responseType);
 
     /**
      * @return The route

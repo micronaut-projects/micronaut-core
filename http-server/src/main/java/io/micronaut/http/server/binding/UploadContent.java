@@ -117,6 +117,14 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
     abstract byte[] readComplete() throws IOException;
 
     /**
+     * Check that the complete content can be read, blocking, on this thread, before it is claimed.
+     *
+     * @throws IllegalStateException if reading it would block a thread that must not block
+     */
+    void checkBlockingRead() {
+    }
+
+    /**
      * @return Whether the whole content was received and stored, so that it can be read without
      * waiting for the client
      */
@@ -166,6 +174,8 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
         if (!isComplete()) {
             throw new IllegalStateException("The content of " + describe() + " is still arriving: read it with bytes(int)");
         }
+        // before claiming: a read that cannot run leaves the content to another operation
+        checkBlockingRead();
         synchronized (this) {
             checkAvailable();
             state = CONSUMED;

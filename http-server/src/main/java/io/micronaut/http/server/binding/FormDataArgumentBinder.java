@@ -30,6 +30,7 @@ import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.multipart.CompletedFileUpload;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -46,6 +47,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.CompletableFuture;
 
@@ -108,7 +110,20 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
      * @return Completes with the form
      */
     static CompletableFuture<FormData> collect(FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
-        UploadContext uploadContext = UploadContext.of(factory, request);
+        return start(UploadContext.of(factory, request), factory, conversionService, request).result();
+    }
+
+    /**
+     * Start reading every field of the form of a request, like {@link #collect}, in a collection
+     * that can be cancelled: the fields that were not read yet are discarded.
+     *
+     * @param uploadContext     The context of the content of the fields
+     * @param factory           The form factory
+     * @param conversionService The conversion service of the form
+     * @param request           The request, with a form body
+     * @return The collection
+     */
+    static Collection start(UploadContext uploadContext, FormFactory factory, ConversionService conversionService, FormCapableHttpRequest<?> request) {
         Map<String, List<String>> fields = new LinkedHashMap<>();
         Map<String, List<FileUpload>> files = new LinkedHashMap<>();
         OwnedUploads owned = new OwnedUploads();
@@ -119,11 +134,12 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         AtomicLong textBytes = new AtomicLong();
         CompletableFuture<FormData> result = new CompletableFuture<>();
         // the parts of a form arrive in order: each one is read or stored before the next
-        owned.reading(Flux.from(request.getRawFormFields())
+        Disposable subscription = Flux.from(request.getRawFormFields())
             .concatMap(field -> Flux.from(ReactiveExecutionFlow.toPublisher(complete(factory, uploadContext, request, field, fields, files, owned, textBytes))))
             .then(Mono.fromSupplier(() -> form(fields, files, conversionService)))
-            .subscribe(result::complete, result::completeExceptionally));
-        return result;
+            .subscribe(result::complete, result::completeExceptionally);
+        owned.reading(subscription);
+        return new Collection(result, subscription);
     }
 
     private static FormData form(Map<String, List<String>> fields, Map<String, List<FileUpload>> files, ConversionService conversionService) {
@@ -177,6 +193,27 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
             }
             return Boolean.TRUE;
         });
+    }
+
+    /**
+     * A collection of a form that is running, or completed.
+     *
+     * @param result       Completes with the form
+     * @param subscription The subscription to the fields of the form
+     */
+    record Collection(CompletableFuture<FormData> result, Disposable subscription) {
+
+        /**
+         * Stop reading the form, if it was not completely read: the rest of the body is
+         * discarded, and the result fails. The files stored so far stay owned by the request.
+         */
+        void cancel() {
+            if (result.isDone()) {
+                return;
+            }
+            subscription.dispose();
+            result.completeExceptionally(new CancellationException("The form was not read completely before the handler completed"));
+        }
     }
 
     /**

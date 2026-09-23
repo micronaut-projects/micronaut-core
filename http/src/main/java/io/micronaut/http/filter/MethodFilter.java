@@ -417,7 +417,9 @@ record MethodFilter<T>(FilterOrder order,
      * the URI in place and does not return a request, the view replaces the request, so that
      * the new URI is used, e.g. to match the route after a pre-matching filter. The view of a
      * server request replaces it as a server request, see {@link MutableServerRequest}, so that the
-     * route still reads the bytes of the body.
+     * route still reads the bytes of the body. The URI of an asynchronous filter is compared when
+     * its result completes. Changes to the parameters or the body of the view are not kept unless
+     * the filter returns the view.
      *
      * @param filterContext The context the filter ran with
      * @param argument      The mutable request the filter was given
@@ -426,11 +428,32 @@ record MethodFilter<T>(FilterOrder order,
      */
     private static ExecutionFlow<FilterContext> keepChangedUri(FilterContext filterContext, @Nullable Object argument, ExecutionFlow<FilterContext> flow) {
         HttpRequest<?> request = filterContext.request();
-        if (!(argument instanceof MutableHttpRequest<?> view) || argument == request || view.getUri().equals(request.getUri())) {
+        if (!(argument instanceof MutableHttpRequest<?> view) || argument == request) {
             return flow;
         }
-        HttpRequest<?> changed = MutableServerRequest.of(request, view);
-        return flow.map(result -> result.request() == request && result.response() == null ? result.withRequest(changed) : result);
+        if (flow.tryCompleteValue() != null && !isUriChanged(request, view)) {
+            // a synchronous filter that did not change the URI
+            return flow;
+        }
+        // an asynchronous filter changes the URI until its result completes
+        return flow.map(result -> result.request() == request && result.response() == null && isUriChanged(request, view)
+            ? result.withRequest(MutableServerRequest.of(request, view))
+            : result);
+    }
+
+    /**
+     * Whether the filter changed the URI of the mutable view of the request, without parsing the
+     * URI of the request when the view knows that its URI was not set.
+     *
+     * @param request The request
+     * @param view    Its mutable view
+     * @return Whether the URI was changed
+     */
+    private static boolean isUriChanged(HttpRequest<?> request, MutableHttpRequest<?> view) {
+        if (view instanceof UriChangeAwareRequest aware && !aware.isUriSet()) {
+            return false;
+        }
+        return !view.getUri().equals(request.getUri());
     }
 
     private Object[] bindArgsSync(FilterMethodContext context) {

@@ -99,8 +99,9 @@ public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRo
      * });
      * }</pre>
      *
-     * @param port The port
+     * @param port The port, between {@code 1} and {@code 65535}, see {@link HttpRouteSpec#port(int)}
      * @return This group
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
      * @since 5.3.0
      */
     HttpRouteGroup port(int port);

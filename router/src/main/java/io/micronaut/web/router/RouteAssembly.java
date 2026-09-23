@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -203,10 +203,10 @@ public final class RouteAssembly {
     }
 
     /**
-     * @return The ports the routes are exposed on
+     * @return The ports the routes are exposed on, a read-only view
      */
     public Set<Integer> exposedPorts() {
-        return exposedPorts;
+        return Collections.unmodifiableSet(exposedPorts);
     }
 
     /**
@@ -410,6 +410,20 @@ public final class RouteAssembly {
         }
         String prefix = contextPath.charAt(0) == '/' ? contextPath : '/' + contextPath;
         return UriTemplate.of(prefix).nest(uri).toString();
+    }
+
+    /**
+     * The target of a route, for its description: the declaring type and the name of a method,
+     * or the description of a handler function, whose type is a generated lambda class.
+     *
+     * @param targetMethod The target of the route
+     * @return The description
+     */
+    static String target(MethodExecutionHandle<?, ?> targetMethod) {
+        if (targetMethod instanceof HandlerMethod<?> handlerMethod) {
+            return handlerMethod.toString();
+        }
+        return targetMethod.getDeclaringType().getSimpleName() + '#' + targetMethod.getName();
     }
 
     /**
@@ -642,8 +656,7 @@ public final class RouteAssembly {
         @Override
         public String toString() {
             return ' ' + error.getSimpleName()
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod;
+                    + " -> " + target(targetMethod);
         }
     }
 
@@ -790,7 +803,11 @@ public final class RouteAssembly {
          * @param methods The methods of the requests to filter
          */
         public void methods(HttpMethod... methods) {
-            this.methods = methods.clone();
+            HttpMethod[] copy = Objects.requireNonNull(methods, "methods").clone();
+            for (HttpMethod method : copy) {
+                Objects.requireNonNull(method, "methods must not contain null");
+            }
+            this.methods = copy;
         }
 
         /**
@@ -996,6 +1013,7 @@ public final class RouteAssembly {
             if (executorName == null) {
                 return null;
             }
+            RouteArguments.executorName(executorName);
             return SupplierUtil.memoized(() -> {
                 ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
@@ -1139,6 +1157,7 @@ public final class RouteAssembly {
          * @param port The port
          */
         public void port(int port) {
+            RouteArguments.port(port);
             checkOpen();
             this.port = port;
             RouteAssembly.this.exposedPorts.add(port);
@@ -1497,8 +1516,7 @@ public final class RouteAssembly {
         public String toString() {
             return getHttpMethodName() + ' '
                     + uriMatchTemplate
-                    + " -> " + targetMethod.getDeclaringType().getSimpleName()
-                    + '#' + targetMethod.getName()
+                    + " -> " + target(targetMethod)
                     + " (" + String.join(",", consumesMediaTypes) + ')';
         }
 
@@ -1514,6 +1532,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata) {
+            Objects.requireNonNull(annotationMetadata, "annotationMetadata");
             if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
                 throw new IllegalStateException("A route to a bean method has the annotations of the method: " + this);
             }
@@ -1523,6 +1542,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute implementing(ExecutableMethod<?, ?> method) {
+            Objects.requireNonNull(method, "method");
             if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
                 throw new IllegalStateException("A route to a bean method already implements the method: " + this);
             }
@@ -1531,8 +1551,17 @@ public final class RouteAssembly {
         }
 
         @Override
+        public HandlerUriRoute responseType(Argument<?> responseType) {
+            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
+                throw new IllegalStateException("A route to a bean method has the return type of the method: " + this);
+            }
+            handlerMethod.responseType(responseType);
+            return this;
+        }
+
+        @Override
         public HandlerUriRoute executeOn(String executorName) {
-            this.executeOn = Objects.requireNonNull(executorName, "executorName");
+            this.executeOn = RouteArguments.executorName(executorName);
             this.nonBlocking = false;
             return this;
         }
@@ -1545,7 +1574,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
-            filters.before(filter, Objects.requireNonNull(executorName, "executorName"));
+            filters.before(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
@@ -1563,7 +1592,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-            filters.after(filter, Objects.requireNonNull(executorName, "executorName"));
+            filters.after(filter, RouteArguments.executorName(executorName));
             return this;
         }
 
@@ -1610,7 +1639,7 @@ public final class RouteAssembly {
 
         @Override
         public HandlerUriRoute port(int port) {
-            exposedPort(port);
+            exposedPort(RouteArguments.port(port));
             return this;
         }
 

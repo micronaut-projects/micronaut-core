@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 
 import java.util.Objects;
@@ -79,7 +80,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec before(String executorName, ContextRouteRequestFilter filter) {
-        serverFilters.filters().before(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().before(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
@@ -97,7 +98,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().after(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().after(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
