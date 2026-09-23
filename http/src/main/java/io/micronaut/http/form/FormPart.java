@@ -20,6 +20,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
 import org.jspecify.annotations.Nullable;
 
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -29,7 +30,7 @@ import java.util.concurrent.CompletionStage;
  * {@code multipart/form-data} form.
  *
  * <p>The content can be consumed once, with {@link #text()}, {@link #bytes(int)},
- * {@link #transferTo(Path)} or {@link #takeBody()}, or through the {@link #file()} view, which
+ * {@link #transferTo(Path)}, {@link #transferTo(OutputStream)} or {@link #takeBody()}, or through the {@link #file()} view, which
  * shares the content and the lifecycle of the part: consuming or closing one consumes or closes
  * the other. See {@link FileUpload} for the rules of consumption and closing.</p>
  *
@@ -120,6 +121,18 @@ public interface FormPart extends AutoCloseable {
      * @see FileUpload#transferTo(Path)
      */
     CompletionStage<Void> transferTo(Path destination);
+
+    /**
+     * Write the content to a stream, a text field as well as a file, on the thread that delivers
+     * the content, usually an I/O thread of the server: the stream must not block, see
+     * {@link FileUpload#transferTo(OutputStream)}. The stream is flushed at the end and not closed.
+     *
+     * @param out The stream
+     * @return Completes when the content was written
+     * @throws IllegalStateException if the content was already consumed, or the part closed
+     * @see FileUpload#transferTo(OutputStream)
+     */
+    CompletionStage<Void> transferTo(OutputStream out);
 
     /**
      * Take the content as a byte body: the caller becomes responsible for it. In a

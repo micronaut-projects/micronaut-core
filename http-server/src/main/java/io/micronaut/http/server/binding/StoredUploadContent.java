@@ -23,6 +23,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.OptionalLong;
 import java.util.concurrent.CancellationException;
@@ -100,6 +101,34 @@ final class StoredUploadContent extends UploadContent {
                 return error;
             }
         };
+    }
+
+    @Override
+    UploadContent.Operation<Void> newStreamTransfer(OutputStream out) {
+        return new Blocking<>() {
+            @Override
+            @Nullable Void work() throws IOException {
+                try (InputStream in = upload.getInputStream()) {
+                    in.transferTo(out);
+                }
+                out.flush();
+                return null;
+            }
+        };
+    }
+
+    @Override
+    boolean isComplete() {
+        return true;
+    }
+
+    @Override
+    byte[] readComplete() throws IOException {
+        try {
+            return upload.getBytes();
+        } finally {
+            upload.close();
+        }
     }
 
     @Override

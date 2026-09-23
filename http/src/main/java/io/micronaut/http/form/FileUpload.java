@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
 
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.OptionalLong;
@@ -31,7 +32,8 @@ import java.util.concurrent.CompletionStage;
  * memory, on disk or still being received.
  *
  * <h2>Single use</h2>
- * <p>The content can be consumed once: {@link #bytes(int)}, {@link #transferTo(Path)} and
+ * <p>The content can be consumed once: {@link #bytes(int)}, {@link #transferTo(Path)},
+ * {@link #transferTo(OutputStream)}, {@link #readAllBytes()}, {@link #readString()} and
  * {@link #takeBody()} are mutually exclusive, whatever the storage. A second consumption, or a
  * consumption after {@link #close()}, fails synchronously with an {@link IllegalStateException},
  * and so does a consumption with invalid arguments. A consumption that fails once it has started
@@ -128,6 +130,50 @@ public interface FileUpload extends AutoCloseable {
      * @throws IllegalStateException if the content was already consumed, or the upload closed
      */
     CompletionStage<Void> transferTo(Path destination);
+
+    /**
+     * Write the content to a stream, which is flushed at the end and not closed.
+     *
+     * <p>The stream is written by the thread that delivers the content: an I/O thread of the
+     * server for content that is still arriving, e.g. the file of a {@link FormPart}, and a
+     * thread of the I/O executor for a stored upload of a {@link FormData}. A stream that blocks,
+     * e.g. a network or file stream, must not be written on an I/O thread of the server: write it
+     * on an executor, e.g. with {@link #takeBody()} and {@link CloseableByteBody#toInputStream()}
+     * on the blocking executor. A stream in memory, such as a {@link java.io.ByteArrayOutputStream},
+     * can be written anywhere.</p>
+     *
+     * @param out The stream
+     * @return Completes when the content was written, or exceptionally when writing failed, or
+     * with a {@link io.micronaut.http.exceptions.ContentLengthExceededException} when the content
+     * is larger than the limit of the server for a file
+     * @throws IllegalStateException if the content was already consumed, or the upload closed
+     */
+    CompletionStage<Void> transferTo(OutputStream out);
+
+    /**
+     * Read the whole content of an upload that was completely received, blocking: the uploads of
+     * a {@link FormData}, which are stored in memory or on disk before the handler runs, for a
+     * handler that runs on an executor. The content is consumed, like with {@link #bytes(int)}.
+     * It is not available for an upload that is still arriving, e.g. the file of a
+     * {@link FormPart}: read it with {@link #bytes(int)}.
+     *
+     * @return The content
+     * @throws IllegalStateException if the upload is still arriving, the content was already
+     * consumed, or the upload closed
+     * @throws java.io.UncheckedIOException if reading the stored content fails
+     */
+    byte[] readAllBytes();
+
+    /**
+     * Read the whole content of an upload that was completely received as text, in the charset
+     * of the request, blocking, like {@link #readAllBytes()}.
+     *
+     * @return The content
+     * @throws IllegalStateException if the upload is still arriving, the content was already
+     * consumed, or the upload closed
+     * @throws java.io.UncheckedIOException if reading the stored content fails
+     */
+    String readString();
 
     /**
      * Take the content as a byte body: the caller becomes responsible for it. Nothing is read

@@ -20,6 +20,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.form.FileUpload;
 
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.Optional;
@@ -73,6 +74,21 @@ final class DefaultFileUpload implements FileUpload {
     @Override
     public CompletionStage<Void> transferTo(Path destination) {
         return content.transferTo(destination);
+    }
+
+    @Override
+    public CompletionStage<Void> transferTo(OutputStream out) {
+        return content.transferTo(out);
+    }
+
+    @Override
+    public byte[] readAllBytes() {
+        return content.readAllBytes();
+    }
+
+    @Override
+    public String readString() {
+        return content.readString();
     }
 
     @Override

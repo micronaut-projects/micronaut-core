@@ -116,6 +116,21 @@ final class StreamingUploadContent extends UploadContent {
     }
 
     @Override
+    UploadContent.Operation<Void> newStreamTransfer(OutputStream out) {
+        return new StreamTransfer(out, fieldLimit());
+    }
+
+    @Override
+    boolean isComplete() {
+        return false;
+    }
+
+    @Override
+    byte[] readComplete() {
+        throw new IllegalStateException("The content of " + describe() + " is still arriving");
+    }
+
+    @Override
     CloseableByteBody moveBody() {
         return field.byteBody().move();
     }
@@ -271,6 +286,141 @@ final class StreamingUploadContent extends UploadContent {
                 field.close();
             }
             closeAll(discard);
+            settle(null, new CancellationException("The " + describe() + " was closed"), null);
+        }
+    }
+
+    /**
+     * Writes the content to a stream on the thread that delivers it, one buffer at a time: the
+     * next buffer is requested once the previous one was written. The stream is flushed at the
+     * end, and not closed.
+     */
+    private final class StreamTransfer extends UploadContent.Operation<Void> implements Subscriber<ReadBuffer> {
+        private final OutputStream out;
+        private final long limit;
+        // guarded by this
+        private @Nullable Subscription subscription;
+        private long total;
+        private boolean done;
+
+        StreamTransfer(OutputStream out, long limit) {
+            this.out = out;
+            this.limit = limit;
+        }
+
+        @Override
+        void start() {
+            synchronized (this) {
+                if (done) {
+                    return;
+                }
+            }
+            source().subscribe(this);
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            boolean cancel;
+            synchronized (this) {
+                cancel = done;
+                subscription = s;
+            }
+            if (cancel) {
+                s.cancel();
+            } else {
+                s.request(1);
+            }
+        }
+
+        @Override
+        public void onNext(ReadBuffer buffer) {
+            Subscription s;
+            long received;
+            synchronized (this) {
+                if (done) {
+                    buffer.close();
+                    return;
+                }
+                total += buffer.readable();
+                received = total;
+                s = subscription;
+                if (received > limit) {
+                    done = true;
+                }
+            }
+            Throwable error = null;
+            if (received > limit) {
+                buffer.close();
+                error = tooLarge(limit, received);
+            } else {
+                try {
+                    // consuming
+                    buffer.transferTo(out);
+                } catch (IOException | RuntimeException e) {
+                    buffer.close();
+                    synchronized (this) {
+                        done = true;
+                    }
+                    error = e;
+                }
+            }
+            if (error != null) {
+                if (s != null) {
+                    s.cancel();
+                }
+                settle(null, error, null);
+            } else if (s != null) {
+                s.request(1);
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            synchronized (this) {
+                if (done) {
+                    return;
+                }
+                done = true;
+            }
+            settle(null, t, null);
+        }
+
+        @Override
+        public void onComplete() {
+            long size;
+            synchronized (this) {
+                if (done) {
+                    return;
+                }
+                done = true;
+                size = total;
+            }
+            try {
+                out.flush();
+            } catch (IOException | RuntimeException e) {
+                settle(null, e, null);
+                return;
+            }
+            completeSize = size;
+            settle(null, null, null);
+        }
+
+        @Override
+        void abort() {
+            Subscription s;
+            synchronized (this) {
+                if (done) {
+                    return;
+                }
+                done = true;
+                s = subscription;
+            }
+            if (s != null) {
+                s.cancel();
+            } else {
+                // never subscribed: discard the content
+                field.close();
+            }
             settle(null, new CancellationException("The " + describe() + " was closed"), null);
         }
     }

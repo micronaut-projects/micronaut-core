@@ -23,6 +23,8 @@ import io.micronaut.http.multipart.FormFieldMetadata;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
+import java.io.OutputStream;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
@@ -101,6 +103,26 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
     abstract Operation<Void> newTransfer(Path destination);
 
     /**
+     * @param out The stream
+     * @return The operation that writes the content to the stream, without closing it
+     */
+    abstract Operation<Void> newStreamTransfer(OutputStream out);
+
+    /**
+     * Read the whole content, which is complete, blocking the caller, and release it.
+     *
+     * @return The content
+     * @throws IOException if reading fails
+     */
+    abstract byte[] readComplete() throws IOException;
+
+    /**
+     * @return Whether the whole content was received and stored, so that it can be read without
+     * waiting for the client
+     */
+    abstract boolean isComplete();
+
+    /**
      * @return The content, moved to the caller
      */
     abstract CloseableByteBody moveBody();
@@ -133,6 +155,30 @@ abstract sealed class UploadContent permits StreamingUploadContent, StoredUpload
     final CompletionStage<Void> transferTo(Path destination) {
         Objects.requireNonNull(destination, "destination");
         return run(newTransfer(destination));
+    }
+
+    final CompletionStage<Void> transferTo(OutputStream out) {
+        Objects.requireNonNull(out, "out");
+        return run(newStreamTransfer(out));
+    }
+
+    final byte[] readAllBytes() {
+        if (!isComplete()) {
+            throw new IllegalStateException("The content of " + describe() + " is still arriving: read it with bytes(int)");
+        }
+        synchronized (this) {
+            checkAvailable();
+            state = CONSUMED;
+        }
+        try {
+            return readComplete();
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to read the " + describe(), e);
+        }
+    }
+
+    final String readString() {
+        return new String(readAllBytes(), context.charset());
     }
 
     final CloseableByteBody takeBody() {

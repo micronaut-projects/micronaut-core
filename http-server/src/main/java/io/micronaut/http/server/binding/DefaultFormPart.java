@@ -23,6 +23,7 @@ import io.micronaut.http.form.FormFieldException;
 import io.micronaut.http.form.FormPart;
 import org.jspecify.annotations.Nullable;
 
+import java.io.OutputStream;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletionStage;
@@ -86,6 +87,11 @@ final class DefaultFormPart implements FormPart {
     @Override
     public CompletionStage<Void> transferTo(Path destination) {
         return content.transferTo(destination);
+    }
+
+    @Override
+    public CompletionStage<Void> transferTo(OutputStream out) {
+        return content.transferTo(out);
     }
 
     @Override

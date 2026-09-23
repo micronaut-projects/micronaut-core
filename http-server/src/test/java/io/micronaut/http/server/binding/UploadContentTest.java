@@ -21,7 +21,9 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.FileAlreadyExistsException;
@@ -95,6 +97,12 @@ class UploadContentTest {
     private static Throwable failure(CompletionStage<?> stage) {
         CompletionException e = assertThrows(CompletionException.class, () -> stage.toCompletableFuture().join());
         return e.getCause();
+    }
+
+    private List<Path> temporaryFiles() throws IOException {
+        try (Stream<Path> files = Files.list(directory)) {
+            return files.filter(p -> p.getFileName().toString().startsWith("stored")).toList();
+        }
     }
 
     private List<Path> leftovers() throws IOException {
@@ -395,6 +403,132 @@ class UploadContentTest {
         FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
         join(part.closeAsync());
         assertThrows(IllegalStateException.class, () -> part.file().bytes(10));
+    }
+
+    @Test
+    void storedUploadIsWrittenToAStreamOnTheExecutorWithoutClosingIt() throws IOException {
+        FileUpload upload = disk(temporary("stored content"));
+        TrackingOutputStream out = new TrackingOutputStream();
+        CompletionStage<Void> transfer = upload.transferTo(out);
+        assertEquals(0, out.size(), "written on the I/O executor");
+        executor.runAll();
+        join(transfer);
+        assertEquals("stored content", out.toString(StandardCharsets.UTF_8));
+        assertFalse(out.closed);
+        assertTrue(out.flushed);
+        assertThrows(IllegalStateException.class, () -> upload.transferTo(new ByteArrayOutputStream()));
+        assertThrows(IllegalStateException.class, upload::readAllBytes);
+        assertEquals(List.of(), temporaryFiles(), "the temporary file of the upload was released");
+    }
+
+    @Test
+    void streamingContentIsWrittenToAStreamAsItArrives() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
+        TrackingOutputStream out = new TrackingOutputStream();
+        CompletionStage<Void> transfer = part.transferTo(out);
+        publisher.emit("first ");
+        assertEquals("first ", out.toString(StandardCharsets.UTF_8), "written by the thread that delivers the content");
+        publisher.emit("second");
+        assertFalse(transfer.toCompletableFuture().isDone());
+        publisher.complete();
+        join(transfer);
+        assertEquals("first second", out.toString(StandardCharsets.UTF_8));
+        assertFalse(out.closed);
+        assertTrue(out.flushed);
+        assertEquals(OptionalLong.of(12), part.file().size());
+        assertThrows(IllegalStateException.class, () -> part.transferTo(new ByteArrayOutputStream()));
+    }
+
+    @Test
+    void streamingContentOverTheFileLimitIsNotWrittenToAStream() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(5)));
+        TrackingOutputStream out = new TrackingOutputStream();
+        CompletionStage<Void> transfer = part.file().transferTo(out);
+        publisher.emit("1234");
+        publisher.emit("56");
+        assertInstanceOf(ContentLengthExceededException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+        assertEquals("1234", out.toString(StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void closingThePartAbortsAStreamTransfer() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
+        CompletionStage<Void> transfer = part.transferTo(new ByteArrayOutputStream());
+        publisher.emit("partial");
+        join(part.closeAsync());
+        assertInstanceOf(CancellationException.class, failure(transfer));
+        assertTrue(publisher.cancelled);
+    }
+
+    @Test
+    void aStreamThatFailsFailsTheTransfer() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
+        CompletionStage<Void> transfer = part.transferTo(new OutputStream() {
+            @Override
+            public void write(int b) throws IOException {
+                throw new IOException("write failed");
+            }
+        });
+        publisher.emit("content");
+        assertEquals("write failed", failure(transfer).getMessage());
+        assertTrue(publisher.cancelled);
+    }
+
+    @Test
+    void completeUploadsAreReadBlocking() throws IOException {
+        FileUpload memory = memory("in memory");
+        assertEquals("in memory", memory.readString());
+        assertThrows(IllegalStateException.class, memory::readAllBytes);
+        assertThrows(IllegalStateException.class, () -> memory.bytes(100));
+
+        FileUpload disk = disk(temporary("on disk"));
+        assertArrayEquals("on disk".getBytes(StandardCharsets.UTF_8), disk.readAllBytes());
+        assertEquals(List.of(), temporaryFiles(), "the temporary file of the upload was released");
+        assertThrows(IllegalStateException.class, disk::readString);
+        // the metadata stays readable
+        assertEquals("file.txt", disk.fileName());
+        join(disk.closeAsync());
+
+        FileUpload closed = memory("closed");
+        join(closed.closeAsync());
+        assertThrows(IllegalStateException.class, closed::readAllBytes);
+    }
+
+    @Test
+    void anUploadThatIsStillArrivingIsNotReadBlocking() {
+        TestPublisher publisher = new TestPublisher();
+        FormPart part = new DefaultFormPart(new StreamingUploadContent(new RawFormField(FILE, BODY_FACTORY.adapt(publisher)), context(Long.MAX_VALUE)));
+        IllegalStateException e = assertThrows(IllegalStateException.class, () -> part.file().readAllBytes());
+        assertTrue(e.getMessage().contains("still arriving"), e.getMessage());
+        assertThrows(IllegalStateException.class, () -> part.file().readString());
+        // not consumed: it can still be read asynchronously
+        CompletionStage<byte[]> bytes = part.file().bytes(100);
+        publisher.emit("arrived");
+        publisher.complete();
+        assertEquals("arrived", new String(join(bytes), StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Records whether it was flushed and closed.
+     */
+    private static final class TrackingOutputStream extends ByteArrayOutputStream {
+        volatile boolean flushed;
+        volatile boolean closed;
+
+        @Override
+        public void flush() {
+            flushed = true;
+        }
+
+        @Override
+        public void close() {
+            closed = true;
+        }
     }
 
     /**
