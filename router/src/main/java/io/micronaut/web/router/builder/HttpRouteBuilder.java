@@ -42,6 +42,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Experimental
+@SuppressWarnings("MethodName")
 public interface HttpRouteBuilder {
 
     /**

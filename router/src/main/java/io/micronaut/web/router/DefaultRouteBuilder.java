@@ -25,7 +25,6 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.annotation.Get;
 import io.micronaut.http.filter.FilterOrder;
 import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.filter.HttpFilter;
@@ -64,17 +63,17 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
 
     protected static final Logger LOG = LoggerFactory.getLogger(DefaultRouteBuilder.class);
 
-
     protected final ExecutionHandleLocator executionHandleLocator;
     protected final UriNamingStrategy uriNamingStrategy;
     protected final ConversionService conversionService;
     protected final Charset defaultCharset;
 
-    private final List<FilterRoute> filterRoutes = new ArrayList<>();
     /**
      * The routes of this builder, assembled like the routes of every route builder.
      */
     final RouteAssembly assembly;
+
+    private final List<FilterRoute> filterRoutes = new ArrayList<>();
 
     /**
      * @param executionHandleLocator The execution handler locator

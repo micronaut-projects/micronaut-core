@@ -66,6 +66,9 @@ import java.util.stream.Stream;
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+    private static final String VARIABLE_SEGMENT = "{}";
+    private static final String ANY_SEGMENTS = "{*}";
+    private static final Pattern SIMPLE_VARIABLE = Pattern.compile("\\{\\w[\\w-]*}");
 
     private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
@@ -1023,10 +1026,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         }
         return true;
     }
-
-    private static final String VARIABLE_SEGMENT = "{}";
-    private static final String ANY_SEGMENTS = "{*}";
-    private static final Pattern SIMPLE_VARIABLE = Pattern.compile("\\{\\w[\\w-]*}");
 
     /**
      * The path segments of a route's template: a literal, {@link #VARIABLE_SEGMENT} for a
