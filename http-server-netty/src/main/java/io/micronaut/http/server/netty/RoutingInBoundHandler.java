@@ -59,6 +59,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
@@ -319,12 +320,37 @@ public final class RoutingInBoundHandler implements RequestHandler {
                               HttpResponse<?> response,
                               @Nullable
                               Throwable throwable) {
+        writeResponse(outboundAccess, nettyHttpRequest, response, throwable, null);
+    }
+
+    /**
+     * Write the response.
+     *
+     * @param outboundAccess    The outbound access
+     * @param nettyHttpRequest  The request
+     * @param response          The response, if there was no error
+     * @param throwable         The error, if there is no response
+     * @param writeErrorHandler Gives the error response when writing the body of the response
+     *                          fails before anything was sent, or {@code null} to answer the
+     *                          default error response
+     */
+    void writeResponse(OutboundAccess outboundAccess,
+                       NettyHttpRequest<?> nettyHttpRequest,
+                       @Nullable
+                       HttpResponse<?> response,
+                       @Nullable
+                       Throwable throwable,
+                       @Nullable
+                       Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
         if (throwable != null) {
             response = routeExecutor.createDefaultErrorResponse(nettyHttpRequest, throwable);
+            writeErrorHandler = null;
         }
         if (response != null) {
-            ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse =
-                new NettyResponseLifecycle(this, nettyHttpRequest).encodeHttpResponseSafe(nettyHttpRequest, response);
+            NettyResponseLifecycle responseLifecycle = new NettyResponseLifecycle(this, nettyHttpRequest);
+            ExecutionFlow<? extends ByteBodyHttpResponse<?>> finalResponse = writeErrorHandler == null
+                ? responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response)
+                : responseLifecycle.encodeHttpResponseSafe(nettyHttpRequest, response, writeErrorHandler);
             finalResponse.onComplete((r, t) -> {
                 ByteBodyHttpResponse<?> encodedResponse;
                 if (t != null) {

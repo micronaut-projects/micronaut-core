@@ -20,7 +20,6 @@ import io.micronaut.core.async.publisher.Publishers;
 import io.micronaut.core.async.subscriber.LazySendingSubscriber;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
@@ -44,13 +43,11 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.ResponseBodyWriter;
 import io.micronaut.http.codec.CodecException;
-import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.exceptions.response.Error;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.json.JsonSyntaxException;
-import io.micronaut.json.body.CustomizableJsonHandler;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -65,6 +62,7 @@ import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -119,16 +117,14 @@ public abstract class ResponseLifecycle {
         try {
             return encodeHttpResponse(
                 httpRequest,
-                response,
-                null
+                response
             );
         } catch (Throwable e) {
             try {
                 response = routeExecutor.createDefaultErrorResponse(httpRequest, e);
                 return encodeHttpResponse(
                     httpRequest,
-                    response,
-                    e
+                    response
                 );
             } catch (Throwable f) {
                 f.addSuppressed(e);
@@ -138,20 +134,45 @@ public abstract class ResponseLifecycle {
     }
 
     /**
-     * Encode the response.
+     * Encode the response. If writing the body fails before anything was sent, the given handler
+     * gives the error response for the failure, e.g. from the exception handlers and the error and
+     * status routes, and that response is encoded instead. The handler runs at most once: if the
+     * error response fails to encode too, this falls back like
+     * {@link #encodeHttpResponseSafe(HttpRequest, HttpResponse)}.
      *
-     * @param nettyRequest The request
-     * @param httpResponse The response
-     * @param handledError The error this response answers, if it is the response of an error
-     *                     that happened while encoding. A body writer that fails to write such a
-     *                     response fails the encoding instead of being handled again.
+     * @param httpRequest       The request that triggered this response
+     * @param response          The unencoded response
+     * @param writeErrorHandler Gives the error response for a failure to write the body
      * @return The encoded response
+     * @since 5.3.0
      */
+    @SuppressWarnings("unchecked")
+    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(HttpRequest<?> httpRequest,
+                                                                                        HttpResponse<?> response,
+                                                                                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        ExecutionFlow<ByteBodyHttpResponse<?>> flow;
+        try {
+            flow = (ExecutionFlow<ByteBodyHttpResponse<?>>) encodeHttpResponse(httpRequest, response);
+        } catch (Throwable e) {
+            flow = ExecutionFlow.error(e);
+        }
+        // a failure after the first byte was sent does not complete this flow, it fails the body
+        return flow.onErrorResume(e -> {
+            ExecutionFlow<HttpResponse<?>> errorResponse;
+            try {
+                errorResponse = writeErrorHandler.apply(e);
+            } catch (Throwable f) {
+                f.addSuppressed(e);
+                return ExecutionFlow.error(f);
+            }
+            return errorResponse.flatMap(r -> encodeHttpResponseSafe(httpRequest, r));
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
-        HttpResponse<?> httpResponse,
-        @Nullable Throwable handledError) {
+        HttpResponse<?> httpResponse) {
         ExecutionFlow<? extends ByteBodyHttpResponse<?>> byteBodyResponse = encodeByteBodyResponse(nettyRequest, httpResponse);
         if (byteBodyResponse != null) {
             return byteBodyResponse;
@@ -205,7 +226,7 @@ public abstract class ResponseLifecycle {
                 responseBodyType = Argument.ofInstance(body);
                 messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
             }
-            return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false, handledError);
+            return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
         } else {
             response.body(null);
 
@@ -429,8 +450,7 @@ public abstract class ResponseLifecycle {
         }
         return encodeHttpResponse(
             request,
-            errorResponse,
-            t
+            errorResponse
         );
     }
 
@@ -489,10 +509,9 @@ public abstract class ResponseLifecycle {
                                                                           MediaType mediaType,
                                                                           T body,
                                                                           MessageBodyWriter<T> messageBodyWriter,
-                                                                          boolean onIoExecutor,
-                                                                          @Nullable Throwable handledError) {
+                                                                          boolean onIoExecutor) {
         if (!onIoExecutor && messageBodyWriter.isBlocking()) {
-            return ExecutionFlow.async(ioExecutor(), () -> buildFinalResponse(nettyRequest, response, responseBodyType, mediaType, body, messageBodyWriter, true, handledError));
+            return ExecutionFlow.async(ioExecutor(), () -> buildFinalResponse(nettyRequest, response, responseBodyType, mediaType, body, messageBodyWriter, true));
         }
 
         try {
@@ -511,43 +530,7 @@ public abstract class ResponseLifecycle {
                 return ExecutionFlow.just(wrap(errorBodyWriter)
                     .write(byteBodyFactory, nettyRequest, errorResponse, type, errorContentType, errorBody));
             }
-        } catch (Exception e) {
-            if (messageBodyWriter instanceof CustomizableJsonHandler) {
-                // an encoding failure of a JSON codec, which its mapper may report with an
-                // unchecked exception of its own rather than a CodecException (Jackson 3 does):
-                // answered with the default error response like a CodecException, not by the
-                // exception handlers, which take such exceptions for a malformed request
-                throw e;
-            }
-            if (handledError != null) {
-                // the response of an error failed to write as well: fail the encoding, which
-                // answers a plain 500, rather than handling this error again
-                e.addSuppressed(handledError);
-                return ExecutionFlow.error(e);
-            }
-            return onBodyWriterError(nettyRequest, e);
         }
-    }
-
-    /**
-     * Handle an exception of the body writer, thrown before anything of the response was sent,
-     * like an exception of the route: by the error routes, exception handlers and status routes,
-     * or with the default error response. Then encode that response instead. The filters are not
-     * run again, they already returned the response the writer failed on. The encoding of the
-     * response of the error does not handle a failing writer again.
-     * <p>
-     * A body that is written as a stream fails after the response was committed, which aborts
-     * the response instead, see {@link #mapToHttpContent}.
-     *
-     * @param request The request
-     * @param failure The exception of the writer
-     * @return The encoded response for the error
-     */
-    private ExecutionFlow<ByteBodyHttpResponse<?>> onBodyWriterError(HttpRequest<?> request, Exception failure) {
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request));
-        return new RequestLifecycle(routeExecutor)
-            .onBodyWriterError(request, failure, propagatedContext)
-            .flatMap(errorResponse -> encodeHttpResponse(request, errorResponse, failure));
     }
 
     private static boolean isImplicitlyEmptyBody(Object body) {

@@ -51,7 +51,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * An exception that a {@link MessageBodyWriter} throws before the response was sent is handled
  * like an exception of the route: by {@link ExceptionHandler} beans, error routes and status
  * routes, for controller routes and handler routes alike. A writer that fails on the response of
- * that error answers a plain {@code 500} instead of handling the error again.
+ * that error answers the default {@code 500} error response instead of handling the error again.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
