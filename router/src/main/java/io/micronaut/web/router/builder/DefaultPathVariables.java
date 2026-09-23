@@ -63,26 +63,32 @@ public record DefaultPathVariables(Map<String, Object> values,
     }
 
     @Override
-    public <T> T get(String name, Class<T> type) {
-        Argument<T> argument = Argument.of(type, name);
+    public <T> T get(String name, Argument<T> type) {
         Object value = values.get(name);
         if (value == null) {
-            throw new UnsatisfiedPathVariableRouteException(name, argument);
+            throw new UnsatisfiedPathVariableRouteException(name, named(name, type));
         }
-        return convert(argument, value);
+        return convert(named(name, type), value);
     }
 
     @Override
-    public <T> Optional<T> find(String name, Class<T> type) {
+    public <T> Optional<T> find(String name, Argument<T> type) {
         Object value = values.get(name);
         if (value == null) {
             return Optional.empty();
         }
-        return Optional.of(convert(Argument.of(type, name), value));
+        return Optional.of(convert(named(name, type), value));
+    }
+
+    /**
+     * The type, named after the variable for the errors of the conversion.
+     */
+    private static <T> Argument<T> named(String name, Argument<T> type) {
+        return name.equals(type.getName()) ? type : Argument.of(type.getType(), name, type.getAnnotationMetadata(), type.getTypeParameters());
     }
 
     private <T> T convert(Argument<T> argument, Object value) {
-        if (argument.getType().isInstance(value)) {
+        if (argument.getTypeParameters().length == 0 && argument.getType().isInstance(value)) {
             return argument.getType().cast(value);
         }
         ConversionContext context = ConversionContext.of(argument);
