@@ -60,6 +60,8 @@ public class GroupRoutes implements HttpRoutes {
                     response.getStatus() == HttpStatus.OK && request.getHeaders().contains("X-Legacy")
                         ? HttpResponse.status(HttpStatus.GONE)
                         : null);
+
+            api.GET((request, pathVariables) -> text("api of " + PropagatedContext.get().get(Tenant.class).id())); // <7>
         });
         // end::groups[]
 

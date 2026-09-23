@@ -714,6 +714,368 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
+     * Like {@link #GET(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec GET(RequestHandler handler) {
+        return GET("/", handler);
+    }
+
+    /**
+     * Like {@link #POST(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec POST(RequestHandler handler) {
+        return POST("/", handler);
+    }
+
+    /**
+     * Like {@link #PUT(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec PUT(RequestHandler handler) {
+        return PUT("/", handler);
+    }
+
+    /**
+     * Like {@link #PATCH(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec PATCH(RequestHandler handler) {
+        return PATCH("/", handler);
+    }
+
+    /**
+     * Like {@link #DELETE(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec DELETE(RequestHandler handler) {
+        return DELETE("/", handler);
+    }
+
+    /**
+     * Like {@link #POST(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec POST(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return POST("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #POST(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec POST(Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return POST("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #PUT(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PUT(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return PUT("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #PUT(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PUT(Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return PUT("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #PATCH(String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PATCH(Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return PATCH("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #PATCH(String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec PATCH(Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return PATCH("/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #POST(String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec POST(FormRequestHandler handler) {
+        return POST("/", handler);
+    }
+
+    /**
+     * Like {@link #PUT(String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec PUT(FormRequestHandler handler) {
+        return PUT("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncGET(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncGET(AsyncRequestHandler handler) {
+        return asyncGET("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncPOST(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPOST(AsyncRequestHandler handler) {
+        return asyncPOST("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncPUT(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPUT(AsyncRequestHandler handler) {
+        return asyncPUT("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncPATCH(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPATCH(AsyncRequestHandler handler) {
+        return asyncPATCH("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncDELETE(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncDELETE(AsyncRequestHandler handler) {
+        return asyncDELETE("/", handler);
+    }
+
+    /**
+     * Like {@link #handle(HttpMethod, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handle(HttpMethod method, RequestHandler handler) {
+        return handle(method, "/", handler);
+    }
+
+    /**
+     * Like {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(method, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handle(HttpMethod, String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(HttpMethod method, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(method, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handleForm(HttpMethod, String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleForm(HttpMethod method, FormRequestHandler handler) {
+        return handleForm(method, "/", handler);
+    }
+
+    /**
+     * Like {@link #handleAsync(HttpMethod, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(HttpMethod method, AsyncRequestHandler handler) {
+        return handleAsync(method, "/", handler);
+    }
+
+    /**
+     * Like {@link #handle(Set, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param methods        The HTTP methods
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handle(Set<HttpMethod> methods, RequestHandler handler) {
+        return handle(methods, "/", handler);
+    }
+
+    /**
+     * Like {@link #handleAsync(Set, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param methods        The HTTP methods
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(Set<HttpMethod> methods, AsyncRequestHandler handler) {
+        return handleAsync(methods, "/", handler);
+    }
+
+    /**
+     * Like {@link #handle(String, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handle(String httpMethodName, RequestHandler handler) {
+        return handle(httpMethodName, "/", handler);
+    }
+
+    /**
+     * Like {@link #handle(String, String, Argument, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(String httpMethodName, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(httpMethodName, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handle(String, String, Class, BodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param bodyType       The body type
+     * @param handler        The handler
+     * @param <B>            The body type
+     * @return The route
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec handle(String httpMethodName, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return handle(httpMethodName, "/", bodyType, handler);
+    }
+
+    /**
+     * Like {@link #handleAsync(String, String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(String httpMethodName, AsyncRequestHandler handler) {
+        return handleAsync(httpMethodName, "/", handler);
+    }
+
+    /**
+     * Like {@link #handleForm(String, String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleForm(String httpMethodName, FormRequestHandler handler) {
+        return handleForm(httpMethodName, "/", handler);
+    }
+
+    /**
      * A body type that is {@code null} when the request has no body, for the handlers that
      * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)},
      * and for the body an asynchronous handler reads:
