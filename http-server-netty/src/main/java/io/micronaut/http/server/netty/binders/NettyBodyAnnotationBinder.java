@@ -80,7 +80,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
-        if (source instanceof FormCapableHttpRequest<?> nhr && nhr.hasFormBody()) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        FormCapableHttpRequest<?> nhr = source instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(source);
+        if (nhr != null && nhr.hasFormBody()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
             return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), nhr, bodyComponent, true);
         } else {
@@ -90,7 +92,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
-        if (!(source instanceof NettyHttpRequest<?> nhr)) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        if (nhr == null) {
             return super.bindFullBodyConvertibleValues(source);
         }
         BindingResult<ConvertibleValues<?>> existing = nhr.convertibleBody;
@@ -106,7 +110,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (!(source instanceof NettyHttpRequest<?> nhr)) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
+        if (nhr == null) {
             return super.bindFullBody(context, source);
         }
         if (nhr.byteBody().expectedLength().orElse(-1) == 0) {

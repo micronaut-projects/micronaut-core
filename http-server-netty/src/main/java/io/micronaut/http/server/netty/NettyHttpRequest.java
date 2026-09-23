@@ -105,6 +105,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -234,6 +235,26 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public MutableHttpRequest<T> mutate() {
         return new NettyMutableHttpRequest();
+    }
+
+    /**
+     * The Netty request whose body is the body of the given request: the given request itself, or
+     * the Netty request of a {@link #mutate() mutable view}, e.g. one a filter continued with,
+     * whose body the filter did not set.
+     *
+     * @param request The request
+     * @return The Netty request, or {@code null} if the body of the request is not the body of one
+     * @since 5.2.4
+     */
+    @Internal
+    public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
+        if (request instanceof NettyHttpRequest<?> nettyRequest) {
+            return nettyRequest;
+        }
+        if (request instanceof NettyHttpRequest<?>.NettyMutableHttpRequest view && view.body == null) {
+            return view.request();
+        }
+        return null;
     }
 
     @Override
@@ -808,6 +829,13 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Nullable
         private Object body;
 
+        /**
+         * @return The request this is the mutable view of
+         */
+        NettyHttpRequest<T> request() {
+            return NettyHttpRequest.this;
+        }
+
         @Override
         public void setConversionService(ConversionService conversionService) {
             if (httpParameters != null) {
@@ -882,6 +910,43 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public HttpMethod getMethod() {
             return NettyHttpRequest.this.getMethod();
+        }
+
+        // the connection is the connection of the request, whatever the URI of the view
+
+        @Override
+        public HttpVersion getHttpVersion() {
+            return NettyHttpRequest.this.getHttpVersion();
+        }
+
+        @Override
+        public InetSocketAddress getRemoteAddress() {
+            return NettyHttpRequest.this.getRemoteAddress();
+        }
+
+        @Override
+        public InetSocketAddress getServerAddress() {
+            return NettyHttpRequest.this.getServerAddress();
+        }
+
+        @Override
+        public String getServerName() {
+            return NettyHttpRequest.this.getServerName();
+        }
+
+        @Override
+        public boolean isSecure() {
+            return NettyHttpRequest.this.isSecure();
+        }
+
+        @Override
+        public Optional<SSLSession> getSslSession() {
+            return NettyHttpRequest.this.getSslSession();
+        }
+
+        @Override
+        public Optional<Certificate> getCertificate() {
+            return NettyHttpRequest.this.getCertificate();
         }
 
         @Override
