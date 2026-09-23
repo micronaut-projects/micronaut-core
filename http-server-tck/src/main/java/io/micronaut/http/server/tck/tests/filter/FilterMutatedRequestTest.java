@@ -71,6 +71,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class FilterMutatedRequestTest {
     public static final String SPEC_NAME = "FilterMutatedRequestTest";
     private static final String MUTATE = "X-Mutate";
+    private static final String BODY = "X-Body";
 
     @Test
     void aFilterThatContinuesWithTheMutableViewKeepsTheConnectionOfTheRequest() throws IOException {
@@ -113,6 +114,45 @@ public class FilterMutatedRequestTest {
             assertForms(server, "/fmr/pre", false);
             // continued with after the route match
             assertForms(server, "/fmr/target", true);
+        }
+    }
+
+    @Test
+    void theBodyOfARequestAFilterContinuedWithTheMutableViewOfIsTheBodyTheFilterSet() throws IOException {
+        try (ServerUnderTest server = server()) {
+            for (String path : new String[]{"/fmr/target/body-required", "/fmr/target/body-nullable"}) {
+                // the filter did not set the body
+                assertEquals("body original", text(server, path, null, false), path);
+                assertEquals("body original", text(server, path, null, true), path);
+                // the filter set the body, on the view or on a view derived from it
+                for (String body : new String[]{"replace", "replace-mutate"}) {
+                    assertEquals("body replacement", text(server, path, body, false), path + " " + body);
+                    assertEquals("body replacement", text(server, path, body, true), path + " " + body);
+                }
+            }
+            // the filter cleared the body, on the view or on a view derived from it
+            for (String body : new String[]{"clear", "clear-mutate"}) {
+                assertEquals("400", text(server, "/fmr/target/body-required", body, false), body);
+                assertEquals("400", text(server, "/fmr/target/body-required", body, true), body);
+                assertEquals("body null", text(server, "/fmr/target/body-nullable", body, false), body);
+                assertEquals("body null", text(server, "/fmr/target/body-nullable", body, true), body);
+            }
+        }
+    }
+
+    private static String text(ServerUnderTest server, String path, @Nullable String body, boolean mutate) {
+        MutableHttpRequest<String> request = HttpRequest.POST(path, "original")
+            .contentType(MediaType.TEXT_PLAIN_TYPE);
+        if (body != null) {
+            request.header(BODY, body);
+        }
+        if (mutate) {
+            request.header(MUTATE, "true");
+        }
+        try {
+            return get(server, request);
+        } catch (HttpClientResponseException e) {
+            return String.valueOf(e.getStatus().getCode());
         }
     }
 
@@ -223,6 +263,17 @@ public class FilterMutatedRequestTest {
             if (path.startsWith("/fmr/pre/")) {
                 return request.mutate().uri(URI.create("/fmr/target/" + path.substring("/fmr/pre/".length())));
             }
+            String body = request.getHeaders().get(BODY);
+            if (body != null) {
+                // a filter that sets the body, before the route match
+                return switch (body) {
+                    case "clear" -> request.mutate().body(null);
+                    case "clear-mutate" -> request.mutate().body(null).mutate();
+                    case "replace" -> request.mutate().body("replacement");
+                    case "replace-mutate" -> request.mutate().body("replacement").mutate();
+                    default -> null;
+                };
+            }
             return null;
         }
 
@@ -249,6 +300,16 @@ public class FilterMutatedRequestTest {
         @Get("/info")
         String info(HttpRequest<?> request) {
             return describe(request);
+        }
+
+        @Post(value = "/body-required", consumes = MediaType.TEXT_PLAIN)
+        String bodyRequired(@Body String body) {
+            return "body " + body;
+        }
+
+        @Post(value = "/body-nullable", consumes = MediaType.TEXT_PLAIN)
+        String bodyNullable(@Nullable @Body String body) {
+            return "body " + body;
         }
 
         @Post(value = "/form-pojo", consumes = MediaType.APPLICATION_FORM_URLENCODED)
