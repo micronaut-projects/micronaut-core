@@ -56,6 +56,7 @@ import io.micronaut.inject.MethodReference;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingExecutorService;
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.scheduling.executor.ExecutorSelector;
+import io.micronaut.web.router.DefaultRequestMatcher;
 import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.MethodBasedRouteInfo;
@@ -609,9 +610,14 @@ public final class RouteExecutor {
     }
 
     private ExecutionFlow<MutableHttpResponse<?>> fromKotlinCoroutineExecute(PropagatedContext propagatedContext, HttpRequest<?> request, @Nullable Object body, RouteInfo<?> routeInfo) {
-        boolean isKotlinFunctionReturnTypeUnit =
-            routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
+        boolean isKotlinFunctionReturnTypeUnit;
+        if (routeInfo instanceof DefaultRequestMatcher<?, ?> requestMatcher) {
+            // computed once for the route: a suspended route is void when it returns Unit
+            isKotlinFunctionReturnTypeUnit = requestMatcher.isVoid();
+        } else {
+            isKotlinFunctionReturnTypeUnit = routeInfo instanceof MethodBasedRouteInfo<?, ?> mbri &&
                 isKotlinFunctionReturnTypeUnit(mbri.getTargetMethod().getExecutableMethod());
+        }
         if (isKotlinCoroutineSuspended(body)) {
             final Supplier<CompletableFuture<?>> supplier = ContinuationArgumentBinder.extractContinuationCompletableFutureSupplier(request);
             if (supplier == null) {
