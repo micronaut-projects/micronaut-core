@@ -1006,7 +1006,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return path.replace('\\', '/');
     }
 
-    private static String cacheFilePath(String sourcePath, String cachePath) {
+    static String cacheFilePath(String sourcePath, String cachePath) {
+        cachePath = normalizeResourcePath(cachePath);
         int sourceSeparator = sourcePath.lastIndexOf('/');
         int cacheSeparator = cachePath.lastIndexOf('/');
         String parent = sourceSeparator == -1 ? "" : sourcePath.substring(0, sourceSeparator + 1);
