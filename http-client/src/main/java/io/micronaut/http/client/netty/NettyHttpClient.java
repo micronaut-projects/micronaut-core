@@ -1355,11 +1355,10 @@ final class NettyHttpClient implements
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         ExecutionFlow<HttpResponse<?>> mono;
         try {
-            mono = sendRequestWithRedirects(
+            mono = sendRawExchange(
                 propagatedContext,
                 blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body),
-                (req, resp) -> ExecutionFlow.just(resp)
+                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body)
             );
         } catch (RuntimeException | Error e) {
             body.close();
@@ -1367,6 +1366,27 @@ final class NettyHttpClient implements
         }
         // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
         return toMono(mono, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * Send a raw request. A relative request URI is resolved against the URL of this client
+     * first, like the URI of any other request.
+     *
+     * @param propagatedContext The propagated context
+     * @param blockHint         The block hint, if any
+     * @param rawRequest        The raw request
+     * @return The response flow
+     */
+    private ExecutionFlow<HttpResponse<?>> sendRawExchange(PropagatedContext propagatedContext, @Nullable BlockHint blockHint, MutableHttpRequest<?> rawRequest) {
+        if (rawRequest.getUri().getScheme() != null) {
+            return sendRequestWithRedirects(propagatedContext, blockHint, rawRequest, (req, resp) -> ExecutionFlow.just(resp));
+        }
+        return resolveRequestURI(rawRequest).flatMap(uri -> sendRequestWithRedirects(
+            propagatedContext,
+            blockHint,
+            rawRequest.uri(uri),
+            (req, resp) -> ExecutionFlow.just(resp)
+        ));
     }
 
     private ExecutionFlow<HttpResponse<?>> sendRequestWithRedirects(
