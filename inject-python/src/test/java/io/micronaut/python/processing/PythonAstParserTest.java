@@ -2712,4 +2712,96 @@ class ProductMappers:
         // All our test properties are non-static, so size should remain the same
         assertEquals(allProperties.size(), noStaticProperties.size(), "Should include all non-static properties");
     }
+    /**
+     * The run time strips a leading "io." from every Java package
+     * (context-python/.../micronaut_java_imports.py), so io.swagger.v3.oas.annotations is imported from
+     * Python as swagger.v3.oas.annotations. The compiler restored the prefix only for micronaut.*, which
+     * left every other io. library unresolvable -- and unresolvable annotations are dropped silently.
+     *
+     * <p>The stand-in here is io.example.oas.SampleJavaType; the visitor context below deliberately
+     * resolves only the io.-prefixed spelling, which is the situation a real compile classpath presents.
+     */
+    @Test
+    void testImportOfAnIoPackageOtherThanMicronautResolvesToTheIoPrefixedName() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import SampleJavaType
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("SampleJavaType = java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * The same asymmetry on the package lookup, which backs a wildcard import.
+     */
+    @Test
+    void testWildcardImportOfAnIoPackageOtherThanMicronautResolves() {
+        PythonAstParser pythonProcessor = new PythonAstParser();
+        VisitorContext visitorContext = ioPrefixedVisitorContext();
+
+        PythonAstParser.TransformResult transformResult = pythonProcessor.transform(visitorContext, """
+            from example.oas import *
+
+            class Demo:
+                def index(self, sample: SampleJavaType | None = None) -> dict:
+                    return {}
+            """);
+
+        assertTrue(
+            transformResult.runtimeCode().contains("java.type('io.example.oas.SampleJavaType')"),
+            transformResult.runtimeCode()
+        );
+    }
+
+    /**
+     * A visitor context that knows io.example.oas.SampleJavaType and nothing else -- in particular it
+     * does not answer to the "example.oas" spelling Python uses.
+     */
+    private static VisitorContext ioPrefixedVisitorContext() {
+        return (VisitorContext) Proxy.newProxyInstance(
+            VisitorContext.class.getClassLoader(),
+            new Class<?>[] { VisitorContext.class },
+            (proxy, method, args) -> {
+                if (method.getDeclaringClass() == Object.class) {
+                    return switch (method.getName()) {
+                        case "toString" -> "testVisitorContext";
+                        case "hashCode" -> System.identityHashCode(proxy);
+                        case "equals" -> proxy == args[0];
+                        default -> null;
+                    };
+                }
+                if ("getClassElement".equals(method.getName())
+                    && args != null
+                    && args.length >= 1
+                    && "io.example.oas.SampleJavaType".equals(args[0])) {
+                    return Optional.of(ClassElement.of(io.example.oas.SampleJavaType.class));
+                }
+                if ("getClassElements".equals(method.getName())) {
+                    if (args != null && args.length >= 1 && "io.example.oas".equals(args[0])) {
+                        return new ClassElement[] { ClassElement.of(io.example.oas.SampleJavaType.class) };
+                    }
+                    return ClassElement.ZERO_CLASS_ELEMENTS;
+                }
+                if (Optional.class.equals(method.getReturnType())) {
+                    return Optional.empty();
+                }
+                if (method.getReturnType().equals(boolean.class)) {
+                    return false;
+                }
+                if (method.getReturnType().equals(int.class)) {
+                    return 0;
+                }
+                return null;
+            }
+        );
+    }
 }
