@@ -158,4 +158,11 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#where(Predicate)
      */
     HandlerUriRoute where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * @param order The order
+     * @return The route
+     * @see HttpRouteSpec#order(int)
+     */
+    HandlerUriRoute order(int order);
 }

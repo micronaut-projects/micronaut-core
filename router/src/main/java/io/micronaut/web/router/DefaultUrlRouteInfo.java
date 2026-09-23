@@ -56,6 +56,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * is built, before the route info is published.
      */
     List<GenericHttpFilter> routeFilters = List.of();
+    /**
+     * The order of the route among equally good routes. Set when the route is built, before the
+     * route info is published.
+     */
+    int order;
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
@@ -245,6 +250,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     @Override
     public boolean isImplicitHead() {
         return implicitHead;
+    }
+
+    @Override
+    public int getOrder() {
+        return order;
     }
 
     @Override

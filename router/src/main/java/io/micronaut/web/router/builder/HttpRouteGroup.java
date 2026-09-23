@@ -119,4 +119,22 @@ public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRo
      * @since 5.3.0
      */
     HttpRouteGroup where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * The order of the routes of the group, see {@link HttpRouteSpec#order(int)}: the routes of
+     * the group, and of its nested groups, have it, wherever it is declared in the lambda,
+     * unless they or a nested group have their own.
+     *
+     * <pre>{@code
+     * routes.group(fallbacks -> {
+     *     fallbacks.order(100);
+     *     fallbacks.GET("/{+path}", notFoundPage);
+     * });
+     * }</pre>
+     *
+     * @param order The order, lower wins
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup order(int order);
 }

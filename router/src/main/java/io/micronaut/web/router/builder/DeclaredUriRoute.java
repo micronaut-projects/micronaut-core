@@ -50,6 +50,8 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
     private final IntConsumer exposePort;
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
+    private @Nullable Integer order;
+    private RouteAssembly.@Nullable RouteGroup group;
 
     /**
      * @param declaration The declaration
@@ -84,6 +86,21 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
         if (fixedConfiguration == null) {
             fixedConfiguration = List.copyOf(configuration);
         }
+    }
+
+    /**
+     * @return The order of the route, or {@code null} if it has none of its own: the router orders
+     * the route before it is built
+     */
+    public @Nullable Integer order() {
+        return order;
+    }
+
+    /**
+     * @return The settings of the group of the route, or {@code null}
+     */
+    public RouteAssembly.@Nullable RouteGroup group() {
+        return group;
     }
 
     /**
@@ -180,7 +197,14 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
 
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteGroup group) {
+        this.group = group;
         return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute order(int order) {
+        this.order = order;
+        return configure(r -> r.order(order));
     }
 
     @Override

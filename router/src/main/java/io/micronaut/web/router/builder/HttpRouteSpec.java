@@ -146,4 +146,31 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      * @since 5.3.0
      */
     HttpRouteSpec where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * Break a tie with other routes that are equally good for a request: the route with the
+     * lowest order answers it. The router selects the most specific route by its URI template,
+     * then by the media types, then prefers an explicit {@code HEAD} route over an implicit one;
+     * only the routes still left after that are compared by their order. So the order never
+     * makes a less specific route win over a more specific one: it chooses among routes of the
+     * same URI template whose {@link #where(Predicate) conditions} a request both meets, e.g. a
+     * specialized route and a fallback. Two routes left with the same order still make the
+     * request ambiguous, answered with {@code 400}.
+     *
+     * <pre>{@code
+     * routes.GET("/reports/{id}", csvHandler)
+     *     .where(RequestPredicates.queryParam("format", "csv"))
+     *     .order(-1);
+     * routes.GET("/reports/{id}", reportHandler); // the order 0: answers the other requests
+     * }</pre>
+     *
+     * <p>The default order is {@code 0}, the order of a controller route, or the order of the
+     * {@link HttpRouteGroup#order(int) group} of the route, which the order of the route
+     * overrides. The order of an {@link HttpRoutes} bean orders the beans, not their routes.</p>
+     *
+     * @param order The order, lower wins
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec order(int order);
 }

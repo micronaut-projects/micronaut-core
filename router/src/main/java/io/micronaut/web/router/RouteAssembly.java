@@ -329,10 +329,12 @@ public final class RouteAssembly {
         List<LazyUriRouteInfo> infos = new ArrayList<>(declaredRoutes.size() + implicitHeadDeclaredRoutes.size());
         for (DeclaredUriRoute route : declaredRoutes) {
             route.fix();
-            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false, route::toRouteInfo));
+            infos.add(new LazyUriRouteInfo(route.declaration(), route.declaration().httpMethod(), false,
+                effectiveOrder(route.order(), route.group()), route::toRouteInfo));
         }
         for (DeclaredUriRoute route : implicitHeadDeclaredRoutes) {
-            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true, route::implicitHeadRouteInfo));
+            infos.add(new LazyUriRouteInfo(route.declaration(), HttpMethod.HEAD, true,
+                effectiveOrder(route.order(), route.group()), route::implicitHeadRouteInfo));
         }
         return infos;
     }
@@ -376,6 +378,21 @@ public final class RouteAssembly {
                 implicitHeadDeclaredRoutes.add(route);
             }
         }
+    }
+
+    /**
+     * The order of a route: its own, or the one of its group, or {@code 0}.
+     *
+     * @param order The order of the route, or {@code null}
+     * @param group The settings of the group of the route, or {@code null}
+     * @return The order
+     */
+    private static int effectiveOrder(@Nullable Integer order, @Nullable RouteGroup group) {
+        if (order != null) {
+            return order;
+        }
+        Integer groupOrder = group == null ? null : group.order();
+        return groupOrder == null ? 0 : groupOrder;
     }
 
     /**
@@ -966,6 +983,7 @@ public final class RouteAssembly {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private @Nullable Integer port;
+        private @Nullable Integer order;
         private boolean closed;
 
         /**
@@ -988,6 +1006,16 @@ public final class RouteAssembly {
         }
 
         /**
+         * The order of the routes of the group among equally good routes.
+         *
+         * @param order The order
+         */
+        public void order(int order) {
+            checkOpen();
+            this.order = order;
+        }
+
+        /**
          * A condition the requests of the routes of the group must meet.
          *
          * @param condition The condition
@@ -1003,6 +1031,18 @@ public final class RouteAssembly {
          */
         public void close() {
             closed = true;
+        }
+
+        /**
+         * @return The order of the group, or of the closest enclosing group that has one, or {@code null}
+         */
+        @Nullable Integer order() {
+            Integer own = order;
+            if (own != null) {
+                return own;
+            }
+            RouteGroup group = enclosing;
+            return group == null ? null : group.order();
         }
 
         /**
@@ -1053,6 +1093,7 @@ public final class RouteAssembly {
             targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
         private boolean implicitHead;
         private @Nullable RouteGroup group;
+        private @Nullable Integer order;
 
         /**
          * @param httpMethod The HTTP method
@@ -1162,6 +1203,7 @@ public final class RouteAssembly {
                 implicitHead
             );
             routeInfo.routeFilters = routeFilters();
+            routeInfo.order = effectiveOrder(order, group);
             return routeInfo;
         }
 
@@ -1243,6 +1285,7 @@ public final class RouteAssembly {
             head.nonBlocking = nonBlocking;
             head.filters.copy(filters);
             head.group = group;
+            head.order = order;
             head.implicitHead = true;
             return head;
         }
@@ -1379,6 +1422,12 @@ public final class RouteAssembly {
         @Override
         public HandlerUriRoute port(int port) {
             exposedPort(port);
+            return this;
+        }
+
+        @Override
+        public HandlerUriRoute order(int order) {
+            this.order = order;
             return this;
         }
 
