@@ -398,6 +398,48 @@ public final class RouteAssembly {
     }
 
     /**
+     * A standard HTTP method of a route: {@link HttpMethod#CUSTOM} stands for any custom method,
+     * which a route declares by its name.
+     *
+     * @param httpMethod The HTTP method
+     * @param byName     How to declare the route by the name of the method, for the message
+     * @return The HTTP method
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is {@link HttpMethod#CUSTOM}
+     */
+    public static HttpMethod standardMethod(@Nullable HttpMethod httpMethod, String byName) {
+        Objects.requireNonNull(httpMethod, "httpMethod");
+        if (httpMethod == HttpMethod.CUSTOM) {
+            throw new IllegalArgumentException("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, e.g. " + byName);
+        }
+        return httpMethod;
+    }
+
+    /**
+     * The name of the HTTP method of a route: a token, as the method of a request is.
+     *
+     * @param httpMethodName The name
+     * @return The name
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is empty or not a token, e.g. blank
+     */
+    public static String httpMethodName(@Nullable String httpMethodName) {
+        Objects.requireNonNull(httpMethodName, "httpMethodName");
+        if (httpMethodName.isEmpty() || !httpMethodName.chars().allMatch(RouteAssembly::isTokenChar)) {
+            throw new IllegalArgumentException("The name of an HTTP method must be a token, e.g. PROPFIND: '" + httpMethodName + "'");
+        }
+        return httpMethodName;
+    }
+
+    /**
+     * @param c A character
+     * @return Whether it is a {@code tchar} of RFC 9110
+     */
+    private static boolean isTokenChar(int c) {
+        return c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9' || "!#$%&'*+-.^_`|~".indexOf(c) >= 0;
+    }
+
+    /**
      * The port of a handler route or of a group of handler routes: a port the server can listen
      * on. Unlike {@code @Controller(port = ...)}, which ignores a negative port, and with
      * {@code 0} opens a listener on a random port that the route cannot know, it is rejected.

@@ -133,10 +133,12 @@ public interface HttpRouteBuilder {
      * consumes JSON unless {@link HttpRouteSpec#consumes} says otherwise, and in {@link HttpRoutes} and
      * route tables its URI is under {@code micronaut.server.context-path}.
      *
-     * @param method  The HTTP method
+     * @param method  The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom method
+     *                is declared by its name, see {@link #handle(String, String, RequestHandler)}
      * @param uri     The URI template
      * @param handler The handler
      * @return The route
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
     HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler);
 
@@ -418,10 +420,11 @@ public interface HttpRouteBuilder {
      * Route requests of a method by its name, including a custom HTTP method such as
      * {@code PROPFIND}, like a controller method annotated {@code @CustomHttpMethod}.
      *
-     * @param httpMethodName The name of the HTTP method
+     * @param httpMethodName The name of the HTTP method, a token
      * @param uri            The URI template
      * @param handler        The handler
      * @return The route
+     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
      * @see #handle(HttpMethod, String, RequestHandler)
      */
     HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler);

@@ -37,6 +37,7 @@ import io.micronaut.web.router.builder.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.builder.StatusRouteHandler;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 
@@ -122,6 +123,45 @@ class HandlerRouteArgumentsTest {
             assertBlankExecutor(() -> filter.before(" ", (ContextRouteRequestFilter) (request, context) -> null));
             assertMissing("filter", () -> filter.beforeAsync((AsyncContextRouteRequestFilter) null));
         });
+    }
+
+    @Test
+    void aRouteOfACustomMethodIsDeclaredByItsName() {
+        Router router = router(routes -> {
+            IllegalArgumentException custom = assertThrows(IllegalArgumentException.class,
+                () -> routes.handle(HttpMethod.CUSTOM, "/x", HandlerRouteArgumentsTest::ok));
+            assertEquals("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, "
+                + "e.g. handle(\"PROPFIND\", uri, handler)", custom.getMessage());
+            assertThrows(IllegalArgumentException.class, () -> routes.handleAsync(HttpMethod.CUSTOM, "/x", (request, pathVariables) -> null));
+            assertThrows(IllegalArgumentException.class, () -> routes.handle(Set.of(HttpMethod.GET, HttpMethod.CUSTOM), "/x", HandlerRouteArgumentsTest::ok));
+            for (String name : new String[] {"", " ", "PROP FIND", "GET\r\n", "PROP/FIND"}) {
+                IllegalArgumentException invalid = assertThrows(IllegalArgumentException.class,
+                    () -> routes.handle(name, "/x", HandlerRouteArgumentsTest::ok), name);
+                assertEquals("The name of an HTTP method must be a token, e.g. PROPFIND: '" + name + "'", invalid.getMessage());
+            }
+            routes.handle("PROPFIND", "/x", HandlerRouteArgumentsTest::ok);
+        });
+
+        // the rejected declarations added no route: GET /x is not routed, PROPFIND /x is
+        assertNull(router.findClosest(HttpRequest.GET("/x")));
+        assertEquals(1, router.findAny(HttpRequest.create(HttpMethod.CUSTOM, "/x", "PROPFIND")).size());
+    }
+
+    @Test
+    void aDeclarationOfACustomMethodIsDeclaredByItsName() {
+        IllegalArgumentException custom = assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of(HttpMethod.CUSTOM, "/x"));
+        assertEquals("HttpMethod.CUSTOM is not the name of a method: declare a route of a custom HTTP method by its name, "
+            + "e.g. RouteDeclaration.of(\"PROPFIND\", uriTemplate)", custom.getMessage());
+        assertThrows(IllegalArgumentException.class, () -> IndexedRouteDeclaration.of(HttpMethod.CUSTOM, "/x"));
+        assertMissing("httpMethod", () -> IndexedRouteDeclaration.of((HttpMethod) null, "/x"));
+        assertMissing("httpMethodName", () -> IndexedRouteDeclaration.of((String) null, "/x"));
+        assertMissing("uriTemplate", () -> RouteDeclaration.of(HttpMethod.GET, null));
+        assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of(" ", "/x"));
+        assertThrows(IllegalArgumentException.class, () -> RouteDeclaration.of("", "/x"));
+        RouteDeclaration propfind = RouteDeclaration.of("PROPFIND", "/x");
+        assertEquals(HttpMethod.CUSTOM, propfind.httpMethod());
+        assertEquals("PROPFIND", propfind.httpMethodName());
+        assertEquals("GET", RouteDeclaration.of("get", "/x").httpMethodName());
     }
 
     private static void assertEveryMissingSettingFails(HttpRouteSpec route) {

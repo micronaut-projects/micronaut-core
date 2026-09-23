@@ -316,7 +316,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
-        Objects.requireNonNull(httpMethodName, "httpMethodName");
+        RouteAssembly.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
@@ -324,7 +324,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
-        Objects.requireNonNull(method, "method");
+        standardMethod(method);
         RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler));
         return grouped(consumes == null ? route : route.consumes(consumes));
     }
@@ -341,13 +341,23 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
         for (HttpMethod method : methods) {
             // before any route is added
-            Objects.requireNonNull(method, "methods must not contain null");
+            standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
         }
         List<HandlerUriRoute> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
         return new Routes(routes.toArray(new HandlerUriRoute[0]));
+    }
+
+    /**
+     * @param method The HTTP method of a route
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is {@link HttpMethod#CUSTOM}, which has no name
+     */
+    private static void standardMethod(HttpMethod method) {
+        Objects.requireNonNull(method, "method");
+        RouteAssembly.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
     }
 
     /**
