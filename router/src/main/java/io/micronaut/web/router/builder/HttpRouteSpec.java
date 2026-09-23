@@ -17,8 +17,11 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
+
+import java.util.function.Predicate;
 
 /**
  * A route to a handler function, to configure after it was added with the {@link HttpRouteBuilder}.
@@ -117,4 +120,29 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);
+
+    /**
+     * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
+     * method: a request the condition rejects is answered as if the route did not exist, by
+     * another route of the same URI and method, e.g. one with another condition, or by
+     * {@code 404}, never by a {@code 405}, {@code 415} or {@code 406} of this route. The
+     * conditions of the groups of the route, outer group first, then those of the route, must
+     * all be met. The conditions are evaluated while the request is matched, for every request
+     * whose path the route matches: they must be fast and must not block, nor read the body.
+     *
+     * <pre>{@code
+     * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.csv(pathVariables.getLong("id"))))
+     *     .where(request -> "csv".equals(request.getHeaders().get("X-Export")));
+     * routes.GET("/reports/{id}", (request, pathVariables) -> HttpResponse.ok(reports.find(pathVariables.getLong("id"))));
+     * }</pre>
+     *
+     * <p>A request both routes of the example match, with the header, is ambiguous: the most
+     * specific route answers it, and the two routes are equally specific, so it is answered with
+     * {@code 400}.</p>
+     *
+     * @param condition The condition
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec where(Predicate<HttpRequest<?>> condition);
 }

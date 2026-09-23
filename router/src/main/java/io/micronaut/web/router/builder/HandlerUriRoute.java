@@ -17,9 +17,12 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
+
+import java.util.function.Predicate;
 
 /**
  * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
@@ -148,4 +151,11 @@ public interface HandlerUriRoute {
      * @see HttpRouteSpec#port(int)
      */
     HandlerUriRoute port(int port);
+
+    /**
+     * @param condition The condition
+     * @return The route
+     * @see HttpRouteSpec#where(Predicate)
+     */
+    HandlerUriRoute where(Predicate<HttpRequest<?>> condition);
 }

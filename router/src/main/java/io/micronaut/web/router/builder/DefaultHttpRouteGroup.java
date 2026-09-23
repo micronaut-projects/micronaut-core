@@ -16,10 +16,12 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
+import java.util.function.Predicate;
 
 /**
  * The {@link HttpRouteGroup}: the routes it adds carry its filters, which it collects until its
@@ -57,6 +59,12 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     @Override
     public HttpRouteGroup port(int port) {
         settings.port(port);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup where(Predicate<HttpRequest<?>> condition) {
+        settings.where(condition);
         return this;
     }
 

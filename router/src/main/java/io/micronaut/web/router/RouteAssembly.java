@@ -964,6 +964,7 @@ public final class RouteAssembly {
     @Internal
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
+        private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private @Nullable Integer port;
         private boolean closed;
 
@@ -987,10 +988,34 @@ public final class RouteAssembly {
         }
 
         /**
+         * A condition the requests of the routes of the group must meet.
+         *
+         * @param condition The condition
+         */
+        public void where(Predicate<HttpRequest<?>> condition) {
+            Objects.requireNonNull(condition, "condition");
+            checkOpen();
+            predicates.add(condition);
+        }
+
+        /**
          * Close the group: its lambda returned.
          */
         public void close() {
             closed = true;
+        }
+
+        /**
+         * Add the conditions of the enclosing groups, then of this group.
+         *
+         * @param conditions The conditions to add to
+         */
+        void addPredicates(List<Predicate<HttpRequest<?>>> conditions) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addPredicates(conditions);
+            }
+            conditions.addAll(predicates);
         }
 
         /**
@@ -1111,12 +1136,6 @@ public final class RouteAssembly {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
-            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
-                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
-                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
-                    where(request -> annotation.booleanValue().orElse(false));
-                }
-            }
         }
 
         @Override
@@ -1159,20 +1178,31 @@ public final class RouteAssembly {
         }
 
         /**
-         * The conditions of the route info: the conditions of the route, and a request on the port
-         * of the route if it has one.
+         * The conditions of the route info: the conditions of the groups of the route, outer group
+         * first, the {@link RouteCondition} of the target method, the conditions of the route, and
+         * a request on the port of the route if it has one. They are read when the route info is
+         * built: the annotations of a handler route may be given after the route is added.
          *
          * @param effectivePort The port of the route, or {@code null}
          * @return The conditions
          */
         private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
-            if (effectivePort == null) {
-                return List.copyOf(conditions);
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 2);
+            RouteGroup routeGroup = group;
+            if (routeGroup != null) {
+                routeGroup.addPredicates(predicates);
             }
-            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 1);
+            if (targetMethod.isPresent(RouteCondition.class, AnnotationMetadata.VALUE_MEMBER)) {
+                AnnotationValue<RouteCondition> annotation = targetMethod.getAnnotation(RouteCondition.class);
+                if (annotation instanceof EvaluatedAnnotationValue<RouteCondition>) {
+                    predicates.add(request -> annotation.booleanValue().orElse(false));
+                }
+            }
             predicates.addAll(conditions);
-            int routePort = effectivePort;
-            predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
+            if (effectivePort != null) {
+                int routePort = effectivePort;
+                predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
+            }
             return List.copyOf(predicates);
         }
 
@@ -1388,8 +1418,9 @@ public final class RouteAssembly {
         }
 
         @Override
-        public UriRoute where(Predicate<HttpRequest<?>> condition) {
-            return (UriRoute) super.where(condition);
+        public DefaultUriRoute where(Predicate<HttpRequest<?>> condition) {
+            super.where(condition);
+            return this;
         }
 
         @Override

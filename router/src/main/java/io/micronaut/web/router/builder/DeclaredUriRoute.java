@@ -18,6 +18,7 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
@@ -27,8 +28,10 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.IntConsumer;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 
 /**
@@ -178,6 +181,12 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     @Override
     public HandlerUriRoute inGroup(RouteAssembly.RouteGroup group) {
         return configure(r -> r.inGroup(group));
+    }
+
+    @Override
+    public HandlerUriRoute where(Predicate<HttpRequest<?>> condition) {
+        Objects.requireNonNull(condition, "condition");
+        return configure(r -> r.where(condition));
     }
 
     @Override

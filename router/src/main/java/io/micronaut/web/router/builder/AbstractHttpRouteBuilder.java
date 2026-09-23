@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
@@ -34,6 +35,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 /**
  * Adds the routes to handler functions to a {@link RouteAssembly}: the routes of the builder of
@@ -381,6 +383,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         public HttpRouteSpec port(int port) {
             for (HandlerUriRoute route : routes) {
                 route.port(port);
+            }
+            return this;
+        }
+
+        @Override
+        public HttpRouteSpec where(Predicate<HttpRequest<?>> condition) {
+            Objects.requireNonNull(condition, "condition");
+            for (HandlerUriRoute route : routes) {
+                route.where(condition);
             }
             return this;
         }

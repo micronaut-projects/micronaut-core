@@ -16,6 +16,9 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpRequest;
+
+import java.util.function.Predicate;
 
 /**
  * A group of routes, declared with {@link HttpRouteBuilder#group} or, under a prefix, with
@@ -97,4 +100,23 @@ public interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRo
      * @since 5.3.0
      */
     HttpRouteGroup port(int port);
+
+    /**
+     * Match the requests of the routes of the group that meet a condition only, see
+     * {@link HttpRouteSpec#where(Predicate)}: a route of the group, including its locator routes
+     * and the routes of its nested groups, matches a request that meets the conditions of its
+     * groups, outer group first, and its own, wherever they are declared in the lambda.
+     *
+     * <pre>{@code
+     * routes.path("/beta", beta -> {
+     *     beta.where(request -> request.getHeaders().contains("X-Beta"));
+     *     beta.GET("/search", betaSearchHandler);
+     * });
+     * }</pre>
+     *
+     * @param condition The condition
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup where(Predicate<HttpRequest<?>> condition);
 }
