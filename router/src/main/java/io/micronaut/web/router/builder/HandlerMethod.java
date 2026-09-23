@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
@@ -114,7 +115,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private ReturnType<R> returnType;
     private final Invoker<R> invoker;
     private AnnotationMetadata annotationMetadata = AnnotationMetadata.EMPTY_METADATA;
-    private @Nullable ExecutableMethod<?, ?> implemented;
+    private @Nullable AnnotationMetadataProvider annotationMetadataProvider;
     private @Nullable ReturnType<R> annotatedReturnType;
 
     private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
@@ -312,7 +313,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     @Override
     public Method getTargetMethod() {
-        ExecutableMethod<?, ?> target = implemented;
+        ExecutableMethod<?, ?> target = implemented();
         return target == null ? method.get() : target.getTargetMethod();
     }
 
@@ -330,13 +331,13 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     @SuppressWarnings("unchecked")
     @Override
     public Class<Object> getDeclaringType() {
-        ExecutableMethod<?, ?> target = implemented;
+        ExecutableMethod<?, ?> target = implemented();
         return (Class<Object>) (target == null ? handler.getClass() : target.getDeclaringType());
     }
 
     @Override
     public String getMethodName() {
-        ExecutableMethod<?, ?> target = implemented;
+        ExecutableMethod<?, ?> target = implemented();
         return target == null ? HANDLE : target.getMethodName();
     }
 
@@ -346,15 +347,32 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * Give the route to the handler annotations, see {@link HttpRouteSpec#annotationMetadata}.
+     * Give the route to the handler the annotations of an element, see
+     * {@link HttpRouteSpec#annotationMetadata}: an {@link ExecutableMethod} is the bean method the
+     * route implements, whose target method, declaring type and method name the route has too.
      *
-     * @param annotationMetadata The annotations of the route
+     * @param annotationMetadata The annotated element
      */
     @Internal
-    public void annotationMetadata(AnnotationMetadata annotationMetadata) {
-        this.annotationMetadata = Objects.requireNonNull(annotationMetadata, "annotationMetadata");
+    public void annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
+        Objects.requireNonNull(annotationMetadata, "annotationMetadata");
+        AnnotationMetadata metadata = Objects.requireNonNull(annotationMetadata.getAnnotationMetadata(), "annotationMetadata");
+        this.annotationMetadataProvider = annotationMetadata;
+        this.annotationMetadata = metadata;
         // like the return type of a method, it has the annotations of the method
-        this.annotatedReturnType = new AnnotatedReturnType<>(returnType, annotationMetadata);
+        this.annotatedReturnType = new AnnotatedReturnType<>(returnType, metadata);
+    }
+
+    /**
+     * The element the route to the handler has the annotations of, see
+     * {@link HttpRouteSpec#annotationMetadata}.
+     *
+     * @return The element, an {@link ExecutableMethod} if the route implements a bean method, or
+     * {@code null} if the route was given no annotations
+     */
+    @Internal
+    public @Nullable AnnotationMetadataProvider getAnnotationMetadataProvider() {
+        return annotationMetadataProvider;
     }
 
     /**
@@ -382,14 +400,10 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * The route to the handler implements a bean method, see {@link HttpRouteSpec#implementing}.
-     *
-     * @param method The bean method
+     * @return The bean method the route implements: the element of its annotations, if it is a method
      */
-    @Internal
-    public void implementing(ExecutableMethod<?, ?> method) {
-        this.implemented = Objects.requireNonNull(method, "method");
-        annotationMetadata(method.getAnnotationMetadata());
+    private @Nullable ExecutableMethod<?, ?> implemented() {
+        return annotationMetadataProvider instanceof ExecutableMethod<?, ?> method ? method : null;
     }
 
     /**
@@ -440,7 +454,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @Override
     public String toString() {
-        ExecutableMethod<?, ?> target = implemented;
+        ExecutableMethod<?, ?> target = implemented();
         if (target != null) {
             return withoutPackage(target.getDeclaringType().getName()) + '#' + target.getMethodName();
         }

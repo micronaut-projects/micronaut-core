@@ -15,12 +15,11 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
 
 import java.util.function.Predicate;
@@ -63,18 +62,11 @@ public interface HandlerUriRoute {
     HandlerUriRoute executeOn(String executorName);
 
     /**
-     * @param annotationMetadata The annotations of the route
+     * @param annotationMetadata The annotated element whose annotations the route has
      * @return The route
-     * @see HttpRouteSpec#annotationMetadata(AnnotationMetadata)
+     * @see HttpRouteSpec#annotationMetadata(AnnotationMetadataProvider)
      */
-    HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata);
-
-    /**
-     * @param method The bean method
-     * @return The route
-     * @see HttpRouteSpec#implementing(ExecutableMethod)
-     */
-    HandlerUriRoute implementing(ExecutableMethod<?, ?> method);
+    HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
      * @param responseType The type of the body of the response

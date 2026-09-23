@@ -71,6 +71,12 @@
  *     its handler, e.g. generated at compile time.</li>
  * </ul>
  *
+ * <p>The builders, the route, group, error, status and server filter specs and the path
+ * variables are sealed: Micronaut implements them, the application uses them. The application
+ * implements {@link io.micronaut.web.router.builder.HttpRoutes}, the handler and filter
+ * functions, usually as lambdas, and may implement
+ * {@link io.micronaut.web.router.builder.RouteDeclaration}.</p>
+ *
  * <p>Routes that change while the application runs are built with
  * {@link io.micronaut.web.router.RouteTableFactory#buildHttpRoutes(io.micronaut.web.router.builder.HttpRoutes)}
  * and published by a {@link io.micronaut.web.router.RouteSource}. See the "Functional Routes"

@@ -51,7 +51,7 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Experimental
-public interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder {
+public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder permits DefaultLocatedHttpRouteBuilder {
 
     /**
      * @return The type of the located targets of the table

@@ -27,7 +27,7 @@ import io.micronaut.http.MediaType;
  * @since 5.3.0
  */
 @Experimental
-public interface StatusRouteSpec {
+public sealed interface StatusRouteSpec permits DefaultStatusRouteSpec {
 
     /**
      * Produce these media types, like {@code @Produces} on an {@code @Error} method.
