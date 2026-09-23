@@ -1181,7 +1181,7 @@ final class NettyHttpClient implements
             if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 Object bodyValue = body.get();
                 return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
-            } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
+            } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 return buildFormRequest(request, byteBodyFactory, r -> buildMultipartRequest(r, body.get()));
             } else {
                 ReadBuffer bodyContent;
@@ -1225,7 +1225,7 @@ final class NettyHttpClient implements
     }
 
     /**
-     * A form body that is already encoded is written as is, like any other raw body.
+     * A form or multipart body that is already encoded is written as is, like any other raw body.
      *
      * @param bodyValue The body value
      * @return Whether the body is already encoded
