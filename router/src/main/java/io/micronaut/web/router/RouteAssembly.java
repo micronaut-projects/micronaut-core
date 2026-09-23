@@ -23,7 +23,6 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ImmediateExecutor;
 import io.micronaut.core.type.Argument;
-import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpMethod;
@@ -45,15 +44,15 @@ import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
-import io.micronaut.web.router.builder.AsyncRouteRequestFilter;
-import io.micronaut.web.router.builder.AsyncRouteResponseFilter;
+import io.micronaut.web.router.builder.AsyncContextRouteRequestFilter;
+import io.micronaut.web.router.builder.AsyncContextRouteResponseFilter;
+import io.micronaut.web.router.builder.ContextRouteRequestFilter;
+import io.micronaut.web.router.builder.ContextRouteResponseFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
-import io.micronaut.web.router.builder.RouteRequestFilter;
-import io.micronaut.web.router.builder.RouteResponseFilter;
 import io.micronaut.web.router.exceptions.RoutingException;
 import org.jspecify.annotations.Nullable;
 
@@ -892,72 +891,48 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute before(RouteRequestFilter filter) {
+        public HandlerUriRoute before(ContextRouteRequestFilter filter) {
             return addRequestFilter(filter, null);
         }
 
         @Override
-        public HandlerUriRoute before(String executorName, RouteRequestFilter filter) {
+        public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
             return addRequestFilter(filter, executor(executorName));
         }
 
         @Override
-        public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+        public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
             Objects.requireNonNull(filter, "filter");
-            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(request -> {
-                try {
-                    return filter.filter(request);
-                } catch (Exception e) {
-                    return ExceptionUtils.sneakyThrow(e);
-                }
-            }));
+            requestFilters.add(GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
             return this;
         }
 
         @Override
-        public HandlerUriRoute after(RouteResponseFilter filter) {
+        public HandlerUriRoute after(ContextRouteResponseFilter filter) {
             return addResponseFilter(filter, null);
         }
 
         @Override
-        public HandlerUriRoute after(String executorName, RouteResponseFilter filter) {
+        public HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter) {
             return addResponseFilter(filter, executor(executorName));
         }
 
         @Override
-        public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
+        public HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter) {
             Objects.requireNonNull(filter, "filter");
-            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter((request, response) -> {
-                try {
-                    return filter.filter(request, response);
-                } catch (Exception e) {
-                    return ExceptionUtils.sneakyThrow(e);
-                }
-            }));
+            responseFilters.add(GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
             return this;
         }
 
-        private HandlerUriRoute addRequestFilter(RouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
+        private HandlerUriRoute addRequestFilter(ContextRouteRequestFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
-            requestFilters.add(GenericHttpFilter.createRouteRequestFilter(request -> {
-                try {
-                    return filter.filter(request);
-                } catch (Exception e) {
-                    return ExceptionUtils.sneakyThrow(e);
-                }
-            }, executor));
+            requestFilters.add(GenericHttpFilter.createRouteRequestFilter(filter::filter, executor));
             return this;
         }
 
-        private HandlerUriRoute addResponseFilter(RouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
+        private HandlerUriRoute addResponseFilter(ContextRouteResponseFilter filter, @Nullable Supplier<Executor> executor) {
             Objects.requireNonNull(filter, "filter");
-            responseFilters.add(GenericHttpFilter.createRouteResponseFilter((request, response) -> {
-                try {
-                    filter.filter(request, response);
-                } catch (Exception e) {
-                    ExceptionUtils.sneakyThrow(e);
-                }
-            }, executor));
+            responseFilters.add(GenericHttpFilter.createRouteResponseFilter(filter::filter, executor));
             return this;
         }
 

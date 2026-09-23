@@ -281,6 +281,42 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
 
         @Override
         public HttpRouteSpec before(RouteRequestFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return before((ContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        }
+
+        @Override
+        public HttpRouteSpec before(String executorName, RouteRequestFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return before(executorName, (ContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        }
+
+        @Override
+        public HttpRouteSpec beforeAsync(AsyncRouteRequestFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return beforeAsync((AsyncContextRouteRequestFilter) (request, propagatedContext) -> filter.filter(request));
+        }
+
+        @Override
+        public HttpRouteSpec after(RouteResponseFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return after((ContextRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+        }
+
+        @Override
+        public HttpRouteSpec after(String executorName, RouteResponseFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return after(executorName, (ContextRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+        }
+
+        @Override
+        public HttpRouteSpec afterAsync(AsyncRouteResponseFilter filter) {
+            Objects.requireNonNull(filter, "filter");
+            return afterAsync((AsyncContextRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+        }
+
+        @Override
+        public HttpRouteSpec before(ContextRouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(filter);
             }
@@ -288,7 +324,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         }
 
         @Override
-        public HttpRouteSpec before(String executorName, RouteRequestFilter filter) {
+        public HttpRouteSpec before(String executorName, ContextRouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.before(executorName, filter);
             }
@@ -296,7 +332,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         }
 
         @Override
-        public HttpRouteSpec beforeAsync(AsyncRouteRequestFilter filter) {
+        public HttpRouteSpec beforeAsync(AsyncContextRouteRequestFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.beforeAsync(filter);
             }
@@ -304,7 +340,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         }
 
         @Override
-        public HttpRouteSpec after(RouteResponseFilter filter) {
+        public HttpRouteSpec after(ContextRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(filter);
             }
@@ -312,7 +348,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         }
 
         @Override
-        public HttpRouteSpec after(String executorName, RouteResponseFilter filter) {
+        public HttpRouteSpec after(String executorName, ContextRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(executorName, filter);
             }
@@ -320,7 +356,7 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         }
 
         @Override
-        public HttpRouteSpec afterAsync(AsyncRouteResponseFilter filter) {
+        public HttpRouteSpec afterAsync(AsyncContextRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.afterAsync(filter);
             }

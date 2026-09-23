@@ -19,16 +19,14 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
-import io.micronaut.http.HttpRequest;
+import io.micronaut.core.propagation.MutablePropagatedContext;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -36,6 +34,12 @@ import java.util.function.Supplier;
  * and may answer it instead, or it filters the response of the route. A synchronous filter runs
  * on the thread of the filter chain, or on its executor if it has one; an asynchronous filter
  * completes the filter chain when its {@link CompletionStage} completes.
+ *
+ * <p>Like a filter method, the filter runs with the propagated context of the filter chain in
+ * scope, and it can change that context with a {@link MutablePropagatedContext}, for what runs
+ * after it: the next filters, the route, the error routes and the response filters. The change of
+ * a synchronous filter is taken when it returns, the change of an asynchronous filter when its
+ * stage completes, e.g. an element the filter added once it looked something up.</p>
  *
  * @param requestStep  The request filter
  * @param responseStep The response filter
@@ -57,10 +61,12 @@ record RouteFunctionFilter(
      * @param executor The executor to run the filter on, or {@code null}
      * @return The filter
      */
-    static RouteFunctionFilter request(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter, @Nullable Supplier<? extends Executor> executor) {
+    static RouteFunctionFilter request(RouteFilterFunctions.Request filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(context -> {
-            HttpResponse<?> response = filter.apply(context.request());
-            return ExecutionFlow.just(response == null ? context : context.withResponse(response));
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            HttpResponse<?> response = filter.filter(context.request(), propagatedContext);
+            FilterContext next = withChangedContext(context, propagatedContext);
+            return ExecutionFlow.just(response == null ? next : next.withResponse(response));
         }, null, executor);
     }
 
@@ -70,10 +76,16 @@ record RouteFunctionFilter(
      * @param filter Completes with a response to answer the request with, or {@code null} to proceed
      * @return The filter
      */
-    static RouteFunctionFilter requestAsync(Function<HttpRequest<?>, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> filter) {
-        return new RouteFunctionFilter(context -> CompletableFutureExecutionFlow.just(
-            filter.apply(context.request()).thenApply(response -> response == null ? context : context.withResponse(response))
-        ), null, null);
+    static RouteFunctionFilter requestAsync(RouteFilterFunctions.AsyncRequest filter) {
+        return new RouteFunctionFilter(context -> {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            return CompletableFutureExecutionFlow.just(
+                filter.filter(context.request(), propagatedContext).thenApply(response -> {
+                    FilterContext next = withChangedContext(context, propagatedContext);
+                    return response == null ? next : next.withResponse(response);
+                })
+            );
+        }, null, null);
     }
 
     /**
@@ -83,10 +95,11 @@ record RouteFunctionFilter(
      * @param executor The executor to run the filter on, or {@code null}
      * @return The filter
      */
-    static RouteFunctionFilter response(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter, @Nullable Supplier<? extends Executor> executor) {
+    static RouteFunctionFilter response(RouteFilterFunctions.Response filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(null, (context, response) -> {
-            filter.accept(context.request(), response);
-            return ExecutionFlow.just(context.withResponse(response));
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            filter.filter(context.request(), response, propagatedContext);
+            return ExecutionFlow.just(withChangedContext(context, propagatedContext).withResponse(response));
         }, executor);
     }
 
@@ -96,10 +109,27 @@ record RouteFunctionFilter(
      * @param filter Completes when the response is filtered
      * @return The filter
      */
-    static RouteFunctionFilter responseAsync(BiFunction<HttpRequest<?>, MutableHttpResponse<?>, ? extends CompletionStage<?>> filter) {
-        return new RouteFunctionFilter(null, (context, response) -> CompletableFutureExecutionFlow.just(
-            filter.apply(context.request(), response).thenApply(ignored -> context.withResponse(response))
-        ), null);
+    static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter) {
+        return new RouteFunctionFilter(null, (context, response) -> {
+            MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            return CompletableFutureExecutionFlow.just(
+                filter.filter(context.request(), response, propagatedContext)
+                    .thenApply(ignored -> withChangedContext(context, propagatedContext).withResponse(response))
+            );
+        }, null);
+    }
+
+    /**
+     * The context of the filter chain after a filter, with the propagated context the filter
+     * changed, like a filter method with a {@link MutablePropagatedContext} parameter.
+     *
+     * @param context           The context the filter ran with
+     * @param propagatedContext The propagated context the filter was given
+     * @return The context
+     */
+    private static FilterContext withChangedContext(FilterContext context, MutablePropagatedContext propagatedContext) {
+        PropagatedContext changed = propagatedContext.getContext();
+        return changed == null ? context : context.withPropagatedContext(changed);
     }
 
     @Override
@@ -118,7 +148,7 @@ record RouteFunctionFilter(
         if (step == null) {
             return ExecutionFlow.just(context);
         }
-        return run(() -> step.apply(context));
+        return run(context.propagatedContext(), () -> step.apply(context));
     }
 
     @Override
@@ -129,17 +159,37 @@ record RouteFunctionFilter(
             return ExecutionFlow.just(context);
         }
         MutableHttpResponse<?> mutableResponse = response instanceof MutableHttpResponse<?> mutable ? mutable : response.toMutableResponse();
-        return run(() -> step.apply(context, mutableResponse));
+        return run(context.propagatedContext(), () -> step.apply(context, mutableResponse));
     }
 
-    private ExecutionFlow<FilterContext> run(Step step) {
+    private ExecutionFlow<FilterContext> run(PropagatedContext propagatedContext, Step step) {
         Supplier<? extends Executor> executorSupplier = executor;
         if (executorSupplier == null) {
-            return invoke(step);
+            return invoke(propagatedContext, step);
         }
         try {
             // like a filter method annotated @ExecuteOn, which the propagated context follows
-            return ExecutionFlow.async(executorSupplier.get(), () -> invoke(step));
+            return ExecutionFlow.async(executorSupplier.get(), () -> invoke(propagatedContext, step));
+        } catch (Throwable e) {
+            return ExecutionFlow.error(e);
+        }
+    }
+
+    /**
+     * Run the filter with the propagated context of the filter chain in scope, like a filter
+     * method: what it logs, and the tasks it submits to a propagating executor, see the context
+     * the filters before it produced.
+     *
+     * @param propagatedContext The propagated context of the filter chain
+     * @param step              The filter
+     * @return The result of the filter
+     */
+    private static ExecutionFlow<FilterContext> invoke(PropagatedContext propagatedContext, Step step) {
+        if (propagatedContext.isBound()) {
+            return invoke(step);
+        }
+        try {
+            return propagatedContext.propagate(() -> invoke(step));
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }

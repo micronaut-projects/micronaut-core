@@ -97,7 +97,10 @@ public interface HttpRouteSpec {
     /**
      * Filter the requests of this route, like a {@code @RequestFilter} method that applies to this
      * route only. Route filters run after the application's filters, closest to the route, in the
-     * order they are declared, and are resolved when the route is built.
+     * order they are declared, and are resolved when the route is built. Like a filter method, a
+     * route filter runs with the propagated context of the filter chain in scope, e.g. the MDC
+     * context an application filter added; to change it, see
+     * {@link #before(ContextRouteRequestFilter)}.
      *
      * @param filter The filter, which can answer the request instead of the route
      * @return The route
@@ -154,4 +157,74 @@ public interface HttpRouteSpec {
      * @return The route
      */
     HttpRouteSpec afterAsync(AsyncRouteResponseFilter filter);
+
+    /**
+     * Filter the requests of this route with a filter that changes the propagated context, like
+     * a {@code @RequestFilter} method with a {@code MutablePropagatedContext} parameter: what it
+     * adds is in scope for the next filters, the handler, the error routes and the response
+     * filters. Otherwise the same as {@link #before(RouteRequestFilter)}.
+     *
+     * @param filter The filter, which can answer the request instead of the route
+     * @return The route
+     * @see ContextRouteRequestFilter
+     */
+    HttpRouteSpec before(ContextRouteRequestFilter filter);
+
+    /**
+     * Filter the requests of this route on the named executor with a filter that changes the
+     * propagated context.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter, which can answer the request instead of the route
+     * @return The route
+     * @see #before(String, RouteRequestFilter)
+     * @see ContextRouteRequestFilter
+     */
+    HttpRouteSpec before(String executorName, ContextRouteRequestFilter filter);
+
+    /**
+     * Filter the requests of this route asynchronously with a filter that changes the propagated
+     * context until its stage completes.
+     *
+     * @param filter The filter, which can answer the request instead of the route
+     * @return The route
+     * @see #beforeAsync(AsyncRouteRequestFilter)
+     * @see AsyncContextRouteRequestFilter
+     */
+    HttpRouteSpec beforeAsync(AsyncContextRouteRequestFilter filter);
+
+    /**
+     * Filter the responses of this route with a filter that changes the propagated context of the
+     * response filters after it, like a {@code @ResponseFilter} method with a
+     * {@code MutablePropagatedContext} parameter.
+     *
+     * @param filter The filter
+     * @return The route
+     * @see #after(RouteResponseFilter)
+     * @see ContextRouteResponseFilter
+     */
+    HttpRouteSpec after(ContextRouteResponseFilter filter);
+
+    /**
+     * Filter the responses of this route on the named executor with a filter that changes the
+     * propagated context.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter
+     * @return The route
+     * @see #after(String, RouteResponseFilter)
+     * @see ContextRouteResponseFilter
+     */
+    HttpRouteSpec after(String executorName, ContextRouteResponseFilter filter);
+
+    /**
+     * Filter the responses of this route asynchronously with a filter that changes the propagated
+     * context until its stage completes.
+     *
+     * @param filter The filter
+     * @return The route
+     * @see #afterAsync(AsyncRouteResponseFilter)
+     * @see AsyncContextRouteResponseFilter
+     */
+    HttpRouteSpec afterAsync(AsyncContextRouteResponseFilter filter);
 }

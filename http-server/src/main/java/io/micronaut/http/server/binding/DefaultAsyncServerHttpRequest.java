@@ -22,6 +22,7 @@ import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.BasicHttpAttributes;
@@ -175,6 +176,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
                 + ": take it with takeBody(), or write it to a file with transferTo()");
         }
         claim("body");
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         // bound like the @Body argument of a controller, with the binder of the type
         Argument<T> argument = HandlerMethod.bodyArgument(type);
         CompletableFuture<T> result = new CompletableFuture<>();
@@ -188,14 +190,17 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
             ExecutionFlow<?> waitsFor = BasicHttpAttributes.detachRouteWaitsFor(request, () -> bound[0] = argumentBinder.bind(context, request));
             waitsFor.onComplete((ignored, error) -> {
                 if (error != null) {
-                    result.completeExceptionally(error);
+                    complete(propagatedContext, result, null, error);
                     return;
                 }
+                T value;
                 try {
-                    result.complete(value(argument, context, Objects.requireNonNull(bound[0], "binding result")));
+                    value = value(argument, context, Objects.requireNonNull(bound[0], "binding result"));
                 } catch (Throwable e) {
-                    result.completeExceptionally(e);
+                    complete(propagatedContext, result, null, e);
+                    return;
                 }
+                complete(propagatedContext, result, value, null);
             });
         } catch (Throwable e) {
             result.completeExceptionally(e);
@@ -207,28 +212,28 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public CompletionStage<String> text() {
         claim("text");
         UploadContext context = uploadContext();
-        return content(context).text(context.maxBufferSize());
+        return inRouteContext(content(context).text(context.maxBufferSize()));
     }
 
     @Override
     public CompletionStage<String> text(int maximumBytes) {
         checkLimit(maximumBytes);
         claim("text");
-        return content(uploadContext()).text(maximumBytes);
+        return inRouteContext(content(uploadContext()).text(maximumBytes));
     }
 
     @Override
     public CompletionStage<byte[]> bytes(int maximumBytes) {
         checkLimit(maximumBytes);
         claim("bytes");
-        return content(uploadContext()).bytes(maximumBytes);
+        return inRouteContext(content(uploadContext()).bytes(maximumBytes));
     }
 
     @Override
     public CompletionStage<Void> transferTo(Path destination) {
         Objects.requireNonNull(destination, "destination");
         claim("transferTo");
-        return content(uploadContext()).transferTo(destination);
+        return inRouteContext(content(uploadContext()).transferTo(destination));
     }
 
     @Override
@@ -250,7 +255,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     public CompletionStage<FormData> form() {
         claim("form");
         try {
-            return FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest());
+            return inRouteContext(FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest()));
         } catch (Throwable e) {
             return CompletableFuture.failedFuture(e);
         }
@@ -296,6 +301,45 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     @Override
     public String toString() {
         return request.toString();
+    }
+
+    /**
+     * The stage of a read of the whole body, which completes with the propagated context of the
+     * route in scope: the handler reads the body where a controller method receives it, so what
+     * the handler continues with runs with the context the controller method runs with, e.g. the
+     * MDC context a filter added, even when the body arrives later on another thread.
+     *
+     * @param stage The stage of the read
+     * @param <T>   The type of the result
+     * @return The stage
+     */
+    private static <T> CompletionStage<T> inRouteContext(CompletionStage<T> stage) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        if (propagatedContext.isEmpty()) {
+            return stage;
+        }
+        CompletableFuture<T> result = new CompletableFuture<>();
+        stage.whenComplete((value, error) -> complete(propagatedContext, result, value, error));
+        return result;
+    }
+
+    /**
+     * Complete the stage of a read with the propagated context in scope, so that the
+     * continuations of the handler run with it.
+     *
+     * @param propagatedContext The propagated context of the route
+     * @param result            The stage
+     * @param value             The value
+     * @param error             The error, or {@code null}
+     * @param <T>               The type of the value
+     */
+    private static <T> void complete(PropagatedContext propagatedContext, CompletableFuture<T> result, @Nullable T value, @Nullable Throwable error) {
+        Runnable completion = error != null ? () -> result.completeExceptionally(error) : () -> result.complete(value);
+        if (propagatedContext.isEmpty() || propagatedContext.isBound()) {
+            completion.run();
+        } else {
+            propagatedContext.propagate(completion);
+        }
     }
 
     /**
