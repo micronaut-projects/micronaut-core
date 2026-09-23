@@ -36,7 +36,9 @@ public interface StatusRouteHandler {
      * Handle the status.
      *
      * @param request The request
-     * @return The response
+     * @return The response; {@code null} is answered like the {@code null} result of an
+     * {@code @Error(status = ...)} method: with {@code 404}, or with {@code 204} if
+     * {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, answered with the default error response
      */
     HttpResponse<?> handle(HttpRequest<?> request) throws Exception;

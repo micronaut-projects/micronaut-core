@@ -66,7 +66,9 @@ public interface AsyncRequestHandler {
      *
      * @param request       The request, whose body the handler reads
      * @param pathVariables The path variables of the matched route
-     * @return The response, completed later
+     * @return The response, completed later, not {@code null}: a stage completed with {@code null}
+     * is answered like the {@code null} result of a controller method, with {@code 404}, or with
+     * {@code 204} if {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
     CompletionStage<? extends HttpResponse<?>> handle(AsyncServerHttpRequest<?> request, PathVariables pathVariables) throws Exception;
