@@ -29,6 +29,7 @@ import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
+import java.util.Objects;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -122,8 +123,10 @@ record RouteFunctionFilter(
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
             MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
             URI uri = request.getUri();
+            CompletionStage<? extends @Nullable HttpMessage<?>> stage = Objects.requireNonNull(filter.filter(request, propagatedContext),
+                "The asynchronous request filter returned no stage");
             return CompletableFutureExecutionFlow.just(
-                filter.filter(request, propagatedContext).thenApply(result ->
+                stage.thenApply(result ->
                     next(withChangedContext(context, propagatedContext), request, uri, result))
             );
         }, null, null);
@@ -182,9 +185,10 @@ record RouteFunctionFilter(
     static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter) {
         return new RouteFunctionFilter(null, (context, response) -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            CompletionStage<? extends @Nullable HttpResponse<?>> stage = Objects.requireNonNull(filter.filter(context.request(), response, propagatedContext),
+                "The asynchronous response filter returned no stage");
             return CompletableFutureExecutionFlow.just(
-                filter.filter(context.request(), response, propagatedContext)
-                    .thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
+                stage.thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
             );
         }, null);
     }

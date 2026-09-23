@@ -425,19 +425,26 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static CompletionStage<? extends HttpResponse<?>> releaseWhenDone(AsyncServerHttpRequest<?> request,
                                                                              Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
-        if (!(request instanceof AsyncHandlerRequest handlerRequest)) {
-            return handler.call();
-        }
+        AsyncHandlerRequest handlerRequest = request instanceof AsyncHandlerRequest r ? r : null;
         CompletionStage<? extends HttpResponse<?>> stage;
         try {
             stage = handler.call();
-        } catch (Exception e) {
-            handlerRequest.releaseBody();
+        } catch (Throwable e) {
+            // an Error too: the body is released now, not when the request ends
+            if (handlerRequest != null) {
+                release(handlerRequest, e);
+            }
             throw e;
         }
         if (stage == null) {
-            handlerRequest.releaseBody();
-            throw new NullPointerException("The handler returned no stage");
+            NullPointerException noStage = new NullPointerException("The asynchronous handler returned no stage");
+            if (handlerRequest != null) {
+                release(handlerRequest, noStage);
+            }
+            throw noStage;
+        }
+        if (handlerRequest == null) {
+            return stage;
         }
         CompletableFuture<HttpResponse<?>> result = new CompletableFuture<>();
         stage.whenComplete((response, error) -> {
@@ -465,6 +472,23 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * Release the body when the handler failed without a stage: a failure to release is added as
+     * suppressed to the failure of the handler, which it does not replace.
+     *
+     * @param request The request of the handler
+     * @param failure The failure of the handler
+     */
+    private static void release(AsyncHandlerRequest request, Throwable failure) {
+        try {
+            request.releaseBody();
+        } catch (Throwable releaseError) {
+            if (releaseError != failure) {
+                failure.addSuppressed(releaseError);
+            }
+        }
+    }
+
+    /**
      * The stage of an asynchronous error or status handler: an error route that answers with no
      * stage fails, like one that throws, instead of answering {@code 404} or {@code 204}.
      *
@@ -473,7 +497,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     private static CompletionStage<? extends HttpResponse<?>> stage(@Nullable CompletionStage<? extends HttpResponse<?>> stage) {
         if (stage == null) {
-            throw new NullPointerException("The handler returned no stage");
+            throw new NullPointerException("The asynchronous error or status handler returned no stage");
         }
         return stage;
     }
