@@ -26,6 +26,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.ByteBodyHttpResponseWrapper;
+import io.micronaut.http.CaseInsensitiveMutableHttpHeaders;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
@@ -286,7 +287,9 @@ public abstract class ResponseLifecycle {
                     if (prefix != null) {
                         out.write(prefix);
                     }
-                    writer.writeTo(type, finalMediaType, element, response.getHeaders(), out);
+                    // the headers of the response may already be sent: the elements are
+                    // written after, on any thread
+                    writer.writeTo(type, finalMediaType, element, new CaseInsensitiveMutableHttpHeaders(conversionService), out);
                 });
             }
 
