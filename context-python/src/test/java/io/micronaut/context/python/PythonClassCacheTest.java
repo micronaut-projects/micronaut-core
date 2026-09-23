@@ -4,11 +4,14 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
+import java.util.Map;
+
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Python classes are resolved once per context and reused for every instance created afterwards.
@@ -53,4 +56,47 @@ final class PythonClassCacheTest {
             PythonContextRegistry.unregisterContext(second);
         }
     }
+
+    @Test
+    void uninitializedAllocatorsAreIsolatedByClassAndContext() {
+        var other = new PythonContextRuntime.PythonClassReference(
+            "__main__", "Other", new String[0], "Other", "class-instance:__main__.Other");
+        try (Context first = newContext(); Context second = newContext()) {
+            try {
+                for (Context context : new Context[]{first, second}) {
+                    context.eval(PYTHON, """
+                        from dataclasses import dataclass
+                        @dataclass(frozen=True, slots=True)
+                        class Book:
+                            title: str
+                            def __post_init__(self):
+                                raise AssertionError("constructor must not run")
+                        class Other:
+                            def __new__(cls):
+                                raise AssertionError("custom allocation must not run")
+                            def __init__(self):
+                                raise AssertionError("constructor must not run")
+                        """);
+                    for (int i = 0; i < 3; i++) {
+                        Value book = PythonContextRuntime.newFrozenDataclassInstance(context, BOOK, Map.of("title", "book-" + i));
+                        Value otherInstance = PythonContextRuntime.newUninitializedInstance(context, other, Map.of("title", "other-" + i));
+                        assertEquals("book-" + i, book.getMember("title").asString());
+                        assertEquals("other-" + i, otherInstance.getMember("title").asString());
+                        assertEquals(PythonContextRuntime.findClass(BOOK, context), book.getMetaObject());
+                        assertEquals(PythonContextRuntime.findClass(other, context), otherInstance.getMetaObject());
+                        assertEquals(context, book.getContext());
+                        assertEquals(context, otherInstance.getContext());
+                    }
+                }
+                PythonContextRegistry.unregisterContext(first);
+                first.eval(PYTHON, "class Book: replacement = True");
+                Value replacement = PythonContextRuntime.newUninitializedInstance(first, BOOK);
+                assertTrue(replacement.getMember("replacement").asBoolean());
+            } finally {
+                PythonContextRegistry.unregisterContext(first);
+                PythonContextRegistry.unregisterContext(second);
+            }
+        }
+    }
+
 }
