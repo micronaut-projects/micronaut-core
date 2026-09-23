@@ -788,6 +788,10 @@ final class PythonContextRegistry {
         final Map<Value, AsyncInstance> asyncInstances = Collections.synchronizedMap(new WeakHashMap<>());
         /** Whether a Python class declares coroutine methods, keyed by its class cache key. */
         final Map<String, Boolean> coroutineClasses = new ConcurrentHashMap<>();
+        /** Class-bound allocators, keyed by the precomputed class reference cache key. */
+        final Map<String, Value> uninitializedInstanceFactories = new ConcurrentHashMap<>();
+        /** Successfully prepared introduction classes, keyed by the precomputed class reference cache key. */
+        final Set<String> preparedIntroductionClasses = ConcurrentHashMap.newKeySet();
         /** Helper functions and cached pooled values, keyed by name or expression. */
         final Map<String, Value> helpers = new ConcurrentHashMap<>();
         /** The micronaut_runtime module imported into this context, once resolved. */
@@ -807,6 +811,8 @@ final class PythonContextRegistry {
             asyncConstructorArguments.clear();
             asyncInstances.clear();
             coroutineClasses.clear();
+            uninitializedInstanceFactories.clear();
+            preparedIntroductionClasses.clear();
             helpers.clear();
             classes.clear();
             scopedProxies.clear();

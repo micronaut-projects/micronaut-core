@@ -70,6 +70,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
+import io.micronaut.http.client.AsyncRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientSupport;
 import io.micronaut.http.client.RawRequestOptions;
@@ -190,6 +191,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -229,6 +231,11 @@ final class NettyHttpClient implements
      * {@link RawRequestOptions#isDecompress()}.
      */
     private static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
+    /**
+     * Request attribute with the {@link Duration} that replaces the configured read timeout for
+     * one exchange, see {@link RawRequestOptions#getResponseTimeout()}.
+     */
+    private static final String RESPONSE_TIMEOUT = "micronaut.http.client.raw.response-timeout";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1203,14 +1210,9 @@ final class NettyHttpClient implements
         if (permitsBody) {
             Optional<?> body = request.getBody();
             boolean hasBody = body.isPresent();
-            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
+            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 Object bodyValue = body.get();
-                if (bodyValue instanceof CharSequence sequence) {
-                    ReadBuffer byteBuf = charSequenceToByteBuf(sequence, requestContentType);
-                    return byteBodyFactory.adapt(byteBuf);
-                } else {
-                    return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
-                }
+                return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
             } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
                 return buildFormRequest(request, byteBodyFactory, r -> buildMultipartRequest(r, body.get()));
             } else {
@@ -1252,6 +1254,16 @@ final class NettyHttpClient implements
         } else {
             return NettyByteBodyFactory.empty();
         }
+    }
+
+    /**
+     * A form body that is already encoded is written as is, like any other raw body.
+     *
+     * @param bodyValue The body value
+     * @return Whether the body is already encoded
+     */
+    private static boolean isEncodedFormBody(Object bodyValue) {
+        return bodyValue instanceof CharSequence || bodyValue instanceof byte[] || bodyValue instanceof ByteBuffer<?>;
     }
 
     private static boolean requiresRequestBody(HttpMethod method) {
@@ -1375,48 +1387,62 @@ final class NettyHttpClient implements
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> mono;
-        try {
-            mono = sendRequestWithRedirects(
-                propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
-                (req, resp) -> ExecutionFlow.just(resp)
-            );
-        } catch (RuntimeException | Error e) {
-            requestBody.close();
-            throw e;
-        }
-        return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
+        return rawExchange(request, requestBody, blockedThread, null);
     }
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
         Objects.requireNonNull(options, "options");
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
+        return rawExchange(request, requestBody, blockedThread, options);
+    }
+
+    @Override
+    public AsyncRawHttpClient toAsyncRaw() {
+        return new NettyAsyncRawHttpClient(this);
+    }
+
+    private Mono<HttpResponse<?>> rawExchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
+        CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> flow;
+        ExecutionFlow<HttpResponse<?>> flow = rawExchangeFlow(propagatedContext, request, body, blockedThread, options);
+        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
+        return toMono(flow, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * The flow of a raw exchange. Cancelling it before the response arrives aborts the request.
+     * The caller closes the request body when the flow completes or is cancelled.
+     *
+     * @param propagatedContext The propagated context
+     * @param request           The request metadata
+     * @param requestBody       The request body
+     * @param blockedThread     The thread that blocks on the response, if any
+     * @param options           The per-exchange options, or {@code null} for none
+     * @return The response flow
+     */
+    ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         try {
+            BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
+            if (options == null) {
+                return sendRequestWithRedirects(
+                    propagatedContext,
+                    blockHint,
+                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
+                    (req, resp) -> ExecutionFlow.just(resp)
+                );
+            }
             MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
-            flow = RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
+            return RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
                 propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
+                blockHint,
                 rawRequest,
                 (req, resp) -> ExecutionFlow.just(resp)
-            ), options.getResponseTimeout());
+            ), options.getResponseTimeout()).map(response -> RawHttpClientSupport.toMutableResponse(response, options));
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
         }
-        return toMono(flow.map(response -> RawHttpClientSupport.toMutableResponse(response, options)), propagatedContext)
-            .doOnTerminate(requestBody::close);
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
@@ -1425,6 +1451,9 @@ final class NettyHttpClient implements
         }
         if (!options.isDecompress()) {
             request.setAttribute(NO_DECOMPRESSION, Boolean.TRUE);
+        }
+        if (options.getResponseTimeout() != null) {
+            request.setAttribute(RESPONSE_TIMEOUT, options.getResponseTimeout());
         }
     }
 
@@ -1562,6 +1591,7 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
+                    request.getAttribute(RESPONSE_TIMEOUT).ifPresent(responseTimeout -> redirectRequest.setAttribute(RESPONSE_TIMEOUT, responseTimeout));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> {
                             setRedirectHeaders(request, redirectRequest.uri(uri), preserveBody);
@@ -1645,13 +1675,24 @@ final class NettyHttpClient implements
             }
         }
 
+        // a response timeout of the exchange replaces the read timeout until the response arrives
+        Duration responseTimeout = request.getAttribute(RESPONSE_TIMEOUT, Duration.class).orElse(null);
+        ResponseDeadline responseDeadline = responseTimeout == null ? null : ResponseDeadline.start(poolHandle, responseTimeout);
+        AtomicBoolean responded = new AtomicBoolean();
+
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
+                if (responseDeadline != null) {
+                    responseDeadline.stop();
+                }
                 poolHandle.taint();
-                completeExceptionallySafe(sink, handleResponseError(request, cause));
+                if (!sink.isCancelled()) {
+                    // nobody takes the error of a cancelled exchange, e.g. its closed connection
+                    completeExceptionallySafe(sink, handleResponseError(request, cause));
+                }
             }
 
             @Override
@@ -1668,10 +1709,19 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                if (responseDeadline != null) {
+                    // the configured read timeout applies to the response body
+                    responseDeadline.stop();
+                }
+                responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-
+                if (sink.isCancelled()) {
+                    // nobody takes the response of a cancelled exchange
+                    body.close();
+                    return;
+                }
                 sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
             }
 
@@ -1696,6 +1746,9 @@ final class NettyHttpClient implements
 
             @Override
             public void finish(ChannelHandlerContext ctx) {
+                if (responseDeadline != null) {
+                    responseDeadline.stop();
+                }
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
                 if (streamWriter != null) {
                     if (!streamWriter.isCompleted()) {
@@ -1709,6 +1762,14 @@ final class NettyHttpClient implements
                     byteBuf.release();
                 }
                 poolHandle.release();
+            }
+        }));
+        // cancelling the exchange before the response arrives aborts the request: the connection
+        // (HTTP/1) or the stream (HTTP/2) is closed, which also stops the request body
+        sink.onCancel(() -> poolHandle.channel().eventLoop().execute(() -> {
+            if (!responded.get()) {
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
         }));
         poolHandle.notifyRequestPipelineBuilt();
