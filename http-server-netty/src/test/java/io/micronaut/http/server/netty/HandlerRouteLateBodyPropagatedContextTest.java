@@ -171,9 +171,8 @@ class HandlerRouteLateBodyPropagatedContextTest {
             return read.thenApply(value -> HttpResponse.ok("handler=" + handler + ";" + value + ":" + describe()).contentType(MediaType.TEXT_PLAIN_TYPE));
         }
 
-        private static HttpResponse<?> addRouteTrace(HttpRequest<?> request, MutablePropagatedContext propagatedContext) {
+        private static void addRouteTrace(HttpRequest<?> request, MutablePropagatedContext propagatedContext) {
             propagatedContext.add(new RouteTrace("r-" + request.getHeaders().get("X-Trace")));
-            return null;
         }
     }
 

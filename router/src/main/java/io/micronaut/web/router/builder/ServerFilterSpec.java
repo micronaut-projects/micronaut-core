@@ -25,7 +25,7 @@ import io.micronaut.http.filter.FilterPatternStyle;
  * {@code @RequestFilter} and {@code @ResponseFilter} methods.
  *
  * <pre>{@code
- * routes.filter("/**").order(100).before((request, propagatedContext) -> {
+ * routes.filter("/**").order(100).beforeReplacing((request, propagatedContext) -> {
  *     propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
  *     return null;
  * });
@@ -100,13 +100,13 @@ public sealed interface ServerFilterSpec extends RouteFilterSpec<ServerFilterSpe
      * Run the request filters before the route is matched, like {@code @RequestFilter} methods
      * annotated {@code @PreMatching}: the route is matched with the request they continue with,
      * e.g. with the URI they changed in place or the method of the request they returned, see
-     * {@link RouteRequestFilter}. They run with the pre-matching filter beans, ordered by
+     * {@link ReplacingRouteRequestFilter}. They run with the pre-matching filter beans, ordered by
      * {@link #order(int)}, before the filters that run once the route is matched, and they filter
      * the requests of the patterns and methods, as they were received, including those no route
      * matches. The patterns and methods select the filter before the request filters run.
      *
      * <pre>{@code
-     * routes.filter("/legacy/**").preMatching().before(request -> {
+     * routes.filter("/legacy/**").preMatching().beforeReplacing(request -> {
      *     request.uri(URI.create(request.getPath().replaceFirst("/legacy", "/api")));
      *     return null;
      * });

@@ -244,7 +244,6 @@ public class HandlerRoutesConcurrencyTest {
         public void routes(HttpRouteBuilder routes) {
             routes.filter("/conc/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new RequestId(id(request)));
-                return null;
             }).after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
             RouteTable located = tables.buildLocatedHttpRoutes(table -> table.GET("/show", (request, pathVariables) ->
                     text("located " + pathVariables.locatedTarget(Located.class).id()))
@@ -256,7 +255,7 @@ public class HandlerRoutesConcurrencyTest {
                 }, executor));
                 group.after((request, response) -> response.header("X-Group-Filter", request.getAttribute("group-id", String.class).orElse("none")));
                 group.GET("/sync/{id}", (request, pathVariables) -> text("sync " + pathVariables.getString("id")))
-                    .before(request -> id(request).equals(pathVariables(request)) ? null : HttpResponse.badRequest())
+                    .beforeReplacing(request -> id(request).equals(pathVariables(request)) ? null : HttpResponse.badRequest())
                     .after((request, response) -> response.header("X-Route-Filter", id(request)));
                 group.asyncGET("/async/{id}", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> text("async " + pathVariables.getString("id")), executor))
                     .after(TaskExecutors.BLOCKING, (request, response) -> response.header("X-Route-Filter", id(request)));

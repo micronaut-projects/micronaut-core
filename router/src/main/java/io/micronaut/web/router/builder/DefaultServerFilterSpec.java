@@ -65,19 +65,19 @@ record DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) implem
     }
 
     @Override
-    public ServerFilterSpec before(ContextRouteRequestFilter filter) {
+    public ServerFilterSpec beforeReplacing(ContextReplacingRouteRequestFilter filter) {
         serverFilters.filters().before(filter, null);
         return this;
     }
 
     @Override
-    public ServerFilterSpec before(String executorName, ContextRouteRequestFilter filter) {
+    public ServerFilterSpec beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
         serverFilters.filters().before(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
     @Override
-    public ServerFilterSpec beforeAsync(AsyncContextRouteRequestFilter filter) {
+    public ServerFilterSpec beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
         serverFilters.filters().beforeAsync(filter);
         return this;
     }
