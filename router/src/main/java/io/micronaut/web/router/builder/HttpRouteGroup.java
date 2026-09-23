@@ -112,6 +112,25 @@ public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec
     HttpRouteGroup port(int port);
 
     /**
+     * Route the requests on the port of a property, like {@code @Controller(port = "${my.admin.port}")},
+     * whose {@code port} member is a string: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * environment of the application like the port of a controller, when the routes are declared.
+     * Otherwise the same as {@link #port(int)}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * }</pre>
+     *
+     * @param port The port, or an expression that resolves to it
+     * @return This group
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(String port);
+
+    /**
      * Match the requests of the routes of the group that meet a condition only, see
      * {@link HttpRouteSpec#where(Predicate)}: a route of the group, including its locator routes
      * and the routes of its nested groups, matches a request that meets the conditions of its

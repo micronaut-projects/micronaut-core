@@ -276,6 +276,25 @@ public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> per
     HttpRouteSpec port(int port);
 
     /**
+     * Route the requests on the port of a property, like {@code @Controller(port = "${my.admin.port}")},
+     * whose {@code port} member is a string: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * environment of the application like the port of a controller, when the routes are declared.
+     * Otherwise the same as {@link #port(int)}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * }</pre>
+     *
+     * @param port The port, or an expression that resolves to it
+     * @return The route
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteSpec port(String port);
+
+    /**
      * Match the requests that meet a condition only, like {@code @RouteCondition} on a controller
      * method: a request the condition rejects is answered as if the route did not exist, by
      * another route of the same URI and method, e.g. one with another condition, or by

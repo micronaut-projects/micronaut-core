@@ -26,25 +26,19 @@ import java.lang.annotation.Annotation;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Predicate;
+import java.util.function.ToIntFunction;
 
 /**
  * The {@link HttpRouteSpec}: the routes of a handler, one, or one per HTTP method, configured
  * together. The spec holds no state of its own, the routes do: it compares by its routes.
  *
  * @param routes The routes of the handler
+ * @param ports  Resolves a port given as a string, see {@link #port(String)}
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
-
-    /**
-     * @param route The route of the handler
-     * @return The spec of the route
-     */
-    static DefaultHttpRouteSpec of(HandlerUriRoute route) {
-        return new DefaultHttpRouteSpec(List.of(route));
-    }
+record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> ports) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
 
     @Override
     public HttpRouteSpec consumes(MediaType... mediaTypes) {
@@ -112,6 +106,11 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes) implements HttpRouteSp
             route.nonBlocking();
         }
         return this;
+    }
+
+    @Override
+    public HttpRouteSpec port(String port) {
+        return port(ports.applyAsInt(port));
     }
 
     @Override
