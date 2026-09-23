@@ -16,16 +16,9 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
-import io.micronaut.http.HttpRequest;
-import io.micronaut.http.HttpResponse;
-import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
-import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
-import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -77,7 +70,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createRouteRequestFilter(Function<HttpRequest<?>, @Nullable HttpResponse<?>> filter,
+    static GenericHttpFilter createRouteRequestFilter(RouteFilterFunctions.Request filter,
                                                       @Nullable Supplier<? extends Executor> executor) {
         return RouteFunctionFilter.request(filter, executor);
     }
@@ -90,7 +83,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createAsyncRouteRequestFilter(Function<HttpRequest<?>, ? extends CompletionStage<? extends @Nullable HttpResponse<?>>> filter) {
+    static GenericHttpFilter createAsyncRouteRequestFilter(RouteFilterFunctions.AsyncRequest filter) {
         return RouteFunctionFilter.requestAsync(filter);
     }
 
@@ -103,7 +96,7 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createRouteResponseFilter(BiConsumer<HttpRequest<?>, MutableHttpResponse<?>> filter,
+    static GenericHttpFilter createRouteResponseFilter(RouteFilterFunctions.Response filter,
                                                        @Nullable Supplier<? extends Executor> executor) {
         return RouteFunctionFilter.response(filter, executor);
     }
@@ -116,8 +109,25 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createAsyncRouteResponseFilter(BiFunction<HttpRequest<?>, MutableHttpResponse<?>, ? extends CompletionStage<?>> filter) {
+    static GenericHttpFilter createAsyncRouteResponseFilter(RouteFilterFunctions.AsyncResponse filter) {
         return RouteFunctionFilter.responseAsync(filter);
+    }
+
+    /**
+     * A filter of one route, created with the methods above, as a server filter: sorted with the
+     * server filters by the given order, like a filter method of a {@code @ServerFilter} bean.
+     *
+     * @param routeFilter The filter of a route
+     * @param order       The order
+     * @return The server filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter withOrder(GenericHttpFilter routeFilter, int order) {
+        if (!(routeFilter instanceof RouteFunctionFilter filter)) {
+            throw new IllegalArgumentException("Not a filter of a route: " + routeFilter);
+        }
+        return filter.withOrder(order);
     }
 
     /**

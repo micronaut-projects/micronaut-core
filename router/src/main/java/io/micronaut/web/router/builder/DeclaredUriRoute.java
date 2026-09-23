@@ -149,33 +149,38 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute before(RouteRequestFilter filter) {
+    public HandlerUriRoute before(ContextRouteRequestFilter filter) {
         return configure(r -> r.before(filter));
     }
 
     @Override
-    public HandlerUriRoute after(RouteResponseFilter filter) {
+    public HandlerUriRoute after(ContextRouteResponseFilter filter) {
         return configure(r -> r.after(filter));
     }
 
     @Override
-    public HandlerUriRoute before(String executorName, RouteRequestFilter filter) {
+    public HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter) {
         return configure(r -> r.before(executorName, filter));
     }
 
     @Override
-    public HandlerUriRoute after(String executorName, RouteResponseFilter filter) {
+    public HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter) {
         return configure(r -> r.after(executorName, filter));
     }
 
     @Override
-    public HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter) {
+    public HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter) {
         return configure(r -> r.beforeAsync(filter));
     }
 
     @Override
-    public HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter) {
+    public HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter) {
         return configure(r -> r.afterAsync(filter));
+    }
+
+    @Override
+    public HandlerUriRoute inGroup(RouteAssembly.RouteFilters group) {
+        return configure(r -> r.inGroup(group));
     }
 
     @Override

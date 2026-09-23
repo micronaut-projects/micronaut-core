@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
+import io.micronaut.web.router.RouteAssembly;
 
 /**
  * The configuration of a route to a handler function that {@link HttpRouteSpec} applies: the
@@ -80,44 +81,54 @@ public interface HandlerUriRoute {
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#before(RouteRequestFilter)
+     * @see HttpRouteSpec#before(ContextRouteRequestFilter)
      */
-    HandlerUriRoute before(RouteRequestFilter filter);
+    HandlerUriRoute before(ContextRouteRequestFilter filter);
 
     /**
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see HttpRouteSpec#before(String, RouteRequestFilter)
+     * @see HttpRouteSpec#before(String, ContextRouteRequestFilter)
      */
-    HandlerUriRoute before(String executorName, RouteRequestFilter filter);
+    HandlerUriRoute before(String executorName, ContextRouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#beforeAsync(AsyncRouteRequestFilter)
+     * @see HttpRouteSpec#beforeAsync(AsyncContextRouteRequestFilter)
      */
-    HandlerUriRoute beforeAsync(AsyncRouteRequestFilter filter);
+    HandlerUriRoute beforeAsync(AsyncContextRouteRequestFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#after(RouteResponseFilter)
+     * @see HttpRouteSpec#after(ContextRouteResponseFilter)
      */
-    HandlerUriRoute after(RouteResponseFilter filter);
+    HandlerUriRoute after(ContextRouteResponseFilter filter);
 
     /**
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see HttpRouteSpec#after(String, RouteResponseFilter)
+     * @see HttpRouteSpec#after(String, ContextRouteResponseFilter)
      */
-    HandlerUriRoute after(String executorName, RouteResponseFilter filter);
+    HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#afterAsync(AsyncRouteResponseFilter)
+     * @see HttpRouteSpec#afterAsync(AsyncContextRouteResponseFilter)
      */
-    HandlerUriRoute afterAsync(AsyncRouteResponseFilter filter);
+    HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter);
+
+    /**
+     * Declare the route in a group: the filters of the group, and of the groups around it, run
+     * before the filters of the route.
+     *
+     * @param group The filters of the group
+     * @return The route
+     * @see HttpRouteGroup
+     */
+    HandlerUriRoute inGroup(RouteAssembly.RouteFilters group);
 }

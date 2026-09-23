@@ -34,12 +34,16 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.IOException;
+import java.net.http.HttpConnectTimeoutException;
+import java.net.http.HttpTimeoutException;
+import java.time.Duration;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -141,8 +145,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
             }
         }
         request.setAttribute(OPTIONS_ATTRIBUTE, options);
+        // the response timeout is the timeout of the JDK request, see mapToHttpRequest
         ExecutionFlow<HttpResponse<?>> flow = ReactiveExecutionFlow.fromPublisher(Mono.from(exchangeImpl(request, null)).map(r -> (HttpResponse<?>) r));
-        flow = RawHttpClientSupport.withResponseTimeout(flow, options.getResponseTimeout());
         Mono<MutableHttpResponse<?>> response = Mono.from(ReactiveExecutionFlow.toPublisher(
             flow.map(r -> RawHttpClientSupport.toMutableResponse(r, options))
         ));
@@ -172,7 +176,21 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // the request cookies are sent in its Cookie header, and must not reach the cookie store
         // that is shared with the other clients of the same configuration
         return resolveRequestUri(request)
-            .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build());
+            .map(uri -> {
+                java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
+                Duration responseTimeout = responseTimeout(request);
+                if (responseTimeout != null) {
+                    // replaces the configured read timeout, it may be longer or shorter
+                    builder.timeout(responseTimeout);
+                }
+                return builder.build();
+            });
+    }
+
+    private static @Nullable Duration responseTimeout(HttpRequest<?> request) {
+        return request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class)
+            .map(RawRequestOptions::getResponseTimeout)
+            .orElse(null);
     }
 
     @Override
@@ -194,6 +212,10 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 return httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
             })
             .flatMap(Mono::fromCompletionStage)
+            .onErrorMap(
+                e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
+                e -> ReadTimeoutException.TIMEOUT_EXCEPTION
+            )
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .map(netResponse -> {

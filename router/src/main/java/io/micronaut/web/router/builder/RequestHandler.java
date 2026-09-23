@@ -24,7 +24,9 @@ import io.micronaut.http.HttpResponse;
  * matched route. It runs like a controller method that returns an {@link HttpResponse}: filters, error routes and
  * body writers apply unchanged, and the executor is selected like for a blocking controller
  * method (see {@code micronaut.server.thread-selection}, {@link io.micronaut.web.router.builder.HttpRouteSpec#executeOn(String)} and
- * {@link io.micronaut.web.router.builder.HttpRouteSpec#nonBlocking()}).
+ * {@link io.micronaut.web.router.builder.HttpRouteSpec#nonBlocking()}). On whatever thread, it
+ * runs with the propagated context of the request in scope, e.g. the MDC context a filter added,
+ * like a controller method.
  *
  * <pre>{@code
  * routes.GET("/hello/{name}", (request, pathVariables) -> HttpResponse.ok("Hello " + pathVariables.getString("name")));

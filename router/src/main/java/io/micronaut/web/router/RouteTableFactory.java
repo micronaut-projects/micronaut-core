@@ -155,7 +155,7 @@ public final class RouteTableFactory {
     }
 
     private static RouteTable table(RouteAssembly assembly, List<RouteBuilder> builders, List<AssembledRoutes> assembled) {
-        if (!assembly.statusRoutes().isEmpty() || !assembly.errorRoutes().isEmpty()) {
+        if (!assembly.statusRoutes().isEmpty() || !assembly.errorRoutes().isEmpty() || !assembly.filterRoutes().isEmpty()) {
             throw new IllegalArgumentException("A route table can only declare URI routes, not filter, status or error routes");
         }
         if (!assembly.exposedPorts().isEmpty()) {

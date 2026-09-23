@@ -210,6 +210,39 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
+     * @param errorType The type of the exception, which the error route binds to the second argument
+     * @param handler   The handler
+     * @param <E>       The type of the exception
+     * @return The method that calls it
+     */
+    @SuppressWarnings("unchecked")
+    public static <E extends Throwable> HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(Class<E> errorType, AsyncErrorRouteHandler<E> handler) {
+        return new HandlerMethod<>(
+            handler,
+            AsyncErrorRouteHandler.class,
+            new Class<?>[]{HttpRequest.class, Throwable.class},
+            new Argument<?>[]{REQUEST, Argument.of(errorType, "error")},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> stage(handler.handle((HttpRequest<?>) args[0], (E) args[1]))
+        );
+    }
+
+    /**
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncStatusRouteHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            AsyncStatusRouteHandler.class,
+            new Class<?>[]{HttpRequest.class},
+            new Argument<?>[]{REQUEST},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> stage(handler.handle((HttpRequest<?>) args[0]))
+        );
+    }
+
+    /**
      * @param handler The handler
      * @return The method that calls it
      */
@@ -433,6 +466,20 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             });
         });
         return result;
+    }
+
+    /**
+     * The stage of an asynchronous error or status handler: an error route that answers with no
+     * stage fails, like one that throws, instead of answering {@code 404} or {@code 204}.
+     *
+     * @param stage The stage the handler returned
+     * @return The stage
+     */
+    private static CompletionStage<? extends HttpResponse<?>> stage(@Nullable CompletionStage<? extends HttpResponse<?>> stage) {
+        if (stage == null) {
+            throw new NullPointerException("The handler returned no stage");
+        }
+        return stage;
     }
 
     private static Throwable unwrap(Throwable error) {

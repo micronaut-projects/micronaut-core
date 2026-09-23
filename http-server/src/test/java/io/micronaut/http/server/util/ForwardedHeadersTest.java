@@ -19,6 +19,7 @@ import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MutableHttpRequest;
+import io.micronaut.http.server.HttpServerConfiguration;
 import org.junit.jupiter.api.Test;
 
 import java.net.InetSocketAddress;
@@ -136,6 +137,133 @@ class ForwardedHeadersTest {
 
         assertFalse(outbound.getHeaders().contains(ForwardedHeaders.X_FORWARDED_FOR));
         assertEquals("for=\"[2001:db8:0:0:0:0:0:17]\";proto=http;host=gateway.example", outbound.getHeaders().get(HttpHeaders.FORWARDED));
+    }
+
+    @Test
+    void trustedXForwardedOnlyChainIsKeptInForwarded() {
+        // the trusted proxy in front only writes X-Forwarded-*: the Forwarded header written for
+        // this hop must not shadow the original client, scheme and host
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https",
+            ForwardedHeaders.X_FORWARDED_HOST, "shop.example",
+            ForwardedHeaders.X_FORWARDED_PORT, "443");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("203.0.113.7, 10.0.0.2", headers.get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("https", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("shop.example", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+        assertEquals("443", headers.get(ForwardedHeaders.X_FORWARDED_PORT));
+        assertEquals("for=203.0.113.7;proto=https;host=shop.example, for=10.0.0.2;proto=http;host=gateway.internal", headers.get(HttpHeaders.FORWARDED));
+        // the default port of the scheme is not repeated in the host
+        assertResolvesOriginalClient(outbound, "203.0.113.7", "https", "shop.example", null);
+    }
+
+    @Test
+    void trustedXForwardedChainIsTranslatedWhenOnlyForwardedIsWritten() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7, 2001:db8::17",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https",
+            ForwardedHeaders.X_FORWARDED_HOST, "shop.example",
+            ForwardedHeaders.X_FORWARDED_PORT, "8443");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .xForwarded(false)
+            .build()
+            .write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertFalse(headers.contains(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("for=203.0.113.7;proto=https;host=\"shop.example:8443\", for=\"[2001:db8::17]\", for=10.0.0.2;proto=http;host=gateway.internal",
+            headers.get(HttpHeaders.FORWARDED));
+        assertResolvesOriginalClient(outbound, "203.0.113.7", "https", "shop.example", 8443);
+    }
+
+    @Test
+    void trustedForwardedOnlyChainIsKeptInXForwarded() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal",
+            HttpHeaders.FORWARDED, "for=203.0.113.7;proto=https;host=\"shop.example:8443\", for=\"[2001:db8::17]\";by=_edge");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("203.0.113.7, 2001:db8::17, 10.0.0.2", headers.get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("https", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("shop.example", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+        assertEquals("8443", headers.get(ForwardedHeaders.X_FORWARDED_PORT));
+        assertEquals("for=203.0.113.7;proto=https;host=\"shop.example:8443\", for=\"[2001:db8::17]\";by=_edge, for=10.0.0.2;proto=http;host=gateway.internal",
+            headers.get(HttpHeaders.FORWARDED));
+        assertResolvesOriginalClient(outbound, "203.0.113.7", "https", "shop.example", 8443);
+
+        // a downstream that only reads the X-Forwarded-* headers resolves the same client
+        MutableHttpRequest<?> xForwardedOnly = HttpRequest.GET("http://upstream/orders");
+        ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .forwarded(false)
+            .build()
+            .write(inbound, xForwardedOnly);
+        assertFalse(xForwardedOnly.getHeaders().contains(HttpHeaders.FORWARDED));
+        assertResolvesOriginalClient(xForwardedOnly, "203.0.113.7", "https", "shop.example", 8443);
+    }
+
+    @Test
+    void trustedChainInBothFormatsIsAppendedToEach() {
+        HttpRequest<?> inbound = inbound("10.0.0.2", false, "gateway.internal",
+            ForwardedHeaders.X_FORWARDED_FOR, "203.0.113.7",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https",
+            ForwardedHeaders.X_FORWARDED_HOST, "shop.example",
+            HttpHeaders.FORWARDED, "for=203.0.113.7;proto=https;host=shop.example");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(inbound, outbound);
+
+        HttpHeaders headers = outbound.getHeaders();
+        assertEquals("203.0.113.7, 10.0.0.2", headers.get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("https", headers.get(ForwardedHeaders.X_FORWARDED_PROTO));
+        assertEquals("shop.example", headers.get(ForwardedHeaders.X_FORWARDED_HOST));
+        assertEquals("for=203.0.113.7;proto=https;host=shop.example, for=10.0.0.2;proto=http;host=gateway.internal", headers.get(HttpHeaders.FORWARDED));
+        assertResolvesOriginalClient(outbound, "203.0.113.7", "https", "shop.example", null);
+    }
+
+    @Test
+    void untrustedXForwardedOnlyChainIsNotTranslated() {
+        HttpRequest<?> inbound = inbound("203.0.113.7", false, "gateway.example",
+            ForwardedHeaders.X_FORWARDED_FOR, "10.0.0.1",
+            ForwardedHeaders.X_FORWARDED_PROTO, "https");
+        MutableHttpRequest<?> outbound = HttpRequest.GET("http://upstream/orders");
+
+        trustingPrivateNetwork().write(inbound, outbound);
+
+        assertEquals("203.0.113.7", outbound.getHeaders().get(ForwardedHeaders.X_FORWARDED_FOR));
+        assertEquals("for=203.0.113.7;proto=http;host=gateway.example", outbound.getHeaders().get(HttpHeaders.FORWARDED));
+        assertResolvesOriginalClient(outbound, "203.0.113.7", "http", "gateway.example", null);
+    }
+
+    private static ForwardedHeaders trustingPrivateNetwork() {
+        return ForwardedHeaders.builder()
+            .trustedProxy(address -> address.getHostString().startsWith("10."))
+            .build();
+    }
+
+    /**
+     * Resolve the client, scheme and host the way the upstream server does.
+     */
+    private static void assertResolvesOriginalClient(MutableHttpRequest<?> outbound, String client, String scheme, String host, Integer port) {
+        HttpRequest<?> received = inbound("10.0.0.3", false, "upstream",
+            outbound.getHeaders().asMap().entrySet().stream()
+                .flatMap(entry -> entry.getValue().stream().flatMap(value -> java.util.stream.Stream.of(entry.getKey(), value)))
+                .toArray(String[]::new));
+        assertEquals(client, new DefaultHttpClientAddressResolver(new HttpServerConfiguration()).resolve(received));
+        ProxyHeaderParser parser = new ProxyHeaderParser(received);
+        assertEquals(scheme, parser.getScheme());
+        assertEquals(host, parser.getHost());
+        assertEquals(port, parser.getPort());
     }
 
     private static HttpRequest<?> inbound(String remoteAddress, boolean secure, String host, String... headers) {

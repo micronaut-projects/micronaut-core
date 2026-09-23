@@ -237,6 +237,29 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Handle an exception that the body writer threw while it encoded the response, before
+     * anything of it was sent. The exception is handled like one of the route: by error routes,
+     * {@link ExceptionHandler} beans, status routes and the default error response. The filters
+     * are not run again, they already ran for the request and returned the response the writer
+     * failed on.
+     *
+     * @param request           The request
+     * @param throwable         The exception of the writer
+     * @param propagatedContext The propagated context
+     * @return The response for the error
+     */
+    final ExecutionFlow<HttpResponse<?>> onBodyWriterError(HttpRequest<?> request, Throwable throwable, PropagatedContext propagatedContext) {
+        try {
+            // what the filter runner does with the response of the route or of its error handling
+            return onErrorNoFilter(request, throwable, propagatedContext)
+                .flatMap(response -> handleStatusException(request, response, RouteAttributes.getRouteInfo(response).orElse(null), propagatedContext))
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
+        } catch (Throwable e) {
+            return createDefaultErrorResponseFlow(request, e, propagatedContext);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> onErrorNoFilter(HttpRequest<?> request, Throwable t, PropagatedContext propagatedContext) {
 
         if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
@@ -561,7 +584,7 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
-        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus());
+        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());
         if (flow != null) {
             return flow;
         }
@@ -635,7 +658,8 @@ public class RequestLifecycle {
                                                          HttpStatusException cause,
                                                          @Nullable Class<?> declaringType,
                                                          PropagatedContext propagatedContext) {
-        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        // the status route runs with the propagated context of the filters, like the error routes
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus(), propagatedContext);
         if (flow != null) {
             return flow;
         }
@@ -675,9 +699,10 @@ public class RequestLifecycle {
 
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(HttpRequest<?> request,
-                                                                        HttpStatus status) {
+                                                                        HttpStatus status,
+                                                                        PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
+                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
     }
 }

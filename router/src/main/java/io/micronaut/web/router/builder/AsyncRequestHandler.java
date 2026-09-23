@@ -38,6 +38,21 @@ import java.util.concurrent.CompletionStage;
  *     .thenApply(found -> found ? HttpResponse.ok() : HttpResponse.badRequest()));
  * }</pre>
  *
+ * <p>Like a controller method, the handler runs with the propagated context of the request in
+ * scope: the context the filters produced, e.g. the MDC context a filter added with a
+ * {@link io.micronaut.core.propagation.MutablePropagatedContext}, and the request of
+ * {@link io.micronaut.http.context.ServerRequestContext}. Like a controller method returning a
+ * {@link CompletionStage}, a continuation of a stage completed by another thread sees the context
+ * only if that thread has it, e.g. a task submitted to the {@code TaskExecutors.IO} or
+ * {@code TaskExecutors.BLOCKING} executor, which propagates the context of the thread that
+ * submits it; see {@link io.micronaut.core.propagation.PropagatedContext#wrap(Runnable)} for
+ * other threads. The reads of the body are no exception, like the {@code CompletableFuture} or
+ * {@code Publisher} body of a controller method: a read, or a consumer of {@code parts()} or
+ * {@code elements()}, that completes once the rest of the body arrives, completes on the thread
+ * that delivers the body, without the context. A handler that needs the context once it has the
+ * body continues with a propagating executor, or is a body or form handler, which is called once
+ * the body arrived, like a controller method with a {@code @Body} argument.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  * @see io.micronaut.web.router.builder.HttpRouteBuilder#handleAsync(io.micronaut.http.HttpMethod, String, AsyncRequestHandler)

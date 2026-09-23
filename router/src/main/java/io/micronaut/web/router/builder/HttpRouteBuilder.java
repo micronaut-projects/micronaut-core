@@ -24,6 +24,7 @@ import io.micronaut.http.form.FormData;
 import io.micronaut.http.uri.RouteTemplate;
 
 import java.util.Set;
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -276,7 +277,8 @@ public interface HttpRouteBuilder {
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function, like an
      * {@code @Error(global = true)} method: it answers requests to controller routes and handler
-     * routes that fail with such an exception.
+     * routes that fail with such an exception. An error route declared in a {@link HttpRouteGroup}
+     * is global too: the group neither prefixes nor filters it.
      *
      * @param type    The type of the exception
      * @param handler The handler
@@ -287,13 +289,42 @@ public interface HttpRouteBuilder {
 
     /**
      * Handle the responses of a status with a handler function, like an
-     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}.
+     * {@code @Error(status = ..., global = true)} method, e.g. to answer {@code 404}. A status
+     * route declared in a {@link HttpRouteGroup} is global too: the group neither prefixes nor
+     * filters it.
      *
      * @param status  The status
      * @param handler The handler
      * @return The status route
      */
     StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler);
+
+    /**
+     * Handle the exceptions of a type, and of its subtypes, with a handler function that completes
+     * the response later, like an {@code @Error(global = true)} method returning a
+     * {@code CompletionStage}. The error route is selected like one added with
+     * {@link #error(Class, ErrorRouteHandler)}: the error route of the closest exception type
+     * answers, whether its handler is synchronous or not.
+     *
+     * @param type    The type of the exception
+     * @param handler The handler
+     * @param <E>     The type of the exception
+     * @return The error route
+     * @see AsyncErrorRouteHandler
+     */
+    <E extends Throwable> ErrorRouteSpec errorAsync(Class<E> type, AsyncErrorRouteHandler<E> handler);
+
+    /**
+     * Handle the responses of a status with a handler function that completes the response later,
+     * like an {@code @Error(status = ..., global = true)} method returning a
+     * {@code CompletionStage}.
+     *
+     * @param status  The status
+     * @param handler The handler
+     * @return The status route
+     * @see AsyncStatusRouteHandler
+     */
+    StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler);
 
     /**
      * Bind a handler function to a declared route, e.g. a constant generated at compile time. The
@@ -457,7 +488,10 @@ public interface HttpRouteBuilder {
      * }</pre>
      *
      * <p>A Micronaut template is the same as {@link #locate(String, LocatorHandler, Function)}
-     * with its expression.</p>
+     * with its expression. In a group with a prefix, see {@link #path(String, Consumer)}, the
+     * template must be a Micronaut one: the prefix of a group is joined to Micronaut URI templates
+     * only, and the template of another engine is rejected with an
+     * {@link IllegalArgumentException}.</p>
      *
      * @param prefix  The template of the prefix
      * @param locator Locates the target, or answers {@code null} for {@code 404}
@@ -465,6 +499,74 @@ public interface HttpRouteBuilder {
      * @since 5.3.0
      */
     void locate(RouteTemplate prefix, LocatorHandler locator, Function<Object, RouteTable> tables);
+
+    /**
+     * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters
+     * every request whose path matches one of the patterns, e.g. {@code /**} or {@code /api/**},
+     * whatever answers it, a controller, a handler route or a static resource, including the
+     * requests no route matches, ordered together with the filter beans. It is global wherever it
+     * is declared: the prefix and the filters of a {@link HttpRouteGroup} do not apply to it.
+     *
+     * <pre>{@code
+     * routes.filter("/**").order(100).before((request, propagatedContext) -> {
+     *     propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
+     *     return null;
+     * });
+     * }</pre>
+     *
+     * <p>Each call declares a new server filter. The server filters of an {@link HttpRoutes} bean
+     * are read when the router is built. A route table built at runtime cannot declare them.</p>
+     *
+     * @param patterns The patterns of the paths to filter, in the {@link ServerFilterSpec#patternStyle style} of the filter, {@code ANT} by default
+     * @return The server filter, to declare its filters on
+     * @see ServerFilterSpec
+     * @since 5.3.0
+     */
+    ServerFilterSpec filter(String... patterns);
+
+    /**
+     * Declare a group of routes, whose filters apply to every route declared in the lambda,
+     * e.g. to filter every route of an {@link HttpRoutes} bean. The builder of an
+     * {@link HttpRoutes} bean has no route filter methods of its own, as it is shared by the beans:
+     * the group is the scope of the filters, see {@link #filter(String...)} for a server filter.
+     *
+     * <pre>{@code
+     * routes.group(all -> {
+     *     all.before((request, propagatedContext) -> {
+     *         propagatedContext.add(new MdcPropagationContext(Map.of("path", request.getPath())));
+     *         return null;
+     *     });
+     *     all.GET("/orders", ordersHandler);
+     *     all.GET("/customers", customersHandler);
+     * });
+     * }</pre>
+     *
+     * <p>See {@link HttpRouteGroup} for which routes the filters apply to, and in which order.</p>
+     *
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void group(Consumer<HttpRouteGroup> routes);
+
+    /**
+     * Declare a group of routes under a prefix: the URI template of every route of the group,
+     * including its locator routes and the routes of its nested groups, is the prefix followed by
+     * the URI template of the route, like the URI of a controller method under the URI of the
+     * controller: {@code path("/api", api -> api.GET("/orders", handler))} routes
+     * {@code GET /api/orders}. The prefixes of nested groups add up. The filters of the group apply
+     * to every route declared in the lambda, see {@link HttpRouteGroup}.
+     *
+     * <p>The prefix is a path: it may have path variables, e.g. {@code /tenants/{tenant}}, but no
+     * query or fragment. A {@link RouteDeclaration}, whose index keys are computed for its own URI
+     * template, cannot be bound in a group with a prefix, nor can a locator whose prefix is a
+     * template of another {@link io.micronaut.http.uri.spi.RouteTemplateEngine engine}, see
+     * {@link #locate(RouteTemplate, LocatorHandler, Function)}.</p>
+     *
+     * @param prefix The prefix of the URI templates of the routes of the group
+     * @param routes Declares the routes and the filters of the group
+     * @since 5.3.0
+     */
+    void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
      * A body type that is {@code null} when the request has no body, for the handlers that
