@@ -66,6 +66,12 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
     }
 
     @Override
+    public ServerFilterSpec preMatching() {
+        serverFilters.preMatching();
+        return this;
+    }
+
+    @Override
     public ServerFilterSpec before(ContextRouteRequestFilter filter) {
         serverFilters.filters().before(filter, null);
         return this;

@@ -733,6 +733,7 @@ public final class RouteAssembly {
         private int order;
         private FilterPatternStyle patternStyle = FilterPatternStyle.ANT;
         private boolean appendContextPath = true;
+        private boolean preMatching;
 
         ServerFilters(String... patterns) {
             Objects.requireNonNull(patterns, "patterns");
@@ -782,6 +783,15 @@ public final class RouteAssembly {
             this.appendContextPath = appendContextPath;
         }
 
+        /**
+         * Run the filters before the route is matched, like filter methods annotated
+         * {@code @PreMatching}. The response filters also filter the responses of the routes,
+         * like filter methods that are not.
+         */
+        public void preMatching() {
+            this.preMatching = true;
+        }
+
         private void addFilterRoutes(List<FilterRoute> routes) {
             String path = RouteAssembly.this.contextPath;
             List<String> resolved = patterns;
@@ -793,18 +803,31 @@ public final class RouteAssembly {
             // like the filter methods of a filter bean: a filter route per filter, all with the same
             // order, which the stable sort of the server filters keeps in the order of the chain
             for (GenericHttpFilter filter : filters.chain()) {
-                GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
-                DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, false);
-                route.patternStyle(patternStyle);
-                for (String pattern : resolved) {
-                    route.pattern(pattern);
-                }
-                HttpMethod[] httpMethods = methods;
-                if (httpMethods != null) {
-                    route.methods(httpMethods);
-                }
-                routes.add(route);
+                routes.add(filterRoute(filter, resolved, preMatching));
             }
+            if (preMatching) {
+                // like a bean with a @PreMatching @ResponseFilter method, which filters the response
+                // a pre-matching request filter answered with, and a @ResponseFilter method, which
+                // filters the response of the route: the chain runs one or the other, as it drops the
+                // pre-matching filters when it matches the route
+                for (GenericHttpFilter filter : filters.responseChain()) {
+                    routes.add(filterRoute(filter, resolved, false));
+                }
+            }
+        }
+
+        private DefaultFilterRoute filterRoute(GenericHttpFilter filter, List<String> patterns, boolean isPreMatching) {
+            GenericHttpFilter ordered = GenericHttpFilter.withOrder(filter, order);
+            DefaultFilterRoute route = new DefaultFilterRoute(() -> ordered, AnnotationMetadata.EMPTY_METADATA, isPreMatching);
+            route.patternStyle(patternStyle);
+            for (String pattern : patterns) {
+                route.pattern(pattern);
+            }
+            HttpMethod[] httpMethods = methods;
+            if (httpMethods != null) {
+                route.methods(httpMethods);
+            }
+            return route;
         }
     }
 
@@ -916,6 +939,13 @@ public final class RouteAssembly {
             filters.addAll(responseFilters.reversed());
             filters.addAll(requestFilters);
             return List.copyOf(filters);
+        }
+
+        /**
+         * @return The response filters of this level, in the order the filter chain has them, see {@link #chain()}
+         */
+        List<GenericHttpFilter> responseChain() {
+            return responseFilters.reversed();
         }
 
         private void add(List<GenericHttpFilter> filters, GenericHttpFilter filter) {
