@@ -237,6 +237,29 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Handle an exception that the body writer threw while it encoded the response, before
+     * anything of it was sent. The exception is handled like one of the route: by error routes,
+     * {@link ExceptionHandler} beans, status routes and the default error response. The filters
+     * are not run again, they already ran for the request and returned the response the writer
+     * failed on.
+     *
+     * @param request           The request
+     * @param throwable         The exception of the writer
+     * @param propagatedContext The propagated context
+     * @return The response for the error
+     */
+    final ExecutionFlow<HttpResponse<?>> onBodyWriterError(HttpRequest<?> request, Throwable throwable, PropagatedContext propagatedContext) {
+        try {
+            // what the filter runner does with the response of the route or of its error handling
+            return onErrorNoFilter(request, throwable, propagatedContext)
+                .flatMap(response -> handleStatusException(request, response, RouteAttributes.getRouteInfo(response).orElse(null), propagatedContext))
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
+        } catch (Throwable e) {
+            return createDefaultErrorResponseFlow(request, e, propagatedContext);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> onErrorNoFilter(HttpRequest<?> request, Throwable t, PropagatedContext propagatedContext) {
 
         if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
