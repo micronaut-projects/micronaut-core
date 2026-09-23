@@ -1,0 +1,11 @@
+The routes of `HttpRoutes` beans are read once, when the router is created. Routes that change while the application runs, e.g. routes configured by the tenants of an application or read from a database, are published by a api:web.router.RouteSource[] bean as a api:web.router.RouteTable[]:
+
+snippet::io.micronaut.docs.server.functional.TenantRouteSource[tags="imports,clazz", indent=0, title="A route source"]
+
+<1> A `RouteSource` bean.
+<2> api:web.router.RouteTableFactory[] builds a table with the same builder as an `HttpRoutes` bean. Build the table once, when the routes change.
+<3> The router asks for the current table at most once per request, so a request is answered by the table it was matched with, even if a new table is published while it runs.
+
+The routes of the application, controllers and `HttpRoutes` beans, are matched first, then the tables of the route sources, in their order. The routes of a table are under `micronaut.server.context-path` like the other routes.
+
+A table cannot declare server filters or open ports, and its global error and status routes are rejected: declare error routes in a group of the table.

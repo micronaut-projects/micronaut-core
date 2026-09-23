@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -33,6 +34,7 @@ final class DefaultRouteTable implements RouteTable {
 
     private final DefaultRouter router;
     private final boolean empty;
+    private final @Nullable Argument<?> locatedTargetType;
     @Nullable
     private volatile List<Integer> appliedDefaultPorts;
 
@@ -40,8 +42,25 @@ final class DefaultRouteTable implements RouteTable {
      * @param router The router of the table's routes
      */
     DefaultRouteTable(DefaultRouter router) {
+        this(router, null);
+    }
+
+    /**
+     * @param router            The router of the table's routes
+     * @param locatedTargetType The type of the located targets the table routes, or {@code null}
+     */
+    DefaultRouteTable(DefaultRouter router, @Nullable Argument<?> locatedTargetType) {
         this.router = router;
         this.empty = router.uriRoutes().findAny().isEmpty();
+        this.locatedTargetType = locatedTargetType;
+    }
+
+    /**
+     * @return The type of the located targets the table routes, or {@code null} if the table
+     * routes any target
+     */
+    @Nullable Argument<?> locatedTargetType() {
+        return locatedTargetType;
     }
 
     /**

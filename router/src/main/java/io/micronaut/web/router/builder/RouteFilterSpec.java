@@ -44,7 +44,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 5.3.0
  */
 @Experimental
-public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
+public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits HttpRouteSpec, HttpRouteGroup, ServerFilterSpec, ContextFilterSpec {
 
     /**
      * Filter the requests, like a {@code @RequestFilter} method. The filters of a route and of its

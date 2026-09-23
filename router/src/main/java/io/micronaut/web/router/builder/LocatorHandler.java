@@ -29,12 +29,13 @@ import org.jspecify.annotations.Nullable;
  * the request and the path variables of the prefix only. It may run more than once for a
  * request, e.g. again to find the methods allowed for the path when no route matched.</p>
  *
+ * @param <T> The type of the target, which the route table function of the locator receives
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @FunctionalInterface
-public interface LocatorHandler {
+public interface LocatorHandler<T> {
 
     /**
      * Locate the target.
@@ -46,5 +47,5 @@ public interface LocatorHandler {
      * @return The target, or {@code null} if there is none: the request is not found
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    @Nullable Object locate(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
+    @Nullable T locate(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
 }

@@ -18,28 +18,21 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 
 import java.util.Objects;
 
 /**
  * The {@link ServerFilterSpec}: a server filter of the {@link RouteAssembly}, whose filter routes
- * the router reads with the routes.
+ * the router reads with the routes. The server filter holds the configuration.
  *
+ * @param serverFilters The server filter
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSpec<ServerFilterSpec> {
-
-    private final RouteAssembly.ServerFilters serverFilters;
-
-    /**
-     * @param serverFilters The server filter
-     */
-    DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) {
-        this.serverFilters = serverFilters;
-    }
+record DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) implements ServerFilterSpec, ContextFilterSpec<ServerFilterSpec> {
 
     @Override
     public ServerFilterSpec methods(HttpMethod... methods) {
@@ -79,7 +72,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec before(String executorName, ContextRouteRequestFilter filter) {
-        serverFilters.filters().before(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().before(filter, RouteArguments.executorName(executorName));
         return this;
     }
 
@@ -97,7 +90,7 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
 
     @Override
     public ServerFilterSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().after(filter, Objects.requireNonNull(executorName, "executorName"));
+        serverFilters.filters().after(filter, RouteArguments.executorName(executorName));
         return this;
     }
 

@@ -100,6 +100,34 @@ class PublisherBodyElementsTest {
     }
 
     @Test
+    void completingTheReturnedStageDoesNotLeaveTheOperationInProgress() {
+        ElementPublisher publisher = new ElementPublisher();
+        BodyElements<String> elements = new PublisherBodyElements<>(() -> publisher, () -> { });
+        List<String> consumed = new ArrayList<>();
+        CompletionStage<Void> all = elements.forEach(element -> {
+            consumed.add(element);
+            return CompletableFuture.completedFuture(null);
+        });
+        // a caller cannot complete or cancel the operation: it ends with the body
+        all.toCompletableFuture().complete(null);
+        all.toCompletableFuture().cancel(true);
+        assertFalse(all.toCompletableFuture().isDone());
+        publisher.emit("a");
+        publisher.complete();
+        join(all);
+        assertEquals(List.of("a"), consumed);
+        // the operation ended: the next one starts
+        assertEquals(Optional.empty(), join(elements.next()));
+
+        ElementPublisher second = new ElementPublisher();
+        BodyElements<String> read = new PublisherBodyElements<>(() -> second, () -> { });
+        CompletionStage<Optional<String>> next = read.next();
+        next.toCompletableFuture().complete(Optional.of("forged"));
+        second.emit("b");
+        assertEquals(Optional.of("b"), join(next));
+    }
+
+    @Test
     void forEachReadsTheNextElementWhenTheConsumerIsDone() {
         ElementPublisher publisher = new ElementPublisher();
         BodyElements<String> elements = new PublisherBodyElements<>(() -> publisher, () -> { });

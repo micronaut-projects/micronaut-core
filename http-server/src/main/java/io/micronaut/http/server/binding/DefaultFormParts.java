@@ -21,6 +21,7 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -135,10 +136,10 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
     private <T> CompletionStage<T> walk(Function<DefaultFormPart, @Nullable CompletionStage<?>> visitor, boolean once, @Nullable T ended, @Nullable T visited) {
         synchronized (this) {
             if (closed != null) {
-                return CompletableFuture.failedFuture(new IllegalStateException("The form parts were closed"));
+                return CompletableFuture.failedStage(new IllegalStateException("The form parts were closed"));
             }
             if (busy) {
-                return CompletableFuture.failedFuture(new IllegalStateException("Another operation on the form parts is in progress"));
+                return CompletableFuture.failedStage(new IllegalStateException("Another operation on the form parts is in progress"));
             }
             busy = true;
         }
@@ -147,7 +148,8 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             walking = walk;
         }
         walk.run();
-        return walk.result;
+        // a view: the caller cannot complete or cancel the operation, which ends with the form
+        return walk.result.minimalCompletionStage();
     }
 
     /**
@@ -175,7 +177,16 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             }
         }
         if (subscribe) {
-            request.getRawFormFields().subscribe(this);
+            Publisher<RawFormField> fields;
+            try {
+                fields = request.getRawFormFields();
+            } catch (Throwable e) {
+                // e.g. the body was claimed by a filter: this and every later operation fail
+                // with the cause, instead of leaving the operation in progress
+                onError(e);
+                return future;
+            }
+            fields.subscribe(this);
         } else if (s != null) {
             s.request(1);
         }

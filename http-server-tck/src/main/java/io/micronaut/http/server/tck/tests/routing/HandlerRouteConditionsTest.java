@@ -178,7 +178,7 @@ public class HandlerRouteConditionsTest {
                 beta.where(request -> request.getHeaders().contains("X-Beta"));
             });
             routes.GET("/conditions/variant", (request, pathVariables) -> text(target.variantB()))
-                .implementing(beanContext.getBeanDefinition(VariantTarget.class).getRequiredMethod("variantB"));
+                .annotationMetadata(beanContext.getBeanDefinition(VariantTarget.class).getRequiredMethod("variantB"));
             routes.GET("/conditions/variant", (request, pathVariables) -> text("a"))
                 .where(request -> !"b".equals(request.getHeaders().get("X-Variant")));
             Predicate<HttpRequest<?>> csv = RequestPredicates.queryParam("format", "csv")
