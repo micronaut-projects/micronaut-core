@@ -276,10 +276,23 @@ sealed class MutableServerRequest<B> extends HttpRequestWrapper<B> implements Mu
      *
      * @param <B> The body type
      */
-    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> {
+    private static final class Overlay<B> extends MutableHttpRequestWrapper<B> implements UriChangeAwareRequest {
+
+        private boolean uriSet;
 
         private Overlay(HttpRequest<B> request) {
             super(ConversionService.SHARED, request);
+        }
+
+        @Override
+        public MutableHttpRequest<B> uri(URI uri) {
+            uriSet = true;
+            return super.uri(uri);
+        }
+
+        @Override
+        public boolean isUriSet() {
+            return uriSet;
         }
 
         @Override

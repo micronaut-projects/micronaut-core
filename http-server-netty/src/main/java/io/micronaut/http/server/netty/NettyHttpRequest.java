@@ -47,6 +47,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.filter.UriChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -836,7 +837,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, UriChangeAwareRequest {
 
         @Nullable
         private URI uri;
@@ -963,6 +964,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public Optional<Certificate> getCertificate() {
             return NettyHttpRequest.this.getCertificate();
+        }
+
+        @Override
+        public boolean isUriSet() {
+            return uri != null;
         }
 
         @Override

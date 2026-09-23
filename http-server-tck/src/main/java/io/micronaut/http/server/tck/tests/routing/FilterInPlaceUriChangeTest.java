@@ -47,6 +47,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -54,6 +55,7 @@ import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -80,6 +82,15 @@ public class FilterInPlaceUriChangeTest {
             assertEquals(direct.replace("from=controller", "from=handler"), get(server, HttpRequest.GET("/ipc/target/handler")));
             assertEquals(direct, get(server, HttpRequest.GET("/ipc/pre/info")));
             assertEquals(direct.replace("from=controller", "from=handler"), get(server, HttpRequest.GET("/ipc/pre/handler")));
+        }
+    }
+
+    @Test
+    void anAsynchronousPreMatchingFilterMethodThatChangesTheUriWhenItCompletesChangesTheMatchedRoute() throws IOException {
+        try (ServerUnderTest server = server()) {
+            String direct = get(server, HttpRequest.GET("/ipc/target/info"));
+            assertEquals(direct, get(server, HttpRequest.GET("/ipc/async/info")));
+            assertEquals(direct.replace("from=controller", "from=handler"), get(server, HttpRequest.GET("/ipc/async/handler")));
         }
     }
 
@@ -215,6 +226,18 @@ public class FilterInPlaceUriChangeTest {
             if (path.startsWith("/ipc/pre/")) {
                 request.uri(URI.create(moved(path, "/ipc/pre/")));
             }
+        }
+
+        @RequestFilter
+        @PreMatching
+        Publisher<HttpResponse<?>> asyncPreMatching(MutableHttpRequest<?> request) {
+            String path = request.getPath();
+            if (!path.startsWith("/ipc/async/")) {
+                return Mono.empty();
+            }
+            // the URI is changed once the filter looked something up
+            return Mono.delay(Duration.ofMillis(10))
+                .then(Mono.fromRunnable(() -> request.uri(URI.create(moved(path, "/ipc/async/")))));
         }
 
         @RequestFilter
