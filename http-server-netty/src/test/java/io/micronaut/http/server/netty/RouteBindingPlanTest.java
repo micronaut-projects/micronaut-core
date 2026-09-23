@@ -12,6 +12,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Header;
@@ -199,6 +200,33 @@ public class RouteBindingPlanTest {
     }
 
     @Test
+    void pathVariableWinsOverTheBinderOfTheArgument() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            var response = get("/binding-plan/wins/path?tenant=query", "X-Tenant", "header");
+            assertEquals(200, response.statusCode());
+            assertEquals("path header", response.body());
+        }
+    }
+
+    @Test
+    void optionalPathVariable() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            assertEquals("5", get("/binding-plan/optional/5").body());
+            assertEquals("query", get("/binding-plan/optional?id=query").body());
+            assertEquals("none", get("/binding-plan/optional").body());
+        }
+    }
+
+    @Test
+    void pathVariableAndBody() throws Exception {
+        for (int i = 0; i < 2; i++) {
+            var response = postJson("/binding-plan/body/7", "{\"name\":\"body\"}");
+            assertEquals(200, response.statusCode());
+            assertEquals("7 body", response.body());
+        }
+    }
+
+    @Test
     void everyBinderGetsTheLocaleOfTheRequest() throws Exception {
         var response = get("/binding-plan/locale", "Accept-Language", "de-DE");
         assertEquals(200, response.statusCode());
@@ -263,6 +291,21 @@ public class RouteBindingPlanTest {
         @Post("/unmatched")
         String unmatched(String name) {
             return name;
+        }
+
+        @Get("/wins/{tenant}")
+        String wins(@QueryValue("tenant") String tenant, @Header("X-Tenant") String header) {
+            return tenant + " " + header;
+        }
+
+        @Get("/optional{/id}")
+        String optional(Optional<String> id) {
+            return id.orElse("none");
+        }
+
+        @Post("/body/{id}")
+        String body(String id, @Body Map<String, String> body) {
+            return id + " " + body.get("name");
         }
 
         @Get("/locale")
