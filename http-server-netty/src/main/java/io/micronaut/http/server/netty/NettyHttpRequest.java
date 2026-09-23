@@ -251,6 +251,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      * @since 5.3.0
      */
     @Internal
+    @SuppressWarnings("ReferenceEquality") // the same bytes
     public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
         HttpRequest<?> current = request;
         // the first server request: its bytes are the body of the request
@@ -847,7 +848,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         private Object body;
 
         /**
-         * @return The request this is the mutable view of
+         * The request this is the mutable view of.
+         *
+         * @return The request
          */
         NettyHttpRequest<T> request() {
             return NettyHttpRequest.this;

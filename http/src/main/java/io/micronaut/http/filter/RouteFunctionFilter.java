@@ -208,6 +208,7 @@ record RouteFunctionFilter(
      * @param result   The result of the filter
      * @return The context
      */
+    @SuppressWarnings("ReferenceEquality") // the same response instance
     private static FilterContext next(FilterContext context, MutableHttpResponse<?> response, @Nullable HttpResponse<?> result) {
         HttpResponse<?> next = result == null ? response : result.toMutableResponse();
         return next == context.response() ? context : context.withResponse(next);

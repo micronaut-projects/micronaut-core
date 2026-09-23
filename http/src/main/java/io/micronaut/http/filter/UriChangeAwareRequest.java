@@ -33,7 +33,9 @@ import java.net.URI;
 public interface UriChangeAwareRequest {
 
     /**
-     * @return Whether the URI of the view was set, which may still be the URI of the request
+     * Whether the URI of the view was set, which may still be the URI of the request.
+     *
+     * @return {@code true} if the URI was set
      */
     boolean isUriSet();
 }
