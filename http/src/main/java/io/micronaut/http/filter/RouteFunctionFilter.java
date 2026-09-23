@@ -53,6 +53,10 @@ import java.util.function.Supplier;
  * route with the new URI after a pre-matching filter. Like a filter method returning a request, a
  * request filter can also continue with another request, e.g. with another method or body.</p>
  *
+ * <p>Like a {@code @ResponseFilter} method, a response filter is given the response, mutable, and
+ * can change it in place or return another response, which replaces it for the response filters
+ * after it and the client.</p>
+ *
  * @param requestStep  The request filter
  * @param responseStep The response filter
  * @param executor     The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
@@ -155,22 +159,24 @@ record RouteFunctionFilter(
     /**
      * A synchronous response filter.
      *
-     * @param filter   The filter
+     * @param filter   Returns a response to continue with, or {@code null} to continue with the
+     *                 response it was given
      * @param executor The executor to run the filter on, or {@code null}
      * @return The filter
      */
     static RouteFunctionFilter response(RouteFilterFunctions.Response filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(null, (context, response) -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            filter.filter(context.request(), response, propagatedContext);
-            return ExecutionFlow.just(withChangedContext(context, propagatedContext).withResponse(response));
+            HttpResponse<?> result = filter.filter(context.request(), response, propagatedContext);
+            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), response, result));
         }, executor);
     }
 
     /**
      * An asynchronous response filter.
      *
-     * @param filter Completes when the response is filtered
+     * @param filter Completes with a response to continue with, or {@code null} to continue with
+     *               the response it was given
      * @return The filter
      */
     static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter) {
@@ -178,9 +184,25 @@ record RouteFunctionFilter(
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
             return CompletableFutureExecutionFlow.just(
                 filter.filter(context.request(), response, propagatedContext)
-                    .thenApply(ignored -> withChangedContext(context, propagatedContext).withResponse(response))
+                    .thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
             );
         }, null);
+    }
+
+    /**
+     * The context of the filter chain after a response filter, like after a {@code @ResponseFilter}
+     * method: a response it returns replaces the response for the response filters after it and the
+     * client; otherwise the response it was given continues, with what the filter changed in place.
+     * The replacement is {@link HttpResponse#toMutableResponse() mutable}, like the response of a
+     * route, so a filter method after it with a {@link MutableHttpResponse} parameter can change it.
+     *
+     * @param context  The context after the filter, with the propagated context it changed
+     * @param response The mutable response the filter was given
+     * @param result   The result of the filter
+     * @return The context
+     */
+    private static FilterContext next(FilterContext context, MutableHttpResponse<?> response, @Nullable HttpResponse<?> result) {
+        return context.withResponse(result == null ? response : result.toMutableResponse());
     }
 
     /**

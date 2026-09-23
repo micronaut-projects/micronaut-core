@@ -21,7 +21,9 @@ import java.util.Objects;
 
 /**
  * The filter methods of a {@link RouteFilterSpec} implemented with the variants that receive the
- * propagated context: a filter that does not change the context is one that ignores it.
+ * propagated context: a filter that does not change the context is one that ignores it. The
+ * response filters are implemented with the variants that can replace the response: a filter
+ * that does not replace it is one that returns {@code null}.
  *
  * @param <S> The type that declares the filters
  * @author Denis Stepanov
@@ -64,5 +66,48 @@ interface ContextFilterSpec<S extends RouteFilterSpec<S>> extends RouteFilterSpe
     default S afterAsync(AsyncRouteResponseFilter filter) {
         Objects.requireNonNull(filter, "filter");
         return afterAsync((AsyncContextRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+    }
+
+    @Override
+    default S after(ContextRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacing((ContextReplacingRouteResponseFilter) (request, response, propagatedContext) -> {
+            filter.filter(request, response, propagatedContext);
+            return null;
+        });
+    }
+
+    @Override
+    default S after(String executorName, ContextRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacing(executorName, (ContextReplacingRouteResponseFilter) (request, response, propagatedContext) -> {
+            filter.filter(request, response, propagatedContext);
+            return null;
+        });
+    }
+
+    @Override
+    default S afterAsync(AsyncContextRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacingAsync((AsyncContextReplacingRouteResponseFilter) (request, response, propagatedContext) ->
+            filter.filter(request, response, propagatedContext).thenApply(ignored -> null));
+    }
+
+    @Override
+    default S afterReplacing(ReplacingRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacing((ContextReplacingRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+    }
+
+    @Override
+    default S afterReplacing(String executorName, ReplacingRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacing(executorName, (ContextReplacingRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
+    }
+
+    @Override
+    default S afterReplacingAsync(AsyncReplacingRouteResponseFilter filter) {
+        Objects.requireNonNull(filter, "filter");
+        return afterReplacingAsync((AsyncContextReplacingRouteResponseFilter) (request, response, propagatedContext) -> filter.filter(request, response));
     }
 }

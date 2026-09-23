@@ -51,10 +51,10 @@ import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.builder.AsyncContextReplacingRouteResponseFilter;
 import io.micronaut.web.router.builder.AsyncContextRouteRequestFilter;
-import io.micronaut.web.router.builder.AsyncContextRouteResponseFilter;
+import io.micronaut.web.router.builder.ContextReplacingRouteResponseFilter;
 import io.micronaut.web.router.builder.ContextRouteRequestFilter;
-import io.micronaut.web.router.builder.ContextRouteResponseFilter;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
@@ -1069,7 +1069,7 @@ public final class RouteAssembly {
          * @param filter       The filter
          * @param executorName The name of the executor to run the filter on, or {@code null}
          */
-        public void after(ContextRouteResponseFilter filter, @Nullable String executorName) {
+        public void after(ContextReplacingRouteResponseFilter filter, @Nullable String executorName) {
             Objects.requireNonNull(filter, "filter");
             add(responseFilters, GenericHttpFilter.createRouteResponseFilter(filter::filter, executor(executorName)));
         }
@@ -1077,7 +1077,7 @@ public final class RouteAssembly {
         /**
          * @param filter The filter
          */
-        public void afterAsync(AsyncContextRouteResponseFilter filter) {
+        public void afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
             Objects.requireNonNull(filter, "filter");
             add(responseFilters, GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
         }
@@ -1755,19 +1755,19 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute after(ContextRouteResponseFilter filter) {
+        public HandlerUriRoute after(ContextReplacingRouteResponseFilter filter) {
             filters.after(filter, null);
             return this;
         }
 
         @Override
-        public HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter) {
+        public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
             filters.after(filter, Objects.requireNonNull(executorName, "executorName"));
             return this;
         }
 
         @Override
-        public HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter) {
+        public HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
             filters.afterAsync(filter);
             return this;
         }
