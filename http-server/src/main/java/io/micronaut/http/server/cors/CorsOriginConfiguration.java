@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -50,8 +51,7 @@ public class CorsOriginConfiguration {
     private List<String> allowedOrigins = ANY;
     @Nullable
     private String allowedOriginsRegex;
-    @Nullable
-    private volatile Pattern allowedOriginsPattern;
+    private final AtomicReference<Pattern> allowedOriginsPattern = new AtomicReference<>();
     private List<HttpMethod> allowedMethods = ANY_METHOD;
     private List<String> allowedHeaders = ANY;
     private List<String> exposedHeaders = Collections.emptyList();
@@ -94,7 +94,7 @@ public class CorsOriginConfiguration {
      */
     public void setAllowedOriginsRegex(String allowedOriginsRegex) {
         this.allowedOriginsRegex = allowedOriginsRegex;
-        this.allowedOriginsPattern = compileAllowedOriginsRegex(allowedOriginsRegex);
+        this.allowedOriginsPattern.set(compileAllowedOriginsRegex(allowedOriginsRegex));
     }
 
     /**
@@ -104,11 +104,11 @@ public class CorsOriginConfiguration {
      * @return The compiled regular expression
      */
     Pattern getAllowedOriginsPattern(String regex) {
-        Pattern pattern = allowedOriginsPattern;
+        Pattern pattern = allowedOriginsPattern.get();
         // A subclass can override getAllowedOriginsRegex, so check that the precompiled pattern is still the one asked for
         if (pattern == null || !pattern.pattern().equals(regex)) {
             pattern = Pattern.compile(regex);
-            allowedOriginsPattern = pattern;
+            allowedOriginsPattern.set(pattern);
         }
         return pattern;
     }

@@ -78,7 +78,7 @@ class CorsOriginConfigurationTest {
         CorsOriginConfiguration configuration = new CorsOriginConfiguration();
 
         assertDoesNotThrow(() -> configuration.setAllowedOriginsRegex("^https://(foo\\.com$"));
-        assertThrows(PatternSyntaxException.class,
-            () -> configuration.getAllowedOriginsPattern(configuration.getAllowedOriginsRegex().orElseThrow()));
+        String regex = configuration.getAllowedOriginsRegex().orElseThrow();
+        assertThrows(PatternSyntaxException.class, () -> configuration.getAllowedOriginsPattern(regex));
     }
 }

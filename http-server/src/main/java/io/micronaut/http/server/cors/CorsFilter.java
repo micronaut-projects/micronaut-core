@@ -413,13 +413,8 @@ public class CorsFilter implements Ordered, ConditionalFilter {
      * The route annotation metadata does not change for a route, so the configuration does not either.
      */
     private Optional<CorsOriginConfiguration> getCorsOriginConfiguration(RouteMatch<?> routeMatch) {
-        RouteInfo<?> routeInfo = routeMatch.getRouteInfo();
-        Optional<CorsOriginConfiguration> configuration = routeConfigurations.get(routeInfo);
-        if (configuration == null) {
-            configuration = CrossOriginUtil.getCorsOriginConfiguration(routeMatch.getAnnotationMetadata());
-            routeConfigurations.putIfAbsent(routeInfo, configuration);
-        }
-        return configuration;
+        return routeConfigurations.computeIfAbsent(routeMatch.getRouteInfo(),
+            routeInfo -> CrossOriginUtil.getCorsOriginConfiguration(routeMatch.getAnnotationMetadata()));
     }
 
     private static boolean matchesOrigin(CorsOriginConfiguration config, String requestOrigin) {
