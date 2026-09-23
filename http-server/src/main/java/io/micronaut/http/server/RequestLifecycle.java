@@ -19,6 +19,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
@@ -53,6 +54,7 @@ import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
@@ -67,6 +69,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -429,6 +432,25 @@ public class RequestLifecycle {
                             propagatedContext);
                     }
                     return executeRoute(request, propagatedContext, routeMatch);
+                }
+
+                @Override
+                protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
+                    try {
+                        doRouteMatch(request);
+                        return null;
+                    } catch (RuntimeException e) {
+                        CompletionStage<?> pending = RouteLocator.pendingLocation(e);
+                        if (pending == null) {
+                            throw e;
+                        }
+                        // an asynchronous locator locates its target: match again when it has
+                        PropagatedContext context = PropagatedContext.getOrEmpty();
+                        return CompletableFutureExecutionFlow.just(pending).flatMap(located -> context.propagate(() -> {
+                            ExecutionFlow<?> next = doRouteMatchAsync(request);
+                            return next == null ? ExecutionFlow.just(Boolean.TRUE) : next;
+                        }));
+                    }
                 }
 
                 @Override

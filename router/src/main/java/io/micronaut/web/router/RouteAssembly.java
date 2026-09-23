@@ -1180,6 +1180,10 @@ public final class RouteAssembly {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
+        private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
+        private final List<DefaultStatusRoute> statusRoutes = new ArrayList<>(0);
+        private final Supplier<ErrorRouteInfo<Object, Object>[]> errorRouteInfos = SupplierUtil.memoized(this::buildErrorRoutes);
+        private final Supplier<StatusRouteInfo<Object, Object>[]> statusRouteInfos = SupplierUtil.memoized(this::buildStatusRoutes);
         private @Nullable Integer port;
         private @Nullable Integer order;
         private boolean closed;
@@ -1189,6 +1193,108 @@ public final class RouteAssembly {
          */
         RouteGroup(@Nullable RouteGroup enclosing) {
             this.enclosing = enclosing;
+        }
+
+        /**
+         * Add an error route local to the routes of the group.
+         *
+         * @param error            The type of the exception
+         * @param executableHandle The target of the route
+         * @return The route
+         */
+        public DefaultErrorRoute addErrorRoute(Class<? extends Throwable> error, MethodExecutionHandle<Object, Object> executableHandle) {
+            checkOpen();
+            DefaultErrorRoute route = new DefaultErrorRoute(error, executableHandle, conversionService);
+            errorRoutes.add(route);
+            return route;
+        }
+
+        /**
+         * Add a status route local to the routes of the group.
+         *
+         * @param status           The status
+         * @param executableHandle The target of the route
+         * @return The route
+         */
+        public DefaultStatusRoute addStatusRoute(HttpStatus status, MethodExecutionHandle<Object, Object> executableHandle) {
+            checkOpen();
+            DefaultStatusRoute route = new DefaultStatusRoute(status, executableHandle, conversionService);
+            statusRoutes.add(route);
+            return route;
+        }
+
+        /**
+         * @return The enclosing group, or {@code null}
+         */
+        public @Nullable RouteGroup enclosing() {
+            return enclosing;
+        }
+
+        /**
+         * @return The error routes of this group only, built once
+         */
+        public ErrorRouteInfo<Object, Object>[] errorRouteInfos() {
+            return errorRouteInfos.get();
+        }
+
+        /**
+         * @return The status routes of this group only, built once
+         */
+        public StatusRouteInfo<Object, Object>[] statusRouteInfos() {
+            return statusRouteInfos.get();
+        }
+
+        /**
+         * @return Whether the group, or an enclosing group, has error or status routes
+         */
+        boolean hasErrorOrStatusRoutes() {
+            RouteGroup group = this;
+            while (group != null) {
+                if (!group.errorRoutes.isEmpty() || !group.statusRoutes.isEmpty()) {
+                    return true;
+                }
+                group = group.enclosing;
+            }
+            return false;
+        }
+
+        /**
+         * Build the error and status routes of the group and of the enclosing groups, which
+         * rejects duplicates, when the first route of the group is built.
+         */
+        void buildErrorAndStatusRoutes() {
+            RouteGroup group = this;
+            while (group != null) {
+                group.errorRouteInfos();
+                group.statusRouteInfos();
+                group = group.enclosing;
+            }
+        }
+
+        @SuppressWarnings("unchecked")
+        private ErrorRouteInfo<Object, Object>[] buildErrorRoutes() {
+            List<ErrorRouteInfo<Object, Object>> infos = new ArrayList<>(errorRoutes.size());
+            for (DefaultErrorRoute route : errorRoutes) {
+                ErrorRouteInfo<Object, Object> info = route.toRouteInfo();
+                if (infos.stream().anyMatch(other -> other.exceptionType() == info.exceptionType() && other.getProduces().equals(info.getProduces()))) {
+                    throw new RoutingException("Attempted to register multiple error routes for error [" + route.exceptionType().getSimpleName() + "] in a route group: " + route);
+                }
+                infos.add(info);
+            }
+            return infos.toArray(ErrorRouteInfo[]::new);
+        }
+
+        @SuppressWarnings("unchecked")
+        private StatusRouteInfo<Object, Object>[] buildStatusRoutes() {
+            List<StatusRouteInfo<Object, Object>> infos = new ArrayList<>(statusRoutes.size());
+            for (DefaultStatusRoute route : statusRoutes) {
+                StatusRouteInfo<Object, Object> info = route.toRouteInfo();
+                if (infos.stream().anyMatch(other -> other.statusCode() == info.statusCode() && other.getProduces().equals(info.getProduces()))) {
+                    throw new RoutingException("Attempted to register multiple status routes for http status [" + route.statusCode() + "] in a route group: " + route);
+                }
+                infos.add(info);
+            }
+            return infos.toArray(StatusRouteInfo[]::new);
         }
 
         /**
@@ -1462,6 +1568,12 @@ public final class RouteAssembly {
             routeInfo.routeFilters = routeFilters();
             routeInfo.order = effectiveOrder(order, group);
             routeInfo.attributes = attributes();
+            RouteGroup routeGroup = group;
+            if (routeGroup != null && routeGroup.hasErrorOrStatusRoutes()) {
+                // built now: a duplicate fails when the router is built
+                routeGroup.buildErrorAndStatusRoutes();
+                routeInfo.errorScope = routeGroup;
+            }
             return routeInfo;
         }
 

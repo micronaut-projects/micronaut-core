@@ -30,9 +30,11 @@ import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
+import io.micronaut.web.router.builder.AsyncLocatorHandler;
 import io.micronaut.web.router.builder.DefaultPathVariables;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.LocatorHandler;
+import io.micronaut.web.router.builder.PathVariables;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -41,6 +43,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
 /**
@@ -68,7 +73,13 @@ public final class RouteLocator {
      */
     private static final String TEMPLATE_SUFFIX = "/{+" + REMAINDER + "}";
 
-    private final LocatorHandler locator;
+    /**
+     * The request attribute of the targets that asynchronous locators located for the request.
+     */
+    private static final String LOCATED_ATTRIBUTE = "micronaut.router.located";
+
+    private final @Nullable LocatorHandler locator;
+    private final @Nullable AsyncLocatorHandler asyncLocator;
     private final Function<Object, RouteTable> tables;
 
     /**
@@ -77,7 +88,31 @@ public final class RouteLocator {
      */
     public RouteLocator(LocatorHandler locator, Function<Object, RouteTable> tables) {
         this.locator = Objects.requireNonNull(locator, "locator");
+        this.asyncLocator = null;
         this.tables = Objects.requireNonNull(tables, "tables");
+    }
+
+    /**
+     * @param locator Locates the target later
+     * @param tables  The route table of a target
+     * @since 5.3.0
+     */
+    public RouteLocator(AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+        this.locator = null;
+        this.asyncLocator = Objects.requireNonNull(locator, "locator");
+        this.tables = Objects.requireNonNull(tables, "tables");
+    }
+
+    /**
+     * The stage that an asynchronous locator is waiting for, when the router could not match a
+     * request because of it: match the request again when the stage completes.
+     *
+     * @param error An error of the router
+     * @return The stage, completed with a non-null value when the target is located, or
+     * {@code null} if the error is not an asynchronous locator that waits
+     */
+    public static @Nullable CompletionStage<?> pendingLocation(Throwable error) {
+        return error instanceof PendingLocation pending ? pending.stage : null;
     }
 
     /**
@@ -182,12 +217,23 @@ public final class RouteLocator {
         if (request instanceof LocatedRequest<?> located) {
             filters.addAll(located.filters);
         }
+        // the groups with error routes of this locator route, then of the locator routes that located it
+        List<RouteAssembly.RouteGroup> errorScopes = new ArrayList<>(1);
         if (locatorMatch.getRouteInfo() instanceof DefaultUrlRouteInfo<?, ?> locatorRoute) {
             filters.addAll(locatorRoute.routeFilters);
+            RouteAssembly.RouteGroup errorScope = locatorRoute.errorScope;
+            if (errorScope != null) {
+                errorScopes.add(errorScope);
+            }
+        }
+        if (request instanceof LocatedRequest<?> located) {
+            errorScopes.addAll(located.errorScopes);
         }
         Object target;
+        DefaultPathVariables pathVariables = new DefaultPathVariables(decoded, locatorMatch.conversionService, owner);
         try {
-            target = locator.locate(original, new DefaultPathVariables(decoded, locatorMatch.conversionService, owner));
+            LocatorHandler syncLocator = locator;
+            target = syncLocator != null ? syncLocator.locate(original, pathVariables) : locateAsync(original, request.getPath(), pathVariables);
         } catch (Exception e) {
             // like a controller method: the error routes see the exception the locator threw
             return ExceptionUtils.sneakyThrow(e);
@@ -199,12 +245,95 @@ public final class RouteLocator {
         if (!(table instanceof DefaultRouteTable defaultTable)) {
             throw new IllegalStateException("No route table for the located target: " + target);
         }
-        return new Located(defaultTable.router(null), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables, List.copyOf(filters)), target);
+        return new Located(defaultTable.router(null), new LocatedRequest<>(original, remainder, target, rawValues, decoded, variables,
+            List.copyOf(filters), List.copyOf(errorScopes)), target);
+    }
+
+    /**
+     * The target of the asynchronous locator, located once per request and level: the outcome
+     * of the stage is kept in an attribute of the request. If the stage does not complete now,
+     * the router cannot match the request yet, see {@link #pendingLocation(Throwable)}.
+     *
+     * @param original      The original request
+     * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
+     * @param pathVariables The path variables of the locator
+     * @return The target, or {@code null}
+     * @throws Exception The error of the locator
+     */
+    private @Nullable Object locateAsync(HttpRequest<?> original, String levelPath, PathVariables pathVariables) throws Exception {
+        Map<LocationKey, Outcome> outcomes = outcomes(original);
+        LocationKey key = new LocationKey(this, levelPath);
+        Outcome outcome = outcomes.get(key);
+        if (outcome == null) {
+            CompletionStage<?> stage = Objects.requireNonNull(asyncLocator, "asyncLocator").locate(original, pathVariables);
+            if (stage == null) {
+                throw new NullPointerException("The locator returned no stage: " + this);
+            }
+            CompletionStage<Boolean> located = stage.handle((value, error) -> {
+                outcomes.put(key, new Outcome(value, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error, null));
+                return Boolean.TRUE;
+            });
+            // unless the stage completed already: the locator is not called again until it does
+            outcomes.putIfAbsent(key, new Outcome(null, null, located));
+            outcome = Objects.requireNonNull(outcomes.get(key));
+        }
+        CompletionStage<Boolean> pending = outcome.pending();
+        if (pending != null) {
+            // not located yet: the router matches the request again when it is
+            throw new PendingLocation(pending);
+        }
+        Throwable error = outcome.error();
+        if (error != null) {
+            return ExceptionUtils.sneakyThrow(error);
+        }
+        return outcome.target();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<LocationKey, Outcome> outcomes(HttpRequest<?> request) {
+        Object attribute = request.getAttribute(LOCATED_ATTRIBUTE).orElse(null);
+        if (attribute instanceof Map<?, ?> map) {
+            return (Map<LocationKey, Outcome>) map;
+        }
+        Map<LocationKey, Outcome> outcomes = new ConcurrentHashMap<>(2);
+        request.setAttribute(LOCATED_ATTRIBUTE, outcomes);
+        return outcomes;
     }
 
     @Override
     public String toString() {
-        return "RouteLocator[" + locator + ']';
+        return "RouteLocator[" + (locator != null ? locator : asyncLocator) + ']';
+    }
+
+    /**
+     * An asynchronous locator of a level of the located path.
+     *
+     * @param locator   The locator
+     * @param levelPath The path the locator route matched
+     */
+    private record LocationKey(RouteLocator locator, String levelPath) {
+    }
+
+    /**
+     * The outcome of an asynchronous locator.
+     *
+     * @param target  The target, or {@code null}
+     * @param error   The error, or {@code null}
+     * @param pending The stage that completes when the target is located, or {@code null} if it is
+     */
+    private record Outcome(@Nullable Object target, @Nullable Throwable error, @Nullable CompletionStage<Boolean> pending) {
+    }
+
+    /**
+     * The router could not match the request: an asynchronous locator waits for its stage.
+     */
+    private static final class PendingLocation extends RuntimeException {
+        private final transient CompletionStage<?> stage;
+
+        PendingLocation(CompletionStage<?> stage) {
+            super("The route locator has not located its target yet", null, false, false);
+            this.stage = stage;
+        }
     }
 
     /**
@@ -239,7 +368,7 @@ public final class RouteLocator {
             values.putAll(inner.getVariableValues());
             List<UriMatchVariable> variables = new ArrayList<>(request.variables);
             variables.addAll(inner.getVariables());
-            LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters);
+            LocatedUriMatchInfo info = new LocatedUriMatchInfo(request.original.getPath(), values, variables, target, request.filters, request.errorScopes);
             // the media type a route selector of the target's table negotiated is kept
             return innerMatch.withMatchInfo(info);
         }
@@ -272,11 +401,13 @@ public final class RouteLocator {
         private final Map<String, Object> decodedValues;
         private final List<UriMatchVariable> variables;
         private final List<GenericHttpFilter> filters;
+        private final List<RouteAssembly.RouteGroup> errorScopes;
         private @Nullable URI uri;
 
         @SuppressWarnings("ParameterNumber")
         LocatedRequest(HttpRequest<B> original, String path, Object target, Map<String, Object> rawValues,
-                       Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters) {
+                       Map<String, Object> decodedValues, List<UriMatchVariable> variables, List<GenericHttpFilter> filters,
+                       List<RouteAssembly.RouteGroup> errorScopes) {
             super(original);
             this.original = original;
             this.path = path;
@@ -285,6 +416,7 @@ public final class RouteLocator {
             this.decodedValues = decodedValues;
             this.variables = variables;
             this.filters = filters;
+            this.errorScopes = errorScopes;
         }
 
         @Override
@@ -315,14 +447,16 @@ public final class RouteLocator {
         private final Map<String, UriMatchVariable> variableMap;
         private final Object target;
         private final List<GenericHttpFilter> filters;
+        private final List<RouteAssembly.RouteGroup> errorScopes;
 
         LocatedUriMatchInfo(String uri, Map<String, Object> values, List<UriMatchVariable> variables, Object target,
-                            List<GenericHttpFilter> filters) {
+                            List<GenericHttpFilter> filters, List<RouteAssembly.RouteGroup> errorScopes) {
             this.uri = uri;
             this.values = values;
             this.variables = variables;
             this.target = target;
             this.filters = filters;
+            this.errorScopes = errorScopes;
             this.variableMap = LinkedHashMap.newLinkedHashMap(variables.size());
             for (UriMatchVariable variable : variables) {
                 variableMap.put(variable.getName(), variable);
@@ -342,6 +476,14 @@ public final class RouteLocator {
          */
         List<GenericHttpFilter> filters() {
             return filters;
+        }
+
+        /**
+         * @return The groups with error or status routes of the locator routes that located the
+         * route, the closest locator first
+         */
+        List<RouteAssembly.RouteGroup> errorScopes() {
+            return errorScopes;
         }
 
         @Override

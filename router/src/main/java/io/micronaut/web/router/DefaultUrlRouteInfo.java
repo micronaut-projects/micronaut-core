@@ -75,6 +75,11 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * The attributes of the route. Set when the route is built, before the route info is published.
      */
     Map<String, Object> attributes = Map.of();
+    /**
+     * The innermost group of the route that has error or status routes, in it or around it, or
+     * {@code null}. Set when the route is built, before the route info is published.
+     */
+    RouteAssembly.@Nullable RouteGroup errorScope;
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     /**
