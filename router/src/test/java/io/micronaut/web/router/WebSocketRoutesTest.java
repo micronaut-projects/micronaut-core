@@ -16,6 +16,7 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
@@ -154,8 +155,14 @@ class WebSocketRoutesTest {
         AnnotationMetadata produces = new DefaultAnnotationMetadata(
             Map.of(Produces.class.getName(), Map.of("value", new String[]{"text/plain"})), Map.of(), Map.of(),
             Map.of(Produces.class.getName(), Map.of("value", new String[]{"text/plain"})), Map.of(), false);
+        AnnotationMetadataProvider annotated = new AnnotationMetadataProvider() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return produces;
+            }
+        };
         Router router = router(routes -> routes.webSocket("/annotated", ws -> ws.onOpen((session, request) -> null))
-            .annotationMetadata(produces));
+            .annotationMetadata(annotated));
         UriRouteInfo<?, ?> route = route(router, HttpRequest.GET("/annotated"));
         assertTrue(route.isWebSocketRoute());
         assertTrue(route.getAnnotationMetadata().hasAnnotation(Produces.class));

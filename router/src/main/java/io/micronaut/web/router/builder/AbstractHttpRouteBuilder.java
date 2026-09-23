@@ -15,15 +15,13 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
-import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
@@ -37,7 +35,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
-import java.util.function.Predicate;
 
 /**
  * Adds the routes to handler functions to a {@link RouteAssembly}: the routes of the builder of
@@ -49,7 +46,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Internal
-abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup {
+abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permits DefaultHttpRouteBuilder, DefaultHttpRouteGroup, DefaultLocatedHttpRouteBuilder {
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
@@ -67,6 +64,10 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * The prefix of the URI templates of the routes, or {@code null}.
      */
     private final @Nullable RoutePrefix prefix;
+    /**
+     * Whether the routes of the builder were read: see {@link DefaultHttpRouteBuilder#close()}.
+     */
+    private boolean closed;
 
     /**
      * @param assembly     The assembly the routes are added to
@@ -86,23 +87,23 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(handler), null));
+        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(HttpMethod method, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
         // the body argument is annotated @Body
-        return new Routes(route(method, uri, HandlerMethod.of(bodyType, handler), null));
+        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(handler), null));
+        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return new Routes(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return DefaultHttpRouteSpec.of(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -117,22 +118,22 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
-        return new Routes(declare(route, HandlerMethod.of(handler), null));
+        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(RouteDeclaration route, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return new Routes(declare(route, HandlerMethod.of(bodyType, handler), null));
+        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(bodyType, handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
-        return new Routes(declare(route, HandlerMethod.of(handler), null));
+        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), null));
     }
 
     @Override
     public final HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return new Routes(declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return DefaultHttpRouteSpec.of(declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -147,32 +148,34 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
+        Objects.requireNonNull(status, "status");
         return statusRoute(status, HandlerMethod.of(handler));
     }
 
     @Override
     public final HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)));
+        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)));
     }
 
     @Override
     public final <B> HttpRouteSpec handle(String httpMethodName, String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
+        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(bodyType, handler)));
     }
 
     @Override
     public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)));
+        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)));
     }
 
     @Override
     public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        return new Routes(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+        return DefaultHttpRouteSpec.of(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -184,16 +187,16 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         HandlerUriRoute route = grouped(assembly.addRoute(HttpMethod.GET.name(), HttpMethod.GET, template, DEFAULT_CONSUMES,
             handle(HandlerMethod.webSocket(webSocket, WebSocketRouteEndpoint.ROUTE_METADATA))));
         route.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
-        return new Routes(route);
+        return DefaultHttpRouteSpec.of(route);
     }
 
     @Override
-    public final void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
     @Override
-    public final void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables) {
+    public final <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables) {
         locate(prefixUri, new RouteLocator(locator, tables));
     }
 
@@ -243,7 +246,18 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
     }
 
+    /**
+     * Close the builder: its routes were read. A later declaration would be dropped, so it fails.
+     */
+    final void closeBuilder() {
+        closed = true;
+    }
+
     private void checkOpen() {
+        if (closed) {
+            throw new IllegalStateException("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
+                + "or inside the callback that builds the route table, not after it returned");
+        }
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null && filters.isClosed()) {
             throw new IllegalStateException("The route group is closed: declare the routes of a group in its lambda");
@@ -287,13 +301,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         RouteAssembly.DefaultErrorRoute route = settings == null
             ? assembly.addErrorRoute(null, type, handle(handler))
             : settings.addErrorRoute(type, handle(handler));
-        return new ErrorRouteSpec() {
-            @Override
-            public ErrorRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
-                return this;
-            }
-        };
+        return new DefaultErrorRouteSpec(route, handler);
     }
 
     private StatusRouteSpec statusRoute(HttpStatus status, HandlerMethod<?> handler) {
@@ -303,17 +311,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         RouteAssembly.DefaultStatusRoute route = settings == null
             ? assembly.addStatusRoute(null, status, handle(handler))
             : settings.addStatusRoute(status, handle(handler));
-        return new StatusRouteSpec() {
-            @Override
-            public StatusRouteSpec produces(MediaType... mediaTypes) {
-                route.produces(mediaTypes);
-                return this;
-            }
-        };
+        return new DefaultStatusRouteSpec(route, handler);
     }
 
     private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
-        Objects.requireNonNull(httpMethodName, "httpMethodName");
+        RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
@@ -321,6 +323,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+        standardMethod(method);
         RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler));
         return grouped(consumes == null ? route : route.consumes(consumes));
     }
@@ -331,164 +334,43 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     private static HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+        Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
+        }
+        for (HttpMethod method : methods) {
+            // before any route is added
+            standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
         }
         List<HandlerUriRoute> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
-        return new Routes(routes.toArray(new HandlerUriRoute[0]));
+        return new DefaultHttpRouteSpec(List.copyOf(routes));
     }
 
     /**
-     * The routes of a handler: one, or one per HTTP method, configured together.
+     * @param method The HTTP method of a route
+     * @throws NullPointerException     if it is {@code null}
+     * @throws IllegalArgumentException if it is {@link HttpMethod#CUSTOM}, which has no name
      */
-    private static final class Routes implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+    private static void standardMethod(HttpMethod method) {
+        Objects.requireNonNull(method, "method");
+        RouteArguments.standardMethod(method, "handle(\"PROPFIND\", uri, handler)");
+    }
 
-        private final HandlerUriRoute[] routes;
-
-        Routes(HandlerUriRoute... routes) {
-            this.routes = routes;
+    /**
+     * The media types given to a route: a copy, without {@code null}.
+     *
+     * @param mediaTypes The media types
+     * @return A copy
+     */
+    static MediaType[] mediaTypes(MediaType[] mediaTypes) {
+        Objects.requireNonNull(mediaTypes, "mediaTypes");
+        MediaType[] copy = mediaTypes.clone();
+        for (MediaType mediaType : copy) {
+            Objects.requireNonNull(mediaType, "mediaTypes must not contain null");
         }
-
-        @Override
-        public HttpRouteSpec consumes(MediaType... mediaTypes) {
-            for (HandlerUriRoute route : routes) {
-                route.consumes(mediaTypes);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec consumesAll() {
-            for (HandlerUriRoute route : routes) {
-                route.consumesAll();
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec produces(MediaType... mediaTypes) {
-            for (HandlerUriRoute route : routes) {
-                route.produces(mediaTypes);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata) {
-            for (HandlerUriRoute route : routes) {
-                route.annotationMetadata(annotationMetadata);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec implementing(ExecutableMethod<?, ?> method) {
-            for (HandlerUriRoute route : routes) {
-                route.implementing(method);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec executeOn(String executorName) {
-            for (HandlerUriRoute route : routes) {
-                route.executeOn(executorName);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec nonBlocking() {
-            for (HandlerUriRoute route : routes) {
-                route.nonBlocking();
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec port(int port) {
-            for (HandlerUriRoute route : routes) {
-                route.port(port);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec attribute(String name, Object value) {
-            Objects.requireNonNull(name, "name");
-            Objects.requireNonNull(value, "value");
-            for (HandlerUriRoute route : routes) {
-                route.attribute(name, value);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec order(int order) {
-            for (HandlerUriRoute route : routes) {
-                route.order(order);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec where(Predicate<HttpRequest<?>> condition) {
-            Objects.requireNonNull(condition, "condition");
-            for (HandlerUriRoute route : routes) {
-                route.where(condition);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec before(ContextRouteRequestFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.before(filter);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec before(String executorName, ContextRouteRequestFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.before(executorName, filter);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec beforeAsync(AsyncContextRouteRequestFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.beforeAsync(filter);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec afterReplacing(ContextReplacingRouteResponseFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.after(filter);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.after(executorName, filter);
-            }
-            return this;
-        }
-
-        @Override
-        public HttpRouteSpec afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
-            for (HandlerUriRoute route : routes) {
-                route.afterAsync(filter);
-            }
-            return this;
-        }
+        return copy;
     }
 }

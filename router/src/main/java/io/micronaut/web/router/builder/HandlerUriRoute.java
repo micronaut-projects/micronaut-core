@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,11 +15,11 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.web.router.RouteAssembly;
 
 import java.util.function.Predicate;
@@ -62,18 +62,18 @@ public interface HandlerUriRoute {
     HandlerUriRoute executeOn(String executorName);
 
     /**
-     * @param annotationMetadata The annotations of the route
+     * @param annotationMetadata The annotated element whose annotations the route has
      * @return The route
-     * @see HttpRouteSpec#annotationMetadata(AnnotationMetadata)
+     * @see HttpRouteSpec#annotationMetadata(AnnotationMetadataProvider)
      */
-    HandlerUriRoute annotationMetadata(AnnotationMetadata annotationMetadata);
+    HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
-     * @param method The bean method
+     * @param responseType The type of the body of the response
      * @return The route
-     * @see HttpRouteSpec#implementing(ExecutableMethod)
+     * @see HttpRouteSpec#responseType(Argument)
      */
-    HandlerUriRoute implementing(ExecutableMethod<?, ?> method);
+    HandlerUriRoute responseType(Argument<?> responseType);
 
     /**
      * @return The route

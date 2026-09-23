@@ -36,7 +36,9 @@ public interface StreamedNettyRequestArgumentBinder<T> extends RequestArgumentBi
 
     @Override
     default BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nettyHttpRequest) {
+        // e.g. the mutable view of the request that a filter changed the URI of in place
+        NettyHttpRequest<?> nettyHttpRequest = source instanceof NettyHttpRequest<?> nhr ? nhr : NettyHttpRequest.findBodyRequest(source);
+        if (nettyHttpRequest != null) {
             io.netty.handler.codec.http.HttpRequest nativeRequest = nettyHttpRequest.getNativeRequest();
             if (nativeRequest instanceof StreamedHttpRequest streamedHttpRequest) {
                 return bindForStreamedNettyRequest(context, streamedHttpRequest, nettyHttpRequest);

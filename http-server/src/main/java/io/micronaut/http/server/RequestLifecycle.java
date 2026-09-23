@@ -254,12 +254,15 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         try {
+            // the route that answered, whose own filters filter the response: an error route
+            // replaces the route match of the request
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
             return onErrorNoFilter(request, throwable, propagatedContext)
                 .flatMap(response -> {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
                     return handleStatusException(request, response, routeInfo, propagatedContext);
                 })
-                .flatMap(response -> runResponseFilters(request, response, propagatedContext))
+                .flatMap(response -> runResponseFilters(request, routeMatch, response, propagatedContext))
                 .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
         } catch (Throwable e) {
             return createDefaultErrorResponseFlow(request, e, propagatedContext);
@@ -427,11 +430,13 @@ public class RequestLifecycle {
     }
 
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                              @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
         FilterRunner filterRunner = new FilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
-            routeExecutor.router.findFilters(request),
+            // the filters of the route too, like the filters that ran for the request
+            routeExecutor.router.findFilters(request, routeMatch),
             (httpRequest, context) -> {
                 throw new IllegalStateException("Should not be called");
             }) {

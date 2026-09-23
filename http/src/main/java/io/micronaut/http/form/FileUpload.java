@@ -35,10 +35,12 @@ import java.util.concurrent.CompletionStage;
  * <p>The content can be consumed once: {@link #bytes(int)}, {@link #transferTo(Path)},
  * {@link #transferTo(OutputStream)}, {@link #readAllBytes()}, {@link #readString()} and
  * {@link #takeBody()} are mutually exclusive, whatever the storage. A second consumption, or a
- * consumption after {@link #close()}, fails synchronously with an {@link IllegalStateException},
- * and so does a consumption with invalid arguments. A consumption that fails once it has started
- * still consumes the upload, as the content cannot be replayed. The metadata stays readable after
- * the content was consumed or the upload closed.</p>
+ * consumption after {@link #close()}, fails synchronously with an {@link IllegalStateException}.
+ * A consumption with invalid arguments fails synchronously too, without consuming the upload:
+ * with an {@link IllegalArgumentException} for a negative limit, and a
+ * {@link NullPointerException} for a missing destination or stream. A consumption that fails
+ * once it has started still consumes the upload, as the content cannot be replayed. The metadata
+ * stays readable after the content was consumed or the upload closed.</p>
  *
  * <h2>Ownership and closing</h2>
  * <p>An upload is owned by the scope that handed it out: the request for a {@link FormData}, the
@@ -128,6 +130,7 @@ public interface FileUpload extends AutoCloseable {
      * @return Completes when the file was written, or exceptionally, e.g. with a
      * {@link java.nio.file.FileAlreadyExistsException} if the destination exists
      * @throws IllegalStateException if the content was already consumed, or the upload closed
+     * @throws NullPointerException  if the destination is {@code null}
      */
     CompletionStage<Void> transferTo(Path destination);
 
@@ -147,6 +150,7 @@ public interface FileUpload extends AutoCloseable {
      * with a {@link io.micronaut.http.exceptions.ContentLengthExceededException} when the content
      * is larger than the limit of the server for a file
      * @throws IllegalStateException if the content was already consumed, or the upload closed
+     * @throws NullPointerException  if the stream is {@code null}
      */
     CompletionStage<Void> transferTo(OutputStream out);
 
@@ -155,11 +159,13 @@ public interface FileUpload extends AutoCloseable {
      * a {@link FormData}, which are stored in memory or on disk before the handler runs, for a
      * handler that runs on an executor. The content is consumed, like with {@link #bytes(int)}.
      * It is not available for an upload that is still arriving, e.g. the file of a
-     * {@link FormPart}: read it with {@link #bytes(int)}.
+     * {@link FormPart}: read it with {@link #bytes(int)}. Content stored on disk is not read on an
+     * I/O thread of the server, which must not block: read it with {@link #bytes(int)} there.
      *
      * @return The content
-     * @throws IllegalStateException if the upload is still arriving, the content was already
-     * consumed, or the upload closed
+     * @throws IllegalStateException if the upload is still arriving, the content is stored on disk
+     * and this is an I/O thread of the server (the content is not consumed then), the content was
+     * already consumed, or the upload closed
      * @throws java.io.UncheckedIOException if reading the stored content fails
      */
     byte[] readAllBytes();
@@ -169,8 +175,9 @@ public interface FileUpload extends AutoCloseable {
      * of the request, blocking, like {@link #readAllBytes()}.
      *
      * @return The content
-     * @throws IllegalStateException if the upload is still arriving, the content was already
-     * consumed, or the upload closed
+     * @throws IllegalStateException if the upload is still arriving, the content is stored on disk
+     * and this is an I/O thread of the server, the content was already consumed, or the upload
+     * closed
      * @throws java.io.UncheckedIOException if reading the stored content fails
      */
     String readString();

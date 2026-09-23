@@ -96,6 +96,19 @@ final class DefaultFormData implements FormData {
     }
 
     @Override
+    public <T> Optional<T> find(String name, Argument<T> type) {
+        List<String> values = fields.get(name);
+        if (values == null || values.isEmpty()) {
+            return Optional.empty();
+        }
+        Class<T> rawType = type.getType();
+        // a collection or an array gets every value of the field
+        boolean all = Iterable.class.isAssignableFrom(rawType) || rawType.isArray();
+        Argument<T> named = name.equals(type.getName()) ? type : Argument.of(rawType, name, type.getAnnotationMetadata(), type.getTypeParameters());
+        return Optional.of(convert(named, all ? List.copyOf(values) : values.get(0)));
+    }
+
+    @Override
     public List<FileUpload> getFiles(String name) {
         return files.getOrDefault(name, List.of());
     }
@@ -161,8 +174,8 @@ final class DefaultFormData implements FormData {
         return result.minimalCompletionStage();
     }
 
-    private <T> T convert(Argument<T> argument, String value) {
-        if (argument.getType().isInstance(value)) {
+    private <T> T convert(Argument<T> argument, Object value) {
+        if (argument.getTypeParameters().length == 0 && argument.getType().isInstance(value)) {
             return argument.getType().cast(value);
         }
         ConversionContext context = ConversionContext.of(argument);

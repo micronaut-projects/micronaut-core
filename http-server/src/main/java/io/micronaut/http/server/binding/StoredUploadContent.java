@@ -20,6 +20,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.InputStreamByteBody;
 import io.micronaut.http.multipart.CompletedFileUpload;
 import org.jspecify.annotations.Nullable;
+import reactor.core.scheduler.Schedulers;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -123,12 +124,29 @@ final class StoredUploadContent extends UploadContent {
     }
 
     @Override
-    byte[] readComplete() throws IOException {
-        try {
-            return upload.getBytes();
-        } finally {
-            upload.close();
+    void checkBlockingRead() {
+        if (!upload.isInMemory() && Schedulers.isInNonBlockingThread()) {
+            throw new IllegalStateException("The " + describe() + " is stored on disk, and reading it would block this I/O thread"
+                + ": read it with bytes(int) or transferTo(...), or on an executor, e.g. with @ExecuteOn(TaskExecutors.BLOCKING)");
         }
+    }
+
+    @Override
+    byte[] readComplete() throws IOException {
+        byte[] bytes;
+        try {
+            bytes = upload.getBytes();
+        } catch (IOException | RuntimeException e) {
+            // the upload is consumed: release it, without hiding why the read failed
+            try {
+                upload.close();
+            } catch (IOException | RuntimeException closeError) {
+                e.addSuppressed(closeError);
+            }
+            throw e;
+        }
+        upload.close();
+        return bytes;
     }
 
     @Override
@@ -163,9 +181,36 @@ final class StoredUploadContent extends UploadContent {
                 }
             });
         } catch (RejectedExecutionException e) {
-            released.completeExceptionally(e);
+            return closeRejected();
         }
         return released;
+    }
+
+    /**
+     * Close the upload when the I/O executor rejected the work: on this thread if it may block,
+     * otherwise on a new thread, so that the temporary file is still deleted.
+     *
+     * @return Completes when the upload was closed
+     */
+    private CompletableFuture<Void> closeRejected() {
+        if (upload.isInMemory() || !Schedulers.isInNonBlockingThread()) {
+            try {
+                upload.close();
+                return CompletableFuture.completedFuture(null);
+            } catch (Throwable e) {
+                return CompletableFuture.failedFuture(e);
+            }
+        }
+        CompletableFuture<Void> closed = new CompletableFuture<>();
+        Thread.ofVirtual().name("upload-cleanup").start(() -> {
+            try {
+                upload.close();
+                closed.complete(null);
+            } catch (Throwable e) {
+                closed.completeExceptionally(e);
+            }
+        });
+        return closed;
     }
 
     private void closeUpload() {
@@ -202,7 +247,8 @@ final class StoredUploadContent extends UploadContent {
             try {
                 context.ioExecutor().execute(this::runTask);
             } catch (RejectedExecutionException e) {
-                finish(null, e);
+                // nothing ran, and the caller may be an I/O thread, which cannot delete the file
+                closeRejected().whenComplete((ignored, closeError) -> settle(null, e, closeError));
             }
         }
 
