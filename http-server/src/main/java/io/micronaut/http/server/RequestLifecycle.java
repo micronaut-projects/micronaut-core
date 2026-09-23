@@ -240,6 +240,32 @@ public class RequestLifecycle {
         }
     }
 
+    /**
+     * Handle an error thrown while the body of the response was written, before anything was
+     * sent. This runs the exception handlers and the error and status routes like
+     * {@link #onError(HttpRequest, Throwable)}. The request filters already ran and do not run
+     * again, but the response filters run on the response that replaces the failed one.
+     *
+     * @param request   The request
+     * @param throwable The error
+     * @return The response for the error
+     * @since 5.3.0
+     */
+    protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
+        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
+        try {
+            return onErrorNoFilter(request, throwable, propagatedContext)
+                .flatMap(response -> {
+                    RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
+                    return handleStatusException(request, response, routeInfo, propagatedContext);
+                })
+                .flatMap(response -> runResponseFilters(request, response, propagatedContext))
+                .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
+        } catch (Throwable e) {
+            return createDefaultErrorResponseFlow(request, e, propagatedContext);
+        }
+    }
+
     private ExecutionFlow<HttpResponse<?>> onErrorNoFilter(HttpRequest<?> request, Throwable t, PropagatedContext propagatedContext) {
 
         if ((t instanceof CompletionException || t instanceof ExecutionException) && t.getCause() != null) {
@@ -368,6 +394,30 @@ public class RequestLifecycle {
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                              HttpResponse<?> response,
+                                                              PropagatedContext propagatedContext) {
+        FilterRunner filterRunner = new FilterRunner(
+            routeExecutor.router.findPreMatchingFilters(request),
+            routeExecutor.router.findFilters(request),
+            (httpRequest, context) -> {
+                throw new IllegalStateException("Should not be called");
+            }) {
+            @Override
+            protected ExecutionFlow<HttpResponse<?>> processResponse(HttpRequest<?> request, HttpResponse<?> response, PropagatedContext propagatedContext) {
+                RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
+                return handleStatusException(request, response, routeInfo, propagatedContext)
+                    .onErrorResume(throwable -> onErrorNoFilter(request, throwable, propagatedContext));
+            }
+
+            @Override
+            protected ExecutionFlow<HttpResponse<?>> processFailure(HttpRequest<?> request, Throwable failure, PropagatedContext propagatedContext) {
+                return onErrorNoFilter(request, failure, propagatedContext);
+            }
+        };
+        return filterRunner.runResponseFilters(request, response, propagatedContext);
     }
 
     private ExecutionFlow<HttpResponse<?>> runServerFilters(HttpRequest<?> request) {

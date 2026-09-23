@@ -144,7 +144,11 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         return mediaType != null && mediaType.matchesAllOrWildcardOrExtension(MediaType.EXTENSION_JSON);
     }
 
-    private static CodecException decorateWrite(Object object, IOException e) {
+    /**
+     * A failure of the mapper while writing is an encoding failure, whether it is an
+     * {@link IOException} or unchecked, like the exceptions of Jackson 3.
+     */
+    private static CodecException decorateWrite(Object object, Exception e) {
         return new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
     }
 
@@ -153,7 +157,9 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         outgoingHeaders.set(HttpHeaders.CONTENT_TYPE, mediaType != null ? mediaType : MediaType.APPLICATION_JSON_TYPE);
         try {
             writeValue(type, mediaType, outgoingHeaders, object, outputStream);
-        } catch (IOException e) {
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
             throw decorateWrite(object, e);
         }
     }
@@ -163,8 +169,10 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
         httpResponse.getHeaders().contentTypeIfMissing(mediaType);
         try {
             return ByteBodyHttpResponseWrapper.wrap(httpResponse, bodyFactory.buffer(WRITE_BUFFER_SIZE, s -> jsonMapper.writeValue(s, object)));
-        } catch (IOException e) {
-            throw new CodecException("Error encoding object [" + object + "] to JSON: " + e.getMessage(), e);
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
+            throw decorateWrite(object, e);
         }
     }
 
@@ -172,7 +180,9 @@ public final class JsonMessageHandler<T> implements MessageBodyHandler<T>, Custo
     public CloseableByteBody writePiece(ByteBodyFactory bodyFactory, HttpRequest<?> request, HttpResponse<?> response, Argument<T> type, MediaType mediaType, T object) throws CodecException {
         try {
             return bodyFactory.buffer(s -> writeValue(type, mediaType, response.getHeaders(), object, s));
-        } catch (IOException e) {
+        } catch (CodecException e) {
+            throw e;
+        } catch (IOException | RuntimeException e) {
             throw decorateWrite(object, e);
         }
     }
