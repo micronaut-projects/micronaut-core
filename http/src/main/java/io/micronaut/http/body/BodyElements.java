@@ -34,14 +34,14 @@ import java.util.function.Function;
  *     .thenApply(done -> HttpResponse.accepted());
  * }</pre>
  *
- * <p>One operation at a time: an operation started while another one is in progress fails with
- * an {@link IllegalStateException}. The end of the body and closing are different: at the end of
- * the body, {@link #next()} completes with an empty optional and {@link #forEach} completes
- * normally, while closing during an operation completes that operation with a
- * {@link java.util.concurrent.CancellationException}, and an operation started after closing
- * fails with an {@link IllegalStateException}. Closing discards the rest of the body; the
- * elements are closed when the stage returned by the handler completes, and when the request
- * ends.</p>
+ * <p>One operation at a time: an operation started while another one is in progress throws an
+ * {@link IllegalStateException}, at once, instead of returning a stage. The end of the body and
+ * closing are different: at the end of the body, {@link #next()} completes with an empty
+ * optional and {@link #forEach} completes normally, while closing during an operation completes
+ * that operation with a {@link java.util.concurrent.CancellationException}, and an operation
+ * started after closing throws an {@link IllegalStateException}. Closing discards the rest of
+ * the body; the elements read by an asynchronous handler route are closed when the stage
+ * returned by the handler completes, and those of a controller method when the request ends.</p>
  *
  * <p>The stages complete on a thread chosen by the server, usually an I/O thread: a consumer
  * must not block.</p>

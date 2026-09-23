@@ -39,7 +39,7 @@ import io.micronaut.web.router.RouteTableFactory;
  * }</pre>
  *
  * <p>The same function builds routes that change at runtime:
- * {@link RouteTableFactory#build(java.util.function.Consumer)} turns it into a
+ * {@link RouteTableFactory#buildHttpRoutes(HttpRoutes)} turns it into a
  * {@link RouteTable} that a {@link RouteSource} publishes.</p>
  *
  * @author Denis Stepanov

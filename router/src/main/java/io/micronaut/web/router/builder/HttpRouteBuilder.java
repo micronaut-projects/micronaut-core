@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,8 @@ import java.util.function.Function;
  * @since 5.3.0
  */
 @Experimental
-public interface HttpRouteBuilder {
+@SuppressWarnings("MethodName")
+public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpRouteGroup, LocatedHttpRouteBuilder {
 
     /**
      * Route a {@code GET} request to a handler function, with an implicit {@code HEAD} route
@@ -133,10 +134,12 @@ public interface HttpRouteBuilder {
      * consumes JSON unless {@link HttpRouteSpec#consumes} says otherwise, and in {@link HttpRoutes} and
      * route tables its URI is under {@code micronaut.server.context-path}.
      *
-     * @param method  The HTTP method
+     * @param method  The HTTP method, not {@link HttpMethod#CUSTOM}: a route of a custom method
+     *                is declared by its name, see {@link #handle(String, String, RequestHandler)}
      * @param uri     The URI template
      * @param handler The handler
      * @return The route
+     * @throws IllegalArgumentException if the method is {@link HttpMethod#CUSTOM}
      */
     HttpRouteSpec handle(HttpMethod method, String uri, RequestHandler handler);
 
@@ -298,8 +301,8 @@ public interface HttpRouteBuilder {
      * controllers and of {@link HttpRoutes} beans; within each level, the error route of the
      * closest exception type answers. So a group's error route for a supertype wins over a global
      * error route for the exact type, like the local error route of a controller does. A route
-     * that {@link HttpRouteSpec#implementing implements} a bean method first has the local
-     * error routes of the bean class. An error of a request no route matched, e.g. a
+     * that implements a bean method, see {@link HttpRouteSpec#annotationMetadata}, first has the
+     * local error routes of the bean class. An error of a request no route matched, e.g. a
      * {@code 404} or a {@code 405}, is answered by the global error routes only. A route table
      * built at runtime can declare error routes in its groups only.</p>
      *
@@ -418,10 +421,11 @@ public interface HttpRouteBuilder {
      * Route requests of a method by its name, including a custom HTTP method such as
      * {@code PROPFIND}, like a controller method annotated {@code @CustomHttpMethod}.
      *
-     * @param httpMethodName The name of the HTTP method
+     * @param httpMethodName The name of the HTTP method, a token
      * @param uri            The URI template
      * @param handler        The handler
      * @return The route
+     * @throws IllegalArgumentException if the name is empty or not a token, e.g. blank
      * @see #handle(HttpMethod, String, RequestHandler)
      */
     HttpRouteSpec handle(String httpMethodName, String uri, RequestHandler handler);
@@ -477,12 +481,18 @@ public interface HttpRouteBuilder {
      * locates again, from the rest of the path.
      *
      * <pre>{@code
-     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(items -> {
-     *     items.GET("/items/{item}", (request, pathVariables) ->
-     *         HttpResponse.ok(pathVariables.locatedTarget(Order.class).item(pathVariables.getInt("item"))));
-     * });
+     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(Order.class, items ->
+     *     items.handle(HttpMethod.GET, "/items/{item}", (request, pathVariables, order) ->
+     *         HttpResponse.ok(order.item(pathVariables.getInt("item")))));
      * routes.locate("/orders/{id}", (request, pathVariables) -> orders.find(pathVariables.getLong("id")), order -> itemRoutes);
      * }</pre>
+     *
+     * <p>The type of the target is the type the locator returns: the route table function
+     * receives it, e.g. to choose the table of a subtype. A table built for a type, see
+     * {@link io.micronaut.web.router.RouteTableFactory#buildLocatedHttpRoutes(Class, Consumer)},
+     * gives its handlers the target of that type; a located target that is not an instance of
+     * the type of its table fails the request, answered by the error routes like a failed
+     * controller method.</p>
      *
      * <p>When the table has no route for the rest of the path, the request is answered like a
      * request that no route of the table matches: {@code 404}, or {@code 405}, {@code 415} or
@@ -493,15 +503,17 @@ public interface HttpRouteBuilder {
      * <p>The locator runs while the request is matched, see {@link LocatorHandler}. Its tables
      * are built with {@link io.micronaut.web.router.RouteTableFactory#buildLocatedHttpRoutes},
      * whose URIs are relative to the prefix, and should be built once per type of target, not per
-     * request: the target reaches the handlers through {@link PathVariables#locatedTarget()}.
+     * request: the target reaches the handlers as an argument, see {@link LocatedHttpRouteBuilder},
+     * or through {@link PathVariables#locatedTarget()}.
      * Requests with a custom HTTP method are not located.</p>
      *
      * @param prefixUri The URI template of the prefix
      * @param locator   Locates the target, or answers {@code null} for {@code 404}
      * @param tables    The route table of a located target
+     * @param <T>       The type of the target
      * @since 5.3.0
      */
-    void locate(String prefixUri, LocatorHandler locator, Function<Object, RouteTable> tables);
+    <T> void locate(String prefixUri, LocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables);
 
     /**
      * Route the requests under a prefix to the routes of a target located asynchronously, e.g.
@@ -511,9 +523,9 @@ public interface HttpRouteBuilder {
      * that matches the request. See {@link AsyncLocatorHandler}.
      *
      * <pre>{@code
-     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(items ->
-     *     items.GET("/items/{item}", (request, pathVariables) ->
-     *         HttpResponse.ok(pathVariables.locatedTarget(Order.class).item(pathVariables.getInt("item")))));
+     * RouteTable itemRoutes = tables.buildLocatedHttpRoutes(Order.class, items ->
+     *     items.handle(HttpMethod.GET, "/items/{item}", (request, pathVariables, order) ->
+     *         HttpResponse.ok(order.item(pathVariables.getInt("item")))));
      * routes.locateAsync("/orders/{id}",
      *     (request, pathVariables) -> orders.findAsync(pathVariables.getLong("id")), // completes with null: 404
      *     order -> itemRoutes);
@@ -529,9 +541,10 @@ public interface HttpRouteBuilder {
      * @param prefixUri The URI template of the prefix
      * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
      * @param tables    The route table of a located target
+     * @param <T>       The type of the target
      * @since 5.3.0
      */
-    void locateAsync(String prefixUri, AsyncLocatorHandler locator, Function<Object, RouteTable> tables);
+    <T> void locateAsync(String prefixUri, AsyncLocatorHandler<? extends T> locator, Function<? super T, RouteTable> tables);
 
     /**
      * Declare a server filter, the functional form of a {@code @ServerFilter} bean: it filters

@@ -42,6 +42,7 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
@@ -92,9 +93,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     /**
      * The server request whose bytes are the body of the request a route is bound with: the Netty
-     * request itself, or the server request that a request a filter continued with is or wraps,
-     * see {@link ServerRequestBody}, unless the filter set the body to an object, which the
-     * default binder converts, like before.
+     * request itself, the server request that a request a filter continued with is or wraps,
+     * see {@link ServerRequestBody}, or the Netty request of its mutable view, unless the filter
+     * set the body to an object, which the default binder converts, like before, or to
+     * {@code null}, which is no body.
      *
      * @param source The request
      * @return The server request, or {@code null} if the body is not read from bytes
@@ -103,10 +105,16 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (source instanceof NettyHttpRequest<?> nhr) {
             return nhr;
         }
-        if (source.getBody().isPresent()) {
+        if (source.getBody().isPresent() || BodyChangeAwareRequest.isBodySet(source)) {
+            // the body a filter set, even none when it cleared it
             return null;
         }
-        return ServerRequestBody.of(source);
+        ServerHttpRequest<?> server = ServerRequestBody.of(source);
+        if (server == null) {
+            // e.g. the mutable view of the Netty request, which a filter continued with
+            return NettyHttpRequest.findBodyRequest(source);
+        }
+        return server;
     }
 
     @Override
@@ -193,9 +201,12 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
      * @throws Throwable If the body cannot be read
      */
     Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
+        // the form is decoded by the Netty request whose bytes are the body, e.g. of the mutable
+        // view a filter continued with after it changed the URI in place
+        NettyHttpRequest<?> formRequest = server instanceof NettyHttpRequest<?> netty ? netty : NettyHttpRequest.findBodyRequest(server);
         // the decoded body is kept by the Netty request it is read from, not by a request a filter
         // continued with
-        NettyHttpRequest<?> nhr = request == server && server instanceof NettyHttpRequest<?> netty ? netty : null;
+        NettyHttpRequest<?> nhr = request == server && formRequest == server ? formRequest : null;
         MessageBodyReader<T> reader = null;
         final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(request).orElse(null);
         if (routeInfo != null) {
@@ -205,14 +216,16 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
-        if (reader == null && nhr != null && nhr.hasFormBody()) {
+        if (reader == null && formRequest != null && formRequest.hasFormBody()) {
             Map<String, List<CloseableByteBody>> bodies = new LinkedHashMap<>();
-            for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
+            for (RawFormField rff : toListNow(formRequest.getRawFormFields(imm))) {
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
-            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
+            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, formRequest.getCharacterEncoding());
             Optional<T> converted = conversionService.convert(intermediate, context);
-            nhr.setLegacyBody(converted.orElse(null));
+            if (nhr != null) {
+                nhr.setLegacyBody(converted.orElse(null));
+            }
             return converted;
         }
         if (reader != null) {

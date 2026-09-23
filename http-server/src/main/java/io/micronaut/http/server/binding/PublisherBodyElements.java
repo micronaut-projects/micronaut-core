@@ -79,7 +79,8 @@ final class PublisherBodyElements<T> implements BodyElements<T>, Subscriber<T> {
                 result.complete(element);
             }
         });
-        return result;
+        // a view: the caller cannot complete or cancel the read
+        return result.minimalCompletionStage();
     }
 
     @Override
@@ -91,7 +92,8 @@ final class PublisherBodyElements<T> implements BodyElements<T>, Subscriber<T> {
             walking = result;
         }
         walk(consumer, result);
-        return result;
+        // a view: the caller cannot complete or cancel the operation, which would leave it in progress
+        return result.minimalCompletionStage();
     }
 
     @Override

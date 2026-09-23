@@ -1,0 +1,22 @@
+A lambda has no annotations. The features that read the annotations of the matched route, such as filter binding with a ann:http.annotation.FilterMatcher[] annotation, route versioning with `@Version`, `@CrossOrigin`, `@RouteCondition`, the message body writers, and security rules such as `@Secured` from Micronaut Security, need the route to carry them. `annotationMetadata(AnnotationMetadataProvider)` gives a handler route the annotations of an annotated element, and what else the route gets depends on the element:
+
+* an `ExecutableMethod` makes the route implement that bean method: the route has the annotations of the method, and its target method, declaring type and method name are those of the bean method, e.g. for the local `@Error` methods of the bean class. The arguments of the route stay those of the handler;
+* any other element, e.g. a `BeanDefinition`, gives the route its annotations only.
+
+The route keeps the element: `MethodBasedRouteInfo.getAnnotationMetadataProvider()` returns it for the matched route, the bean method of a controller route, or nothing for a handler route without annotations, so an integration finds the bean method of a route with `instanceof ExecutableMethod`.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", indent=0, title="An annotation that binds a filter"]
+
+<1> A filter matcher annotation.
+<2> A filter bean that only filters the routes annotated with `@Audited`.
+<3> A bean method with the annotation. It must be executable to be looked up.
+<4> A bean class with the annotation.
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotationRoutes", indent=0, title="Handler routes with annotations"]
+
+<5> The route implements the bean method and has its annotations: the filter applies.
+<6> The route has the annotations of the bean class only: the filter applies too.
+
+The route of `/prices` has no annotation, and the filter does not apply to it.
+
+This is mostly meant for framework integrations that route the methods of their own resource classes with handler functions, e.g. a JAX-RS implementation, and for generated code.

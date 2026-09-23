@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
@@ -253,12 +254,16 @@ public class FilterRunner {
                         return processFailure(request, error, propagatedContext);
                     }
                     if (matching.tryCompleteValue() == null) {
-                        // the route match completes later: then the filters after it run
-                        return matching.<HttpResponse<?>>flatMap(done -> runAfterRouteMatch(request, propagatedContext))
-                            .onErrorResume(t -> {
-                                ExecutionFlow<HttpResponse<?>> failure = processFailure(request, t, propagatedContext);
-                                return failure == null ? ExecutionFlow.error(t) : failure;
-                            });
+                        // the route match completes later: then the filters after it run, and
+                        // only a failure of the route match itself is processed here
+                        return failureOf(matching).flatMap(failure -> {
+                            if (failure.isPresent()) {
+                                Throwable t = failure.get();
+                                ExecutionFlow<HttpResponse<?>> processed = processFailure(request, t, propagatedContext);
+                                return processed == null ? ExecutionFlow.error(t) : processed;
+                            }
+                            return runAfterRouteMatch(request, propagatedContext);
+                        });
                     }
                 }
                 return runAfterRouteMatch(request, propagatedContext);
@@ -273,6 +278,18 @@ public class FilterRunner {
             iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : filterFilters(filters, request).listIterator();
         }
         return runFilters(request, propagatedContext, iterator);
+    }
+
+    /**
+     * The failure of a route match that completes later, or nothing when it succeeds, so that a
+     * failure of what runs after the route match is not taken for one of the route match.
+     *
+     * @param matching The route match
+     * @return The failure, if any
+     */
+    private static ExecutionFlow<Optional<Throwable>> failureOf(ExecutionFlow<?> matching) {
+        return matching.<Optional<Throwable>>map(done -> Optional.empty())
+            .onErrorResume(t -> ExecutionFlow.just(Optional.of(t)));
     }
 
     private ExecutionFlow<HttpResponse<?>> runAfterRouteMatch(HttpRequest<?> request, PropagatedContext propagatedContext) {
@@ -536,14 +553,16 @@ public class FilterRunner {
                 replaceFilters(request);
                 return failure;
             }
-            // the route match completes later: then the filters after it are found
-            return matching.<FilterContext>map(done -> {
+            // the route match completes later: then the filters after it are found, once, and a
+            // failure to find them is processed by the filter chain, not as one of the route match
+            return failureOf(matching).flatMap(failure -> {
+                if (failure.isPresent()) {
+                    ExecutionFlow<FilterContext> processed = processFailurePropagateException(failure.get(), context);
+                    replaceFilters(request);
+                    return processed;
+                }
                 replaceFilters(request);
-                return context;
-            }).onErrorResume(throwable -> {
-                ExecutionFlow<FilterContext> failure = processFailurePropagateException(throwable, context);
-                replaceFilters(request);
-                return failure;
+                return ExecutionFlow.just(context);
             });
         }
 

@@ -1,0 +1,9 @@
+Functional routes are experimental and have these known limitations:
+
+* A handler route has no annotations unless it is given some, see <<functionalRoutesAnnotations, Annotations on Handler Routes>>. Validation of the body (`@Valid`, constraints) is not applied to handler routes: validate in the handler.
+* Tools that read the annotations of controllers, such as Micronaut OpenAPI, do not see handler routes.
+* Groups have no `consumes`, `produces`, executor or annotations of their own: set them on each route.
+* There is no API to stream a response other than a `Publisher` body.
+* There is no Kotlin DSL and no support for `suspend` handler functions.
+* A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes when it is created. Use a <<functionalRoutesTables, route table>> for routes that change.
+* A pending asynchronous locator is not cancelled when the client disconnects, and a CORS preflight request does not wait for an asynchronous locator: the routes it would locate are not seen by the preflight.

@@ -44,11 +44,22 @@ record UploadContext(Executor ioExecutor,
                      long maxFileSize) {
 
     static UploadContext of(FormFactory formFactory, ServerHttpRequest<?> request) {
+        return of(formFactory, request, request.getCharacterEncoding());
+    }
+
+    /**
+     * @param formFactory The form factory
+     * @param request     The server request whose body is read
+     * @param charset     The charset of the text: that of the request the route received, which
+     *                    a filter may have changed
+     * @return The context
+     */
+    static UploadContext of(FormFactory formFactory, ServerHttpRequest<?> request, Charset charset) {
         HttpServerConfiguration configuration = formFactory.getConfiguration();
         return new UploadContext(
             formFactory.getDiskWriteExecutor(),
             request.byteBodyFactory(),
-            request.getCharacterEncoding(),
+            charset,
             (int) Math.min(Integer.MAX_VALUE - 8, Math.max(0, configuration.getMaxRequestBufferSize())),
             configuration.getMultipart().getMaxFileSize()
         );

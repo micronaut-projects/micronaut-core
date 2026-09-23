@@ -38,8 +38,10 @@ import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyReader;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
+import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
 import io.micronaut.web.router.builder.AsyncHandlerRequest;
@@ -52,11 +54,13 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
@@ -71,6 +75,10 @@ import java.util.function.Supplier;
  * through the {@code @Body} binders, outside the argument binding of the route, or moved to the
  * reader that was asked for.</p>
  *
+ * <p>A filter that set the body of the mutable request it continued with, see
+ * {@link BodyChangeAwareRequest}, replaced those bytes: a body set to {@code null} is no body,
+ * and a body set to an object is only read with {@link #body(Argument)}, which converts it.</p>
+ *
  * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
@@ -84,6 +92,14 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     private final HttpRequest<B> request;
     private final ServerHttpRequest<?> server;
     private final AsyncServerHttpRequestArgumentBinder binder;
+    /**
+     * The empty body of a request whose body a filter set to {@code null}, or {@code null}.
+     */
+    private final @Nullable ByteBody cleared;
+    /**
+     * Whether a filter set the body to an object, which replaces the bytes of the request.
+     */
+    private final boolean decoded;
 
     // guarded by this
     private @Nullable String reader;
@@ -99,11 +115,20 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         this.request = request;
         this.server = server;
         this.binder = binder;
+        if (BodyChangeAwareRequest.isBodySet(request)) {
+            // a filter replaced the bytes of the request with the body it set
+            boolean present = request.getBody().isPresent();
+            this.cleared = present ? null : server.byteBodyFactory().createEmpty();
+            this.decoded = present;
+        } else {
+            this.cleared = null;
+            this.decoded = false;
+        }
     }
 
     @Override
     public ByteBody byteBody() {
-        return server.byteBody();
+        return cleared == null ? server.byteBody() : cleared;
     }
 
     @Override
@@ -159,22 +184,25 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
 
     @Override
     public boolean hasBody() {
-        OptionalLong length = server.byteBody().expectedLength();
+        if (decoded) {
+            return true;
+        }
+        OptionalLong length = byteBody().expectedLength();
         return length.isEmpty() || length.getAsLong() != 0;
     }
 
     @Override
     public OptionalLong expectedBodySize() {
-        return server.byteBody().expectedLength();
+        return decoded ? OptionalLong.empty() : byteBody().expectedLength();
     }
 
     @Override
-    public <T> CompletionStage<T> body(Class<T> type) {
+    public <T> CompletionStage<@Nullable T> body(Class<T> type) {
         return body(Argument.of(type));
     }
 
     @Override
-    public <T> CompletionStage<T> body(Argument<T> type) {
+    public <T> CompletionStage<@Nullable T> body(Argument<T> type) {
         Objects.requireNonNull(type, "type");
         if (type.isAsyncOrReactive()) {
             throw new IllegalArgumentException("The body cannot be read as the reactive or asynchronous type " + type.getTypeName()
@@ -187,7 +215,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         claim("body");
         // bound like the @Body argument of a controller, with the binder of the type
         Argument<T> argument = HandlerMethod.bodyArgument(type);
-        CompletableFuture<T> result = new CompletableFuture<>();
+        CompletableFuture<@Nullable T> result = new CompletableFuture<>();
         try {
             ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
                 .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
@@ -210,12 +238,13 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         } catch (Throwable e) {
             result.completeExceptionally(e);
         }
-        return result;
+        // a view: the caller cannot complete or cancel the read
+        return result.minimalCompletionStage();
     }
 
     @Override
     public CompletionStage<String> text() {
-        claim("text");
+        claimBytes("text");
         UploadContext context = uploadContext();
         return content(context).text(context.maxBufferSize());
     }
@@ -223,21 +252,21 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     @Override
     public CompletionStage<String> text(int maximumBytes) {
         checkLimit(maximumBytes);
-        claim("text");
+        claimBytes("text");
         return content(uploadContext()).text(maximumBytes);
     }
 
     @Override
     public CompletionStage<byte[]> bytes(int maximumBytes) {
         checkLimit(maximumBytes);
-        claim("bytes");
+        claimBytes("bytes");
         return content(uploadContext()).bytes(maximumBytes);
     }
 
     @Override
     public CompletionStage<Void> transferTo(Path destination) {
         Objects.requireNonNull(destination, "destination");
-        claim("transferTo");
+        claimBytes("transferTo");
         return content(uploadContext()).transferTo(destination);
     }
 
@@ -249,8 +278,16 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     @Override
     public <T> BodyElements<T> elements(Argument<T> type) {
         Objects.requireNonNull(type, "type");
-        claim("elements");
-        CloseableByteBody body = server.byteBody().move();
+        if (type.isAsyncOrReactive()) {
+            throw new IllegalArgumentException("The elements of the body cannot be read as the reactive or asynchronous type " + type.getTypeName()
+                + ": an element is decoded whole, read the elements one at a time instead");
+        }
+        if (InputStream.class.isAssignableFrom(type.getType())) {
+            throw new IllegalArgumentException("The elements of the body cannot be read as InputStreams by an asynchronous handler, as reading them blocks"
+                + ": take the body with takeBody()");
+        }
+        claimBytes("elements");
+        CloseableByteBody body = byteBody().move();
         PublisherBodyElements<T> elements = new PublisherBodyElements<>(() -> elementPublisher(type, body), body::close);
         owned(elements::closeAsync, elements::close);
         return elements;
@@ -258,33 +295,53 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
 
     @Override
     public CompletionStage<FormData> form() {
-        claim("form");
+        claimBytes("form");
         try {
-            return FormDataArgumentBinder.collect(binder.formFactory(), binder.conversionService, formRequest());
+            FormCapableHttpRequest<?> formRequest = formRequest();
+            if (cleared != null) {
+                // no body: a form without fields
+                return CompletableFuture.completedFuture(new DefaultFormData(Map.of(), Map.of(), binder.conversionService));
+            }
+            FormDataArgumentBinder.Collection collection = FormDataArgumentBinder.start(
+                UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding()), binder.formFactory(), binder.conversionService, formRequest);
+            // a form the handler did not wait for is not read after the handler completed, nor
+            // after the request ended; the files stored so far are owned by the request
+            owned(() -> {
+                collection.cancel();
+                return CompletableFuture.completedStage(null);
+            }, collection::cancel);
+            // a view: the caller cannot complete or cancel the collection
+            return collection.result().minimalCompletionStage();
         } catch (Throwable e) {
-            return CompletableFuture.failedFuture(e);
+            return CompletableFuture.failedStage(e);
         }
     }
 
     @Override
     public FormParts parts() {
-        claim("parts");
+        claimBytes("parts");
         FormCapableHttpRequest<?> formRequest = formRequest();
-        DefaultFormParts parts = new DefaultFormParts(formRequest, UploadContext.of(binder.formFactory(), formRequest));
+        if (cleared != null) {
+            // no body: a form without parts
+            return NoFormParts.INSTANCE;
+        }
+        DefaultFormParts parts = new DefaultFormParts(formRequest, UploadContext.of(binder.formFactory(), formRequest, request.getCharacterEncoding()));
         owned(parts::closeAsync, parts::close);
         return parts;
     }
 
     @Override
     public CloseableByteBody takeBody() {
-        claim("takeBody");
-        return server.byteBody().move();
+        claimBytes("takeBody");
+        return byteBody().move();
     }
 
     @Override
     public CompletionStage<Void> discardBody() {
         claim("discardBody");
-        server.byteBody().move().close();
+        if (!decoded) {
+            byteBody().move().close();
+        }
         return CompletableFuture.completedStage(null);
     }
 
@@ -322,6 +379,19 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
     }
 
     /**
+     * Claim the bytes of the body for a reader, which a filter did not replace with an object.
+     *
+     * @param name The method that reads the body
+     */
+    private void claimBytes(String name) {
+        if (decoded) {
+            throw new IllegalStateException("The body of the request cannot be read with " + name
+                + "(): a filter replaced the body with a decoded object, read it with body(Type)");
+        }
+        claim(name);
+    }
+
+    /**
      * Keep what the reader of the body must release when the handler completes, and when the
      * request ends.
      */
@@ -334,15 +404,19 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         }
     }
 
+    /**
+     * @return The context of the body: the text is in the charset of the request of the route,
+     * like its content type
+     */
     private UploadContext uploadContext() {
-        return UploadContext.of(binder.formFactory(), server);
+        return UploadContext.of(binder.formFactory(), server, request.getCharacterEncoding());
     }
 
     /**
      * The body, moved to content read like a form field: in memory with a limit, or to a file.
      */
     private UploadContent content(UploadContext context) {
-        StreamingUploadContent content = StreamingUploadContent.requestBody(server.byteBody().move(), request.getContentType().orElse(null), context);
+        StreamingUploadContent content = StreamingUploadContent.requestBody(byteBody().move(), request.getContentType().orElse(null), context);
         owned(content::closeAsync, content::closeAsync);
         return content;
     }
@@ -416,5 +490,34 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
             return null;
         }
         throw UnsatisfiedRouteException.create(argument);
+    }
+
+    /**
+     * The parts of a form without a body.
+     */
+    private static final class NoFormParts implements FormParts {
+        static final NoFormParts INSTANCE = new NoFormParts();
+
+        @Override
+        public CompletionStage<Void> forEach(Function<? super FormPart, ? extends CompletionStage<?>> consumer) {
+            Objects.requireNonNull(consumer, "consumer");
+            return CompletableFuture.completedStage(null);
+        }
+
+        @Override
+        public CompletionStage<Boolean> part(String name, Function<? super FormPart, ? extends CompletionStage<?>> consumer) {
+            Objects.requireNonNull(name, "name");
+            Objects.requireNonNull(consumer, "consumer");
+            return CompletableFuture.completedStage(false);
+        }
+
+        @Override
+        public CompletionStage<Void> closeAsync() {
+            return CompletableFuture.completedStage(null);
+        }
+
+        @Override
+        public void close() {
+        }
     }
 }

@@ -46,7 +46,9 @@ public interface RequestHandler {
      *
      * @param request       The request
      * @param pathVariables The path variables of the matched route
-     * @return The response
+     * @return The response; {@code null} is answered like the {@code null} result of a controller
+     * method: with {@code 404}, or with {@code 204} if {@code micronaut.server.not-found-on-missing-body}
+     * is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
     HttpResponse<?> handle(HttpRequest<?> request, PathVariables pathVariables) throws Exception;

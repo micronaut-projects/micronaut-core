@@ -1,5 +1,5 @@
 /*
- * Copyright 2017-2020 original authors
+ * Copyright 2017-2026 original authors
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,9 @@
  */
 package io.micronaut.web.router.builder;
 
-import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.ExecutableMethod;
@@ -31,11 +32,16 @@ import java.util.function.Predicate;
  * the filters of the groups the route is declared in, closest to the route, and are resolved when
  * the route is built.</p>
  *
+ * <p>The configuration of the route is read when the router is built, once the routes were
+ * declared: configure the route where it is declared, in {@link HttpRoutes#routes(HttpRouteBuilder)}
+ * or in the callback that builds a route table. A change made to a route kept after that is
+ * ignored.</p>
+ *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
+public sealed interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> permits DefaultHttpRouteSpec {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method.
@@ -61,28 +67,61 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
     HttpRouteSpec produces(MediaType... mediaTypes);
 
     /**
-     * Give the route annotations: the features that read the annotations of the matched route,
-     * such as security rules, versioning, filter binding and the message body writers, see them
-     * as if they were on a controller method, and so does the return type of the route. Typically
-     * they are the annotations of the bean method the handler implements, from its
-     * {@link io.micronaut.inject.ExecutableMethod}.
+     * Give the route the annotations of an annotated element: the features that read the
+     * annotations of the matched route, such as security rules, versioning, filter binding, route
+     * conditions and the message body writers, see them as if they were on a controller method,
+     * and so does the return type of the route.
      *
-     * @param annotationMetadata The annotations of the route
+     * <p>When the element is an {@link ExecutableMethod}, e.g. a method of a resource that a
+     * framework integration routes with handler functions, the route implements that bean
+     * method: besides its annotations, the target method, declaring type and method name of the
+     * route are the ones of the bean method, so the local {@code @Error} methods of the bean class
+     * apply to the route, and the route is described as the bean method. The arguments of the
+     * route stay those of the handler. Any other element, e.g. a
+     * {@link io.micronaut.inject.BeanDefinition}, gives the route its annotations only.</p>
+     *
+     * <pre>{@code
+     * ExecutableMethod<Payments, String> pay = beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class);
+     * routes.POST("/payments/{amount}", (request, pathVariables) -> HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))))
+     *     .annotationMetadata(pay);
+     * }</pre>
+     *
+     * <p>The route keeps the element: an integration finds it back on the matched route with
+     * {@link io.micronaut.web.router.MethodBasedRouteInfo#getAnnotationMetadataProvider()}, and
+     * the bean method of the route with {@code instanceof ExecutableMethod}. The last element
+     * given to the route wins.</p>
+     *
+     * @param annotationMetadata The annotated element whose annotations the route has, an
+     *                           {@link ExecutableMethod} for a route that implements a bean method
      * @return The route
      */
-    HttpRouteSpec annotationMetadata(AnnotationMetadata annotationMetadata);
+    HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata);
 
     /**
-     * The route implements a bean method, e.g. a method of a resource that a framework
-     * integration routes with handler functions: the route has the annotations of the method, see
-     * {@link #annotationMetadata(AnnotationMetadata)}, and its target method, declaring type and
-     * method name are the ones of the bean method. The arguments of the route stay those of the
-     * handler.
+     * Declare the type of the body of the responses of the route, like the return type
+     * {@code HttpResponse<R>} of a controller method: the message body writer is selected for the
+     * declared type, with its type arguments and annotations, instead of the runtime class of the
+     * body, e.g. a writer or a JSON view for {@code List<Item>} instead of one for
+     * {@code ArrayList}. The handler still returns an {@code HttpResponse}, or a stage of one;
+     * a body that is not an instance of the declared type is written as its runtime class, like
+     * the body of a controller route.
      *
-     * @param method The bean method
+     * <pre>{@code
+     * routes.GET("/items", (request, pathVariables) -> HttpResponse.ok(items.findAll()))
+     *     .responseType(Argument.listOf(Item.class));
+     * }</pre>
+     *
+     * <p>A response without a body, and a handler that returns no response, are answered like
+     * those of a controller route. The route has the declared type for every handler kind,
+     * e.g. {@code CompletionStage<HttpResponse<R>>} for a handler that completes the response
+     * later, and for the features that read the return type of the matched route, see
+     * {@link io.micronaut.web.router.RouteInfo#getResponseBodyType()}.</p>
+     *
+     * @param responseType The type of the body of the response
      * @return The route
+     * @since 5.3.0
      */
-    HttpRouteSpec implementing(ExecutableMethod<?, ?> method);
+    HttpRouteSpec responseType(Argument<?> responseType);
 
     /**
      * Run the route on the named executor, like {@code @ExecuteOn} on a controller method. It
@@ -115,8 +154,11 @@ public interface HttpRouteSpec extends RouteFilterSpec<HttpRouteSpec> {
      *
      * <p>A route table built at runtime cannot open a port: its routes cannot have one.</p>
      *
-     * @param port The port
+     * @param port The port, between {@code 1} and {@code 65535}: unlike
+     *             {@code @Controller(port = ...)}, a negative port or {@code 0}, a random port the
+     *             route could not match, is rejected
      * @return The route
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
      * @since 5.3.0
      */
     HttpRouteSpec port(int port);
