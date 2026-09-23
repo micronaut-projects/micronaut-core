@@ -35,7 +35,6 @@ import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -211,17 +210,17 @@ public class HandlerRoutesConcurrencyTest {
         return new ArrayList<>(failures);
     }
 
-    @FunctionalInterface
-    interface Call {
-        String call(int thread, int n) throws Exception;
-    }
-
     private static HttpResponse<?> text(String body) {
         return HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE);
     }
 
     private static String id(HttpRequest<?> request) {
         return Objects.requireNonNullElse(request.getHeaders().get(ID), "none");
+    }
+
+    @FunctionalInterface
+    interface Call {
+        String call(int thread, int n) throws Exception;
     }
 
     record RequestId(String id) implements PropagatedContextElement {
