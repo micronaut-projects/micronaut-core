@@ -486,7 +486,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
 
         @Override
-        public HttpRouteSpec after(ContextRouteResponseFilter filter) {
+        public HttpRouteSpec afterReplacing(ContextReplacingRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(filter);
             }
@@ -494,7 +494,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
 
         @Override
-        public HttpRouteSpec after(String executorName, ContextRouteResponseFilter filter) {
+        public HttpRouteSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.after(executorName, filter);
             }
@@ -502,7 +502,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         }
 
         @Override
-        public HttpRouteSpec afterAsync(AsyncContextRouteResponseFilter filter) {
+        public HttpRouteSpec afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
             for (HandlerUriRoute route : routes) {
                 route.afterAsync(filter);
             }

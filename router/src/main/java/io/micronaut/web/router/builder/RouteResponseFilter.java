@@ -22,7 +22,9 @@ import io.micronaut.http.MutableHttpResponse;
 /**
  * A filter of one route's responses, declared with {@link io.micronaut.web.router.builder.HttpRouteSpec#after(RouteResponseFilter)}.
  * Like a {@code @ResponseFilter} method it runs after the route, before the application's
- * response filters, and can change the response.
+ * response filters, and can change the response in place. To replace the response, e.g. with
+ * another status or body, like a {@code @ResponseFilter} method returning a response, declare a
+ * {@link ReplacingRouteResponseFilter} with {@link RouteFilterSpec#afterReplacing(ReplacingRouteResponseFilter)}.
  *
  * @author Denis Stepanov
  * @since 5.3.0

@@ -90,19 +90,19 @@ final class DefaultServerFilterSpec implements ServerFilterSpec, ContextFilterSp
     }
 
     @Override
-    public ServerFilterSpec after(ContextRouteResponseFilter filter) {
+    public ServerFilterSpec afterReplacing(ContextReplacingRouteResponseFilter filter) {
         serverFilters.filters().after(filter, null);
         return this;
     }
 
     @Override
-    public ServerFilterSpec after(String executorName, ContextRouteResponseFilter filter) {
+    public ServerFilterSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
         serverFilters.filters().after(filter, Objects.requireNonNull(executorName, "executorName"));
         return this;
     }
 
     @Override
-    public ServerFilterSpec afterAsync(AsyncContextRouteResponseFilter filter) {
+    public ServerFilterSpec afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
         serverFilters.filters().afterAsync(filter);
         return this;
     }

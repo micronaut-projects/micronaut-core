@@ -17,31 +17,41 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpResponse;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * An asynchronous filter of one route's responses, declared with
- * {@link io.micronaut.web.router.builder.HttpRouteSpec#afterAsync(AsyncRouteResponseFilter)}. The filter chain continues when the
- * returned stage completes, so the filter must not block. To replace the response when the stage
- * completes, declare an {@link AsyncReplacingRouteResponseFilter} with
- * {@link RouteFilterSpec#afterReplacingAsync(AsyncReplacingRouteResponseFilter)}.
+ * An asynchronous filter of one route's responses that can replace the response, declared with
+ * {@link RouteFilterSpec#afterReplacingAsync(AsyncReplacingRouteResponseFilter)}: the
+ * {@link ReplacingRouteResponseFilter} whose result completes later, like a {@code @ResponseFilter}
+ * method returning a {@code CompletionStage} of a response. The filter chain continues when the
+ * returned stage completes, so the filter must not block.
+ *
+ * <pre>{@code
+ * routes.GET("/avatars/{id}", handler).afterReplacingAsync((request, response) ->
+ *     response.code() == 404
+ *         ? avatars.fallback().thenApply(HttpResponse::ok)
+ *         : CompletableFuture.completedFuture(null));
+ * }</pre>
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
 @FunctionalInterface
-public interface AsyncRouteResponseFilter {
+public interface AsyncReplacingRouteResponseFilter {
 
     /**
      * Filter the response.
      *
      * @param request  The request
      * @param response The response of the route, which the filter can change until the stage completes
-     * @return Completes when the response is filtered; completing exceptionally is handled by the error routes
+     * @return Completes with a response to continue with instead of the response, or with
+     * {@code null} to continue with the response; completing exceptionally is handled by the error routes
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response) throws Exception;
+    CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request, MutableHttpResponse<?> response) throws Exception;
 }
