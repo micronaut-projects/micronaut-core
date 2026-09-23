@@ -190,6 +190,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeoutException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
@@ -1380,48 +1381,57 @@ final class NettyHttpClient implements
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> mono;
-        try {
-            mono = sendRequestWithRedirects(
-                propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
-                new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
-                (req, resp) -> ExecutionFlow.just(resp)
-            );
-        } catch (RuntimeException | Error e) {
-            requestBody.close();
-            throw e;
-        }
-        return toMono(mono, propagatedContext).doOnTerminate(requestBody::close);
+        return rawExchange(request, requestBody, blockedThread, null);
     }
 
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, RawRequestOptions options) {
         Objects.requireNonNull(options, "options");
-        if (requestBody == null) {
-            requestBody = NettyByteBodyFactory.empty();
-        }
+        return rawExchange(request, requestBody, blockedThread, options);
+    }
+
+    private Mono<HttpResponse<?>> rawExchange(io.micronaut.http.HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
+        CloseableByteBody body = requestBody == null ? NettyByteBodyFactory.empty() : requestBody;
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        ExecutionFlow<HttpResponse<?>> flow;
+        ExecutionFlow<HttpResponse<?>> flow = rawExchangeFlow(propagatedContext, request, body, blockedThread, options);
+        // doFinally: a cancelled exchange closes the body too, e.g. one that waits for a connection
+        return toMono(flow, propagatedContext).doFinally(signal -> body.close());
+    }
+
+    /**
+     * The flow of a raw exchange. Cancelling it before the response arrives aborts the request.
+     * The caller closes the request body when the flow completes or is cancelled.
+     *
+     * @param propagatedContext The propagated context
+     * @param request           The request metadata
+     * @param requestBody       The request body
+     * @param blockedThread     The thread that blocks on the response, if any
+     * @param options           The per-exchange options, or {@code null} for none
+     * @return The response flow
+     */
+    ExecutionFlow<HttpResponse<?>> rawExchangeFlow(PropagatedContext propagatedContext, io.micronaut.http.HttpRequest<?> request, CloseableByteBody requestBody, @Nullable Thread blockedThread, @Nullable RawRequestOptions options) {
         try {
+            BlockHint blockHint = blockedThread == null ? null : new BlockHint(blockedThread, null);
+            if (options == null) {
+                return sendRequestWithRedirects(
+                    propagatedContext,
+                    blockHint,
+                    new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody),
+                    (req, resp) -> ExecutionFlow.just(resp)
+                );
+            }
             MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
-            flow = RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
+            return RawHttpClientSupport.withResponseTimeout(sendRequestWithRedirects(
                 propagatedContext,
-                blockedThread == null ? null : new BlockHint(blockedThread, null),
+                blockHint,
                 rawRequest,
                 (req, resp) -> ExecutionFlow.just(resp)
-            ), options.getResponseTimeout());
+            ), options.getResponseTimeout()).map(response -> RawHttpClientSupport.toMutableResponse(response, options));
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
         }
-        return toMono(flow.map(response -> RawHttpClientSupport.toMutableResponse(response, options)), propagatedContext)
-            .doOnTerminate(requestBody::close);
     }
 
     private static void applyOptions(MutableHttpRequest<?> request, RawRequestOptions options) {
@@ -1657,6 +1667,7 @@ final class NettyHttpClient implements
         // a response timeout of the exchange replaces the read timeout until the response arrives
         Duration responseTimeout = request.getAttribute(RESPONSE_TIMEOUT, Duration.class).orElse(null);
         ResponseDeadline responseDeadline = responseTimeout == null ? null : ResponseDeadline.start(poolHandle, responseTimeout);
+        AtomicBoolean responded = new AtomicBoolean();
 
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
             boolean stillExpectingContinue = expectContinue;
@@ -1667,7 +1678,10 @@ final class NettyHttpClient implements
                     responseDeadline.stop();
                 }
                 poolHandle.taint();
-                completeExceptionallySafe(sink, handleResponseError(request, cause));
+                if (!sink.isCancelled()) {
+                    // nobody takes the error of a cancelled exchange, e.g. its closed connection
+                    completeExceptionallySafe(sink, handleResponseError(request, cause));
+                }
             }
 
             @Override
@@ -1688,10 +1702,15 @@ final class NettyHttpClient implements
                     // the configured read timeout applies to the response body
                     responseDeadline.stop();
                 }
+                responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
-
+                if (sink.isCancelled()) {
+                    // nobody takes the response of a cancelled exchange
+                    body.close();
+                    return;
+                }
                 sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
             }
 
@@ -1732,6 +1751,14 @@ final class NettyHttpClient implements
                     byteBuf.release();
                 }
                 poolHandle.release();
+            }
+        }));
+        // cancelling the exchange before the response arrives aborts the request: the connection
+        // (HTTP/1) or the stream (HTTP/2) is closed, which also stops the request body
+        sink.onCancel(() -> poolHandle.channel().eventLoop().execute(() -> {
+            if (!responded.get()) {
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
         }));
         poolHandle.notifyRequestPipelineBuilt();
