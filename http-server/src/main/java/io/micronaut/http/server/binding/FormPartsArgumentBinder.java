@@ -56,11 +56,8 @@ final class FormPartsArgumentBinder implements TypedRequestArgumentBinder<FormPa
         if (!(source instanceof FormCapableHttpRequest<?> request) || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
-        FormFactory factory = formFactory.get();
-        DefaultFormParts parts = new DefaultFormParts(request, UploadContext.of(factory, request));
-        // the handler closes the parts when it completes; this is the safety net for handlers
-        // that do not, failures before the handler is called, and disconnects
-        request.addDisposalResource(parts::close);
+        // one for the request, closed when the request ends
+        FormParts parts = FormBinding.of(request).parts(formFactory.get());
         return () -> Optional.of(parts);
     }
 }
