@@ -295,6 +295,33 @@ public interface HttpRouteBuilder {
     StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler);
 
     /**
+     * Handle the exceptions of a type, and of its subtypes, with a handler function that completes
+     * the response later, like an {@code @Error(global = true)} method returning a
+     * {@code CompletionStage}. The error route is selected like one added with
+     * {@link #error(Class, ErrorRouteHandler)}: the error route of the closest exception type
+     * answers, whether its handler is synchronous or not.
+     *
+     * @param type    The type of the exception
+     * @param handler The handler
+     * @param <E>     The type of the exception
+     * @return The error route
+     * @see AsyncErrorRouteHandler
+     */
+    <E extends Throwable> ErrorRouteSpec errorAsync(Class<E> type, AsyncErrorRouteHandler<E> handler);
+
+    /**
+     * Handle the responses of a status with a handler function that completes the response later,
+     * like an {@code @Error(status = ..., global = true)} method returning a
+     * {@code CompletionStage}.
+     *
+     * @param status  The status
+     * @param handler The handler
+     * @return The status route
+     * @see AsyncStatusRouteHandler
+     */
+    StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler);
+
+    /**
      * Bind a handler function to a declared route, e.g. a constant generated at compile time. The
      * route is registered with the keys of the declaration and built the first time the router
      * uses it; otherwise it is the same as {@link #handle(HttpMethod, String, RequestHandler)}.

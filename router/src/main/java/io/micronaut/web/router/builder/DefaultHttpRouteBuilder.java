@@ -109,7 +109,26 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
 
     @Override
     public <E extends Throwable> ErrorRouteSpec error(Class<E> type, ErrorRouteHandler<E> handler) {
-        RouteAssembly.DefaultErrorRoute route = assembly.addErrorRoute(null, type, handle(HandlerMethod.of(type, handler)));
+        return errorRoute(type, HandlerMethod.of(type, handler));
+    }
+
+    @Override
+    public <E extends Throwable> ErrorRouteSpec errorAsync(Class<E> type, AsyncErrorRouteHandler<E> handler) {
+        return errorRoute(type, HandlerMethod.of(type, handler));
+    }
+
+    @Override
+    public StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
+        return statusRoute(status, HandlerMethod.of(handler));
+    }
+
+    @Override
+    public StatusRouteSpec statusAsync(HttpStatus status, AsyncStatusRouteHandler handler) {
+        return statusRoute(status, HandlerMethod.of(handler));
+    }
+
+    private ErrorRouteSpec errorRoute(Class<? extends Throwable> type, HandlerMethod<?> handler) {
+        RouteAssembly.DefaultErrorRoute route = assembly.addErrorRoute(null, type, handle(handler));
         return new ErrorRouteSpec() {
             @Override
             public ErrorRouteSpec produces(MediaType... mediaTypes) {
@@ -119,9 +138,8 @@ public final class DefaultHttpRouteBuilder implements HttpRouteBuilder {
         };
     }
 
-    @Override
-    public StatusRouteSpec status(HttpStatus status, StatusRouteHandler handler) {
-        RouteAssembly.DefaultStatusRoute route = assembly.addStatusRoute(null, status, handle(HandlerMethod.of(handler)));
+    private StatusRouteSpec statusRoute(HttpStatus status, HandlerMethod<?> handler) {
+        RouteAssembly.DefaultStatusRoute route = assembly.addStatusRoute(null, status, handle(handler));
         return new StatusRouteSpec() {
             @Override
             public StatusRouteSpec produces(MediaType... mediaTypes) {
