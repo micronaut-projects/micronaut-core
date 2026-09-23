@@ -84,7 +84,6 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     private static final String SCOPED_PROXY_FACTORY = "__micronaut_create_scoped_proxy";
     private static final String SCOPED_PROXY_BIND_JAVA_PROXY_METHOD = "_micronaut_bind_java_proxy";
     private static final String RAW_INSTANCE_FACTORY = "__micronaut_create_raw_instance";
-    private static final String PREPARE_INTRODUCTION = "__micronaut_prepare_introduction";
     private static final String SCOPED_PROXY_OVERRIDE_METHOD = "_micronaut_put_override";
     private static final String SCOPED_PROXY_SETTER_OVERRIDE_METHOD = "_micronaut_put_setter_override";
     private static final String SCOPED_PROXY_REGISTER_MEMBER_METHOD = "_micronaut_register_member";
@@ -116,7 +115,8 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
     }
 
     private <T> T createIntroductionProxyInFrame(RuntimeProxyDefinition<T> proxyDefinition) {
-        Value value = PythonContextRuntime.findClass(resolvePythonClassReference(proxyDefinition));
+        PythonContextRuntime.PythonClassReference classReference = resolvePythonClassReference(proxyDefinition);
+        Value value = PythonContextRuntime.findClass(classReference);
         AtomicReference<@Nullable Object> targetBeanRef = new AtomicReference<>();
         Map<String, List<RuntimeProxyDefinition.InterceptedMethod<T>>> interceptedMethodsByName = new LinkedHashMap<>();
         for (RuntimeProxyDefinition.InterceptedMethod<T> interceptedMethod : proxyDefinition.interceptedMethods()) {
@@ -145,8 +145,7 @@ public final class PythonProxyCreator implements RuntimeProxyCreator {
             );
             introductionFunctions.put(methodName, proxiedFunction);
         }
-        // stubs the abstract methods once per class and context, as newIntroduction does
-        PythonContextRuntime.helper(value.getContext(), PREPARE_INTRODUCTION).execute(value);
+        PythonContextRuntime.prepareIntroductionClass(classReference, value);
         Class<T> type = proxyDefinition.proxyBeanDefinition().getBeanType();
         Value targetValue = newIntroductionTarget(proxyDefinition, value);
         T target = box(type, targetValue);
