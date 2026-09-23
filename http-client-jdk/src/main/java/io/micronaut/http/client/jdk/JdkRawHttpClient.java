@@ -51,19 +51,17 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
         // null is equivalent to an empty body
         CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
-        boolean built = false;
+        Flux<? extends HttpResponse<?>> response;
         try {
-            Flux<? extends HttpResponse<?>> response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
-            built = true;
-            // the body is released however the exchange ends, also when the JDK client never reads
-            // it, e.g. because the connection was refused or the request is a GET
-            return response.doFinally(signal -> body.close());
-        } finally {
-            if (!built) {
-                // building the exchange failed, so nothing else releases the body
-                body.close();
-            }
+            response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
+        } catch (RuntimeException e) {
+            // building the exchange failed, so nothing else releases the body
+            body.close();
+            throw e;
         }
+        // the body is released however the exchange ends, also when the JDK client never reads
+        // it, e.g. because the connection was refused or the request is a GET
+        return response.doFinally(signal -> body.close());
     }
 
     @Override
