@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.type.Argument;
 import io.micronaut.web.router.exceptions.UnsatisfiedPathVariableRouteException;
 import io.micronaut.http.MediaType;
 import org.jspecify.annotations.Nullable;
@@ -37,7 +38,9 @@ import java.util.Set;
  * <p>There are accessors for strings and the primitive types, e.g. {@code getLong("id")} or
  * {@code findInt("page")}, with a default value for a missing variable, e.g.
  * {@code getInt("page", 0)}, and {@link #get(String, Class)} and {@link #find(String, Class)} for
- * any other type, e.g. {@code UUID}. Values convert with the conversion service of the route,
+ * any other type, e.g. {@code UUID}, or {@link #get(String, Argument)} and
+ * {@link #find(String, Argument)} for a generic type, e.g. {@code List<Integer>} of an exploded
+ * variable. Values convert with the conversion service of the route,
  * like the path variable arguments of a controller method, and fail the same way: a missing
  * variable or a value that does not convert is answered with 400.</p>
  *
@@ -68,7 +71,9 @@ public interface PathVariables {
      * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
      * @throws ConversionErrorException if the value does not convert, answered with 400
      */
-    <T> T get(String name, Class<T> type);
+    default <T> T get(String name, Class<T> type) {
+        return get(name, Argument.of(type, name));
+    }
 
     /**
      * An optional variable converted to a type.
@@ -79,7 +84,35 @@ public interface PathVariables {
      * @return The value, if present
      * @throws ConversionErrorException if the value is present but does not convert, answered with 400
      */
-    <T> Optional<T> find(String name, Class<T> type);
+    default <T> Optional<T> find(String name, Class<T> type) {
+        return find(name, Argument.of(type, name));
+    }
+
+    /**
+     * A required variable converted to a type, with its type arguments, like a path variable
+     * argument of a controller method of that type, e.g. {@code Argument.listOf(Integer.class)}.
+     *
+     * @param name The name of the variable
+     * @param type The type
+     * @param <T>  The type
+     * @return The value
+     * @throws UnsatisfiedPathVariableRouteException if the variable has no value, answered with 400
+     * @throws ConversionErrorException if the value does not convert, answered with 400
+     * @since 5.3.0
+     */
+    <T> T get(String name, Argument<T> type);
+
+    /**
+     * An optional variable converted to a type, with its type arguments.
+     *
+     * @param name The name of the variable
+     * @param type The type
+     * @param <T>  The type
+     * @return The value, if present
+     * @throws ConversionErrorException if the value is present but does not convert, answered with 400
+     * @since 5.3.0
+     */
+    <T> Optional<T> find(String name, Argument<T> type);
 
     /**
      * A required variable as a string.
