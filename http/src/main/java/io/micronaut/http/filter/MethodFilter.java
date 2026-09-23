@@ -144,7 +144,9 @@ record MethodFilter<T>(FilterOrder order,
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
-                        request = ctx.request.mutate();
+                        // a mutable wrapper of a request that cannot be mutated, e.g. a wrapper
+                        // another filter continued with
+                        request = MutableServerRequest.mutable(ctx.request);
                     }
                     return request;
                 };
@@ -413,7 +415,9 @@ record MethodFilter<T>(FilterOrder order,
      * mutable receives a mutable view of it, see {@link HttpRequest#mutate()}. The headers of the
      * view are those of the request, but a new URI is the view's own: when the filter changes
      * the URI in place and does not return a request, the view replaces the request, so that
-     * the new URI is used, e.g. to match the route after a pre-matching filter.
+     * the new URI is used, e.g. to match the route after a pre-matching filter. The view of a
+     * server request replaces it as a server request, see {@link MutableServerRequest}, so that the
+     * route still reads the bytes of the body.
      *
      * @param filterContext The context the filter ran with
      * @param argument      The mutable request the filter was given
@@ -425,7 +429,8 @@ record MethodFilter<T>(FilterOrder order,
         if (!(argument instanceof MutableHttpRequest<?> view) || argument == request || view.getUri().equals(request.getUri())) {
             return flow;
         }
-        return flow.map(result -> result.request() == request && result.response() == null ? result.withRequest(view) : result);
+        HttpRequest<?> changed = MutableServerRequest.of(request, view);
+        return flow.map(result -> result.request() == request && result.response() == null ? result.withRequest(changed) : result);
     }
 
     private Object[] bindArgsSync(FilterMethodContext context) {

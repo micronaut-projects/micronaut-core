@@ -66,10 +66,12 @@ final class AsyncServerHttpRequestArgumentBinder implements TypedRequestArgument
 
     @Override
     public BindingResult<AsyncServerHttpRequest<?>> bind(ArgumentConversionContext<AsyncServerHttpRequest<?>> context, HttpRequest<?> source) {
-        if (!(source instanceof ServerHttpRequest<?> request)) {
+        // the request a filter continued with reads the body of the server request it wraps
+        ServerHttpRequest<?> server = ServerRequestBody.of(source);
+        if (server == null) {
             return BindingResult.unsatisfied();
         }
-        AsyncServerHttpRequest<?> asyncRequest = new DefaultAsyncServerHttpRequest<>(request, this);
+        AsyncServerHttpRequest<?> asyncRequest = new DefaultAsyncServerHttpRequest<>(source, server, this);
         return () -> Optional.of(asyncRequest);
     }
 

@@ -21,10 +21,14 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.order.Ordered;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.core.propagation.PropagatedContext;
+import io.micronaut.http.HttpMessage;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
 
+import java.net.URI;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
@@ -40,6 +44,14 @@ import java.util.function.Supplier;
  * after it: the next filters, the route, the error routes and the response filters. The change of
  * a synchronous filter is taken when it returns, the change of an asynchronous filter when its
  * stage completes, e.g. an element the filter added once it looked something up.</p>
+ *
+ * <p>Like a filter method with a {@link MutableHttpRequest} parameter, a request filter is given
+ * the request if it is mutable, and its {@link HttpRequest#mutate() mutable view} otherwise, which
+ * is a server request if the request is one, see {@link MutableServerRequest}. What runs after the
+ * filter sees the headers and attributes it changed in place, and the URI it changed in place: the
+ * mutable request replaces the request then, like the view of a filter method, e.g. to match the
+ * route with the new URI after a pre-matching filter. Like a filter method returning a request, a
+ * request filter can also continue with another request, e.g. with another method or body.</p>
  *
  * @param requestStep  The request filter
  * @param responseStep The response filter
@@ -79,35 +91,65 @@ record RouteFunctionFilter(
     /**
      * A synchronous request filter.
      *
-     * @param filter   Returns a response to answer the request with, or {@code null} to proceed
+     * @param filter   Returns a response to answer the request with, a request to continue with,
+     *                 or {@code null} to proceed
      * @param executor The executor to run the filter on, or {@code null}
      * @return The filter
      */
     static RouteFunctionFilter request(RouteFilterFunctions.Request filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(context -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
-            HttpResponse<?> response = filter.filter(context.request(), propagatedContext);
-            FilterContext next = withChangedContext(context, propagatedContext);
-            return ExecutionFlow.just(response == null ? next : next.withResponse(response));
+            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
+            URI uri = request.getUri();
+            HttpMessage<?> result = filter.filter(request, propagatedContext);
+            return ExecutionFlow.just(next(withChangedContext(context, propagatedContext), request, uri, result));
         }, null, executor);
     }
 
     /**
      * An asynchronous request filter.
      *
-     * @param filter Completes with a response to answer the request with, or {@code null} to proceed
+     * @param filter Completes with a response to answer the request with, a request to continue
+     *               with, or {@code null} to proceed
      * @return The filter
      */
     static RouteFunctionFilter requestAsync(RouteFilterFunctions.AsyncRequest filter) {
         return new RouteFunctionFilter(context -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
+            MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
+            URI uri = request.getUri();
             return CompletableFutureExecutionFlow.just(
-                filter.filter(context.request(), propagatedContext).thenApply(response -> {
-                    FilterContext next = withChangedContext(context, propagatedContext);
-                    return response == null ? next : next.withResponse(response);
-                })
+                filter.filter(request, propagatedContext).thenApply(result ->
+                    next(withChangedContext(context, propagatedContext), request, uri, result))
             );
         }, null, null);
+    }
+
+    /**
+     * The context of the filter chain after a request filter, like after a filter method: a
+     * response answers the request, a request replaces it, and so does the mutable request the
+     * filter was given when the filter changed its URI in place.
+     *
+     * @param context The context after the filter, with the propagated context it changed
+     * @param request The mutable request the filter was given
+     * @param uri     The URI of the mutable request before the filter
+     * @param result  The result of the filter
+     * @return The context
+     */
+    private static FilterContext next(FilterContext context, MutableHttpRequest<?> request, URI uri, @Nullable HttpMessage<?> result) {
+        if (result instanceof HttpResponse<?> response) {
+            return context.withResponse(response);
+        }
+        if (result instanceof HttpRequest<?> replacement) {
+            return context.withRequest(replacement);
+        }
+        if (result != null) {
+            throw new IllegalArgumentException("A request filter returns a response, a request or null, not: " + result);
+        }
+        if (request != context.request() && !request.getUri().equals(uri)) {
+            return context.withRequest(request);
+        }
+        return context;
     }
 
     /**

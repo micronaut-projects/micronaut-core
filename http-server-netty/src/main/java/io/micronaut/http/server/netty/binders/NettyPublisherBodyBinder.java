@@ -25,13 +25,13 @@ import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.reactivestreams.Publisher;
@@ -70,18 +70,19 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
 
     @Override
     public BindingResult<Publisher<?>> bind(ArgumentConversionContext<Publisher<?>> context, HttpRequest<?> source) {
-        if (source instanceof NettyHttpRequest<?> nhr) {
-            ByteBody rootBody = nhr.byteBody();
+        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
             @SuppressWarnings("unchecked")
             Argument<Object> targetType = (Argument<Object>) context.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-            MediaType mediaType = nhr.getContentType().orElse(null);
+            MediaType mediaType = source.getContentType().orElse(null);
             if (!Publishers.isSingle(context.getArgument().getType()) && !context.getArgument().isSpecifiedSingle() && mediaType != null) {
                 Optional<MessageBodyReader<Object>> reader = nettyBodyAnnotationBinder.bodyHandlerRegistry.findReader(targetType, List.of(mediaType));
                 if (reader.isPresent() && reader.get() instanceof ChunkedMessageBodyReader<Object> piecewise) {
-                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, nhr.getHeaders(), rootBody.toByteBufferPublisher());
+                    Publisher<?> pub = piecewise.readChunked(targetType, mediaType, source.getHeaders(), rootBody.toByteBufferPublisher());
                     return () -> Optional.of(pub);
                 }
             }
@@ -90,7 +91,7 @@ final class NettyPublisherBodyBinder implements NonBlockingBodyArgumentBinder<Pu
                 .map(bytes -> {
                     Optional<Object> value;
                     try {
-                        value = nettyBodyAnnotationBinder.transform(nhr, context.with(targetType), bytes);
+                        value = nettyBodyAnnotationBinder.transform(source, server, context.with(targetType), bytes);
                     } catch (RuntimeException e) {
                         throw e;
                     } catch (Throwable e) {
