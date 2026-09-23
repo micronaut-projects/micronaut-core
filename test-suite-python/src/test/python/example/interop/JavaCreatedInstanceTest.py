@@ -4,6 +4,7 @@ from micronaut.test.extensions.junit5.annotation import MicronautTest
 from org.junit.jupiter.api import Test
 
 from .Greeting import Greeting
+from .Note import Note
 
 
 @MicronautTest
@@ -30,6 +31,38 @@ class JavaCreatedInstanceTest:
             assert isinstance(greeting, Greeting), f"not a Greeting: {type(greeting)}"
             assert greeting == Greeting("Hello John"), f"not equal: {greeting!r}"
             assert repr(greeting) == repr(Greeting("Hello John")), f"repr is {greeting!r}"
+        finally:
+            nested.close()
+
+    @Test
+    def a_java_created_instance_is_one_python_object_per_context(self) -> None:
+        nested = ApplicationContext.run()
+        try:
+            mapper = nested.getBean(JsonMapper)
+            note = mapper.readValue('{"text":"Hello John"}', Note)
+
+            assert isinstance(note, Note), f"not a Note: {type(note)}"
+            # Note has no __eq__, so it is equal only to itself: the Python view of the wrapper has to
+            # answer with one object per context for any of this to hold
+            assert note == note, f"not equal to itself: {note!r}"
+            assert hash(note) == hash(note), "the hash of the wrapper is not stable"
+            assert {note: "value"}[note] == "value", "the wrapper cannot be a dictionary key"
+            assert note in {note}, "the wrapper cannot be a set member"
+        finally:
+            nested.close()
+
+    @Test
+    def the_public_as_polyglot_value_is_the_object_of_the_wrapper(self) -> None:
+        nested = ApplicationContext.run()
+        try:
+            mapper = nested.getBean(JsonMapper)
+            note = mapper.readValue('{"text":"Hello John"}', Note)
+
+            # asPolyglotValue() is a public member Python calls to reach the live object of a wrapper
+            # (a bean held across a RefreshEvent, for one): a write through it must reach the wrapper
+            note.asPolyglotValue().text = "Hello Jane"
+
+            assert note.text == "Hello Jane", "a write through asPolyglotValue() did not reach the wrapper"
         finally:
             nested.close()
 
