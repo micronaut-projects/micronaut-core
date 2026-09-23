@@ -21,6 +21,7 @@ import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.multipart.RawFormField;
 import org.jspecify.annotations.Nullable;
+import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
@@ -175,7 +176,16 @@ final class DefaultFormParts implements FormParts, Subscriber<RawFormField> {
             }
         }
         if (subscribe) {
-            request.getRawFormFields().subscribe(this);
+            Publisher<RawFormField> fields;
+            try {
+                fields = request.getRawFormFields();
+            } catch (Throwable e) {
+                // e.g. the body was claimed by a filter: this and every later operation fail
+                // with the cause, instead of leaving the operation in progress
+                onError(e);
+                return future;
+            }
+            fields.subscribe(this);
         } else if (s != null) {
             s.request(1);
         }
