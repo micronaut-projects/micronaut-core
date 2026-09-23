@@ -166,7 +166,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute after(ContextRouteResponseFilter filter) {
+    public HandlerUriRoute after(ContextReplacingRouteResponseFilter filter) {
         return configure(r -> r.after(filter));
     }
 
@@ -176,7 +176,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter) {
+    public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
         return configure(r -> r.after(executorName, filter));
     }
 
@@ -186,7 +186,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter) {
+    public HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
         return configure(r -> r.afterAsync(filter));
     }
 

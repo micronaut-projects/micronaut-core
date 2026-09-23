@@ -173,4 +173,75 @@ public interface RouteFilterSpec<S extends RouteFilterSpec<S>> {
      * @see AsyncContextRouteResponseFilter
      */
     S afterAsync(AsyncContextRouteResponseFilter filter);
+
+    /**
+     * Filter the responses with a filter that can replace the response, like a
+     * {@code @ResponseFilter} method returning a response: the response it returns is the response
+     * the response filters after it and the client see, and {@code null} continues with the
+     * response it was given. Otherwise the same as {@link #after(RouteResponseFilter)}, which
+     * takes a filter that returns nothing, so that its lambdas are never ambiguous.
+     *
+     * @param filter The filter, which can change the response in place or replace it
+     * @return This
+     * @see ReplacingRouteResponseFilter
+     */
+    S afterReplacing(ReplacingRouteResponseFilter filter);
+
+    /**
+     * Filter the responses on the named executor with a filter that can replace the response.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter, which can change the response in place or replace it
+     * @return This
+     * @see #after(String, RouteResponseFilter)
+     * @see ReplacingRouteResponseFilter
+     */
+    S afterReplacing(String executorName, ReplacingRouteResponseFilter filter);
+
+    /**
+     * Filter the responses asynchronously with a filter that can replace the response, like a
+     * {@code @ResponseFilter} method returning a {@code CompletionStage} of a response: the filter
+     * chain continues with the response the stage completes with, or with the response the filter
+     * was given if it completes with {@code null}.
+     *
+     * @param filter The filter, which can change the response in place or replace it
+     * @return This
+     * @see #afterAsync(AsyncRouteResponseFilter)
+     * @see AsyncReplacingRouteResponseFilter
+     */
+    S afterReplacingAsync(AsyncReplacingRouteResponseFilter filter);
+
+    /**
+     * Filter the responses with a filter that can replace the response and changes the propagated
+     * context of the response filters after it.
+     *
+     * @param filter The filter, which can change the response in place or replace it
+     * @return This
+     * @see #afterReplacing(ReplacingRouteResponseFilter)
+     * @see ContextReplacingRouteResponseFilter
+     */
+    S afterReplacing(ContextReplacingRouteResponseFilter filter);
+
+    /**
+     * Filter the responses on the named executor with a filter that can replace the response and
+     * changes the propagated context.
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @param filter       The filter, which can change the response in place or replace it
+     * @return This
+     * @see #afterReplacing(String, ReplacingRouteResponseFilter)
+     * @see ContextReplacingRouteResponseFilter
+     */
+    S afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter);
+
+    /**
+     * Filter the responses asynchronously with a filter that can replace the response and changes
+     * the propagated context until its stage completes.
+     *
+     * @param filter The filter, which can change the response in place or replace it
+     * @return This
+     * @see #afterReplacingAsync(AsyncReplacingRouteResponseFilter)
+     * @see AsyncContextReplacingRouteResponseFilter
+     */
+    S afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter);
 }

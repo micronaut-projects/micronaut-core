@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpMessage;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import org.jspecify.annotations.Nullable;
@@ -79,9 +80,11 @@ public final class RouteFilterFunctions {
          * @param request           The request
          * @param response          The response
          * @param propagatedContext The propagated context, to change for the response filters after it
+         * @return A response to continue with instead of the response, or {@code null} to continue
+         * with the response
          * @throws Exception An error
          */
-        void filter(HttpRequest<?> request, MutableHttpResponse<?> response, MutablePropagatedContext propagatedContext) throws Exception;
+        @Nullable HttpResponse<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response, MutablePropagatedContext propagatedContext) throws Exception;
     }
 
     /**
@@ -93,9 +96,10 @@ public final class RouteFilterFunctions {
          * @param request           The request
          * @param response          The response
          * @param propagatedContext The propagated context, to change until the stage completes
-         * @return Completes when the response is filtered
+         * @return Completes with a response to continue with instead of the response, or with
+         * {@code null} to continue with the response
          * @throws Exception An error
          */
-        CompletionStage<?> filter(HttpRequest<?> request, MutableHttpResponse<?> response, MutablePropagatedContext propagatedContext) throws Exception;
+        CompletionStage<? extends @Nullable HttpResponse<?>> filter(HttpRequest<?> request, MutableHttpResponse<?> response, MutablePropagatedContext propagatedContext) throws Exception;
     }
 }

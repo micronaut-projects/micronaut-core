@@ -106,24 +106,24 @@ public interface HandlerUriRoute {
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#after(ContextRouteResponseFilter)
+     * @see HttpRouteSpec#afterReplacing(ContextReplacingRouteResponseFilter)
      */
-    HandlerUriRoute after(ContextRouteResponseFilter filter);
+    HandlerUriRoute after(ContextReplacingRouteResponseFilter filter);
 
     /**
      * @param executorName The name of the executor
      * @param filter       The filter
      * @return The route
-     * @see HttpRouteSpec#after(String, ContextRouteResponseFilter)
+     * @see HttpRouteSpec#afterReplacing(String, ContextReplacingRouteResponseFilter)
      */
-    HandlerUriRoute after(String executorName, ContextRouteResponseFilter filter);
+    HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter);
 
     /**
      * @param filter The filter
      * @return The route
-     * @see HttpRouteSpec#afterAsync(AsyncContextRouteResponseFilter)
+     * @see HttpRouteSpec#afterReplacingAsync(AsyncContextReplacingRouteResponseFilter)
      */
-    HandlerUriRoute afterAsync(AsyncContextRouteResponseFilter filter);
+    HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter);
 
     /**
      * Declare the route in a group: the filters of the group, and of the groups around it, run
