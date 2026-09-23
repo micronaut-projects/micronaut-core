@@ -30,6 +30,7 @@ import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BaseStreamingByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.StreamingBodyExecutor;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
@@ -207,6 +208,21 @@ public class ByteBodyFactory {
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer. Upstream upstream) {
         ReactiveByteBufferByteBody.SharedBuffer sb = new ReactiveByteBufferByteBody.SharedBuffer(this.readBufferFactory(), limits, upstream);
         return new StreamingBody(sb, new ReactiveByteBufferByteBody(sb));
+    }
+
+    /**
+     * The executor the {@link StreamingBody#sharedBuffer() buffer} of a
+     * {@link #createStreamingBody streaming body} of this factory must be fed on. <b>Internal
+     * API.</b>
+     *
+     * @return The executor, or {@code null} if the buffer may be fed from any thread, one call at
+     * a time
+     * @since 5.3.0
+     */
+    @Internal
+    public @Nullable StreamingBodyExecutor streamingBodyExecutor() {
+        // the default buffer serializes concurrent calls itself
+        return null;
     }
 
     /**

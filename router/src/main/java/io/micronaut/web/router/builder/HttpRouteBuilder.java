@@ -190,6 +190,25 @@ public interface HttpRouteBuilder {
     HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler);
 
     /**
+     * Route a {@code GET} request to a server-sent events handler: the response is a
+     * {@code text/event-stream} of the events the handler pushes to its
+     * {@link io.micronaut.http.sse.SseEmitter}. The route produces {@code text/event-stream}.
+     *
+     * <pre>{@code
+     * routes.sse("/ticks", (request, pathVariables, events) -> {
+     *     events.heartbeat(Duration.ofSeconds(15));
+     *     ticker.onTick(tick -> events.send(Event.of(tick).id(String.valueOf(tick.sequence()))));
+     * });
+     * }</pre>
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see SseHandler
+     */
+    HttpRouteSpec sse(String uri, SseHandler handler);
+
+    /**
      * Route a {@code GET} request to a handler function that completes the response later.
      *
      * @param uri     The URI template

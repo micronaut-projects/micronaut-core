@@ -28,6 +28,7 @@ import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.sse.SseEmitter;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -72,6 +73,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
     private static final Argument<AsyncServerHttpRequest> ASYNC_REQUEST = Argument.of(AsyncServerHttpRequest.class, "request");
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
+    private static final Argument<SseResponder> SSE_RESPONDER = Argument.of(SseResponder.class, "events");
 
     /**
      * The metadata of a {@code @Body} parameter, which selects the body binder.
@@ -155,6 +157,25 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             new Argument<?>[]{ASYNC_REQUEST, PATH_VARIABLES},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> releaseWhenDone((AsyncServerHttpRequest<?>) args[0], () -> handler.handle((AsyncServerHttpRequest<?>) args[0], (PathVariables) args[1]))
+        );
+    }
+
+    /**
+     * The method of a server-sent events route: the server binds the {@link SseResponder}, which
+     * creates the emitter, and the result completes with the response when the first event is
+     * sent.
+     *
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(SseHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            SseHandler.class,
+            new Class<?>[]{HttpRequest.class, PathVariables.class, SseEmitter.class},
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, SSE_RESPONDER},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> ((SseResponder) args[2]).respond(events -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], events))
         );
     }
 
