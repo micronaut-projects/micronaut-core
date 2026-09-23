@@ -1,4 +1,4 @@
-import io.micronaut.build.internal.python.PythonVfsBytecodeCompile
+import io.micronaut.build.python.PythonVfsBytecodeCompile
 
 plugins {
     id("io.micronaut.build.internal.convention-library")
@@ -51,4 +51,23 @@ tasks.processResources {
     from(compileVfsPythonBytecode) {
         into("GRAALPY-VFS/io.micronaut/micronaut-inject-python")
     }
+}
+
+noReflection {
+    allowIn("io.micronaut.python.compiler.InMemoryBeanDefinitionsProvider", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.python.compiler.IncrementalCompilation", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.python.compiler.JavaFileObjectClassLoader", "CLASS_LOADING")
+    allowIn("io.micronaut.python.compiler.PyronautJavaCompiler", "CLASS_LOADING", "CLASS_NAMES", "SERVICE_LOADING")
+    allowIn("io.micronaut.python.processing.PythonStubGenerator", "CLASS_MEMBERS", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.python.processing.annotation.AnnotationMemberReflection", "CLASS_MEMBERS")
+    allowIn("io.micronaut.python.processing.annotation.PythonAnnotationValues", "REFLECTIVE_ACCESS")
+    allowIn("io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor", "CLASS_NAMES")
+    allowIn("io.micronaut.python.processing.element.AbstractPythonClassElement", "CLASS_NAMES")
+    allowIn("io.micronaut.python.processing.element.AbstractPythonElement", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.python.processing.element.PythonAnnotationElement", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.python.processing.element.PythonScriptElement", "SERVICE_LOADING")
+    allowIn("io.micronaut.python.processing.element.TypeAnnotatedClassElement", "CLASS_NAMES")
+    allowIn("io.micronaut.python.processing.util.PythonAnnotationTypes", "ANNOTATIONS", "CLASS_MEMBERS", "CLASS_NAMES", "ENUM_CONSTANTS")
+    allowIn("io.micronaut.python.processing.visitor.LoadedVisitor", "GENERIC_SIGNATURES")
+    allowIn("io.micronaut.python.processing.visitor.PythonTypeElementVisitorProcessor", "ANNOTATIONS", "CLASS_NAMES", "SERVICE_LOADING")
 }

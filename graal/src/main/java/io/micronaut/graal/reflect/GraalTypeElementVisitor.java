@@ -33,6 +33,7 @@ import io.micronaut.inject.ast.ElementQuery;
 import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.MethodElement;
 import io.micronaut.inject.ast.ParameterElement;
+import io.micronaut.inject.utils.BeanInjectionUtils;
 import io.micronaut.inject.visitor.TypeElementQuery;
 import io.micronaut.inject.visitor.TypeElementVisitor;
 import io.micronaut.inject.visitor.VisitorContext;
@@ -179,10 +180,6 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
                     element,
                     false
                 );
-                MethodElement me = element.getPrimaryConstructor().orElse(null);
-                if (me != null && me.isPrivate() && !me.hasAnnotation(ReflectiveAccess.class)) {
-                    processMethodElement(me, reflectiveClasses);
-                }
             }
 
             if (element.isInner()) {
@@ -294,11 +291,10 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
     }
 
     private void processBeanConstructor(Map<String, ReflectionConfigData> reflectiveClasses, ClassElement beanElement, boolean isImport) {
-        final MethodElement constructor = beanElement.getPrimaryConstructor().orElse(null);
+        final MethodElement constructor = BeanInjectionUtils.findBeanConstructor(beanElement).orElse(null);
         if (constructor != null &&
             (constructor.hasAnnotation(ReflectiveAccess.class) ||
-                (isImport && !constructor.isPublic()) ||
-                (!isImport && constructor.isPrivate()))) {
+                (isImport && !constructor.isPublic()))) {
             processMethodElement(constructor, reflectiveClasses);
         }
     }
@@ -332,7 +328,9 @@ public class GraalTypeElementVisitor implements TypeElementVisitor<Object, Objec
         final String methodName = element.getName();
         final ClassElement declaringType = element.getDeclaringType();
         final ReflectionConfigData data = resolveClassData(declaringType.getName(), classes);
-        final List<AnnotationClassValue<?>> params = Arrays.stream(element.getParameters())
+        // a Kotlin suspend function has a trailing Continuation parameter on the JVM
+        final ParameterElement[] parameters = element.isSuspend() ? element.getSuspendParameters() : element.getParameters();
+        final List<AnnotationClassValue<?>> params = Arrays.stream(parameters)
             .map(ParameterElement::getType)
             .map(this::resolveName).collect(Collectors.toList());
         data.methods.add(

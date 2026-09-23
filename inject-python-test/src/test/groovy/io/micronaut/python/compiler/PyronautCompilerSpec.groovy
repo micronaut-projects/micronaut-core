@@ -407,15 +407,12 @@ class MyNamedService:
         // Check that META-INF file was generated
         def metaInfDir = new File(tempDir, "META-INF")
         metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/inject/Singleton.py")
-        transformedFile.exists()
-
-        // Verify the transformed content contains the original code and generated decorators
-        def transformedContent = transformedFile.text
-        // Check that decorators were generated for jakarta.inject annotations
-        // no @Target on Singleton: Java lets it annotate annotation types, so the decorator says so
-        transformedContent.contains("@micronaut_annotation(\"jakarta.inject.Singleton\", annotationTypeTarget=True)")
-        transformedContent.contains("def Singleton(")
+        // no module is generated for the annotations: the manifest names them for the runtime
+        !new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/inject").exists()
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.packages["jakarta.inject"] == "jakarta.inject"
+        manifest.member("jakarta.inject", "Singleton") == ["jakarta.inject.Singleton", "annotation"]
+        manifest.member("jakarta.inject", "Named") == ["jakarta.inject.Named", "annotation"]
 
         cleanup:
         tempDir.deleteDir()
@@ -664,15 +661,8 @@ class MyRepeatableService:
         // Check that META-INF file was generated
         def metaInfDir = new File(tempDir, "META-INF")
         metaInfDir.exists()
-        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/RepeatableAnnotation.py")
-        transformedFile.exists()
-
-        // Verify the transformed content contains the original code and generated decorators
-        def transformedContent = transformedFile.text
-
-        // Check that decorator was generated with repeatable info using the new codepath
-        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.RepeatableAnnotation\", repeated=\"io.micronaut.python.compiler.RepeatableAnnotations\", annotationTypeTarget=True)")
-        transformedContent.contains("def RepeatableAnnotation(")
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.member("micronaut.python.compiler", "RepeatableAnnotation") == ["io.micronaut.python.compiler.RepeatableAnnotation", "annotation"]
 
         cleanup:
         tempDir.deleteDir()
@@ -700,16 +690,12 @@ class MyNestedRepeatableService:
 
         then:
         def metaInfDir = new File(tempDir, "META-INF")
-        def transformedFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/NestedRepeatableAnnotation.py")
-        transformedFile.exists()
-        def transformedContent = transformedFile.text
-        transformedContent.contains('@micronaut_annotation("io.micronaut.python.compiler.NestedRepeatableAnnotation", repeated="io.micronaut.python.compiler.NestedRepeatableAnnotation.List", annotationTypeTarget=True)')
-        transformedContent.contains("def NestedRepeatableAnnotation(")
-        !transformedContent.contains("@List()")
-
-        def packageInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/__init__.py")
-        packageInit.exists()
-        packageInit.text.contains("from .NestedRepeatableAnnotation import NestedRepeatableAnnotation")
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.packages["micronaut.python.compiler"] == "io.micronaut.python.compiler"
+        manifest.member("micronaut.python.compiler", "NestedRepeatableAnnotation") == ["io.micronaut.python.compiler.NestedRepeatableAnnotation", "annotation"]
+        // the container of the repeatable annotation is not imported by the source, so it is no member
+        manifest.member("micronaut.python.compiler.NestedRepeatableAnnotation", "List") == null
+        !new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler").exists()
 
         cleanup:
         tempDir.deleteDir()
@@ -739,14 +725,11 @@ class MyTransactionalService:
 
         then:
         def metaInfDir = new File(tempDir, "META-INF")
-        def transactionalFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/jakarta/transaction/Transactional.py")
-        transactionalFile.exists()
-
-        def transformedContent = transactionalFile.text
-        transformedContent.contains("@micronaut_annotation(\"jakarta.transaction.Transactional\")")
-        transformedContent.contains("def Transactional(")
-        !transformedContent.contains("jakarta.interceptor")
-        !transformedContent.contains("InterceptorBinding")
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.member("jakarta.transaction", "Transactional") == ["jakarta.transaction.Transactional", "annotation"]
+        // the meta-annotations of an imported annotation are not imported with it
+        !manifest.packages.containsKey("jakarta.interceptor")
+        manifest.members.values().every { members -> !members.keySet().contains("InterceptorBinding") }
 
         cleanup:
         tempDir.deleteDir()
@@ -785,22 +768,20 @@ class AsyncImportService:
 
         then:
         def metaInfDir = new File(tempDir, "META-INF")
-        def singleResultFile = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/annotation/SingleResult.py")
-        singleResultFile.exists()
-        singleResultFile.text.contains('@micronaut_annotation("io.micronaut.core.async.annotation.SingleResult"')
-
-        def propagationInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/async_/propagation/__init__.py")
-        propagationInit.exists()
-        propagationInit.text.contains("ReactorPropagation = java.type('io.micronaut.core.async.propagation.ReactorPropagation')")
-
-        def coreInit = new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core/__init__.py")
-        coreInit.text.contains("from . import async_")
+        // the keyword segment is importable with a trailing underscore; the manifest maps it back to the Java package
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.packages["micronaut.core.async_"] == "io.micronaut.core.async"
+        manifest.packages["micronaut.core.async_.annotation"] == "io.micronaut.core.async.annotation"
+        manifest.packages["micronaut.core.async_.propagation"] == "io.micronaut.core.async.propagation"
+        manifest.member("micronaut.core.async_.annotation", "SingleResult") == ["io.micronaut.core.async.annotation.SingleResult", "annotation"]
+        manifest.member("micronaut.core.async_.propagation", "ReactorPropagation") == ["io.micronaut.core.async.propagation.ReactorPropagation", "class"]
+        !new File(metaInfDir, PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/core").exists()
 
         cleanup:
         tempDir.deleteDir()
     }
 
-    def "test imported Java keyword methods use generated facades and direct aliases use mapped bytecode"() {
+    def "test imported Java keyword methods and direct aliases use mapped bytecode"() {
         given:
         def pythonCode = '''
 from java.lang import Thread
@@ -850,15 +831,93 @@ class KeywordMethodService:
         def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
         sourceFile.exists()
         sourceFile.text == pythonCode
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}java/lang/__init__.py")
-            .text.contains("Thread = _MicronautJavaType(java.type('java.lang.Thread'), False)")
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}reactor/core/publisher/__init__.py")
-            .text.contains("Mono = _MicronautJavaType(java.type('reactor.core.publisher.Mono'), False)")
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.member("java.lang", "Thread") == ["java.lang.Thread", "class"]
+        manifest.member("reactor.core.publisher", "Mono") == ["reactor.core.publisher.Mono", "class"]
         new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}__pycache__")
             .listFiles().any { it.name.startsWith('__main__.') && it.name.endsWith('.pyc') }
         pythonContext.eval("python", "KeywordMethodService().imported_reactor(ImportedMono.just('imported')).block()").asString() == 'imported'
         pythonContext.eval("python", "KeywordMethodService().assigned_reactor(ImportedMono.just('assigned')).blockFirst()").asString() == 'assigned'
         pythonContext.eval("python", "KeywordMethodService().python_method()").asString() == 'python'
+
+        cleanup:
+        context?.close()
+        classLoader?.close()
+        tempDir.deleteDir()
+    }
+
+    def "test Python keyword aliases resolve on Java objects returned at runtime"() {
+        given:
+        def pythonCode = '''
+from jakarta.inject import Singleton
+from micronaut.python.compiler import KeywordMessage, KeywordSpecification
+
+
+@Singleton
+class KeywordAliasService:
+    def message(self):
+        return KeywordMessage.builder().from_("sender@example.com").to("john@example.com").build()
+
+    def sender(self, message):
+        return message.from_()
+
+    def combined(self):
+        a = KeywordSpecification.named("a")
+        b = KeywordSpecification.named("b")
+        return a.and_(b).or_(b.not_()).name()
+
+    def same(self):
+        a = KeywordSpecification.named("a")
+        return a.is_(KeywordSpecification.named("a")) and a.in_(["a", "b"]) and not a.is_(a.not_())
+
+    def missing(self, message):
+        return message.missing_()
+
+    def missing_keyword(self, message):
+        return message.while_()
+'''
+        def tempDir = File.createTempDir("python-test-keyword-alias", "")
+        def compiler = PyronautCompiler.builder()
+            .pythonCode(pythonCode)
+            .targetDir(tempDir)
+            .build()
+
+        when:
+        compiler.compile()
+        def classLoader = new URLClassLoader(tempDir.toURI().toURL())
+        def context = ApplicationContext.builder()
+            .classLoader(classLoader)
+            .build()
+            .start()
+        def pythonContext = context.getBean(org.graalvm.polyglot.Context)
+        def message = pythonContext.eval("python", "KeywordAliasService().message()").asHostObject()
+
+        then: "the alias is resolved at runtime, not rewritten by the compiler"
+        !pythonContext.eval("python", "'getattr' in KeywordAliasService.sender.__code__.co_names or 'getattr' in KeywordAliasService.message.__code__.co_names").asBoolean()
+        message instanceof KeywordMessage
+        message.from() == 'sender@example.com'
+        message.to() == 'john@example.com'
+        pythonContext.eval("python", "KeywordAliasService().sender(KeywordMessage.builder().from_('x@y').build())").asString() == 'x@y'
+        pythonContext.eval("python", "KeywordAliasService().combined()").asString() == '((a and b) or not b)'
+        pythonContext.eval("python", "KeywordAliasService().same()").asBoolean()
+
+        and: "the explicit spelling and the alias agree"
+        pythonContext.eval("python", "getattr(KeywordMessage.builder().from_('x@y').build(), 'from')()").asString() == 'x@y'
+        pythonContext.eval("python", "m = KeywordMessage.builder(); hasattr(m, 'from_') and hasattr(m, 'from') and not hasattr(m, 'nope_') and not hasattr(m, 'nope')").asBoolean()
+
+        when: "a member that exists under neither spelling"
+        pythonContext.eval("python", "KeywordAliasService().missing(KeywordMessage.builder().build())")
+
+        then:
+        def error = thrown(PolyglotException)
+        error.message.contains("foreign object has no attribute 'missing_'")
+
+        when: "a keyword alias whose stripped member does not exist either"
+        pythonContext.eval("python", "KeywordAliasService().missing_keyword(KeywordMessage.builder().build())")
+
+        then: "the error names the alias the caller used"
+        def keywordError = thrown(PolyglotException)
+        keywordError.message.contains("foreign object has no attribute 'while_'")
 
         cleanup:
         context?.close()
@@ -890,8 +949,7 @@ class ErrorController:
         def sourceFile = new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
         sourceFile.exists()
         sourceFile.text == pythonCode
-        new File(tempDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}micronaut/http/annotation/Error.py")
-            .text.contains('@micronaut_annotation("io.micronaut.http.annotation.Error"')
+        JavaImportsManifest.read(tempDir).member("micronaut.http.annotation", "Error") == ["io.micronaut.http.annotation.Error", "annotation", "class-value"]
 
         cleanup:
         tempDir.deleteDir()
@@ -1063,12 +1121,8 @@ class MyMergeStrategy(Mapper.MergeStrategy):
         compiler.compile()
 
         then:
-        def mapperFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/context/annotation/Mapper.py")
-        mapperFile.exists()
-        mapperFile.text.contains("def _Mapper_Mapping(")
-        !mapperFile.text.contains("def Mapping(")
-        mapperFile.text.contains("Mapper.Mapping = _Mapper_Mapping")
-        mapperFile.text.contains("Mapper.MergeStrategy = MergeStrategy")
+        // the nested types of the annotation are attributes of its runtime decorator, resolved on the class path
+        JavaImportsManifest.read(tempDir).member("micronaut.context.annotation", "Mapper") == ["io.micronaut.context.annotation.Mapper", "annotation"]
 
         cleanup:
         tempDir.deleteDir()
@@ -1096,19 +1150,11 @@ class Message:
         compiler.compile()
 
         then:
-        def serdeableFile = new File(tempDir, "META-INF/" + PythonAnnotationProcessor.APPLICATION_SRC_PATH + "/micronaut/python/compiler/Serdeable.py")
-        serdeableFile.exists()
-        def transformedContent = serdeableFile.text
-        transformedContent.indexOf("def _Serdeable_Serializable(") < transformedContent.indexOf("@_Serdeable_Serializable()")
-        transformedContent.indexOf("def _Serdeable_Deserializable(") < transformedContent.indexOf("@_Serdeable_Deserializable()")
-        transformedContent.indexOf("@_Serdeable_Serializable()") < transformedContent.indexOf("def Serdeable(")
-        transformedContent.indexOf("@_Serdeable_Deserializable()") < transformedContent.indexOf("def Serdeable(")
-        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Serializable\")")
-        transformedContent.contains("@micronaut_annotation(\"io.micronaut.python.compiler.Serdeable\$Deserializable\")")
-        !transformedContent.contains("def Serializable(")
-        !transformedContent.contains("def Deserializable(")
-        transformedContent.contains("Serdeable.Serializable = _Serdeable_Serializable")
-        transformedContent.contains("Serdeable.Deserializable = _Serdeable_Deserializable")
+        def manifest = JavaImportsManifest.read(tempDir)
+        manifest.member("micronaut.python.compiler", "Serdeable") == ["io.micronaut.python.compiler.Serdeable", "annotation"]
+        // the nested annotations are reached through the decorator (Serdeable.Serializable), not as members of the package
+        manifest.member("micronaut.python.compiler", "Serializable") == null
+        manifest.member("micronaut.python.compiler", "Deserializable") == null
 
         cleanup:
         tempDir.deleteDir()
@@ -1206,9 +1252,9 @@ class Message:
         then:
         filesList.contains("/src/__main__.py")
         filesList.contains("/src/__pycache__/__main__.")
-        filesList.contains("/src/micronaut/core/annotation/Introspected.py")
-        filesList.contains("/src/micronaut/core/annotation/__pycache__/Introspected.")
-        filesList.contains("/src/micronaut/core/__pycache__/__init__.")
+        // the imported annotation is served from the manifest: no module and no bytecode for it
+        filesList.contains("/src/${PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX}")
+        !filesList.contains("/src/micronaut/")
         messageClass.getMethod("formattedDateCreated").returnType == String
         message.formattedDateCreated() == "formatted: today"
 
@@ -1453,8 +1499,9 @@ class UserController:
         filesList.contains("/src/example/__pycache__/HelloController.")
         filesList.contains("/src/example/__init__.py")
         filesList.contains("/src/example/__pycache__/__init__.")
-        filesList.contains("/src/jakarta/inject/Singleton.py")
-        filesList.contains("/src/jakarta/inject/__pycache__/Singleton.")
+        // the Java imports are a manifest, not modules: nothing to compile for them
+        filesList.contains("/src/${PythonAnnotationProcessor.JAVA_IMPORTS_MANIFEST_PREFIX}")
+        !filesList.contains("/src/jakarta/")
         context.getBean(classLoader.loadClass('example.UserController'))
         context.getBean(classLoader.loadClass('example.HelloController'))
         cachedModule.contains("/__pycache__/HelloController.")
@@ -1603,11 +1650,7 @@ class RoomRepository:
         compiler.compile()
 
         then:
-        def joinFile = new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_SRC_PATH}/micronaut/data/annotation/Join.py")
-        joinFile.exists()
-        def joinContent = joinFile.text
-        joinContent.contains('Type = java.type("io.micronaut.data.annotation.Join$Type")')
-        joinContent.contains("Join.Type = Type")
+        JavaImportsManifest.read(tempTargetDir).member("micronaut.data.annotation", "Join") == ["io.micronaut.data.annotation.Join", "annotation"]
 
         and:
         def launcherFile = new File(tempTargetDir, "META-INF/${PythonAnnotationProcessor.APPLICATION_LAUNCHER_PATH}")
@@ -1749,8 +1792,8 @@ class PhoneRepository(CrudRepository[PhoneEntity, int]):
         when:
         compiler.compile()
         def classLoader = new URLClassLoader(tempTargetDir.toURI().toURL())
-        def contactDefinition = classLoader.loadClass('python.$ContactRepository$RuntimeProxy$Definition').newInstance()
-        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$RuntimeProxy$Definition').newInstance()
+        def contactDefinition = classLoader.loadClass('python.$ContactRepository$Intercepted$Definition').newInstance()
+        def phoneDefinition = classLoader.loadClass('python.$PhoneRepository$Intercepted$Definition').newInstance()
         def contactSave = contactDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
         def phoneSave = phoneDefinition.executableMethods.find { it.methodName == "save" && it.arguments.length == 1 }
 

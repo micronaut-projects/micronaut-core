@@ -20,6 +20,7 @@ import io.micronaut.context.event.ApplicationEventListener;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.server.tck.CorsUtils;
 import io.micronaut.http.tck.AssertionUtils;
 import io.micronaut.http.tck.HttpResponseAssertion;
 import io.micronaut.http.tck.ServerUnderTest;
@@ -33,7 +34,6 @@ import java.util.Map;
 
 import static io.micronaut.http.tck.TestScenario.asserts;
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -107,7 +107,7 @@ public class SimpleRequestWithCorsNotEnabledTest {
         if (expectedStatus.getCode() >= 400) {
             AssertionUtils.assertThrows(server, request, HttpResponseAssertion.builder()
                 .status(expectedStatus)
-                .assertResponse(response -> assertFalse(response.getHeaders().contains("Vary")))
+                .assertResponse(CorsUtils::assertVaryDoesNotNameOrigin)
                 .build());
         } else {
             AssertionUtils.assertDoesNotThrow(server, request, HttpResponseAssertion.builder()

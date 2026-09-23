@@ -17,6 +17,7 @@ dependencies {
     testImplementation(libs.managed.netty.codec.http)
     testImplementation(libs.managed.kotlinx.coroutines.core)
     testImplementation(projects.micronautContextPropagation)
+    testRuntimeOnly(projects.micronautJsonCore)
 
     testAnnotationProcessor(projects.micronautInjectJava)
     testAnnotationProcessor(platform(libs.test.boms.micronaut.validation))
@@ -35,3 +36,7 @@ dependencies {
 }
 
 //compileTestGroovy.groovyOptions.forkOptions.jvmArgs = ['-Xdebug', '-Xrunjdwp:transport=dt_socket,server=y,suspend=y,address=5005']
+
+noReflection {
+    allowIn("io.micronaut.http.server.ExecutableRouteInfo", "TARGET_MEMBERS")
+}

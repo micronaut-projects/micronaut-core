@@ -70,6 +70,17 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
+     * Attribute used while a bean with constructor advice is being constructed to share the interceptor registrations
+     * selected for it with its post-construct interception.
+     *
+     * <p>The value is a mutable stack that belongs to the creation in progress and must be treated as an
+     * implementation detail.</p>
+     *
+     * @since 5.2.1
+     */
+    String SHARED_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.sharedInterceptorRegistrations";
+
+    /**
      * Attribute that exposes the interceptor registrations selected while creating the bean being disposed.
      *
      * <p>The value is a read-only {@code List<BeanRegistration<?>>}. It is set only while a bean is being disposed and

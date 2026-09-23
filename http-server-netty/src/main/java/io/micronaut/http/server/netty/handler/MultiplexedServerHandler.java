@@ -28,7 +28,6 @@ import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.reactive.HotObservable;
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
@@ -106,6 +105,7 @@ abstract class MultiplexedServerHandler {
         private boolean requestAccepted;
         private boolean finished;
         private boolean reset;
+        private boolean closed;
         private Compressor. @Nullable Session compressionSession;
 
         MultiplexedStream(int streamId) {
@@ -165,7 +165,10 @@ abstract class MultiplexedServerHandler {
          * {@link #notifyDataConsumed(int)})
          */
         final int onDataRead(ByteBuf data, boolean endOfStream) {
-            if (streamer == null) {
+            if (streamer == null && closed) {
+                // no request will be accepted for this stream anymore
+                data.release();
+            } else if (streamer == null) {
                 if (requestAccepted) {
                     throw new IllegalStateException("Request already accepted");
                 }
@@ -176,12 +179,11 @@ abstract class MultiplexedServerHandler {
                     if (bufferedContent == null) {
                         fullBody = data;
                     } else {
-                        CompositeByteBuf composite = requiredCtx().alloc().compositeBuffer();
-                        for (ByteBuf c : bufferedContent) {
-                            composite.addComponent(true, c);
-                        }
-                        composite.addComponent(true, data);
-                        fullBody = composite;
+                        bufferedContent.add(data);
+                        List<ByteBuf> pieces = bufferedContent;
+                        // composeBody takes ownership of the pieces even when it fails
+                        bufferedContent = null;
+                        fullBody = PipeliningServerHandler.composeBody(requiredCtx().alloc(), pieces);
                     }
                     bufferedContent = null;
 
@@ -208,10 +210,15 @@ abstract class MultiplexedServerHandler {
          * on buffering data in hopes of reading it all in one go.
          */
         final void devolveToStreaming() {
-            if (requestAccepted || streamer != null || request == null) {
+            if (closed || requestAccepted || streamer != null || request == null) {
                 return;
             }
             streamer = new InputStreamer(HttpUtil.is100ContinueExpected(request));
+            // set the expected length before replaying the buffered frames, like the HTTP/1 path:
+            // the declared Content-Length is charged to the size limit in full, and frames that
+            // arrive without a known length are charged individually, so the buffered frames
+            // would be counted twice if they were added first
+            streamer.dest.setExpectedLengthFrom(request.headers());
             if (bufferedContent != null) {
                 for (ByteBuf buf : bufferedContent) {
                     streamer.add(byteBodyFactory().readBufferFactory().adapt(buf));
@@ -219,7 +226,6 @@ abstract class MultiplexedServerHandler {
                 bufferedContent = null;
             }
             requestAccepted = true;
-            streamer.dest.setExpectedLengthFrom(request.headers());
             requestHandler.accept(requiredCtx(), request, new StreamingNettyByteBody(streamer.dest), this);
         }
 
@@ -243,6 +249,23 @@ abstract class MultiplexedServerHandler {
                 streamer.error(e);
             }
             disposeWriteSide();
+        }
+
+        /**
+         * Called when the stream is closed, or when no more of it will be read. Request data
+         * that is still buffered for the next read complete is released, and no request is
+         * accepted for the stream afterwards. The released bytes are not reported to
+         * {@link #notifyDataConsumed(int)}: the flow control window of a closed stream is settled
+         * by the transport.
+         */
+        final void discardBufferedContent() {
+            closed = true;
+            if (bufferedContent != null) {
+                for (ByteBuf buf : bufferedContent) {
+                    buf.release();
+                }
+                bufferedContent = null;
+            }
         }
 
         private void disposeWriteSide() {
@@ -295,7 +318,21 @@ abstract class MultiplexedServerHandler {
                 var consumer = new BufferConsumer() {
                     @Nullable
                     Upstream upstream;
+                    // data written before the upstream was attached: primary() can deliver it
+                    long consumedBeforeAttach;
+                    boolean discardOnAttach;
                     final EventLoopFlow flow = new EventLoopFlow(requiredCtx().channel().eventLoop());
+
+                    // on the event loop, in the order of the flow
+                    void attach(Upstream attached) {
+                        upstream = attached;
+                        if (discardOnAttach) {
+                            attached.allowDiscard();
+                        } else if (consumedBeforeAttach > 0) {
+                            attached.onBytesConsumed(consumedBeforeAttach);
+                        }
+                        startStreaming(attached);
+                    }
 
                     @Override
                     public void add(ReadBuffer buf) {
@@ -305,14 +342,28 @@ abstract class MultiplexedServerHandler {
                     }
 
                     private void add0(ReadBuffer buf) {
+                        if (finished || reset) {
+                            // the stream is gone: the upstream is told to discard in startStreaming
+                            buf.close();
+                            return;
+                        }
                         int n = buf.readable();
                         writeData(NettyReadBufferFactory.toByteBuf(buf), false, requiredCtx().newPromise()
                             .addListener((ChannelFutureListener) future -> {
+                                Upstream attached = upstream;
                                 if (future.isSuccess()) {
-                                    Objects.requireNonNull(upstream).onBytesConsumed(n);
+                                    if (attached == null) {
+                                        consumedBeforeAttach += n;
+                                    } else {
+                                        attached.onBytesConsumed(n);
+                                    }
                                 } else {
                                     logStreamWriteFailure(future.cause());
-                                    Objects.requireNonNull(upstream).allowDiscard();
+                                    if (attached == null) {
+                                        discardOnAttach = true;
+                                    } else {
+                                        attached.allowDiscard();
+                                    }
                                 }
                             }));
                         flush();
@@ -353,17 +404,30 @@ abstract class MultiplexedServerHandler {
                         flush();
                     }
                 };
-                consumer.upstream = snbb.primary(consumer);
-                writeStreaming(response, consumer.upstream, snbb.expectedLength().orElse(-1));
+                long contentLength = snbb.expectedLength().orElse(-1);
+                // the headers go first: a body with data already available (e.g. a relayed client
+                // response) delivers it from primary(), and HTTP/2 must not send DATA before the
+                // HEADERS of the stream. The flow runs its tasks in order on the event loop.
+                if (consumer.flow.executeNow(() -> writeStreamingHeaders(response, contentLength))) {
+                    writeStreamingHeaders(response, contentLength);
+                }
+                BufferConsumer.Upstream upstream = snbb.primary(consumer);
+                if (consumer.flow.executeNow(() -> consumer.attach(upstream))) {
+                    consumer.attach(upstream);
+                }
             }
         }
 
-        private void writeStreaming(HttpResponse response, BufferConsumer.Upstream upstream, long contentLength) {
-            if (!requiredCtx().executor().inEventLoop()) {
-                requiredCtx().executor().execute(() -> writeStreaming(response, upstream, contentLength));
+        private void writeStreamingHeaders(HttpResponse response, long contentLength) {
+            if (finished || reset) {
+                // startStreaming discards the body
                 return;
             }
+            prepareCompression(response, contentLength);
+            writeHeaders(response, false, requiredCtx().voidPromise());
+        }
 
+        private void startStreaming(BufferConsumer.Upstream upstream) {
             if (finished) {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
@@ -377,10 +441,6 @@ abstract class MultiplexedServerHandler {
             }
 
             writerUpstream = upstream;
-
-            prepareCompression(response, contentLength);
-
-            writeHeaders(response, false, requiredCtx().voidPromise());
             upstream.start();
         }
 

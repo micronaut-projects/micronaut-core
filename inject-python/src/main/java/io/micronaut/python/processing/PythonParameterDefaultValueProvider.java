@@ -35,7 +35,8 @@ import java.util.Optional;
  * carries its value into {@code ArgumentDef#defaultValue()} at compile time, so it can be passed
  * explicitly and is indistinguishable from letting Python apply it.</p>
  *
- * <p>Anything else — a mutable literal, a {@code default_factory}, a call, a name — yields
+ * <p>Anything else — a mutable literal, a {@code default_factory} (an
+ * {@link io.micronaut.python.processing.model.DefaultFactoryDef}), a call, a name — yields
  * {@link Optional#empty()}, leaving those parameters to the stub's own defaulting. In particular a
  * fresh mutable default must not be materialised here, as Python evaluates a mutable default once
  * at definition time and shares it between calls.</p>

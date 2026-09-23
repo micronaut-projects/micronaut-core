@@ -1181,15 +1181,10 @@ final class NettyHttpClient implements
         if (permitsBody) {
             Optional<?> body = request.getBody();
             boolean hasBody = body.isPresent();
-            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody) {
+            if (requestContentType.equals(MediaType.APPLICATION_FORM_URLENCODED_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 Object bodyValue = body.get();
-                if (bodyValue instanceof CharSequence sequence) {
-                    ReadBuffer byteBuf = charSequenceToByteBuf(sequence, requestContentType);
-                    return byteBodyFactory.adapt(byteBuf);
-                } else {
-                    return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
-                }
-            } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody) {
+                return buildFormRequest(request, byteBodyFactory, r -> buildFormDataRequest(r, bodyValue));
+            } else if (requestContentType.equals(MediaType.MULTIPART_FORM_DATA_TYPE) && hasBody && !isEncodedFormBody(body.get())) {
                 return buildFormRequest(request, byteBodyFactory, r -> buildMultipartRequest(r, body.get()));
             } else {
                 ReadBuffer bodyContent;
@@ -1230,6 +1225,16 @@ final class NettyHttpClient implements
         } else {
             return NettyByteBodyFactory.empty();
         }
+    }
+
+    /**
+     * A form or multipart body that is already encoded is written as is, like any other raw body.
+     *
+     * @param bodyValue The body value
+     * @return Whether the body is already encoded
+     */
+    private static boolean isEncodedFormBody(Object bodyValue) {
+        return bodyValue instanceof CharSequence || bodyValue instanceof byte[] || bodyValue instanceof ByteBuffer<?>;
     }
 
     private static boolean requiresRequestBody(HttpMethod method) {
@@ -1613,6 +1618,15 @@ final class NettyHttpClient implements
                 }
 
                 sink.complete(new NettyClientByteBodyResponse(response, body, conversionService));
+            }
+
+            @Override
+            public void discardLimitReached() {
+                // the rest of an abandoned body is too long to drain (e.g. an endless stream whose
+                // downstream client went away): close the connection (HTTP/1) or reset the stream
+                // (HTTP/2) instead of reading it
+                poolHandle.taint();
+                poolHandle.channel().close();
             }
 
             @Override

@@ -24,6 +24,7 @@ import javax.annotation.processing.RoundEnvironment;
 import javax.annotation.processing.SupportedAnnotationTypes;
 import javax.lang.model.SourceVersion;
 import javax.lang.model.element.TypeElement;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
@@ -1541,9 +1542,28 @@ final class PyronautCompilerIncrementalTest {
             """);
         compilePython(directory.resolve("python"), java, output, cache);
 
-        String content = Files.readString(initializer);
+        assertTrue(Files.isRegularFile(initializer));
+        // the members module of the previous compilation, named after its content, is replaced
+        String content = packageMembers(initializer.getParent());
         assertTrue(content.contains("from .alpha import Added"));
         assertTrue(content.contains("from .beta import Beta"));
+    }
+
+    /**
+     * The members a compilation contributes to a package, written to a module named after
+     * its content next to the package initialiser that merges them: exactly one such module
+     * is expected, a change of the members replacing the previous one.
+     */
+    private static String packageMembers(Path packageDirectory) throws IOException {
+        List<Path> modules;
+        try (var files = Files.list(packageDirectory)) {
+            modules = files
+                .filter(file -> file.getFileName().toString().startsWith("__micronaut_members_"))
+                .sorted()
+                .toList();
+        }
+        assertEquals(1, modules.size(), "members modules of " + packageDirectory + ": " + modules);
+        return Files.readString(modules.getFirst());
     }
 
     @Test

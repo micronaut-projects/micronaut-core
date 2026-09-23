@@ -19,6 +19,7 @@ import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelInitializer
+import io.netty.channel.ChannelPipeline
 import io.netty.channel.nio.NioEventLoopGroup
 import io.netty.channel.socket.SocketChannel
 import io.netty.channel.socket.nio.NioSocketChannel
@@ -46,6 +47,7 @@ import spock.lang.Specification
 
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
 
 @MicronautTest
@@ -233,9 +235,16 @@ class H2cSpec extends Specification {
         content.release()
     }
 
-    def 'prior knowledge'() {
-        given:
-        def responseFuture = new CompletableFuture()
+    /**
+     * Send a request over a connection that speaks HTTP/2 straight away, without an upgrade, and
+     * wait for the response. The connection and its event loop are always torn down before this
+     * method returns, whether the request succeeded or not.
+     *
+     * @param request The request to send
+     * @return The response, which the caller has to release
+     */
+    private FullHttpResponse requestPriorKnowledge(DefaultFullHttpRequest request) {
+        CompletableFuture<FullHttpResponse> responseFuture = new CompletableFuture<>()
 
         def group = new NioEventLoopGroup(1)
         def bootstrap = new Bootstrap()
@@ -266,7 +275,7 @@ class H2cSpec extends Specification {
                                             if (msg.headers().getInt(HttpConversionUtil.ExtensionHeaderNames.STREAM_ID.text(), -1) != 3) {
                                                 responseFuture.completeExceptionally(new AssertionError("Response must be on stream 3"));
                                             }
-                                            responseFuture.complete(ReferenceCountUtil.retain(msg))
+                                            responseFuture.complete((FullHttpResponse) ReferenceCountUtil.retain(msg))
                                         }
                                         super.channelRead(ctx, msg)
                                     }
@@ -282,21 +291,50 @@ class H2cSpec extends Specification {
                     }
                 })
 
-        def channel = (SocketChannel) bootstrap.connect().await().channel()
+        try {
+            def channel = (SocketChannel) bootstrap.connect().await().channel()
+            try {
+                request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
+                channel.writeAndFlush(request)
+                channel.read()
 
-        def request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test')
-        request.headers().set(HttpConversionUtil.ExtensionHeaderNames.SCHEME.text(), "http")
-        channel.writeAndFlush(request)
-        channel.read()
+                return responseFuture.get(10, TimeUnit.SECONDS)
+            } finally {
+                channel.close().await(10, TimeUnit.SECONDS)
+            }
+        } finally {
+            group.shutdownGracefully()
+        }
+    }
 
-        expect:
-        def resp = responseFuture.get(10, TimeUnit.SECONDS)
+    def 'prior knowledge'() {
+        when:
+        def resp = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
+
+        then:
         resp != null
 
         cleanup:
-        channel.close()
-        resp.release()
-        group.shutdownGracefully()
+        resp?.release()
+    }
+
+    def 'prior knowledge triggers the pipeline listeners'() {
+        given:
+        def pipelines = new LinkedBlockingQueue<ChannelPipeline>()
+        ((ChannelPipelineCustomizer) embeddedServer).doOnConnect(p -> {
+            pipelines.add(p)
+            return p
+        })
+
+        when:
+        def resp = requestPriorKnowledge(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, '/h2c/test'))
+
+        then:
+        resp != null
+        pipelines.poll(10, TimeUnit.SECONDS) != null
+
+        cleanup:
+        resp?.release()
     }
 
     @Controller("/h2c")

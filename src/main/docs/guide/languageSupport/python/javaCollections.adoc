@@ -1,0 +1,65 @@
+A Java collection class of its own crosses into Python by reference. A `java.util.Map` implementation such as a cache or a view that is injected into a Python bean, passed to a Python method, or assigned to an attribute of a Python object is the Java object itself, exposed by GraalPy as a foreign dict: it keeps its class, its identity and its full Java API, and changes made in Python are visible from Java.
+
+[source,python]
+----
+from typing import Annotated
+
+from com.example.cache import NamedCache  # a Java Map implementation with an API of its own
+from jakarta.inject import Inject, Singleton
+
+
+@Singleton
+class PeopleService:
+    people: Annotated[NamedCache[str, Person], Inject]
+
+    def add(self, person: Person) -> str:
+        self.people.put(person.getId(), person)   # the Java API of the injected map
+        self.people[person.getId()] = person      # or the Python dict protocol
+        return self.people.getName()
+----
+
+A plain JDK collection (an `ArrayList`, a `HashMap`, a `List.of(...)`, ...) is copied when it enters Python, with its elements converted (generated Python classes arrive as Python objects, `java.time` values as their Python counterparts). Python code works on the copy: it can append to a list that is unmodifiable on the Java side, and it never mutates Java state it was merely handed, such as a configuration list.
+
+The `list` and `dict` attributes of a Python object are Python collections and stay Python collections. The Java class generated for an `@Introspected` Python class does not copy such an attribute into its property: the property is a live view of the Python list or dict, so `cart.items.append(name)` in Python and `cart.getItems().add(name)` in Java reach the same collection, whether the object was created in Python or read back from a Java store such as an HTTP session, and `dataclasses.asdict`, `copy.deepcopy` and `json.dumps` keep working on the Python side. A collection that Java assigns to the property (`cart.setItems(list)`) is copied into a Python list the next time the object is used from Python, and the property views that list from then on. This applies to lists and dicts of strings, numbers, booleans and nested lists and dicts of those; a collection of Python objects or of `java.time` values is converted on each crossing.
+
+=== Serialization
+
+The Java class generated for an `@Introspected` Python class (`@Serdeable` includes it) implements `java.io.Serializable`, so Python objects can be stored wherever Java serialization is used: a distributed cache, a topic or an HTTP session store. The serialized form consists of the introspected property values, written from the generated Java fields; the GraalPy object is transient. After deserialization the Python object is recreated from those values by the Python runtime the first time it is used, in the same way an object is rebuilt for a pooled context.
+
+The contract has the following limits:
+
+* Only introspected property values are serialized. Any other state of the Python object (attributes that are not declared properties, closures, open resources) is lost and `+__init__+` is not called again.
+* Every property value must itself be serializable; nested Python objects are, when their class is introspected, and a viewed `list` or `dict` attribute is written as a plain `ArrayList` or `LinkedHashMap` copy.
+* A Python class with a custom property accessor (a `@property` with logic) or without `@Introspected` is not serializable, because its state cannot be rebuilt from its properties.
+* A deserialized object is a new Python instance: it does not share identity with the original.
+* The generated class declares a fixed `serialVersionUID`: the serialized form depends on the property values only, not on the shape of the generated class.
+
+=== Objects created from Java and persistence
+
+An object of an introspected Python class that Java creates (through a constructor of the generated class, `BeanIntrospection.instantiate(...)`, a deserializer) or that a persistence library loads from storage has no Python object until Python first uses it. From then on the generated Java fields own its state: the Python object is a view built from the fields, and its collection attributes and its nested introspected objects are handed to Python by reference. A `dict[str, Customer]` attribute is the Java `Map` of the field, an entry Python adds is added to that map (as the generated `Customer` class), a nested object is the Java object, and an attribute Python assigns on it is written to the Java field. The generated class of such an object that returns to Java from Python keeps its identity, it is not wrapped again.
+
+That makes the Java object graph the live state, which is what a Java persistence library that stores objects reflectively (EclipseStore, MicroStream) needs: only the property fields of the generated class are persistent (the GraalPy object and the synchronization state are transient), the values stored are those Python worked on, and a graph loaded after a restart is used from Python like any other Java-created object.
+
+[source,python]
+----
+@Introspected
+@dataclass
+class Data:
+    customers: dict[str, Customer] = field(default_factory=dict)
+
+
+@Singleton
+class CustomerRepository:
+    def __init__(self, root_provider: RootProvider[Data]):
+        self.root_provider = root_provider
+
+    @StoreParams("customers")
+    def add_customer(self, customers: dict[str, Customer], customer_save: CustomerSave) -> Customer:
+        customer = Customer(str(uuid.uuid4()), customer_save.firstName, customer_save.lastName)
+        customers[customer.id] = customer   # the Java map of the stored root: this is what gets stored
+        return customer
+----
+
+The entries of such a collection and the nested objects are the Java objects, not Python instances created by the dataclass. Through the view of the generated wrappers described in the <<runtimeTypes, runtime types section>>, reading and assigning their attributes and calling their methods work as on any Python object (an assignment reaches the Java field, which is the point of the write-through), `isinstance(entry, Customer)` is `True` and `entry == Customer(...)` compares the dataclass fields; dataclass helpers such as `dataclasses.asdict` or `dataclasses.replace`, which look at `type(entry)`, do not apply to them.
+
+An object created in Python keeps the Python objects it holds: the generated Java class of such an object is a view of it whose collection fields are converted copies, and Python changes made to the Python object after the view was created are not reflected in the view. Changes to an object that is part of a Java-owned graph are made through the object Java hands back, as in the example above.

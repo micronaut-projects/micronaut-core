@@ -18,6 +18,7 @@ package io.micronaut.http.server.netty.redirect
 import io.micronaut.context.ApplicationContext
 import io.micronaut.core.io.socket.SocketUtils
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.client.HttpClient
@@ -55,5 +56,68 @@ class HttpToHttpsRedirectSpec extends Specification {
         response.status == HttpStatus.PERMANENT_REDIRECT
         response.header(HttpHeaders.LOCATION).startsWith("https://localhost")
         response.header(HttpHeaders.CONNECTION) == 'close'
+    }
+
+    void 'test http to https redirect retains the query string'() {
+        when:
+        HttpResponse response = httpClient.toBlocking().exchange(HttpRequest.GET('/hello?foo=bar&baz=a%20b'))
+
+        then:
+        response.status == HttpStatus.PERMANENT_REDIRECT
+        def location = URI.create(response.header(HttpHeaders.LOCATION))
+        location.scheme == 'https'
+        location.rawPath == '/hello'
+        location.rawQuery == 'foo=bar&baz=a%20b'
+    }
+
+    void 'test http to https redirect retains an empty query string'() {
+        when: 'the request target ends in "?", which is a query component that happens to be empty'
+        String location = redirectLocationOf('/hello?')
+
+        then: 'the delimiter is kept, because an empty query and an absent query are distinct URI forms'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?')
+    }
+
+    void 'test http to https redirect reproduces the query string verbatim'() {
+        when: 'the query uses reserved and percent encoded characters'
+        String location = redirectLocationOf('/hello?a=1%2F2&b=x:y@z&c=p,q$r&d=%7Bjson%7D')
+
+        then: 'the Location header carries the original bytes without a decode or re-encode round trip'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?a=1%2F2&b=x:y@z&c=p,q$r&d=%7Bjson%7D')
+    }
+
+    void 'test http to https redirect reproduces the query string of an absolute-form target verbatim'() {
+        given: 'a proxy-style request line whose target carries the authority'
+        int port = (embeddedServer.boundPorts - embeddedServer.port).first() as int
+
+        when: 'the query holds a percent encoded reserved character'
+        String location = redirectLocationOf("http://localhost:${port}/hello?value=a%26b&x=1")
+
+        then: 'it is neither decoded nor re-encoded on the way to the Location header'
+        location.startsWith('https://localhost')
+        location.endsWith('/hello?value=a%26b&x=1')
+    }
+
+    /**
+     * Sends a request line verbatim so the request target is not normalised by a client, and returns
+     * the value of the Location header of the response.
+     */
+    private String redirectLocationOf(String requestTarget) {
+        int port = (embeddedServer.boundPorts - embeddedServer.port).first() as int
+        new Socket('localhost', port).withCloseable { Socket socket ->
+            socket.soTimeout = 10_000
+            socket.outputStream.with {
+                write("GET ${requestTarget} HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n".getBytes('ISO-8859-1'))
+                flush()
+            }
+            String response = new String(socket.inputStream.readAllBytes(), 'ISO-8859-1')
+            assert response.startsWith('HTTP/1.1 308 Permanent Redirect')
+            return response.readLines()
+                    .find { it.toLowerCase(Locale.ROOT).startsWith('location:') }
+                    .substring('location:'.length())
+                    .trim()
+        }
     }
 }

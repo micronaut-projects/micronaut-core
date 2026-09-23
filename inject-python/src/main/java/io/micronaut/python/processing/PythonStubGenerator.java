@@ -16,9 +16,15 @@
 package io.micronaut.python.processing;
 
 import io.micronaut.core.annotation.Experimental;
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -37,6 +43,7 @@ import io.micronaut.aop.Around;
 import io.micronaut.aop.InterceptorBinding;
 import io.micronaut.aop.Introduction;
 import io.micronaut.context.annotation.Bean;
+import io.micronaut.core.annotation.AnnotationClassValue;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Vetoed;
@@ -44,11 +51,14 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.expressions.parser.ast.util.TypeDescriptors;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.EnumElement;
+import io.micronaut.inject.ast.FieldElement;
 import io.micronaut.inject.ast.TypedElement;
 import io.micronaut.inject.processing.BeanDefinitionCreatorFactory;
 import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.python.processing.model.ArgumentDef;
 import io.micronaut.python.processing.model.DecoratorDef;
+import io.micronaut.python.processing.model.DefaultFactoryDef;
+import io.micronaut.python.processing.model.FunctionDef;
 import io.micronaut.python.processing.visitor.PythonVisitorContext;
 import io.micronaut.sourcegen.model.AbstractElementBuilder;
 import io.micronaut.sourcegen.model.AnnotationDef;
@@ -57,6 +67,7 @@ import org.graalvm.polyglot.Context;
 import org.graalvm.polyglot.Value;
 
 import io.micronaut.context.annotation.Executable;
+import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
@@ -74,6 +85,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonPropertyElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.python.processing.model.ScriptDef;
 import io.micronaut.sourcegen.generator.SourceGenerator;
@@ -92,6 +104,8 @@ import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import io.micronaut.sourcegen.model.VariableDef;
 import io.micronaut.python.processing.util.ObjectHelper;
+import io.micronaut.python.processing.util.PythonAnnotationTypes;
+import io.micronaut.python.processing.util.PythonJavaTypes;
 
 /**
  * Generates Java stubs for Python classes, scripts, enums, interfaces, and annotations.
@@ -102,13 +116,39 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     public static final TypeDef POLYGLOT_VALUE = TypeDef.of(Value.class);
 
+    /**
+     * The {@code class} member of a type: {@code Type.class}.
+     */
+    private static final String GENERATED_PROPERTY_MEMBERS = "io.micronaut.context.python.ValueCoercible$GeneratedPropertyMembers";
+    private static final String GENERATED_PROPERTY_MEMBERS_CANONICAL = "io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers";
     private static final String MEMBER_PRE_DESTROY = "preDestroy";
+    private static final String PUT_MEMBER = "putMember";
+    private static final String CLASS_FIELD = "class";
     public static final TypeDef POLYGLOT_CONTEXT = TypeDef.of(Context.class);
-    public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField("class", TypeDef.CLASS);
+    public static final VariableDef.StaticField CLASS_OBJECT = ClassTypeDef.of(Object.class).getStaticField(CLASS_FIELD, TypeDef.CLASS);
     public static final String AS_POLYGLOT_VALUE = "asPolyglotValue";
     private static final String SYNC_SNAPSHOT_FIELD_PREFIX = "graalpyInternalSynced_";
     private static final String MEMBER_LOCAL_PREFIX = "pythonMember_";
     private static final String BOOLEAN_TYPE = "boolean";
+    private static final String SHORT_TYPE = "short";
+    private static final String DOUBLE_TYPE = "double";
+    private static final String FLOAT_TYPE = "float";
+    private static final String JAVA_LANG_SHORT = "java.lang.Short";
+    private static final String JAVA_LANG_DOUBLE = "java.lang.Double";
+    private static final String JAVA_LANG_FLOAT = "java.lang.Float";
+    private static final String AS_SHORT = "asShort";
+    private static final String AS_DOUBLE = "asDouble";
+    private static final String AS_FLOAT = "asFloat";
+    private static final String JAVA_LANG_STRING = "java.lang.String";
+    private static final String SERIAL_VERSION_UID = "serialVersionUID";
+    private static final String AS_OBJECT_METHOD = "asObject";
+    private static final String CONVERT_VALUE = "convertValue";
+    private static final String EQUALS_METHOD = "equals";
+    private static final String VALUE_PARAMETER = "value";
+    private static final String NEW_INSTANCE = "newInstance";
+    private static final String NEW_INTRODUCTION = "newIntroduction";
+    private static final String IS_NONE = "isNone";
+    private static final String SUBCLASS_WRAPPER = "subclassWrapper";
     private static final Set<String> IMMUTABLE_PROPERTY_TYPES = Set.of(
         String.class.getName(), Boolean.class.getName(), Byte.class.getName(), Short.class.getName(),
         Integer.class.getName(), Long.class.getName(), Float.class.getName(), Double.class.getName(),
@@ -120,18 +160,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     public static final String RECONSTRUCT_POLYGLOT_VALUE = "reconstructPolyglotValue";
     public static final String FROM_POLYGLOT_VALUE = "fromPolyglotValue";
     public static final ClassTypeDef PYTHON_COERCION = ClassTypeDef.of("io.micronaut.context.python.PythonCoercion");
+    public static final ClassTypeDef VALUE_COERCIBLES = ClassTypeDef.of("io.micronaut.context.python.ValueCoercibles");
     public static final ClassTypeDef PYTHON_CONVERSION = ClassTypeDef.of("io.micronaut.context.python.PythonConversion");
+    public static final ClassTypeDef PYTHON_EXCEPTIONS = ClassTypeDef.of("io.micronaut.context.python.PythonExceptions");
     public static final ClassTypeDef PYTHON_HTTP_CONVERSION = ClassTypeDef.of("io.micronaut.context.python.PythonHttpConversion");
     public static final ClassTypeDef PYTHON_INVOCATION = ClassTypeDef.of("io.micronaut.context.python.PythonInvocation");
     public static final ClassTypeDef PYTHON_ASYNCIO_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonAsyncioRuntime");
     public static final ClassTypeDef PYTHON_CONTEXT_RUNTIME = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime");
+    public static final ClassTypeDef PYTHON_JAVA_BASES = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases");
+    private static final ClassTypeDef JAVA_BASE_CONSTRUCTION = ClassTypeDef.of("io.micronaut.context.python.PythonJavaBases.Construction");
+    private static final ClassTypeDef JAVA_BASE_MEMBERS = ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.JavaBaseMembers");
+    private static final String INVOKE_JAVA_BASE_METHOD = "micronautInvokeJavaBaseMethod";
     public static final ClassTypeDef PYTHON_CLASS_REFERENCE = ClassTypeDef.of("io.micronaut.context.python.PythonContextRuntime.PythonClassReference");
     public static final ClassTypeDef PYTHON_CLASS_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonClass");
     public static final ClassTypeDef PYTHON_MODULE_ANNOTATION = ClassTypeDef.of("io.micronaut.context.python.annotation.PythonModule");
     public static final ClassTypeDef POLYGLOT_VALUE_CONVERTER = ClassTypeDef.of("io.micronaut.context.python.PolyglotValueConverter");
+    /**
+     * The type of a proxy that intercepts a target bean; a generated stub that is one has no Python object of its own.
+     */
+    public static final ClassTypeDef INTERCEPTED_PROXY = ClassTypeDef.of("io.micronaut.aop.InterceptedProxy");
+    private static final String INTERCEPTED_TARGET_VALUE = "interceptedTargetValue";
+    private static final String IS_LIVE_INSTANCE = "isLiveInstance";
+    private static final String PYTHON_CLASS_REFERENCE_PARAMETER = "pythonClassReference";
     public static final String GENERATOR_NAME = "python";
     private static final String HTTP_RESPONSE = "io.micronaut.http.HttpResponse";
-    private static final String PUBLISHER = "org.reactivestreams.Publisher";
+    static final String PUBLISHER = "org.reactivestreams.Publisher";
+    private static final String CONVERT_PUBLISHER = "convertPublisher";
     private static final String GET_MEMBER = "getMember";
     private static final String MAP_OF = "mapOf";
     private static final String ENUM_VALUE = "enumValue";
@@ -142,12 +196,31 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     private static final String ANN_CONFIGURATION_BUILDER = "io.micronaut.context.annotation.ConfigurationBuilder";
     private static final String NEW_UNINITIALIZED_INSTANCE = "newUninitializedInstance";
     private static final String ANN_CONFIGURATION_INJECT = "io.micronaut.context.annotation.ConfigurationInject";
+    private static final String ANN_CREATOR = "io.micronaut.core.annotation.Creator";
     private static final String ANN_CONFIGURATION_READER = "io.micronaut.context.annotation.ConfigurationReader";
     private static final String ANN_ANNOTATION_EXPRESSION_CONTEXT = "io.micronaut.context.annotation.AnnotationExpressionContext";
     private static final String ANN_CONSTRAINT = "jakarta.validation.Constraint";
     private static final String ANN_VALID = "jakarta.validation.Valid";
-    private static final Set<String> ANNOTATION_PACKAGES_TO_COPY = Set.of("org.junit.jupiter.api", "io.micronaut.test.extensions.junit5.annotation");
-    private static final Set<String> TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE = Set.of(
+    /**
+     * Micronaut annotations that are read reflectively from the generated Java class rather than from
+     * the annotation metadata of the Python element: the JUnit 5 extension looks {@code @MicronautTest}
+     * and the {@code @Property} container up on the test class. Every other Micronaut annotation is
+     * served by the annotation metadata, so it stays off the generated source.
+     */
+    private static final Set<String> MICRONAUT_ANNOTATION_PACKAGES_TO_COPY = Set.of("io.micronaut.test.extensions.junit5.annotation");
+    private static final Set<String> MICRONAUT_ANNOTATIONS_TO_COPY = Set.of("io.micronaut.context.annotation.PropertySource");
+    private static final String MICRONAUT_PACKAGE_PREFIX = "io.micronaut.";
+    /**
+     * The dependency injection and common annotations Micronaut processes itself ({@code @Singleton},
+     * {@code @Inject}, {@code @Named}, {@code @PostConstruct}, ...): served by the annotation metadata like
+     * the Micronaut annotations, and kept off the generated source so that the vetoed generated class is
+     * not taken for an annotated bean class by the visitors of the Java processing round.
+     */
+    private static final Set<String> INJECTION_ANNOTATION_PACKAGE_PREFIXES = Set.of("jakarta.inject.", "javax.inject.", "jakarta.annotation.", "javax.annotation.");
+    private static final String JAVA_LANG_PACKAGE_PREFIX = "java.lang.";
+    private static final String WITH_VARARGS = "withVarargs";
+    private static final String PYTHON_METHOD_KEY_PREFIX = "python:";
+    static final Set<String> TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE = Set.of(
         "io.micronaut.core.annotation.NonNull",
         "io.micronaut.core.annotation.Nullable",
         "jakarta.annotation.Nonnull",
@@ -157,13 +230,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         "org.jspecify.annotations.NonNull",
         "org.jspecify.annotations.Nullable"
     );
+    private final Map<String, PythonReflectionGate.Copy> copiedRuntimeAnnotations = new HashMap<>();
+    private PythonReflectionGate reflectionGate;
     private final Map<String, StubEntry> classBuilders = new LinkedHashMap<>();
     private final Map<String, EnumEntry> enumDefs = new LinkedHashMap<>();
     private final Map<String, InterfaceEntry> interfaceDefs = new LinkedHashMap<>();
     private final Map<String, AnnotationEntry> annotationDefs = new LinkedHashMap<>();
+    private final Map<String, Boolean> junitExtensionAnnotations = new HashMap<>();
     private Map<String, ClassElement> allClasses = Map.of();
 
     public static final String JUNIT_TEST = "org.junit.jupiter.api.Test";
+    private static final String JUNIT_EXTEND_WITH = "org.junit.jupiter.api.extension.ExtendWith";
+    private static final String JUNIT_EXTENSIONS = "org.junit.jupiter.api.extension.Extensions";
+    private static final String JUNIT_TEST_TEMPLATE = "org.junit.jupiter.api.TestTemplate";
+    private static final String JUNIT_TEST_FACTORY = "org.junit.jupiter.api.TestFactory";
+    private static final String JUNIT_PACKAGE_PREFIX = "org.junit.";
     private static final String ANN_MICRONAUT_TEST = "io.micronaut.test.extensions.junit5.annotation.MicronautTest";
     public static final String ANN_JSON_PROPERTY = "com.fasterxml.jackson.annotation.JsonProperty";
     public static final String ANN_JSON_CREATOR = "com.fasterxml.jackson.annotation.JsonCreator";
@@ -175,10 +256,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     @Override
     public void finish(VisitorContext visitorContext) {
+        if (reflectionGate != null) {
+            reflectionGate.report(visitorContext);
+        }
         SourceGenerator sourceGenerator = SourceGenerators.findByLanguage(VisitorContext.Language.JAVA).orElse(null);
         try {
             if (sourceGenerator != null) {
-                for (StubEntry entry : classBuilders.values()) {
+                for (StubEntry entry : topLevelStubEntries()) {
                     ClassDef.ClassDefBuilder builder = entry.builder;
                     sourceGenerator.write(builder.build(), visitorContext, entry.originatingElement);
                 }
@@ -205,8 +289,87 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
+    /**
+     * The stubs written as top-level types, once the stubs of nested classes have been added to the
+     * stubs of their enclosing classes as member types (innermost first).
+     */
+    private List<StubEntry> topLevelStubEntries() {
+        List<StubEntry> memberEntries = classBuilders.values().stream()
+            .filter(entry -> isMemberStub(entry.originatingElement))
+            .sorted(Comparator.comparingInt((StubEntry entry) -> nestingDepth(entry.originatingElement)).reversed())
+            .toList();
+        List<StubEntry> topLevel = new ArrayList<>(classBuilders.values());
+        for (StubEntry memberEntry : memberEntries) {
+            ClassElement enclosingType = memberEntry.originatingElement.getEnclosingType().orElseThrow();
+            StubEntry enclosingEntry = classBuilders.get(enclosingType.getName());
+            if (enclosingEntry == null) {
+                // the enclosing class has no stub of its own (it failed to generate): keep the top-level form
+                continue;
+            }
+            enclosingEntry.builder.addInnerType(memberEntry.builder.build());
+            topLevel.remove(memberEntry);
+        }
+        return topLevel;
+    }
+
+    private static int nestingDepth(ClassElement element) {
+        String name = element.getName();
+        int depth = 0;
+        for (int i = 0; i < name.length(); i++) {
+            if (name.charAt(i) == '$') {
+                depth++;
+            }
+        }
+        return depth;
+    }
+
+    /**
+     * Whether the stub of a Python class owns the Python object it creates through its no-argument
+     * constructor: such a stub has the protected constructor taking the class reference of the object,
+     * which the stubs of its subclasses create their objects through, and creates the object again in
+     * another application. Test stubs, introspected stubs and stubs extending a host class create their
+     * objects otherwise.
+     *
+     * @param element The class element
+     * @return {@code true} when the stub has the owned-object constructor
+     */
+    private static boolean hasOwnedObjectConstructor(ClassElement element) {
+        ClassElement superType = element.getSuperType().orElse(null);
+        boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
+        boolean extendsHostClass = superType != null
+            && !extendsPythonClass
+            && !Object.class.getName().equals(superType.getName())
+            && !superType.isInterface();
+        return !element.hasStereotype(Introspected.class)
+            && !extendsHostClass
+            && element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isEmpty();
+    }
+
+    /**
+     * Whether the stub of a Python class is a member type of the stub of its enclosing class.
+     *
+     * @param element The class element
+     * @return {@code true} for a class nested in a Python class that is generated as a member type
+     */
+    static boolean isMemberStub(ClassElement element) {
+        return element instanceof PythonClassElement pythonClassElement && pythonClassElement.isMemberOfEnclosingType();
+    }
+
+    /**
+     * The name the stub builder of a class is created with. A member stub is built under its simple name
+     * in the package: adding it to the enclosing stub renames it to the binary name of the member type.
+     */
+    private static String stubBuilderName(AbstractPythonClassElement classElement) {
+        if (isMemberStub(classElement)) {
+            String name = classElement.getName();
+            return classElement.getPackageName() + "." + name.substring(name.lastIndexOf('$') + 1);
+        }
+        return classElement.getName();
+    }
+
     @Override
     public void start(VisitorContext visitorContext) {
+        this.reflectionGate = PythonReflectionGate.of(visitorContext);
         if (visitorContext instanceof PythonVisitorContext pythonVisitorContext) {
             this.allClasses = pythonVisitorContext.getProcessingEnvironment().classes();
             pythonVisitorContext
@@ -276,12 +439,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         if (interfaceDefs.containsKey(classElement.getName())) {
                             return;
                         }
-                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(buildInterfaceDef(classElement, typeName, interfaces), classElement));
+                        interfaceDefs.put(classElement.getName(), new InterfaceEntry(PythonInterfaceStubGenerator.buildInterfaceDef(classElement, typeName, interfaces, allClasses, reflectionGate(context), context), classElement));
                         return;
                     }
 
-                    var builder = ClassDef.builder(typeName)
+                    var builder = ClassDef.builder(stubBuilderName(classElement))
                         .addModifiers(Modifier.PUBLIC);
+                    if (isMemberStub(classElement) && classElement.isStatic()) {
+                        builder.addModifiers(Modifier.STATIC);
+                    }
                     FieldDef pythonClassReference = pythonClassReferenceField("__PYTHON_CLASS_REFERENCE", classElement);
                     builder.addField(pythonClassReference);
                     for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
@@ -290,22 +456,48 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     builder.addAnnotation(Vetoed.class);
                     builder.addAnnotation(pythonClassAnnotation(classElement));
 
-                    copyAnnotations(element, builder, ANNOTATION_PACKAGES_TO_COPY, context);
+                    copyRuntimeAnnotations(element, builder, ElementType.TYPE, typeName, context);
                     ClassElement superType = element.getSuperType().orElse(null);
-                    boolean extendsPythonClass = superType instanceof AbstractPythonClassElement;
+                    boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
+                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(PythonStubGenerator::isJunit5TestMethod)).isPresent();
+                    boolean hasPythonSuperType = superType instanceof AbstractPythonClassElement;
+                    // A test class is instantiated by the test framework before the application context
+                    // exists and creates its Python object lazily; the generated class of a Python base
+                    // would create the base's object eagerly, so a test class with a Python base stands
+                    // alone and bridges the inherited test and lifecycle methods itself.
+                    boolean extendsPythonClass = hasPythonSuperType && !isJunit5Test;
                     boolean extendsHostClass = superType != null
-                        && !extendsPythonClass
+                        && !hasPythonSuperType
                         && !Object.class.getName().equals(superType.getName())
                         && !superType.isInterface();
-                    boolean isIntrospectedBean = element.hasStereotype(Introspected.class);
+                    boolean inheritsTestMembers = hasPythonSuperType && isJunit5Test;
+                    if (inheritsTestMembers) {
+                        copyInheritedTestAnnotations(element, superType, builder, context);
+                    }
 
                     // Check if this class extends another PythonClassElement
                     if (extendsPythonClass || extendsHostClass) {
                         builder.superclass(parameterizedClassTypeDef(superType));
                     }
+                    JavaSuperConstructor javaSuperConstructor = null;
+                    if (extendsHostClass) {
+                        String refusal = JavaSuperConstructor.refusal(element, superType);
+                        if (refusal != null) {
+                            // an error of this class only: the other classes of the module are still generated
+                            context.fail(refusal, element);
+                            return;
+                        }
+                        if (extendsJavaBase(superType, extendsHostClass)) {
+                            javaSuperConstructor = isJunit5Test
+                                ? JavaSuperConstructor.resolveForTest(element, superType, pythonVisitorContext)
+                                : JavaSuperConstructor.resolve(element, superType, pythonVisitorContext);
+                            if (javaSuperConstructor == null) {
+                                return;
+                            }
+                        }
+                    }
 
                     final boolean isIntroductionBean = element.hasStereotype(Introduction.class);
-                    boolean isJunit5Test = element.getEnclosedElement(ElementQuery.ALL_METHODS.onlyInstance().annotated(ann -> ann.hasDeclaredAnnotation(JUNIT_TEST))).isPresent();
                     boolean isConfigurationBuilderType = isConfigurationBuilderType(element);
 
                     List<PropertyElement> beanProperties = element.getBeanProperties();
@@ -316,6 +508,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     boolean isReconstructibleBean = isIntrospectedBean && !hasDynamicBeanProperties;
                     if (isReconstructibleBean) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
+                        if (isSerializableStub(superType, extendsPythonClass, extendsHostClass) && !declaresInterface(interfaces, Serializable.class)) {
+                            // The Java fields carry the introspected properties; the Python object is
+                            // transient and rebuilt from them on the first use after deserialization.
+                            // A class listing Serializable among its bases declares it itself.
+                            builder.addSuperinterface(ClassTypeDef.of(Serializable.class));
+                            // a fixed UID: the serialized form is the property values, not the shape of the stub
+                            builder.addField(FieldDef.builder(SERIAL_VERSION_UID)
+                                .ofType(TypeDef.Primitive.LONG)
+                                .addModifiers(Modifier.PRIVATE, Modifier.STATIC, Modifier.FINAL)
+                                .initializer(ExpressionDef.constant(1L))
+                                .build());
+                        }
                     } else if (!extendsPythonClass) {
                         builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
                     }
@@ -331,18 +535,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         // DefaultValidator can inspect constrained configuration properties.
                         builder.addAnnotation(Introspected.class);
                     }
-                    StateFields state = addStateFields(builder, element, beanProperties, isIntrospectedBean, extendsPythonClass, isJunit5Test, hasDynamicBeanProperties);
+                    StateFields state = addStateFields(builder, element, beanProperties, isIntrospectedBean, extendsPythonClass, extendsHostClass, isJunit5Test, hasDynamicBeanProperties, context);
                     Map<String, FieldDef> propertyFields = state.propertyFields();
                     Map<String, FieldDef> syncSnapshotFields = state.syncSnapshotFields();
                     FieldDef pythonValue = state.pythonValue();
                     FieldDef pythonValueSyncing = state.pythonValueSyncing();
+                    FieldDef javaOwned = state.javaOwned();
                     StubEntry stubEntry = new StubEntry(builder, classElement, propertyFields);
                     classBuilders.put(classElement.getName(), stubEntry);
 
                     // Track method names that have been added to avoid duplicates
                     Set<String> addedMethodNames = stubEntry.bridgedMethods();
 
-                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, isDeclaredBean, isIntroductionBean, isAopProxy);
+                    isAopProxy = addInterfaceAndHostBridges(classElement, element, builder, context, addedMethodNames, superType, extendsHostClass, inheritsTestMembers, isDeclaredBean, isIntroductionBean, isAopProxy, beanProperties);
+                    if (extendsJavaBase(superType, extendsHostClass)) {
+                        addJavaBaseMembers(builder, superType, addedMethodNames);
+                    }
                     // Constructor from polyglot Value
                     final FieldDef pythonValueFinal = pythonValue;
                     final FieldDef pythonValueSyncingFinal = pythonValueSyncing;
@@ -350,7 +558,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         throw new IllegalStateException("Expected graalpyInternalValue field to be initialized");
                     }
 
-                    ClassStubModel model = new ClassStubModel(builder, element, classElement, context, pythonVisitorContext, typeName, isAopProxy, pythonClassReference, superType, extendsPythonClass, extendsHostClass, isIntrospectedBean, isJunit5Test, beanProperties, hasDynamicBeanProperties, isReconstructibleBean, hasConfigurationBuilderProperty, propertyFields, syncSnapshotFields, pythonValueFinal, pythonValueSyncingFinal);
+                    ClassStubModel model = new ClassStubModel(builder, element, classElement, context, pythonVisitorContext, typeName, isAopProxy, pythonClassReference, superType, extendsPythonClass, extendsHostClass, isIntrospectedBean, isJunit5Test, beanProperties, hasDynamicBeanProperties, isReconstructibleBean, hasConfigurationBuilderProperty, propertyFields, syncSnapshotFields, pythonValueFinal, pythonValueSyncingFinal, javaOwned, state.ownedClassReference(), javaSuperConstructor, inheritsTestMembers);
                     addValueConstructors(model);
                     addPolyglotValueMethods(model);
                     addFactoryMethods(model);
@@ -370,9 +578,98 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * Whether a class extends a Java class other than a throwable, so the generated class is the
+     * only Java instance of the base and is bound to the Python object.
+     */
+    private static boolean extendsJavaBase(@Nullable ClassElement superType, boolean extendsHostClass) {
+        return extendsHostClass && superType != null && !superType.isAssignable(Throwable.class);
+    }
+
+    /**
+     * Implements {@code ValueCoercible.JavaBaseMembers}: a non-virtual call of every accessible
+     * instance method of the Java base, so the Python object reaches the base implementation of a
+     * method (also one it overrides, through {@code super()}) on the Java instance bound to it.
+     */
+    private void addJavaBaseMembers(ClassDef.ClassDefBuilder builder, ClassElement superType, Set<String> addedMethodNames) {
+        builder.addSuperinterface(JAVA_BASE_MEMBERS);
+        Map<String, List<MethodElement>> baseMethods = new LinkedHashMap<>();
+        Set<String> signatures = new HashSet<>();
+        for (MethodElement method : superType.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance())) {
+            // a generic method (toArray(T[])) has no erasure javac can select an overload for; it is left out
+            if (method.isAbstract() || method.isStatic() || !(method.isPublic() || method.isProtected())
+                || !method.getDeclaredTypeVariables().isEmpty()
+                || Object.class.getName().equals(method.getDeclaringType().getName())
+                || !signatures.add(bridgeMethodKey(method))) {
+                continue;
+            }
+            baseMethods.computeIfAbsent(method.getName(), name -> new ArrayList<>()).add(method);
+        }
+        builder.addMethod(MethodDef.builder(INVOKE_JAVA_BASE_METHOD)
+            .addAnnotation(Override.class)
+            .addModifiers(Modifier.PUBLIC)
+            .addParameter("name", TypeDef.STRING)
+            .addParameter("arguments", TypeDef.parameterized(ClassTypeDef.of(List.class), POLYGLOT_VALUE))
+            .returns(TypeDef.OBJECT)
+            .build((aThis, methodParameters) -> {
+                VariableDef.MethodParameter name = methodParameters.get(0);
+                VariableDef.MethodParameter arguments = methodParameters.get(1);
+                ExpressionDef arity = arguments.invoke("size", TypeDef.Primitive.INT);
+                List<StatementDef> statements = new ArrayList<>();
+                for (Map.Entry<String, List<MethodElement>> entry : baseMethods.entrySet()) {
+                    List<StatementDef> overloads = new ArrayList<>();
+                    for (MethodElement method : entry.getValue()) {
+                        ParameterElement[] parameters = method.getParameters();
+                        boolean sameArityOverloads = entry.getValue().stream()
+                            .filter(other -> other != method && other.getParameters().length == parameters.length)
+                            .findAny()
+                            .isPresent();
+                        ExpressionDef.ConditionExpressionDef condition = arity.compare(ExpressionDef.ComparisonOperation.OpType.EQUAL_TO, ExpressionDef.constant(parameters.length));
+                        List<ExpressionDef> converted = new ArrayList<>(parameters.length);
+                        for (int i = 0; i < parameters.length; i++) {
+                            ExpressionDef argument = arguments.invoke("get", POLYGLOT_VALUE, ExpressionDef.constant(i));
+                            if (sameArityOverloads) {
+                                condition = condition.and(VALUE_COERCIBLES.invokeStatic("matchesArgument", TypeDef.Primitive.BOOLEAN, argument, classLiteral(parameters[i].getType())).isTrue());
+                            }
+                            // a parameterized type is converted to its erasure: the type arguments of an
+                            // inherited signature are not always resolved against the extended type
+                            ClassElement parameterType = parameters[i].getGenericType();
+                            converted.add(isParameterizedReference(parameterType)
+                                ? PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT, argument, classLiteral(parameterType)).cast(erasedType(parameterType))
+                                : convertValueForType(parameterType, argument));
+                        }
+                        ExpressionDef.InvokeInstanceMethod invocation = aThis.superRef().invoke(method.getName(), TypeDef.OBJECT, converted);
+                        StatementDef result = method.getReturnType().isVoid()
+                            ? StatementDef.multi((StatementDef) invocation, ExpressionDef.nullValue().returning())
+                            : invocation.returning();
+                        overloads.add(condition.doIf(result));
+                    }
+                    statements.add(ExpressionDef.constant(entry.getKey()).invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, name).isTrue().doIf(StatementDef.multi(overloads)));
+                }
+                statements.add(PYTHON_JAVA_BASES.invokeStatic("noSuchMethod", ClassTypeDef.of(IllegalArgumentException.class),
+                    ExpressionDef.constant(superType.getName()), name, arguments).doThrow());
+                return StatementDef.multi(statements);
+            }));
+        addedMethodNames.add(INVOKE_JAVA_BASE_METHOD + "(" + String.class.getName() + ";" + List.class.getName() + ";)");
+    }
+
+    private static boolean isParameterizedReference(ClassElement type) {
+        if (type instanceof WildcardElement) {
+            return true;
+        }
+        if (type instanceof GenericPlaceholderElement || type.isPrimitive()) {
+            return false;
+        }
+        if (type.isArray()) {
+            return isParameterizedReference(type.fromArray());
+        }
+        return !type.getTypeArguments().isEmpty();
+    }
+
+    /**
      * Emits the property, snapshot and Python value fields of a class stub.
      */
-    private static StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean isJunit5Test, boolean hasDynamicBeanProperties) {
+    @SuppressWarnings("java:S107") // the flags describe generated state; a state record would obscure the call sites
+    private StateFields addStateFields(ClassDef.ClassDefBuilder builder, ClassElement element, List<PropertyElement> beanProperties, boolean isIntrospectedBean, boolean extendsPythonClass, boolean extendsHostClass, boolean isJunit5Test, boolean hasDynamicBeanProperties, VisitorContext context) {
         Map<String, FieldDef> propertyFields = new LinkedHashMap<>();
         // Last value written to the Python object for every property. The generated
         // asPolyglotValue() only re-syncs when one of these differs from the field, so a bridge
@@ -384,16 +681,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 && !hasDynamicBeanProperties
                 && beanProperties.stream().allMatch(PythonStubGenerator::isImmutablePropertyType);
             for (PropertyElement beanProperty : beanProperties) {
-                FieldDef field = FieldDef.builder(beanProperty.getName())
+                FieldDef.FieldDefBuilder fieldBuilder = FieldDef.builder(beanProperty.getName())
                     .ofType(propertySourceType(beanProperty))
-                    .addModifiers(Modifier.PUBLIC)
-                    .build();
+                    .addModifiers(Modifier.PUBLIC);
+                // A declared attribute is the field of the generated class: its runtime annotations
+                // (@Id, @Column, @XmlElement, ...) go with it so that field access finds them.
+                attributeField(beanProperty).ifPresent(pythonField -> copyRuntimeAnnotations(pythonField, fieldBuilder, ElementType.FIELD, element.getName(), context));
+                FieldDef field = fieldBuilder.build();
                 builder.addField(field);
                 propertyFields.put(beanProperty.getName(), field);
                 if (trackSyncState) {
                     FieldDef snapshot = FieldDef.builder(SYNC_SNAPSHOT_FIELD_PREFIX + beanProperty.getName())
                         .ofType(propertySourceType(beanProperty))
-                        .addModifiers(Modifier.PRIVATE)
+                        .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
                         .build();
                     builder.addField(snapshot);
                     syncSnapshotFields.put(beanProperty.getName(), snapshot);
@@ -401,34 +701,78 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         FieldDef pythonValue = null;
+        FieldDef ownedClassReference = null;
         if (!extendsPythonClass || isIntrospectedBean) {
+            // The Python state is transient: it is neither a persistent attribute of an entity nor
+            // serializable, and reflection-based frameworks (JPA field access, Java serialization)
+            // skip transient fields.
             FieldDef.FieldDefBuilder pythonValueBuilder = FieldDef.builder("graalpyInternalValue")
                 .ofType(POLYGLOT_VALUE)
-                .addModifiers(Modifier.PROTECTED);
+                .addModifiers(Modifier.PROTECTED, Modifier.TRANSIENT);
             if (!isIntrospectedBean && !isJunit5Test) {
-                pythonValueBuilder.addModifiers(Modifier.FINAL);
+                // an owned object is replaced when its application shut down, under the stub's monitor,
+                // and read without it by every other thread
+                pythonValueBuilder.addModifiers(extendsHostClass ? Modifier.FINAL : Modifier.VOLATILE);
             }
             pythonValue = pythonValueBuilder.build();
             builder.addField(pythonValue);
+            if (!isIntrospectedBean && !isJunit5Test && !extendsHostClass) {
+                // The Python class of an object the stub owns: an instance created through the
+                // no-argument constructor of the stub, not one wrapping an existing Python object. The
+                // object is created again once the application it was created in has shut down (its
+                // runtime is no longer installed): a JVM-wide singleton (a service loaded once per JVM)
+                // keeps working across the applications of a JVM.
+                ownedClassReference = FieldDef.builder("graalpyInternalClassReference")
+                    .ofType(PYTHON_CLASS_REFERENCE)
+                    .addModifiers(Modifier.PROTECTED, Modifier.FINAL)
+                    .build();
+                builder.addField(ownedClassReference);
+            }
         }
         FieldDef pythonValueSyncing = null;
+        FieldDef javaOwned = null;
         if (isIntrospectedBean) {
             pythonValueSyncing = FieldDef.builder("graalpyInternalValueSyncing")
                 .ofType(TypeDef.Primitive.BOOLEAN)
-                .addModifiers(Modifier.PRIVATE)
+                .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
                 .build();
             builder.addField(pythonValueSyncing);
+            if (pythonValue != null && !hasDynamicBeanProperties && ownershipMatters(beanProperties)) {
+                // Set when the Python object is created from the Java fields (the wrapper was
+                // constructed from Java or loaded from storage): the fields own the state, and
+                // collections and nested objects are handed to Python by reference so Python
+                // changes them in place. Not part of the serialized form: a restored object is
+                // Java-owned again as soon as its Python object is rebuilt.
+                javaOwned = FieldDef.builder("graalpyInternalJavaOwned")
+                    .ofType(TypeDef.Primitive.BOOLEAN)
+                    .addModifiers(Modifier.PRIVATE, Modifier.TRANSIENT)
+                    .build();
+                builder.addField(javaOwned);
+            }
         }
 
-        return new StateFields(propertyFields, syncSnapshotFields, pythonValue, pythonValueSyncing);
+        return new StateFields(propertyFields, syncSnapshotFields, pythonValue, pythonValueSyncing, javaOwned, ownedClassReference);
     }
 
     /**
      * Bridges the methods of implemented Java interfaces, overridden host methods and abstract introduction methods; returns whether an interceptor binding was found on the way.
      */
     @SuppressWarnings("java:S107") // the flags describe one bean kind; a record for them is a refactoring of its own
-    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy) {
+    private boolean addInterfaceAndHostBridges(AbstractPythonClassElement classElement, ClassElement element, ClassDef.ClassDefBuilder builder, VisitorContext context, Set<String> addedMethodNames, @Nullable ClassElement superType, boolean extendsHostClass, boolean inheritsTestMembers, boolean isDeclaredBean, boolean isIntroductionBean, boolean isAopProxy, List<PropertyElement> beanProperties) {
         Collection<ClassElement> interfaces = classElement.getInterfaces();
+        if (inheritsTestMembers) {
+            // the interfaces of the Python bases the standalone test class does not extend
+            Map<String, ClassElement> allInterfaces = new LinkedHashMap<>();
+            for (ClassElement anInterface : interfaces) {
+                allInterfaces.put(anInterface.getName(), anInterface);
+            }
+            for (ClassElement base = superType; base instanceof AbstractPythonClassElement; base = base.getSuperType().orElse(null)) {
+                for (ClassElement anInterface : base.getInterfaces()) {
+                    allInterfaces.putIfAbsent(anInterface.getName(), anInterface);
+                }
+            }
+            interfaces = allInterfaces.values();
+        }
         for (ClassElement anInterface : interfaces) {
             TypeDef interfaceTypeDef = parameterizedTypeDef(anInterface);
             builder.addSuperinterface(interfaceTypeDef);
@@ -437,16 +781,30 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             Set<MethodElement> methodSet = new LinkedHashSet<>();
             for (int i = 0; i < methods.size(); i++) {
                 MethodElement method = methods.get(i);
-                if (methodSet.contains(method) || method.isDefault()) {
+                // A static interface method (Predicate.not(Predicate<? super T>)) is neither inherited nor
+                // implemented by the Python class: copying it would only reproduce its signature in the stub.
+                if (methodSet.contains(method) || method.isStatic()) {
                     continue;
                 }
                 MethodElement resolvedMethod = resolvedInterfaceMethod(method, resolvedMethods, i);
                 MethodElement interfaceMethod = withOwningInterface(resolvedMethod, anInterface);
                 MethodElement bridgeMethod = resolveDeclaredBridgeMethod(element, interfaceMethod);
+                if (method.isDefault() && bridgeMethod == interfaceMethod && !declaresOverride(element, interfaceMethod)) {
+                    // A default method the Python class does not override keeps its Java implementation.
+                    continue;
+                }
+                if (bridgeMethod == interfaceMethod && isImplementedByPropertyAccessor(interfaceMethod, beanProperties)) {
+                    // The accessor generated for the attribute implements the interface method
+                    methodSet.add(method);
+                    continue;
+                }
                 if (interfaceMethod.hasDeclaredStereotype(InterceptorBinding.class) || bridgeMethod.hasDeclaredStereotype(InterceptorBinding.class)) {
                     isAopProxy = true;
                 }
                 ClassElement returnTypeOverride = resolveInterfaceBridgeReturnType(interfaceMethod, anInterface);
+                if (returnTypeOverride == null && bridgeMethod != interfaceMethod) {
+                    returnTypeOverride = resolveDeclaredBridgeReturnType(bridgeMethod, interfaceMethod);
+                }
                 // The generated Java stub must implement the Java interface signature,
                 // not the Python source annotation signature. Python annotations are
                 // often raw while Java interfaces may declare parameterized or wildcard
@@ -456,8 +814,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 // <S extends E> into the entity type and produce same-erasure methods
                 // that fail to override.
                 Map<String, ClassElement> signatureTypeArguments = resolvedInterfaceMethodTypeArguments(anInterface, method);
+                // A method of an introduction interface that the Python class does not declare is implemented by
+                // the proxy alone, as in Java where only the proxy class implements the introduced interface.
+                boolean introduced = bridgeMethod == interfaceMethod
+                    && classElement instanceof PythonClassElement pythonClassElement
+                    && pythonClassElement.isIntroductionInterface(anInterface);
                 addBridgeMethod(
-                    BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments),
+                    BridgeMethodSpec.of(bridgeMethod, element).returnType(returnTypeOverride).signature(method, interfaceMethod, signatureTypeArguments).introduced(introduced),
                     builder, context, addedMethodNames);
                 methodSet.add(method);
             }
@@ -469,7 +832,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyInstance()
                     .filter(MethodElement::isAbstract));
             for (MethodElement method : abstractHostMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames);
+                addBridgeMethod(hostBridgeMethodSpec(method, element, superType), builder, context, addedMethodNames);
             }
             List<MethodElement> hostMethods = superType.getEnclosedElements(
                 ElementQuery.ALL_METHODS
@@ -483,7 +846,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .onlyDeclared());
             for (MethodElement hostMethod : hostMethods) {
                 if (declaredMethods.stream().anyMatch(declaredMethod -> overridesHostMethod(declaredMethod, hostMethod))) {
-                    addBridgeMethod(BridgeMethodSpec.of(hostMethod, element), builder, context, addedMethodNames);
+                    addBridgeMethod(hostBridgeMethodSpec(hostMethod, element, superType), builder, context, addedMethodNames);
                 }
             }
         }
@@ -506,6 +869,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * The bridge of a method of the Java base class: a method of a generic base is declared with the type
+     * arguments the Python class binds ({@code GenericHolder[str]} declares {@code transform(String)} returning
+     * {@code String}), as a method of a generic interface is, so the bridge overrides the base method.
+     */
+    private static BridgeMethodSpec hostBridgeMethodSpec(MethodElement hostMethod, ClassElement element, ClassElement superType) {
+        Map<String, ClassElement> typeArguments = resolvedInterfaceMethodTypeArguments(superType, hostMethod);
+        boolean bound = typeArguments.values().stream()
+            .anyMatch(typeArgument -> !(typeArgument instanceof GenericPlaceholderElement) && !isObjectType(typeArgument));
+        if (!bound) {
+            // a raw or unbound base (MyMap(HashMap)) keeps the plain bridge of its erased signature
+            return BridgeMethodSpec.of(hostMethod, element);
+        }
+        return BridgeMethodSpec.of(hostMethod, element).signature(hostMethod, hostMethod, typeArguments);
+    }
+
+    /**
      * Emits the constructors that wrap an existing Python value.
      */
     private void addValueConstructors(ClassStubModel model) {
@@ -524,7 +903,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                     MethodDef.constructor()
                         .addModifiers(Modifier.PUBLIC)
-                        .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                        .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                         .build(((aThis, methodParameters) -> {
                                 VariableDef.MethodParameter val = methodParameters.get(0);
                                 List<StatementDef> assigns = new ArrayList<>();
@@ -544,35 +923,105 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             builder.addMethod(
                     MethodDef.constructor()
                         .addModifiers(Modifier.PUBLIC)
-                        .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
+                        .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
                         .build(((aThis, methodParameters) -> {
                                 if (extendsPythonClass) {
                                     return aThis.superRef().invokeSuperConstructor(methodParameters.get(0));
                                 } else {
-                                    return aThis.field(pythonValueField(model)).assign(methodParameters.get(0));
+                                    return StatementDef.multi(
+                                        aThis.field(pythonValueField(model)).assign(methodParameters.get(0)),
+                                        aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue())
+                                    );
                                 }
+                            })
+                        ));
+            // The constructor of an object the stub owns, used by its no-argument constructor and by the
+            // stubs of subclasses. The object is created here, unless the stub is an AOP proxy standing
+            // in for another bean; asPolyglotValue() creates it again in a new application.
+            builder.addMethod(
+                    MethodDef.constructor()
+                        .addModifiers(Modifier.PROTECTED)
+                        .addParameter(ParameterDef.of(PYTHON_CLASS_REFERENCE_PARAMETER, PYTHON_CLASS_REFERENCE))
+                        .build(((aThis, methodParameters) -> {
+                                if (extendsPythonClass) {
+                                    return invokeOwnedObjectSuperConstructor(aThis, superType, methodParameters.get(0));
+                                }
+                                return StatementDef.multi(
+                                    aThis.field(pythonValueField(model)).assign(newInstanceUnlessProxy(aThis, methodParameters.get(0))),
+                                    aThis.field(ownedClassReferenceField(model)).assign(methodParameters.get(0))
+                                );
                             })
                         ));
             }
         }
-        if (!isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class)) {
-            // Python exceptions raised from GraalPy can surface as host adapter exceptions.
-            // The runtime remaps those adapters back to the generated Throwable subtype
-            // through this Value constructor so Micronaut exception handlers can match it.
+        if (model.extendsJavaBase() && !isJunit5Test) {
+            // The Java base receives the arguments of the Python super().__init__(...) call, read
+            // from the Python object once its __init__ has run; the constructors generated from
+            // the Python constructor parameters delegate here. The Python object is then bound to
+            // this instance, the only Java instance of the base, so the inherited Java methods it
+            // calls run on it.
+            // The Java super constructor may call a method the Python class overrides, before this
+            // instance holds its Python object: the public constructor marks the object as under
+            // construction (PythonJavaBases.constructing, evaluated before the super constructor runs)
+            // and asPolyglotValue() falls back to it until the field is assigned.
+            JavaSuperConstructor superConstructor = model.javaSuperConstructor();
+            MethodDef constructingConstructor = MethodDef.constructor()
+                .addModifiers(Modifier.PRIVATE)
+                .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+                .addParameter(ParameterDef.of("construction", JAVA_BASE_CONSTRUCTION))
+                .build((aThis, methodParameters) -> {
+                    VariableDef.MethodParameter value = methodParameters.get(0);
+                    List<StatementDef> statements = new ArrayList<>();
+                    statements.add(aThis.superRef().invokeSuperConstructor(superConstructor.arguments(value, this::convertValueForType)));
+                    statements.add((StatementDef) methodParameters.get(1).invoke("finished", TypeDef.VOID));
+                    statements.add(aThis.field(pythonValueField(model)).assign(value));
+                    if (isIntrospectedBean) {
+                        statements.addAll(polyglotValuePropertyAssignments(aThis, value, beanProperties, propertyFields, syncSnapshotFields));
+                    }
+                    statements.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, value, aThis));
+                    return StatementDef.multi(statements);
+                });
             builder.addMethod(
                 MethodDef.constructor()
                     .addModifiers(Modifier.PUBLIC)
-                    .addParameter(ParameterDef.of("value", POLYGLOT_VALUE))
-                    .build((aThis, methodParameters) ->
-                        aThis.field(pythonValueField(model)).assign(methodParameters.get(0))
-                    )
+                    .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+                    .build((aThis, methodParameters) -> {
+                        VariableDef.MethodParameter value = methodParameters.get(0);
+                        return new ExpressionDef.InvokeInstanceMethod(aThis, constructingConstructor, List.of(
+                            value,
+                            PYTHON_JAVA_BASES.invokeStatic("constructing", JAVA_BASE_CONSTRUCTION, value, javaClassType(model.element()).getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                        ));
+                    })
+            );
+            builder.addMethod(constructingConstructor);
+        }
+        if (!isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class)) {
+            // A Python exception raised from GraalPy is remapped by the runtime to the generated
+            // Throwable subtype through this Value constructor so Micronaut exception handlers can
+            // match it. The Java base receives the arguments of the Python super().__init__(...)
+            // call, read back from the exception's args, so the message and the state of the base
+            // survive the crossing into Java.
+            ThrowableSuperConstructor superConstructor = ThrowableSuperConstructor.resolve(model.element(), superType, model.pythonVisitorContext());
+            builder.addMethod(
+                MethodDef.constructor()
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+                    .build((aThis, methodParameters) -> {
+                        VariableDef.MethodParameter value = methodParameters.get(0);
+                        return StatementDef.multi(
+                            aThis.superRef().invokeSuperConstructor(superConstructor.arguments(value, this::convertValueForType)),
+                            aThis.field(pythonValueField(model)).assign(value),
+                            PYTHON_EXCEPTIONS.invokeStatic("attachCause", TypeDef.VOID, aThis, value)
+                        );
+                    })
             );
         }
 
     }
 
     /**
-     * Bridges the declared methods that Micronaut needs to see (executable, advised, lifecycle, mapper, configuration builder) and returns them.
+     * Bridges the declared methods of the class: the methods Micronaut needs to see (executable, advised, lifecycle,
+     * mapper, configuration builder) are bridged first and returned, then every other public method.
      */
     private BridgedMethods addBridgeMethods(ClassStubModel model, Set<String> addedMethodNames, boolean isConfigurationBuilderType) {
         ClassElement element = model.element();
@@ -581,7 +1030,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassDef.ClassDefBuilder builder = model.builder();
         VisitorContext context = model.context();
         List<PropertyElement> beanProperties = model.beanProperties();
-        boolean isIntrospectedBean = model.isIntrospectedBean();
         boolean isAnnotationExpressionContextType = isAnnotationExpressionContextType(element, pythonVisitorContext);
         Predicate<AnnotationMetadata> bridgeMethodFilter = ann -> isJunit5Test ||
             isAnnotationExpressionContextType ||
@@ -597,29 +1045,52 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ann.hasDeclaredStereotype(AnnotationUtil.SCOPE) ||
             isDeclaredBeanMethod(ann) ||
             isConfigurationBuilderType;
-        List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(
-            ElementQuery.ALL_METHODS
-                .onlyAccessible()
-                .onlyInstance()
-                .onlyDeclared()
-                .annotated(bridgeMethodFilter)));
-        addReferencedPythonClassReferenceFields(builder, element, methodsToBridge);
+        ElementQuery<MethodElement> instanceMethods = ElementQuery.ALL_METHODS
+            .onlyAccessible()
+            .onlyInstance();
+        if (!model.inheritsTestMembers()) {
+            instanceMethods = instanceMethods.onlyDeclared();
+        }
+        List<MethodElement> methodsToBridge = new ArrayList<>(element.getEnclosedElements(instanceMethods.annotated(bridgeMethodFilter)));
         methodsToBridge.addAll(element.getEnclosedElements(
             ElementQuery.ALL_METHODS
                 .onlyAccessible()
                 .onlyStatic()
                 .onlyDeclared()
                 .annotated(bridgeMethodFilter)));
-        boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
+        // Every other public method of the class is bridged as well: type element visitors see it on the
+        // element and may generate Java code that calls it, and frameworks that instantiate the generated
+        // Java class themselves (a serverless runtime, a test engine) invoke it reflectively. Methods
+        // already bridged with a special signature (interface, host or advised methods) are kept by key.
+        ClassElement superType = model.superType();
+        // A Python method implementing an interface or host method whose parameter types its hints do not repeat
+        // (an untyped callback parameter) is bridged with the inherited signature already; it is not an overload
+        Set<String> inheritedSignatures = new HashSet<>();
+        for (String key : addedMethodNames) {
+            inheritedSignatures.add(bridgeMethodNameAndArity(key));
+        }
+        List<MethodElement> publicMethods = element.getEnclosedElements(
+            ElementQuery.ALL_METHODS
+                .onlyAccessible()
+                .onlyDeclared()
+                .filter(method -> !methodsToBridge.contains(method)
+                    && shouldBridgeDeclaredPythonMethod(method, beanProperties)
+                    && isDeclarableJavaMethod(method)
+                    && !inheritedSignatures.contains(bridgeMethodNameAndArity(bridgeMethodKey(method)))
+                    && !overridesBridgedPythonMethodWithAnotherReturnType(method, superType))
+        );
+        List<MethodElement> allBridgedMethods = new ArrayList<>(methodsToBridge);
+        allBridgedMethods.addAll(publicMethods);
+        addReferencedPythonClassReferenceFields(builder, element, allBridgedMethods);
+        // an async method that is not bridged still runs in an event-loop context when another Python bean awaits
+        // it, and needs the injected members adapted as a bridged one does
+        boolean hasAsyncBridgeMethod = allBridgedMethods.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod)
+            || element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyInstance().onlyDeclared())
+                .stream()
+                .anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
-        boolean hasIntroductionAdviceMethod = false;
         for (MethodElement methodElement : methodsToBridge) {
-            if (methodElement.hasStereotype(InterceptorBinding.class) ||
-                methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper") ||
-                methodElement.hasAnnotation("io.micronaut.context.annotation.Mapper$Mapping")) {
-                hasIntroductionAdviceMethod = true;
-            }
-            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
         }
         // A class can name its own pre-destroy callback with @Bean(preDestroy), the class-level counterpart of the
         // factory case handled in addBridgeMethod. The generated bean definition invokes the callback directly on the
@@ -634,29 +1105,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .named(name)
                     .filter(method -> !method.hasParameters())))
             .ifPresent(method -> addBridgeMethod(BridgeMethodSpec.of(method, element), builder, context, addedMethodNames));
-        if (hasIntroductionAdviceMethod) {
-            List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
-                ElementQuery.ALL_METHODS
-                    .onlyAccessible()
-                    .onlyInstance()
-                    .onlyDeclared()
-                    .filter(method -> !method.isAbstract())
-            );
-            for (MethodElement methodElement : concreteDeclaredMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
-            }
-        }
-        if (isIntrospectedBean) {
-            List<MethodElement> concreteDeclaredMethods = element.getEnclosedElements(
-                ElementQuery.ALL_METHODS
-                    .onlyAccessible()
-                    .onlyInstance()
-                    .onlyDeclared()
-                    .filter(method -> shouldBridgeDeclaredPythonMethod(method, beanProperties))
-            );
-            for (MethodElement methodElement : concreteDeclaredMethods) {
-                addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(methodElement.hasDeclaredAnnotation(JUNIT_TEST)), builder, context, addedMethodNames);
-            }
+        for (MethodElement methodElement : publicMethods) {
+            addBridgeMethod(BridgeMethodSpec.of(methodElement, element).junit5Test(isJunit5TestMethod(methodElement)), builder, context, addedMethodNames);
         }
 
         return new BridgedMethods(methodsToBridge, hasAsyncBridgeMethod);
@@ -672,13 +1122,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, FieldDef> propertyFields = model.propertyFields();
         boolean isIntrospectedBean = model.isIntrospectedBean();
         VisitorContext context = model.context();
-        String typeName = model.typeName();
         // Find static factory methods (annotated with @Creator)
         List<MethodElement> staticCreatorMethod = element.getEnclosedElements(
             ElementQuery.ALL_METHODS
                 .onlyAccessible()
                 .onlyStatic()
-                .annotated(ann -> ann.hasStereotype("io.micronaut.core.annotation.Creator"))
+                .annotated(ann -> ann.hasStereotype(ANN_CREATOR))
         );
 
         // Generate static factory methods for @Creator methods
@@ -694,10 +1143,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
                 if (isDynamicBeanProperty(beanProperty)) {
                     beanProperty.getWriteMethod().ifPresent(m -> addNamedSetterDynamic(beanProperty, builder, context, hasAsyncBridgeMethod));
-                    beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder));
+                    beanProperty.getReadMethod().ifPresent(m -> addNamedGetterDynamic(beanProperty, builder, true, context));
                 } else {
-                    addSetterPojo(beanProperty, builder, field);
-                    addGetterPojo(beanProperty, builder, field);
+                    addSetterPojo(beanProperty, builder, field, context);
+                    addGetterPojo(beanProperty, builder, field, context);
                 }
             } else {
                 addSetterDynamic(beanProperty, builder, context, hasAsyncBridgeMethod);
@@ -712,19 +1161,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     String beanStyle = beanGetterName(beanProperty.getName());
                     String booleanBeanStyle = booleanBeanGetterName(beanProperty.getName());
                     if (!m.getName().equals(beanStyle) && (!isBooleanProperty(beanProperty) || !m.getName().equals(booleanBeanStyle))) {
-                        addNamedGetterDynamic(beanProperty, builder);
+                        // addGetterDynamic already emitted the is-prefixed alias of a boolean property
+                        addNamedGetterDynamic(beanProperty, builder, false, context);
                     }
                 });
             }
         }
 
         if (isIntrospectedBean) {
-            ObjectHelper.addObjectMethods(builder, ClassTypeDef.of(typeName), beanProperties, propertyFields);
+            ObjectHelper.addObjectMethods(builder, javaClassType(element), beanProperties, propertyFields);
         }
 
         if (!beanProperties.isEmpty()) {
-            builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible.GeneratedPropertyMembers"));
-            addValueCoerciblePropertyMembers(builder, beanProperties, propertyFields);
+            builder.addSuperinterface(ClassTypeDef.of(GENERATED_PROPERTY_MEMBERS_CANONICAL));
+            addValueCoerciblePropertyMembers(builder, beanProperties, propertyFields, !propertyFields.isEmpty() || inheritsPropertyMemberHooks(model));
         }
 
     }
@@ -734,168 +1184,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private void addPolyglotValueMethods(ClassStubModel model) {
         ClassDef.ClassDefBuilder builder = model.builder();
-        boolean isAopProxy = model.isAopProxy();
-        FieldDef pythonClassReference = model.pythonClassReference();
-        boolean extendsPythonClass = model.extendsPythonClass();
         boolean isIntrospectedBean = model.isIntrospectedBean();
-        boolean isJunit5Test = model.isJunit5Test();
-        List<PropertyElement> beanProperties = model.beanProperties();
-        boolean hasDynamicBeanProperties = model.hasDynamicBeanProperties();
         boolean isReconstructibleBean = model.isReconstructibleBean();
-        Map<String, FieldDef> propertyFields = model.propertyFields();
-        Map<String, FieldDef> syncSnapshotFields = model.syncSnapshotFields();
-        @Nullable FieldDef pythonValueFinal = model.pythonValue();
-        @Nullable FieldDef pythonValueSyncingFinal = model.pythonValueSyncing();
-        ClassElement element = model.element();
         // implement asPolyglotValue by reconstructing the Python object with current field values
         if (isIntrospectedBean) {
-            final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
-            final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
             builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                 .addAnnotation(Override.class)
                 .addModifiers(Modifier.PUBLIC)
-                .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
-                        if (hasDynamicBeanProperties && pythonValueFinal != null) {
-                            ExpressionDef storedValue = aThis.field(pythonValueField(model));
-                            return storedValue.isNonNull().doIfElse(
-                                storedValue.returning(),
-                                ExpressionDef.nullValue().returning()
-                            );
-                        }
-                        if (beanProperties.isEmpty() && pythonValueFinal != null) {
-                            ExpressionDef storedValue = aThis.field(pythonValueField(model));
-                            ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                isAbstractIntro ? "newIntroduction" : "newInstance",
-                                POLYGLOT_VALUE,
-                                List.of(pythonClassReference(element, pythonClassReference))
-                            );
-                            return storedValue.isNonNull().doIfElse(
-                                storedValue.returning(),
-                                StatementDef.multi(
-                                    aThis.field(pythonValueField(model)).assign(newValue),
-                                    aThis.field(pythonValueField(model)).returning()
-                                )
-                            );
-                        }
-                        ExpressionDef reconstructedValue;
-                        if (isAbstractIntro) {
-                            List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
-                            var primaryCtor = element.getPrimaryConstructor().orElse(null);
-                            if (primaryCtor != null) {
-                                for (PropertyElement beanProperty : beanProperties) {
-                                    FieldDef field = propertyFields.get(beanProperty.getName());
-                                    if (field == null) {
-                                        continue;
-                                    }
-                                    ExpressionDef fieldRef = aThis.field(field);
-                                    arguments.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
-                                }
-                            }
-                            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                "newIntroduction",
-                                POLYGLOT_VALUE,
-                                arguments
-                            );
-                        } else if (isFrozenDataclass) {
-                            List<ExpressionDef> mapEntries = new ArrayList<>();
-                            for (PropertyElement beanProperty : beanProperties) {
-                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field == null) {
-                                    continue;
-                                }
-                                ExpressionDef fieldRef = aThis.field(field);
-                                mapEntries.add(ExpressionDef.constant(beanProperty.getName()));
-                                mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
-                            }
-                            ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
-                                .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
-                            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                "newFrozenDataclassInstance",
-                                POLYGLOT_VALUE,
-                                List.of(
-                                    pythonClassReference(element, pythonClassReference),
-                                    propsMap
-                                )
-                            );
-                        } else {
-                            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                NEW_UNINITIALIZED_INSTANCE,
-                                POLYGLOT_VALUE,
-                                List.of(
-                                    pythonClassReference(element, pythonClassReference)
-                                )
-                            );
-                        }
-                        if (pythonValueFinal != null) {
-                            if (isFrozenDataclass && !isAbstractIntro) {
-                                return reconstructedValue.returning();
-                            }
-                            FieldDef pythonValueField = pythonValueField(model);
-                            ExpressionDef storedValue = aThis.field(pythonValueField);
-                            // Full sync: every field is written (used when the Python object is created).
-                            List<StatementDef> syncStatements = new ArrayList<>();
-                            // Incremental sync: a tracked field is written only when it changed since the
-                            // last write, so attribute changes made in Python survive on untouched fields.
-                            List<StatementDef> incrementalSyncStatements = new ArrayList<>();
-                            if (pythonValueSyncingFinal != null) {
-                                StatementDef syncing = aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.trueValue());
-                                syncStatements.add(syncing);
-                                incrementalSyncStatements.add(syncing);
-                            }
-                            boolean tracked = false;
-                            for (PropertyElement beanProperty : beanProperties) {
-                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field == null) {
-                                    continue;
-                                }
-                                ExpressionDef fieldRef = aThis.field(field);
-                                StatementDef write = PYTHON_COERCION.invokeStatic(
-                                    "putMember",
-                                    TypeDef.VOID,
-                                    storedValue,
-                                    ExpressionDef.constant(beanProperty.getName()),
-                                    coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
-                                );
-                                FieldDef snapshot = syncSnapshotFields.get(beanProperty.getName());
-                                if (snapshot == null) {
-                                    syncStatements.add(write);
-                                    incrementalSyncStatements.add(write);
-                                } else {
-                                    tracked = true;
-                                    StatementDef remember = aThis.field(snapshot).assign(fieldRef);
-                                    syncStatements.add(write);
-                                    syncStatements.add(remember);
-                                    incrementalSyncStatements.add(
-                                        fieldRef.notEqualsReferentially(aThis.field(snapshot))
-                                            .doIf(StatementDef.multi(write, remember))
-                                    );
-                                }
-                            }
-                            if (pythonValueSyncingFinal != null) {
-                                StatementDef synced = aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.falseValue());
-                                syncStatements.add(synced);
-                                incrementalSyncStatements.add(synced);
-                            }
-                            syncStatements.add(storedValue.returning());
-                            incrementalSyncStatements.add(storedValue.returning());
-                            StatementDef syncBody = StatementDef.multi(syncStatements);
-                            StatementDef existingValueBody = tracked ? StatementDef.multi(incrementalSyncStatements) : syncBody;
-                            if (pythonValueSyncingFinal != null) {
-                                existingValueBody = aThis.field(pythonValueSyncingFinal)
-                                    .isTrue()
-                                    .doIfElse(storedValue.returning(), existingValueBody);
-                            }
-                            return storedValue.isNonNull().doIfElse(
-                                existingValueBody,
-                                StatementDef.multi(
-                                    aThis.field(pythonValueField).assign(reconstructedValue),
-                                    syncBody
-                                )
-                            );
-                        }
-                        return reconstructedValue.returning();
-                    })
-                ));
+                .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> StatementDef.multi(
+                    returnInterceptedTargetValue(aThis),
+                    returnObjectUnderConstruction(model, aThis),
+                    introspectedPolyglotValueBody(model, aThis)
+                ))));
             if (isReconstructibleBean) {
                 builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
                     .addAnnotation(Override.class)
@@ -912,133 +1212,431 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     .addAnnotation(Override.class)
                     .addModifiers(Modifier.PUBLIC)
                     .addParameter(POLYGLOT_CONTEXT)
-                    .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
-                    ExpressionDef targetContext = methodParameters.getFirst();
-                    StatementDef reconstructedBody;
-                    if (isAbstractIntro) {
-                        List<ExpressionDef> arguments = new ArrayList<>(List.of(targetContext, pythonClassReference(element, pythonClassReference)));
-                        for (PropertyElement beanProperty : beanProperties) {
-                            FieldDef field = propertyFields.get(beanProperty.getName());
-                            if (field != null) {
-                                arguments.add(coerceTypedElementToPolyglotValue(beanProperty, aThis.field(field), targetContext).cast(TypeDef.OBJECT));
-                            }
-                        }
-                        ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic("newIntroduction", POLYGLOT_VALUE, arguments);
-                        reconstructedBody = introduction.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
-                            PYTHON_COERCION.invokeStatic(
-                                REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
-                            ),
-                            targetValue.returning()
-                        ));
-                    } else if (beanProperties.isEmpty()) {
-                        ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic("newInstance", POLYGLOT_VALUE,
-                            List.of(targetContext, pythonClassReference(element, pythonClassReference)));
-                        reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
-                            PYTHON_COERCION.invokeStatic(
-                                REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
-                            ),
-                            targetValue.returning()
-                        ));
-                    } else {
-                        ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_UNINITIALIZED_INSTANCE, POLYGLOT_VALUE,
-                            List.of(targetContext, pythonClassReference(element, pythonClassReference)));
-                        reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> {
-                            List<StatementDef> statements = new ArrayList<>();
-                            statements.add(PYTHON_COERCION.invokeStatic(
-                                REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
-                            ));
-                            List<ExpressionDef> memberNames = new ArrayList<>();
-                            List<ExpressionDef> memberValues = new ArrayList<>();
-                            for (PropertyElement beanProperty : beanProperties) {
-                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field == null) {
-                                    continue;
-                                }
-                                ExpressionDef propertyValue = coerceTypedElementToPolyglotValue(
-                                    beanProperty, aThis.field(field), targetContext
-                                ).cast(TypeDef.OBJECT);
-                                if (isFrozenDataclass) {
-                                    statements.add(PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                                        "setInstanceProperty",
-                                        TypeDef.VOID,
-                                        targetValue,
-                                        ExpressionDef.constant(beanProperty.getName()),
-                                        propertyValue
-                                    ));
-                                } else {
-                                    memberNames.add(ExpressionDef.constant(beanProperty.getName()));
-                                    memberValues.add(propertyValue);
-                                }
-                            }
-                            if (!memberNames.isEmpty()) {
-                                statements.add(putMembers(targetValue, memberNames, memberValues));
-                            }
-                            statements.add(targetValue.returning());
-                            return StatementDef.multi(statements);
-                        });
-                    }
-                    if (pythonValueFinal != null) {
-                        ExpressionDef storedValue = aThis.field(pythonValueField(model));
-                        List<StatementDef> reuseStatements = new ArrayList<>();
-                        reuseStatements.add(PYTHON_COERCION.invokeStatic(
-                            REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, storedValue
-                        ));
-                        if (!isFrozenDataclass) {
-                            List<ExpressionDef> memberNames = new ArrayList<>();
-                            List<ExpressionDef> memberValues = new ArrayList<>();
-                            for (PropertyElement beanProperty : beanProperties) {
-                                FieldDef field = propertyFields.get(beanProperty.getName());
-                                if (field != null) {
-                                    memberNames.add(ExpressionDef.constant(beanProperty.getName()));
-                                    memberValues.add(coerceTypedElementToPolyglotValue(
-                                        beanProperty, aThis.field(field), targetContext
-                                    ).cast(TypeDef.OBJECT));
-                                }
-                            }
-                            if (!memberNames.isEmpty()) {
-                                reuseStatements.add(putMembers(storedValue, memberNames, memberValues));
-                            }
-                        }
-                        reuseStatements.add(storedValue.returning());
-                        return PYTHON_COERCION.invokeStatic("isValueInContext", TypeDef.Primitive.BOOLEAN, storedValue, targetContext).isTrue()
-                            .doIfElse(StatementDef.multi(reuseStatements), reconstructedBody);
-                    }
-                    return reconstructedBody;
-                    })
-                ));
+                    .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> reconstructPolyglotValueBody(model, aThis, methodParameters))));
             }
         } else {
-            builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
-                .addModifiers(Modifier.PUBLIC)
-                .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
-                    if (isJunit5Test) {
-                        ExpressionDef storedValue = aThis.field(pythonValueField(model));
-                        ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                            "newInstance",
-                            POLYGLOT_VALUE,
-                            List.of(
-                                pythonClassReference(element, pythonClassReference)
-                            )
-                        );
-                        return storedValue.isNonNull().doIfElse(
-                            storedValue.returning(),
-                            StatementDef.multi(
-                                aThis.field(pythonValueField(model)).assign(newValue),
-                                aThis.field(pythonValueField(model)).returning()
-                            )
-                        );
-                    }
-                    if (pythonValueFinal != null) {
-                        return aThis.field(pythonValueFinal).returning();
-                    } else if (extendsPythonClass) {
-                        return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning();
-                    } else {
-                        return aThis.field("graalpyInternalValue", POLYGLOT_VALUE).returning();
-                    }
-                }))
+            addDynamicPolyglotValueMethod(model);
+        }
+    }
+
+    /**
+     * The body of {@code asPolyglotValue()} of an introspected stub: the Python object is created from the
+     * current field values when it does not exist yet, and re-synchronised with them otherwise.
+     */
+    private StatementDef introspectedPolyglotValueBody(ClassStubModel model, VariableDef.This aThis) {
+        boolean isAopProxy = model.isAopProxy();
+        FieldDef pythonClassReference = model.pythonClassReference();
+        List<PropertyElement> beanProperties = model.beanProperties();
+        boolean hasDynamicBeanProperties = model.hasDynamicBeanProperties();
+        Map<String, FieldDef> propertyFields = model.propertyFields();
+        Map<String, FieldDef> syncSnapshotFields = model.syncSnapshotFields();
+        @Nullable FieldDef pythonValueFinal = model.pythonValue();
+        @Nullable FieldDef pythonValueSyncingFinal = model.pythonValueSyncing();
+        @Nullable FieldDef javaOwnedField = model.javaOwned();
+        ClassElement element = model.element();
+        final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+        final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
+        if (hasDynamicBeanProperties && pythonValueFinal != null) {
+            ExpressionDef storedValue = aThis.field(pythonValueField(model));
+            return storedValue.isNonNull().doIfElse(
+                storedValue.returning(),
+                ExpressionDef.nullValue().returning()
             );
         }
+        if (beanProperties.isEmpty() && pythonValueFinal != null) {
+            ExpressionDef storedValue = aThis.field(pythonValueField(model));
+            ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                isAbstractIntro ? NEW_INTRODUCTION : NEW_INSTANCE,
+                POLYGLOT_VALUE,
+                List.of(pythonClassReference(element, pythonClassReference))
+            );
+            return storedValue.isNonNull().doIfElse(
+                storedValue.returning(),
+                StatementDef.multi(
+                    aThis.field(pythonValueField(model)).assign(newValue),
+                    aThis.field(pythonValueField(model)).returning()
+                )
+            );
+        }
+        ExpressionDef reconstructedValue;
+        if (isAbstractIntro) {
+            List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
+            var primaryCtor = element.getPrimaryConstructor().orElse(null);
+            if (primaryCtor != null) {
+                for (PropertyElement beanProperty : beanProperties) {
+                    FieldDef field = propertyFields.get(beanProperty.getName());
+                    if (field == null) {
+                        continue;
+                    }
+                    ExpressionDef fieldRef = aThis.field(field);
+                    arguments.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT));
+                }
+            }
+            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                NEW_INTRODUCTION,
+                POLYGLOT_VALUE,
+                arguments
+            );
+        } else if (isFrozenDataclass) {
+            List<ExpressionDef> mapEntries = new ArrayList<>();
+            for (PropertyElement beanProperty : beanProperties) {
+                FieldDef field = propertyFields.get(beanProperty.getName());
+                if (field == null) {
+                    continue;
+                }
+                ExpressionDef fieldRef = aThis.field(field);
+                mapEntries.add(ExpressionDef.constant(beanProperty.getName()));
+                mapEntries.add(coerceTypedElementToPolyglotValue(beanProperty, fieldRef));
+            }
+            ExpressionDef propsMap = ClassTypeDef.of(AnnotationUtil.class)
+                .invokeStatic(MAP_OF, TypeDef.of(Map.class), mapEntries);
+            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                "newFrozenDataclassInstance",
+                POLYGLOT_VALUE,
+                List.of(
+                    pythonClassReference(element, pythonClassReference),
+                    propsMap
+                )
+            );
+        } else {
+            reconstructedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                NEW_UNINITIALIZED_INSTANCE,
+                POLYGLOT_VALUE,
+                List.of(
+                    pythonClassReference(element, pythonClassReference)
+                )
+            );
+        }
+        if (pythonValueFinal != null) {
+            if (isFrozenDataclass && !isAbstractIntro) {
+                return reconstructedValue.returning();
+            }
+            FieldDef pythonValueField = pythonValueField(model);
+            ExpressionDef storedValue = aThis.field(pythonValueField);
+            // Full sync: every field is written (an existing Python object of a class that
+            // is not tracked).
+            List<StatementDef> syncStatements = new ArrayList<>();
+            // Full sync of a Python object just created from the fields: the fields own
+            // the state, so collections and nested objects are written by reference.
+            List<StatementDef> reconstructSyncStatements = new ArrayList<>();
+            // Incremental sync: a tracked field is written only when it changed since the
+            // last write, so attribute changes made in Python survive on untouched fields.
+            List<StatementDef> incrementalSyncStatements = new ArrayList<>();
+            if (pythonValueSyncingFinal != null) {
+                StatementDef syncing = aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.trueValue());
+                syncStatements.add(syncing);
+                reconstructSyncStatements.add(syncing);
+                incrementalSyncStatements.add(syncing);
+            }
+            boolean tracked = false;
+            for (PropertyElement beanProperty : beanProperties) {
+                FieldDef field = propertyFields.get(beanProperty.getName());
+                if (field == null) {
+                    continue;
+                }
+                ExpressionDef fieldRef = aThis.field(field);
+                StatementDef write = propertyWrite(aThis, storedValue, beanProperty, field, javaOwnedField, null);
+                StatementDef ownedWrite = propertyWrite(aThis, storedValue, beanProperty, field, javaOwnedField, true);
+                FieldDef snapshot = syncSnapshotFields.get(beanProperty.getName());
+                if (snapshot == null) {
+                    syncStatements.add(write);
+                    reconstructSyncStatements.add(ownedWrite);
+                    incrementalSyncStatements.add(write);
+                } else {
+                    tracked = true;
+                    StatementDef remember = aThis.field(snapshot).assign(fieldRef);
+                    syncStatements.add(write);
+                    syncStatements.add(remember);
+                    reconstructSyncStatements.add(ownedWrite);
+                    reconstructSyncStatements.add(remember);
+                    incrementalSyncStatements.add(
+                        fieldRef.notEqualsReferentially(aThis.field(snapshot))
+                            .doIf(StatementDef.multi(write, remember))
+                    );
+                }
+            }
+            if (pythonValueSyncingFinal != null) {
+                StatementDef synced = aThis.field(pythonValueSyncingFinal).assign(ExpressionDef.falseValue());
+                syncStatements.add(synced);
+                reconstructSyncStatements.add(synced);
+                incrementalSyncStatements.add(synced);
+            }
+            syncStatements.add(storedValue.returning());
+            reconstructSyncStatements.add(storedValue.returning());
+            incrementalSyncStatements.add(storedValue.returning());
+            StatementDef syncBody = StatementDef.multi(syncStatements);
+            StatementDef existingValueBody = tracked ? StatementDef.multi(incrementalSyncStatements) : syncBody;
+            if (pythonValueSyncingFinal != null) {
+                existingValueBody = aThis.field(pythonValueSyncingFinal)
+                    .isTrue()
+                    .doIfElse(storedValue.returning(), existingValueBody);
+            }
+            List<StatementDef> reconstruct = new ArrayList<>();
+            reconstruct.add(aThis.field(pythonValueField).assign(reconstructedValue));
+            if (javaOwnedField != null) {
+                // no Python object existed: the object was created from Java (or loaded
+                // from storage), so its Java fields own the state from here on
+                reconstruct.add(aThis.field(javaOwnedField).assign(ExpressionDef.trueValue()));
+            }
+            reconstruct.add(StatementDef.multi(reconstructSyncStatements));
+            return storedValue.isNonNull().doIfElse(
+                existingValueBody,
+                StatementDef.multi(reconstruct)
+            );
+        }
+        return reconstructedValue.returning();
+    }
 
+    /**
+     * The body of {@code reconstructPolyglotValue(Context)} of a reconstructible introspected stub.
+     */
+    private StatementDef reconstructPolyglotValueBody(ClassStubModel model, VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
+        boolean isAopProxy = model.isAopProxy();
+        FieldDef pythonClassReference = model.pythonClassReference();
+        List<PropertyElement> beanProperties = model.beanProperties();
+        Map<String, FieldDef> propertyFields = model.propertyFields();
+        @Nullable FieldDef pythonValueFinal = model.pythonValue();
+        ClassElement element = model.element();
+        final boolean isAbstractIntro = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+        final boolean isFrozenDataclass = isFrozenPythonDataclass(element);
+        ExpressionDef targetContext = methodParameters.getFirst();
+        StatementDef reconstructedBody;
+        if (isAbstractIntro) {
+            List<ExpressionDef> arguments = new ArrayList<>(List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+            for (PropertyElement beanProperty : beanProperties) {
+                FieldDef field = propertyFields.get(beanProperty.getName());
+                if (field != null) {
+                    arguments.add(coerceTypedElementToPolyglotValue(beanProperty, aThis.field(field), targetContext).cast(TypeDef.OBJECT));
+                }
+            }
+            ExpressionDef introduction = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INTRODUCTION, POLYGLOT_VALUE, arguments);
+            reconstructedBody = introduction.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                PYTHON_COERCION.invokeStatic(
+                    REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                ),
+                targetValue.returning()
+            ));
+        } else if (beanProperties.isEmpty()) {
+            ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE,
+                List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+            reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                PYTHON_COERCION.invokeStatic(
+                    REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                ),
+                targetValue.returning()
+            ));
+        } else {
+            ExpressionDef instance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_UNINITIALIZED_INSTANCE, POLYGLOT_VALUE,
+                List.of(targetContext, pythonClassReference(element, pythonClassReference)));
+            reconstructedBody = instance.newLocal(TARGET_VALUE, targetValue -> {
+                List<StatementDef> statements = new ArrayList<>();
+                statements.add(PYTHON_COERCION.invokeStatic(
+                    REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue
+                ));
+                List<ExpressionDef> memberNames = new ArrayList<>();
+                List<ExpressionDef> memberValues = new ArrayList<>();
+                for (PropertyElement beanProperty : beanProperties) {
+                    FieldDef field = propertyFields.get(beanProperty.getName());
+                    if (field == null) {
+                        continue;
+                    }
+                    ExpressionDef propertyValue = coerceTypedElementToPolyglotValue(
+                        beanProperty, aThis.field(field), targetContext
+                    ).cast(TypeDef.OBJECT);
+                    if (isFrozenDataclass) {
+                        statements.add(PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                            "setInstanceProperty",
+                            TypeDef.VOID,
+                            targetValue,
+                            ExpressionDef.constant(beanProperty.getName()),
+                            propertyValue
+                        ));
+                    } else {
+                        memberNames.add(ExpressionDef.constant(beanProperty.getName()));
+                        memberValues.add(propertyValue);
+                    }
+                }
+                if (!memberNames.isEmpty()) {
+                    statements.add(putMembers(targetValue, memberNames, memberValues));
+                }
+                statements.add(targetValue.returning());
+                return StatementDef.multi(statements);
+            });
+        }
+        if (pythonValueFinal != null) {
+            ExpressionDef storedValue = aThis.field(pythonValueField(model));
+            List<StatementDef> reuseStatements = new ArrayList<>();
+            reuseStatements.add(PYTHON_COERCION.invokeStatic(
+                REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, storedValue
+            ));
+            if (!isFrozenDataclass) {
+                // the object of this context: the same sync as any other bridge crossing,
+                // so the fields of a Java-owned object stay shared by reference
+                reuseStatements.add(aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning());
+            } else {
+                reuseStatements.add(storedValue.returning());
+            }
+            if (!isFrozenDataclass) {
+                // no Python object yet and the target is the primary context: create the one
+                // this wrapper keeps, so a Java-created object handed to Python is the same
+                // object on every crossing and Python changes it in place
+                StatementDef createOwn = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).newLocal(TARGET_VALUE, targetValue -> StatementDef.multi(
+                    PYTHON_COERCION.invokeStatic(REMEMBER_POOLED_VALUE, TypeDef.VOID, aThis, targetContext, targetValue),
+                    targetValue.returning()
+                ));
+                reconstructedBody = storedValue.isNull()
+                    .and(PYTHON_CONTEXT_RUNTIME.invokeStatic("isCurrentContext", TypeDef.Primitive.BOOLEAN, targetContext).isTrue())
+                    .doIfElse(createOwn, reconstructedBody);
+            }
+            return PYTHON_COERCION.invokeStatic("isValueInContext", TypeDef.Primitive.BOOLEAN, storedValue, targetContext).isTrue()
+                .doIfElse(StatementDef.multi(reuseStatements), reconstructedBody);
+        }
+        return reconstructedBody;
+    }
+
+    /**
+     * Emits {@code asPolyglotValue()} of a stub that wraps a Python object without mirroring its state in fields.
+     */
+    private void addDynamicPolyglotValueMethod(ClassStubModel model) {
+        ClassDef.ClassDefBuilder builder = model.builder();
+        FieldDef pythonClassReference = model.pythonClassReference();
+        boolean extendsPythonClass = model.extendsPythonClass();
+        boolean isJunit5Test = model.isJunit5Test();
+        @Nullable FieldDef pythonValueFinal = model.pythonValue();
+        ClassElement element = model.element();
+        builder.addMethod(MethodDef.builder(AS_POLYGLOT_VALUE)
+            .addModifiers(Modifier.PUBLIC)
+            .returns(POLYGLOT_VALUE).build(((aThis, methodParameters) -> {
+                if (isJunit5Test) {
+                    ExpressionDef storedValue = aThis.field(pythonValueField(model));
+                    ExpressionDef newValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                        NEW_INSTANCE,
+                        POLYGLOT_VALUE,
+                        List.of(
+                            pythonClassReference(element, pythonClassReference)
+                        )
+                    );
+                    List<StatementDef> creation = new ArrayList<>();
+                    creation.add(aThis.field(pythonValueField(model)).assign(newValue));
+                    if (model.extendsJavaBase()) {
+                        // the test's Python object reaches the Java base through this instance
+                        creation.add(PYTHON_JAVA_BASES.invokeStatic("bind", TypeDef.VOID, aThis.field(pythonValueField(model)), aThis));
+                    }
+                    creation.add(aThis.field(pythonValueField(model)).returning());
+                    return storedValue.isNonNull().doIfElse(
+                        storedValue.returning(),
+                        StatementDef.multi(creation)
+                    );
+                }
+                if (pythonValueFinal != null) {
+                    FieldDef ownedClassReference = model.ownedClassReference();
+                    if (ownedClassReference == null) {
+                        return StatementDef.multi(
+                            returnInterceptedTargetValue(aThis),
+                            returnObjectUnderConstruction(model, aThis),
+                            aThis.field(pythonValueFinal).returning()
+                        );
+                    }
+                    // an owned object is created again when the application it was created in has shut
+                    // down (its runtime is no longer installed); the field is volatile and the check is
+                    // repeated under the stub's monitor, so concurrent callers share one new object
+                    ExpressionDef.InvokeStaticMethod newInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(aThis.field(ownedClassReference)));
+                    return StatementDef.multi(
+                        returnInterceptedTargetValue(aThis),
+                        returnObjectUnderConstruction(model, aThis),
+                        aThis.field(pythonValueFinal).newLocal(VALUE_PARAMETER, value -> StatementDef.multi(
+                            aThis.field(ownedClassReference).isNonNull()
+                                .and(PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse())
+                                .doIf(new StatementDef.Synchronized(aThis, StatementDef.multi(
+                                    value.assign(aThis.field(pythonValueFinal)),
+                                    PYTHON_CONTEXT_RUNTIME.invokeStatic(IS_LIVE_INSTANCE, TypeDef.Primitive.BOOLEAN, value).isFalse()
+                                        .doIf(StatementDef.multi(
+                                            value.assign(newInstance),
+                                            aThis.field(pythonValueFinal).assign(value)
+                                        ))
+                                ))),
+                            value.returning()
+                        ))
+                    );
+                } else if (extendsPythonClass) {
+                    return aThis.superRef().invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).returning();
+                } else {
+                    return StatementDef.multi(
+                        returnInterceptedTargetValue(aThis),
+                        aThis.field("graalpyInternalValue", POLYGLOT_VALUE).returning()
+                    );
+                }
+            }))
+        );
+    }
+
+    /**
+     * The super constructor call of a stub extending another Python class stub, for an object the stub
+     * owns: the class reference is handed up when the superclass stub owns its objects, otherwise the
+     * object is created here and wrapped by the superclass stub.
+     *
+     * @param aThis The stub instance
+     * @param superType The Python superclass
+     * @param classReference The Python class reference of the object
+     * @return The super constructor call
+     */
+    private static StatementDef invokeOwnedObjectSuperConstructor(VariableDef.This aThis, ClassElement superType, ExpressionDef classReference) {
+        if (hasOwnedObjectConstructor(superType)) {
+            return aThis.superRef().invokeSuperConstructor(classReference);
+        }
+        return aThis.superRef().invokeSuperConstructor(
+            PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference))
+        );
+    }
+
+    /**
+     * The statement of {@code asPolyglotValue()} of a stub extending a Java class that answers a bridge
+     * method the Java super constructor calls: the instance does not hold its Python object yet, which
+     * the runtime knows as the object under construction on the thread for the stub class.
+     *
+     * @param model The class model
+     * @param aThis The stub instance
+     * @return The conditional return statement, empty for a stub without a Java base
+     */
+    private static StatementDef returnObjectUnderConstruction(ClassStubModel model, VariableDef.This aThis) {
+        if (!model.extendsJavaBase() || model.isJunit5Test()) {
+            return StatementDef.multi();
+        }
+        ExpressionDef stubClass = javaClassType(model.element()).getStaticField(CLASS_FIELD, TypeDef.CLASS);
+        return aThis.field(pythonValueField(model)).isNull().doIf(
+            PYTHON_JAVA_BASES.invokeStatic("underConstruction", POLYGLOT_VALUE, stubClass).newLocal("constructing", constructing ->
+                constructing.isNonNull().doIf(constructing.returning())
+            )
+        );
+    }
+
+    /**
+     * A statement returning the Python object of the intercepted target when the stub instance is an AOP
+     * proxy (the scoped proxy of a factory bean, for example): the proxy has no Python object of its own.
+     *
+     * @param aThis The stub instance
+     * @return The conditional return statement
+     */
+    private static StatementDef returnInterceptedTargetValue(VariableDef.This aThis) {
+        return aThis.instanceOf(INTERCEPTED_PROXY).doIf(
+            PYTHON_COERCION.invokeStatic(INTERCEPTED_TARGET_VALUE, POLYGLOT_VALUE, aThis.cast(INTERCEPTED_PROXY)).returning()
+        );
+    }
+
+    /**
+     * An expression creating the Python object of a stub, unless the stub instance is an AOP proxy: a proxy
+     * delegates to the Python object of its target and creating one would run the constructor of the Python
+     * class for an object nothing uses.
+     *
+     * @param aThis The stub instance
+     * @param classReference The Python class reference
+     * @return The expression
+     */
+    private static ExpressionDef newInstanceUnlessProxy(VariableDef.This aThis, ExpressionDef classReference) {
+        return aThis.instanceOf(INTERCEPTED_PROXY).doIfElse(
+            ExpressionDef.nullValue().cast(POLYGLOT_VALUE),
+            PYTHON_CONTEXT_RUNTIME.invokeStatic(NEW_INSTANCE, POLYGLOT_VALUE, List.of(classReference))
+        );
     }
 
     /**
@@ -1046,7 +1644,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private void addFactoryMethods(ClassStubModel model) {
         ClassDef.ClassDefBuilder builder = model.builder();
-        String typeName = model.typeName();
         boolean isAopProxy = model.isAopProxy();
         FieldDef pythonClassReference = model.pythonClassReference();
         @Nullable ClassElement superType = model.superType();
@@ -1054,6 +1651,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean extendsHostClass = model.extendsHostClass();
         boolean isIntrospectedBean = model.isIntrospectedBean();
         boolean isJunit5Test = model.isJunit5Test();
+        boolean extendsThrowable = !isJunit5Test && extendsHostClass && superType.isAssignable(Throwable.class);
         List<PropertyElement> beanProperties = model.beanProperties();
         boolean hasDynamicBeanProperties = model.hasDynamicBeanProperties();
         boolean hasConfigurationBuilderProperty = model.hasConfigurationBuilderProperty();
@@ -1063,14 +1661,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement element = model.element();
         VisitorContext context = model.context();
         // implement static factory
-        ClassTypeDef thisType = ClassTypeDef.of(typeName);
+        ClassTypeDef thisType = javaClassType(element);
 
-        if (!isJunit5Test && !extendsHostClass) {
+        boolean extendsJavaBase = model.extendsJavaBase();
+        if (!isJunit5Test && (!extendsHostClass || extendsJavaBase)) {
             builder.addMethod(MethodDef.builder(FROM_POLYGLOT_VALUE)
                 .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
                 .addParameter(POLYGLOT_VALUE)
                 .returns(thisType)
-                .build((aThis, methodParameters) -> fromPolyglotValueBody(thisType, methodParameters.get(0)))
+                .build((aThis, methodParameters) -> extendsJavaBase || hasJavaBaseAncestor(superType)
+                    ? boundOrNewFromPolyglotValueBody(thisType, methodParameters.get(0))
+                    : fromPolyglotValueBody(thisType, methodParameters.get(0)))
             );
         }
 
@@ -1102,10 +1703,18 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             final int requiredConstructorParameterCount = requiredConstructorParameterCount(parameters);
             final boolean hasDefaultedConstructorParameters = requiredConstructorParameterCount < parameters.length;
             final boolean constructorParametersBackedByFields = constructorParametersBackedByFields(parameters, propertyFields);
+            // A dataclass takes the fields of its dataclass base first; an introspected base is constructed from
+            // them. Any other Python base only wraps the Python object, which then has to exist up front.
+            final int[] superConstructorParameterIndexes = extendsPythonClass ? pythonSuperConstructorParameterIndexes(superType, parameters) : null;
+            final boolean requiresPythonInstance = extendsPythonClass && superConstructorParameterIndexes == null;
                 builder.addMethod(
                 constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
+                    if (extendsJavaBase && !isJunit5Test) {
+                        // the Value constructor calls the Java super constructor with the Python super().__init__ arguments
+                        return invokeValueConstructor(aThis, newPythonInstance(element, pythonClassReference, parameters, methodParameters, isAbstractIntroCtor, requiredConstructorParameterCount));
+                    }
                     if (isIntrospectedBean && (constructorParametersBackedByFields || hasDynamicBeanProperties)) {
-                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties) {
+                        if (hasConfigurationBuilderProperty || hasDynamicBeanProperties || requiresPythonInstance) {
                             List<ExpressionDef> arguments = new ArrayList<>(List.of(pythonClassReference(element, pythonClassReference)));
                             if (hasDefaultedConstructorParameters) {
                                 arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
@@ -1134,6 +1743,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         List<StatementDef> assignments = new ArrayList<>();
                         if (extendsHostClass) {
                             assignments.add(aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, parameters, methodParameters)));
+                        } else if (extendsPythonClass) {
+                            List<ExpressionDef> superArguments = new ArrayList<>(superConstructorParameterIndexes.length);
+                            for (int index : superConstructorParameterIndexes) {
+                                superArguments.add(methodParameters.get(index));
+                            }
+                            assignments.add(aThis.superRef().invokeSuperConstructor(superArguments));
                         }
                         for (int i = 0; i < parameters.length; i++) {
                             @NonNull ParameterElement parameter = parameters[i];
@@ -1175,6 +1790,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, extendsPythonClass);
                         } else if (extendsPythonClass) {
                             return aThis.superRef().invokeSuperConstructor(pythonInstance);
+                        } else if (extendsThrowable) {
+                            // the Value constructor forwards the Python super().__init__ arguments to the Java base
+                            return invokeValueConstructor(aThis, pythonInstance);
                         } else if (extendsHostClass) {
                             List<ExpressionDef> superArguments = superConstructorArguments(superType, parameters, methodParameters);
                             return StatementDef.multi(
@@ -1182,60 +1800,184 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                                 aThis.field(pythonValueField(model)).assign(pythonInstance)
                             );
                         } else {
-                            return aThis.field(pythonValueField(model)).assign(pythonInstance);
+                            // created with the arguments given: not created again in another context
+                            return StatementDef.multi(
+                                aThis.field(pythonValueField(model)).assign(pythonInstance),
+                                aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue())
+                            );
                         }
                     }
                 }))
             );
-        } else {
-            if (isIntrospectedBean && pythonConstructor != null && pythonConstructor.getParameters().length != 0) {
-                    // add default constructor
-                    MethodDef.MethodDefBuilder defaultConstructor = MethodDef.constructor().addModifiers(Modifier.PUBLIC);
-                    jsonCreatorClassElement.ifPresent(t ->
-                        defaultConstructor.addAnnotation(t.getName())
-                    );
-
-                    builder.addMethod(defaultConstructor.build());
+            if (!isJunit5Test && PythonClassElement.isCallableWithoutArguments(pythonConstructor)) {
+                // Every parameter has a default (a dataclass whose fields all have defaults): the class can also
+                // be constructed without arguments, through its own __init__() so that the Python defaults apply.
+                builder.addMethod(MethodDef.constructor().addModifiers(Modifier.PUBLIC).build((aThis, methodParameters) ->
+                    pythonInstanceConstructorBody(model, isAbstractIntroCtor, aThis, methodParameters)
+                ));
+            } else if (isIntrospectedBean
+                && constructorParametersBackedByFields
+                && !hasDynamicBeanProperties
+                && !hasConfigurationBuilderProperty
+                && !extendsHostClass
+                && !extendsPythonClass) {
+                addNoArgumentConstructor(builder, parameters, beanProperties, propertyFields);
             }
-
+        } else {
             MethodDef.MethodDefBuilder constructor = MethodDef.constructor();
             final boolean isAbstractIntroNoArg = element.isAbstract() && isAopProxy && element.hasStereotype(Introduction.class);
+            // An introspected class whose attributes have defaults (count: int = 5) has to be created through its
+            // Python class for the defaults to apply; an ordinary introspected bean stays lazy.
+            final boolean appliesPythonDefaults = isIntrospectedBean
+                && beanProperties.stream().anyMatch(PythonStubGenerator::hasPythonDefaultValue)
+                && isPythonConstructibleWithoutArguments(element);
             builder.addMethod(constructor.addModifiers(Modifier.PUBLIC).build(((aThis, methodParameters) -> {
                 if (isJunit5Test) {
                     return StatementDef.multi();
-                } else if (isIntrospectedBean && hasConfigurationBuilderProperty) {
-                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
-                        isAbstractIntroNoArg ? "newIntroduction" : "newInstance",
+                } else if (extendsJavaBase) {
+                    return invokeValueConstructor(aThis, PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                        isAbstractIntroNoArg ? NEW_INTRODUCTION : NEW_INSTANCE,
                         POLYGLOT_VALUE,
                         List.of(pythonClassReference(element, pythonClassReference))
-                    );
-                    if (extendsHostClass) {
-                        return StatementDef.multi(
-                            aThis.superRef().invokeSuperConstructor(superConstructorArguments(superType, new ParameterElement[0], methodParameters)),
-                            initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, false)
-                        );
-                    }
-                    return initializeFromPolyglotValue(aThis, pythonInstance, beanProperties, propertyFields, syncSnapshotFields, pythonValueFinal, extendsPythonClass);
-                } else if (isIntrospectedBean) {
+                    ));
+                } else if (isIntrospectedBean && !hasConfigurationBuilderProperty && !appliesPythonDefaults) {
                     // Keep ordinary introspected beans lazy; resolving their Python class here
                     // would break beans whose Python constructor requires arguments.
                     return StatementDef.multi();
                 } else {
-                    ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME
-                        .invokeStatic(isAbstractIntroNoArg ? "newIntroduction" : "newInstance", POLYGLOT_VALUE,
-                            List.of(
-                                pythonClassReference(element, pythonClassReference)
-                            )
-                        );
-                    if (extendsPythonClass) {
-                        return aThis.superRef().invokeSuperConstructor(pythonInstance);
-                    } else {
-                        return aThis.field(pythonValueField(model)).assign(pythonInstance);
-                    }
+                    return pythonInstanceConstructorBody(model, isAbstractIntroNoArg, aThis, methodParameters);
                 }
             })));
         }
 
+    }
+
+    /**
+     * {@code this(value)}: delegates to the constructor that wraps an existing Python value.
+     */
+    private static StatementDef invokeValueConstructor(VariableDef.This aThis, ExpressionDef value) {
+        MethodDef valueConstructor = MethodDef.constructor()
+            .addParameter(ParameterDef.of(VALUE_PARAMETER, POLYGLOT_VALUE))
+            .build();
+        return new ExpressionDef.InvokeInstanceMethod(aThis, valueConstructor, List.of(value));
+    }
+
+    /**
+     * The body of a no-arg constructor that creates the Python object through its own constructor, so that the
+     * defaults of the Python class apply, and reads the fields of an introspected class from it.
+     */
+    private StatementDef pythonInstanceConstructorBody(ClassStubModel model, boolean introduction, VariableDef.This aThis, List<VariableDef.MethodParameter> methodParameters) {
+        ClassElement element = model.element();
+        ExpressionDef pythonInstance = PYTHON_CONTEXT_RUNTIME.invokeStatic(
+            introduction ? NEW_INTRODUCTION : NEW_INSTANCE,
+            POLYGLOT_VALUE,
+            List.of(pythonClassReference(element, model.pythonClassReference()))
+        );
+        if (model.extendsJavaBase() && !model.isJunit5Test()) {
+            // the Value constructor calls the Java super constructor with the Python super().__init__ arguments
+            return invokeValueConstructor(aThis, pythonInstance);
+        }
+        if (model.isIntrospectedBean()) {
+            if (model.extendsHostClass()) {
+                return StatementDef.multi(
+                    aThis.superRef().invokeSuperConstructor(superConstructorArguments(model.superType(), new ParameterElement[0], methodParameters)),
+                    initializeFromPolyglotValue(aThis, pythonInstance, model.beanProperties(), model.propertyFields(), model.syncSnapshotFields(), model.pythonValue(), false)
+                );
+            }
+            return initializeFromPolyglotValue(aThis, pythonInstance, model.beanProperties(), model.propertyFields(), model.syncSnapshotFields(), model.pythonValue(), model.extendsPythonClass());
+        }
+        ExpressionDef classReference = pythonClassReference(element, model.pythonClassReference());
+        if (model.extendsPythonClass()) {
+            // the stub of the root Python class owns the object
+            return introduction
+                ? aThis.superRef().invokeSuperConstructor(pythonInstance)
+                : invokeOwnedObjectSuperConstructor(aThis, model.superType(), classReference);
+        }
+        if (!model.isJunit5Test() && model.extendsHostClass() && model.superType().isAssignable(Throwable.class)) {
+            // the Value constructor forwards the Python super().__init__ arguments to the Java base
+            return invokeValueConstructor(aThis, pythonInstance);
+        }
+        if (model.extendsHostClass()) {
+            return StatementDef.multi(
+                aThis.superRef().invokeSuperConstructor(superConstructorArguments(model.superType(), new ParameterElement[0], methodParameters)),
+                aThis.field(pythonValueField(model)).assign(introduction ? pythonInstance : newInstanceUnlessProxy(aThis, classReference))
+            );
+        }
+        if (introduction) {
+            return StatementDef.multi(
+                aThis.field(pythonValueField(model)).assign(pythonInstance),
+                aThis.field(ownedClassReferenceField(model)).assign(ExpressionDef.nullValue())
+            );
+        }
+        // an object the stub owns: created again when its context is no longer the primary one
+        return StatementDef.multi(
+            aThis.field(pythonValueField(model)).assign(newInstanceUnlessProxy(aThis, classReference)),
+            aThis.field(ownedClassReferenceField(model)).assign(classReference)
+        );
+    }
+
+    /**
+     * The {@code PythonContextRuntime.newInstance(...)} call creating the Python object of a class
+     * from the constructor parameters.
+     */
+    private ExpressionDef newPythonInstance(ClassElement element, FieldDef pythonClassReference, ParameterElement[] parameters, List<VariableDef.MethodParameter> methodParameters, boolean introduction, int requiredConstructorParameterCount) {
+        List<ExpressionDef> arguments = new ArrayList<>();
+        arguments.add(pythonClassReference(element, pythonClassReference));
+        if (requiredConstructorParameterCount < parameters.length) {
+            arguments.add(ExpressionDef.constant(requiredConstructorParameterCount));
+        }
+        for (int i = 0; i < parameters.length; i++) {
+            coerceParameterToPolyglotValue(parameters[i], arguments, methodParameters.get(i));
+            int lastArgIndex = arguments.size() - 1;
+            arguments.set(lastArgIndex, arguments.get(lastArgIndex).cast(TypeDef.OBJECT));
+        }
+        return PYTHON_CONTEXT_RUNTIME.invokeStatic(
+            constructorFactoryMethod(introduction, requiredConstructorParameterCount < parameters.length),
+            POLYGLOT_VALUE,
+            arguments
+        );
+    }
+
+    /**
+     * Whether the attribute backing the property declares a default value (an initializer in the class body,
+     * which only the Python class applies).
+     */
+    private static boolean hasPythonDefaultValue(PropertyElement beanProperty) {
+        return beanProperty instanceof PythonPropertyElement pythonProperty
+            && pythonProperty.getNativeType().field() != null
+            && pythonProperty.getNativeType().field().hasDefaultValue();
+    }
+
+    /**
+     * Whether the Python class can be instantiated without arguments: the {@code __init__} it declares or
+     * inherits from the nearest Python base class that declares one takes no required parameter.
+     */
+    private static boolean isPythonConstructibleWithoutArguments(ClassElement element) {
+        ClassElement current = element;
+        while (current instanceof AbstractPythonClassElement pythonClassElement) {
+            FunctionDef constructor = pythonClassElement.getNativeType().constructor();
+            if (constructor != null) {
+                return constructor.arguments() == null
+                    || constructor.arguments().arguments().stream().allMatch(ArgumentDef::hasDefaultValue);
+            }
+            current = current.getSuperType().orElse(null);
+        }
+        return true;
+    }
+
+    /**
+     * Whether a Python class has a Java base class somewhere above it, so a Python object of the
+     * class may already be bound to a Java instance.
+     */
+    private static boolean hasJavaBaseAncestor(@Nullable ClassElement superType) {
+        ClassElement current = superType;
+        while (current != null && !Object.class.getName().equals(current.getName())) {
+            if (!(current instanceof AbstractPythonClassElement)) {
+                return !current.isInterface() && !current.isAssignable(Throwable.class);
+            }
+            current = current.getSuperType().orElse(null);
+        }
+        return false;
     }
 
     /**
@@ -1250,10 +1992,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .onlyAccessible()
                 .onlyInstance()
                 .filter(method -> !methodsToBridge.contains(method))
-                .annotated(ann ->
-                    ann.hasStereotype(AnnotationUtil.INJECT) ||
-                        ann.hasAnnotation(ANN_CONFIGURATION_INJECT)
-                ));
+                .annotated(PythonStubGenerator::isInjectionMethod));
 
         for (MethodElement injectionMethod : injectionMethods) {
             MethodDef.MethodDefBuilder injectionMethodBuilder = MethodDef.builder(injectionMethod.getName());
@@ -1299,11 +2038,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     }
 
-    private static TypeDef parameterizedTypeDef(ClassElement anInterface) {
+    static TypeDef parameterizedTypeDef(ClassElement anInterface) {
         Map<String, ClassElement> typeArguments = resolvedTypeArguments(anInterface);
         TypeDef interfaceTypeDef = javaClassType(anInterface);
         List<? extends GenericPlaceholderElement> declaredPlaceholders = anInterface.getDeclaredGenericPlaceholders();
-        if (!typeArguments.isEmpty()) {
+        if (!typeArguments.isEmpty() && !rendersRaw(anInterface, typeArguments, declaredPlaceholders)) {
             List<TypeDef> resolvedTypeArguments = new ArrayList<>(typeArguments.size());
             int index = 0;
             for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
@@ -1486,14 +2225,38 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 continue;
             }
             AnnotationValue<?> annotationValue = annotationMetadata.getDeclaredAnnotation(annotationName);
-            if (annotationValue != null) {
-                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(annotationValue.getAnnotationName(), annotationValue.getValues()));
+            if (annotationValue == null) {
+                continue;
+            }
+            // A repeatable annotation (@Size, @Min) is held by its container (Size.List) in the metadata; the
+            // source names the repeated annotations, not the container, which is not importable by its binary name
+            for (AnnotationValue<?> repeated : repeatedAnnotations(annotationMetadata, annotationValue)) {
+                annotationDefs.add(PythonAnnotationStubGenerator.buildAnnotationDef(repeated.getAnnotationName(), repeated.getValues()));
             }
         }
         if (annotationDefs.isEmpty()) {
             return typeDef;
         }
         return typeDef.annotated(annotationDefs);
+    }
+
+    private static List<AnnotationValue<?>> repeatedAnnotations(AnnotationMetadata annotationMetadata, AnnotationValue<?> annotationValue) {
+        String containerName = annotationValue.getAnnotationName();
+        Map<CharSequence, Object> values = annotationValue.getValues();
+        Object value = values.size() == 1 ? values.get(AnnotationMetadata.VALUE_MEMBER) : null;
+        Object[] elements = value instanceof Object[] array ? array : value instanceof Collection<?> collection ? collection.toArray() : null;
+        if (elements == null || elements.length == 0) {
+            return List.of(annotationValue);
+        }
+        List<AnnotationValue<?>> repeated = new ArrayList<>(elements.length);
+        for (Object element : elements) {
+            if (!(element instanceof AnnotationValue<?> nested)
+                || !annotationMetadata.findRepeatableAnnotation(nested.getAnnotationName()).filter(containerName::equals).isPresent()) {
+                return List.of(annotationValue);
+            }
+            repeated.add(nested);
+        }
+        return repeated;
     }
 
     static TypeDef propertyType(PropertyElement beanProperty) {
@@ -1504,7 +2267,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return TypeDef.of(beanProperty.getType());
     }
 
-    private static TypeDef sourceSignatureType(ClassElement anInterface) {
+    static TypeDef sourceSignatureType(ClassElement anInterface) {
         return sourceSignatureType(anInterface, false, Map.of());
     }
 
@@ -1513,6 +2276,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         boolean typeArgument,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (anInterface.isArray() && (anInterface instanceof GenericPlaceholderElement || anInterface instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            return sourceSignatureType(anInterface.fromArray(), typeArgument, signatureTypeArguments).array(anInterface.getArrayDimensions());
+        }
         if (anInterface instanceof WildcardElement wildcardElement) {
             if (!wildcardElement.getLowerBounds().isEmpty()) {
                 return TypeDef.wildcardSupertypeOf(sourceSignatureType(wildcardElement.getLowerBounds().getFirst(), true, signatureTypeArguments));
@@ -1527,21 +2294,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (anInterface instanceof GenericPlaceholderElement placeholder) {
             ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
-            if (resolvedTypeArgument != null
-                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+            if (resolvedTypeArgument != null && !samePlaceholderType(placeholder, resolvedTypeArgument)) {
                 return sourceSignatureType(resolvedTypeArgument, typeArgument, signatureTypeArguments);
             }
-            if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
+            if (isMethodTypeVariable(placeholder)) {
                 return TypeDef.variable(placeholder.getVariableName());
             }
             Optional<ClassElement> resolved = placeholder.getResolved();
-            if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
+            if (resolved.isPresent() && !samePlaceholderType(placeholder, resolved.get())) {
                 return sourceSignatureType(resolved.get(), typeArgument, signatureTypeArguments);
             }
             if (placeholder.isRawType()) {
-                return sourceSignatureType(firstBound(placeholder), typeArgument, signatureTypeArguments);
+                return boundSignatureType(placeholder, typeArgument, signatureTypeArguments);
             }
             return TypeDef.variable(placeholder.getVariableName());
+        }
+        if (anInterface.isArray()) {
+            return TypeDef.of(anInterface);
         }
         if (anInterface.isPrimitive()) {
             TypeDef primitiveType = TypeDef.of(anInterface);
@@ -1550,16 +2319,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return typeArgument ? TypeDescriptors.toBoxedIfNecessary(primitiveType) : primitiveType;
         }
-        if (anInterface.isArray()) {
-            return TypeDef.of(anInterface);
-        }
         if (anInterface.isRawType()) {
             return javaClassType(anInterface);
         }
         Map<String, ClassElement> typeArguments = resolvedTypeArguments(anInterface);
         TypeDef interfaceTypeDef = javaClassType(anInterface);
         List<? extends GenericPlaceholderElement> declaredPlaceholders = anInterface.getDeclaredGenericPlaceholders();
-        if (!typeArguments.isEmpty()) {
+        if (!typeArguments.isEmpty() && !rendersRaw(anInterface, typeArguments, declaredPlaceholders)) {
             List<TypeDef> resolvedTypeArguments = new ArrayList<>(typeArguments.size());
             int index = 0;
             for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
@@ -1576,15 +2342,29 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ClassElement resolvedType,
         Map<String, ClassElement> signatureTypeArguments
     ) {
+        if (signatureType.isArray() && (signatureType instanceof GenericPlaceholderElement || signatureType instanceof WildcardElement)) {
+            // E[] / E... keeps its array shape around the resolved type variable
+            ClassElement resolvedComponentType = resolvedType != null && resolvedType.isArray() ? resolvedType.fromArray() : resolvedType;
+            return bridgeSignatureType(signatureType.fromArray(), resolvedComponentType, signatureTypeArguments).array(signatureType.getArrayDimensions());
+        }
         if (signatureType instanceof WildcardElement wildcardElement) {
+            // The resolved counterpart of a wildcard is usually a wildcard too: its bound, not the
+            // wildcard itself, resolves the signature bound (otherwise `? super T` resolved against
+            // `? super Book` would render as `? super ? super Book`).
+            WildcardElement resolvedWildcard = resolvedType instanceof WildcardElement wildcard ? wildcard : null;
             if (!wildcardElement.getLowerBounds().isEmpty()) {
-                return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedType, signatureTypeArguments));
+                ClassElement resolvedBound = resolvedWildcard == null ? resolvedType : firstOrNull(resolvedWildcard.getLowerBounds());
+                return TypeDef.wildcardSupertypeOf(bridgeSignatureType(wildcardElement.getLowerBounds().getFirst(), resolvedBound, signatureTypeArguments));
             }
             if (!wildcardElement.getUpperBounds().isEmpty()) {
                 ClassElement upperBound = wildcardElement.getUpperBounds().getFirst();
                 if (!Object.class.getName().equals(upperBound.getName())) {
-                    return TypeDef.wildcardSubtypeOf(bridgeSignatureType(upperBound, resolvedType, signatureTypeArguments));
+                    ClassElement resolvedBound = resolvedWildcard == null ? resolvedType : firstOrNull(resolvedWildcard.getUpperBounds());
+                    return TypeDef.wildcardSubtypeOf(bridgeSignatureType(upperBound, resolvedBound, signatureTypeArguments));
                 }
+            }
+            if (resolvedWildcard != null) {
+                return sourceSignatureType(resolvedWildcard, true, signatureTypeArguments);
             }
             if (resolvedType != null && !isObjectType(resolvedType)) {
                 return TypeDef.wildcardSubtypeOf(sourceSignatureType(resolvedType, true, signatureTypeArguments));
@@ -1593,22 +2373,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
         if (signatureType instanceof GenericPlaceholderElement placeholder) {
             ClassElement resolvedTypeArgument = resolveMappedTypeArgument(signatureTypeArguments.get(placeholder.getVariableName()));
-            if (resolvedTypeArgument != null
-                && (!(resolvedTypeArgument instanceof GenericPlaceholderElement) || !placeholder.equals(resolvedTypeArgument))) {
+            if (resolvedTypeArgument != null && !samePlaceholderType(placeholder, resolvedTypeArgument)) {
                 return sourceSignatureType(resolvedTypeArgument, false, signatureTypeArguments);
             }
-            if (placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent()) {
+            if (isMethodTypeVariable(placeholder)) {
                 return TypeDef.variable(placeholder.getVariableName());
             }
             if (resolvedType != null && !isObjectType(resolvedType)) {
                 return sourceSignatureType(resolvedType, false, signatureTypeArguments);
             }
             Optional<ClassElement> resolved = placeholder.getResolved();
-            if (resolved.isPresent() && !placeholder.equals(resolved.get())) {
+            if (resolved.isPresent() && !samePlaceholderType(placeholder, resolved.get())) {
                 return sourceSignatureType(resolved.get(), false, signatureTypeArguments);
             }
             if (placeholder.isRawType()) {
-                return sourceSignatureType(firstBound(placeholder), false, signatureTypeArguments);
+                return boundBridgeSignatureType(placeholder, null, signatureTypeArguments);
             }
             return TypeDef.variable(placeholder.getVariableName());
         }
@@ -1628,6 +2407,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 }
             }
             List<? extends GenericPlaceholderElement> declaredPlaceholders = signatureType.getDeclaredGenericPlaceholders();
+            if (rendersRaw(signatureType, typeArguments, declaredPlaceholders)) {
+                return javaClassType(signatureType);
+            }
             Map<String, ClassElement> resolvedTypeArguments = resolvedType == null ? Map.of() : resolvedType.getTypeArguments();
             List<TypeDef> resolvedTypeDefs = new ArrayList<>(typeArguments.size());
             int index = 0;
@@ -1701,6 +2483,41 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
+    /**
+     * Adds the no-argument constructor that reflection-based frameworks (JPA, JAXB, Java serialization)
+     * instantiate a field-backed class with before they populate its fields. Only the constant defaults of
+     * the Python constructor are applied: the Python object itself is created lazily by
+     * {@code asPolyglotValue()} from the field values, as after the field-assigning constructor.
+     */
+    private static void addNoArgumentConstructor(ClassDef.ClassDefBuilder builder,
+                                                 ParameterElement[] parameters,
+                                                 List<PropertyElement> beanProperties,
+                                                 Map<String, FieldDef> propertyFields) {
+        PythonParameterDefaultValueProvider defaultValueProvider = new PythonParameterDefaultValueProvider();
+        builder.addMethod(MethodDef.constructor()
+            .addModifiers(Modifier.PUBLIC)
+            .build((aThis, methodParameters) -> {
+                List<StatementDef> assignments = new ArrayList<>();
+                for (ParameterElement parameter : parameters) {
+                    PropertyElement beanProperty = findBeanProperty(beanProperties, parameter.getName());
+                    FieldDef field = propertyFields.get(parameter.getName());
+                    if (beanProperty == null || field == null || !hasDefaultValue(parameter)) {
+                        continue;
+                    }
+                    ExpressionDef defaultValue = defaultedConstructorParameterValue(parameter);
+                    if (defaultValue == null) {
+                        defaultValue = defaultValueProvider.defaultValueExpression(parameter, null)
+                            .filter(value -> !(value instanceof ExpressionDef.Constant constant && constant.value() == null))
+                            .orElse(null);
+                    }
+                    if (defaultValue != null) {
+                        assignments.add(aThis.field(field).assign(defaultValue));
+                    }
+                }
+                return StatementDef.multi(assignments);
+            }));
+    }
+
     private static int requiredConstructorParameterCount(ParameterElement[] parameters) {
         int requiredParameterCount = parameters.length;
         while (requiredParameterCount > 0 && hasDefaultValue(parameters[requiredParameterCount - 1])) {
@@ -1728,6 +2545,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .findFirst()
             .map(constructor -> new ArrayList<ExpressionDef>(methodParameters.subList(0, constructor.getParameters().length)))
             .orElseGet(() -> new ArrayList<>(methodParameters));
+    }
+
+    /**
+     * The positions, among the constructor parameters, of the arguments of the constructor of an introspected Python
+     * base class, which a dataclass inherits as its leading fields. {@code null} when the base has to be constructed
+     * from the Python object instead: it is not introspected, or its constructor takes a parameter of another name.
+     */
+    private static int @Nullable [] pythonSuperConstructorParameterIndexes(ClassElement superType, ParameterElement[] parameters) {
+        if (!superType.hasStereotype(Introspected.class)) {
+            return null;
+        }
+        ParameterElement[] superParameters = superType.getPrimaryConstructor()
+            .map(MethodElement::getParameters)
+            .orElse(ParameterElement.ZERO_PARAMETER_ELEMENTS);
+        int[] indexes = new int[superParameters.length];
+        for (int i = 0; i < superParameters.length; i++) {
+            indexes[i] = indexOfParameter(parameters, superParameters[i].getName());
+            if (indexes[i] < 0) {
+                return null;
+            }
+        }
+        return indexes;
+    }
+
+    private static int indexOfParameter(ParameterElement[] parameters, String name) {
+        for (int i = 0; i < parameters.length; i++) {
+            if (parameters[i].getName().equals(name)) {
+                return i;
+            }
+        }
+        return -1;
     }
 
     private static boolean matchesConstructorPrefix(ConstructorElement constructor, ParameterElement[] parameters) {
@@ -1762,13 +2610,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean hasDataclassDefaultFactory(ParameterElement parameter, String factoryName) {
-        if (!(parameter.getNativeType() instanceof ArgumentDef argumentDef)) {
-            return false;
-        }
-        if (argumentDef.defaultValue() instanceof String defaultFactoryName) {
-            return factoryName.equals(defaultFactoryName) || defaultFactoryName.endsWith("." + factoryName);
-        }
-        return false;
+        return parameter.getNativeType() instanceof ArgumentDef argumentDef
+            && argumentDef.defaultValue() instanceof DefaultFactoryDef factory
+            && factory.isBuiltin(factoryName);
     }
 
     private static boolean isFrozenPythonDataclass(ClassElement element) {
@@ -1778,9 +2622,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static String constructorFactoryMethod(boolean introduction, boolean hasDefaultedParameters) {
         if (introduction) {
-            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : "newIntroduction";
+            return hasDefaultedParameters ? "newIntroductionWithDefaultedTrailingNulls" : NEW_INTRODUCTION;
         }
-        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : "newInstance";
+        return hasDefaultedParameters ? "newInstanceWithDefaultedTrailingNulls" : NEW_INSTANCE;
     }
 
     private static boolean hasConfigurationInjectConstructor(ClassElement element) {
@@ -1844,7 +2688,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> signatureTypeArguments
     ) {
         if (placeholder != null && isDeclaredPlaceholderArgument(signatureTypeArgument, placeholder)) {
-            return bridgeSignatureType(firstBound(placeholder), resolvedTypeArgument, signatureTypeArguments);
+            return boundBridgeSignatureType(placeholder, resolvedTypeArgument, signatureTypeArguments);
         }
         return bridgeSignatureType(signatureTypeArgument, resolvedTypeArgument, signatureTypeArguments);
     }
@@ -1856,11 +2700,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (placeholder == null || !(typeArgument instanceof GenericPlaceholderElement argumentPlaceholder)) {
             return false;
         }
-        if (!placeholder.getVariableName().equals(argumentPlaceholder.getVariableName())) {
-            return false;
-        }
-        return argumentPlaceholder.equals(placeholder)
-            || argumentPlaceholder.getDeclaringElement().equals(placeholder.getDeclaringElement());
+        return samePlaceholder(argumentPlaceholder, placeholder);
     }
 
     private static TypeDef sourceTypeArgument(ClassElement typeArgument, @Nullable GenericPlaceholderElement placeholder) {
@@ -1872,17 +2712,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable GenericPlaceholderElement placeholder,
         Map<String, ClassElement> resolvedTypeArguments
     ) {
+        if (typeArgument instanceof WildcardElement) {
+            return sourceSignatureType(typeArgument, true, resolvedTypeArguments);
+        }
         if (typeArgument instanceof GenericPlaceholderElement
             && (placeholder == null || !isDeclaredPlaceholderArgument(typeArgument, placeholder))) {
             return sourceSignatureType(typeArgument, true, resolvedTypeArguments);
         }
         if (placeholder != null) {
             if (isDeclaredPlaceholderArgument(typeArgument, placeholder)) {
-                return sourceSignatureType(firstBound(placeholder), true, resolvedTypeArguments);
+                return boundSignatureType(placeholder, true, resolvedTypeArguments);
             }
             if (isObjectType(typeArgument)) {
                 Optional<ClassElement> bound = firstNonObjectBound(placeholder);
-                if (bound.isPresent()) {
+                if (bound.isPresent() && !referencesPlaceholder(bound.get(), placeholder, new HashSet<>())) {
                     return sourceSignatureType(bound.get(), true, resolvedTypeArguments);
                 }
             }
@@ -2001,37 +2844,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return left.getName().equals(right.getName());
     }
 
-    private static InterfaceDef buildInterfaceDef(AbstractPythonClassElement classElement,
-                                                  String typeName,
-                                                  Collection<ClassElement> interfaces) {
-        InterfaceDef.InterfaceDefBuilder interfaceBuilder = InterfaceDef.builder(typeName)
-            .addModifiers(Modifier.PUBLIC);
-        for (GenericPlaceholderElement placeholder : classElement.getDeclaredGenericPlaceholders()) {
-            interfaceBuilder.addTypeVariable(TypeDef.variable(placeholder.getVariableName()));
-        }
-        for (ClassElement anInterface : interfaces) {
-            interfaceBuilder.addSuperinterface(parameterizedTypeDef(anInterface));
-        }
-        Set<String> addedMethodNames = new LinkedHashSet<>();
-        for (MethodElement methodElement : classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyAccessible().onlyInstance())) {
-            String key = bridgeMethodKey(methodElement);
-            if (!addedMethodNames.add(key)) {
-                continue;
-            }
-            MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(methodElement.getName())
-                .addModifiers(Modifier.PUBLIC, Modifier.ABSTRACT)
-                .returns(sourceMethodReturnType(methodElement, false));
-            addMethodTypeVariables(methodElement, methodBuilder);
-            for (@NonNull ParameterElement parameter : methodElement.getParameters()) {
-                methodBuilder.addParameter(ParameterDef
-                    .builder(parameter.getName(), sourceSignatureType(parameter.getGenericType()))
-                    .build());
-            }
-            interfaceBuilder.addMethod(methodBuilder.build());
-        }
-        return interfaceBuilder.build();
-    }
-
     private static @Nullable DecoratorDef findScriptDecorator(PythonScriptElement scriptElement, PythonVisitorContext context) {
         return context
             .getProcessingEnvironment()
@@ -2060,7 +2872,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addMember("packageName", scriptElement.getPackageName())
                 .build());
             builder.addAnnotation(Vetoed.class);
-            copyAnnotations(scriptElement, builder, ANNOTATION_PACKAGES_TO_COPY, context);
+            copyRuntimeAnnotations(scriptElement, builder, ElementType.TYPE, typeName, context);
             builder.addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.ValueCoercible"));
             boolean isJunit5TestModule = scriptElement.hasAnnotation(ANN_MICRONAUT_TEST);
 
@@ -2150,7 +2962,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                             isDeclaredBeanMethod(ann)));
 
             for (MethodElement methodElement : methodsToBridge) {
-                boolean isJunit5Test = methodElement.hasDeclaredAnnotation(JUNIT_TEST)
+                boolean isJunit5Test = isJunit5TestMethod(methodElement)
                     || (isJunit5TestModule && isScriptTestMethod(methodElement));
                 addBridgeMethod(BridgeMethodSpec.of(methodElement, scriptElement).junit5Test(isJunit5Test).script(true), builder, context, addedMethodNames);
             }
@@ -2179,6 +2991,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (t instanceof GenericPlaceholderElement placeholder) {
             return erasedType(resolvedOrFirstBound(placeholder));
         }
+        if (t instanceof WildcardElement wildcard) {
+            return erasedType(wildcardErasure(wildcard));
+        }
         if (t.isPrimitive() || t.isArray()) {
             return TypeDef.of(t);
         }
@@ -2191,6 +3006,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static TypeDef constructorParameterType(ParameterElement parameter) {
         ClassElement genericType = parameter.getGenericType();
+        if (genericType instanceof GenericPlaceholderElement) {
+            // the field of a generic dataclass attribute (result: T) has the type variable as its type
+            return sourceSignatureType(genericType);
+        }
         if (!genericType.getTypeArguments().isEmpty() && !(genericType instanceof AbstractPythonClassElement)) {
             return parameterizedTypeDef(genericType);
         }
@@ -2222,7 +3041,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return sourceSignatureType(methodElement.getGenericReturnType());
     }
 
-    private static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
+    static void addMethodTypeVariables(MethodElement methodElement, MethodDef.MethodDefBuilder methodBuilder) {
         addMethodTypeVariables(methodElement, methodBuilder, Map.of());
     }
 
@@ -2240,22 +3059,53 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, ClassElement> resolvedTypeArguments,
         Map<String, ClassElement> inferredMethodBounds
     ) {
+        methodTypeVariables(methodElement, resolvedTypeArguments, inferredMethodBounds).forEach(methodBuilder::addTypeVariable);
+    }
+
+    private static List<TypeDef.TypeVariable> methodTypeVariables(
+        MethodElement methodElement,
+        Map<String, ClassElement> resolvedTypeArguments,
+        Map<String, ClassElement> inferredMethodBounds
+    ) {
+        List<TypeDef.TypeVariable> typeVariables = new ArrayList<>();
         for (GenericPlaceholderElement placeholder : methodElement.getDeclaredTypeVariables()) {
             List<TypeDef> bounds = placeholder.getBounds().stream()
                 .filter(bound -> !Object.class.getName().equals(bound.getName()))
-                .map(bound -> sourceSignatureType(bound, true, resolvedTypeArguments))
+                .map(bound -> typeVariableReferencesAsClassNames(sourceSignatureType(bound, true, resolvedTypeArguments)))
                 .toList();
             ClassElement inferredBound = inferredMethodBounds.get(placeholder.getVariableName());
             if (bounds.isEmpty() && inferredBound != null && !isObjectType(inferredBound)) {
                 bounds = List.of(sourceSignatureType(inferredBound, true, resolvedTypeArguments));
             }
-            methodBuilder.addTypeVariable(
-                TypeDef.variable(
-                    placeholder.getVariableName(),
-                    bounds
-                )
-            );
+            typeVariables.add(TypeDef.variable(placeholder.getVariableName(), bounds));
         }
+        return typeVariables;
+    }
+
+    /**
+     * The source generator renders the bounds of a method type variable without the method in
+     * scope, so a bound that references another variable of the same method (a variable
+     * {@code L} bounded by a list of the variable {@code A}) would print as that variable's
+     * bound. A plain class type named like the variable prints as the variable.
+     */
+    private static TypeDef typeVariableReferencesAsClassNames(TypeDef typeDef) {
+        return switch (typeDef) {
+            case TypeDef.TypeVariable typeVariable -> ClassTypeDef.of(typeVariable.name());
+            case ClassTypeDef.Parameterized parameterized -> TypeDef.parameterized(
+                parameterized.rawType(),
+                parameterized.typeArguments().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList()
+            );
+            case TypeDef.Wildcard wildcard -> new TypeDef.Wildcard(
+                wildcard.upperBounds().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList(),
+                wildcard.lowerBounds().stream().map(PythonStubGenerator::typeVariableReferencesAsClassNames).toList()
+            );
+            case TypeDef.Array array -> TypeDef.array(typeVariableReferencesAsClassNames(array.componentType()), array.dimensions());
+            default -> typeDef;
+        };
+    }
+
+    private static @Nullable ClassElement firstOrNull(List<? extends ClassElement> elements) {
+        return elements.isEmpty() ? null : elements.getFirst();
     }
 
     private static Map<String, ClassElement> withoutDeclaredMethodTypeVariables(
@@ -2324,7 +3174,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     static String javaTypeName(ClassElement t) {
         if (t instanceof AbstractPythonClassElement) {
-            return t.getName();
+            // the member type of an enclosing stub is referenced by its canonical name (Outer.Inner);
+            // other nested Python classes are top-level types named Outer$Inner
+            return t.getCanonicalName();
         }
         return t.getName().replace('$', '.');
     }
@@ -2351,6 +3203,212 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return bounds.getFirst();
     }
 
+    /**
+     * The erasure of a wildcard: its upper bound ({@code ? extends X} erases to {@code X},
+     * {@code ?} and {@code ? super X} to {@code Object}).
+     */
+    private static ClassElement wildcardErasure(WildcardElement wildcard) {
+        List<? extends ClassElement> upperBounds = wildcard.getUpperBounds();
+        if (upperBounds.isEmpty()) {
+            return ClassElement.of(Object.class);
+        }
+        return upperBounds.getFirst();
+    }
+
+    /**
+     * Whether two placeholders are the same type variable. Placeholders cannot be compared with
+     * {@code equals}: a Java placeholder is represented by its bound, so every unbounded type
+     * variable equals every other one.
+     */
+    private static boolean samePlaceholder(GenericPlaceholderElement left, GenericPlaceholderElement right) {
+        if (left == right) {
+            return true;
+        }
+        if (!left.getVariableName().equals(right.getVariableName())) {
+            return false;
+        }
+        Optional<Element> leftDeclaring = left.getDeclaringElement();
+        Optional<Element> rightDeclaring = right.getDeclaringElement();
+        if (leftDeclaring.isEmpty() || rightDeclaring.isEmpty()) {
+            return left.equals(right);
+        }
+        return leftDeclaring.get().equals(rightDeclaring.get());
+    }
+
+    private static boolean isMethodTypeVariable(GenericPlaceholderElement placeholder) {
+        return placeholder.getDeclaringElement().filter(MethodElement.class::isInstance).isPresent();
+    }
+
+    /**
+     * Whether a placeholder already carries the type it resolves to in the signature it was read
+     * from, so it must not be re-resolved by name against the type arguments of another declaration.
+     */
+    private static boolean isResolvedPlaceholder(GenericPlaceholderElement placeholder) {
+        return !placeholder.isRawType() && placeholder.getResolved().filter(resolved -> !samePlaceholderType(placeholder, resolved)).isPresent();
+    }
+
+    private static boolean samePlaceholderType(GenericPlaceholderElement placeholder, ClassElement resolved) {
+        return resolved instanceof GenericPlaceholderElement resolvedPlaceholder && samePlaceholder(placeholder, resolvedPlaceholder);
+    }
+
+    /**
+     * Whether a type mentions the given placeholder in its type arguments or, through other
+     * placeholders, in their bounds: expanding such a bound into a signature would never end
+     * ({@code B extends Builder<T, B>}, {@code E extends Enum<E>}).
+     */
+    private static boolean referencesPlaceholder(ClassElement type, GenericPlaceholderElement placeholder, Set<String> visitedPlaceholders) {
+        if (type instanceof GenericPlaceholderElement candidate) {
+            if (samePlaceholder(candidate, placeholder)) {
+                return true;
+            }
+            if (!visitedPlaceholders.add(placeholderKey(candidate))) {
+                return false;
+            }
+            for (ClassElement bound : candidate.getBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (type instanceof WildcardElement wildcard) {
+            for (ClassElement bound : wildcard.getUpperBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            for (ClassElement bound : wildcard.getLowerBounds()) {
+                if (referencesPlaceholder(bound, placeholder, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        for (ClassElement typeArgument : type.getTypeArguments().values()) {
+            if (referencesPlaceholder(typeArgument, placeholder, visitedPlaceholders)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a type mentions the given raw type in its type arguments or, through placeholders,
+     * in their bounds.
+     */
+    private static boolean referencesRawType(ClassElement type, String rawTypeName, Set<String> visitedPlaceholders) {
+        if (type instanceof GenericPlaceholderElement placeholder) {
+            if (!visitedPlaceholders.add(placeholderKey(placeholder))) {
+                return false;
+            }
+            for (ClassElement bound : placeholder.getBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (type instanceof WildcardElement wildcard) {
+            for (ClassElement bound : wildcard.getUpperBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            for (ClassElement bound : wildcard.getLowerBounds()) {
+                if (referencesRawType(bound, rawTypeName, visitedPlaceholders)) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        if (sameRawTypeName(type, rawTypeName)) {
+            return true;
+        }
+        for (ClassElement typeArgument : type.getTypeArguments().values()) {
+            if (referencesRawType(typeArgument, rawTypeName, visitedPlaceholders)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a reference to a generic type has to stay raw: one of its type arguments is a
+     * variable of the type itself (an unparameterized reference), or the {@code Object} the element
+     * model substitutes for a cyclic argument, and that variable's bound refers back to the type
+     * ({@code AgentBuilder<T, B extends AgentBuilder<T, ?>>}). Expanding such a bound never ends,
+     * and neither its erasure nor {@code Object} is within the bound; the raw type is.
+     */
+    private static boolean rendersRaw(
+        ClassElement type,
+        Map<String, ClassElement> typeArguments,
+        List<? extends GenericPlaceholderElement> declaredPlaceholders
+    ) {
+        String rawTypeName = type.getName();
+        int index = 0;
+        for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
+            GenericPlaceholderElement placeholder = placeholderFor(declaredPlaceholders, entry.getKey(), index++);
+            if (placeholder == null) {
+                continue;
+            }
+            ClassElement typeArgument = entry.getValue();
+            if (!isDeclaredPlaceholderArgument(typeArgument, placeholder) && !isObjectType(typeArgument)) {
+                continue;
+            }
+            ClassElement bound = firstBound(placeholder);
+            if (referencesRawType(bound, rawTypeName, new HashSet<>()) || referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Identifies a placeholder by its declaring element and variable name. A method is identified by
+     * its owner and parameter types, not only its simple name, so the {@code T} of {@code <T> foo(a)}
+     * and the {@code T} of {@code <T> foo(a, b)} are distinct keys.
+     */
+    private static String placeholderKey(GenericPlaceholderElement placeholder) {
+        String declaringElement = placeholder.getDeclaringElement().map(element -> {
+            if (element instanceof MethodElement methodElement) {
+                return methodElement.getOwningType().getName() + "." + bridgeMethodKey(methodElement);
+            }
+            return element.getName();
+        }).orElse("");
+        return declaringElement + "#" + placeholder.getVariableName();
+    }
+
+    /**
+     * The first bound of a placeholder as a source type. A bound that refers back to the
+     * placeholder is rendered as its erasure.
+     */
+    private static TypeDef boundSignatureType(
+        GenericPlaceholderElement placeholder,
+        boolean typeArgument,
+        Map<String, ClassElement> signatureTypeArguments
+    ) {
+        ClassElement bound = firstBound(placeholder);
+        if (referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+            return javaClassType(bound);
+        }
+        return sourceSignatureType(bound, typeArgument, signatureTypeArguments);
+    }
+
+    /**
+     * The first bound of a placeholder as a bridge signature type, see {@link #boundSignatureType}.
+     */
+    private static TypeDef boundBridgeSignatureType(
+        GenericPlaceholderElement placeholder,
+        @Nullable ClassElement resolvedType,
+        Map<String, ClassElement> signatureTypeArguments
+    ) {
+        ClassElement bound = firstBound(placeholder);
+        if (referencesPlaceholder(bound, placeholder, new HashSet<>())) {
+            return javaClassType(bound);
+        }
+        return bridgeSignatureType(bound, resolvedType, signatureTypeArguments);
+    }
+
     private static String pythonSimpleName(ClassElement element) {
         if (element instanceof AbstractPythonClassElement pythonClassElement) {
             return pythonClassElement.getNativeType().name().replace('$', '.');
@@ -2359,22 +3417,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static FieldDef pythonClassReferenceField(String fieldName, ClassElement element) {
+        return FieldDef.builder(fieldName)
+            .ofType(PYTHON_CLASS_REFERENCE)
+            .addModifiers(Modifier.STATIC, Modifier.FINAL)
+            .initializer(pythonClassReferenceExpression(element))
+            .build();
+    }
+
+    /**
+     * The expression instantiating the {@code PythonClassReference} of a Python class.
+     *
+     * @param element The Python class
+     * @return The instantiation expression
+     */
+    static ExpressionDef pythonClassReferenceExpression(ClassElement element) {
         PythonClassReferenceDef classReference = pythonClassReferenceDef(element);
         List<ExpressionDef> nestedMembers = new ArrayList<>();
         for (String nestedMemberName : classReference.nestedMemberNames()) {
             nestedMembers.add(ExpressionDef.constant(nestedMemberName));
         }
-        return FieldDef.builder(fieldName)
-            .ofType(PYTHON_CLASS_REFERENCE)
-            .addModifiers(Modifier.STATIC, Modifier.FINAL)
-            .initializer(PYTHON_CLASS_REFERENCE.instantiate(
-                ExpressionDef.constant(classReference.packageName()),
-                ExpressionDef.constant(classReference.rootName()),
-                TypeDef.STRING.array().instantiate(nestedMembers),
-                ExpressionDef.constant(classReference.displayName()),
-                ExpressionDef.constant(classReference.cacheKey())
-            ))
-            .build();
+        return PYTHON_CLASS_REFERENCE.instantiate(
+            ExpressionDef.constant(classReference.packageName()),
+            ExpressionDef.constant(classReference.rootName()),
+            TypeDef.STRING.array().instantiate(nestedMembers),
+            ExpressionDef.constant(classReference.displayName()),
+            ExpressionDef.constant(classReference.cacheKey())
+        );
     }
 
     static AnnotationDef pythonClassAnnotation(ClassElement element) {
@@ -2432,14 +3500,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static ExpressionDef pythonClassReference(ClassElement owner, FieldDef field) {
-        return ClassTypeDef.of(owner.getName()).getStaticField(field.getName(), PYTHON_CLASS_REFERENCE);
+        return javaClassType(owner).getStaticField(field.getName(), PYTHON_CLASS_REFERENCE);
     }
 
     static ExpressionDef pythonClassReference(ClassElement owner, ClassElement element) {
         if (!(element instanceof AbstractPythonClassElement) || owner.getName().equals(element.getName())) {
-            return ClassTypeDef.of(owner.getName()).getStaticField("__PYTHON_CLASS_REFERENCE", PYTHON_CLASS_REFERENCE);
+            return javaClassType(owner).getStaticField("__PYTHON_CLASS_REFERENCE", PYTHON_CLASS_REFERENCE);
         }
-        return ClassTypeDef.of(owner.getName()).getStaticField(pythonClassReferenceFieldName(element), PYTHON_CLASS_REFERENCE);
+        return javaClassType(owner).getStaticField(pythonClassReferenceFieldName(element), PYTHON_CLASS_REFERENCE);
     }
 
     private static String pythonClassReferenceFieldName(ClassElement element) {
@@ -2459,18 +3527,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         VariableDef.MethodParameter methodParam,
         @Nullable ExpressionDef targetContext) {
         ClassElement genericType = param.getGenericType();
-        boolean mapOfPython = genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement;
+        boolean mapOfPython = isMapOfPythonClasses(genericType);
         boolean listOfPython = genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement;
         if (targetContext != null) {
             // Generated Python-class arguments stay as host bridges for ordinary methods, including
-            // inside lists and maps, so Python consistently uses their generated Java accessors.
+            // inside lists and maps, so Python consistently uses their generated Java accessors; enum
+            // constants inside them become Python enum members, as bare enum arguments do.
             // Pooled bridges instead pass raw arguments to invokePooled, which converts them after
             // borrowing the target context.
             ExpressionDef parameter;
             if (mapOfPython) {
-                parameter = PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam);
+                parameter = PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), methodParam, targetContext);
             } else if (listOfPython) {
-                parameter = PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam);
+                parameter = PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), methodParam, targetContext);
             } else if (genericType instanceof PythonClassElement) {
                 parameter = methodParam;
             } else {
@@ -2496,9 +3565,21 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         parameters.add(parameter);
     }
 
+    /**
+     * Whether a map type has generated Python classes as its keys or its values: such a map is coerced
+     * entry by entry before it reaches Python, keys and values alike.
+     */
+    private static boolean isMapOfPythonClasses(ClassElement genericType) {
+        if (!genericType.isAssignable(Map.class)) {
+            return false;
+        }
+        Map<String, ClassElement> typeArguments = genericType.getTypeArguments();
+        return typeArguments.get("K") instanceof PythonClassElement || typeArguments.get("V") instanceof PythonClassElement;
+    }
+
     private static ExpressionDef coerceTypedElementToPolyglotValue(TypedElement element, ExpressionDef expr) {
         ClassElement genericType = element.getGenericType();
-        if (genericType.isAssignable(Map.class) && genericType.getTypeArguments().get("V") instanceof PythonClassElement) {
+        if (isMapOfPythonClasses(genericType)) {
             return PYTHON_COERCION.invokeStatic(COERCE_MAP, TypeDef.of(Map.class), expr);
         } else if (genericType.isAssignable(List.class) && genericType.getTypeArguments().get("E") instanceof PythonClassElement) {
             return PYTHON_COERCION.invokeStatic(COERCE_LIST, TypeDef.of(List.class), expr);
@@ -2515,18 +3596,335 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return PYTHON_COERCION.invokeStatic("coerceToContext", TypeDef.OBJECT, expr, targetContext, classLiteral(element.getGenericType()));
     }
 
-    private void copyAnnotations(Element element, AbstractElementBuilder<?> builder, Set<String> annotationPackagesToCopy, VisitorContext visitorContext) {
-        AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
-        Set<String> annotationNames = annotationMetadata.getDeclaredAnnotationNames();
-        for (String annotationName : annotationNames) {
-            if (annotationName.equals("io.micronaut.context.annotation.PropertySource")
-                || annotationPackagesToCopy.stream().anyMatch(annotationName::startsWith)) {
-                AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
-                if (av != null) {
-                    builder.addAnnotation(AnnotationDef.of(av, visitorContext));
+    /**
+     * Whether a method is a JUnit 5 test: a {@code @Test}, a test template such as {@code @ParameterizedTest} or
+     * {@code @RepeatedTest} (both meta-annotated with {@code @TestTemplate}) or a {@code @TestFactory}.
+     *
+     * @param annotationMetadata The method annotation metadata
+     * @return Whether JUnit runs the method as a test
+     */
+    static boolean isJunit5TestMethod(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasDeclaredAnnotation(JUNIT_TEST)
+            || annotationMetadata.hasDeclaredStereotype(JUNIT_TEST_TEMPLATE)
+            || annotationMetadata.hasDeclaredStereotype(JUNIT_TEST_FACTORY);
+    }
+
+    /**
+     * Copies the runtime annotations of a Python-defined property accessor ({@code @property} getter or
+     * setter) onto the generated accessor, which is where a framework that reads properties reflectively
+     * (JPA property access) looks for them. Synthetic accessors carry the field's annotations, which
+     * belong on the generated field instead.
+     */
+    private void copyAccessorAnnotations(PropertyElement beanProperty, Optional<MethodElement> accessor, MethodDef.MethodDefBuilder builder, VisitorContext visitorContext) {
+        accessor.filter(method -> !method.isSynthetic())
+            .ifPresent(method -> copyRuntimeAnnotations(method, builder, ElementType.METHOD, beanProperty.getOwningType().getName(), visitorContext));
+    }
+
+    /**
+     * Copies the test annotations of the Python bases of a standalone test class ({@code @MicronautTest},
+     * {@code @TestInstance}, ...) that the class does not declare itself.
+     */
+    private void copyInheritedTestAnnotations(ClassElement element, @Nullable ClassElement superType, AbstractElementBuilder<?> builder, VisitorContext visitorContext) {
+        Set<String> declared = new HashSet<>(element.getAnnotationMetadata().getDeclaredAnnotationNames());
+        for (ClassElement base = superType; base instanceof AbstractPythonClassElement; base = base.getSuperType().orElse(null)) {
+            AnnotationMetadata annotationMetadata = base.getAnnotationMetadata();
+            for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
+                if (declared.add(annotationName) && isCopiedRuntimeAnnotation(annotationName, ElementType.TYPE, element.getName(), base, visitorContext)) {
+                    AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
+                    if (av != null) {
+                        try {
+                            builder.addAnnotation(reflectiveAnnotationDef(av, element, visitorContext));
+                        } catch (UnrepresentableAnnotationException e) {
+                            visitorContext.warn("Annotation @" + annotationName + " of the test base is not copied onto ["
+                                + element.getName() + "]: " + e.getMessage(), element);
+                        }
+                    }
                 }
             }
         }
+    }
+
+    /**
+     * Copies the annotations that reflection-based frameworks (JPA, JAXB, Bean Validation, JUnit, ...)
+     * need to find on the generated Java declaration: every annotation of a Java annotation type with
+     * {@link RetentionPolicy#RUNTIME} retention that may be placed on such a declaration. Micronaut and
+     * dependency injection annotations are served through the annotation metadata of the Python element
+     * and are only copied when a framework reads them reflectively ({@link #MICRONAUT_ANNOTATIONS_TO_COPY});
+     * Python-defined annotations and the {@code java.lang} annotations that constrain the declaration
+     * ({@code @FunctionalInterface}, {@code @SafeVarargs}) are never copied.
+     *
+     * <p>The JUnit annotations and the test annotations registering a JUnit extension are always copied,
+     * as the test framework reads the generated test class; every other annotation is reflection data of
+     * the generated type and is copied only when the {@link PythonReflectionGate} allows the type.</p>
+     *
+     * @param element        The Python element
+     * @param builder        The builder of the generated declaration
+     * @param declaration    The kind of the generated declaration
+     * @param typeName       The name of the generated type that carries the declaration
+     * @param visitorContext The visitor context
+     */
+    private void copyRuntimeAnnotations(Element element, AbstractElementBuilder<?> builder, ElementType declaration, String typeName, VisitorContext visitorContext) {
+        AnnotationMetadata annotationMetadata = element.getAnnotationMetadata();
+        for (String annotationName : annotationMetadata.getDeclaredAnnotationNames()) {
+            if (!isCopiedRuntimeAnnotation(annotationName, declaration, typeName, element, visitorContext)) {
+                continue;
+            }
+            AnnotationValue<Annotation> av = annotationMetadata.getAnnotation(annotationName);
+            if (av == null) {
+                continue;
+            }
+            try {
+                builder.addAnnotation(reflectiveAnnotationDef(av, element, visitorContext));
+            } catch (UnrepresentableAnnotationException e) {
+                visitorContext.warn("Annotation @" + annotationName + " is not copied onto the generated Java declaration of ["
+                    + element.getName() + "], reflection-based frameworks will not see it: " + e.getMessage(), element);
+            }
+        }
+    }
+
+    /**
+     * Builds the source representation of an annotation, checking that every member value can be written as a
+     * Java constant of the member type. The metadata can hold members the annotation type does not declare
+     * (added by an annotation mapper) and values the source cannot express, such as an unresolved Python
+     * expression for a nested annotation. Such a member is left out, with a warning, when the annotation type
+     * fills it with its default: a member that does not compile would break the whole generated class. Only a
+     * member without a default cannot be left out, and then the annotation as a whole is not copied.
+     *
+     * @param annotation The annotation
+     * @param element    The annotated Python element, for the warnings
+     * @param context    The visitor context
+     * @return The annotation definition
+     * @throws UnrepresentableAnnotationException When the annotation cannot be written at all
+     */
+    private static AnnotationDef reflectiveAnnotationDef(AnnotationValue<?> annotation, Element element, VisitorContext context) {
+        String annotationName = annotation.getAnnotationName();
+        ClassElement annotationType = context.getClassElement(annotationName)
+            .orElseThrow(() -> new UnrepresentableAnnotationException("the annotation type cannot be resolved"));
+        Map<String, ClassElement> memberTypes = new LinkedHashMap<>();
+        for (MethodElement member : annotationType.getMethods()) {
+            memberTypes.putIfAbsent(member.getName(), member.getReturnType());
+        }
+        Set<String> defaultedMembers = PythonAnnotationTypes.defaultedMembers(annotationType);
+        AnnotationDef.AnnotationDefBuilder builder = AnnotationDef.builder(ClassTypeDef.of(annotationType));
+        for (Map.Entry<CharSequence, Object> entry : annotation.getValues().entrySet()) {
+            String memberName = entry.getKey().toString();
+            ClassElement memberType = memberTypes.get(memberName);
+            if (memberType == null) {
+                // A mapper added the member: it is served by the annotation metadata, not the annotation type
+                context.warn("The " + memberDescription(annotationName, memberName) + " is not declared by the annotation type"
+                    + " and is not copied onto the generated Java declaration of [" + element.getName() + "]", element);
+                continue;
+            }
+            Object value;
+            try {
+                value = reflectiveMemberValue(annotationName, memberName, entry.getValue(), memberType, element, context);
+            } catch (UnrepresentableAnnotationException e) {
+                if (!defaultedMembers.contains(memberName)) {
+                    throw e;
+                }
+                context.warn("The " + memberDescription(annotationName, memberName) + " keeps its default on the generated Java declaration of ["
+                    + element.getName() + "], reflection-based frameworks will not see its value: " + e.getMessage(), element);
+                continue;
+            }
+            if (value instanceof Collection<?> collection) {
+                builder.addMember(memberName, new ArrayList<Object>(collection));
+            } else {
+                builder.addMember(memberName, value);
+            }
+        }
+        return builder.build();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Object reflectiveMemberValue(String annotationName, String memberName, Object value, ClassElement memberType, Element element, VisitorContext context) {
+        if (memberType.isArray()) {
+            ClassElement componentType = memberType.fromArray();
+            List<Object> values = new ArrayList<>();
+            for (Object elementValue : memberValues(value)) {
+                values.add(reflectiveMemberValue(annotationName, memberName, elementValue, componentType, element, context));
+            }
+            return values;
+        }
+        if (value instanceof Collection<?> || (value != null && value.getClass().isArray())) {
+            List<Object> values = memberValues(value);
+            if (values.size() != 1) {
+                throw unrepresentable(annotationName, memberName, value, memberType);
+            }
+            value = values.getFirst();
+        }
+        if (value instanceof AnnotationValue<?> nested) {
+            if (!PythonAnnotationTypes.isAnnotationType(memberType)) {
+                throw unrepresentable(annotationName, memberName, value, memberType);
+            }
+            return reflectiveAnnotationDef(nested, element, context);
+        }
+        String typeName = memberType.getName();
+        if (String.class.getName().equals(typeName)) {
+            if (value instanceof CharSequence) {
+                return value.toString();
+            }
+            throw unrepresentable(annotationName, memberName, value, memberType);
+        }
+        if (memberType.isPrimitive()) {
+            return primitiveMemberValue(annotationName, memberName, value, memberType);
+        }
+        if (Class.class.getName().equals(typeName)) {
+            String className = value instanceof AnnotationClassValue<?> classValue ? classValue.getName() : value instanceof CharSequence ? value.toString() : null;
+            if (className != null) {
+                ClassElement type = context.getClassElement(className).orElse(null);
+                if (type != null) {
+                    return ClassTypeDef.of(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
+                }
+            }
+            throw unrepresentable(annotationName, memberName, value, memberType);
+        }
+        if (memberType.isEnum()) {
+            String constantName = value instanceof Enum<?> enumValue ? enumValue.name() : value instanceof CharSequence ? value.toString() : null;
+            boolean known = constantName != null && (memberType instanceof EnumElement enumElement
+                ? enumElement.values().contains(constantName)
+                : javax.lang.model.SourceVersion.isIdentifier(constantName));
+            if (!known) {
+                throw unrepresentable(annotationName, memberName, value, memberType);
+            }
+            ClassTypeDef enumType = ClassTypeDef.of(memberType);
+            return enumType.getStaticField(constantName, enumType);
+        }
+        throw unrepresentable(annotationName, memberName, value, memberType);
+    }
+
+    private static Object primitiveMemberValue(String annotationName, String memberName, Object value, ClassElement memberType) {
+        String typeName = memberType.getName();
+        if (value instanceof Boolean booleanValue && BOOLEAN_TYPE.equals(typeName)) {
+            return booleanValue;
+        }
+        if ("char".equals(typeName)) {
+            if (value instanceof Character character) {
+                return character;
+            }
+            if (value instanceof CharSequence text && text.length() == 1) {
+                return text.charAt(0);
+            }
+        } else if (value instanceof Number number) {
+            switch (typeName) {
+                case "int":
+                    return number.intValue();
+                case "long":
+                    return number.longValue();
+                case SHORT_TYPE:
+                    return number.shortValue();
+                case "byte":
+                    return number.byteValue();
+                case DOUBLE_TYPE:
+                    return number.doubleValue();
+                case FLOAT_TYPE:
+                    return number.floatValue();
+                default:
+                    break;
+            }
+        }
+        throw unrepresentable(annotationName, memberName, value, memberType);
+    }
+
+    private static List<Object> memberValues(Object value) {
+        if (value instanceof Collection<?> collection) {
+            return new ArrayList<>(collection);
+        }
+        if (value != null && value.getClass().isArray()) {
+            int length = java.lang.reflect.Array.getLength(value);
+            List<Object> values = new ArrayList<>(length);
+            for (int i = 0; i < length; i++) {
+                values.add(java.lang.reflect.Array.get(value, i));
+            }
+            return values;
+        }
+        List<Object> values = new ArrayList<>(1);
+        values.add(value);
+        return values;
+    }
+
+    private static UnrepresentableAnnotationException unrepresentable(String annotationName, String memberName, Object value, ClassElement memberType) {
+        return new UnrepresentableAnnotationException("the value [" + value + "] of " + memberDescription(annotationName, memberName)
+            + " cannot be written as a " + memberType.getName() + " constant");
+    }
+
+    private static String memberDescription(String annotationName, String memberName) {
+        return "member '" + memberName + "' of @" + annotationName;
+    }
+
+    private PythonReflectionGate reflectionGate(VisitorContext visitorContext) {
+        if (reflectionGate == null) {
+            reflectionGate = PythonReflectionGate.of(visitorContext);
+        }
+        return reflectionGate;
+    }
+
+    /**
+     * Whether an annotation is copied onto a generated declaration: never, always, or when the
+     * {@link PythonReflectionGate} allows the generated type to carry reflection data.
+     *
+     * @param annotationName The annotation
+     * @param declaration    The kind of the generated declaration
+     * @param typeName       The name of the generated type that carries the declaration
+     * @param element        The annotated Python element
+     * @param visitorContext The visitor context
+     * @return Whether the annotation is copied
+     */
+    private boolean isCopiedRuntimeAnnotation(String annotationName, ElementType declaration, String typeName, Element element, VisitorContext visitorContext) {
+        PythonReflectionGate.Copy copy = copiedRuntimeAnnotations.computeIfAbsent(
+            annotationName + '#' + declaration,
+            key -> runtimeAnnotationCopy(annotationName, declaration, visitorContext)
+        );
+        return copy == PythonReflectionGate.Copy.ALWAYS
+            || (copy == PythonReflectionGate.Copy.REFLECTIVE && reflectionGate(visitorContext).allows(typeName, annotationName, element));
+    }
+
+    private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
+        if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
+            // Micronaut annotations are served by the annotation metadata, except the ones JUnit reads
+            // reflectively on the test class: @MicronautTest and the module test annotations that
+            // register their own extension through @ExtendWith
+            boolean copied = MICRONAUT_ANNOTATIONS_TO_COPY.contains(annotationName)
+                || MICRONAUT_ANNOTATION_PACKAGES_TO_COPY.stream().anyMatch(annotationName::startsWith)
+                || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext));
+            return copied ? PythonReflectionGate.Copy.ALWAYS : PythonReflectionGate.Copy.NEVER;
+        }
+        if (annotationName.startsWith(JAVA_LANG_PACKAGE_PREFIX)
+            || TYPE_ANNOTATIONS_TO_SKIP_IN_SOURCE.contains(annotationName)
+            || INJECTION_ANNOTATION_PACKAGE_PREFIXES.stream().anyMatch(annotationName::startsWith)) {
+            return PythonReflectionGate.Copy.NEVER;
+        }
+        ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
+        if (annotationType == null
+            || annotationType instanceof AbstractPythonClassElement
+            || !PythonAnnotationTypes.isAnnotationType(annotationType)
+            || PythonAnnotationTypes.retentionPolicy(annotationType) != RetentionPolicy.RUNTIME
+            || !PythonAnnotationTypes.targetsDeclaration(annotationType, declaration)) {
+            return PythonReflectionGate.Copy.NEVER;
+        }
+        // the test framework reads the generated test class: JUnit's own annotations and the test
+        // annotations of other libraries that register a JUnit extension are not reflection data of the type
+        if (annotationName.startsWith(JUNIT_PACKAGE_PREFIX)
+            || (declaration == ElementType.TYPE && isJunitExtensionAnnotation(annotationName, visitorContext))) {
+            return PythonReflectionGate.Copy.ALWAYS;
+        }
+        return PythonReflectionGate.Copy.REFLECTIVE;
+    }
+
+    /**
+     * Whether an annotation registers a JUnit 5 extension: {@code @ExtendWith} itself or an annotation
+     * meta-annotated with it, such as the test annotations of the Micronaut modules that extend
+     * {@code @MicronautTest} with their own extension. JUnit finds them reflectively on the test class, so
+     * they are copied onto the generated Java class like {@code @MicronautTest}.
+     */
+    private boolean isJunitExtensionAnnotation(String annotationName, VisitorContext visitorContext) {
+        if (JUNIT_EXTEND_WITH.equals(annotationName) || JUNIT_EXTENSIONS.equals(annotationName)) {
+            return true;
+        }
+        // A repeated @ExtendWith is folded into its @Extensions container by the annotation metadata
+        return junitExtensionAnnotations.computeIfAbsent(annotationName, name -> visitorContext.getClassElement(name)
+            .filter(annotationType -> !(annotationType instanceof AbstractPythonClassElement))
+            .map(annotationType -> annotationType.hasStereotype(JUNIT_EXTEND_WITH) || annotationType.hasStereotype(JUNIT_EXTENSIONS))
+            .orElse(false));
     }
 
     /**
@@ -2545,7 +3943,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addAnnotation(pythonClassAnnotation(classElement))
             .addSuperinterface(ClassTypeDef.of("io.micronaut.context.python.PooledValueCoercible"));
         enumBuilder.addField(pythonClassReference);
-        copyAnnotations(classElement, enumBuilder, ANNOTATION_PACKAGES_TO_COPY, context);
+        copyRuntimeAnnotations(classElement, enumBuilder, ElementType.TYPE, classElement.getName(), context);
         List<String> enumConstants = classElement instanceof EnumElement enumElement ? enumElement.values() : List.of();
         for (String enumConstant : enumConstants) {
             enumBuilder.addEnumConstant(enumConstant);
@@ -2588,10 +3986,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter(POLYGLOT_VALUE)
             .returns(thisType)
             .build((aThis, methodParameters) -> PYTHON_CONVERSION.invokeStatic(
-                "convertValue",
+                CONVERT_VALUE,
                 thisType,
                 methodParameters.get(0),
-                thisType.getStaticField("class", TypeDef.CLASS)
+                thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS)
             ).returning()));
         Set<String> addedMethodNames = new LinkedHashSet<>();
         MethodElement jsonValueMethod = enumJsonValueMethod(classElement);
@@ -2617,7 +4015,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 .addModifiers(Modifier.PUBLIC)
                 .returns(TypeDef.STRING)
                 .build((aThis, parameters) -> aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE)
-                    .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant("value"))
+                    .invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(VALUE_PARAMETER))
                     .invoke("asString", TypeDef.STRING)
                     .returning()));
         }
@@ -2689,21 +4087,41 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         MethodElement methodElement = spec.method();
         ClassElement bridgeOwner = spec.owner();
         boolean isJunit5Test = spec.junit5Test();
-        boolean isScript = spec.script();
         ClassElement returnTypeOverride = spec.returnTypeOverride();
         MethodElement signatureMethod = spec.signatureMethod();
         MethodElement resolvedSignatureMethod = spec.resolvedSignatureMethod();
         Map<String, ClassElement> signatureTypeArguments = spec.signatureTypeArguments();
         String pythonFunctionName = methodElement.getName();
-        String key = bridgeMethodKey(methodElement);
-        // Check if method name has already been added to avoid duplicates
-        if (addedMethodNames.contains(key)) {
+        Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
+        Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
+        boolean genericToArray = "toArray".equals(signatureMethod.getName())
+            && signatureMethod.getParameters().length == 1
+            && (signatureMethod.getDeclaredTypeVariables().size() == 1 || resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1);
+        MethodElement sourceSignatureMethod = resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1
+            ? resolvedSignatureMethod
+            : signatureMethod;
+        List<TypeDef.TypeVariable> methodTypeVariables = methodTypeVariables(sourceSignatureMethod, bridgeSignatureTypeArguments, inferredMethodBounds);
+        List<ParameterDef> parameterDefs = bridgeParameters(spec, sourceSignatureMethod, genericToArray, bridgeSignatureTypeArguments);
+        // Duplicates are detected on the Java signature the stub emits, not on the Python method:
+        // a Java interface may declare same-arity overloads (generate(Class<T>) and generate(T))
+        // that Python, which has no overloading, implements with a single method. Each overload
+        // needs its own bridge or javac rejects the stub as not implementing the interface. The
+        // key is built from the emitted (resolved) parameter types rather than the declaring
+        // method, so a generic interface method (handle(T) implemented for String) and a plain
+        // interface method with the same erasure (handle(String)) are bridged once. The Python
+        // method key is recorded too so the later declared-method pass does not bridge a method
+        // again under its Python signature.
+        String key = bridgeMethodKey(pythonFunctionName, parameterDefs, methodTypeVariables);
+        String pythonKey = PYTHON_METHOD_KEY_PREFIX + bridgeMethodKey(methodElement);
+        boolean declaredSignature = signatureMethod == methodElement;
+        if (addedMethodNames.contains(key) || declaredSignature && addedMethodNames.contains(pythonKey)) {
             return;
         }
 
         addedMethodNames.add(key);
+        addedMethodNames.add(pythonKey);
 
-        if (isDeclaredBeanMethod(methodElement.getAnnotationMetadata())) {
+        if (isFactoryBeanMethod(bridgeOwner, methodElement.getAnnotationMetadata())) {
             if (isAsyncPythonMethod(methodElement)) {
                 throw new ProcessingException(methodElement, "Factory methods declared with @Bean cannot be async.");
             }
@@ -2722,6 +4140,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             String preDestroy = methodElement.stringValue(Bean.class, MEMBER_PRE_DESTROY).orElse(null);
             if (preDestroy != null && genericReturnType instanceof AbstractPythonClassElement) {
                 StubEntry stubEntry = this.classBuilders.get(genericReturnType.getName());
+                if (stubEntry == null) {
+                    // The produced type is visited in registry order and may follow the factory: generate its stub
+                    // now so the callback bridge lands on it (a visited class is not visited twice). The lookup is
+                    // deliberately not filtered by the affected sources of an incremental build: the stub of the
+                    // produced type carries the bridge the factory refers to, so it is regenerated whenever the
+                    // factory is, even when only the factory's source changed
+                    visitClass(allClasses.getOrDefault(genericReturnType.getName(), genericReturnType), visitorContext);
+                    stubEntry = this.classBuilders.get(genericReturnType.getName());
+                }
                 if (stubEntry != null) {
                     MethodElement preDestroyMethod = stubEntry.originatingElement
                         .findMethod(preDestroy).orElse(null);
@@ -2734,19 +4161,16 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
 
-        Map<String, ClassElement> inferredMethodBounds = inferMethodTypeBounds(signatureMethod, methodElement);
-        Map<String, ClassElement> bridgeSignatureTypeArguments = withoutDeclaredMethodTypeVariables(signatureTypeArguments, signatureMethod);
         ClassElement effectiveReturnType = effectiveBridgeReturnType(methodElement, returnTypeOverride);
-        boolean genericToArray = "toArray".equals(signatureMethod.getName())
-            && signatureMethod.getParameters().length == 1
-            && (signatureMethod.getDeclaredTypeVariables().size() == 1 || resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1);
-        MethodElement sourceSignatureMethod = resolvedSignatureMethod.getDeclaredTypeVariables().size() == 1
-            ? resolvedSignatureMethod
-            : signatureMethod;
+        ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
+            ? null
+            : resolvedSignatureMethod.getGenericReturnType();
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
-        boolean returnsMethodTypeVariable = !(methodElement instanceof PythonMethodElement) && !sourceSignatureMethod.getDeclaredTypeVariables().isEmpty();
+        // A return type naming a method type variable (List<S>) is converted from the erased type, so it is cast back
+        // to the declared type for Python methods declaring their own type variables as for Java signatures
+        boolean returnsMethodTypeVariable = !sourceSignatureMethod.getDeclaredTypeVariables().isEmpty();
         MethodDef.MethodDefBuilder methodBuilder = MethodDef.builder(pythonFunctionName)
             .returns(methodSourceReturnType);
         if (methodElement.isStatic()) {
@@ -2754,28 +4178,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         } else {
             methodBuilder.addModifiers(Modifier.PUBLIC);
         }
-        addMethodTypeVariables(sourceSignatureMethod, methodBuilder, bridgeSignatureTypeArguments, inferredMethodBounds);
+        methodTypeVariables.forEach(methodBuilder::addTypeVariable);
 
-        copyAnnotations(methodElement, methodBuilder, ANNOTATION_PACKAGES_TO_COPY, visitorContext);
-        if (isJunit5Test && !methodElement.hasDeclaredAnnotation(JUNIT_TEST)) {
+        copyRuntimeAnnotations(methodElement, methodBuilder, ElementType.METHOD, bridgeOwner.getName(), visitorContext);
+        if (isJunit5Test && !isJunit5TestMethod(methodElement)) {
             methodBuilder.addAnnotation(JUNIT_TEST);
         }
+        parameterDefs.forEach(methodBuilder::addParameter);
         @NonNull ParameterElement[] parameters = methodElement.getParameters();
-        @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
-        @NonNull ParameterElement[] resolvedSignatureParameters = resolvedSignatureMethod.getParameters();
-        int receiverOffset = isScript && parameters.length > 0 && "self".equals(parameters[0].getName()) ? 1 : 0;
-        for (int i = receiverOffset; i < parameters.length; i++) {
-            @NonNull ParameterElement parameter = parameters[i];
-            ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
-            ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
-            TypeDef parameterType = genericToArray
-                ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
-                : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
-            ParameterDef parameterDef = ParameterDef
-                .builder(parameter.getName(), parameterType).build();
-            methodBuilder.addParameter(parameterDef);
-        }
+        int receiverOffset = parameters.length - parameterDefs.size();
 
+        boolean spreadsVarargs = spreadsVarargs(methodElement, bridgeOwner);
         builder.addMethod(methodBuilder
             .build(((aThis, methodParameters) -> {
                 List<ExpressionDef> parameterExpressions = new ArrayList<>();
@@ -2786,7 +4199,17 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     ClassElement declaringType = methodElement.getDeclaringType();
                     arguments.add(pythonClassReference(bridgeOwner, declaringType));
                     arguments.add(ExpressionDef.constant(pythonFunctionName));
-                    arguments.addAll(methodParameters);
+                    if (spreadsVarargs) {
+                        // `*args`: the trailing Java array is spread into positional Python arguments
+                        arguments.add(PYTHON_INVOCATION.invokeStatic(
+                            WITH_VARARGS,
+                            TypeDef.OBJECT.array(),
+                            TypeDef.OBJECT.array().instantiate(methodParameters.subList(0, methodParameters.size() - 1)),
+                            methodParameters.getLast()
+                        ));
+                    } else {
+                        arguments.addAll(methodParameters);
+                    }
                     invokedValue = PYTHON_CONTEXT_RUNTIME.invokeStatic(
                         "invokeStaticMethod",
                         POLYGLOT_VALUE,
@@ -2808,18 +4231,41 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     if (receiverOffset == 1) {
                         parameterExpressions.add(aThis);
                     }
+                    ExpressionDef variadicArguments = null;
                     for (int i = receiverOffset; i < parameters.length; i++) {
                         @NonNull ParameterElement parameter = parameters[i];
                         VariableDef.MethodParameter methodParameter = methodParameters.get(i - receiverOffset);
-                        coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                        if (spreadsVarargs && i == parameters.length - 1) {
+                            // `*args`: the trailing Java array is spread into positional Python arguments
+                            List<ExpressionDef> variadic = new ArrayList<>(1);
+                            coerceParameterToPolyglotValue(parameter, variadic, methodParameter, targetContext);
+                            variadicArguments = variadic.getFirst();
+                        } else {
+                            coerceParameterToPolyglotValue(parameter, parameterExpressions, methodParameter, targetContext);
+                        }
                     }
-                    invokedValue = PYTHON_INVOCATION.invokeStatic(
-                        "invokePythonMethod",
-                        POLYGLOT_VALUE,
-                        targetValue,
-                        ExpressionDef.constant(pythonFunctionName),
-                        TypeDef.OBJECT.array().instantiate(parameterExpressions)
-                    );
+                    ExpressionDef pythonArguments = TypeDef.OBJECT.array().instantiate(parameterExpressions);
+                    if (variadicArguments != null) {
+                        pythonArguments = PYTHON_INVOCATION.invokeStatic(WITH_VARARGS, TypeDef.OBJECT.array(), pythonArguments, variadicArguments);
+                    }
+                    if (spec.introduced()) {
+                        invokedValue = PYTHON_INVOCATION.invokeStatic(
+                            "invokeIntroducedMethod",
+                            POLYGLOT_VALUE,
+                            targetValue,
+                            ExpressionDef.constant(pythonFunctionName),
+                            classLiteral(effectiveReturnType),
+                            pythonArguments
+                        );
+                    } else {
+                        invokedValue = PYTHON_INVOCATION.invokeStatic(
+                            "invokePythonMethod",
+                            POLYGLOT_VALUE,
+                            targetValue,
+                            ExpressionDef.constant(pythonFunctionName),
+                            pythonArguments
+                        );
+                    }
                 }
 
                 if (isJunit5Test) {
@@ -2827,20 +4273,24 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 } else {
                     if (effectiveReturnType.isVoid()) {
                         return (StatementDef) invokedValue;
+                    } else if (isAsyncGeneratorPythonMethod(methodElement)) {
+                        return invokedValue.newLocal("pythonAsyncGenerator", pythonAsyncGenerator ->
+                            convertedElementPublisher(allClasses, effectiveReturnType, PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                                "generatorToPublisher",
+                                ClassTypeDef.of(PUBLISHER),
+                                pythonAsyncGenerator
+                            )).returning()
+                        );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
-                            PYTHON_ASYNCIO_RUNTIME.invokeStatic(
-                                "toCompletionStage",
-                                TypeDef.of(CompletionStage.class),
-                                pythonCoroutine
-                            ).cast(TypeDef.of(CompletionStage.class)).cast(methodSourceReturnType).returning()
+                            coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
                         );
                     } else {
                         boolean bridgeSignature = signatureMethod != methodElement
                             || !bridgeSignatureTypeArguments.isEmpty()
                             || returnTypeOverride != null
                             || returnsMethodTypeVariable;
-                        return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null);
+                        return returnConvertedValue(allClasses, effectiveReturnType, invokedValue, bridgeSignature ? methodSourceReturnType : null, declaredReturnType);
                     }
                 }
             })));
@@ -2924,6 +4374,32 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return null;
     }
 
+    /**
+     * The value a bridged {@code async def} returns: the coroutine as a {@link CompletionStage}, or,
+     * when the Java signature declares a publisher type, a publisher that starts the coroutine on
+     * subscription in the reactive context of the subscriber, adapted to the declared type.
+     */
+    private static ExpressionDef coroutineResult(
+        ExpressionDef pythonCoroutine,
+        TypeDef methodSourceReturnType,
+        @Nullable ClassElement declaredReturnType
+    ) {
+        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !declaredReturnType.isAssignable(CompletionStage.class)) {
+            ExpressionDef publisher = PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+                "toPublisher",
+                ClassTypeDef.of(PUBLISHER),
+                pythonCoroutine
+            );
+            return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT, publisher, classLiteral(declaredReturnType))
+                .cast(methodSourceReturnType);
+        }
+        return PYTHON_ASYNCIO_RUNTIME.invokeStatic(
+            "toCompletionStage",
+            TypeDef.of(CompletionStage.class),
+            pythonCoroutine
+        ).cast(TypeDef.of(CompletionStage.class)).cast(methodSourceReturnType);
+    }
+
     private static ClassElement effectiveBridgeReturnType(MethodElement methodElement, @Nullable ClassElement returnTypeOverride) {
         ClassElement returnType = returnTypeOverride == null ? methodElement.getGenericReturnType() : returnTypeOverride;
         if (returnType instanceof GenericPlaceholderElement placeholder) {
@@ -2932,19 +4408,135 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return returnType;
     }
 
-    private static String bridgeMethodKey(MethodElement methodElement) {
+    static String bridgeMethodKey(MethodElement methodElement) {
         StringBuilder key = new StringBuilder(methodElement.getName()).append('(');
         for (ParameterElement parameter : methodElement.getParameters()) {
-            key.append(parameter.getType().getName()).append(';');
+            ClassElement type = parameter.getType();
+            key.append(type.getName());
+            key.append("[]".repeat(type.getArrayDimensions()));
+            key.append(';');
         }
         return key.append(')').toString();
     }
 
+    /**
+     * The parameters of a bridge method as the stub emits them: the Python parameters typed with the
+     * (resolved) Java signature the bridge implements.
+     */
+    private static List<ParameterDef> bridgeParameters(
+        BridgeMethodSpec spec,
+        MethodElement sourceSignatureMethod,
+        boolean genericToArray,
+        Map<String, ClassElement> bridgeSignatureTypeArguments
+    ) {
+        MethodElement methodElement = spec.method();
+        MethodElement signatureMethod = spec.signatureMethod();
+        @NonNull ParameterElement[] parameters = methodElement.getParameters();
+        @NonNull ParameterElement[] signatureParameters = signatureMethod.getParameters();
+        @NonNull ParameterElement[] resolvedSignatureParameters = spec.resolvedSignatureMethod().getParameters();
+        int receiverOffset = spec.script() && parameters.length > 0 && "self".equals(parameters[0].getName()) ? 1 : 0;
+        List<ParameterDef> parameterDefs = new ArrayList<>(parameters.length);
+        for (int i = receiverOffset; i < parameters.length; i++) {
+            @NonNull ParameterElement parameter = parameters[i];
+            ParameterElement signatureParameter = i < signatureParameters.length ? signatureParameters[i] : parameter;
+            ParameterElement resolvedSignatureParameter = i < resolvedSignatureParameters.length ? resolvedSignatureParameters[i] : signatureParameter;
+            TypeDef parameterType = genericToArray
+                ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
+                : bridgeSourceParameterType(signatureMethod, signatureParameter, resolvedSignatureParameter, parameter, bridgeSignatureTypeArguments);
+            parameterDefs.add(ParameterDef.builder(parameter.getName(), parameterType).build());
+        }
+        return parameterDefs;
+    }
+
+    /**
+     * The key of a bridge method as javac sees it: the method name and the erasure of each emitted
+     * parameter type, with method type variables erased to their first bound.
+     */
+    private static String bridgeMethodKey(String name, List<ParameterDef> parameters, List<TypeDef.TypeVariable> methodTypeVariables) {
+        Map<String, TypeDef> bounds = new LinkedHashMap<>();
+        for (TypeDef.TypeVariable typeVariable : methodTypeVariables) {
+            bounds.put(typeVariable.name(), typeVariable.bounds().isEmpty() ? TypeDef.OBJECT : typeVariable.bounds().getFirst());
+        }
+        StringBuilder key = new StringBuilder(name).append('(');
+        for (ParameterDef parameter : parameters) {
+            key.append(erasedTypeName(parameter.getType(), bounds)).append(';');
+        }
+        return key.append(')').toString();
+    }
+
+    private static String erasedTypeName(TypeDef type, Map<String, TypeDef> methodTypeVariableBounds) {
+        return switch (type) {
+            case TypeDef.Array array -> erasedTypeName(array.componentType(), methodTypeVariableBounds) + "[]".repeat(array.dimensions());
+            case TypeDef.TypeVariable typeVariable -> {
+                TypeDef bound = methodTypeVariableBounds.get(typeVariable.name());
+                if (bound == null) {
+                    bound = typeVariable.bounds().isEmpty() ? TypeDef.OBJECT : typeVariable.bounds().getFirst();
+                }
+                yield bound instanceof TypeDef.TypeVariable ? Object.class.getName() : erasedTypeName(bound, methodTypeVariableBounds);
+            }
+            case TypeDef.Wildcard wildcard -> wildcard.upperBounds().isEmpty()
+                ? Object.class.getName()
+                : erasedTypeName(wildcard.upperBounds().getFirst(), methodTypeVariableBounds);
+            case TypeDef.AnnotatedTypeDef annotated -> erasedTypeName(annotated.typeDef(), methodTypeVariableBounds);
+            case ClassTypeDef.AnnotatedClassTypeDef annotated -> erasedTypeName(annotated.typeDef(), methodTypeVariableBounds);
+            case TypeDef.Primitive primitive -> primitive.name();
+            case ClassTypeDef classTypeDef -> classTypeDef.getName();
+            default -> type.toString();
+        };
+    }
+
+    /**
+     * Whether the bridge spreads its trailing array parameter into positional Python arguments: the Python
+     * implementation declares {@code *args}. When the bridged method is the Java interface method itself
+     * (the Python type hints did not match its signature), the Python method is looked up by name and arity.
+     */
+    private static boolean spreadsVarargs(MethodElement methodElement, ClassElement owner) {
+        ParameterElement[] parameters = methodElement.getParameters();
+        if (parameters.length == 0 || !parameters[parameters.length - 1].getType().isArray()) {
+            return false;
+        }
+        if (methodElement instanceof PythonMethodElement pythonMethod) {
+            return pythonMethod.isVarArgs();
+        }
+        return owner.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named(methodElement.getName()))
+            .stream()
+            .anyMatch(declared -> declared instanceof PythonMethodElement pythonMethod
+                && pythonMethod.isVarArgs()
+                && pythonMethod.getParameters().length == parameters.length);
+    }
+
+    private static String bridgeMethodNameAndArity(String bridgeMethodKey) {
+        int parameterStart = bridgeMethodKey.indexOf('(');
+        if (parameterStart < 0) {
+            // a key recorded by name only
+            return bridgeMethodKey + "/0";
+        }
+        int parameters = 0;
+        for (int i = parameterStart; i < bridgeMethodKey.length(); i++) {
+            if (bridgeMethodKey.charAt(i) == ';') {
+                parameters++;
+            }
+        }
+        return bridgeMethodKey.substring(0, parameterStart) + '/' + parameters;
+    }
+
+    /**
+     * Whether a declared method of a Python class is bridged to the generated Java class on its own account: every
+     * concrete public method (Python treats names starting with an underscore as private, which also leaves the
+     * dunder methods out), except the accessors of bean properties, which are generated from the property, the
+     * {@code @Creator} factories, which are generated as factory methods, the injection methods, which are
+     * generated by {@link #addInjectionMethods}, and the Python value accessor itself.
+     *
+     * @param methodElement  The declared method
+     * @param beanProperties The bean properties of the class
+     * @return Whether to bridge the method
+     */
     private static boolean shouldBridgeDeclaredPythonMethod(MethodElement methodElement, List<PropertyElement> beanProperties) {
         if (methodElement.isAbstract()
-            || methodElement.isStatic()
             || methodElement.isSynthetic()
-            || methodElement.isPrivate()) {
+            || methodElement.isPrivate()
+            || (methodElement.isStatic() && methodElement.hasStereotype(ANN_CREATOR))
+            || isInjectionMethod(methodElement)) {
             return false;
         }
         String methodName = methodElement.getName();
@@ -2960,15 +4552,223 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return true;
     }
 
+    /**
+     * Whether a Python method bridged on its own account can be declared as a Java method of the generated class
+     * under its own name and signature. Python allows names Java does not: a Java keyword ({@code default},
+     * {@code new}) is not a valid method name, and a signature {@link Object} declares can only be overridden when
+     * the method is not final ({@code notify}, {@code wait}, {@code getClass}) and the return hint is compatible:
+     * the same primitive ({@code hashCode} returning a string is not) or a subtype of the reference type
+     * ({@code toString} without a hint returns {@code Object}, which cannot override a method returning
+     * {@code String}). Such a method is left out of the generated class, as it was before every public method
+     * was bridged, rather than failing the compilation.
+     *
+     * @param methodElement The declared method
+     * @return Whether the method can be declared in Java
+     */
+    private static boolean isDeclarableJavaMethod(MethodElement methodElement) {
+        String methodName = methodElement.getName();
+        if (!javax.lang.model.SourceVersion.isName(methodName)) {
+            return false;
+        }
+        ParameterElement[] parameters = methodElement.getParameters();
+        for (Method objectMethod : Object.class.getDeclaredMethods()) {
+            if (!objectMethod.getName().equals(methodName)
+                || java.lang.reflect.Modifier.isPrivate(objectMethod.getModifiers())
+                || !sameErasedParameterTypes(objectMethod, parameters)) {
+                continue;
+            }
+            if (java.lang.reflect.Modifier.isFinal(objectMethod.getModifiers()) || methodElement.isStatic()) {
+                return false;
+            }
+            Class<?> objectReturnType = objectMethod.getReturnType();
+            ClassElement bridgeReturnType = methodElement.getGenericReturnType();
+            boolean compatibleReturnType = objectReturnType.isPrimitive()
+                ? TypeDef.primitive(objectReturnType).equals(methodReturnType(methodElement, false))
+                : !bridgeReturnType.isPrimitive() && bridgeReturnType.isAssignable(objectReturnType);
+            if (!compatibleReturnType) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static boolean sameErasedParameterTypes(Method method, ParameterElement[] parameters) {
+        Class<?>[] parameterTypes = method.getParameterTypes();
+        if (parameterTypes.length != parameters.length) {
+            return false;
+        }
+        for (int i = 0; i < parameterTypes.length; i++) {
+            TypeDef erased = erasedType(parameters[i].getType());
+            boolean same = erased instanceof TypeDef.Primitive primitive
+                ? primitive.clazz() == parameterTypes[i]
+                : erased instanceof ClassTypeDef classTypeDef && classTypeDef.getName().equals(parameterTypes[i].getName());
+            if (!same) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static Optional<FieldElement> attributeField(PropertyElement beanProperty) {
+        if (beanProperty instanceof PythonPropertyElement pythonProperty) {
+            return pythonProperty.getAttributeField();
+        }
+        return beanProperty.getField();
+    }
+
+    /**
+     * Whether a Java interface accessor is implemented by the getter or setter generated for an attribute of the same
+     * name, so a dataclass can implement an interface such as {@code KubernetesObject} through its attributes
+     * ({@code apiVersion} implements {@code getApiVersion()}). The Python class declares no method of that name, and
+     * the attribute type must satisfy the interface signature for the generated accessor to override it.
+     */
+    private static boolean isImplementedByPropertyAccessor(MethodElement interfaceMethod, List<PropertyElement> beanProperties) {
+        String methodName = interfaceMethod.getName();
+        ParameterElement[] parameters = interfaceMethod.getParameters();
+        for (PropertyElement beanProperty : beanProperties) {
+            String propertyName = beanProperty.getName();
+            if (parameters.length == 0 && !interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getReadMethod().map(MethodElement::isSynthetic).orElse(true);
+                boolean sameName = methodName.equals(beanGetterName(propertyName))
+                    || (isBooleanProperty(beanProperty) && methodName.equals(booleanBeanGetterName(propertyName)));
+                if (synthetic && sameName && !beanProperty.isWriteOnly()
+                    && satisfiesReturnType(beanProperty.getGenericType(), interfaceMethod.getGenericReturnType())) {
+                    return true;
+                }
+            } else if (parameters.length == 1 && interfaceMethod.getReturnType().isVoid()) {
+                boolean synthetic = beanProperty.getWriteMethod().map(MethodElement::isSynthetic).orElse(true);
+                if (synthetic && methodName.equals(beanSetterName(propertyName)) && !beanProperty.isReadOnly()
+                    && parameters[0].getType().getName().equals(beanProperty.getType().getName())) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Whether a generated getter of the property type overrides the interface accessor: the type has to be
+     * assignable, and where the accessor returns a parameterized type the type arguments have to match as well,
+     * as javac requires (a {@code list[CustomObject]} attribute does not implement a getter returning a list of
+     * {@code KubernetesObject}); a type variable or wildcard of the accessor accepts any argument.
+     */
+    private static boolean satisfiesReturnType(ClassElement propertyType, ClassElement returnType) {
+        if (!propertyType.isAssignable(returnType)) {
+            return false;
+        }
+        Map<String, ClassElement> expectedArguments = returnType.getTypeArguments();
+        if (expectedArguments.isEmpty()) {
+            return true;
+        }
+        Map<String, ClassElement> actualArguments = propertyType.getTypeArguments(returnType.getName());
+        for (Map.Entry<String, ClassElement> expected : expectedArguments.entrySet()) {
+            ClassElement expectedArgument = expected.getValue();
+            if (expectedArgument instanceof GenericPlaceholderElement || expectedArgument instanceof WildcardElement) {
+                continue;
+            }
+            ClassElement actualArgument = actualArguments.get(expected.getKey());
+            if (actualArgument == null || !actualArgument.getName().equals(expectedArgument.getName())) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Whether a method overrides a method bridged in the stub of a Python superclass with another return type hint
+     * ({@code int} against the inherited {@code T} or an unhinted {@code Object}), which the Java override could
+     * not always repeat. The inherited Java method dispatches to the Python override anyway, so the override is
+     * left to it rather than generating a Java method that may not compile.
+     *
+     * @param methodElement The declared method
+     * @param superType     The supertype of the class, if any
+     * @return Whether the bridge of the method is inherited
+     */
+    private boolean overridesBridgedPythonMethodWithAnotherReturnType(MethodElement methodElement, @Nullable ClassElement superType) {
+        String key = bridgeMethodKey(methodElement);
+        Set<String> visited = new HashSet<>();
+        ClassElement type = superType;
+        while (type instanceof AbstractPythonClassElement && !type.isInterface() && visited.add(type.getName())) {
+            // The declared class, not the parameterized supertype: the inherited Java method returns the declared
+            // type variable, not the type argument the subclass binds it to
+            ClassElement declared = allClasses.getOrDefault(type.getName(), type);
+            for (MethodElement inherited : declared.getEnclosedElements(ElementQuery.ALL_METHODS.onlyAccessible().onlyDeclared())) {
+                if (!key.equals(bridgeMethodKey(inherited)) || inherited.isStatic() != methodElement.isStatic()) {
+                    continue;
+                }
+                boolean inheritedBridged = !inherited.isAbstract() || inherited.hasStereotype(Executable.class);
+                return inheritedBridged && !sameBridgeReturnType(methodElement, inherited);
+            }
+            type = declared.getSuperType().orElse(null);
+        }
+        return false;
+    }
+
+    private static boolean sameBridgeReturnType(MethodElement method, MethodElement inherited) {
+        return methodReturnType(method, false).equals(methodReturnType(inherited, false));
+    }
+
+    private static boolean isInjectionMethod(AnnotationMetadata annotationMetadata) {
+        return annotationMetadata.hasStereotype(AnnotationUtil.INJECT)
+            || annotationMetadata.hasAnnotation(ANN_CONFIGURATION_INJECT);
+    }
+
     private static boolean isDynamicBeanProperty(PropertyElement beanProperty) {
         return beanProperty.getReadMethod().filter(method -> !method.isSynthetic()).isPresent()
             || beanProperty.getWriteMethod().filter(method -> !method.isSynthetic()).isPresent();
+    }
+
+    /**
+     * Whether the stub of a reconstructible bean (an {@code @Introspected} class whose state is fully
+     * held by the generated property fields) can implement {@link Serializable}.
+     *
+     * <p>Java serialization writes the property fields only; the GraalPy value and the sync state are
+     * transient, and {@code asPolyglotValue()} recreates the Python object from the fields on the first
+     * use after deserialization. A Python superclass must be reconstructible as well, and a Java
+     * superclass must itself be serializable, otherwise its state could not be written.</p>
+     */
+    private static boolean isSerializableStub(@Nullable ClassElement superType, boolean extendsPythonClass, boolean extendsHostClass) {
+        if (superType == null || (!extendsPythonClass && !extendsHostClass)) {
+            return true;
+        }
+        if (extendsHostClass) {
+            return superType.isAssignable(Serializable.class);
+        }
+        return superType.hasStereotype(Introspected.class)
+            && superType.getBeanProperties().stream().noneMatch(PythonStubGenerator::isDynamicBeanProperty)
+            && isSerializableStub(
+                superType.getSuperType().orElse(null),
+                superType.getSuperType().map(AbstractPythonClassElement.class::isInstance).orElse(false),
+                superType.getSuperType().map(type -> !(type instanceof AbstractPythonClassElement) && !type.isInterface() && !Object.class.getName().equals(type.getName())).orElse(false)
+            );
+    }
+
+    private static boolean declaresInterface(Collection<ClassElement> interfaces, Class<?> interfaceType) {
+        for (ClassElement anInterface : interfaces) {
+            if (interfaceType.getName().equals(anInterface.getName())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static boolean isConfigurationBuilderProperty(PropertyElement property) {
         return property.hasAnnotation(ANN_CONFIGURATION_BUILDER)
             || property.getReadMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false)
             || property.getWriteMethod().map(method -> method.hasAnnotation(ANN_CONFIGURATION_BUILDER)).orElse(false);
+    }
+
+    /**
+     * Whether the Python class declares a method with the name and arity of the interface method, whatever
+     * its type hints: an unannotated {@code def greet(self, who)} overrides {@code greet(String)} too. The
+     * interface signature is bridged for it and the Python method is looked up by name at run time.
+     */
+    private static boolean declaresOverride(ClassElement element, MethodElement interfaceMethod) {
+        int arity = interfaceMethod.getParameters().length;
+        return element.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared().onlyInstance().named(interfaceMethod.getName()))
+            .stream()
+            .anyMatch(declared -> declared.getParameters().length == arity
+                || declared instanceof PythonMethodElement pythonMethod && pythonMethod.isVarArgs() && pythonMethod.getParameters().length <= arity);
     }
 
     private static MethodElement resolveDeclaredBridgeMethod(ClassElement element, MethodElement interfaceMethod) {
@@ -2982,6 +4782,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
         }
         return interfaceMethod;
+    }
+
+    /**
+     * The return type the bridge of a Python override converts the Python result to when the Python hint
+     * names a different primitive or boxed type than the Java method ({@code -> int} for {@code long count()},
+     * or no hint at all): the stub declares the Java type, so the conversion has to produce it.
+     */
+    private static @Nullable ClassElement resolveDeclaredBridgeReturnType(MethodElement declaredMethod, MethodElement interfaceMethod) {
+        ClassElement interfaceReturnType = interfaceMethod.getGenericReturnType();
+        if (interfaceReturnType instanceof GenericPlaceholderElement || interfaceReturnType.isVoid() || !PythonJavaTypes.isPrimitiveOrBoxedType(interfaceReturnType)) {
+            return null;
+        }
+        ClassElement declaredReturnType = declaredMethod.getGenericReturnType();
+        if (declaredReturnType.isVoid() || declaredReturnType.getName().equals(interfaceReturnType.getName())) {
+            return null;
+        }
+        return interfaceReturnType;
     }
 
     private static MethodElement withOwningInterface(MethodElement method, ClassElement anInterface) {
@@ -3018,6 +4835,9 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return resolvedReturnType;
         }
         if (genericReturnType instanceof GenericPlaceholderElement placeholder) {
+            if (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)) {
+                return null;
+            }
             return typeArguments.get(placeholder.getVariableName());
         }
         if (genericReturnType.isVoid() || !Object.class.getName().equals(genericReturnType.getName())) {
@@ -3047,6 +4867,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private static @Nullable ClassElement resolveInterfaceType(ClassElement type, Map<String, ClassElement> interfaceTypeArguments) {
         if (type instanceof GenericPlaceholderElement placeholder) {
+            // A method type variable (<R> R findOne(...)) stays a variable, and a placeholder the
+            // element model already resolved against its declaring type (the T of ArgumentBinder<T, S>
+            // bound to Object through AnnotatedArgumentBinder<A, Object, S>) keeps that resolution; the
+            // arguments of the implemented interface only answer for its own, unresolved variables.
+            if (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)) {
+                return null;
+            }
             return interfaceTypeArguments.get(placeholder.getVariableName());
         }
         Map<String, ClassElement> typeArguments = type.getTypeArguments();
@@ -3058,7 +4885,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (Map.Entry<String, ClassElement> entry : typeArguments.entrySet()) {
             ClassElement typeArgument = entry.getValue();
             ClassElement resolvedTypeArgument = resolveInterfaceType(typeArgument, interfaceTypeArguments);
-            if (resolvedTypeArgument == null && typeArguments.size() == 1 && interfaceTypeArguments.size() == 1 && Object.class.getName().equals(typeArgument.getName())) {
+            if (resolvedTypeArgument == null
+                && typeArguments.size() == 1
+                && interfaceTypeArguments.size() == 1
+                && Object.class.getName().equals(typeArgument.getName())
+                && !(typeArgument instanceof GenericPlaceholderElement placeholder && (isMethodTypeVariable(placeholder) || isResolvedPlaceholder(placeholder)))) {
                 resolvedTypeArgument = interfaceTypeArguments.values().iterator().next();
             }
             if (resolvedTypeArgument == null) {
@@ -3101,6 +4932,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (parameterTypeName.equals(interfaceTypeName)) {
             return true;
         }
+        // Python has no overloading: a `def find(self, id: int)` overrides `find(Integer)` as well as
+        // `find(ID)` resolved to Integer, so a primitive hint matches the boxed Java type.
+        if (PythonJavaTypes.isSameOrBoxedType(parameter.getType(), interfaceParameter.getGenericType())) {
+            return true;
+        }
         String parameterGenericTypeName = parameter.getGenericType().getName();
         String interfaceGenericTypeName = interfaceParameter.getGenericType().getName();
         if (parameterGenericTypeName.equals(interfaceGenericTypeName)) {
@@ -3124,10 +4960,34 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return "set" + NameUtils.capitalize(name);
     }
 
+    /**
+     * Whether the generated class inherits property member hooks ({@code micronautValueCoercibleSetMember},
+     * {@code micronautValueCoerciblePutMember}) that write fields, which a class without property fields
+     * of its own overrides to return false. When the effective inherited implementation is the interface
+     * default (no base, an Object or interface base, or a Python base whose stub writes no fields), the
+     * override would only return false as the default does, so none is declared.
+     */
+    private static boolean inheritsPropertyMemberHooks(ClassStubModel model) {
+        ClassElement superType = model.superType();
+        if (superType == null || !(model.extendsPythonClass() || model.extendsHostClass())) {
+            return false;
+        }
+        if (superType instanceof AbstractPythonClassElement pythonSuperType) {
+            // the stub of a Python base writes fields, and so declares hooks that do more than return
+            // false, only when it is introspected with bean properties; a plain base inherits the default
+            // or returns false itself
+            return pythonSuperType.hasStereotype(Introspected.class) && !pythonSuperType.getBeanProperties().isEmpty();
+        }
+        // a compiled stub or another Java base implementing the interface: its hook bodies are not known
+        // here, so the override suppressing them is kept
+        return superType.isAssignable(GENERATED_PROPERTY_MEMBERS);
+    }
+
     private void addValueCoerciblePropertyMembers(
         ClassDef.ClassDefBuilder builder,
         List<PropertyElement> beanProperties,
-        Map<String, FieldDef> propertyFields
+        Map<String, FieldDef> propertyFields,
+        boolean overridePropertyMemberHooks
     ) {
         // Precompute JavaBean accessor aliases for ValueCoercible. The runtime proxy only consults
         // these generated tables, avoiding reflection over generated wrapper methods.
@@ -3165,18 +5025,22 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .addParameter("key", TypeDef.STRING)
             .returns(TypeDef.STRING)
             .build((aThis, methodParameters) -> propertyNameMatchBody(methodParameters.getFirst(), setterMappings)));
+        if (!overridePropertyMemberHooks) {
+            // the interface defaults return false, which is all the bodies below would do without property fields
+            return;
+        }
         builder.addMethod(MethodDef.builder("micronautValueCoercibleSetMember")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("key", TypeDef.STRING)
-            .addParameter("value", POLYGLOT_VALUE)
+            .addParameter(VALUE_PARAMETER, POLYGLOT_VALUE)
             .returns(TypeDef.Primitive.BOOLEAN)
             .build((aThis, methodParameters) -> propertySetterBody(aThis, methodParameters.getFirst(), methodParameters.get(1), setterProperties, propertyFields)));
         builder.addMethod(MethodDef.builder("micronautValueCoerciblePutMember")
             .addAnnotation(Override.class)
             .addModifiers(Modifier.PUBLIC)
             .addParameter("key", TypeDef.STRING)
-            .addParameter("value", POLYGLOT_VALUE)
+            .addParameter(VALUE_PARAMETER, POLYGLOT_VALUE)
             .returns(TypeDef.Primitive.BOOLEAN)
             .build((aThis, methodParameters) -> putMemberMatchBody(aThis, methodParameters.get(0), methodParameters.get(1), beanProperties, propertyFields)));
     }
@@ -3186,7 +5050,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         for (Map.Entry<String, String> entry : mappings.entrySet()) {
             statements.add(
                 ExpressionDef.constant(entry.getKey())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(ExpressionDef.constant(entry.getValue()).returning())
             );
@@ -3212,12 +5076,12 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             ExpressionDef convertedValue = convertRuntimeValue(beanProperty.getGenericType(), value);
             statements.add(
                 ExpressionDef.constant(entry.getKey())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(StatementDef.multi(
                         aThis.field(field).assign(convertedValue),
                         PYTHON_COERCION.invokeStatic(
-                            "putMember",
+                            PUT_MEMBER,
                             TypeDef.VOID,
                             aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE),
                             ExpressionDef.constant(beanProperty.getName()),
@@ -3246,10 +5110,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             statements.add(
                 ExpressionDef.constant(beanProperty.getName())
-                    .invoke("equals", TypeDef.Primitive.BOOLEAN, key)
+                    .invoke(EQUALS_METHOD, TypeDef.Primitive.BOOLEAN, key)
                     .isTrue()
                     .doIf(StatementDef.multi(
-                        aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), value)),
+                        aThis.field(field).assign(propertyFieldValue(beanProperty, value)),
                         ExpressionDef.trueValue().returning()
                     ))
             );
@@ -3258,31 +5122,35 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return StatementDef.multi(statements);
     }
 
-    private void addGetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
+    private void addGetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field, VisitorContext visitorContext) {
         TypeDef propertyType = propertySourceType(beanProperty);
         Optional<MethodElement> rm = beanProperty.getReadMethod();
         boolean isSynthetic = rm.map(MethodElement::isSynthetic).orElse(true);
         String getterName = isSynthetic ? beanGetterName(beanProperty.getName()) :
             rm.get().getName();
-        addGetterPojo(beanProperty, builder, field, propertyType, getterName);
+        addGetterPojo(beanProperty, builder, field, propertyType, getterName, visitorContext);
 
         String booleanGetterName = booleanBeanGetterName(beanProperty.getName());
         if (isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
-            addGetterPojo(beanProperty, builder, field, propertyType, booleanGetterName);
+            addGetterPojo(beanProperty, builder, field, propertyType, booleanGetterName, null);
         }
     }
 
-    private static void addGetterPojo(
+    private void addGetterPojo(
         PropertyElement beanProperty,
         ClassDef.ClassDefBuilder builder,
         FieldDef field,
         TypeDef propertyType,
-        String getterName
+        String getterName,
+        @Nullable VisitorContext visitorContext
     ) {
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
+        if (visitorContext != null) {
+            copyAccessorAnnotations(beanProperty, beanProperty.getReadMethod(), getterBuilder, visitorContext);
+        }
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> aThis.field(field).returning())));
     }
@@ -3302,7 +5170,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return BOOLEAN_TYPE.equals(typeName) || Boolean.class.getName().equals(typeName);
     }
 
-    private void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field) {
+    private void addSetterPojo(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, FieldDef field, VisitorContext visitorContext) {
         TypeDef returnType = TypeDef.VOID;
         Optional<MethodElement> wm = beanProperty.getWriteMethod();
         boolean isSynthetic = wm.map(MethodElement::isSynthetic).orElse(true);
@@ -3312,6 +5180,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
+        copyAccessorAnnotations(beanProperty, wm, propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -3363,10 +5232,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         TypeDef propertyType,
         String getterName
     ) {
+        addGetterDynamic(beanProperty, builder, propertyType, getterName, null);
+    }
+
+    private void addGetterDynamic(
+        PropertyElement beanProperty,
+        ClassDef.ClassDefBuilder builder,
+        TypeDef propertyType,
+        String getterName,
+        @Nullable VisitorContext visitorContext
+    ) {
         MethodDef.MethodDefBuilder getterBuilder = MethodDef
             .builder(getterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(propertyType);
+        if (visitorContext != null) {
+            copyAccessorAnnotations(beanProperty, beanProperty.getReadMethod(), getterBuilder, visitorContext);
+        }
 
         builder.addMethod(getterBuilder.build(((aThis, methodParameters) -> {
             var invokedValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE).invoke(
@@ -3378,14 +5260,15 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         })));
     }
 
-    private void addNamedGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder) {
+    private void addNamedGetterDynamic(PropertyElement beanProperty, ClassDef.ClassDefBuilder builder, boolean addBooleanAlias, VisitorContext visitorContext) {
         TypeDef propertyType = propertySourceType(beanProperty);
         String getterName = beanProperty.getReadMethod().map(MethodElement::getName).orElse(beanProperty.getName());
-        addGetterDynamic(beanProperty, builder, propertyType, getterName);
+        addGetterDynamic(beanProperty, builder, propertyType, getterName, visitorContext);
 
         String booleanGetterName = booleanBeanGetterName(beanProperty.getName());
-        if (isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
-            addGetterDynamic(beanProperty, builder, propertyType, booleanGetterName);
+        if (addBooleanAlias && isBooleanProperty(beanProperty) && !booleanGetterName.equals(getterName)) {
+            // the alias carries no annotations: one annotated getter per property (JPA property access)
+            addGetterDynamic(beanProperty, builder, propertyType, booleanGetterName, null);
         }
     }
 
@@ -3396,7 +5279,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        beanProperty.getWriteMethod().ifPresent(method -> copyAnnotations(method, propertySetter, ANNOTATION_PACKAGES_TO_COPY, visitorContext));
+        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -3404,7 +5287,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
             if (!adaptAsyncMembers) {
                 return PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -3413,7 +5296,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -3442,7 +5325,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             .builder(setterName)
             .addModifiers(Modifier.PUBLIC)
             .returns(returnType);
-        beanProperty.getWriteMethod().ifPresent(method -> copyAnnotations(method, propertySetter, ANNOTATION_PACKAGES_TO_COPY, visitorContext));
+        copyAccessorAnnotations(beanProperty, beanProperty.getWriteMethod(), propertySetter, visitorContext);
 
         propertySetter.addParameter(propertySourceType(beanProperty));
 
@@ -3450,7 +5333,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             var targetValue = aThis.invoke(AS_POLYGLOT_VALUE, POLYGLOT_VALUE);
             if (!adaptAsyncMembers) {
                 return PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -3459,7 +5342,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             }
             return StatementDef.multi(
                 PYTHON_COERCION.invokeStatic(
-                    "putMember",
+                    PUT_MEMBER,
                     TypeDef.VOID,
                     targetValue,
                     ExpressionDef.constant(beanProperty.getName()),
@@ -3524,7 +5407,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 targetContext
             );
             ExpressionDef.InvokeInstanceMethod result = targetValue.invoke(
-                "putMember",
+                PUT_MEMBER,
                 TypeDef.VOID,
                 parameters
             );
@@ -3540,6 +5423,42 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     static ExpressionDef handleReturnType(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
+        return handleReturnType(allClasses, returnType, invokedValue, null);
+    }
+
+    /**
+     * Converts the value a Python method returned to the method's Java return type.
+     *
+     * @param allClasses         The generated classes by name
+     * @param returnType         The return type the Python method declares
+     * @param invokedValue       The polyglot value the Python method returned
+     * @param declaredReturnType The return type of the Java method the Python method implements, if
+     *                           it differs from the Python declaration; a reactive Java declaration
+     *                           ({@code Mono}, {@code Flux}, {@code CompletionStage}) adapts the Python
+     *                           result to it
+     * @return The conversion expression
+     */
+    static ExpressionDef handleReturnType(
+        Map<String, ClassElement> allClasses,
+        ClassElement returnType,
+        ExpressionDef invokedValue,
+        @Nullable ClassElement declaredReturnType
+    ) {
+        if (declaredReturnType != null && isReactiveType(declaredReturnType) && !sameErasure(declaredReturnType, returnType)) {
+            if (Object.class.getName().equals(returnType.getName())) {
+                // The Python method has no usable return annotation: the Java declaration decides
+                return handleReturnType(allClasses, declaredReturnType, invokedValue, null);
+            }
+            // The bridge casts the result to the Java signature, so the erasure of the declaration suffices here
+            if (returnType.isAssignable(PUBLISHER)) {
+                return convertPublisher(allClasses, returnType, invokedValue, declaredReturnType, erasedType(declaredReturnType));
+            }
+            if (returnType.isAssignable(CompletionStage.class)) {
+                return PYTHON_HTTP_CONVERSION.invokeStatic("convertReactive", TypeDef.OBJECT,
+                        convertRuntimeValue(returnType, invokedValue), classLiteral(declaredReturnType))
+                    .cast(erasedType(declaredReturnType));
+            }
+        }
         // Choose appropriate conversion method based on return type
         if (returnType.isVoid()) {
             // For void methods, just invoke the Python method without returning
@@ -3556,20 +5475,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     convertNullableValue(invokedValue, invokedValue.invoke("asInt", TypeDef.Primitive.INT));
                 case "java.lang.Boolean" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
-                case "java.lang.Double" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE));
-                case "java.lang.Float" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT));
+                case JAVA_LANG_DOUBLE ->
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
+                case JAVA_LANG_FLOAT ->
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asLong", TypeDef.Primitive.LONG));
-                case "java.lang.Short" ->
-                    convertNullableValue(invokedValue, invokedValue.invoke("asShort", TypeDef.Primitive.SHORT));
+                case JAVA_LANG_SHORT ->
+                    convertNullableValue(invokedValue, invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character" ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING)
                         .invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String" ->
+                case JAVA_LANG_STRING ->
                     convertNullableValue(invokedValue, invokedValue.invoke("asString", ClassTypeDef.STRING));
                 case "java.lang.Object" ->
                     PYTHON_CONVERSION.invokeStatic("convertObject", ClassTypeDef.OBJECT, invokedValue);
@@ -3608,18 +5527,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         yield uncheckedCast(PYTHON_CONVERSION.invokeStatic("convertOptional", ClassTypeDef.of(java.util.Optional.class),
                                 invokedValue, genericType), returnType);
                     } else if (returnType.isAssignable(PUBLISHER)) {
-                        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
-                        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
-                            yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic(
-                                "convertPublisher",
-                                List.of(POLYGLOT_VALUE, POLYGLOT_VALUE_CONVERTER),
-                                ClassTypeDef.of(PUBLISHER),
-                                invokedValue,
-                                generatedWrapperConverter(componentType)
-                            ), returnType);
-                        }
-                        yield uncheckedCast(PYTHON_HTTP_CONVERSION.invokeStatic("convertPublisher", ClassTypeDef.of(PUBLISHER),
-                                invokedValue, toClassExpression(componentType)), returnType);
+                        yield convertPublisher(allClasses, returnType, invokedValue, returnType, sourceSignatureType(returnType));
+                    } else if (returnType.isAssignable(CompletionStage.class)) {
+                        // A publisher returned where a completion stage is declared (an unannotated
+                        // method implementing a CompletableFuture signature returning a Mono) is adapted
+                        yield PYTHON_HTTP_CONVERSION.invokeStatic("convertReactiveValue", TypeDef.OBJECT,
+                                invokedValue, classLiteral(returnType))
+                            .cast(sourceSignatureType(returnType));
                     } else if (returnType.isAssignable(HTTP_RESPONSE)) {
                         ClassElement bodyType = returnType.getFirstTypeArgument().orElse(null);
                         if (bodyType == null || Object.class.getName().equals(bodyType.getName())) {
@@ -3643,21 +5557,78 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         }
     }
 
-    private static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
-        return returnConvertedValue(allClasses, returnType, invokedValue, null);
+    /**
+     * Converts a Python-returned publisher: its items to the item type of {@code publisherType} and
+     * the publisher itself to the erasure of {@code targetType} when that is a more specific reactive
+     * type than {@code Publisher} (a Reactor {@code Mono}/{@code Flux}, a {@code CompletionStage}).
+     *
+     * @param allClasses    The generated classes by name
+     * @param publisherType The publisher type the Python method declares
+     * @param invokedValue  The polyglot value the Python method returned
+     * @param targetType    The reactive type to adapt the publisher to
+     * @param castType      The type the expression is cast to
+     * @return The conversion expression
+     */
+    private static ExpressionDef convertPublisher(
+        Map<String, ClassElement> allClasses,
+        ClassElement publisherType,
+        ExpressionDef invokedValue,
+        ClassElement targetType,
+        TypeDef castType
+    ) {
+        ClassElement componentType = publisherType.getFirstTypeArgument().orElse(null);
+        ExpressionDef itemConversion = componentType != null && isGeneratedWrapperType(allClasses, componentType)
+            ? generatedWrapperConverter(componentType)
+            : toClassExpression(componentType);
+        TypeDef itemConversionType = componentType != null && isGeneratedWrapperType(allClasses, componentType)
+            ? POLYGLOT_VALUE_CONVERTER
+            : TypeDef.CLASS;
+        ExpressionDef converted;
+        if (PUBLISHER.equals(targetType.getName())) {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(POLYGLOT_VALUE, itemConversionType),
+                ClassTypeDef.of(PUBLISHER),
+                invokedValue,
+                itemConversion
+            );
+        } else {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(POLYGLOT_VALUE, itemConversionType, TypeDef.CLASS),
+                TypeDef.OBJECT,
+                invokedValue,
+                itemConversion,
+                classLiteral(targetType)
+            );
+        }
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, converted).cast(castType);
+    }
+
+    private static boolean isReactiveType(ClassElement type) {
+        return type.isAssignable(PUBLISHER) || type.isAssignable(CompletionStage.class);
+    }
+
+    private static boolean sameErasure(ClassElement first, ClassElement second) {
+        return first.getName().equals(second.getName());
+    }
+
+    static StatementDef returnConvertedValue(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef invokedValue) {
+        return returnConvertedValue(allClasses, returnType, invokedValue, null, null);
     }
 
     private static StatementDef returnConvertedValue(
         Map<String, ClassElement> allClasses,
         ClassElement returnType,
         ExpressionDef invokedValue,
-        @Nullable TypeDef castType
+        @Nullable TypeDef castType,
+        @Nullable ClassElement declaredReturnType
     ) {
         if (returnType.isVoid() || TypeDef.VOID.equals(castType) || TypeDef.Primitive.VOID.equals(castType)) {
             return (StatementDef) invokedValue;
         }
         return invokedValue.newLocal("pythonResult", result ->
-            castReturnValue(handleReturnType(allClasses, returnType, result), castType).returning()
+            castReturnValue(handleReturnType(allClasses, returnType, result, declaredReturnType), castType).returning()
         );
     }
 
@@ -3665,14 +5636,47 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         if (castType == null) {
             return expression;
         }
-        return PYTHON_CONVERSION.invokeStatic("asObject", castType, expression);
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, castType, expression);
     }
 
-    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+    /**
+     * The body of {@code fromPolyglotValue} for a class with a Java base: the Java instance a Python
+     * object is already bound to is reused, so the object keeps one instance of the base; otherwise
+     * the value is wrapped as in {@link #fromPolyglotValueBody}.
+     */
+    private static StatementDef boundOrNewFromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
         return StatementDef.multi(
-            PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+            PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
                 .isTrue()
                 .doIf(ExpressionDef.nullValue().returning()),
+            PYTHON_JAVA_BASES.invokeStatic("bound", thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal("bound", bound -> bound.isNonNull().doIf(bound.returning())),
+            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
+                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
+            thisType.instantiate(value).returning()
+        );
+    }
+
+    /**
+     * The body of the static {@code fromPolyglotValue} factory: {@code None} is {@code null}, an instance
+     * of a generated Python subclass is wrapped by that subclass so it keeps its runtime type, and any other
+     * value is wrapped by this type.
+     */
+    private static StatementDef fromPolyglotValueBody(ClassTypeDef thisType, VariableDef.MethodParameter value) {
+        return StatementDef.multi(
+            PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
+                .isTrue()
+                .doIf(ExpressionDef.nullValue().returning()),
+            // a Java object of this class that went to Python and comes back (a wrapper handed over by
+            // reference, or an entry of a Java collection Python worked on) keeps its identity: a new
+            // wrapper around it would be a stale copy the Java side never sees changes of
+            VALUE_COERCIBLES.invokeStatic("hostObject", TypeDef.OBJECT, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal("hostObject", hostObject -> hostObject.isNonNull()
+                    .doIf(hostObject.cast(thisType).returning())),
+            PYTHON_CONVERSION.invokeStatic(SUBCLASS_WRAPPER, thisType, value, thisType.getStaticField(CLASS_FIELD, TypeDef.CLASS))
+                .newLocal(SUBCLASS_WRAPPER, subclassWrapper ->
+                    subclassWrapper.isNonNull().doIf(subclassWrapper.returning())),
             thisType.instantiate(value).returning()
         );
     }
@@ -3716,7 +5720,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         String propertyName = beanProperty.getName();
         ExpressionDef.InvokeInstanceMethod member = value.invoke(GET_MEMBER, POLYGLOT_VALUE, ExpressionDef.constant(propertyName));
         if (isCollectionLike(beanProperty.getGenericType())) {
-            return aThis.field(field).assign(convertValueForType(beanProperty.getGenericType(), member));
+            return aThis.field(field).assign(propertyFieldValue(beanProperty, member));
         }
         ExpressionDef.InvokeInstanceMethod has = value.invoke("hasMember", TypeDef.Primitive.BOOLEAN, ExpressionDef.constant(propertyName));
         // Read the member once into a local: the nullable conversions test and convert it separately.
@@ -3748,6 +5752,139 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     /**
+     * The statement that writes a property field to the Python object during a sync and assigns the
+     * field the value to hold from then on.
+     *
+     * <p>A viewed list or dict of this context is already the attribute; a collection assigned from
+     * Java is copied into a native Python collection, which the field views from then on. When the
+     * wrapper tracks ownership and its Java fields own the state, a collection or a nested object is
+     * written by reference instead (see {@code PythonCoercion.putMemberByReference}), so the Python
+     * attribute is the Java field's object and a change made in Python is a change of the Java
+     * field. {@code owned} decides that statically ({@code true} right after the Python object was
+     * created from the fields) or, when {@code null}, at runtime from the ownership field.</p>
+     */
+    private static StatementDef propertyWrite(VariableDef.This aThis,
+                                              ExpressionDef target,
+                                              PropertyElement beanProperty,
+                                              FieldDef field,
+                                              @Nullable FieldDef javaOwnedField,
+                                              @Nullable Boolean owned) {
+        ClassElement type = beanProperty.getGenericType();
+        ExpressionDef fieldRef = aThis.field(field);
+        ExpressionDef name = ExpressionDef.constant(beanProperty.getName());
+        StatementDef coerced;
+        if (isSharedCollectionProperty(beanProperty)) {
+            if (type.isAssignable(List.class)) {
+                coerced = aThis.field(field).assign(uncheckedCast(PYTHON_COERCION.invokeStatic("putListMember", ClassTypeDef.of(List.class),
+                    target, name, fieldRef, toClassExpression(type.getTypeArguments().get("E"))), type));
+            } else {
+                Map<String, ClassElement> typeArguments = type.getTypeArguments();
+                coerced = aThis.field(field).assign(uncheckedCast(PYTHON_COERCION.invokeStatic("putMapMember", ClassTypeDef.of(Map.class),
+                    target, name, fieldRef, toClassExpression(typeArguments.get("K")), toClassExpression(typeArguments.get("V"))), type));
+            }
+        } else {
+            coerced = PYTHON_COERCION.invokeStatic(
+                PUT_MEMBER,
+                TypeDef.VOID,
+                target,
+                name,
+                coerceTypedElementToPolyglotValue(beanProperty, fieldRef).cast(TypeDef.OBJECT)
+            );
+        }
+        if (javaOwnedField == null || !isOwnedByReference(beanProperty) || Boolean.FALSE.equals(owned)) {
+            return coerced;
+        }
+        StatementDef byReference = PYTHON_COERCION.invokeStatic(
+            "putMemberByReference",
+            TypeDef.VOID,
+            target,
+            ExpressionDef.constant(beanProperty.getName()),
+            fieldRef.cast(TypeDef.OBJECT)
+        );
+        if (Boolean.TRUE.equals(owned)) {
+            return byReference;
+        }
+        return aThis.field(javaOwnedField).isTrue().doIfElse(byReference, coerced);
+    }
+
+    /**
+     * Whether any property of the class is written differently when the Java fields own the state.
+     */
+    private static boolean ownershipMatters(List<PropertyElement> beanProperties) {
+        return beanProperties.stream().anyMatch(PythonStubGenerator::isOwnedByReference);
+    }
+
+    /**
+     * Whether a property value is handed to Python by reference when the Java fields own the state:
+     * a collection (changed in place from Python) or a generated wrapper of a mutable Python class
+     * (written through from Python).
+     */
+    private static boolean isOwnedByReference(PropertyElement beanProperty) {
+        ClassElement type = beanProperty.getGenericType();
+        if (isCollectionLike(type)) {
+            return true;
+        }
+        return type instanceof PythonClassElement pythonClass
+            && !type.isEnum()
+            && !type.isInterface()
+            && pythonClass.hasStereotype(Introspected.class)
+            && !isFrozenPythonDataclass(pythonClass);
+    }
+
+    /**
+     * The value of the generated field of a property read from the attribute of the Python object. A
+     * list or dict of plain element types is viewed rather than copied: the Python collection stays the
+     * attribute and the source of truth, and the Java field reads and writes through to it, so an
+     * {@code append} in Python and an {@code add} in Java reach the same collection and the attribute
+     * keeps its native Python type. Every other property value is converted.
+     */
+    private ExpressionDef propertyFieldValue(PropertyElement beanProperty, ExpressionDef member) {
+        ClassElement type = beanProperty.getGenericType();
+        if (isSharedCollectionProperty(beanProperty)) {
+            if (type.isAssignable(List.class)) {
+                return uncheckedCast(PYTHON_COERCION.invokeStatic("listView", ClassTypeDef.of(List.class), member, toClassExpression(type.getTypeArguments().get("E"))), type);
+            }
+            Map<String, ClassElement> typeArguments = type.getTypeArguments();
+            return uncheckedCast(PYTHON_COERCION.invokeStatic("mapView", ClassTypeDef.of(Map.class), member,
+                toClassExpression(typeArguments.get("K")), toClassExpression(typeArguments.get("V"))), type);
+        }
+        return convertValueForType(type, member);
+    }
+
+    /**
+     * Whether a list or dict property holds only plain values (strings, numbers, booleans, nested
+     * lists and dicts of those), so the Java field can view the Python collection. A collection of
+     * Python objects or of converted standard types is converted on every crossing instead.
+     */
+    private static boolean isSharedCollectionProperty(PropertyElement beanProperty) {
+        return isSharedCollectionType(beanProperty.getGenericType());
+    }
+
+    private static boolean isSharedCollectionType(ClassElement type) {
+        if (type.isAssignable(List.class)) {
+            return isPlainElementType(type.getTypeArguments().get("E"));
+        }
+        if (type.isAssignable(Map.class)) {
+            return isPlainElementType(type.getTypeArguments().get("K")) && isPlainElementType(type.getTypeArguments().get("V"));
+        }
+        return false;
+    }
+
+    private static boolean isPlainElementType(@Nullable ClassElement type) {
+        if (type == null || type instanceof GenericPlaceholderElement || type.isArray()) {
+            return false;
+        }
+        if (type.isPrimitive()) {
+            return true;
+        }
+        return switch (type.getName()) {
+            case JAVA_LANG_STRING, "java.lang.Boolean", "java.lang.Byte", JAVA_LANG_SHORT, "java.lang.Integer",
+                 "java.lang.Long", JAVA_LANG_FLOAT, JAVA_LANG_DOUBLE, "java.lang.Character" -> true;
+            default -> isSharedCollectionType(type);
+        };
+    }
+
+    /**
      * One guest call that assigns every listed member, instead of one call per member.
      */
     private static StatementDef putMembers(ExpressionDef target, List<ExpressionDef> names, List<ExpressionDef> values) {
@@ -3776,7 +5913,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef convertNullableValue(ExpressionDef value, ExpressionDef nonNullValue) {
-        return PYTHON_CONVERSION.invokeStatic("isNone", TypeDef.Primitive.BOOLEAN, value)
+        return PYTHON_CONVERSION.invokeStatic(IS_NONE, TypeDef.Primitive.BOOLEAN, value)
             .isTrue()
             .doIfElse(ExpressionDef.nullValue(), nonNullValue);
     }
@@ -3794,11 +5931,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static ExpressionDef uncheckedCast(ExpressionDef expression, ClassElement targetType) {
-        return PYTHON_CONVERSION.invokeStatic("asObject", TypeDef.OBJECT, expression).cast(sourceSignatureType(targetType));
+        return PYTHON_CONVERSION.invokeStatic(AS_OBJECT_METHOD, TypeDef.OBJECT, expression).cast(sourceSignatureType(targetType));
     }
 
     private static ExpressionDef convertRuntimeValue(ClassElement targetType, ExpressionDef value) {
-        return PYTHON_CONVERSION.invokeStatic("convertValue", ClassTypeDef.OBJECT,
+        return PYTHON_CONVERSION.invokeStatic(CONVERT_VALUE, ClassTypeDef.OBJECT,
                 value, classLiteral(targetType))
             .cast(sourceSignatureType(targetType));
     }
@@ -3812,7 +5949,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
 
     private void addCreatorFactoryMethod(MethodElement creatorMethod, ClassDef.ClassDefBuilder builder, ClassElement element) {
         String pythonMethodName = creatorMethod.getName();
-        ClassTypeDef thisType = ClassTypeDef.of(element.getName());
+        ClassTypeDef thisType = javaClassType(element);
 
         MethodDef.MethodDefBuilder factoryMethodBuilder = MethodDef.builder(pythonMethodName)
             .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
@@ -3858,14 +5995,14 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                 invokedValue.invoke("asInt", TypeDef.Primitive.INT);
             case BOOLEAN_TYPE, "java.lang.Boolean" ->
                 invokedValue.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
-            case "double", "java.lang.Double" ->
-                invokedValue.invoke("asDouble", TypeDef.Primitive.DOUBLE);
-            case "float", "java.lang.Float" ->
-                invokedValue.invoke("asFloat", TypeDef.Primitive.FLOAT);
+            case DOUBLE_TYPE, JAVA_LANG_DOUBLE ->
+                invokedValue.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
+            case FLOAT_TYPE, JAVA_LANG_FLOAT ->
+                invokedValue.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
             case "long", "java.lang.Long" ->
                 invokedValue.invoke("asLong", TypeDef.Primitive.LONG);
-            case "short", "java.lang.Short" ->
-                invokedValue.invoke("asShort", TypeDef.Primitive.SHORT);
+            case SHORT_TYPE, JAVA_LANG_SHORT ->
+                invokedValue.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
             case "byte", "java.lang.Byte" ->
                 invokedValue.invoke("asByte", TypeDef.Primitive.BYTE);
             case "char", "java.lang.Character" ->
@@ -3881,6 +6018,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      */
     private static FieldDef pythonValueField(ClassStubModel model) {
         return requireField(model.pythonValue(), "Expected graalpyInternalValue field");
+    }
+
+    private static FieldDef ownedClassReferenceField(ClassStubModel model) {
+        return requireField(model.ownedClassReference(), "Expected graalpyInternalClassReference field");
     }
 
     private static FieldDef requireField(@Nullable FieldDef field, String message) {
@@ -3908,10 +6049,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return switch (type.getName()) {
                 case "int" -> member.invoke("asInt", TypeDef.Primitive.INT);
                 case BOOLEAN_TYPE -> member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN);
-                case "double" -> member.invoke("asDouble", TypeDef.Primitive.DOUBLE);
-                case "float" -> member.invoke("asFloat", TypeDef.Primitive.FLOAT);
+                case DOUBLE_TYPE -> member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE);
+                case FLOAT_TYPE -> member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT);
                 case "long" -> member.invoke("asLong", TypeDef.Primitive.LONG);
-                case "short" -> member.invoke("asShort", TypeDef.Primitive.SHORT);
+                case SHORT_TYPE -> member.invoke(AS_SHORT, TypeDef.Primitive.SHORT);
                 case "byte" -> member.invoke("asByte", TypeDef.Primitive.BYTE);
                 case "char" -> member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0));
                 default -> member.invoke("asString", ClassTypeDef.STRING);
@@ -3923,19 +6064,19 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return convertNullableValue(member, member.invoke("asInt", TypeDef.Primitive.INT));
                 case "java.lang.Boolean":
                     return convertNullableValue(member, member.invoke("asBoolean", TypeDef.Primitive.BOOLEAN));
-                case "java.lang.Double":
-                    return convertNullableValue(member, member.invoke("asDouble", TypeDef.Primitive.DOUBLE));
-                case "java.lang.Float":
-                    return convertNullableValue(member, member.invoke("asFloat", TypeDef.Primitive.FLOAT));
+                case JAVA_LANG_DOUBLE:
+                    return convertNullableValue(member, member.invoke(AS_DOUBLE, TypeDef.Primitive.DOUBLE));
+                case JAVA_LANG_FLOAT:
+                    return convertNullableValue(member, member.invoke(AS_FLOAT, TypeDef.Primitive.FLOAT));
                 case "java.lang.Long":
                     return convertNullableValue(member, member.invoke("asLong", TypeDef.Primitive.LONG));
-                case "java.lang.Short":
-                    return convertNullableValue(member, member.invoke("asShort", TypeDef.Primitive.SHORT));
+                case JAVA_LANG_SHORT:
+                    return convertNullableValue(member, member.invoke(AS_SHORT, TypeDef.Primitive.SHORT));
                 case "java.lang.Byte":
                     return convertNullableValue(member, member.invoke("asByte", TypeDef.Primitive.BYTE));
                 case "java.lang.Character":
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING).invoke("charAt", TypeDef.Primitive.CHAR, ExpressionDef.constant(0)));
-                case "java.lang.String":
+                case JAVA_LANG_STRING:
                     return convertNullableValue(member, member.invoke("asString", ClassTypeDef.STRING));
                 default:
                     if (type.isAssignable(List.class)) {
@@ -3986,20 +6127,137 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return new ExpressionDef.Lambda(POLYGLOT_VALUE_CONVERTER, convertMethod, implementation);
     }
 
+    /**
+     * Whether a method carries a declared {@code @Bean} annotation or stereotype. Every such method is bridged:
+     * a {@code @Factory} needs the bridge for its bean methods, including those it inherits from a base class
+     * that is not itself a {@code @Factory}, as the bean definition of an inherited bean method calls the
+     * bridge of the declaring stub. Visitors can also add {@code @Bean} directly to Python methods after
+     * metadata parsing, and those methods need bridges so that the generated bean definitions can call them.
+     * A plain bridge is harmless elsewhere.
+     *
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method declares a {@code @Bean} annotation or stereotype
+     */
     private static boolean isDeclaredBeanMethod(AnnotationMetadata annotationMetadata) {
-        // Visitors can add @Bean directly to Python methods after metadata parsing. Those
-        // methods still need Java bridge methods so generated bean definitions can call them.
         return annotationMetadata.hasDeclaredAnnotation(Bean.class)
             || annotationMetadata.hasDeclaredStereotype(Bean.class);
+    }
+
+    /**
+     * Whether a method is a factory method producing a bean. Mirrors the core bean definition creators: a
+     * method carrying a declared {@code @Bean} annotation or stereotype only produces a bean when the class
+     * it is bridged for is a {@code @Factory}, or when a {@code @Factory} being compiled extends that class
+     * and so inherits the method as one of its bean methods. Elsewhere the {@code @Bean} stereotype is
+     * incidental, for example messaging listener annotations meta-annotated with {@code @MessageListener}
+     * that are placed on methods of ordinary beans, and such methods are bridged as regular executable
+     * methods without the factory method validation.
+     *
+     * @param owner              The class the method is bridged for
+     * @param annotationMetadata The annotation metadata of the method
+     * @return True if the method is a factory method
+     */
+    private boolean isFactoryBeanMethod(ClassElement owner, AnnotationMetadata annotationMetadata) {
+        return isDeclaredBeanMethod(annotationMetadata)
+            && (owner.hasStereotype(Factory.class) || hasFactorySubclass(owner));
+    }
+
+    /**
+     * Whether a {@code @Factory} class among the compiled Python classes extends the given class. The bean
+     * methods such a factory inherits are bridged once, on the stub of the declaring class, so that stub
+     * has to apply the factory method validation and bridge the pre-destroy method on their behalf.
+     *
+     * @param owner The class declaring the method
+     * @return True if a compiled {@code @Factory} extends the class
+     */
+    private boolean hasFactorySubclass(ClassElement owner) {
+        String ownerName = owner.getName();
+        for (ClassElement classElement : allClasses.values()) {
+            if (!classElement.getName().equals(ownerName)
+                && classElement.hasStereotype(Factory.class)
+                && classElement.isAssignable(ownerName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     static boolean isAsyncPythonMethod(MethodElement methodElement) {
         return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsync();
     }
 
+    /**
+     * Bridges a producer method of an associated bean into the stub of the Python class that declares it. The
+     * child bean definition written for the method invokes it on the generated Java class, and a Python method
+     * is only bridged into the stub when Micronaut needs to see it.
+     *
+     * @param producerMethod The producer method registered with {@code BeanElementBuilder.produceBeans(...)}
+     * @param visitorContext The visitor context
+     */
+    public void bridgeProducerMethod(PythonMethodElement producerMethod, VisitorContext visitorContext) {
+        String declaringTypeName = producerMethod.getDeclaringType().getName();
+        StubEntry stubEntry = classBuilders.get(declaringTypeName);
+        if (stubEntry != null) {
+            addBridgeMethod(BridgeMethodSpec.of(producerMethod, stubEntry.originatingElement), stubEntry.builder, visitorContext, stubEntry.bridgedMethods);
+        } else {
+            // the declaring class is not compiled in this round (a base class of another module, for example):
+            // its stub does not get the bridge, and the child bean definition cannot invoke the producer
+            visitorContext.warn("Producer method [" + producerMethod.getName() + "] of associated bean ["
+                + producerMethod.getOwningType().getName() + "] is declared by [" + declaringTypeName
+                + "], which is not compiled in this round: the method is not bridged into the generated Java class", producerMethod);
+        }
+    }
+
+    /**
+     * Convert the elements of a publisher backed by a Python async generator the way the elements of
+     * a returned {@code Publisher} are converted: a generated wrapper element type keeps its wrapper,
+     * any other declared element type goes through the runtime conversion.
+     *
+     * @param allClasses The generated classes
+     * @param returnType The declared {@code Publisher<T>} return type
+     * @param publisher The raw publisher expression
+     * @return The converted publisher expression
+     */
+    static ExpressionDef convertedElementPublisher(Map<String, ClassElement> allClasses, ClassElement returnType, ExpressionDef publisher) {
+        ClassElement componentType = returnType.getFirstTypeArgument().orElse(null);
+        ExpressionDef converted;
+        if (componentType != null && isGeneratedWrapperType(allClasses, componentType)) {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(ClassTypeDef.of(PUBLISHER), POLYGLOT_VALUE_CONVERTER),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                generatedWrapperConverter(componentType)
+            );
+        } else {
+            converted = PYTHON_HTTP_CONVERSION.invokeStatic(
+                CONVERT_PUBLISHER,
+                List.of(ClassTypeDef.of(PUBLISHER), TypeDef.CLASS),
+                ClassTypeDef.of(PUBLISHER),
+                publisher,
+                toClassExpression(componentType)
+            );
+        }
+        // an element type with type arguments of its own (Event[Tick]) cannot be cast from the raw
+        // publisher directly
+        return uncheckedCast(converted, returnType);
+    }
+
+    static boolean isAsyncGeneratorPythonMethod(MethodElement methodElement) {
+        return methodElement instanceof PythonMethodElement pythonMethodElement && pythonMethodElement.isAsyncGenerator();
+    }
+
     @Override
     public VisitorKind getVisitorKind() {
         return VisitorKind.ISOLATING;
+    }
+
+    /**
+     * Thrown when an annotation value of the metadata cannot be written to the generated Java source.
+     */
+    private static final class UnrepresentableAnnotationException extends RuntimeException {
+        UnrepresentableAnnotationException(String message) {
+            super(message);
+        }
     }
 
     record StubEntry(
@@ -4061,6 +6319,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param syncSnapshotFields The sync snapshot fields by property name
      * @param pythonValue The field holding the Python value, if any
      * @param pythonValueSyncing The re-entrancy guard field for syncing, if any
+     * @param javaOwned The field recording that the Java fields own the state, if any
+     * @param ownedClassReference The field holding the class reference of an owned Python object, if any
+     * @param javaSuperConstructor The Java super constructor when the class extends a Java base class
+     * @param inheritsTestMembers Whether the class is a test class bridging the members of a Python base it does not extend
      */
     private record ClassStubModel(
         ClassDef.ClassDefBuilder builder,
@@ -4083,8 +6345,23 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         Map<String, FieldDef> propertyFields,
         Map<String, FieldDef> syncSnapshotFields,
         @Nullable FieldDef pythonValue,
-        @Nullable FieldDef pythonValueSyncing
+        @Nullable FieldDef pythonValueSyncing,
+        @Nullable FieldDef javaOwned,
+        @Nullable FieldDef ownedClassReference,
+        @Nullable JavaSuperConstructor javaSuperConstructor,
+        boolean inheritsTestMembers
     ) {
+        /**
+         * Whether the class extends a Java class other than a throwable: the generated class is the
+         * only Java instance of the base and is bound to the Python object (see
+         * {@code PythonJavaBases} in the runtime). A test class binds its lazily created Python
+         * object and needs a no-argument constructor of the base.
+         *
+         * @return Whether the class extends a Java base class
+         */
+        boolean extendsJavaBase() {
+            return PythonStubGenerator.extendsJavaBase(superType, extendsHostClass);
+        }
     }
 
     /**
@@ -4098,6 +6375,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param signatureMethod         The method whose raw signature the bridge declares
      * @param resolvedSignatureMethod The signature method with type arguments resolved
      * @param signatureTypeArguments  Type arguments applied to the signature
+     * @param introduced              Whether the method is introduced by an interface the proxy alone implements
      */
     record BridgeMethodSpec(
         MethodElement method,
@@ -4107,27 +6385,37 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         @Nullable ClassElement returnTypeOverride,
         MethodElement signatureMethod,
         MethodElement resolvedSignatureMethod,
-        Map<String, ClassElement> signatureTypeArguments
+        Map<String, ClassElement> signatureTypeArguments,
+        boolean introduced
     ) {
 
         static BridgeMethodSpec of(MethodElement method, ClassElement owner) {
-            return new BridgeMethodSpec(method, owner, false, false, null, method, method, Map.of());
+            return new BridgeMethodSpec(method, owner, false, false, null, method, method, Map.of(), false);
         }
 
         BridgeMethodSpec junit5Test(boolean value) {
-            return new BridgeMethodSpec(method, owner, value, script, returnTypeOverride, signatureMethod, resolvedSignatureMethod, signatureTypeArguments);
+            return new BridgeMethodSpec(method, owner, value, script, returnTypeOverride, signatureMethod, resolvedSignatureMethod, signatureTypeArguments, introduced);
         }
 
         BridgeMethodSpec script(boolean value) {
-            return new BridgeMethodSpec(method, owner, junit5Test, value, returnTypeOverride, signatureMethod, resolvedSignatureMethod, signatureTypeArguments);
+            return new BridgeMethodSpec(method, owner, junit5Test, value, returnTypeOverride, signatureMethod, resolvedSignatureMethod, signatureTypeArguments, introduced);
         }
 
         BridgeMethodSpec returnType(@Nullable ClassElement value) {
-            return new BridgeMethodSpec(method, owner, junit5Test, script, value, signatureMethod, resolvedSignatureMethod, signatureTypeArguments);
+            return new BridgeMethodSpec(method, owner, junit5Test, script, value, signatureMethod, resolvedSignatureMethod, signatureTypeArguments, introduced);
         }
 
         BridgeMethodSpec signature(MethodElement rawSignature, MethodElement resolvedSignature, Map<String, ClassElement> typeArguments) {
-            return new BridgeMethodSpec(method, owner, junit5Test, script, returnTypeOverride, rawSignature, resolvedSignature, typeArguments);
+            return new BridgeMethodSpec(method, owner, junit5Test, script, returnTypeOverride, rawSignature, resolvedSignature, typeArguments, introduced);
+        }
+
+        /**
+         * @param value Whether the method is implemented by the introduction proxy alone, so that an instance
+         *              without the Python member (one not created as the proxy) answers {@code null}
+         * @return The spec
+         */
+        BridgeMethodSpec introduced(boolean value) {
+            return new BridgeMethodSpec(method, owner, junit5Test, script, returnTypeOverride, signatureMethod, resolvedSignatureMethod, signatureTypeArguments, value);
         }
     }
 
@@ -4138,8 +6426,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * @param syncSnapshotFields The sync snapshot fields by property name
      * @param pythonValue        The field holding the Python value, if any
      * @param pythonValueSyncing The re-entrancy guard field for syncing, if any
+     * @param javaOwned          The field recording that the Java fields own the state, if any
+     * @param ownedClassReference The field holding the class reference of an owned Python object, if any
      */
-    private record StateFields(Map<String, FieldDef> propertyFields, Map<String, FieldDef> syncSnapshotFields, @Nullable FieldDef pythonValue, @Nullable FieldDef pythonValueSyncing) {
+    private record StateFields(Map<String, FieldDef> propertyFields, Map<String, FieldDef> syncSnapshotFields, @Nullable FieldDef pythonValue, @Nullable FieldDef pythonValueSyncing, @Nullable FieldDef javaOwned, @Nullable FieldDef ownedClassReference) {
     }
 
     /**

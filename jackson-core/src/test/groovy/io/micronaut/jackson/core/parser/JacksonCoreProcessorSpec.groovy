@@ -16,6 +16,7 @@
 package io.micronaut.jackson.core.parser
 
 
+import tools.jackson.core.JacksonException
 import tools.jackson.core.json.JsonFactory
 import tools.jackson.core.exc.StreamReadException
 import tools.jackson.core.exc.UnexpectedEndOfInputException
@@ -679,4 +680,51 @@ class JacksonCoreProcessorSpec extends Specification {
         nodes[6].equals(JsonNode.createNumberNode(bigIntegerValue))
     }
 
+    void "test Jackson exception is routed to onError"() {
+        given:
+        JacksonCoreProcessor processor = new JacksonCoreProcessor(false, new JsonFactory(), JsonStreamConfig.DEFAULT)
+
+        when:
+        byte[] bytes = '{"key": }'.bytes
+        boolean complete = false
+        JsonNode node = null
+        Throwable error = null
+
+        processor.subscribe(new Subscriber<JsonNode>() {
+            @Override
+            void onSubscribe(Subscription s) {
+                s.request(Long.MAX_VALUE)
+            }
+
+            @Override
+            void onNext(JsonNode jsonNode) {
+                node = jsonNode
+            }
+
+            @Override
+            void onError(Throwable t) {
+                error = t
+            }
+
+            @Override
+            void onComplete() {
+                complete = true
+            }
+        })
+        processor.onSubscribe(new Subscription() {
+            @Override
+            void request(long n) {}
+
+            @Override
+            void cancel() {}
+        })
+
+        processor.onNext(bytes)
+
+        then:
+        !complete
+        node == null
+        error != null
+        error instanceof JacksonException
+    }
 }

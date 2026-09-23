@@ -137,11 +137,13 @@ final class PropertiesLoggingLevelsConfigurer implements ApplicationEventListene
         if (StringUtils.isEmpty(logLevel)) {
             return LogLevel.NOT_SPECIFIED;
         }
-        try {
-            return Enum.valueOf(LogLevel.class, logLevel.toUpperCase(Locale.ENGLISH));
-        } catch (IllegalArgumentException ex) {
-            return null;
+        String name = logLevel.toUpperCase(Locale.ENGLISH);
+        for (LogLevel level : LogLevel.values()) {
+            if (level.name().equals(name)) {
+                return level;
+            }
         }
+        return null;
     }
 
     /**

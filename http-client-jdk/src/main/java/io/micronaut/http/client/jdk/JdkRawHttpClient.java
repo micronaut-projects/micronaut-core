@@ -55,6 +55,14 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
+    protected <I> Mono<java.net.http.HttpRequest> mapToHttpRequest(HttpRequest<I> request, @Nullable Argument<?> bodyType) {
+        // the request cookies are sent in its Cookie header, and must not reach the cookie store
+        // that is shared with the other clients of the same configuration
+        return resolveRequestUri(request)
+            .map(uri -> HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build());
+    }
+
+    @Override
     protected <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, @Nullable Argument<O> bodyType) {
         return Mono.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
             .map(httpRequest -> {
@@ -67,7 +75,8 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                         headerName -> httpRequest.headers().allValues(headerName));
                 }
                 BodySizeLimits bodySizeLimits = new BodySizeLimits(Long.MAX_VALUE, configuration.getMaxContentLength());
-                return client.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
+                // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
+                return rawClient.get().sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
             })
             .flatMap(Mono::fromCompletionStage)
             .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))

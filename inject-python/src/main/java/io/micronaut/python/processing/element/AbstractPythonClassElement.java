@@ -53,6 +53,7 @@ import io.micronaut.python.processing.model.MemberDef;
 import io.micronaut.python.processing.model.PropertyDef;
 import io.micronaut.python.processing.model.TypeRef;
 import io.micronaut.python.processing.util.PythonDocstrings;
+import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.inject.ast.annotation.ElementAnnotationMetadata;
 import io.micronaut.inject.ast.annotation.MutableAnnotationMetadataDelegate;
 import org.jetbrains.annotations.NotNull;
@@ -214,12 +215,34 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return false;
     }
 
+    /**
+     * Whether the class is abstract: it extends {@code ABC} or {@code Protocol}, declares an abstract
+     * function, or is an introduction type declaring a function with the {@code ...} placeholder body
+     * (see {@link PythonMethodElement#isAbstract()}).
+     *
+     * @return True if the class is abstract
+     */
     @Override
     public boolean isAbstract() {
+        return hasAbstractDeclaration() || (hasPlaceholderBodies() && PythonMethodElement.isIntroductionType(this));
+    }
+
+    /**
+     * Whether the class definition itself is abstract: an {@code ABC} or {@code Protocol} base, or a function
+     * decorated with {@code @abstractmethod}. Unlike {@link #isAbstract()} this resolves no other class, so it
+     * is safe while the class elements are being built.
+     */
+    final boolean hasAbstractDeclaration() {
         ClassDef nativeType = getNativeType();
-        return nativeType
-            .bases().stream().anyMatch(b -> b.name().equals("abc.ABC") || isProtocolType(b.name()))
+        return nativeType.bases().stream().anyMatch(b -> b.name().equals("abc.ABC") || isProtocolType(b.name()))
             || nativeType.functions().stream().anyMatch(FunctionDef::isAbstract);
+    }
+
+    /**
+     * Whether a function of the class has the {@code ...} placeholder body.
+     */
+    final boolean hasPlaceholderBodies() {
+        return getNativeType().functions().stream().anyMatch(FunctionDef::hasPlaceholderBody);
     }
 
     private static boolean isProtocolType(String typeName) {
@@ -326,13 +349,26 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         }
 
         List<T> allElements = new ArrayList<>(elements);
+        boolean includeOverriddenMethods = result.isIncludeOverriddenMethods();
         for (MethodElement inheritedMethod : inheritedMethods) {
             int representedMethodIndex = representedInterfaceMethodIndex(allElements, inheritedMethod);
             if (representedMethodIndex == -1) {
                 allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
+            } else if (includeOverriddenMethods
+                && allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
+                && !(representedMethod instanceof PythonMethodElement)
+                && !sameErasedReturnType(representedMethod, inheritedMethod)) {
+                // A covariant override of an inherited interface method (Mono<Page<E>> findAll(Pageable)
+                // overriding Publisher<Page<E>> findAll(Pageable)): a query asking for overridden methods
+                // needs both, as the proxy generated for an interface has to implement both descriptors.
+                allElements.add((T) decorateInheritedInterfaceMethod(inheritedMethod));
             } else if (allElements.get(representedMethodIndex) instanceof PythonMethodElement representedMethod
-                && inheritedMethod.isAbstract()) {
-                allElements.set(representedMethodIndex, (T) representedMethod.withParameters(inheritedMethod.getParameters()));
+                && !inheritedMethod.isStatic()
+                && !inheritedMethod.isPrivate()) {
+                // A Python override of an interface method, abstract or default, adopts the Java signature the
+                // generated stub implements: the Python hints may be lossy (int for a boxed Integer id, list[T]
+                // for Iterable<T>) and the bean definition dispatches to the stub method.
+                allElements.set(representedMethodIndex, (T) withInheritedSignature(representedMethod, inheritedMethod));
             } else if (allElements.get(representedMethodIndex) instanceof MethodElement representedMethod
                 && !representedMethod.getDeclaringType().equals(this)
                 && representedMethod.isAbstract()) {
@@ -340,6 +376,55 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             }
         }
         return allElements;
+    }
+
+    /**
+     * Applies the signature of the overridden Java method to a Python override. The parameters keep the Python
+     * names and annotations (a {@code @Query} refers to them by name) while taking the resolved Java types. The
+     * return type is adopted when its erasure differs from the Python one, since that is when the stub declares
+     * the Java one ({@code long} for a {@code -> int} hint, {@code Iterable<T>} for {@code list[T]}); an
+     * {@code Object} return is the exception, the stub narrows it to the Python type.
+     */
+    private static MethodElement withInheritedSignature(PythonMethodElement pythonMethod, MethodElement inheritedMethod) {
+        if (inheritedMethod instanceof PythonMethodElement) {
+            // A method inherited from a Python interface already carries the Python names and annotations, and
+            // its parameters keep the erased type next to the resolved one: the proxy generated for an interface
+            // implements the erased descriptor (save(Object) for save(T)) while the argument reports the bound type.
+            return pythonMethod.withParameters(inheritedMethod.getParameters());
+        }
+        ParameterElement[] pythonParameters = pythonMethod.getParameters();
+        ParameterElement[] parameters = inheritedMethod.getParameters().clone();
+        // When the Python hints resolve to the Java method, it is among the overridden methods and the Python
+        // parameters already inherit its annotations (see PythonMethodElement#resolveParameters); inheriting
+        // them again here would only repeat the same metadata in the hierarchy.
+        boolean metadataInherited = pythonMethod.getOverriddenMethods().contains(inheritedMethod);
+        if (pythonParameters.length == parameters.length) {
+            for (int i = 0; i < parameters.length; i++) {
+                ParameterElement pythonParameter = pythonParameters[i];
+                AnnotationMetadata inheritedMetadata = metadataInherited ? AnnotationMetadata.EMPTY_METADATA : parameters[i].getAnnotationMetadata();
+                ClassElement inheritedType = parameters[i].getGenericType();
+                if (pythonParameter instanceof PythonParameterElement pythonParameterElement) {
+                    // The parameter stays a parameter of the Python method (its name, its method element, its
+                    // mutable annotation metadata): a visitor that inherits annotations from the overridden Java
+                    // method, as the validation visitor does with constraints, annotates it, which a reflective
+                    // ParameterElement.of() rejects.
+                    PythonParameterElement parameter = pythonParameterElement.withInheritedType(inheritedType);
+                    parameters[i] = inheritedMetadata.isEmpty() ? parameter : parameter.withInheritedAnnotationMetadata(inheritedMetadata);
+                } else {
+                    AnnotationMetadata annotationMetadata = inheritedMetadata.isEmpty()
+                        ? pythonParameter.getAnnotationMetadata()
+                        : new AnnotationMetadataHierarchy(true, inheritedMetadata, MutableAnnotationMetadata.of(pythonParameter.getAnnotationMetadata()));
+                    parameters[i] = ParameterElement.of(inheritedType, pythonParameter.getName()).withAnnotationMetadata(annotationMetadata);
+                }
+            }
+        }
+        ClassElement inheritedReturnType = inheritedMethod.getGenericReturnType();
+        ClassElement returnType = null;
+        if (!Object.class.getName().equals(inheritedReturnType.getName())
+            && !inheritedReturnType.getName().equals(pythonMethod.getGenericReturnType().getName())) {
+            returnType = inheritedReturnType;
+        }
+        return pythonMethod.withInheritedSignature(parameters, returnType);
     }
 
     private MethodElement resolveInheritedInterfaceMethod(ClassElement anInterface, MethodElement inheritedMethod) {
@@ -547,6 +632,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
         return -1;
     }
 
+    private static boolean sameErasedReturnType(MethodElement methodElement, MethodElement inheritedMethod) {
+        return methodElement.getReturnType().getName().equals(inheritedMethod.getReturnType().getName());
+    }
+
+    /**
+     * Whether the parameter types of a Python method match those of the inherited Java method by erasure. A
+     * Python {@code int} hint is a primitive {@code int} while a Java {@code ID} argument resolves to the boxed
+     * {@code Integer}: Python has no overloading, so the two are the same method.
+     */
     private static boolean hasSameRawParameterTypes(MethodElement methodElement, MethodElement inheritedMethod) {
         ParameterElement[] parameters = methodElement.getParameters();
         ParameterElement[] inheritedParameters = inheritedMethod.getParameters();
@@ -554,7 +648,7 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!parameters[i].getType().getName().equals(inheritedParameters[i].getType().getName())) {
+            if (!PythonJavaTypes.isSameOrBoxedType(parameters[i].getType(), inheritedParameters[i].getType())) {
                 return false;
             }
         }
@@ -620,6 +714,22 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
     private void addAttributeBackedProperties(AbstractPythonClassElement declaringType,
                                               ClassElement owningType,
                                               List<PropertyElement> allProperties) {
+        allProperties.addAll(attributeBackedProperties(declaringType, owningType, allProperties));
+    }
+
+    /**
+     * The properties backed by the attributes of a class and of its Python base classes. Inherited attributes lead,
+     * in the order of the fields of a dataclass and of its generated {@code __init__}; an attribute declared again
+     * keeps that position but is represented by the declaration of the subclass.
+     */
+    private List<PropertyElement> attributeBackedProperties(AbstractPythonClassElement declaringType,
+                                                            ClassElement owningType,
+                                                            List<PropertyElement> allProperties) {
+        List<PropertyElement> inheritedProperties = declaringType.getSuperType()
+            .filter(AbstractPythonClassElement.class::isInstance)
+            .map(superType -> attributeBackedProperties((AbstractPythonClassElement) superType, owningType, allProperties))
+            .orElse(List.of());
+        List<PropertyElement> properties = new ArrayList<>(inheritedProperties);
         List<AttributeDef> fields = declaringType.getNativeType().attributes();
         for (AttributeDef field : fields) {
             // Check if this field is already represented as a property
@@ -638,15 +748,24 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                     owningType,
                     environment.metadataFactory()
                 );
-                allProperties.add(propertyElement);
+                int inheritedIndex = indexOfProperty(inheritedProperties, field.name());
+                if (inheritedIndex >= 0) {
+                    properties.set(inheritedIndex, propertyElement);
+                } else {
+                    properties.add(propertyElement);
+                }
             }
         }
+        return properties;
+    }
 
-        declaringType.getSuperType().ifPresent(superType -> {
-            if (superType instanceof AbstractPythonClassElement pythonSuperType) {
-                addAttributeBackedProperties(pythonSuperType, owningType, allProperties);
+    private static int indexOfProperty(List<PropertyElement> properties, String name) {
+        for (int i = 0; i < properties.size(); i++) {
+            if (properties.get(i).getName().equals(name)) {
+                return i;
             }
-        });
+        }
+        return -1;
     }
 
     static List<PropertyElement> filterProperties(List<PropertyElement> properties, PropertyElementQuery query) {
@@ -837,13 +956,15 @@ public abstract sealed class AbstractPythonClassElement extends AbstractPythonEl
                 }
             }
 
-            // For Python, attributes are not real fields since Python uses dynamic attributes
-            // So we don't return them as FieldElement instances to avoid injection issues
-            // Properties are handled separately via PropertyElement
-            // if (elementType == FieldElement.class ||
-            //     elementType == MemberElement.class) {
-            //     elements.addAll(classNode.attributes());
-            // }
+            // The declared attributes of a class are its fields for a field query (findField, ALL_FIELDS):
+            // visitors that read a class through its fields, such as an entity referenced by a JSON view, a
+            // serialization mixin or a JAXB type with field access, see the same attributes the generated
+            // Java class declares as fields. A member query (ALL_FIELD_AND_METHODS) does not report them:
+            // attributes are injected and introspected as properties, and the bean definition would
+            // otherwise process an injected attribute twice.
+            if (elementType == FieldElement.class) {
+                elements.addAll(classNode.attributes());
+            }
 
             // Add properties if the query is for properties or members
             if (elementType == PropertyElement.class ||

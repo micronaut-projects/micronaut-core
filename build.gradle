@@ -1,4 +1,5 @@
 import io.micronaut.build.docs.PublishGuideTask
+import io.micronaut.build.python.MicronautPythonPlugin
 import org.gradle.api.tasks.PathSensitivity
 
 plugins {
@@ -48,13 +49,19 @@ tasks.named("updateVersionCatalogs") {
     ignoredModules.add("com.github.ben-manes.caffeine:caffeine")
 }
 
-def pythonProjects = [
+// Projects whose tests exercise Python without having Python sources of their own. Projects with
+// Python sources apply the io.micronaut.build.internal.python plugin, which takes care of them itself.
+def pythonTestProjects = [
         ":micronaut-inject-python",
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
-        ":micronaut-context-python-netty",
-        ":test-suite-python"
+        ":micronaut-context-python-netty"
 ]
+// Too few test classes to split across the jobs: the first job runs them all
+def pythonUnshardedProjects = [
+        ":micronaut-context-python-netty"
+]
+def pythonProjects = pythonTestProjects + [":test-suite-python"]
 
 if (System.getenv("SONAR_TOKEN") != null) {
     // deprecated and compile time only classes excluded from analysis
@@ -96,12 +103,30 @@ configurations.javadocAggregatorBase.dependencies.removeIf {
     it instanceof ProjectDependency && it.path.startsWith(":test-")
 }
 
-if (!providers.gradleProperty("python-ci").isPresent()) {
-    subprojects { project ->
-        if (project.path in pythonProjects) {
+// Python tests need a GraalVM runtime and are slow: they only run in the Python CI workflow,
+// which runs `pythonCheck -Ppython-ci`, split across the jobs of a matrix (python-ci-shards in
+// gradle.properties) which each run one shard of the test classes. The
+// `io.micronaut.build.internal.python` plugin applies the same conventions to the projects with
+// Python sources and adds them to `pythonCheck`.
+def pythonCiShard = providers.gradleProperty("python-ci-shard")
+subprojects { project ->
+    if (project.path in pythonTestProjects) {
+        if (!providers.gradleProperty("python-ci").isPresent()) {
             project.tasks.withType(Test).configureEach {
                 enabled = false
             }
         }
+        if (project.path in pythonUnshardedProjects) {
+            project.tasks.withType(Test).configureEach {
+                onlyIf("the tests of ${project.path} run in the first Python CI job") {
+                    pythonCiShard.map { it.startsWith("1/") }.getOrElse(true)
+                }
+            }
+        } else {
+            MicronautPythonPlugin.shardTests(project)
+        }
     }
+}
+tasks.matching { it.name == "pythonCheck" }.configureEach {
+    dependsOn pythonTestProjects.collect { "${it}:check" }
 }

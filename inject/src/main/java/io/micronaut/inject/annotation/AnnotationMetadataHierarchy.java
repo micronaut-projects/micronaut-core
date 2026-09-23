@@ -230,6 +230,15 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return hierarchy[0].synthesize(annotationClass, sourceAnnotation);
     }
 
+    /**
+     * Synthesizes the annotation from the first element of the hierarchy that declares it, without merging the
+     * members of the elements further up. Note that this differs from {@link #findAnnotation(String)}, which
+     * completes the members of the nearest occurrence with the members of the occurrences further up.
+     *
+     * @param annotationClass The annotation class
+     * @param <T> The annotation type
+     * @return The synthesized annotation or {@code null}
+     */
     @Nullable
     @Override
     public <T extends Annotation> T synthesize(Class<T> annotationClass) {
@@ -251,6 +260,16 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
         return hierarchy[0].synthesize(annotationClass);
     }
 
+    /**
+     * Finds the annotation by merging the occurrences found in the hierarchy: the members of the nearest
+     * occurrence win and the members it does not declare are filled in from the occurrences further up. Note
+     * that this differs from {@link #synthesize(Class)} and from the single value reads such as
+     * {@link #stringValue(String, String)}, which answer from one element of the hierarchy at a time.
+     *
+     * @param annotation The annotation name
+     * @param <T> The annotation type
+     * @return The merged annotation value
+     */
     @Override
     public <T extends Annotation> Optional<AnnotationValue<T>> findAnnotation(String annotation) {
         AnnotationValue<T> existing = null;
@@ -1080,6 +1099,26 @@ public final class AnnotationMetadataHierarchy implements AnnotationMetadata, En
             delegateDeclaredToAllElements,
             Arrays.stream(copy).map(AnnotationMetadata::copyAnnotationMetadata).toArray(AnnotationMetadata[]::new)
         );
+    }
+
+    /**
+     * Creates a copy of this hierarchy with every element replaced by the result of the given mapper, which
+     * allows the occurrence semantics of the hierarchy to be preserved by wrappers that need to map the
+     * annotation values of each element.
+     *
+     * @param mapper The mapper applied to each element of the hierarchy
+     * @return A new hierarchy of the mapped elements
+     * @since 5.2.2
+     */
+    @Internal
+    public AnnotationMetadataHierarchy mapLayers(Function<AnnotationMetadata, AnnotationMetadata> mapper) {
+        AnnotationMetadata[] mapped = new AnnotationMetadata[hierarchy.length];
+        for (int i = 0; i < hierarchy.length; i++) {
+            mapped[i] = mapper.apply(hierarchy[i]);
+        }
+        // the constructor reverses the elements it is given
+        ArrayUtils.reverse(mapped);
+        return new AnnotationMetadataHierarchy(delegateDeclaredToAllElements, mapped);
     }
 
     /**

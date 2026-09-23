@@ -2,7 +2,6 @@ package io.micronaut.runtime.executor
 
 import io.micronaut.context.ApplicationContext
 import io.micronaut.inject.qualifiers.Qualifiers
-import io.micronaut.scheduling.LoomSupport
 import io.micronaut.scheduling.TaskExecutors
 import io.micronaut.scheduling.executor.ExecutorConfiguration
 import io.micronaut.scheduling.executor.UserExecutorConfiguration
@@ -19,7 +18,7 @@ import java.util.concurrent.ThreadPoolExecutor
  * @since 1.0
  */
 class ExecutorServiceConfigSpec extends Specification {
-    static final int expectedExecutorCount = LoomSupport.isSupported() ? 6 : 5
+    static final int expectedExecutorCount = 6
 
     void "test configure custom executor with invalidate cache: #invalidateCache"() {
         given:

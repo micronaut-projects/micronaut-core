@@ -74,7 +74,8 @@ public final class TargetTypeMappingGenerator implements TypeElementVisitor<Obje
             return;
         }
         String mappingName = element.getName() + "TargetTypeMapping";
-        ClassTypeDef thisType = ClassTypeDef.of(element.getName());
+        // referenced by its canonical name: a nested Python class is a member type of its enclosing stub
+        ClassTypeDef thisType = ClassTypeDef.of(element.getCanonicalName());
         ClassDef.ClassDefBuilder builder = ClassDef.builder(mappingName)
             .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
             .addAnnotation(ClassTypeDef.of("jakarta.inject.Singleton"))

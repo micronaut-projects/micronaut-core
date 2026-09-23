@@ -38,6 +38,8 @@ import java.util.function.Supplier;
 @Internal
 final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations {
 
+    private static final String NAME = "DefaultCircuitBreakerOperations";
+
     private final DefaultRetryRunner retryRunner;
     private final CircuitBreakerRetry retryState;
     private final RetryEventEmitter retryEventEmitter;
@@ -60,20 +62,20 @@ final class DefaultCircuitBreakerOperations implements CircuitBreakerOperations 
     @Override
     public <T> T execute(Supplier<T> supplier) {
         retryState.open();
-        return retryRunner.executeSync(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeSync(supplier, retryState, NAME, retryEventEmitter);
     }
 
     @Override
     public <T> CompletionStage<T> executeCompletionStage(Supplier<? extends CompletionStage<T>> supplier) {
         retryState.open();
-        return retryRunner.executeCompletionStage(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter);
+        return retryRunner.executeCompletionStage(supplier, retryState, NAME, retryEventEmitter);
     }
 
     @Override
     public <T> Publisher<T> executePublisher(Supplier<? extends Publisher<T>> supplier) {
         return Flux.defer(() -> {
             retryState.open();
-            return Flux.from(retryRunner.executePublisher(supplier, retryState, DefaultCircuitBreakerOperations.class.getSimpleName(), retryEventEmitter));
+            return Flux.from(retryRunner.executePublisher(supplier, retryState, NAME, retryEventEmitter));
         });
     }
 

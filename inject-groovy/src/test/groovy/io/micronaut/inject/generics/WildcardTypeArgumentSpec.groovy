@@ -278,6 +278,43 @@ class FooFactory {
         context.close()
     }
 
+    void "an argument with a nested wildcard has the same type as the argument with the type it is bounded by"() {
+        given:
+        BeanDefinition<?> client = buildBeanDefinition('test.HeadersClient', '''
+package test
+
+import io.micronaut.context.annotation.Executable
+import jakarta.inject.Singleton
+
+@Singleton
+class HeadersClient {
+    @Executable
+    void send(Map<String, ? extends Object> headers, List<Map<String, ? extends Number>> nested, Map<String, Object> plain) {}
+}
+''')
+        Argument<?>[] arguments = client.executableMethods.find { it.methodName == 'send' }.arguments
+        Argument<?> headers = arguments[0]
+        Argument<?> nested = arguments[1]
+        Argument<?> plain = arguments[2]
+
+        expect:
+        headers.typeParameters[1] instanceof WildcardArgument
+        headers.equalsType(Argument.mapOf(String, Object))
+        Argument.mapOf(String, Object).equalsType(headers)
+        headers.typeHashCode() == Argument.mapOf(String, Object).typeHashCode()
+        headers.equalsType(plain) && plain.equalsType(headers)
+        headers.typeHashCode() == plain.typeHashCode()
+        !headers.equalsType(Argument.mapOf(String, String))
+
+        and: 'at any depth, the map named after the type parameter of List it stands for'
+        nested.equalsType(Argument.listOf(Argument.mapOf(String, Number).withName('E')))
+        nested.typeHashCode() == Argument.listOf(Argument.mapOf(String, Number).withName('E')).typeHashCode()
+
+        and: 'equals still tells the wildcard apart'
+        headers.typeParameters[1] != plain.typeParameters[1]
+        plain.typeParameters[1] != headers.typeParameters[1]
+    }
+
     void "a wildcard is recorded for introspected properties"() {
         given:
         BeanIntrospection<?> bean = buildBeanIntrospection('test.Bean', '''

@@ -18,4 +18,9 @@ dependencies {
 
     testImplementation(projects.micronautJacksonDatabind)
     testImplementation(projects.micronautDiscoveryCore)
+    testImplementation(libs.logback.classic)
+}
+
+noReflection {
+    allowIn("io.micronaut.retry.intercept.AnnotationRetryStateBuilder", "REFLECTIVE_ACCESS")
 }

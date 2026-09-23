@@ -238,7 +238,8 @@ class _MicronautAsyncioHandle:
     def __init__(self, callback, args, context=None):
         self._callback = callback
         self._args = args
-        # as asyncio: a callback runs in the context of the code that scheduled it
+        # as asyncio: a callback runs in the context of the code that scheduled it (a task passes its
+        # own context, so the steps of a coroutine share one)
         self._context = contextvars.copy_context() if context is None else context
         self._cancelled = False
 
@@ -251,7 +252,21 @@ class _MicronautAsyncioHandle:
     def _run(self):
         if self._cancelled:
             return
-        self._context.run(self._callback, *self._args)
+        self._context.run(self._run_in_context)
+
+    def _run_in_context(self):
+        # the Java PropagatedContext of the task that owns this callback lives in its contextvars: it
+        # is restored around the callback on the loop thread, so a coroutine step resumed by the
+        # loop sees the context of its own task and not the context of whoever scheduled the step (a
+        # task setting a shared Event, a Java thread completing an awaited stage)
+        reactive_context = _micronaut_reactive_context.get()
+        if reactive_context is None:
+            self._callback(*self._args)
+        else:
+            reactive_context.run(self._invoke)
+
+    def _invoke(self):
+        self._callback(*self._args)
 
 class _MicronautAsyncioTimerHandle(_MicronautAsyncioHandle):
     """Timer variant that can cancel the backing Java scheduled future.
@@ -1038,7 +1053,21 @@ def _new_fallback_loop():
         return _MicronautFallbackLoop()
 
 
-def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None):
+# The reactive context (``PythonReactiveContext``: the Reactor context and propagated context of the
+# subscriber, or the propagated context of the caller of an eager coroutine) a Java bridge hands the
+# coroutine it schedules. asyncio copies the variable into the task, so every ``await`` of the coroutine,
+# and of the tasks it spawns, subscribes within that context, and every callback of the task restores
+# its propagated context (``_MicronautAsyncioHandle._run_in_context``).
+_micronaut_reactive_context = contextvars.ContextVar("micronaut_reactive_context", default=None)
+
+
+def __micronaut_current_reactive_context():
+    """The reactive context of the running coroutine, or ``None`` outside a Java-scheduled coroutine."""
+
+    return _micronaut_reactive_context.get()
+
+
+def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter=None, reactive_context=None):
     """Drive a Python awaitable and complete the Java bridge future.
 
     This is the main Java entry point used by ``PythonAsyncioRuntime``. It
@@ -1052,11 +1081,32 @@ def __micronaut_asyncio_to_completion_stage(awaitable, java_future, exception_co
     Python task cancellation, and Python task cancellation cancels the Java
     future. Exceptions are routed through Java's ``ExceptionCompleter`` so the
     bridge keeps existing exception wrapping semantics.
+
+    ``reactive_context`` is the reactive context of the subscriber (or the
+    propagated context of the caller) that started the coroutine; the task
+    copies it, the awaits of the coroutine subscribe within it and its steps run
+    in its propagated context. Started from within a task, a coroutine without
+    a Reactor context of its own inherits the one of that task (a nested
+    coroutine started eagerly by a Java method awaited in a transaction).
     """
 
     if not inspect.isawaitable(awaitable):
         java_future.complete(awaitable)
         return java_future
+    if reactive_context is None:
+        # the task copies the current context, the enclosing task's if any
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    enclosing = _micronaut_reactive_context.get()
+    if enclosing is not None:
+        reactive_context = reactive_context.inheriting(enclosing)
+    token = _micronaut_reactive_context.set(reactive_context)
+    try:
+        return _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter)
+    finally:
+        _micronaut_reactive_context.reset(token)
+
+
+def _micronaut_schedule_awaitable(awaitable, java_future, exception_completer, java_loop, time_unit, executor_adapter):
     if java_loop is not None:
         loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
         with _CurrentLoopForCall(loop):
@@ -1148,11 +1198,423 @@ def __micronaut_completion_stage_awaitable(java_loop, time_unit, executor_adapte
     return future
 
 def __micronaut_complete_completion_stage_awaitable(future, value, throwable):
-    """Complete a Python future from a Java ``CompletionStage`` callback."""
+    """Complete a Python future from a Java ``CompletionStage`` callback.
 
+    A future belongs to the thread running its loop. A stage completing on another thread while a
+    Python loop drives the awaiting coroutine on the calling thread (a Java caller without a Micronaut
+    event loop) hands the completion to that loop, which wakes it up; completing the future directly
+    would leave the loop waiting.
+    """
+
+    loop = future.get_loop()
+    thread_id = _micronaut_loop_thread_id(loop)
+    if thread_id is not None and thread_id != threading.get_ident() and not loop.is_closed():
+        try:
+            loop.call_soon_threadsafe(_micronaut_complete_future, future, value, throwable)
+            return
+        except RuntimeError:
+            # the loop closed between the check and the hand-off (shutdown): complete the future
+            # directly rather than leave it pending
+            pass
+    _micronaut_complete_future(future, value, throwable)
+
+
+def _micronaut_loop_thread_id(loop):
+    """The id of the thread running a standard asyncio loop, or ``None`` when no hand-off is needed.
+
+    ``BaseEventLoop`` records its thread while ``run_forever`` runs (there is no public accessor);
+    the Micronaut loop has no thread of its own and its ``call_soon`` queues every callback on the
+    Netty event loop already, so a future of it is completed directly.
+    """
+    if isinstance(loop, _MicronautAsyncioEventLoop):
+        return None
+    return getattr(loop, "_thread_id", None)
+
+
+def _micronaut_complete_future(future, value, throwable):
     if future.cancelled():
         return
     if throwable is None:
         future.set_result(value)
     else:
         future.set_exception(_micronaut_java_failure(throwable))
+
+
+# ---------------------------------------------------------------------------
+# Python-native streaming: Java publishers as async iterators and back.
+#
+# The Java half (``PythonAsyncioStreams``) owns the Reactive Streams protocol and marshals every
+# signal onto the loop that owns the stream; the classes below own the Python state: pending
+# ``__anext__`` futures, the one-item buffer, demand, and the generator's lifecycle.
+# ---------------------------------------------------------------------------
+
+_AsyncioStreams = java.type("io.micronaut.context.python.PythonAsyncioStreams")
+_MAX_DEMAND = (1 << 63) - 1
+_COMPLETED = object()
+
+
+def _micronaut_stream_loop():
+    """The loop a stream runs on: the running loop, else the Micronaut loop of the current request.
+
+    Streams need a loop that keeps running after the calling function returns, which the
+    Micronaut-managed loop does; a request without one (asyncio disabled, the Netty module absent,
+    or an event loop beyond ``max-event-loop-contexts``) cannot host a stream and fails here rather
+    than falling back to driving the generator synchronously.
+    """
+    try:
+        return asyncio.get_running_loop()
+    except RuntimeError:
+        pass
+    loop = _AsyncioRuntime.currentAsyncioLoop()
+    if loop is None:
+        raise RuntimeError(
+            "Python-native streaming needs the Micronaut asyncio runtime: call as_async_iterable/as_publisher "
+            "from a coroutine running on it, or from a request handled by a Netty event loop with "
+            "micronaut-context-python-netty on the classpath and micronaut.python.asyncio.enabled=true")
+    return loop
+
+
+def _dispatch_on(loop, micronaut_loop, callback, *args):
+    """Run a Java-originated callback on ``loop``: directly when Java already marshalled it onto the
+    Micronaut loop, otherwise by hopping onto the plain asyncio loop from the signalling thread."""
+    if micronaut_loop is not None:
+        callback(*args)
+    else:
+        loop.call_soon_threadsafe(callback, *args)
+
+
+class MicronautPublisherIterator:
+    """An async iterator (and async context manager) over a Java ``Publisher``.
+
+    One outstanding ``request(1)`` per pending ``__anext__``, nothing buffered, a single lazy
+    subscription started by the first iteration, and one cancellation: leaving the ``async with``
+    block, ``aclose()``, task cancellation during ``__anext__`` and the consumer's own exit all
+    cancel the subscription exactly once. Overlapping ``__anext__`` calls are refused. An item for
+    which no iteration is waiting is a publisher that ignored its demand: it is refused rather than
+    held, so memory cannot grow with what the publisher chooses to emit.
+    """
+
+    def __init__(self, publisher, loop, reactive_context=None):
+        self._loop = loop
+        self._micronaut_loop = getattr(loop, "_java_loop", None)
+        self._java = _AsyncioStreams.iterator(publisher, self._micronaut_loop, self, reactive_context)
+        self._waiter = None
+        self._terminal = None
+        self._closed = False
+
+    def __aiter__(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, tb):
+        await self.aclose()
+        return False
+
+    async def __anext__(self):
+        if self._waiter is not None:
+            raise RuntimeError("as_async_iterable: __anext__ called while a previous __anext__ is still pending")
+        if self._closed:
+            raise StopAsyncIteration
+        if self._terminal is not None:
+            self._raise_terminal()
+        waiter = self._loop.create_future()
+        self._waiter = waiter
+        try:
+            self._java.request()
+        except BaseException:
+            self._waiter = None
+            self._close()
+            raise
+        try:
+            outcome = await waiter
+        except asyncio.CancelledError:
+            # the consumer was cancelled while waiting: the upstream demand is withdrawn with it
+            self._close()
+            raise
+        finally:
+            self._waiter = None
+        if outcome is _COMPLETED:
+            self._raise_terminal()
+        return outcome
+
+    def _raise_terminal(self):
+        terminal = self._terminal
+        self._closed = True
+        if terminal is None or terminal is _COMPLETED:
+            raise StopAsyncIteration
+        self._terminal = _COMPLETED
+        raise terminal
+
+    async def aclose(self):
+        """Cancel the subscription; a pending ``__anext__`` ends with ``StopAsyncIteration``."""
+        self._close()
+
+    def _close(self):
+        if self._closed:
+            return
+        self._closed = True
+        self._java.cancel()
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(_COMPLETED)
+
+    # Java entry points (see PythonAsyncioStreams.PublisherIterator)
+
+    def on_next(self, item):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver, item)
+
+    def on_error(self, throwable):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver_terminal, _micronaut_java_failure(throwable))
+
+    def on_complete(self):
+        _dispatch_on(self._loop, self._micronaut_loop, self._deliver_terminal, _COMPLETED)
+
+    def _deliver(self, item):
+        if self._closed or self._terminal is not None:
+            return
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(item)
+            return
+        # nothing is waiting for this item, so nothing requested it (the Java subscriber refuses an
+        # item beyond its demand before this point); refuse the publisher rather than hold the item
+        self._java.cancel()
+        self._terminal = RuntimeError("as_async_iterable: the publisher emitted an item that no iteration requested")
+
+    def _deliver_terminal(self, terminal):
+        if self._closed or self._terminal is not None:
+            return
+        self._terminal = terminal
+        waiter = self._waiter
+        if waiter is not None and not waiter.done():
+            waiter.set_result(_COMPLETED)
+
+
+class _MicronautGeneratorDriver:
+    """Advances one async iterator for one Java subscription, on the loop, only with demand.
+
+    Demand arithmetic saturates; the iterator is opened on the first positive demand and advanced
+    by at most one ``__anext__`` at a time. Cancellation cancels the running advance and then
+    closes the iterator on the loop; a ``None`` element, an exception and exhaustion each end the
+    stream with exactly one terminal signal, after which the Java side is told the iterator has
+    been released.
+    """
+
+    def __init__(self, loop, source, java_subscription):
+        self._loop = loop
+        self._micronaut_loop = getattr(loop, "_java_loop", None)
+        self._source = source
+        self._java = java_subscription
+        self._iterator = None
+        self._demand = 0
+        self._advancing = None
+        self._done = False
+        self._cancelled = False
+        self._released = False
+
+    # Java entry points (see PythonAsyncioStreams.GeneratorSubscription)
+
+    def request(self, n):
+        _dispatch_on(self._loop, self._micronaut_loop, self._request, int(n))
+
+    def cancel(self):
+        _dispatch_on(self._loop, self._micronaut_loop, self._cancel)
+
+    def _request(self, n):
+        if self._done or self._cancelled:
+            return
+        self._demand = min(self._demand + n, _MAX_DEMAND)
+        self._drain()
+
+    def _drain(self):
+        if self._advancing is not None or self._demand <= 0 or self._done or self._cancelled:
+            return
+        if self._iterator is None:
+            try:
+                with _CurrentLoopForCall(self._loop):
+                    self._iterator = _open_async_iterator(self._source)
+            except BaseException as exc:
+                self._finish()
+                self._java.error(exc)
+                self._release()
+                return
+        with _CurrentLoopForCall(self._loop):
+            self._advancing = self._loop.create_task(self._advance())
+
+    async def _advance(self):
+        try:
+            item = await self._iterator.__anext__()
+        except StopAsyncIteration:
+            self._advancing = None
+            self._finish()
+            self._java.complete()
+            self._release()
+            return
+        except asyncio.CancelledError:
+            self._advancing = None
+            await self._close_iterator()
+            return
+        except BaseException as exc:
+            self._advancing = None
+            self._finish()
+            self._java.error(exc)
+            self._release()
+            return
+        self._advancing = None
+        if self._cancelled or self._done:
+            await self._close_iterator()
+            return
+        if item is None:
+            self._finish()
+            await self._close_iterator(release=False)
+            self._java.error(TypeError(
+                "as_publisher: the async iterator yielded None, which Reactive Streams does not allow; "
+                "yield an explicit envelope object when an empty payload is part of the protocol"))
+            self._release()
+            return
+        self._demand -= 1
+        self._java.next(item)
+        if self._java.isDone():
+            # the subscriber cancelled from onNext, or refused the element
+            self._finish()
+            await self._close_iterator()
+            return
+        self._drain()
+
+    def _cancel(self):
+        if self._done or self._cancelled:
+            return
+        self._cancelled = True
+        self._demand = 0
+        if self._advancing is not None:
+            self._advancing.cancel()
+        elif self._iterator is not None:
+            with _CurrentLoopForCall(self._loop):
+                self._loop.create_task(self._close_iterator())
+        else:
+            self._release()
+
+    def _finish(self):
+        self._done = True
+        self._demand = 0
+
+    async def _close_iterator(self, release=True):
+        iterator = self._iterator
+        self._iterator = None
+        try:
+            aclose = getattr(iterator, "aclose", None) if iterator is not None else None
+            if aclose is not None:
+                await aclose()
+        except BaseException as exc:
+            self._loop.call_exception_handler({
+                "message": "Exception while closing an async iterator exposed as a Publisher",
+                "exception": exc,
+            })
+        finally:
+            if release:
+                self._release()
+
+    def _release(self):
+        if self._released:
+            return
+        self._released = True
+        self._java.released()
+
+
+def _open_async_iterator(source):
+    """The async iterator of a subscription: a factory is called, an async iterable is iterated."""
+    if callable(source) and not hasattr(source, "__aiter__"):
+        source = source()
+    if not hasattr(source, "__aiter__"):
+        raise TypeError(f"as_publisher expects an async generator function or an async iterable, got {type(source).__name__}")
+    return source.__aiter__()
+
+
+class _OneShotAsyncIterable:
+    """An already-created async iterator as a source that can be subscribed to once."""
+
+    def __init__(self, iterator):
+        self._iterator = iterator
+
+    def __call__(self):
+        iterator = self._iterator
+        if iterator is None:
+            raise RuntimeError("as_publisher: an async iterator can be subscribed to once; pass an async generator function for a cold publisher")
+        self._iterator = None
+        return iterator
+
+
+class MicronautPublisherAwaitable:
+    """A Java ``Publisher`` returned by an injected member, before anything subscribed to it.
+
+    ``await`` requests one item, completes with it and cancels the subscription (an empty publisher
+    awaits to ``None``); ``as_async_iterable`` takes the publisher itself and consumes every item.
+    """
+
+    __slots__ = ("publisher", "reactive_context")
+
+    def __init__(self, publisher, reactive_context=None):
+        self.publisher = publisher
+        # the reactive context of the coroutine that called the member: the subscription happens within it
+        self.reactive_context = reactive_context
+
+    def __await__(self):
+        return _AsyncioRuntime.awaitPublisher(self.publisher, self.reactive_context).__await__()
+
+    def __repr__(self):
+        return f"MicronautPublisherAwaitable({self.publisher!r})"
+
+
+def __micronaut_publisher_awaitable(publisher, reactive_context=None):
+    """Java entry point: the awaitable view of a publisher returned by a Java member."""
+    return MicronautPublisherAwaitable(publisher, reactive_context)
+
+
+def as_async_iterable(publisher):
+    """Consume a Java ``Publisher`` with ``async for``, one item per iteration.
+
+    Use it as an async context manager so leaving the loop early cancels the subscription::
+
+        async with as_async_iterable(service.updates()) as updates:
+            async for update in updates:
+                ...
+
+    Iterating to exhaustion closes the subscription as well; ``aclose()`` does so explicitly.
+    """
+    reactive_context = _micronaut_reactive_context.get()
+    if isinstance(publisher, MicronautPublisherAwaitable):
+        if publisher.reactive_context is not None:
+            reactive_context = publisher.reactive_context
+        publisher = publisher.publisher
+    return MicronautPublisherIterator(publisher, _micronaut_stream_loop(), reactive_context)
+
+
+def as_publisher(source):
+    """Expose an async generator function (or another async iterable factory) as a Java ``Publisher``.
+
+    Each subscription calls the factory for an iterator of its own and advances it only as the
+    subscriber requests elements; cancelling the subscription closes the iterator. An async
+    iterator object instead of a factory yields a publisher that can be subscribed to once.
+    Elements must not be ``None``.
+    """
+    loop = _micronaut_stream_loop()
+    if not callable(source) and hasattr(source, "__anext__"):
+        source = _OneShotAsyncIterable(source)
+    elif not callable(source) and not hasattr(source, "__aiter__"):
+        raise TypeError(f"as_publisher expects an async generator function or an async iterable, got {type(source).__name__}")
+
+    def start(java_subscription):
+        return _MicronautGeneratorDriver(loop, source, java_subscription)
+
+    return _AsyncioStreams.publisher(start, getattr(loop, "_java_loop", None))
+
+
+def __micronaut_async_iterator_publisher(iterator, java_loop, time_unit, executor_adapter=None):
+    """Java entry point: the Publisher of an async generator object a bridge method returned."""
+    if java_loop is not None:
+        loop = __micronaut_install_asyncio_event_loop(java_loop, time_unit, executor_adapter)
+        with _CurrentLoopForCall(loop):
+            return as_publisher(iterator)
+    return as_publisher(iterator)

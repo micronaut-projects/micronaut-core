@@ -22,6 +22,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.util.LinkedHashSet;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -156,6 +157,11 @@ final class GraalPyExceptionHandler {
             }
             Constructor<?> constructor = exceptionClass.getConstructor(Value.class);
             return (RuntimeException) constructor.newInstance(guestObject);
+        } catch (InvocationTargetException e) {
+            // the generated constructor failed to call the Java super constructor: a programming
+            // error of the Python class, not a Python exception to report as is
+            throw new IllegalStateException("Cannot create the Java exception [" + className + "] for the Python exception ["
+                + guestObject + "]: " + e.getCause(), e.getCause());
         } catch (ReflectiveOperationException | LinkageError e) {
             return null;
         }

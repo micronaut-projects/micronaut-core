@@ -64,7 +64,6 @@ import io.netty.handler.codec.DecoderException;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
 import io.netty.handler.codec.http.HttpClientCodec;
 import io.netty.handler.codec.http.HttpClientUpgradeHandler;
-import io.netty.handler.codec.http.HttpContentDecompressor;
 import io.netty.handler.codec.http.HttpHeaderNames;
 import io.netty.handler.codec.http.HttpMethod;
 import io.netty.handler.codec.http.HttpObjectAggregator;
@@ -739,15 +738,17 @@ public class ConnectionManager {
     private Http2FrameCodec makeFrameCodec() {
         Http2Settings defaultSettings = Http2Settings.defaultSettings();
 
-        defaultSettings.maxHeaderListSize(Objects.requireNonNull(configuration.getHttp2Configuration()).getMaxHeaderListSize());
+        HttpClientConfiguration.Http2ClientConfiguration http2Configuration = configuration.getHttp2Configuration();
+        defaultSettings.maxHeaderListSize(http2Configuration == null
+            ? HttpClientConfiguration.Http2ClientConfiguration.DEFAULT_MAX_HEADER_LIST_SIZE
+            : http2Configuration.getMaxHeaderListSize());
 
         Http2FrameCodecBuilder builder = Http2FrameCodecBuilder.forClient()
             .initialSettings(defaultSettings);
 
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 builder.frameLogger(new Http2FrameLogger(nettyLevel, NettyHttpClient.class));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
@@ -779,20 +780,35 @@ public class ConnectionManager {
             configuration.getMaxHeaderSize(),
             configuration.getMaxChunkSize()));
         if (configuration.isDecompressionEnabled()) {
-            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new HttpContentDecompressor());
+            pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, new ResponseContentDecompressor());
         }
     }
 
     private void addLogHandler(Channel ch) {
         configuration.getLogLevel().ifPresent(logLevel -> {
             try {
-                final LogLevel nettyLevel =
-                    LogLevel.valueOf(logLevel.name());
+                final LogLevel nettyLevel = toNettyLogLevel(logLevel);
                 ch.pipeline().addLast(new LoggingHandler(NettyHttpClient.class, nettyLevel));
             } catch (IllegalArgumentException e) {
                 throw decorate(new HttpClientException("Unsupported log level: " + logLevel));
             }
         });
+    }
+
+    /**
+     * @param logLevel The Micronaut log level
+     * @return The Netty log level
+     * @throws IllegalArgumentException If Netty has no such level
+     */
+    static LogLevel toNettyLogLevel(io.micronaut.logging.LogLevel logLevel) {
+        return switch (logLevel) {
+            case TRACE -> LogLevel.TRACE;
+            case DEBUG -> LogLevel.DEBUG;
+            case INFO -> LogLevel.INFO;
+            case WARN -> LogLevel.WARN;
+            case ERROR -> LogLevel.ERROR;
+            default -> throw new IllegalArgumentException("Unsupported log level: " + logLevel);
+        };
     }
 
     private void insertPcapLoggingHandlerLazy(Channel ch, String qualifier) {
@@ -1791,7 +1807,7 @@ public class ConnectionManager {
                             })
                             .addLast(createFrameToHttpObjectCodec());
                         if (configuration.isDecompressionEnabled()) {
-                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new HttpContentDecompressor());
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_DECOMPRESSOR, new ResponseContentDecompressor());
                         }
                         NettyClientCustomizer streamCustomizer = connectionCustomizer.specializeForChannel(streamChannel, NettyClientCustomizer.ChannelRole.HTTP2_STREAM);
                         PoolHandle ph = new PoolHandle(true, streamChannel) {

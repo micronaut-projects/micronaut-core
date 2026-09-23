@@ -21,4 +21,4 @@ NOTE: If no `@Inject` or `@Creator` is specified Micronaut will try to locate th
 
 If there are multiple possible candidates for a particular constructor argument a qualifier can be specified (such as `jakarta.inject.Named`) to disambiguate the injection. If it is not possible to disambiguate then the result will be a api:context.exceptions.NonUniqueBeanException[]. See the <<qualifiers, Qualifiers>> section for more information.
 
-WARNING: If you use `@Inject` on a `private` constructor then the type will be instantiated via the Java reflection API which is not recommended.
+WARNING: A `private` constructor can only be invoked via the Java reflection API, which is not recommended. If you use `@Inject` or ann:core.annotation.Creator[] on a `private` constructor you must also annotate it with ann:core.annotation.ReflectiveAccess[] to opt into reflective instantiation, otherwise a compilation error will occur. Note that a type instantiated reflectively cannot have AOP advice applied to it, because the generated proxy has to invoke the constructor directly.

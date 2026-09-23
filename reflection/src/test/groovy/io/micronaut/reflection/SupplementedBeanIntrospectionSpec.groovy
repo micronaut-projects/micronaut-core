@@ -24,6 +24,15 @@ class SupplementedBeanIntrospectionSpec extends Specification {
         introspection.toString().startsWith("SupplementedBeanIntrospection(")
     }
 
+    void "the constructor resolves its target constructor from reflection"() {
+        given:
+        def introspection = supplemented(Catalogue)
+
+        expect:
+        introspection.constructor.targetConstructor == Catalogue.getDeclaredConstructor(String, List)
+        introspection.constructor.instantiate("art", ["a"]).name == "art"
+    }
+
     void "a method the processor generated is served as generated, with the class reflection knows declares it"() {
         given:
         def introspection = supplemented(Catalogue)
