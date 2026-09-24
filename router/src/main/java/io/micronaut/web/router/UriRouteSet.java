@@ -357,7 +357,7 @@ final class UriRouteSet {
             return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
         }
         if (resolve) {
-            uriRoutes = DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
+            uriRoutes = RouteAmbiguity.resolve(request, uriRoutes, hasEngineOrders);
         }
         return closest(path, uriRoutes);
     }
@@ -469,7 +469,7 @@ final class UriRouteSet {
         if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
-        return DefaultRouter.resolveAmbiguity(request, uriRoutes, hasEngineOrders);
+        return RouteAmbiguity.resolve(request, uriRoutes, hasEngineOrders);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
