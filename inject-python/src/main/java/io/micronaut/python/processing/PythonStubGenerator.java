@@ -90,6 +90,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonParameterElement;
 import io.micronaut.python.processing.element.PythonPropertyElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.python.processing.model.ScriptDef;
@@ -4451,6 +4452,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
             ? null
             : resolvedSignatureMethod.getGenericReturnType();
+        ClassElement asyncDeclaredReturnType = declaredReturnType == null ? returnTypeOverride : declaredReturnType;
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
@@ -4573,7 +4575,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
-                            coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
+                            coroutineResult(pythonCoroutine, methodSourceReturnType, asyncDeclaredReturnType).returning()
                         );
                     } else {
                         boolean bridgeSignature = signatureMethod != methodElement
@@ -5277,7 +5279,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])) {
+            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])
+                && !(isAsyncPythonMethod(method)
+                && parameters[i] instanceof PythonParameterElement pythonParameter
+                && pythonParameter.getNativeType().typeAnnotation() == null)) {
                 return false;
             }
         }
