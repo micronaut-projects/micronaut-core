@@ -112,7 +112,9 @@ sealed class DefaultMethodBasedRouteInfo<T, R> extends DefaultRouteInfo<R> imple
             } else if (b.isAsyncOrReactive() || b.isOptional()) {
                 b = b.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
             }
-            return messageBodyHandlerRegistry.findReader(b, consumesMediaTypes);
+            var readerType = (Argument<Object>) b;
+            return messageBodyHandlerRegistry.findReader(readerType, consumesMediaTypes)
+                .map(reader -> reader.createSpecific(readerType));
         }).orElse(null);
         needsBody = optionalBodyArgument.isPresent() || hasArg(arguments, HttpRequest.class);
     }

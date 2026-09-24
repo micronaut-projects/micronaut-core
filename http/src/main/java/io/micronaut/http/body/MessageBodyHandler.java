@@ -15,6 +15,8 @@
  */
 package io.micronaut.http.body;
 
+import io.micronaut.core.type.Argument;
+
 /**
  * A handler combines a reader and a writer.
  *
@@ -24,4 +26,8 @@ package io.micronaut.http.body;
  * @since 4.0.0
  */
 public interface MessageBodyHandler<T> extends MessageBodyReader<T>, MessageBodyWriter<T> {
+    @Override
+    default MessageBodyHandler<T> createSpecific(Argument<T> type) {
+        return this;
+    }
 }
