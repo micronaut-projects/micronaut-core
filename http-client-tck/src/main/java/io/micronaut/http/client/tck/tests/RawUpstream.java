@@ -94,6 +94,13 @@ final class RawUpstream implements AutoCloseable {
             this.socket = socket;
         }
 
+        /**
+         * Close the connection, as a server that goes away does.
+         */
+        void close() throws IOException {
+            socket.close();
+        }
+
         private void start() {
             Thread reader = new Thread(this::read, "raw-upstream-reader");
             reader.setDaemon(true);

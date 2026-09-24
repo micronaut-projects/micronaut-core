@@ -22,6 +22,7 @@ import io.micronaut.core.execution.DelayedExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.exceptions.HttpClientException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.netty.channel.loom.EventLoopVirtualThreadScheduler;
 import io.netty.channel.EventLoop;
 import io.netty.channel.SingleThreadIoEventLoop;
@@ -1049,7 +1050,7 @@ final class Pool49 implements Pool {
         @Override
         public void dispatch() {
             if (globalPending != null && globalPending.sum() >= connectionPoolConfiguration.getMaxPendingAcquires()) {
-                tryCompleteExceptionally(new HttpClientException("Cannot acquire connection, exceeded max pending acquires configuration"));
+                tryCompleteExceptionally(new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE, "Cannot acquire connection, exceeded max pending acquires configuration", null));
                 return;
             }
             if (log.isTraceEnabled()) {

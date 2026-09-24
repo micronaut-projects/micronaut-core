@@ -101,6 +101,14 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         state.exceptionCaught(ctx, cause);
     }
 
+    /**
+     * @return The failure of a response whose headers were received, but whose body was cut off
+     * by the connection closing
+     */
+    private static ResponseClosedException closedDuringBody() {
+        return new ResponseClosedException("Connection closed before the response body was received completely", true);
+    }
+
     private void transitionToState(ChannelHandlerContext ctx, ReaderState<?> fromState, ReaderState<?> nextState) {
         if (!ctx.executor().inEventLoop()) {
             throw new IllegalStateException("Not on event loop");
@@ -220,6 +228,11 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             state.exceptionCaught(ctx, cause);
         }
 
+        @Override
+        void channelInactive(ChannelHandlerContext ctx) {
+            exceptionCaught(ctx, closedDuringBody());
+        }
+
         private void devolveToStreaming(ChannelHandlerContext ctx) {
             assert ctx.executor().inEventLoop();
 
@@ -299,6 +312,11 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
             transitionToState(ctx, this, AfterContent.INSTANCE);
             streaming.error(cause);
             listener.finish(ctx);
+        }
+
+        @Override
+        void channelInactive(ChannelHandlerContext ctx) {
+            exceptionCaught(ctx, closedDuringBody());
         }
 
         @Override

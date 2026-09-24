@@ -31,6 +31,7 @@ import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.ClientAttributes;
 import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
@@ -39,6 +40,8 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.jdk.cookie.CookieDecoder;
 import io.micronaut.http.codec.MediaTypeCodecRegistry;
@@ -62,6 +65,7 @@ import reactor.core.publisher.Mono;
 import javax.net.ssl.SSLParameters;
 import java.io.IOException;
 import java.net.Authenticator;
+import java.net.ConnectException;
 import java.net.CookieManager;
 import java.net.HttpCookie;
 import java.net.InetSocketAddress;
@@ -71,6 +75,7 @@ import java.net.SocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.http.HttpClient;
+import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
 import java.util.Arrays;
 import java.util.Collections;
@@ -383,9 +388,20 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
+        return resolveTarget(request).map(ResolvedTarget::uri);
+    }
+
+    /**
+     * Resolve the absolute URI of a request, and the service instance the load balancer selected
+     * for it if the request was load balanced.
+     *
+     * @param request The request
+     * @return The resolved target
+     */
+    Mono<ResolvedTarget> resolveTarget(io.micronaut.http.HttpRequest<?> request) {
         if (request.getUri().getScheme() != null) {
             // Full request URI, so use that
-            return Mono.just(request.getUri());
+            return Mono.just(new ResolvedTarget(request.getUri(), null));
         }
 
         // Otherwise, go and look it up via the LoadBalancer
@@ -400,7 +416,7 @@ abstract class AbstractJdkHttpClient {
         return request;
     }
 
-    private <I> Mono<URI> resolveURI(io.micronaut.http.HttpRequest<I> request) {
+    private <I> Mono<ResolvedTarget> resolveURI(io.micronaut.http.HttpRequest<I> request) {
         URI requestURI = request.getUri();
         if (loadBalancer == null) {
             return Mono.error(populateServiceId(new NoHostException("Request URI specifies no host to connect to"), clientId, configuration));
@@ -413,12 +429,41 @@ abstract class AbstractJdkHttpClient {
                 }
 
                 try {
-                    return server.resolve(ContextPathUtils.prepend(requestURI, contextPath));
+                    return new ResolvedTarget(server.resolve(ContextPathUtils.prepend(requestURI, contextPath)), server);
                 } catch (URISyntaxException e) {
                     throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
                 }
             }
         );
+    }
+
+    /**
+     * Map an I/O failure of {@link HttpClient#sendAsync}: a request that was not sent, because the
+     * connection could not be opened, is an {@link UnprocessedRequestException}, so that the caller
+     * can send it again; a connection closed before the response arrived is a
+     * {@link ResponseClosedException}.
+     *
+     * @param instance The service instance the load balancer selected, or {@code null}
+     * @param uri      The URI the request was sent to
+     * @param e        The failure
+     * @return The client exception
+     */
+    static HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e) {
+        HttpClientException result;
+        if (e instanceof HttpConnectTimeoutException) {
+            result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
+        } else if (e instanceof ConnectException) {
+            result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + e.getMessage(), e);
+        } else if (e.getMessage() != null && e.getMessage().contains("header parser received no bytes")) {
+            // the JDK client reports a connection closed before the response headers with this message
+            result = new ResponseClosedException("Connection closed before response was received", false);
+        } else {
+            result = new HttpClientException("Error sending request: " + e.getMessage(), e);
+        }
+        if (result instanceof UnprocessedRequestException unprocessed) {
+            unprocessed.setTarget(uri, instance);
+        }
+        return result;
     }
 
     /**
@@ -434,9 +479,8 @@ abstract class AbstractJdkHttpClient {
     }
 
     protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
-        var defaultPublisher = responsePublisher(request, bodyType);
-        return resolveRequestUri(request)
-            .flatMapMany(uri -> applyFilterToResponsePublisher(request, uri, defaultPublisher));
+        return resolveTarget(request)
+            .flatMapMany(target -> applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target.instance(), bodyType)));
     }
 
     protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
@@ -471,6 +515,25 @@ abstract class AbstractJdkHttpClient {
         io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
+        return responsePublisher(request, null, bodyType);
+    }
+
+    /**
+     * Send the request and publish the response.
+     *
+     * @param request  The request, with its absolute URI
+     * @param instance The service instance the load balancer selected, or {@code null} if the
+     *                 request was not load balanced
+     * @param bodyType The body type
+     * @param <O>      The body type
+     * @return The response publisher
+     * @since 5.3.0
+     */
+    protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
+        io.micronaut.http.HttpRequest<?> request,
+        @Nullable ServiceInstance instance,
+        @Nullable Argument<O> bodyType
+    ) {
         if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
             ClientAttributes.setServiceId(request, clientId);
         }
@@ -486,7 +549,7 @@ abstract class AbstractJdkHttpClient {
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
+            .onErrorMap(IOException.class, e -> sendError(instance, request.getUri(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {
@@ -503,5 +566,15 @@ abstract class AbstractJdkHttpClient {
                     sink.next(response(netResponse, bodyType));
                 }
             });
+    }
+
+    /**
+     * The absolute URI a request is sent to, and the service instance the load balancer selected
+     * for it, if the request was load balanced.
+     *
+     * @param uri      The absolute request URI
+     * @param instance The selected instance, or {@code null} if the request URI was absolute
+     */
+    record ResolvedTarget(URI uri, @Nullable ServiceInstance instance) {
     }
 }

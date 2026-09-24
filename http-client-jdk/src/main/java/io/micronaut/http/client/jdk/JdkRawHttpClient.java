@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.discovery.ServiceInstance;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.ProxyRequestOptions;
 import io.micronaut.http.client.RawHttpClientSupport;
@@ -35,6 +36,7 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -213,9 +215,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     @Override
-    protected <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, @Nullable Argument<O> bodyType) {
+    protected <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, @Nullable ServiceInstance instance, @Nullable Argument<O> bodyType) {
         return Mono.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
-            .map(httpRequest -> {
+            .flatMap(httpRequest -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
@@ -228,27 +230,27 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 RawRequestOptions options = request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class).orElse(null);
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
-                return httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits));
+                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits)))
+                    .onErrorMap(
+                        e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
+                        e -> ReadTimeoutException.TIMEOUT_EXCEPTION
+                    )
+                    .onErrorMap(IOException.class, e -> sendError(instance, httpRequest.uri(), e));
             })
-            .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(
-                e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
-                e -> ReadTimeoutException.TIMEOUT_EXCEPTION
-            )
-            .onErrorMap(IOException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .map(netResponse -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
 
-                //noinspection unchecked
-                return (HttpResponse<O>) ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
+                ByteBodyHttpResponse<?> response = ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
                     @Override
                     public Optional<O> getBody() {
                         return Optional.empty();
                     }
                 }, netResponse.body());
+                //noinspection unchecked
+                return (HttpResponse<O>) response;
             });
     }
 }

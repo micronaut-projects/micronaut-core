@@ -29,6 +29,7 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
@@ -54,6 +55,7 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
+import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
@@ -1366,12 +1368,15 @@ public class ConnectionManager {
 
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
-            HttpClientException wrapped;
+            // the request was never sent: the caller may retry it on another connection
+            UnprocessedRequestException wrapped;
             if (error == null) {
                 // no failure observed, but channel closed
-                wrapped = new HttpClientException("Unknown connect error");
+                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Unknown connect error", null);
+            } else if (error instanceof ConnectTimeoutException) {
+                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + error.getMessage(), error);
             } else {
-                wrapped = new HttpClientException("Connect Error: " + error.getMessage(), error);
+                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + error.getMessage(), error);
             }
             return wrapped;
         }
@@ -1778,6 +1783,7 @@ public class ConnectionManager {
                         configuration.getReadTimeout().ifPresent(timeout ->
                             streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new StreamReadTimeoutHandler(timeout, this)));
                         streamPipeline
+                            .addLast(new StreamResetHandler())
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override
                                 public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
