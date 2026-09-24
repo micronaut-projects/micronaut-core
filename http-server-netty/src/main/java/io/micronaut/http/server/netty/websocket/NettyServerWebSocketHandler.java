@@ -53,6 +53,7 @@ import io.micronaut.websocket.context.WebSocketBean;
 import io.micronaut.websocket.event.WebSocketMessageProcessedEvent;
 import io.micronaut.websocket.event.WebSocketSessionClosedEvent;
 import io.micronaut.websocket.event.WebSocketSessionOpenEvent;
+import io.micronaut.websocket.route.WebSocketRouteEndpoint;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.http.HttpHeaderNames;
@@ -104,6 +105,12 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     private final Argument<?> pongArgument;
     private final ThreadSelectionConfiguration threadSelection;
     private final ExecutorSelector executorSelector;
+    /**
+     * The executor of a WebSocket route of handler functions, or {@code null} for a
+     * {@code @ServerWebSocket} bean, whose methods select their executor.
+     */
+    @Nullable
+    private final Executor routeExecutor;
 
     /**
      * Default constructor.
@@ -117,6 +124,8 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
      * @param ctx                        The channel handler context
      * @param executorSelector           The executor selector
      * @param coroutineHelper            Helper for kotlin coroutines
+     * @param routeEndpoint              The endpoint of a WebSocket route of handler functions, or {@code null} for a bean
+     * @param routeExecutor              The executor of the WebSocket route of handler functions, or {@code null} for a bean
      */
     NettyServerWebSocketHandler(
         NettyEmbeddedServices nettyEmbeddedServices,
@@ -128,7 +137,9 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
         ChannelHandlerContext ctx,
         ThreadSelectionConfiguration threadSelection,
         ExecutorSelector executorSelector,
-        @Nullable CoroutineHelper coroutineHelper) {
+        @Nullable CoroutineHelper coroutineHelper,
+        @Nullable WebSocketRouteEndpoint routeEndpoint,
+        @Nullable Executor routeExecutor) {
         super(
                 nettyEmbeddedServices.getRequestArgumentSatisfier().getBinderRegistry(),
                 nettyEmbeddedServices.getMediaTypeCodecRegistry(),
@@ -143,48 +154,19 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
 
         this.threadSelection = threadSelection;
         this.executorSelector = executorSelector;
+        this.routeExecutor = routeExecutor;
 
         this.serverSession = createWebSocketSession(ctx);
 
-        ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
-
-        if (messageHandler != null) {
-            BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
-            List<Argument<?>> unboundArguments = bound.getUnboundArguments();
-
-            if (unboundArguments.size() == 1) {
-                this.bodyArgument = unboundArguments.getFirst();
-            } else {
-                this.bodyArgument = null;
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket @OnMessage method {}.{} should define exactly 1 message parameter, but found 2 possible candidates: {}", webSocketBean.getTarget(), messageHandler.getExecutableMethod(), unboundArguments);
-                }
-
-                if (serverSession.isOpen()) {
-                    serverSession.close(CloseReason.INTERNAL_ERROR);
-                }
-            }
+        if (routeEndpoint != null) {
+            // the handler functions declare the type of their message: it is never bound from the
+            // upgrade request, e.g. from a query parameter of the same name
+            this.bodyArgument = routeEndpoint.messageArgument();
+            this.pongArgument = routeEndpoint.pongArgument();
         } else {
-            this.bodyArgument = null;
-        }
-
-        if (pongHandler != null) {
-            BoundExecutable<?, ?> bound = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
-            List<Argument<?>> unboundArguments = bound.getUnboundArguments();
-            if (unboundArguments.size() == 1 && unboundArguments.getFirst().isAssignableFrom(WebSocketPongMessage.class)) {
-                this.pongArgument = unboundArguments.getFirst();
-            } else {
-                this.pongArgument = null;
-                if (LOG.isErrorEnabled()) {
-                    LOG.error("WebSocket @OnMessage pong handler method {}.{} should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: {}", webSocketBean.getTarget(), pongHandler.getExecutableMethod(), unboundArguments);
-                }
-
-                if (serverSession.isOpen()) {
-                    serverSession.close(CloseReason.INTERNAL_ERROR);
-                }
-            }
-        } else {
-            this.pongArgument = null;
+            ExecutableBinder<WebSocketState> binder = new DefaultExecutableBinder<>();
+            this.bodyArgument = messageHandler == null ? null : bodyArgument(binder, webSocketBean, messageHandler);
+            this.pongArgument = pongHandler == null ? null : pongArgument(binder, webSocketBean, pongHandler);
         }
 
         this.nettyEmbeddedServices = nettyEmbeddedServices;
@@ -211,6 +193,39 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
                 LOG.error("Error publishing WebSocket opened event: " + e.getMessage(), e);
             }
         }
+    }
+
+    private @Nullable Argument<?> bodyArgument(ExecutableBinder<WebSocketState> binder, WebSocketBean<?> webSocketBean, MethodExecutionHandle<?, ?> messageHandler) {
+        BoundExecutable<?, ?> bound = binder.tryBind(messageHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
+        List<Argument<?>> unboundArguments = bound.getUnboundArguments();
+
+        if (unboundArguments.size() == 1) {
+            return unboundArguments.getFirst();
+        }
+        if (LOG.isErrorEnabled()) {
+            LOG.error("WebSocket @OnMessage method {}.{} should define exactly 1 message parameter, but found 2 possible candidates: {}", webSocketBean.getTarget(), messageHandler.getExecutableMethod(), unboundArguments);
+        }
+
+        if (serverSession.isOpen()) {
+            serverSession.close(CloseReason.INTERNAL_ERROR);
+        }
+        return null;
+    }
+
+    private @Nullable Argument<?> pongArgument(ExecutableBinder<WebSocketState> binder, WebSocketBean<?> webSocketBean, MethodExecutionHandle<?, ?> pongHandler) {
+        BoundExecutable<?, ?> bound = binder.tryBind(pongHandler.getExecutableMethod(), webSocketBinder, new WebSocketState(serverSession, originatingRequest));
+        List<Argument<?>> unboundArguments = bound.getUnboundArguments();
+        if (unboundArguments.size() == 1 && unboundArguments.getFirst().isAssignableFrom(WebSocketPongMessage.class)) {
+            return unboundArguments.getFirst();
+        }
+        if (LOG.isErrorEnabled()) {
+            LOG.error("WebSocket @OnMessage pong handler method {}.{} should define exactly 1 message parameter assignable from a WebSocketPongMessage, but found: {}", webSocketBean.getTarget(), pongHandler.getExecutableMethod(), unboundArguments);
+        }
+
+        if (serverSession.isOpen()) {
+            serverSession.close(CloseReason.INTERNAL_ERROR);
+        }
+        return null;
     }
 
     @Override
@@ -372,7 +387,7 @@ public class NettyServerWebSocketHandler extends AbstractNettyWebSocketHandler {
     }
 
     private ExecutionFlow<?> invokeExecutable0(BoundExecutable boundExecutable, MethodExecutionHandle<?, ?> messageHandler) {
-        Executor executor = executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
+        Executor executor = routeExecutor != null ? routeExecutor : executorSelector.selectExecutor(messageHandler.getExecutableMethod(), threadSelection);
         ReturnType<?> returnType = messageHandler.getExecutableMethod().getReturnType();
         return ExecutionFlow.async(executor, () -> {
             Object result = invokeWithContext(boundExecutable, messageHandler).get();

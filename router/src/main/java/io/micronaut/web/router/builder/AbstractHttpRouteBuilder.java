@@ -26,6 +26,8 @@ import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteTable;
+import io.micronaut.websocket.route.WebSocketRouteEndpoint;
+import io.micronaut.websocket.route.WebSocketRouteSpec;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -240,6 +242,20 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         RouteSettings route = route(httpMethodName, uri, HandlerMethod.of(handler));
         route.consumes(FORM_MEDIA_TYPES);
         return spec(RouteGroupDefaults.CONSUMES, route);
+    }
+
+    @Override
+    public final HttpRouteSpec webSocket(String uri, Consumer<WebSocketRouteSpec> endpoint) {
+        Objects.requireNonNull(endpoint, "endpoint");
+        String template = uri(uri);
+        WebSocketRouteEndpoint webSocket = WebSocketRouteEndpoint.of(template, endpoint);
+        // the route of the upgrade request: the server finds the endpoint in its attribute
+        RouteSettings route = grouped(assembly.addRoute(HttpMethod.GET.name(), HttpMethod.GET, template, DEFAULT_CONSUMES,
+            handle(HandlerMethod.webSocket(webSocket, WebSocketRouteEndpoint.ROUTE_METADATA))).settings());
+        route.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
+        // the upgrade request has no body and the connection no response body: the media types
+        // of a group do not apply, its executor runs the handlers of the connections
+        return spec(RouteGroupDefaults.CONSUMES | RouteGroupDefaults.PRODUCES, route);
     }
 
     @Override
