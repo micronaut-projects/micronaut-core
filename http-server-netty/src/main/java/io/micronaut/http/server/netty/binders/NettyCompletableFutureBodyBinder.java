@@ -19,10 +19,10 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 
 import java.util.Arrays;
 import java.util.List;
@@ -64,10 +64,9 @@ final class NettyCompletableFutureBodyBinder
 
     @Override
     public BindingResult<CompletableFuture<?>> bind(ArgumentConversionContext<CompletableFuture<?>> context, HttpRequest<?> source) {
-        // the request itself, or e.g. the mutable view of the request that a filter continued with
-        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
-        if (nhr != null) {
-            ByteBody rootBody = nhr.byteBody();
+        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            ByteBody rootBody = server.byteBody();
             if (rootBody.expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
@@ -79,7 +78,7 @@ final class NettyCompletableFutureBodyBinder
                     Optional<Object> value;
                     try {
                         //noinspection unchecked
-                        value = nettyBodyAnnotationBinder.transform(nhr, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
+                        value = nettyBodyAnnotationBinder.transform(source, server, (ArgumentConversionContext<Object>) context.with(targetType), bytes);
                     } catch (RuntimeException e) {
                         throw e;
                     } catch (Throwable e) {

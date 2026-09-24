@@ -179,6 +179,9 @@ final class RouteSourceRouter implements Router {
             matches = ImplicitHeadRoutes.preferExplicit(matches);
         }
         if (matches.size() > 1) {
+            matches = RouteOrders.preferLowest(matches);
+        }
+        if (matches.size() > 1) {
             throw new DuplicateRouteException(request.getPath(), (List) matches);
         }
         return matches.isEmpty() ? null : matches.get(0);

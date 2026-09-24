@@ -16,6 +16,10 @@
 package io.micronaut.http.filter;
 
 import io.micronaut.core.annotation.Internal;
+import org.jspecify.annotations.Nullable;
+
+import java.util.concurrent.Executor;
+import java.util.function.Supplier;
 
 /**
  * Base interface for different filter types. Note that while the base interface is exposed, so you
@@ -55,6 +59,75 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     @Internal
     static GenericHttpFilter createLegacyFilter(HttpFilter bean, FilterOrder order) {
         return new AroundLegacyFilter(bean, order);
+    }
+
+    /**
+     * Create a filter of one route's requests.
+     *
+     * @param filter   Returns a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
+     * @param executor The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createRouteRequestFilter(RouteFilterFunctions.Request filter,
+                                                      @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.request(filter, executor);
+    }
+
+    /**
+     * Create an asynchronous filter of one route's requests.
+     *
+     * @param filter Completes with a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createAsyncRouteRequestFilter(RouteFilterFunctions.AsyncRequest filter) {
+        return RouteFunctionFilter.requestAsync(filter);
+    }
+
+    /**
+     * Create a filter of one route's responses.
+     *
+     * @param filter   Returns a response to continue with instead of the route's response, or {@code null} to continue with it
+     * @param executor The executor to run the filter on, or {@code null} to run it on the thread of the filter chain
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createRouteResponseFilter(RouteFilterFunctions.Response filter,
+                                                       @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.response(filter, executor);
+    }
+
+    /**
+     * Create an asynchronous filter of one route's responses.
+     *
+     * @param filter Completes with a response to continue with instead of the route's response, or {@code null} to continue with it
+     * @return The filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter createAsyncRouteResponseFilter(RouteFilterFunctions.AsyncResponse filter) {
+        return RouteFunctionFilter.responseAsync(filter);
+    }
+
+    /**
+     * A filter of one route, created with the methods above, as a server filter: sorted with the
+     * server filters by the given order, like a filter method of a {@code @ServerFilter} bean.
+     *
+     * @param routeFilter The filter of a route
+     * @param order       The order
+     * @return The server filter
+     * @since 5.3.0
+     */
+    @Internal
+    static GenericHttpFilter withOrder(GenericHttpFilter routeFilter, int order) {
+        if (!(routeFilter instanceof RouteFunctionFilter filter)) {
+            throw new IllegalArgumentException("Not a filter of a route: " + routeFilter);
+        }
+        return filter.withOrder(order);
     }
 
     /**

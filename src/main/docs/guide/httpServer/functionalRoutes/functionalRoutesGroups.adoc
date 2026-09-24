@@ -1,0 +1,33 @@
+`routes.path(prefix, group -> ...)` declares a group of routes under a path prefix, and `routes.group(group -> ...)` a group without one. An api:web.router.builder.HttpRouteGroup[] is a builder itself, so groups nest, and it declares filters, error routes, media types, an executor, annotations, conditions, a port, an order and attributes for all of its routes.
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groups", indent=0, title="A group with a prefix and filters"]
+
+<1> Every route declared in the group is under `/api`: `GET /api/orders`. The prefix and the URI of a route are joined like the URI of a controller and the URI of its methods; a prefix may have path variables (`/tenants/{tenant}`), but no query or fragment.
+<2> A request filter of the group runs for every route of the group, including the routes of nested groups. Here it answers `400` when a header is missing, and otherwise adds an element to the propagated context, which the handler reads. See <<functionalRoutesFilters, Filters>>.
+<3> A response filter of the group, which also filters the answers of the request filters.
+<4> A nested group adds its prefix and its filters.
+<5> Filters of a single route, see the next section.
+<6> A response filter that replaces the response.
+<7> A route without a path is at the prefix of the group, `GET /api`, like a controller method mapped without a URI, e.g. `@Get`, is at the URI of its controller.
+
+Every shortcut has a form without a path: `GET(handler)`, `POST(Item.class, handler)`, `asyncGET(handler)`, `handle(HttpMethod.OPTIONS, handler)` and so on. The route is at the prefix of its group, at `/` outside of a group, under the context path, and at the prefix of the locator in the route table of a <<functionalRoutesLocators, located target>>.
+
+A group declares what its routes consume and produce, and the executor they run on, like `@Consumes`, `@Produces` and `@ExecuteOn` on a controller apply to its methods:
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="groupSettings", indent=0, title="The media types and the executor of a group"]
+
+<1> The routes of the group consume and produce `text/plain` instead of `application/json`: a request with another content type is answered with `415`, and one that accepts another media type only with `406`. `consumesAll()` accepts any content type.
+<2> The routes of the group run on the blocking executor, like `@ExecuteOn(TaskExecutors.BLOCKING)` on a controller. `nonBlocking()` runs them on the event loop instead, when the server selects threads automatically; the last of the two declared on the group wins.
+<3> A route that declares what it consumes, or produces, replaces the media types of its group, like `@Consumes` on a controller method replaces the one of its class.
+<4> A route that chooses its thread, with `executeOn(...)` or `nonBlocking()`, overrides the executor of its group.
+<5> A nested group overrides the settings of the groups around it that it sets, here what its routes produce: they still consume `text/plain` and run on the blocking executor. Like the other settings of a group, it applies to every route of the lambda, wherever it is declared in it.
+
+`annotate(...)` on a group annotates its routes, see <<functionalRoutesAnnotations, Annotations on Handler Routes>>, and `where(...)`, `order(...)`, `attribute(...)` and `port(...)` give them conditions, an order, attributes and a port, see <<functionalRoutesConditions, Conditions, Order, Ports and Attributes>>.
+
+The rules of a group:
+
+* A filter of a group applies to every route declared in the lambda of the group, wherever it is declared in the lambda: before the routes, after them or in between. This includes the implicit `HEAD` routes, the routes declared for several methods and the routes located by a <<functionalRoutesLocators, locator route>> of the group.
+* The filters of a group run only when a route of the group matched the request. A request under the prefix of the group that no route answers (`404`), or that a route would answer with another method or media type (`405`, `415`, `406`), does not run them. Use a <<functionalRoutesFilters, server filter>> to filter every request under a path.
+* The media types and the executor of a group apply to every route to a handler declared in the lambda of the group and of its nested groups, wherever they are declared in the lambda, like its filters: the implicit `HEAD` routes, the routes declared for several methods, the routes without a path and the declared routes. A route, or a nested group, with its own value replaces the value of the group. A form route (`handleForm(...)`, `POST(FormRequestHandler)`, ...) consumes the form media types whatever the group consumes, since its handler reads a form, but produces what the group produces. The media types and the executor of a group do not apply to its error and status routes, nor to its locator routes: the routes of a located table have their own, declared in the table, e.g. on a group of the table.
+* The group is closed when its lambda returns: declaring a route, a filter or a setting on it afterwards throws an `IllegalStateException`.
+* The builder of an `HttpRoutes` bean has no filter methods of its own. It is shared by the `HttpRoutes` beans of the application, so wrap the routes of a bean in `routes.group(all -> ...)` to filter all of them.

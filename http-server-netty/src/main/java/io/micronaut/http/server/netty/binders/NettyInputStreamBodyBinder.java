@@ -19,9 +19,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.NonBlockingBodyArgumentBinder;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
-import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.NettyHttpServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -51,14 +51,13 @@ final class NettyInputStreamBodyBinder implements NonBlockingBodyArgumentBinder<
 
     @Override
     public BindingResult<InputStream> bind(ArgumentConversionContext<InputStream> context, HttpRequest<?> source) {
-        // the request itself, or e.g. the mutable view of the request that a filter continued with
-        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
-        if (nhr != null) {
-            if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
+        ServerHttpRequest<?> server = NettyBodyAnnotationBinder.bodyOf(source);
+        if (server != null) {
+            if (server.byteBody().expectedLength().orElse(-1) == 0) {
                 return BindingResult.empty();
             }
             try {
-                InputStream s = nhr.byteBody().toInputStream();
+                InputStream s = server.byteBody().toInputStream();
                 return () -> Optional.of(s);
             } catch (ContentLengthExceededException t) {
                 if (LOG.isTraceEnabled()) {

@@ -84,6 +84,14 @@ public final class FormFactory {
     }
 
     /**
+     * @return The server configuration, for the limits of form content
+     * @since 5.3.0
+     */
+    public HttpServerConfiguration getConfiguration() {
+        return configuration;
+    }
+
+    /**
      * Get the completer for the given request, if it has been created by
      * {@link #getOrCreateCompleter(HttpRequest)}.
      *

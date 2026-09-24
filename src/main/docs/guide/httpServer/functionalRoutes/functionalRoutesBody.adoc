@@ -1,0 +1,24 @@
+A synchronous handler with a body (api:web.router.builder.BodyRequestHandler[]) or a form (api:web.router.builder.FormRequestHandler[]) is called once the whole body has arrived and has been decoded, like a controller method with a `@Body` argument.
+
+An asynchronous handler never receives a decoded body. An api:web.router.builder.AsyncRequestHandler[], `(request, pathVariables) -> ...`, does not read the body, like a api:web.router.builder.RequestHandler[]. An api:web.router.builder.AsyncBodyRequestHandler[], `(request, pathVariables, body) -> ...`, receives the body as an api:http.body.AsyncRequestBody[] parameter, like a api:web.router.builder.BodyRequestHandler[] receives the decoded body, and reads it when and how it needs to, without a `Publisher`. The builder methods, such as `asyncPOST` and `handleAsync`, take either: the number of parameters of the lambda or of the referenced method selects the handler.
+
+snippet::io.micronaut.docs.server.functional.BodyRoutes[tags="imports,clazz", indent=0, title="Reading the body in asynchronous handlers"]
+
+<1> `body(Class)` or `body(Argument)` decodes the whole body like a `@Body` argument of a controller: the same readers, content negotiation, errors and limits. Reactive and asynchronous types and `InputStream` are rejected, use `elements` or `takeBody()` instead.
+<2> `elements(Class)` reads a JSON array, or a stream of JSON documents, one element at a time: `forEach` calls the consumer for each element and waits for the stage it returns before reading the next one. `BodyElements.next()` is the pull alternative.
+<3> `text()` and `bytes(int)` read the whole body into memory. `text()` is bounded by `micronaut.server.max-request-buffer-size`, and `text(int)` and `bytes(int)` by the given number of bytes: a larger body is answered with `413`.
+<4> `transferTo(Path)` streams the body into a new file, without holding it in memory. An existing file is never replaced.
+<5> A handler that answers without reading the body never receives it: when the client asked for `Expect: 100-continue`, the `100 Continue` answer is only sent on the first read.
+
+The rules of an `AsyncRequestBody`:
+
+* *One read.* The first of `body`, `text`, `bytes`, `elements`, `transferTo`, `form`, `parts`, `takeBody` and `discardBody` owns the body. A second one fails with an `IllegalStateException` that names the first.
+* *Limits apply to what is held in memory.* `body` and `text()` have `micronaut.server.max-request-buffer-size`; `text(int)` and `bytes(int)` the given limit. `transferTo`, `elements`, `parts` and `takeBody` stream the body: only what is decoded in memory at once, one element or one text field, is limited.
+* *The unread body is discarded* when the request ends. What a read leaves open, such as form parts, body elements or a running transfer, is released when the stage returned by the handler completes.
+* `takeBody()` moves the body, unread and undecoded, to the caller, e.g. to forward it to another server with the raw HTTP client. The caller must close it. `discardBody()` drops it.
+* It reads the body of the request as the filters left it. Reading it decodes no body for the request: `getBody()` of the request does not change, and `byteBody()` keeps its `ServerHttpRequest` contract, see <<byteBody, Advanced body access>>.
+* A read that completes when the rest of the body arrives completes on the event loop thread that delivers it. As for a controller argument of type `CompletableFuture`, the propagated context of the request is not in scope in its continuation: continue on an executor that propagates the context, or use a synchronous body or form handler, which is called once the body has arrived.
+
+An error route receives the request without its `AsyncRequestBody`: the error can happen after the body was read, or while it was read.
+
+In the route table of a <<functionalRoutesLocators, located target>> of a type, the asynchronous handler that receives the target, a api:web.router.builder.LocatedAsyncBodyRequestHandler[], receives the body too: `(request, pathVariables, target, body) -> ...`. A lambda `(request, pathVariables, target) -> ...` would be ambiguous with an `AsyncBodyRequestHandler`. A handler that does not read the body leaves it unread, like an `AsyncRequestHandler`.
