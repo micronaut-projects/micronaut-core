@@ -34,12 +34,15 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
+import io.netty.handler.codec.http.DefaultHttpHeaders;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
 import io.netty.handler.codec.http.HttpHeaders;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
 
 import java.util.OptionalLong;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * {@link ByteBodyFactory} implementation with netty-optimized bodies.
@@ -124,7 +127,67 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         NettyBodyAdapter adapter = new NettyBodyAdapter(loop, body.toReadBufferPublisher(), null);
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(BodySizeLimits.UNLIMITED, adapter);
         adapter.setSharedBuffer(sb);
+        adapter.setTrailers(body.trailers());
         expectedLength.ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
+    }
+
+    /**
+     * Attach the trailing headers of a {@link io.netty.handler.codec.http.LastHttpContent} to a
+     * body, see {@link ByteBody#trailers()}.
+     *
+     * @param body            The body
+     * @param trailingHeaders The trailing headers
+     * @return The given body if the trailing headers are empty, else a body with the trailers
+     * @since 5.3.0
+     */
+    public CloseableByteBody withTrailers(CloseableByteBody body, HttpHeaders trailingHeaders) {
+        if (trailingHeaders.isEmpty()) {
+            return body;
+        }
+        return withTrailers(body, CompletableFuture.completedFuture(new NettyHttpHeaders(trailingHeaders, ConversionService.SHARED)));
+    }
+
+    /**
+     * Get the trailers of a body that has ended, as netty headers, to send them after its last
+     * bytes. A body completes its trailers before it completes its consumers, so they are known
+     * when the consumer is completed.
+     *
+     * @param body The body
+     * @return The trailers, or {@code null} if the body carries none, or if they are not known
+     * @since 5.3.0
+     */
+    @Nullable
+    public static HttpHeaders trailersToSend(ByteBody body) {
+        CompletableFuture<io.micronaut.http.HttpHeaders> trailers = body.trailers().toCompletableFuture();
+        if (!trailers.isDone() || trailers.isCompletedExceptionally()) {
+            return null;
+        }
+        io.micronaut.http.HttpHeaders headers = trailers.join();
+        if (headers == null || headers.isEmpty()) {
+            return null;
+        }
+        return toNettyHeaders(headers);
+    }
+
+    /**
+     * Convert headers to netty headers, e.g. the trailers of a body.
+     *
+     * @param headers The headers
+     * @return The netty headers, {@link EmptyHttpHeaders#INSTANCE} if the headers are empty
+     * @since 5.3.0
+     */
+    public static HttpHeaders toNettyHeaders(io.micronaut.http.HttpHeaders headers) {
+        if (headers instanceof NettyHttpHeaders nettyHttpHeaders) {
+            return nettyHttpHeaders.getNettyHeaders();
+        }
+        if (headers.isEmpty()) {
+            return EmptyHttpHeaders.INSTANCE;
+        }
+        HttpHeaders nettyHeaders = new DefaultHttpHeaders(false);
+        for (String name : headers.names()) {
+            nettyHeaders.add(name, headers.getAll(name));
+        }
+        return nettyHeaders;
     }
 }

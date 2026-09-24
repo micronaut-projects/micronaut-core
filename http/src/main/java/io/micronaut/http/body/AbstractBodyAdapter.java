@@ -17,6 +17,7 @@ package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.body.stream.BufferConsumer;
 import org.jspecify.annotations.Nullable;
@@ -24,6 +25,7 @@ import org.reactivestreams.Publisher;
 import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.LongUnaryOperator;
 
@@ -46,6 +48,8 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
     private final Runnable onDiscard;
     private boolean started;
     private volatile boolean cancelled;
+    @Nullable
+    private CompletionStage<? extends HttpHeaders> trailers;
 
     public AbstractBodyAdapter(Publisher<ReadBuffer> source, @Nullable Runnable onDiscard) {
         this.source = source;
@@ -54,6 +58,16 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     public final void setSharedBuffer(BaseSharedBuffer sharedBuffer) {
         this.sharedBuffer = sharedBuffer;
+    }
+
+    /**
+     * Set the trailers to complete the shared buffer with, see {@link ByteBody#trailers()}.
+     *
+     * @param trailers The trailers of the adapted body
+     * @since 5.3.0
+     */
+    public final void setTrailers(@Nullable CompletionStage<? extends HttpHeaders> trailers) {
+        this.trailers = trailers;
     }
 
     @Override
@@ -129,6 +143,11 @@ public class AbstractBodyAdapter implements BufferConsumer.Upstream, Subscriber<
 
     @Override
     public void onComplete() {
-        java.util.Objects.requireNonNull(sharedBuffer).complete();
+        BaseSharedBuffer sharedBuffer = java.util.Objects.requireNonNull(this.sharedBuffer);
+        if (trailers == null) {
+            sharedBuffer.complete();
+        } else {
+            sharedBuffer.complete(trailers);
+        }
     }
 }

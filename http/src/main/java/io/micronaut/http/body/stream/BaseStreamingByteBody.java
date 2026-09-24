@@ -18,12 +18,14 @@ package io.micronaut.http.body.stream;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.io.buffer.ReadBuffer;
+import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import org.reactivestreams.Publisher;
 
 import java.io.InputStream;
 import java.util.OptionalLong;
+import java.util.concurrent.CompletionStage;
 
 /**
  * Implementation of streaming {@link io.micronaut.http.body.ByteBody}s based on a
@@ -46,6 +48,11 @@ public abstract class BaseStreamingByteBody<SB extends BaseSharedBuffer> extends
     @Override
     public final OptionalLong expectedLength() {
         return sharedBuffer.getExpectedLength();
+    }
+
+    @Override
+    public final CompletionStage<HttpHeaders> trailers() {
+        return sharedBuffer.getTrailers();
     }
 
     /**

@@ -1,0 +1,29 @@
+The trailers of an HTTP message are header fields that follow the last bytes of the body: the trailer section of a
+chunked HTTP/1.1 message, or the headers frame that ends an HTTP/2 stream. gRPC for example reports the status of a
+call in the `grpc-status` response trailer.
+
+The trailers travel with the body. api:io.micronaut.http.body.ByteBody[]`.trailers()` returns a `CompletionStage` that
+completes once the body has ended, with empty headers if the message carried no trailers. It is not a primary
+operation, so it can be called before the body is claimed, and the bodies returned by `split()` and `move()` share it.
+Buffering the body with `buffer()` does not keep the trailers, so read `trailers()` first when they are needed:
+
+[source,java]
+----
+CompletionStage<HttpHeaders> trailers = request.byteBody().trailers();
+return Mono.fromFuture(request.byteBody().buffer())
+    .flatMap(body -> Mono.fromFuture(trailers.toCompletableFuture())
+        .map(t -> body.toString(StandardCharsets.UTF_8) + " " + t.get("x-checksum")));
+----
+
+To send trailers, create the body with api:io.micronaut.http.body.ByteBodyFactory[]`.withTrailers(body, trailers)`.
+The trailers are sent when the given stage completes, so they can be computed while the bytes are being sent, for
+example a checksum. A message with such a body always uses the chunked transfer coding on HTTP/1.1, because trailers
+cannot follow a body with a `Content-Length`. A route sends trailers by returning a
+api:io.micronaut.http.ByteBodyHttpResponse[] with such a body, and the raw HTTP client sends the trailers of the
+request body it is given.
+
+The Netty server, the Netty client and the raw client relay support trailers on HTTP/1.1, HTTP/2 and HTTP/3. A relay
+that strips the hop-by-hop headers with `HttpHeadersUtil.stripHopByHopHeaders` keeps `TE: trailers`, so that the next
+hop knows the trailers reach the client. The
+JDK-based HTTP client neither sends nor receives trailers: it completes the trailers of a response empty, and it sends
+a request body without its trailers.
