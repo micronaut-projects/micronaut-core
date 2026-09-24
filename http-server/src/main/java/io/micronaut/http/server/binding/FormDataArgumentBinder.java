@@ -29,6 +29,7 @@ import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.body.CloseableAvailableByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
 import io.micronaut.http.form.FileUpload;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.form.FormData;
@@ -83,6 +84,10 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
         if (!(source instanceof FormCapableHttpRequest<?> request) || !request.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
+        if (BodyChangeAwareRequest.isBodySet(source)) {
+            // a filter replaced the bytes of the request with the body it set
+            return replacedBody(source);
+        }
         CompletableFuture<FormData> future = collect(formFactory.get(), conversionService, request);
 
         BasicHttpAttributes.addRouteWaitsFor(source, CompletableFutureExecutionFlow.just(future));
@@ -99,6 +104,23 @@ final class FormDataArgumentBinder implements TypedRequestArgumentBinder<FormDat
                 return Optional.ofNullable(future.getNow(null));
             }
         };
+    }
+
+    /**
+     * The form of a request whose body a filter set: a body set to {@code null} is a form without
+     * fields, like no body, and a body set to an object is that form, not the bytes of the request.
+     *
+     * @param source The request
+     * @return The form, or unsatisfied if the body that was set is not one
+     */
+    private BindingResult<FormData> replacedBody(HttpRequest<?> source) {
+        Object body = source.getBody().orElse(null);
+        if (body == null) {
+            FormData empty = new DefaultFormData(Map.of(), Map.of(), conversionService);
+            return () -> Optional.of(empty);
+        }
+        Optional<FormData> form = body instanceof FormData data ? Optional.of(data) : conversionService.convert(body, FormData.class);
+        return form.isPresent() ? () -> form : BindingResult.unsatisfied();
     }
 
     /**
