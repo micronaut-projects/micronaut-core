@@ -3,6 +3,11 @@ package io.micronaut.core.optim
 import io.micronaut.core.io.service.ServiceIndex
 import spock.lang.Specification
 
+import java.util.concurrent.Callable
+import java.util.concurrent.CyclicBarrier
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+
 class StaticOptimizationsTest extends Specification {
     def setup() {
         StaticOptimizations.reset()
@@ -90,6 +95,41 @@ class StaticOptimizationsTest extends Specification {
         ex.message == "A ServiceIndex was already set: at most one service index can be registered"
         registered != null
         StaticOptimizations.get(ServiceIndex).get().is(registered)
+    }
+
+    def "of service indexes set concurrently exactly one is set"() {
+        given:
+        int threads = 4
+        def classLoader = new URLClassLoader(new URL[0], getClass().classLoader)
+        def pool = Executors.newFixedThreadPool(threads)
+
+        when: "in each round, several indexes are set at the same time while no index is set"
+        def rounds = (1..1000).collect {
+            StaticOptimizations.@OPTIMIZATIONS.remove(ServiceIndex)
+            def indexes = (1..threads).collect { new ServiceIndex(classLoader, [:], [:]) }
+            def barrier = new CyclicBarrier(threads)
+            def winners = indexes.collect { index ->
+                pool.submit({
+                    barrier.await(30, TimeUnit.SECONDS)
+                    try {
+                        StaticOptimizations.set(index)
+                        return index
+                    } catch (IllegalStateException ignored) {
+                        return null
+                    }
+                } as Callable<ServiceIndex>)
+            }*.get(60, TimeUnit.SECONDS).findAll()
+            [winners: winners, registered: StaticOptimizations.@OPTIMIZATIONS.get(ServiceIndex)]
+        }
+
+        then: "one set succeeds and the others fail, every time"
+        rounds.collect { it.winners.size() } == [1] * rounds.size()
+        rounds.every { it.registered.is(it.winners[0]) }
+
+        cleanup:
+        pool.shutdownNow()
+        classLoader.close()
+        StaticOptimizations.reset()
     }
 
     static class TestOptimizations {

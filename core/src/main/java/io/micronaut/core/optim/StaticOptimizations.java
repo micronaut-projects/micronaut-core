@@ -98,9 +98,9 @@ public abstract class StaticOptimizations {
      */
     public static <T> void set(T value) {
         Class<?> optimizationClass = value.getClass();
-        if (value instanceof ServiceIndex && OPTIMIZATIONS.containsKey(optimizationClass)) {
-            // two indexes would each describe the whole class path, so one of them would be wrong
-            throw new IllegalStateException("A ServiceIndex was already set: at most one service index can be registered");
+        boolean serviceIndex = value instanceof ServiceIndex;
+        if (serviceIndex && OPTIMIZATIONS.containsKey(optimizationClass)) {
+            throw serviceIndexAlreadySet();
         }
         if (CHECKED.containsKey(optimizationClass)) {
             if (!CAPTURE_STACKTRACE_ON_READ) {
@@ -113,7 +113,17 @@ public abstract class StaticOptimizations {
             }
             throw new IllegalStateException(sb.toString());
         }
-        OPTIMIZATIONS.put(optimizationClass, value);
+        if (!serviceIndex) {
+            OPTIMIZATIONS.put(optimizationClass, value);
+        } else if (OPTIMIZATIONS.putIfAbsent(optimizationClass, value) != null) {
+            // a concurrent call set an index after the check above, so exactly one of the calls succeeds
+            throw serviceIndexAlreadySet();
+        }
+    }
+
+    private static IllegalStateException serviceIndexAlreadySet() {
+        // two indexes would each describe the whole class path, so one of them would be wrong
+        return new IllegalStateException("A ServiceIndex was already set: at most one service index can be registered");
     }
 
     /**

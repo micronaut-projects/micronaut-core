@@ -223,8 +223,8 @@ public class ServiceIndexTest {
         for (String entry : List.of("m.M", "z.Z", "a.A")) {
             Files.createFile(services.resolve(entry));
         }
-        // a hidden entry is left out, as the scan does
-        boolean hidden = Files.isHidden(Files.createFile(services.resolve(".hidden")));
+        // an entry named with a leading dot is left out, as the scan does, whether or not the file system marks it hidden
+        Files.createFile(services.resolve(".hidden"));
         Files.createDirectories(root.resolve("META-INF/micronaut/" + OTHER_SERVICE + "/b.B"));
         Files.createDirectories(root.resolve("META-INF/micronaut/" + BEANS));
         Files.writeString(Files.createDirectories(root.resolve("META-INF/services")).resolve(SERVICE), "s.S\n");
@@ -234,7 +234,7 @@ public class ServiceIndexTest {
 
             assertSame(classLoader, index.classLoader());
             assertEquals(List.of(BEANS, OTHER_SERVICE, SERVICE), List.copyOf(index.micronautServices().keySet()));
-            assertEquals(hidden ? List.of("a.A", "m.M", "z.Z") : List.of(".hidden", "a.A", "m.M", "z.Z"), List.copyOf(index.micronautServices().get(SERVICE)));
+            assertEquals(List.of("a.A", "m.M", "z.Z"), List.copyOf(index.micronautServices().get(SERVICE)));
             assertEquals(List.of("b.B"), List.copyOf(index.micronautServices().get(OTHER_SERVICE)));
             assertEquals(List.of(), List.copyOf(index.micronautServices().get(BEANS)));
             assertEquals(Map.of(SERVICE, List.of("s.S")), index.standardServices());

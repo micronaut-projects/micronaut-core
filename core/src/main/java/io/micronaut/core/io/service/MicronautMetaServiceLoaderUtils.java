@@ -169,7 +169,7 @@ public final class MicronautMetaServiceLoaderUtils {
                     return FileVisitResult.CONTINUE;
                 }
                 Path fileName = currentPath.getFileName();
-                if (fileName.startsWith(".")) {
+                if (isDotEntry(fileName)) {
                     return FileVisitResult.CONTINUE;
                 }
                 if (definitions != null) {
@@ -222,8 +222,8 @@ public final class MicronautMetaServiceLoaderUtils {
 
     /**
      * Collects the services of a {@code META-INF/micronaut/} directory in the order of their names. As walking two levels
-     * of the directory does, every directory below it is a service, and every entry of a service that is not hidden is
-     * one of its entries.
+     * of the directory does, every directory below it is a service, and every entry of a service that is neither hidden
+     * nor named with a leading dot is one of its entries.
      *
      * @param root     The {@code META-INF/micronaut/} directory
      * @param services The services to add to
@@ -234,12 +234,23 @@ public final class MicronautMetaServiceLoaderUtils {
             if (Files.isDirectory(serviceDir)) {
                 Set<String> definitions = services.computeIfAbsent(serviceDir.getFileName().toString(), name -> new LinkedHashSet<>());
                 for (Path entry : sortedChildren(serviceDir)) {
-                    if (!Files.isHidden(entry)) {
+                    if (!Files.isHidden(entry) && !isDotEntry(entry.getFileName())) {
                         definitions.add(entry.getFileName().toString());
                     }
                 }
             }
         }
+    }
+
+    /**
+     * Whether the name of an entry starts with a dot. Not every file system marks such an entry as hidden, and
+     * {@link Path#startsWith(String)} compares whole names, so the name is compared as a string.
+     *
+     * @param fileName The name of the entry
+     * @return True if the name starts with a dot
+     */
+    private static boolean isDotEntry(Path fileName) {
+        return fileName.toString().startsWith(".");
     }
 
     private static List<Path> sortedChildren(Path dir) throws IOException {
