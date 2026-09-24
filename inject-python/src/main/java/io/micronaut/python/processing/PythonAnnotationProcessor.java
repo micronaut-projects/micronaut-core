@@ -827,6 +827,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         StaticCompilationConfiguration configuration = staticCompilationConfiguration();
         StaticCompilationPlan plan = parser.staticPlan(processingEnvironment.visitorContext()).withTrace(configuration.trace());
         processingEnvironment.staticCompilationPlan().set(plan);
+        // a module without a generated class gets one for the functions it compiles into static methods
+        parser.staticScripts().forEach(processingEnvironment::addScript);
         boolean planned = configuration.mode() != StaticCompilationMode.OFF || !plan.decisions().isEmpty();
         if (!planned && plan.diagnostics().isEmpty()) {
             return;

@@ -12,6 +12,8 @@ promote), ``float`` values ``double``, ``str`` values ``String``, ``None`` is ``
 """
 import ast
 
+import os
+
 import java
 
 from micronaut_typecheck import BUILTIN, CALLABLE, JAVA, JAVA_REF, MODULE, PY, PY_REF, STANDARD_TYPES, UNKNOWN, Typed
@@ -240,10 +242,27 @@ def _reads(name, statements):
             if any(isinstance(target, ast.Name) and target.id == name for target in targets):
                 return False
             continue
-        for node in ast.walk(statement):
-            if isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load):
-                return True
+        if any(isinstance(node, ast.Name) and node.id == name and isinstance(node.ctx, ast.Load) for node in _outer_nodes(statement, name)):
+            return True
     return False
+
+
+def _outer_nodes(node, name):
+    """The nodes of a statement outside the comprehensions and lambdas binding the name themselves, whose reads are of their own variable."""
+    stack = [node]
+    while stack:
+        current = stack.pop()
+        if isinstance(current, (ast.ListComp, ast.SetComp, ast.DictComp, ast.GeneratorExp)) and any(name in _bound(generator.target) for generator in current.generators):
+            continue
+        if isinstance(current, ast.Lambda) and name in {argument.arg for argument in ast.walk(current.args) if isinstance(argument, ast.arg)}:
+            continue
+        yield current
+        stack.extend(ast.iter_child_nodes(current))
+
+
+def _bound(target):
+    """The names a loop or comprehension target binds."""
+    return {child.id for child in ast.walk(target) if isinstance(child, ast.Name)}
 
 
 def _pure_operand(node):
@@ -283,11 +302,25 @@ class Refused(Exception):
     """A construct without a lowering; the reason is recorded before it is raised."""
 
 
+class _ComprehensionBody(ast.stmt):
+    """The statement at the heart of the loop a comprehension lowers to: the element appended to the result."""
+    _fields = ()
+
+    def __init__(self, node, kind, result):
+        super().__init__()
+        self.node = node
+        self.kind = kind
+        self.result = result
+        self.container_type = None
+
+
 class Lowering:
     """Lowers one function body; see the module documentation."""
 
-    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None):
+    def __init__(self, checker, module, class_def, function_def, node, rules, class_model=None, advised=None, advised_method=False, java_layout=None, planner=None, static=False):
         self.checker = checker
+        self.planner = planner    # the planner, asked for the decisions of the module-level functions the body calls
+        self.static = static      # whether the body compiles into a static Java method: a plain module-level function or a static method
         self.java_layout = java_layout  # (parameter types, return type) of the Java method this one implements, which fix the stub's signature
         self.advised = advised or (lambda function_def: False)  # whether a method of the class is advised
         self.advised_method = advised_method  # whether this method is advised: its Java method runs the interceptor chain first
@@ -316,6 +349,10 @@ class Lowering:
         self.bridge_calls = 0
         self.helper_calls = 0
         self.checked = False      # a call declares a checked exception
+        self.prelude = []         # per statement being lowered, the statements a comprehension hoists before it
+        self.hoist_barrier = 0    # inside an operand evaluated lazily or repeatedly: nothing is hoisted there
+        self.statement_calls = 0  # the calls the statement being lowered has completed: a comprehension after one is not hoisted
+        self.impure = False       # whether the call being lowered runs code of the program (not a builtin or a helper)
 
     # ---------------------------------------------------------------- entry
 
@@ -334,9 +371,15 @@ class Lowering:
         if self.reasons:
             return None
         stats = Stats(len(self.node.body), self.java_calls, self.bridge_calls, self.helper_calls)
-        owner = self.class_def.qualifiedName() if self.class_def is not None else self.module.script.qualifiedName()
+        if self.class_def is not None:
+            owner = self.class_def.qualifiedName()
+        elif self.planner is not None:
+            owner = self.planner.script_class_name(self.module)
+        else:
+            owner = self.module.script.qualifiedName()
         return CompiledBody(owner, self.function_def.name(), parameter_names, parameter_types,
-                            return_type, body, self.function_def.span(), stats, self.checked, self.advised_method)
+                            return_type, body, self.function_def.span(), stats, self.checked, self.advised_method,
+                            self.static, self.class_def is None)
 
     def _shadow_reassigned_parameters(self):
         """
@@ -596,6 +639,19 @@ class Lowering:
         return after
 
     def _statement(self, node):
+        """A statement, preceded by the statements the comprehensions it holds hoist before it."""
+        self.prelude.append([])
+        saved_calls, self.statement_calls = self.statement_calls, 0
+        try:
+            lowered = self._statement_kind(node)
+        finally:
+            prelude = self.prelude.pop()
+            self.statement_calls = saved_calls
+        return prelude + lowered
+
+    def _statement_kind(self, node):
+        if isinstance(node, _ComprehensionBody):
+            return self._comprehension_body(node)
         if isinstance(node, ast.Pass):
             return []
         if isinstance(node, ast.Assert):
@@ -628,7 +684,7 @@ class Lowering:
             self.branches.pop()
             return [If(test, then, or_else)]
         if isinstance(node, ast.While):
-            return self._loop(node, lambda loop: While(loop, self._truthy(node.test), Body(self._block(node.body)), *self._exits(loop)))
+            return self._loop(node, lambda loop: While(loop, self._unhoisted(lambda: self._truthy(node.test)), Body(self._block(node.body)), *self._exits(loop)))
         if isinstance(node, ast.For):
             return [self._for(node)]
         if isinstance(node, ast.Break):
@@ -1006,7 +1062,82 @@ class Lowering:
             return self._dict(node)
         if isinstance(node, ast.Subscript):
             return self._subscript(node)
+        if isinstance(node, (ast.ListComp, ast.SetComp, ast.DictComp)):
+            return self._comprehension(node, "list" if isinstance(node, ast.ListComp) else "set" if isinstance(node, ast.SetComp) else "dict")
         self._refuse("unsupported-expression", f"a {type(node).__name__} expression has no static lowering", node)
+
+    # ---------------------------------------------------------------- comprehensions
+
+    def _comprehension(self, node, kind):
+        """
+        A list, set or dict comprehension, or the generator of any() or all(): a loop over the
+        iterable filling a fresh local declared before the statement, which the expression then
+        reads. The loop reuses the lowering of a for statement, its body being the marker statement
+        that appends the element; a nested comprehension hoists its own loop into that body.
+        """
+        if self.hoist_barrier:
+            self._refuse("unsupported-expression", "a comprehension inside an operand evaluated lazily or repeatedly has no static lowering", node)
+        if self.statement_calls:
+            self._refuse("unsupported-expression", "a comprehension after a call of the same statement has no static lowering: Java would evaluate it before the call", node)
+        if len(node.generators) != 1 or node.generators[0].is_async:
+            self._refuse("unsupported-expression", "a comprehension with more than one for clause has no static lowering", node)
+        if any(isinstance(child, ast.NamedExpr) for child in ast.walk(node)):
+            self._refuse("unsupported-expression", "an assignment expression in a comprehension has no static lowering", node)
+        generator = node.generators[0]
+        result = self._fresh("__mn_" + ("flag" if kind in ("any", "all") else kind))
+        marker = _ComprehensionBody(node, kind, result)
+        ast.copy_location(marker, node)
+        body = [marker]
+        for test in reversed(generator.ifs):
+            body = [ast.copy_location(ast.If(test=test, body=body, orelse=[]), test)]
+        loop = ast.copy_location(ast.For(target=generator.target, iter=generator.iter, body=body, orelse=[], type_comment=None), node)
+        ast.fix_missing_locations(loop)
+        if kind in ("any", "all"):
+            declared = Local(result, BOOLEAN, Const(kind == "all", BOOLEAN))
+        else:
+            declared = None
+        lowered = self._for(loop)
+        if declared is None:
+            container_type = marker.container_type
+            declared = Local(result, container_type, Helper("map" if kind == "dict" else kind, [], container_type))
+            self.helper_calls += 1
+        self.prelude[-1].extend([declared, lowered])
+        return LocalRef(result, declared.type())
+
+    def _comprehension_body(self, marker):
+        """The statement at the heart of a comprehension's loop: the element appended, or the flag of any()/all() set and the loop left."""
+        node, kind, result = marker.node, marker.kind, marker.result
+        if kind in ("any", "all"):
+            test = self._truthy(node.elt)
+            if kind == "all":
+                test = Unary("not", test, BOOLEAN)
+            exit_loop = self._exit(node, Break, "break")
+            return [If(test, Body([Assign(result, Const(kind == "any", BOOLEAN)), exit_loop]), None)]
+        self.helper_calls += 1
+        if kind == "dict":
+            key, value = self._expression(node.key), self._expression(node.value)
+            key_type, value_type = self._element_type(key.type()), self._element_type(value.type())
+            marker.container_type = f"{MAP}<{key_type},{value_type}>"
+            return [Eval(Helper("setItem", [LocalRef(result, marker.container_type), self._boxed(key, node), self._boxed(value, node)], VOID))]
+        element = self._expression(node.elt)
+        element_type = self._element_type(element.type())
+        marker.container_type = f"{SET if kind == 'set' else LIST}<{element_type}>"
+        return [Eval(Helper("add" if kind == "set" else "append", [LocalRef(result, marker.container_type), self._boxed(element, node)], NONE))]
+
+    @staticmethod
+    def _element_type(type_name):
+        """The type argument a collection built by a comprehension carries for its elements, as a literal carries it; Object for None."""
+        return OBJECT if type_name == NONE else type_name
+
+    def _fresh(self, stem):
+        """A local name the body does not use."""
+        name = stem
+        suffix = 0
+        while name in self.identifiers or name in self.locals:
+            suffix += 1
+            name = f"{stem}_{suffix}"
+        self.identifiers.add(name)
+        return name
 
     # ---------------------------------------------------------------- collections
 
@@ -1268,6 +1399,9 @@ class Lowering:
             # an injected bean of the module: a static field of the module's generated class
             if not any(decorator.annotationName().rsplit(".", 1)[-1] == "Inject" for decorator in attribute.decorators()):
                 self._refuse("unknown-type", f"the module attribute [{name}] is not an injected bean; only the injected beans of a module have a static lowering", node)
+            if self.static and not self.module.decorators:
+                # a pooled module holds its injected beans in the instance Micronaut creates: a static method has none
+                self._refuse("pooled-module", f"the module is served by a context pool, whose instance holds the injected [{name}]; a plain function of the module is a static method without one", node)
             hint = attribute.typeName()
             stub_type = self._stub_type(self.bindings.of_hint(hint) if hint is not None else None, hint, node)
             read = ModuleAttribute(self.module.script.qualifiedName(), name, stub_type)
@@ -1322,6 +1456,13 @@ class Lowering:
         typed = self._typed(node)
         if typed is not None and typed.kind in (JAVA_REF, PY_REF, MODULE):
             self._refuse("unknown-type", "a class is not a value here", node)
+        classes = getattr(self.checker, "python_classes", None)
+        if classes is not None and target is None and not isinstance(node.value, ast.Name):
+            # owners[0].id: the receiver the checker did not type is an object of the compilation by the lowering's type
+            value = self._expression(node.value)
+            model = classes.by_qualified.get(_erased(value.type()))
+            if model is not None:
+                return self._python_attribute(model, value, node)
         self._refuse("dynamic-call", f"the attribute [{node.attr}] resolves to no Java field or property of self", node)
 
     def _is_accessor(self, name):
@@ -1356,9 +1497,24 @@ class Lowering:
         return self._stub_type(typed, None, node)
 
     def _call(self, node):
+        outer = self.impure
+        self.impure = False
+        try:
+            lowered = self._call_target(node)
+            if self.impure:
+                # a call of the program's own code completed: a comprehension hoisted after it would run first
+                self.statement_calls += 1
+        finally:
+            self.impure = self.impure or outer
+        return lowered
+
+    def _call_target(self, node):
         function = node.func
         if any(keyword.arg is None for keyword in node.keywords):
             self._refuse("dynamic-call", "spreading keyword arguments has no static lowering", node)
+        if (isinstance(function, ast.Name) and function.id in ("any", "all") and len(node.args) == 1 and not node.keywords
+                and isinstance(node.args[0], ast.GeneratorExp) and function.id not in self.locals and function.id not in self.parameters):
+            return self._comprehension(node.args[0], function.id)
         if any(isinstance(argument, ast.Starred) for argument in node.args):
             self._refuse("dynamic-call", "spreading arguments has no static lowering", node)
         if isinstance(function, ast.Name) and function.id == "str" and len(node.args) == 1 and function.id not in self.locals:
@@ -1400,12 +1556,23 @@ class Lowering:
             typed = self._typed(function.value) if isinstance(function, ast.Attribute) else None
             if isinstance(function, ast.Attribute) and isinstance(function.value, ast.Name) and function.value.id == "self":
                 return self._sibling_call(function.attr, node)
+            if typed is not None and typed.kind == PY_REF and isinstance(function, ast.Attribute):
+                # Cart.factory(...): a static method called on the class
+                model = self.checker.python_classes.of(typed.name)
+                found = model.find(function.attr) if model is not None else None
+                if found is not None and found[0] == "method" and found[2] is not None and _decorated_with(found[2], ("staticmethod",)):
+                    return self._python_receiver_call(model, function.value, function.attr, node)
             if typed is not None and typed.kind in (PY, PY_REF):
                 self._refuse("sibling-call", "calling a Python class of the compilation has no static lowering yet", node)
+            if isinstance(function, ast.Name):
+                module_call = self._module_function_call(function, node)
+                if module_call is not None:
+                    return module_call
             if isinstance(function, ast.Name) and function.id in ("len", "int", "float", "bool", "abs", "min", "max", "isinstance", "range", "print", "sorted", "reversed", "enumerate", "zip", "sum", "any", "all", "round"):
                 self._refuse("python-builtin-not-lowered", f"the builtin [{function.id}] has no static lowering yet", node)
             self._refuse("dynamic-call", "the call resolves to no Java method or constructor", node)
         kind, owner, name, matching, static = target
+        self.impure = True
         if node.keywords:
             self._refuse("kwargs-to-java", "keyword arguments to a Java method or constructor have no static lowering", node)
         lowered_arguments = [self._expression(argument) for argument in node.args]
@@ -1432,6 +1599,56 @@ class Lowering:
         used = JAVA_NUMBERS.get(return_type, return_type)
         return Cast(call, used) if used != return_type else call
 
+    def _module_function_call(self, function, node):
+        """
+        A call of a module-level function of the compilation, of this module or imported from
+        another: the static Java method it compiles into, on the module's generated class. None when
+        the name is no module-level function; refused when the function is not compiled.
+        """
+        if self.planner is None:
+            return None
+        name = function.id
+        module, found = self.module, self.planner.module_function(self.module, name)
+        if found is None:
+            module = self._imported_module(name)
+            found = self.planner.module_function(module, name) if module is not None else None
+        if found is None:
+            return None
+        function_def, function_node = found
+        self.impure = True
+        decision = self.planner.decide_function(module, function_def, function_node)
+        if decision is None:
+            self._refuse("dynamic-call", f"the module-level function [{name}] is being compiled: a cycle of calls has no static lowering", node)
+        body = self.planner.body_of(function_node) if decision.outcome().name() == "COMPILED" else None
+        if body is None or not body.staticMethod():
+            reasons = list(decision.reasons())
+            why = f": [{reasons[0].rule()}] {reasons[0].message()}" if reasons else ""
+            self._refuse("dynamic-call", f"the module-level function [{name}] is not compiled{why}", node)
+        parameters = list(function_def.arguments().arguments())
+        bound = self._bind_arguments(None, parameters, function_node, node, name)
+        if bound is None:
+            self._refuse("dynamic-call", f"calling [{name}] with these arguments has no static lowering: the compiled function takes {len(parameters)} parameters", node)
+        parameter_types = list(body.parameterTypes())
+        arguments = [self._coerce(argument, parameter_type, argument_node)
+                     for (argument, argument_node), parameter_type in zip(bound, parameter_types)]
+        self.java_calls += 1
+        return_type = body.returnType()
+        call = InvokeJava(None, body.className(), name, parameter_types, arguments, return_type)
+        used = JAVA_NUMBERS.get(return_type, return_type)
+        return Cast(call, used) if used != return_type else call
+
+    def _imported_module(self, name):
+        """The module of the compilation a name is imported from (from .mappers import user_public), or None."""
+        visitor = getattr(self.module, "visitor", None)
+        source = getattr(visitor, "imported_source_files", {}).get(name) if visitor is not None else None
+        if source is None:
+            return None
+        wanted = os.path.normcase(os.path.normpath(os.path.abspath(source)))
+        for path, module in self.checker._modules.items():
+            if os.path.normcase(os.path.normpath(os.path.abspath(path))) == wanted:
+                return module
+        return None
+
     def _sibling_call(self, name, node):
         """
         A call of a method of the class on self. The stub's Java method is called when the stub
@@ -1439,6 +1656,7 @@ class Lowering:
         advice intercepts and no subclass of the compilation overrides); otherwise the method of the
         Python object is invoked, which runs the interceptors, the override or the defaults as Python would.
         """
+        self.impure = True
         if self.class_model is None:
             self._refuse("sibling-call", f"self.{name}() has no known target", node)
         found = self.class_model.find(name)
@@ -1447,8 +1665,11 @@ class Lowering:
         if found[0] != "method":
             self._refuse("sibling-call", f"calling [{name}], which is not a method of the class, has no static lowering", node)
         function_def, function_node = found[1], found[2]
-        if function_node is None or function_def.isStatic() or _decorated_with(function_node, ("staticmethod", "classmethod")):
-            self._refuse("sibling-call", f"calling the static or class method [{name}] has no static lowering yet", node)
+        if function_node is None or _decorated_with(function_node, ("classmethod",)):
+            self._refuse("sibling-call", f"calling the class method [{name}] has no static lowering yet", node)
+        if function_def.isStatic() or _decorated_with(function_node, ("staticmethod",)):
+            # self.helper(...) on a static method: the static Java method of the generated class
+            return self._python_receiver_call(self.class_model, ast.copy_location(ast.Name(id=self.class_model.name, ctx=ast.Load()), node), name, node)
         if function_def.isAsync() or function_def.isGenerator():
             self._refuse("sibling-call", f"calling the async or generator method [{name}] has no static lowering", node)
         if self.advised(function_def) and (function_node.args.kwonlyargs or function_node.args.vararg is not None or function_node.args.kwarg is not None):
@@ -1590,6 +1811,7 @@ class Lowering:
         the method of the Python object is invoked, as the Python code would.
         """
         owner = self._generated_class(model, node)
+        self.impure = True
         found = model.find(name)
         if found is None:
             self._refuse("unknown-type", f"[{model.name}] has no method [{name}]", node)
@@ -1640,6 +1862,7 @@ class Lowering:
         """A construction of an object of the compilation: the generated class's constructor, which mirrors the hinted __init__."""
         model = self.checker.python_classes.of(class_def)
         owner = self._generated_class(model, node)
+        self.impure = True
         if _abstract_class(class_def):
             self._refuse("unsupported-expression", f"[{model.name}] is a protocol or an abstract class; the generated type cannot be constructed", node)
         constructor = model.constructor_of()
@@ -1807,8 +2030,16 @@ class Lowering:
             self._refuse("equality-on-object", f"== between [{left_type}] and [{right_type}] has no static lowering", node)
         self._refuse("unsupported-expression", f"the comparison {symbol} of a [{left_type}] and a [{right_type}] has no static lowering", node)
 
+    def _unhoisted(self, lower):
+        """Lower an operand evaluated lazily or repeatedly: a comprehension inside it cannot be hoisted before the statement."""
+        self.hoist_barrier += 1
+        try:
+            return lower()
+        finally:
+            self.hoist_barrier -= 1
+
     def _bool_op(self, node):
-        values = [self._expression(value) for value in node.values]
+        values = [self._expression(node.values[0])] + [self._unhoisted(lambda value=value: self._expression(value)) for value in node.values[1:]]
         if all(value.type() == BOOLEAN for value in values):
             result = values[0]
             for value in values[1:]:
@@ -1865,7 +2096,7 @@ class Lowering:
 
     def _conditional(self, node):
         test = self._truthy(node.test)
-        then, or_else = self._expression(node.body), self._expression(node.orelse)
+        then, or_else = self._unhoisted(lambda: self._expression(node.body)), self._unhoisted(lambda: self._expression(node.orelse))
         if then.type() != or_else.type():
             if self._is_number(then.type()) and self._is_number(or_else.type()):
                 then, or_else = self._coerce(then, DOUBLE, node), self._coerce(or_else, DOUBLE, node)

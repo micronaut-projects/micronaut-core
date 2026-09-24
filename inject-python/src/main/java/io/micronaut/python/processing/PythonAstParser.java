@@ -117,6 +117,7 @@ public final class PythonAstParser {
         static_decisions = [] if static_planner is None else static_planner.plan(type_checker, visitor_context)
         static_bodies = [] if static_planner is None else list(static_planner.bodies)
         static_diagnostics = [] if static_planner is None else list(static_planner.diagnostics)
+        static_scripts = [] if static_planner is None else list(static_planner.scripts)
         """, "micronaut-static-plan-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
@@ -479,6 +480,24 @@ public final class PythonAstParser {
             bodies == null ? Map.of() : StaticCompilationPlan.byKey(List.copyOf(bodies.as(List.class))),
             diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class))
         );
+    }
+
+    /**
+     * The scripts the static plan adds: a module without a generated class of its own gets one for
+     * the plain functions it compiles into static methods. Valid after {@link #staticPlan(VisitorContext)}.
+     *
+     * @return The script definitions, in module order
+     */
+    public List<ScriptDef> staticScripts() {
+        Value scripts = context.getBindings(PYTHON).getMember("static_scripts");
+        if (scripts == null || scripts.isNull()) {
+            return List.of();
+        }
+        List<ScriptDef> result = new ArrayList<>();
+        for (long i = 0; i < scripts.getArraySize(); i++) {
+            result.add(scripts.getArrayElement(i).as(ScriptDef.class));
+        }
+        return result;
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {
@@ -847,7 +866,10 @@ public final class PythonAstParser {
                 case "java.util.Map" -> "#dict";
                 default -> "";
             };
-            targets.add(body.className().substring(body.className().lastIndexOf('.') + 1) + "#" + body.methodName() + conversion);
+            // a static method or a module-level function is called on its generated class
+            String owner = body.moduleLevel() ? "" : body.className().substring(body.className().lastIndexOf('.') + 1);
+            String dispatch = body.staticMethod() ? "#static=" + body.className() : "";
+            targets.add(owner + "#" + body.methodName() + dispatch + conversion);
         }
         if (targets.isEmpty()) {
             return 0;

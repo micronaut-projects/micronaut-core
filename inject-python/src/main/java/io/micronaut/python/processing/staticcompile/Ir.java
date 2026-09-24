@@ -542,7 +542,9 @@ public sealed interface Ir {
                         @Nullable SourceSpan span,
                         StaticCompilationDecision.Stats stats,
                         boolean wrapsCheckedExceptions,
-                        boolean advised) {
+                        boolean advised,
+                        boolean staticMethod,
+                        boolean moduleLevel) {
         public CompiledBody {
             Objects.requireNonNull(className, "className");
             Objects.requireNonNull(methodName, "methodName");
