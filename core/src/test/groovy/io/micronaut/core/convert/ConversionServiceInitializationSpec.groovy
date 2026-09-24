@@ -29,24 +29,7 @@ class ConversionServiceInitializationSpec extends Specification {
 
         when:
         for (int i = 0; i < ITERATIONS && hung.empty; i++) {
-            URLClassLoader loader = isolatedClassLoader()
-            try {
-                // Load both classes without initializing them, so that both threads start initializing at the barrier
-                Method create = loader.loadClass(MutableConversionService.name).getMethod("create")
-                Field shared = loader.loadClass(ConversionService.name).getField("SHARED")
-                CyclicBarrier barrier = new CyclicBarrier(2)
-                Thread createThread = startDaemon("create-$i", loader, barrier, errors) { create.invoke(null) }
-                Thread sharedThread = startDaemon("shared-$i", loader, barrier, errors) { shared.get(null) }
-                createThread.join(JOIN_TIMEOUT_MILLIS)
-                sharedThread.join(JOIN_TIMEOUT_MILLIS)
-                for (Thread thread : [createThread, sharedThread]) {
-                    if (thread.alive) {
-                        hung << "${thread.name} at ${thread.stackTrace.take(3).join(' <- ')}".toString()
-                    }
-                }
-            } finally {
-                loader.close()
-            }
+            hung.addAll(raceCreateAndShared(i, errors))
         }
 
         then:
@@ -78,6 +61,31 @@ class ConversionServiceInitializationSpec extends Specification {
         cleanup:
         Thread.currentThread().contextClassLoader = contextClassLoader
         loader.close()
+    }
+
+    /**
+     * Races {@code MutableConversionService.create()} against a read of {@code ConversionService.SHARED}
+     * in a fresh class loader.
+     *
+     * @return a description of each thread that did not finish in time
+     */
+    private static List<String> raceCreateAndShared(int iteration, Queue<Throwable> errors) {
+        URLClassLoader loader = isolatedClassLoader()
+        try {
+            // Load both classes without initializing them, so that both threads start initializing at the barrier
+            Method create = loader.loadClass(MutableConversionService.name).getMethod("create")
+            Field shared = loader.loadClass(ConversionService.name).getField("SHARED")
+            CyclicBarrier barrier = new CyclicBarrier(2)
+            Thread createThread = startDaemon("create-$iteration", loader, barrier, errors) { create.invoke(null) }
+            Thread sharedThread = startDaemon("shared-$iteration", loader, barrier, errors) { shared.get(null) }
+            createThread.join(JOIN_TIMEOUT_MILLIS)
+            sharedThread.join(JOIN_TIMEOUT_MILLIS)
+            return [createThread, sharedThread]
+                .findAll { it.alive }
+                .collect { "${it.name} at ${it.stackTrace.take(3).join(' <- ')}".toString() }
+        } finally {
+            loader.close()
+        }
     }
 
     /**
