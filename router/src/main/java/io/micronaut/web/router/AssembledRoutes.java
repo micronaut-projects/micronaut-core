@@ -18,7 +18,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Internal;
 
 /**
- * Routes assembled without a legacy {@link RouteBuilder}, e.g. the routes of the
+ * Routes assembled without a legacy {@link RouteBuilder}, e.g. the routes of a route table or of the
  * {@link io.micronaut.web.router.builder.HttpRoutes} beans. The router adds them like the routes
  * of the route builders.
  *

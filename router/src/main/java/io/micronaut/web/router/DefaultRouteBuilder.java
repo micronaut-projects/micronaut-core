@@ -103,6 +103,26 @@ public abstract class DefaultRouteBuilder implements RouteBuilder {
         this.defaultCharset = assembly.defaultCharset;
     }
 
+    /**
+     * A route builder of routes assembled elsewhere, e.g. the routes of the
+     * {@link io.micronaut.web.router.builder.HttpRoutes} beans, so that the router receives them
+     * with the other route builders. The URI templates of its routes are the ones of the assembly:
+     * {@link #routeUri(String)} does not apply.
+     *
+     * @param executionHandleLocator The execution handler locator
+     * @param conversionService      The conversion service
+     * @param assembly               The assembled routes
+     * @since 5.3.0
+     */
+    @Internal
+    protected DefaultRouteBuilder(ExecutionHandleLocator executionHandleLocator, ConversionService conversionService, RouteAssembly assembly) {
+        this.executionHandleLocator = executionHandleLocator;
+        this.uriNamingStrategy = CAMEL_CASE_NAMING_STRATEGY;
+        this.conversionService = conversionService;
+        this.assembly = assembly;
+        this.defaultCharset = assembly.defaultCharset;
+    }
+
     @Override
     public Set<Integer> getExposedPorts() {
         // the set itself, as before the routes were assembled
