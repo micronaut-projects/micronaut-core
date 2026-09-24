@@ -40,6 +40,7 @@ import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.bind.binders.ContinuationArgumentBinder;
+import io.micronaut.http.body.ChunkSource;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.body.stream.BaseSharedBuffer;
 import io.micronaut.http.codec.CodecException;
@@ -50,6 +51,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor;
+import io.micronaut.http.server.stream.ResponseStreams;
 import io.micronaut.http.server.util.HttpDateHeader;
 import io.micronaut.inject.BeanType;
 import io.micronaut.inject.MethodReference;
@@ -590,6 +592,9 @@ public final class RouteExecutor {
             final Object o = response.getBody().orElse(null);
             if (o instanceof ReferenceCounted referenceCounted) {
                 referenceCounted.release();
+            } else if (o instanceof ChunkSource<?> source) {
+                // its elements are never pulled
+                ResponseStreams.discard(source);
             }
             response.body(null);
             if (o != null) {

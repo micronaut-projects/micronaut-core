@@ -35,4 +35,12 @@ public interface OutboundAccess extends NettyWriteContext {
      * unrecoverable error that may corrupt future requests. This method has no effect on HTTP/2.
      */
     void closeAfterWrite();
+
+    /**
+     * Do not compress the next response, whatever the compression strategy says: e.g. server-sent
+     * events, which must reach the client as they are written.
+     *
+     * @since 5.3.0
+     */
+    void disableCompression();
 }

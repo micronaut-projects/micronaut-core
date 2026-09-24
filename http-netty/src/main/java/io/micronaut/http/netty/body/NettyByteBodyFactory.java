@@ -29,12 +29,14 @@ import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.body.stream.StreamingBodyExecutor;
 import io.micronaut.http.netty.NettyHttpHeaders;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.ByteBufAllocator;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoop;
 import io.netty.handler.codec.http.HttpHeaders;
+import io.netty.util.internal.ThreadExecutorMap;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Publisher;
 import reactor.core.publisher.Flux;
@@ -67,6 +69,11 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
     public StreamingBody createStreamingBody(BodySizeLimits limits, BufferConsumer.Upstream upstream) {
         StreamingNettyByteBody.SharedBuffer sb = createStreamingBuffer(limits, upstream);
         return new StreamingBody(sb, new StreamingNettyByteBody(sb));
+    }
+
+    @Override
+    public StreamingBodyExecutor streamingBodyExecutor() {
+        return new LoopExecutor(loop);
     }
 
     @Override
@@ -122,5 +129,23 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         adapter.setSharedBuffer(sb);
         body.expectedLength().ifPresent(sb::setExpectedLength);
         return new StreamingNettyByteBody(sb);
+    }
+
+    /**
+     * The event loop a {@link StreamingNettyByteBody.SharedBuffer} must be fed on.
+     *
+     * @param loop The loop
+     */
+    private record LoopExecutor(EventLoop loop) implements StreamingBodyExecutor {
+        @Override
+        public void execute(Runnable command) {
+            loop.execute(command);
+        }
+
+        @Override
+        public boolean isEventLoopThread() {
+            // this loop, or the loop of another connection
+            return loop.inEventLoop() || ThreadExecutorMap.currentExecutor() != null;
+        }
     }
 }

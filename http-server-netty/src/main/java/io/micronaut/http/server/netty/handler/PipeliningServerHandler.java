@@ -983,6 +983,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         @Nullable
         private Object attachment = null;
         private boolean closeAfterWrite = false;
+        private boolean compressionDisabled = false;
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
@@ -1168,8 +1169,13 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             }
         }
 
+        @Override
+        public void disableCompression() {
+            compressionDisabled = true;
+        }
+
         private void prepareCompression(HttpResponse response, OutboundHandler outboundHandler, long contentLength) {
-            if (compressor == null) {
+            if (compressor == null || compressionDisabled) {
                 return;
             }
             assert ctx != null;

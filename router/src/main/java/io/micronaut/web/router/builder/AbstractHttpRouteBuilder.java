@@ -49,6 +49,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     private static final MediaType[] FORM_MEDIA_TYPES = {MediaType.APPLICATION_FORM_URLENCODED_TYPE, MediaType.MULTIPART_FORM_DATA_TYPE};
     private static final List<MediaType> DEFAULT_CONSUMES = List.of(MediaType.APPLICATION_JSON_TYPE);
+    private static final MediaType[] EVENT_STREAM = {MediaType.TEXT_EVENT_STREAM_TYPE};
 
     final RouteAssembly assembly;
     /**
@@ -146,6 +147,15 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     @Override
     public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncBodyRequestHandler handler) {
         return spec(route(method, uri, HandlerMethod.of(handler), null));
+    }
+
+    @Override
+    public final HttpRouteSpec sse(String uri, SseHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        RouteSettings route = route(HttpMethod.GET, uri, HandlerMethod.of(handler), null);
+        route.produces(EVENT_STREAM);
+        // the event stream is the route's own type, not the type the group produces
+        return spec(RouteGroupDefaults.PRODUCES, route);
     }
 
     @Override
