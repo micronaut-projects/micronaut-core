@@ -28,6 +28,7 @@ import io.micronaut.http.ByteBodyHttpResponseWrapper;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.UpgradedHttpResponse;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.context.ServerHttpRequestContext;
@@ -35,6 +36,8 @@ import io.micronaut.http.context.event.HttpRequestReceivedEvent;
 import io.micronaut.http.context.event.HttpRequestTerminatedEvent;
 import io.micronaut.http.netty.NettyMutableHttpResponse;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.server.netty.websocket.NettyServerWebSocketUpgradeHandler;
+import io.micronaut.http.netty.body.RawDuplexHandler;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
 import io.micronaut.http.server.RouteExecutor;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
@@ -46,10 +49,17 @@ import io.micronaut.runtime.http.scope.RequestScope;
 import io.micronaut.web.router.resource.StaticResourceResolver;
 import io.netty.channel.ChannelHandler.Sharable;
 import io.netty.channel.ChannelHandlerContext;
+import io.netty.channel.ChannelPipeline;
+import io.netty.channel.Channel;
+import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.PrematureChannelClosureException;
 import io.netty.handler.codec.compression.DecompressionException;
 import io.netty.handler.codec.http.DefaultHttpRequest;
 import io.netty.handler.codec.http.DefaultHttpResponse;
+import io.netty.handler.codec.http.HttpHeaderNames;
+import io.netty.handler.codec.http.FullHttpResponse;
+import io.netty.handler.codec.http.EmptyHttpHeaders;
+import io.netty.handler.codec.http.DefaultFullHttpResponse;
 import io.netty.handler.codec.http.HttpResponseStatus;
 import io.netty.handler.codec.http.HttpVersion;
 import io.netty.util.AttributeKey;
@@ -62,6 +72,7 @@ import java.io.IOException;
 import java.nio.channels.ClosedChannelException;
 import java.util.Collection;
 import java.util.Optional;
+import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -416,6 +427,13 @@ public final class RoutingInBoundHandler implements RequestHandler {
                 } else {
                     encodedResponse = r;
                 }
+                UpgradedHttpResponse<?> upgraded = encodedResponse.code() == HttpResponseStatus.SWITCHING_PROTOCOLS.code()
+                    ? UpgradedHttpResponse.unwrap(encodedResponse) : null;
+                if (upgraded != null) {
+                    // the response is a connection to relay, not a body to write: it stays open
+                    switchProtocols(outboundAccess, nettyHttpRequest, NettyMutableHttpResponse.toNoBodyResponse(encodedResponse), upgraded);
+                    return;
+                }
                 try (encodedResponse) {
                     closeConnectionIfError(encodedResponse, nettyHttpRequest, outboundAccess);
                     if (LOG.isDebugEnabled()) {
@@ -450,6 +468,61 @@ public final class RoutingInBoundHandler implements RequestHandler {
             outboundAccess.closeAfterWrite();
             outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SERVICE_UNAVAILABLE), NettyByteBodyFactory.empty());
         }
+    }
+
+    /**
+     * Relay a {@code 101 Switching Protocols} response: write it, then take the connection out
+     * of HTTP and pipe the bytes of the client to the upgraded response and its bytes to the
+     * client, until either side ends.
+     */
+    private void switchProtocols(OutboundAccess outboundAccess,
+                                 NettyHttpRequest<?> request,
+                                 io.netty.handler.codec.http.HttpResponse head,
+                                 UpgradedHttpResponse<?> upgraded) {
+        ChannelHandlerContext ctx = request.getChannelHandlerContext();
+        Channel channel = ctx.channel();
+        if (!channel.eventLoop().inEventLoop()) {
+            channel.eventLoop().execute(() -> switchProtocols(outboundAccess, request, head, upgraded));
+            return;
+        }
+        ChannelPipeline pipeline = channel.pipeline();
+        if (pipeline.get(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC) == null || pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND) == null) {
+            // not an HTTP/1 connection, e.g. an HTTP/2 stream: the switch cannot be relayed
+            LOG.warn("Cannot switch protocols for {} {}: the connection is not HTTP/1.1", request.getMethodName(), request.getUri());
+            upgraded.close();
+            outboundAccess.closeAfterWrite();
+            outboundAccess.write(new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.BAD_GATEWAY), NettyByteBodyFactory.empty());
+            return;
+        }
+        if (LOG.isDebugEnabled()) {
+            LOG.debug("Response 101 - {} {}: switching to {}", request.getMethodName(), request.getUri(), upgraded.getProtocol());
+        }
+        RawDuplexHandler duplex = new RawDuplexHandler(channel, () -> { });
+        // right after the codec, so that the bytes the codec buffered past the request reach it when the codec is removed
+        pipeline.addAfter(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC, RawDuplexHandler.NAME, duplex);
+        FullHttpResponse response = new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.SWITCHING_PROTOCOLS, Unpooled.EMPTY_BUFFER, head.headers(), EmptyHttpHeaders.INSTANCE);
+        response.headers().remove(HttpHeaderNames.CONTENT_LENGTH).remove(HttpHeaderNames.TRANSFER_ENCODING);
+        channel.writeAndFlush(response).addListener(future -> {
+            if (!future.isSuccess()) {
+                upgraded.close();
+                channel.close();
+                return;
+            }
+            for (String name : List.of(ChannelPipelineCustomizer.HANDLER_MICRONAUT_INBOUND, ChannelPipelineCustomizer.HANDLER_ACCESS_LOGGER,
+                ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR, NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER)) {
+                if (pipeline.get(name) != null) {
+                    pipeline.remove(name);
+                }
+            }
+            pipeline.remove(ChannelPipelineCustomizer.HANDLER_HTTP_SERVER_CODEC);
+            // the bytes of the client go to the upgraded connection, and its bytes to the client
+            upgraded.send(duplex.inbound());
+            duplex.send(upgraded.byteBody().move());
+            if (supportLoggingHandler) {
+                channel.attr(ACCESS_LOG_REQUEST_ATTRIBUTE).compareAndSet(request, null);
+            }
+            cleanupRequest(request);
+        });
     }
 
     ExecutorService getIoExecutor() {

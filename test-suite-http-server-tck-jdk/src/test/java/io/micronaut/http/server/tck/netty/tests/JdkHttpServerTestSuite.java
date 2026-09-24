@@ -13,6 +13,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @ExcludeClassNamePatterns({
     "io.micronaut.http.server.tck.tests.FilterProxyTest", // HttpClient.sendAsync completes on the common ForkJoinPool, whose threads carry no leak detection scope, so the server's buffer allocations fail in this harness
     "io.micronaut.http.server.tck.tests.raw.RawProxyTest", // HttpClient.sendAsync completes on the common ForkJoinPool, whose threads carry no leak detection scope, so the server's buffer allocations fail in this harness
+    "io.micronaut.http.server.tck.tests.raw.UpgradeRelayTest", // the JDK client cannot switch a connection to another protocol
     "io.micronaut.http.server.tck.tests.forms.FormsJacksonAnnotationsTest", // it seems application/x-www-form-urlencoded is not yet supported by the JDK client
     "io.micronaut.http.server.tck.tests.forms.UploadTest" // multipart
 })

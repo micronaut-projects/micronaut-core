@@ -148,6 +148,14 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     }
 
     private Mono<MutableHttpResponse<?>> exchangeWithOptions(MutableHttpRequest<?> request, @Nullable CloseableByteBody requestBody, RawRequestOptions options) {
+        if (options.isAllowUpgrade() && request.getHeaders().contains(HttpHeaders.UPGRADE)) {
+            // the JDK client gives no access to a connection that switched protocols
+            if (requestBody != null) {
+                requestBody.close();
+            }
+            return Mono.error(new HttpClientException("The JDK HTTP client cannot switch a connection to another protocol: the request asks to upgrade to '" +
+                request.getHeaders().get(HttpHeaders.UPGRADE) + "'"));
+        }
         Set<String> allowedRestrictedHeaders = allowedRestrictedHeaders();
         if (request.getHeaders().contains(HttpHeaders.HOST) && !allowedRestrictedHeaders.contains("host")) {
             if (requestBody != null) {
