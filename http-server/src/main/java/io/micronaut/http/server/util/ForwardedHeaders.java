@@ -160,31 +160,43 @@ public final class ForwardedHeaders {
             if (inboundForwarded == null && hasXForwarded) {
                 // keep the chain when this hop is appended to a Forwarded header of its own
                 inboundForwarded = toForwarded(inboundFor, inboundProto, inboundHost, inboundPort);
-            } else if (inboundForwarded != null && !hasXForwarded) {
-                // keep the chain when this hop is appended to X-Forwarded-* headers of its own
+            } else if (inboundForwarded != null) {
+                // keep the chain when this hop is appended to X-Forwarded-* headers of its own: the
+                // Forwarded header gives each value the X-Forwarded-* headers do not, e.g. the
+                // client when a proxy only added X-Forwarded-Proto
                 List<Map<String, String>> elements = parseForwarded(inboundForwarded);
                 List<String> addresses = new ArrayList<>(elements.size());
+                String forwardedProto = null;
                 String firstHost = null;
                 for (Map<String, String> element : elements) {
                     String address = element.get("for");
                     addresses.add(address == null ? UNKNOWN : toXForwardedFor(address));
-                    if (inboundProto == null) {
-                        inboundProto = element.get("proto");
+                    if (forwardedProto == null) {
+                        forwardedProto = element.get("proto");
                     }
                     if (firstHost == null) {
                         firstHost = element.get("host");
                     }
                 }
-                inboundFor = addresses.isEmpty() ? null : String.join(", ", addresses);
-                if (firstHost != null) {
+                if (inboundFor == null && !addresses.isEmpty()) {
+                    inboundFor = String.join(", ", addresses);
+                }
+                if (inboundProto == null) {
+                    inboundProto = forwardedProto;
+                }
+                if (inboundHost == null && firstHost != null) {
                     int portSeparator = portSeparator(firstHost);
                     if (portSeparator >= 0) {
                         inboundHost = firstHost.substring(0, portSeparator);
-                        inboundPort = firstHost.substring(portSeparator + 1);
+                        if (inboundPort == null) {
+                            inboundPort = firstHost.substring(portSeparator + 1);
+                        }
                     } else {
                         inboundHost = firstHost;
-                        Integer defaultPort = defaultPort(inboundProto);
-                        inboundPort = defaultPort == null ? null : String.valueOf(defaultPort);
+                        if (inboundPort == null) {
+                            Integer defaultPort = defaultPort(inboundProto);
+                            inboundPort = defaultPort == null ? null : String.valueOf(defaultPort);
+                        }
                     }
                 }
             }
