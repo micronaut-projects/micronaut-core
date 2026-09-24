@@ -33,6 +33,7 @@ import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
+import io.micronaut.http.server.netty.NettyHttpRequest;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
@@ -65,7 +66,9 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
 
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
-        if (!(request instanceof FormCapableHttpRequest<?> nettyRequest) || !nettyRequest.hasFormBody()) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        FormCapableHttpRequest<?> nettyRequest = request instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(request);
+        if (nettyRequest == null || !nettyRequest.hasFormBody()) {
             return BindingResult.unsatisfied();
         }
         if (FormBinding.isBound(context.getArgument())) {

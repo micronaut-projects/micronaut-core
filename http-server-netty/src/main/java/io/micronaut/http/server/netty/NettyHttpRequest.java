@@ -250,7 +250,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
      *
      * @param request The request
      * @return The Netty request, or {@code null} if the body of the request is not the body of one
-     * @since 5.3.0
+     * @since 5.2.4
      */
     @Internal
     @SuppressWarnings("ReferenceEquality") // the same bytes
