@@ -726,8 +726,9 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * {@code HEAD} routes, like any {@code GET} route, and are ordinary routes: the more specific
      * routes of controllers and handlers under the prefix take precedence. Their filters,
      * conditions, order and attributes are declared on the returned route, which configures both.
-     * In a group, the prefix follows the prefix of the group, and the filters of the group
-     * apply.</p>
+     * In a group, the prefix follows the prefix of the group, and the filters and the executor
+     * of the group apply, not its media types: the handler decides the media type of each
+     * resource.</p>
      *
      * @param uriPrefix The URI prefix, e.g. {@code /assets}; empty or {@code /} for the root
      * @param resources The handler of the resources

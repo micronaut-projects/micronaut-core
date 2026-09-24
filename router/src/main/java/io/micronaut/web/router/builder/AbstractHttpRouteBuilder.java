@@ -246,8 +246,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         if (!prefix.isEmpty() && prefix.charAt(0) != '/') {
             prefix = '/' + prefix;
         }
-        // the prefix itself, e.g. for the index file, and every path under it
-        return spec(
+        // the prefix itself, e.g. for the index file, and every path under it; the handler
+        // decides the media type of each resource: the media types of a group do not apply
+        return spec(RouteGroupDefaults.CONSUMES | RouteGroupDefaults.PRODUCES,
             route(HttpMethod.GET, prefix.isEmpty() ? "/" : prefix, HandlerMethod.of(resources), null),
             route(HttpMethod.GET, prefix + "/{+" + pathVariable + "}", HandlerMethod.of(resources), null)
         );
