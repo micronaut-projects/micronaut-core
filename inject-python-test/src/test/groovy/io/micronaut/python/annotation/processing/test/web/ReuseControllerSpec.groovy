@@ -8,6 +8,45 @@ import io.micronaut.context.python.PythonContextRuntime
 
 class ReuseControllerSpec extends AbstractPythonTypeElementSpec {
 
+    void "reuse-context async controller awaits an injected Java publisher"() {
+        given:
+        def python = '''
+from jakarta.inject import Singleton
+from micronaut.context.annotation import Bean, Factory
+from micronaut.http.annotation import Controller, Get
+from micronaut.python.annotation.processing.test.reactive import ContextualService
+
+@Factory
+class ContextualServiceFactory:
+    @Singleton
+    @Bean
+    def service(self) -> ContextualService:
+        return ContextualService()
+
+@Controller("/reuse-async")
+class AsyncController:
+    def __init__(self, service: ContextualService):
+        self.service = service
+
+    @Get
+    async def value(self) -> str:
+        return await self.service.value()
+'''
+        ApplicationContext context = buildContext(python, true)
+        PythonContextRuntime.setReuseContext(true)
+        def server = context.getBean(EmbeddedServer)
+        server.start()
+        def client = context.createBean(HttpClient, server.URL)
+
+        expect:
+        client.toBlocking().retrieve("/reuse-async") == "none"
+
+        cleanup:
+        client?.close()
+        context?.close()
+        PythonContextRuntime.setReuseContext(false)
+    }
+
     void "reuse-context controller uses single context and injection works"() {
         given:
         def python = '''
