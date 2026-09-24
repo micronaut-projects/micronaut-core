@@ -800,6 +800,15 @@ final class PythonContextRegistry {
         final Map<String, Value> classes = new ConcurrentHashMap<>();
         /** The Python scoped proxies standing in for generated AOP proxies of Python classes, by proxy instance. */
         final IdentityHashMap<Object, Value> scopedProxies = new IdentityHashMap<>();
+        /**
+         * The object a wrapper of another context is seen as in this one, by the object the wrapper
+         * holds. Keyed by identity, as {@link Value#equals(Object)} compares the guest objects, so one
+         * Python object of the other context is one object here however often the view asks for it and
+         * whichever wrapper asks: the view hashes, compares and prints the same object every time.
+         * Weakly keyed: the key is the value the wrapper itself holds, so the entry lives exactly as
+         * long as that wrapper and nothing here keeps it alive.
+         */
+        final Map<Value, Value> viewedValues = Collections.synchronizedMap(new WeakHashMap<>());
         private final List<Runnable> noActiveExecutionsListeners = new ArrayList<>();
         private final List<Runnable> noContextListeners = new ArrayList<>();
         private int activeExecutions;
@@ -816,6 +825,7 @@ final class PythonContextRegistry {
             helpers.clear();
             classes.clear();
             scopedProxies.clear();
+            viewedValues.clear();
             runtimeModule.set(null);
             registered = false;
             noActiveExecutionsListeners.clear();

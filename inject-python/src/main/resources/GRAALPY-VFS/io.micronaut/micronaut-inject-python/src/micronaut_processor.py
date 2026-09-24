@@ -88,9 +88,12 @@ def is_abstract_method(funcdef):
 
 def is_placeholder_method(funcdef):
     """
-    Returns True if the function body is only a declaration placeholder.
+    Returns True if the function body is only a declaration placeholder: the ``...`` literal,
+    optionally preceded by a docstring documenting the declared method.
     """
     body = funcdef.body
+    if len(body) == 2 and _is_docstring_statement(body[0]):
+        body = body[1:]
     if len(body) == 1:
         stmt = body[0]
         if isinstance(stmt, ast.Expr):
@@ -100,6 +103,13 @@ def is_placeholder_method(funcdef):
             if isinstance(value, ast.Ellipsis):
                 return True
     return False
+
+def _is_docstring_statement(stmt):
+    return (
+        isinstance(stmt, ast.Expr)
+        and isinstance(stmt.value, ast.Constant)
+        and isinstance(stmt.value.value, str)
+    )
 
 def has_return_value(funcdef):
     """

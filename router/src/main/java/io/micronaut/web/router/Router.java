@@ -25,6 +25,8 @@ import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 /**
@@ -131,6 +133,29 @@ public interface Router {
      * @since 1.2.1
      */
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request);
+
+    /**
+     * Finds the closest matches for the given request among the routes the given filter accepts.
+     * The filter applies to every candidate before the ambiguity between them is resolved, so a
+     * more specific route that the filter rejects, e.g. a route of another version, does not hide
+     * a less specific route that it accepts. A {@link io.micronaut.web.router.filter.FilteredRouter}
+     * passes its {@link io.micronaut.web.router.filter.RouteMatchFilter} here, so that a router it
+     * decorates resolves the ambiguity its own way, e.g. tier by tier.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidate matches
+     * @param <T>     The target type
+     * @param <R>     The type
+     * @return The closest matches that the filter accepts
+     * @since 5.3.0
+     */
+    default <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        List<UriRouteMatch<T, R>> matches = this.<T, R>find(request).filter(filter).collect(Collectors.toList());
+        if (matches.size() < 2) {
+            return matches;
+        }
+        return DefaultRouter.resolveAmbiguity(request, matches);
+    }
 
     /**
      * Finds the closest match for the given request or null if none is found.

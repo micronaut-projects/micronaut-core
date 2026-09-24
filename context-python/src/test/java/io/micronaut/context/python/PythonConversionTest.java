@@ -15,6 +15,7 @@
  */
 package io.micronaut.context.python;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -169,6 +170,52 @@ class PythonConversionTest {
             assertThrows(RuntimeException.class, () -> awareTime.as(LocalTime.class));
             Value customZone = mappedContext.eval("python", "type('CustomZone', (__import__('datetime').tzinfo,), {'utcoffset': lambda self, value: __import__('datetime').timedelta(hours=1)})()");
             assertThrows(RuntimeException.class, () -> customZone.as(ZoneOffset.class));
+        }
+    }
+
+    /**
+     * Python {@code bytes} reaching an erased {@code Object} parameter.
+     * <p>
+     * A generic Java API used with its type arguments erased, {@code RedisCommands<byte[], byte[]>} on a
+     * raw-typed bean, takes {@code Object} parameters at the interop boundary. Only a declared
+     * {@code byte[]} parameter had a mapping, so a Python {@code bytes} value arrived as a foreign
+     * buffer and callers had to write {@code ByteBuffer.wrap(b"...").array()}.
+     */
+    @Test
+    void pythonBytesReachAnErasedObjectParameterAsAByteArray() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            var store = new ErasedStore<byte[], byte[]>();
+            mappedContext.getBindings("python").putMember("store", store);
+
+            mappedContext.eval("python", "store.set(b'key', bytearray(b'value'))");
+
+            assertArrayEquals("key".getBytes(StandardCharsets.UTF_8), (byte[]) store.key());
+            assertArrayEquals("value".getBytes(StandardCharsets.UTF_8), (byte[]) store.value());
+        }
+    }
+
+    /**
+     * A Python string keeps reaching an erased {@code Object} parameter as a string, and a Java
+     * {@code byte[]} that went to Python comes back as the same array.
+     */
+    @Test
+    void otherValuesKeepReachingAnErasedObjectParameterUnchanged() {
+        try (Context mappedContext = Context.newBuilder("python")
+            .allowAllAccess(true)
+            .allowHostAccess(new GraalPyHostAccessFactory().hostAccess(List.of()))
+            .build()) {
+            var store = new ErasedStore<Object, Object>();
+            byte[] payload = "payload".getBytes(StandardCharsets.UTF_8);
+            mappedContext.getBindings("python").putMember("store", store);
+            mappedContext.getBindings("python").putMember("payload", payload);
+
+            mappedContext.eval("python", "store.set('key', payload)");
+
+            assertEquals("key", store.key());
+            assertSame(payload, store.value());
         }
     }
 
@@ -862,6 +909,31 @@ class PythonConversionTest {
     public static final class ClassAcceptor {
         public static String name(Class<?> type) {
             return type.getName();
+        }
+    }
+
+    /**
+     * A generic API used with its type arguments erased, as {@code RedisCommands<byte[], byte[]>} is on
+     * a raw-typed bean: the parameters of {@code set} are {@code Object} at the interop boundary.
+     *
+     * @param <K> The key type
+     * @param <V> The value type
+     */
+    public static final class ErasedStore<K, V> {
+        private Object key;
+        private Object value;
+
+        public void set(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        public Object key() {
+            return key;
+        }
+
+        public Object value() {
+            return value;
         }
     }
 }
