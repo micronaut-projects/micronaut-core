@@ -596,7 +596,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
 
     /**
      * Sets when unhandled exception messages should be included in error responses.
-     * Default value ({@value #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
+     * Default value ({@link #DEFAULT_ERROR_RESPONSE_INCLUDE_MESSAGE}).
      *
      * @param errorResponseIncludeMessage When unhandled exception messages should be included
      * @since 5.1.11
@@ -1279,7 +1279,7 @@ public class HttpServerConfiguration implements ServerContextPathProvider, Threa
     }
 
     /**
-     * Allows configuration of properties for the {@link io.micronaut.http.server.netty.body.AbstractFileBodyWriter}.
+     * Allows configuration of properties for the {@link io.micronaut.http.server.body.AbstractFileBodyWriter}.
      *
      * @author James Kleeh
      * @author graemerocher
