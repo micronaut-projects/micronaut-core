@@ -21,6 +21,9 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.web.router.RouteArguments;
+
+import org.jspecify.annotations.Nullable;
 
 import java.lang.annotation.Annotation;
 import java.util.List;
@@ -38,11 +41,13 @@ import java.util.function.ToIntFunction;
  * @since 5.3.0
  */
 @Internal
-record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> ports) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
+record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> ports,
+                            RouteGroupDefaults.@Nullable Inheriting inherited) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
 
     @Override
     public HttpRouteSpec consumes(MediaType... mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
+        own(RouteGroupDefaults.CONSUMES);
         for (HandlerUriRoute route : routes) {
             route.consumes(checked);
         }
@@ -51,6 +56,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec consumesAll() {
+        own(RouteGroupDefaults.CONSUMES);
         for (HandlerUriRoute route : routes) {
             route.consumesAll();
         }
@@ -60,6 +66,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public HttpRouteSpec produces(MediaType... mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
+        own(RouteGroupDefaults.PRODUCES);
         for (HandlerUriRoute route : routes) {
             route.produces(checked);
         }
@@ -94,6 +101,8 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec executeOn(String executorName) {
+        RouteArguments.executorName(executorName);
+        own(RouteGroupDefaults.EXECUTOR);
         for (HandlerUriRoute route : routes) {
             route.executeOn(executorName);
         }
@@ -102,6 +111,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec nonBlocking() {
+        own(RouteGroupDefaults.EXECUTOR);
         for (HandlerUriRoute route : routes) {
             route.nonBlocking();
         }
@@ -194,5 +204,17 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
             route.afterAsync(filter);
         }
         return this;
+    }
+
+    /**
+     * The routes set a setting of their own: they no longer inherit the setting of their group.
+     *
+     * @param setting The setting
+     */
+    private void own(int setting) {
+        RouteGroupDefaults.Inheriting grouped = inherited;
+        if (grouped != null) {
+            grouped.own(setting);
+        }
     }
 }

@@ -19,6 +19,7 @@ import io.micronaut.context.env.PropertyPlaceholderResolver;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
@@ -39,19 +40,27 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
 
     private final RouteAssembly.RouteFilters filters;
     private final RouteAssembly.RouteGroup settings;
+    private final RouteGroupDefaults defaults;
 
     /**
      * @param assembly The assembly the routes are added to
      * @param filters  The filters of the group
      * @param settings The other settings of the group
+     * @param defaults The media types and the executor of the group
      * @param prefix   The prefix of the URI templates of the routes, or {@code null}
      * @param placeholderResolver Resolves the placeholders of the ports given as strings, or {@code null}
      */
-    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings, @Nullable RoutePrefix prefix,
-                          @Nullable PropertyPlaceholderResolver placeholderResolver) {
+    DefaultHttpRouteGroup(RouteAssembly assembly, RouteAssembly.RouteFilters filters, RouteAssembly.RouteGroup settings,
+                          RouteGroupDefaults defaults, @Nullable RoutePrefix prefix, @Nullable PropertyPlaceholderResolver placeholderResolver) {
         super(assembly, filters, settings, prefix, placeholderResolver);
         this.filters = filters;
         this.settings = settings;
+        this.defaults = defaults;
+    }
+
+    @Override
+    RouteGroupDefaults groupDefaults() {
+        return defaults;
     }
 
     /**
@@ -60,6 +69,38 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     void close() {
         filters.close();
         settings.close();
+        // the last: the routes inherit the settings of the closed groups
+        defaults.close();
+    }
+
+    @Override
+    public HttpRouteGroup consumes(MediaType... mediaTypes) {
+        defaults.consumes(mediaTypes);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup consumesAll() {
+        defaults.consumesAll();
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup produces(MediaType... mediaTypes) {
+        defaults.produces(mediaTypes);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup executeOn(String executorName) {
+        defaults.executeOn(executorName);
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup nonBlocking() {
+        defaults.nonBlocking();
+        return this;
     }
 
     @Override
