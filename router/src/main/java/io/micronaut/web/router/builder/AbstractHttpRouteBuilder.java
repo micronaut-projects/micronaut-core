@@ -124,6 +124,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncBodyRequestHandler handler) {
+        return spec(route(method, uri, HandlerMethod.of(handler), null));
+    }
+
+    @Override
     public final HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
         return spec(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
@@ -139,6 +144,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     @Override
+    public final HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler) {
+        return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
+    }
+
+    @Override
     public final HttpRouteSpec handle(RouteDeclaration route, RequestHandler handler) {
         return spec(declare(route, HandlerMethod.of(handler), null));
     }
@@ -150,6 +160,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler) {
+        return spec(declare(route, HandlerMethod.of(handler), null));
+    }
+
+    @Override
+    public final HttpRouteSpec handleAsync(RouteDeclaration route, AsyncBodyRequestHandler handler) {
         return spec(declare(route, HandlerMethod.of(handler), null));
     }
 
@@ -192,6 +207,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler) {
+        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
+    }
+
+    @Override
+    public final HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncBodyRequestHandler handler) {
         return spec(route(httpMethodName, uri, HandlerMethod.of(handler)));
     }
 

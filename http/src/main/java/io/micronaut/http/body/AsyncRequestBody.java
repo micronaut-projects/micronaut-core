@@ -13,13 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package io.micronaut.http;
+package io.micronaut.http.body;
 
 import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.body.BodyElements;
-import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormParts;
 import org.jspecify.annotations.Nullable;
@@ -29,18 +26,23 @@ import java.util.OptionalLong;
 import java.util.concurrent.CompletionStage;
 
 /**
- * A request received by the server whose body is read asynchronously, by the handler, once: the
- * request an asynchronous handler function receives. Nothing is decoded before the handler asks
- * for it, and the handler chooses how: decoded to a type, as text or bytes, element by element,
- * as a form, part by part, written to a file, or taken as is to pass it on.
+ * The body of a request received by the server, read asynchronously by the handler, once: the
+ * body parameter of an asynchronous handler function, see
+ * {@code io.micronaut.web.router.builder.AsyncBodyRequestHandler}, like the decoded body
+ * parameter of a handler function that receives the body decoded. Nothing is decoded before the
+ * handler asks for it, and the handler chooses how: decoded to a type, as text or bytes, element
+ * by element, as a form, part by part, written to a file, or taken as is to pass it on.
  *
  * <pre>{@code
- * routes.asyncPOST("/people", (request, pathVariables) -> request.body(Person.class)
+ * routes.asyncPOST("/people", (request, pathVariables, body) -> body.body(Person.class)
  *     .thenApply(person -> HttpResponse.created(people.save(person))));
- * routes.asyncPOST("/people/import", (request, pathVariables) -> request.elements(Person.class)
+ * routes.asyncPOST("/people/import", (request, pathVariables, body) -> body.elements(Person.class)
  *     .forEach(people::saveAsync)
  *     .thenApply(done -> HttpResponse.accepted()));
  * }</pre>
+ *
+ * <p>A controller method can declare it as an argument too: what a read left open is then
+ * released when the request ends.</p>
  *
  * <h2>One read</h2>
  * <p>The body is read once: the first of {@link #body(Argument)}, {@link #text()},
@@ -67,40 +69,41 @@ import java.util.concurrent.CompletionStage;
  * that needs one can take the body with {@link #takeBody()}.</p>
  *
  * <h2>The body of the request</h2>
- * <p>{@link #byteBody()} keeps the contract of {@link ServerHttpRequest#byteBody()}: the request
- * owns the bytes, and a caller that reads them {@link ByteBody#split() splits} them first, like
- * a filter does. It is not the way for the handler to read the body: use {@link #takeBody()},
- * which moves the body to the handler. {@link #getBody()} is always empty: no binder decodes a
- * body for the handler.</p>
+ * <p>It is the body of the request the route is invoked with, as the filters left it: the bytes
+ * of its {@link io.micronaut.http.ServerHttpRequest#byteBody() byteBody()}, which keeps its
+ * contract: the request owns the bytes, and a caller that reads them {@link ByteBody#split()
+ * splits} them first, like a filter does. {@link #takeBody()} moves the body to the handler.
+ * Reading the body decodes no body for the request: its
+ * {@link io.micronaut.http.HttpRequest#getBody() getBody()} does not change.</p>
  *
  * <h2>Filters</h2>
  * <p>A filter that reads the body, e.g. with a {@code @Body} argument, reads a copy, and is not
  * the handler's read. It buffers the body before the handler can read it.</p>
  *
  * <p>A filter that continues with a mutable request whose body it set, see
- * {@link MutableHttpRequest#body(Object)}, replaces the bytes of the request with that body. A
- * body set to {@code null} is no body: {@link #hasBody()} is {@code false}, {@link #body(Argument)}
- * completes like it does for a request without a body, with {@code null} for a nullable type and
- * otherwise with the error of a missing {@code @Body} argument, {@link #text()} is empty,
- * {@link #bytes(int)} is an empty array, and {@link #takeBody()} is an empty body. A body set to an
- * object is read with {@link #body(Argument)}, which converts it like a {@code @Body} argument of
- * a controller: the readers of the bytes, {@link #text()}, {@link #bytes(int)},
- * {@link #elements(Argument)}, {@link #transferTo(Path)}, {@link #form()}, {@link #parts()} and
- * {@link #takeBody()}, fail with an {@link IllegalStateException}. A
- * filter that continues with another {@link ServerHttpRequest} replaces the bytes with its
- * {@link ServerHttpRequest#byteBody() byteBody()}. The body is read once either way.</p>
+ * {@link io.micronaut.http.MutableHttpRequest#body(Object)}, replaces the bytes of the request
+ * with that body. A body set to {@code null} is no body: {@link #hasBody()} is {@code false},
+ * {@link #body(Argument)} completes like it does for a request without a body, with {@code null}
+ * for a nullable type and otherwise with the error of a missing {@code @Body} argument,
+ * {@link #text()} is empty, {@link #bytes(int)} is an empty array, and {@link #takeBody()} is an
+ * empty body. A body set to an object is read with {@link #body(Argument)}, which converts it like
+ * a {@code @Body} argument of a controller: the readers of the bytes, {@link #text()},
+ * {@link #bytes(int)}, {@link #elements(Argument)}, {@link #transferTo(Path)}, {@link #form()},
+ * {@link #parts()} and {@link #takeBody()}, fail with an {@link IllegalStateException}. A filter
+ * that continues with another {@link io.micronaut.http.ServerHttpRequest} replaces the bytes with
+ * its {@link io.micronaut.http.ServerHttpRequest#byteBody() byteBody()}. The body is read once
+ * either way.</p>
  *
  * <h2>{@code 100 Continue}</h2>
  * <p>A request that expects {@code 100 Continue} is answered with {@code 100 Continue} when the
  * body is first read. A handler that answers without reading the body, e.g. with {@code 401},
  * never receives it.</p>
  *
- * @param <B> The body type of the request
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Experimental
-public interface AsyncServerHttpRequest<B> extends ServerHttpRequest<B> {
+public interface AsyncRequestBody {
 
     /**
      * Whether the request has a body, without reading it: a body with a length other than zero,

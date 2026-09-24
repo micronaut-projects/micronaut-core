@@ -16,26 +16,23 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Experimental;
-import io.micronaut.http.AsyncServerHttpRequest;
+import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 
 import java.util.concurrent.CompletionStage;
 
 /**
- * A route handler that completes the response later. The executor is selected like for a
- * controller method returning a {@link CompletionStage}: with automatic thread selection it runs
- * on the event loop and must not block.
+ * A route handler that completes the response later, like a controller method returning a
+ * {@link CompletionStage}. The executor is selected like for such a controller method: with
+ * automatic thread selection it runs on the event loop and must not block.
  *
- * <p>The handler receives no decoded body: it reads the body of the request itself, once, with
- * the methods of {@link AsyncServerHttpRequest}, which complete later or read one element or part
- * at a time. What it left open, e.g. the parts of a form it did not read, is released when the
- * returned stage completes, so the stage must include the reading of the body:</p>
+ * <p>The handler does not read the body of the request, like a {@link RequestHandler}: a body
+ * is discarded when the request ends, and a request that expects {@code 100 Continue} is never
+ * sent it. A handler that reads the body is an {@link AsyncBodyRequestHandler}, which receives
+ * the body as a parameter.</p>
  * <pre>{@code
- * routes.asyncPOST("/people", (request, pathVariables) -> request.body(Person.class)
- *     .thenApply(person -> HttpResponse.created(people.save(person))));
- * routes.asyncPOST("/upload", (request, pathVariables) -> request.parts()
- *     .part("file", part -> part.file().transferTo(uploads.resolve(UUID.randomUUID().toString())))
- *     .thenApply(found -> found ? HttpResponse.ok() : HttpResponse.badRequest()));
+ * routes.asyncGET("/people/{id}", (request, pathVariables) -> people.findAsync(pathVariables.getLong("id"))
+ *     .thenApply(HttpResponse::ok));
  * }</pre>
  *
  * <p>Like a controller method, the handler runs with the propagated context of the request in
@@ -46,12 +43,7 @@ import java.util.concurrent.CompletionStage;
  * only if that thread has it, e.g. a task submitted to the {@code TaskExecutors.IO} or
  * {@code TaskExecutors.BLOCKING} executor, which propagates the context of the thread that
  * submits it; see {@link io.micronaut.core.propagation.PropagatedContext#wrap(Runnable)} for
- * other threads. The reads of the body are no exception, like the {@code CompletableFuture} or
- * {@code Publisher} body of a controller method: a read, or a consumer of {@code parts()} or
- * {@code elements()}, that completes once the rest of the body arrives, completes on the thread
- * that delivers the body, without the context. A handler that needs the context once it has the
- * body continues with a propagating executor, or is a body or form handler, which is called once
- * the body arrived, like a controller method with a {@code @Body} argument.</p>
+ * other threads.</p>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -64,12 +56,12 @@ public interface AsyncRequestHandler {
     /**
      * Handle the request.
      *
-     * @param request       The request, whose body the handler reads
+     * @param request       The request
      * @param pathVariables The path variables of the matched route
      * @return The response, completed later, not {@code null}: a stage completed with {@code null}
      * is answered like the {@code null} result of a controller method, with {@code 404}, or with
      * {@code 204} if {@code micronaut.server.not-found-on-missing-body} is {@code false}
      * @throws Exception An error, handled by the error routes like a controller error
      */
-    CompletionStage<? extends HttpResponse<?>> handle(AsyncServerHttpRequest<?> request, PathVariables pathVariables) throws Exception;
+    CompletionStage<? extends HttpResponse<?>> handle(HttpRequest<?> request, PathVariables pathVariables) throws Exception;
 }
