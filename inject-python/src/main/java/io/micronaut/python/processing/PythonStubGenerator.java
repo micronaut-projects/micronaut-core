@@ -4431,6 +4431,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         ClassElement declaredReturnType = signatureMethod == methodElement || returnTypeOverride != null
             ? null
             : resolvedSignatureMethod.getGenericReturnType();
+        ClassElement asyncDeclaredReturnType = declaredReturnType == null ? returnTypeOverride : declaredReturnType;
         TypeDef methodSourceReturnType = genericToArray
             ? ClassTypeDef.of(sourceSignatureMethod.getDeclaredTypeVariables().getFirst().getVariableName()).array()
             : bridgeSourceReturnType(methodElement, signatureMethod, resolvedSignatureMethod, effectiveReturnType, returnTypeOverride, isJunit5Test, bridgeSignatureTypeArguments);
@@ -4553,7 +4554,7 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                         );
                     } else if (isAsyncMethod) {
                         return invokedValue.newLocal("pythonCoroutine", pythonCoroutine ->
-                            coroutineResult(pythonCoroutine, methodSourceReturnType, declaredReturnType).returning()
+                            coroutineResult(pythonCoroutine, methodSourceReturnType, asyncDeclaredReturnType).returning()
                         );
                     } else {
                         boolean bridgeSignature = signatureMethod != methodElement

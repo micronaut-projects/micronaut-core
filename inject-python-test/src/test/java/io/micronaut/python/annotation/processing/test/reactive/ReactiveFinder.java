@@ -24,12 +24,16 @@ import reactor.core.publisher.Mono;
 /**
  * A Java contract with Reactor and future return types implemented by Python classes in the tests.
  */
-public interface ReactiveFinder {
+public interface ReactiveFinder<T> {
 
     Mono<String> find(String id);
 
     default Mono<String> findWithCallback(String id, Consumer<String> callback) {
         return Mono.just("default");
+    }
+
+    default Mono<T> findGenericWithCallback(String id, Consumer<String> callback) {
+        return Mono.empty();
     }
 
     Flux<String> findAll();

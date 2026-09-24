@@ -184,6 +184,9 @@ class AsyncFinder(ReactiveFinder):
     async def findWithCallback(self, id: str, callback=None) -> str:
         return id
 
+    async def findGenericWithCallback(self, id: str, callback=None) -> str:
+        return id
+
     def findAll(self) -> Flux[str]:
         return Flux.just("a")
 
@@ -205,6 +208,7 @@ class AsyncFinder(ReactiveFinder):
         finder.find("x") instanceof Mono
         finder.find("x").block() == "x"
         finder.findWithCallback("c", null).block() == "c"
+        finder.findGenericWithCallback("g", null).block() == "g"
 
         cleanup:
         context?.close()
