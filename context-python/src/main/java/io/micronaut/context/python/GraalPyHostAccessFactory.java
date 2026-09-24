@@ -33,6 +33,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import java.time.Duration;
@@ -42,6 +43,8 @@ import java.time.LocalTime;
 import java.time.ZoneOffset;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 /**
  * Factory that creates the HostAccess bean used by the GraalPy Context.
@@ -84,13 +87,21 @@ final class GraalPyHostAccessFactory {
      * the conversion back. Registered both for their own Java type and for an {@code Object} parameter.
      */
     private static final List<StandardLibraryType<?>> STANDARD_LIBRARY_TYPES = List.of(
-        new StandardLibraryType<>(DATETIME, "date", LocalDate.class, PythonConversion::convertLocalDate),
-        new StandardLibraryType<>(DATETIME, "time", LocalTime.class, PythonConversion::convertLocalTime),
-        new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime),
-        new StandardLibraryType<>(DATETIME, "timedelta", Duration.class, PythonConversion::convertDuration),
-        new StandardLibraryType<>(DATETIME, "timezone", ZoneOffset.class, PythonConversion::convertZoneOffset),
-        new StandardLibraryType<>("uuid", "UUID", UUID.class, PythonConversion::convertUuid)
+        new StandardLibraryType<>(DATETIME, "date", LocalDate.class, PythonConversion::convertLocalDate, value -> true),
+        new StandardLibraryType<>(DATETIME, "time", LocalTime.class, PythonConversion::convertLocalTime, GraalPyHostAccessFactory::isNaive),
+        new StandardLibraryType<>(DATETIME, DATETIME, LocalDateTime.class, PythonConversion::convertLocalDateTime, GraalPyHostAccessFactory::isNaive),
+        new StandardLibraryType<>(DATETIME, "timedelta", Duration.class, PythonConversion::convertDuration, value -> true),
+        new StandardLibraryType<>(DATETIME, "timezone", ZoneOffset.class, PythonConversion::convertZoneOffset, GraalPyHostAccessFactory::isWholeSecondOffset),
+        new StandardLibraryType<>("uuid", "UUID", UUID.class, PythonConversion::convertUuid, value -> true)
     );
+
+    /**
+     * The same table keyed by {@code (module, name)}, so a value's type is looked up once rather than
+     * compared against every entry in turn.
+     */
+    private static final Map<String, StandardLibraryType<?>> STANDARD_LIBRARY_TYPES_BY_NAME =
+        STANDARD_LIBRARY_TYPES.stream().collect(Collectors.toUnmodifiableMap(
+            type -> type.module() + '.' + type.typeName(), type -> type));
 
     /**
      * Builds a HostAccess instance and registers all TargetTypeMapping beans.
@@ -377,28 +388,56 @@ final class GraalPyHostAccessFactory {
             value -> findStandardLibraryType(value) != null,
             value -> {
                 StandardLibraryType<?> standardType = findStandardLibraryType(value);
-                if (standardType == null) {
-                    return value;
-                }
-                try {
-                    return standardType.converter().apply(value);
-                } catch (IllegalArgumentException e) {
-                    return value;
-                }
+                // The predicate above is the same lookup, so a value only reaches here having matched.
+                return Objects.requireNonNull(standardType).converter().apply(value);
             }
         );
     }
 
+    /**
+     * @param value a Python value bound for an {@code Object} parameter
+     * @return the standard library type to convert it as, or {@code null} to leave it alone
+     */
     private static @Nullable StandardLibraryType<?> findStandardLibraryType(@Nullable Value value) {
-        if (value == null || value.isNull() || value.isHostObject()) {
+        if (value == null || value.isNull() || value.isHostObject()
+            || value.isString() || value.isNumber() || value.isBoolean() || !value.hasMembers()) {
             return null;
         }
-        for (StandardLibraryType<?> standardType : STANDARD_LIBRARY_TYPES) {
-            if (standardType.matches(value)) {
-                return standardType;
-            }
+        Value type = value.getMember("__class__");
+        if (type == null || !type.hasMembers()) {
+            return null;
         }
-        return null;
+        String module = PythonConversion.stringMember(type, "__module__");
+        String name = PythonConversion.stringMember(type, "__name__");
+        if (module == null || name == null) {
+            return null;
+        }
+        StandardLibraryType<?> standardType = STANDARD_LIBRARY_TYPES_BY_NAME.get(module + '.' + name);
+        return standardType != null && standardType.convertible().test(value) ? standardType : null;
+    }
+
+    /**
+     * @param value a Python {@code time} or {@code datetime}
+     * @return whether it carries no time zone, and so has a {@code LocalTime} or {@code LocalDateTime}
+     * counterpart. An aware one does not, and keeps the default mapping rather than failing the call
+     */
+    private static boolean isNaive(Value value) {
+        Value tzinfo = value.getMember("tzinfo");
+        return tzinfo == null || tzinfo.isNull();
+    }
+
+    /**
+     * @param value a Python {@code datetime.timezone}
+     * @return whether its offset is an exact number of seconds, which is all {@link ZoneOffset} can
+     * express
+     */
+    private static boolean isWholeSecondOffset(Value value) {
+        try {
+            PythonConversion.convertZoneOffset(value);
+            return true;
+        } catch (RuntimeException e) {
+            return false;
+        }
     }
 
     /**
@@ -873,7 +912,8 @@ final class GraalPyHostAccessFactory {
      * @param converter The conversion
      * @param <T> The Java type
      */
-    private record StandardLibraryType<T>(String module, String typeName, Class<T> targetType, Function<Value, T> converter) {
+    private record StandardLibraryType<T>(String module, String typeName, Class<T> targetType,
+                                         Function<Value, T> converter, Predicate<Value> convertible) {
 
         boolean matches(Value value) {
             return PythonCoercion.isPythonType(value, module, typeName);

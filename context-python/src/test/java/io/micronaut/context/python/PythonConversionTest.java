@@ -268,11 +268,20 @@ class PythonConversionTest {
                 import datetime
 
                 parameter.accept(datetime.time(12, tzinfo=datetime.timezone.utc))
+                parameter.accept(datetime.datetime(2026, 9, 24, 12, tzinfo=datetime.timezone.utc))
+                parameter.accept(datetime.timezone(datetime.timedelta(microseconds=1500)))
                 """);
         }
 
-        assertEquals(1, parameter.received().size());
-        assertFalse(parameter.received().get(0) instanceof LocalTime);
+        // Asserting the exact type matters. A value the conversion cannot take has to keep the
+        // mapping it would have had, which means the predicate must refuse it: refusing inside the
+        // converter instead leaves the parameter holding a polyglot Value, because Truffle passes a
+        // converter's result through once its predicate has said yes.
+        assertEquals(3, parameter.received().size());
+        for (Object received : parameter.received()) {
+            assertFalse(received instanceof Value, "a refused value must not arrive as a polyglot Value");
+            assertTrue(received instanceof Map, "a refused value keeps the default mapping: " + received.getClass());
+        }
     }
 
     @Test
