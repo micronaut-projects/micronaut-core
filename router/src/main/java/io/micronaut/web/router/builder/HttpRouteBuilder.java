@@ -839,6 +839,46 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     void path(String prefix, Consumer<HttpRouteGroup> routes);
 
     /**
+     * Route {@code GET} requests for the URI prefix and every path under it to a handler of
+     * resources, e.g. the static resources of the HTTP server:
+     * {@code routes.resources("/assets", StaticResources.classpath("public"))} serves
+     * {@code GET /assets/css/site.css} from {@code public/css/site.css} on the classpath, and
+     * {@code GET /assets} from the index file.
+     *
+     * <p>It routes {@code GET prefix/{+path}}, where {@code path} is the
+     * {@link ResourceHandler#pathVariable()}, the path of the resource relative to the prefix, and
+     * {@code GET prefix}, without the variable, to the handler. The routes have implicit
+     * {@code HEAD} routes, like any {@code GET} route, and are ordinary routes: the more specific
+     * routes of controllers and handlers under the prefix take precedence. Their filters,
+     * conditions, order and attributes are declared on the returned route, which configures both.
+     * In a group, the prefix follows the prefix of the group, and the filters and the executor
+     * of the group apply, not its media types: the handler decides the media type of each
+     * resource.</p>
+     *
+     * @param uriPrefix The URI prefix, e.g. {@code /assets}; empty or {@code /} for the root
+     * @param resources The handler of the resources
+     * @return The routes
+     * @since 5.3.0
+     */
+    HttpRouteSpec resources(String uriPrefix, ResourceHandler resources);
+
+    /**
+     * Like {@link #resources(String, ResourceHandler)}, at the path of the scope: the prefix of
+     * the {@link #path(String, Consumer) group}, or the root outside of a group.
+     *
+     * <pre>{@code
+     * routes.path("/assets", assets -> assets.resources(StaticResources.classpath("public")));
+     * }</pre>
+     *
+     * @param resources The handler of the resources
+     * @return The routes
+     * @since 5.3.0
+     */
+    default HttpRouteSpec resources(ResourceHandler resources) {
+        return resources("/", resources);
+    }
+
+    /**
      * Like {@link #GET(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param handler        The handler
