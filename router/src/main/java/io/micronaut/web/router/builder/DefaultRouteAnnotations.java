@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.AnnotationMetadata;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Internal;
@@ -54,6 +55,10 @@ public final class DefaultRouteAnnotations {
     private final Map<String, List<AnnotationValue<?>>> annotations = new LinkedHashMap<>(4);
     private final @Nullable DefaultRouteAnnotations enclosing;
     private @Nullable AnnotationMetadata metadata;
+    /**
+     * The element given to the group, see {@link HttpRouteGroup#annotationMetadata}, or {@code null}.
+     */
+    private @Nullable AnnotationMetadataProvider element;
 
     /**
      * The annotations of a route, or collected to be added to a route or a group.
@@ -112,6 +117,31 @@ public final class DefaultRouteAnnotations {
             }
         }
         return builder.build();
+    }
+
+    /**
+     * The element of a group, which the routes of the group without their own element have, see
+     * {@link HttpRouteGroup#annotationMetadata}.
+     *
+     * @param element The annotated element
+     */
+    public void element(AnnotationMetadataProvider element) {
+        Objects.requireNonNull(element, "annotationMetadata");
+        Objects.requireNonNull(element.getAnnotationMetadata(), "annotationMetadata");
+        this.element = element;
+    }
+
+    /**
+     * @return The element of the innermost group that has one, these annotations or the enclosing
+     * ones, or {@code null}
+     */
+    public @Nullable AnnotationMetadataProvider element() {
+        for (DefaultRouteAnnotations level = this; level != null; level = level.enclosing) {
+            if (level.element != null) {
+                return level.element;
+            }
+        }
+        return null;
     }
 
     /**

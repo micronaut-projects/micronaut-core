@@ -37,6 +37,7 @@ import java.util.function.ToIntFunction;
  *
  * @param routes The routes of the handler
  * @param ports  Resolves a port given as a string, see {@link #port(String)}
+ * @param inherited The media types and the executor the routes inherit from their groups, or {@code null}
  * @author Denis Stepanov
  * @since 5.3.0
  */

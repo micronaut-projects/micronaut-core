@@ -3,8 +3,10 @@ package io.micronaut.docs.server.functional;
 import io.micronaut.context.ApplicationContext;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.HttpStatus;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.runtime.server.EmbeddedServer;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -13,7 +15,9 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class AuditedRoutesTest {
 
@@ -65,6 +69,24 @@ class AuditedRoutesTest {
         HttpResponse<String> v2 = http.exchange(HttpRequest.GET("/receipts/7").header("X-API-VERSION", "2"), String.class);
         assertEquals("receipt v2 7", v2.body());
         assertEquals("true", v2.getHeaders().get("X-Audited"));
+    }
+
+    @Test
+    void theRoutesOfAGroupHaveItsExecutorAndAnnotations() {
+        BlockingHttpClient http = client.toBlocking();
+        HttpResponse<String> users = http.exchange(HttpRequest.GET("/admin/users").header("X-API-VERSION", "2"), String.class);
+        // the blocking executor, not the event loop
+        assertFalse(users.body().contains("EventLoop"), users.body());
+        assertEquals("true", users.getHeaders().get("X-Audited"));
+
+        HttpResponse<String> deleted = http.exchange(HttpRequest.DELETE("/admin/users/3").header("X-API-VERSION", "2"), String.class);
+        assertEquals("deleted 3", deleted.body());
+        assertEquals("true", deleted.getHeaders().get("X-Audited"));
+
+        // the routes of the group answer the version 2 only
+        HttpClientResponseException v1 = assertThrows(HttpClientResponseException.class,
+            () -> http.exchange(HttpRequest.GET("/admin/users").header("X-API-VERSION", "1"), String.class));
+        assertEquals(HttpStatus.NOT_FOUND, v1.getStatus());
     }
 
     @Test

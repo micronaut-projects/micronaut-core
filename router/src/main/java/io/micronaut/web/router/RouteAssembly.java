@@ -1167,11 +1167,11 @@ public final class RouteAssembly {
         }
 
         /**
-         * @param annotation An annotation of the routes of the group
+         * @return The annotations and the annotated element of the routes of the group, to add to
          */
-        public void annotate(AnnotationValue<?> annotation) {
+        public DefaultRouteAnnotations annotations() {
             checkOpen();
-            annotations.add(annotation);
+            return annotations;
         }
 
         /**
