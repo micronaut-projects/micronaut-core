@@ -26,12 +26,14 @@ import io.micronaut.core.convert.value.MutableConvertibleValuesMap;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpMessage;
 import io.micronaut.http.MutableHttpResponse;
+import io.micronaut.http.RouteMetadataHolder;
 import io.micronaut.http.body.MessageBodyWriter;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.CookieUtils;
@@ -69,7 +71,10 @@ import java.util.Set;
  */
 @Internal
 @TypeHint(value = NettyMutableHttpResponse.class)
-public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder {
+public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>, NettyHttpResponseBuilder, RouteMetadataHolder {
+    private static final String ROUTE_MATCH_KEY = HttpAttributes.ROUTE_MATCH.toString();
+    private static final String ROUTE_INFO_KEY = HttpAttributes.ROUTE_INFO.toString();
+    private static final String URI_TEMPLATE_KEY = HttpAttributes.URI_TEMPLATE.toString();
     private final HttpVersion httpVersion;
     private HttpResponseStatus httpResponseStatus;
     private final NettyHttpHeaders headers;
@@ -81,8 +86,19 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     @Nullable
     private final DecoderResult decoderResult;
     private final ConversionService conversionService;
+    /**
+     * The attribute map. It is created lazily, by {@link #getAttributes()} only: the route
+     * metadata is kept in the fields below until then, so that a plain response never allocates
+     * the map. Once the map exists it is the only store, and the fields are cleared.
+     */
     @Nullable
     private MutableConvertibleValues<Object> attributes;
+    @Nullable
+    private Object routeMatch;
+    @Nullable
+    private Object routeInfo;
+    @Nullable
+    private String uriTemplate;
     @Nullable
     private BodyConvertor bodyConvertor;
     @Nullable
@@ -260,30 +276,132 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
+        // no synchronization: a response is built by a single thread at a time, and the map is
+        // not shared until it has been published by the caller
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
-            synchronized (this) { // double check
-                attributes = this.attributes;
-                if (attributes == null) {
-                    attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
-                    this.attributes = attributes;
-                }
+            attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
+            // move the route metadata into the map, which is the only store from now on
+            if (routeMatch != null) {
+                attributes.put(ROUTE_MATCH_KEY, routeMatch);
+                routeMatch = null;
             }
+            if (routeInfo != null) {
+                attributes.put(ROUTE_INFO_KEY, routeInfo);
+                routeInfo = null;
+            }
+            if (uriTemplate != null) {
+                attributes.put(URI_TEMPLATE_KEY, uriTemplate);
+                uriTemplate = null;
+            }
+            this.attributes = attributes;
         }
         return attributes;
+    }
+
+    @Override
+    public Optional<Object> getAttribute(CharSequence name) {
+        if (StringUtils.isEmpty(name)) {
+            return Optional.empty();
+        }
+        String key = name.toString();
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes != null) {
+            return Optional.ofNullable(attributes.getValue(key));
+        }
+        if (key.equals(ROUTE_MATCH_KEY)) {
+            return Optional.ofNullable(routeMatch);
+        }
+        if (key.equals(ROUTE_INFO_KEY)) {
+            return Optional.ofNullable(routeInfo);
+        }
+        if (key.equals(URI_TEMPLATE_KEY)) {
+            return Optional.ofNullable(uriTemplate);
+        }
+        return Optional.empty();
     }
 
     @Override
     public io.micronaut.http.HttpResponse<B> setAttribute(CharSequence name, @Nullable Object value) {
         // This is the copy from the super method to avoid the type pollution
         if (StringUtils.isNotEmpty(name)) {
-            if (value == null) {
-                getAttributes().remove(name.toString());
-            } else {
-                getAttributes().put(name.toString(), value);
+            String key = name.toString();
+            if (attributes == null) {
+                if (key.equals(ROUTE_MATCH_KEY)) {
+                    routeMatch = value;
+                    return this;
+                }
+                if (key.equals(ROUTE_INFO_KEY)) {
+                    routeInfo = value;
+                    return this;
+                }
+                if (key.equals(URI_TEMPLATE_KEY) && (value == null || value instanceof String)) {
+                    uriTemplate = (String) value;
+                    return this;
+                }
             }
+            putOrRemove(getAttributes(), key, value);
         }
         return this;
+    }
+
+    @Override
+    public @Nullable Object getRouteMatchMetadata() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        return attributes == null ? routeMatch : attributes.getValue(ROUTE_MATCH_KEY);
+    }
+
+    @Override
+    public void setRouteMatchMetadata(@Nullable Object routeMatch) {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            this.routeMatch = routeMatch;
+        } else {
+            putOrRemove(attributes, ROUTE_MATCH_KEY, routeMatch);
+        }
+    }
+
+    @Override
+    public @Nullable Object getRouteInfoMetadata() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        return attributes == null ? routeInfo : attributes.getValue(ROUTE_INFO_KEY);
+    }
+
+    @Override
+    public void setRouteInfoMetadata(@Nullable Object routeInfo) {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            this.routeInfo = routeInfo;
+        } else {
+            putOrRemove(attributes, ROUTE_INFO_KEY, routeInfo);
+        }
+    }
+
+    @Override
+    public @Nullable String getUriTemplateMetadata() {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            return uriTemplate;
+        }
+        return attributes.getValue(URI_TEMPLATE_KEY) instanceof String template ? template : null;
+    }
+
+    @Override
+    public void setUriTemplateMetadata(@Nullable String uriTemplate) {
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            this.uriTemplate = uriTemplate;
+        } else {
+            putOrRemove(attributes, URI_TEMPLATE_KEY, uriTemplate);
+        }
+    }
+
+    private static void putOrRemove(MutableConvertibleValues<Object> attributes, String key, @Nullable Object value) {
+        if (value == null) {
+            attributes.remove(key);
+        } else {
+            attributes.put(key, value);
+        }
     }
 
     @Override

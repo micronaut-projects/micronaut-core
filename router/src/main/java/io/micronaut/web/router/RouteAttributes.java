@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.RouteMetadataHolder;
 
 import java.util.Optional;
 
@@ -39,6 +40,9 @@ public final class RouteAttributes {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<RouteMatch<?>> getRouteMatch(HttpRequest<?> request) {
+        if (request instanceof RouteMetadataHolder holder) {
+            return routeMatch(holder);
+        }
         return (Optional) request.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
     }
 
@@ -49,7 +53,11 @@ public final class RouteAttributes {
      * @param routeMatch The route match
      */
     public static void setRouteMatch(HttpRequest<?> request, RouteMatch<?> routeMatch) {
-        request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        if (request instanceof RouteMetadataHolder holder) {
+            holder.setRouteMatchMetadata(routeMatch);
+        } else {
+            request.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        }
     }
 
     /**
@@ -60,6 +68,9 @@ public final class RouteAttributes {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<RouteMatch<?>> getRouteMatch(HttpResponse<?> response) {
+        if (response instanceof RouteMetadataHolder holder) {
+            return routeMatch(holder);
+        }
         return (Optional) response.getAttribute(HttpAttributes.ROUTE_MATCH, RouteMatch.class);
     }
 
@@ -70,7 +81,11 @@ public final class RouteAttributes {
      * @param routeMatch The route match
      */
     public static void setRouteMatch(HttpResponse<?> response, RouteMatch<?> routeMatch) {
-        response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        if (response instanceof RouteMetadataHolder holder) {
+            holder.setRouteMatchMetadata(routeMatch);
+        } else {
+            response.setAttribute(HttpAttributes.ROUTE_MATCH, routeMatch);
+        }
     }
 
     /**
@@ -81,6 +96,9 @@ public final class RouteAttributes {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<RouteInfo<?>> getRouteInfo(HttpRequest<?> request) {
+        if (request instanceof RouteMetadataHolder holder) {
+            return routeInfo(holder);
+        }
         return (Optional) request.getAttribute(HttpAttributes.ROUTE_INFO, RouteInfo.class);
     }
 
@@ -91,7 +109,11 @@ public final class RouteAttributes {
      * @param routeInfo The route info
      */
     public static void setRouteInfo(HttpRequest<?> request, RouteInfo<?> routeInfo) {
-        request.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+        if (request instanceof RouteMetadataHolder holder) {
+            holder.setRouteInfoMetadata(routeInfo);
+        } else {
+            request.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+        }
     }
 
     /**
@@ -102,6 +124,9 @@ public final class RouteAttributes {
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<RouteInfo<?>> getRouteInfo(HttpResponse<?> response) {
+        if (response instanceof RouteMetadataHolder holder) {
+            return routeInfo(holder);
+        }
         // don't convert to RouteInfo to avoid type pollution
         return (Optional) response.getAttribute(HttpAttributes.ROUTE_INFO);
     }
@@ -113,7 +138,19 @@ public final class RouteAttributes {
      * @param routeInfo The route info
      */
     public static void setRouteInfo(HttpResponse<?> response, RouteInfo<?> routeInfo) {
-        response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+        if (response instanceof RouteMetadataHolder holder) {
+            holder.setRouteInfoMetadata(routeInfo);
+        } else {
+            response.setAttribute(HttpAttributes.ROUTE_INFO, routeInfo);
+        }
+    }
+
+    private static Optional<RouteMatch<?>> routeMatch(RouteMetadataHolder holder) {
+        return holder.getRouteMatchMetadata() instanceof RouteMatch<?> routeMatch ? Optional.of(routeMatch) : Optional.empty();
+    }
+
+    private static Optional<RouteInfo<?>> routeInfo(RouteMetadataHolder holder) {
+        return holder.getRouteInfoMetadata() instanceof RouteInfo<?> routeInfo ? Optional.of(routeInfo) : Optional.empty();
     }
 
     /**

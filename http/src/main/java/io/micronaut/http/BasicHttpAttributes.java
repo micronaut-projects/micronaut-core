@@ -41,6 +41,9 @@ public final class BasicHttpAttributes {
      * @return The route match, if present
      */
     public static Optional<UriMatchInfo> getRouteMatchInfo(HttpRequest<?> request) {
+        if (request instanceof RouteMetadataHolder holder) {
+            return holder.getRouteMatchMetadata() instanceof UriMatchInfo info ? Optional.of(info) : Optional.empty();
+        }
         return request.getAttribute(HttpAttributes.ROUTE_MATCH, UriMatchInfo.class);
     }
 
@@ -51,6 +54,9 @@ public final class BasicHttpAttributes {
      * @return The template, if present
      */
     public static Optional<String> getUriTemplate(HttpRequest<?> request) {
+        if (request instanceof RouteMetadataHolder holder) {
+            return Optional.ofNullable(holder.getUriTemplateMetadata());
+        }
         return request.getAttribute(HttpAttributes.URI_TEMPLATE, String.class);
     }
 
@@ -61,7 +67,11 @@ public final class BasicHttpAttributes {
      * @param uriTemplate The template, if present
      */
     public static void setUriTemplate(HttpRequest<?> request, String uriTemplate) {
-        request.setAttribute(HttpAttributes.URI_TEMPLATE, uriTemplate);
+        if (request instanceof RouteMetadataHolder holder) {
+            holder.setUriTemplateMetadata(uriTemplate);
+        } else {
+            request.setAttribute(HttpAttributes.URI_TEMPLATE, uriTemplate);
+        }
     }
 
     /**
@@ -83,9 +93,12 @@ public final class BasicHttpAttributes {
      */
     @Experimental
     public static ExecutionFlow<?> getRouteWaitsFor(HttpRequest<?> request) {
-        @SuppressWarnings("rawtypes")
-        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
-        return attr.orElseGet(ExecutionFlow::empty);
+        // getAttribute(name) without a type: the typed lookup allocates a conversion context even
+        // when the attribute is absent, which it is for nearly every request
+        if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> flow) {
+            return flow;
+        }
+        return ExecutionFlow.empty();
     }
 
     /**
@@ -96,11 +109,9 @@ public final class BasicHttpAttributes {
      * @param flowToAdd The condition to wait for
      */
     @Experimental
-    @SuppressWarnings({"rawtypes", "unchecked"})
     public static void addRouteWaitsFor(HttpRequest<?> request, ExecutionFlow<?> flowToAdd) {
-        Optional<ExecutionFlow> attr = request.getAttribute(ROUTE_WAITS_FOR, ExecutionFlow.class);
-        if (attr.isPresent()) {
-            request.setAttribute(ROUTE_WAITS_FOR, attr.get().then(() -> flowToAdd));
+        if (request.getAttribute(ROUTE_WAITS_FOR).orElse(null) instanceof ExecutionFlow<?> existing) {
+            request.setAttribute(ROUTE_WAITS_FOR, existing.then(() -> flowToAdd));
         } else {
             request.setAttribute(ROUTE_WAITS_FOR, flowToAdd);
         }
