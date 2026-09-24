@@ -16,6 +16,7 @@
 package io.micronaut.http.client.tck.tests;
 
 import io.micronaut.context.annotation.Requires;
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
 import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
@@ -23,6 +24,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
+import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
@@ -102,6 +104,34 @@ class RawFailurePhaseTest {
             Assertions.assertFalse(closed.isHeadersReceived());
             // the request was sent, so the server may have processed it
             Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(closed));
+        }
+    }
+
+    @Test
+    void connectionClosedWhileTheRequestIsWrittenIsNotUnprocessed() throws Exception {
+        try (RawUpstream upstream = new RawUpstream(true);
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            // more than the socket buffers hold, so that the write is still in progress when the connection closes
+            byte[] body = new byte[16 * 1024 * 1024];
+            CompletableFuture<HttpResponse<?>> response = Mono.<HttpResponse<?>>from(client.exchange(
+                HttpRequest.POST(upstream.uri("/half-read"), null).contentType(MediaType.APPLICATION_OCTET_STREAM),
+                AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, body),
+                null,
+                RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            // the server read the head and stops reading: the client cannot finish the body, and
+            // the server closes its side of the connection
+            connection.shutdownOutput();
+
+            ExecutionException failure = Assertions.assertThrows(ExecutionException.class, () -> response.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Throwable cause = failure.getCause();
+            // the server received the head, so it may have processed the request: it must not be sent again
+            Assertions.assertFalse(cause instanceof UnprocessedRequestException, () -> describe(cause));
+            Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(cause), () -> describe(cause));
+            Assertions.assertTrue(connection.bytesReceived.get() > 0);
         }
     }
 

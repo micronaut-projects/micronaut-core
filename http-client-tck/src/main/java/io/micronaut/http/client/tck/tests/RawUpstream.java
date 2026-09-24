@@ -39,8 +39,19 @@ final class RawUpstream implements AutoCloseable {
     private final ServerSocket serverSocket;
     private final BlockingQueue<Connection> connections = new LinkedBlockingQueue<>();
     private final Thread acceptor;
+    private final boolean readOnlyRequestHead;
 
     RawUpstream() throws IOException {
+        this(false);
+    }
+
+    /**
+     * @param readOnlyRequestHead Whether each connection stops reading once the request headers
+     *                            arrived, so that a client that sends a large body cannot finish
+     *                            writing it
+     */
+    RawUpstream(boolean readOnlyRequestHead) throws IOException {
+        this.readOnlyRequestHead = readOnlyRequestHead;
         serverSocket = new ServerSocket(0, 50, InetAddress.getLoopbackAddress());
         acceptor = new Thread(this::accept, "raw-upstream-acceptor");
         acceptor.setDaemon(true);
@@ -63,7 +74,7 @@ final class RawUpstream implements AutoCloseable {
         while (!serverSocket.isClosed()) {
             try {
                 Socket socket = serverSocket.accept();
-                Connection connection = new Connection(socket);
+                Connection connection = new Connection(socket, readOnlyRequestHead);
                 connections.add(connection);
                 connection.start();
             } catch (IOException e) {
@@ -88,10 +99,12 @@ final class RawUpstream implements AutoCloseable {
         final CountDownLatch closedByClient = new CountDownLatch(1);
         final AtomicLong bytesReceived = new AtomicLong();
         private final Socket socket;
+        private final boolean readOnlyRequestHead;
         private final ByteArrayOutputStream received = new ByteArrayOutputStream();
 
-        Connection(Socket socket) {
+        Connection(Socket socket, boolean readOnlyRequestHead) {
             this.socket = socket;
+            this.readOnlyRequestHead = readOnlyRequestHead;
         }
 
         /**
@@ -99,6 +112,15 @@ final class RawUpstream implements AutoCloseable {
          */
         void close() throws IOException {
             socket.close();
+        }
+
+        /**
+         * Close this side of the connection, as a server does that has nothing more to say: the
+         * client reads the end of the stream. Unlike {@link #close()}, this does not reset the
+         * connection when the client sent bytes that were not read.
+         */
+        void shutdownOutput() throws IOException {
+            socket.shutdownOutput();
         }
 
         private void start() {
@@ -116,10 +138,14 @@ final class RawUpstream implements AutoCloseable {
                     synchronized (received) {
                         received.write(buffer, 0, n);
                     }
+                    bytesReceived.addAndGet(n);
                     if (requestHeadersReceived.getCount() > 0 && received().contains("\r\n\r\n")) {
                         requestHeadersReceived.countDown();
+                        if (readOnlyRequestHead) {
+                            // leave the rest of the request unread, and the connection open
+                            return;
+                        }
                     }
-                    bytesReceived.addAndGet(n);
                 }
             } catch (SocketException e) {
                 // reset by the client, or closed by the test

@@ -82,6 +82,7 @@ import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -1767,6 +1768,10 @@ final class NettyHttpClient implements
         }
 
         Channel channel = poolHandle.channel();
+        // taken before the head is written, on the event loop: nothing of this request has reached
+        // the transport yet
+        TransportWriteTracker writeTracker = TransportWriteTracker.find(channel);
+        long writeMark = writeTracker == null ? 0 : writeTracker.mark();
         if (streamWriter == null) {
             if (!expectContinue) {
                 // it's a bit more efficient to use a full request for HTTP/2
@@ -1777,12 +1782,12 @@ final class NettyHttpClient implements
                     byteBuf,
                     nettyRequest.headers(),
                     EmptyHttpHeaders.INSTANCE
-                ), requestWritePromise(channel));
+                ), requestWritePromise(channel, writeTracker, writeMark));
             } else {
-                channel.writeAndFlush(nettyRequest, requestWritePromise(channel));
+                channel.writeAndFlush(nettyRequest, requestWritePromise(channel, writeTracker, writeMark));
             }
         } else {
-            channel.writeAndFlush(nettyRequest, requestWritePromise(channel));
+            channel.writeAndFlush(nettyRequest, requestWritePromise(channel, writeTracker, writeMark));
             if (!expectContinue) {
                 streamWriter.startWriting();
             }
@@ -1920,16 +1925,28 @@ final class NettyHttpClient implements
     }
 
     /**
-     * The promise of the write of the request head. Like a void promise, a failure is reported to
-     * the pipeline, so that the response handler fails the exchange. A write rejected because the
-     * connection is already closed means no byte of the request was sent: it is reported as an
+     * The promise of the write of the request head, or of the full request when the body is
+     * available. Like a void promise, a failure is reported to the pipeline, so that the response
+     * handler fails the exchange.
+     * <p>A write that fails with a {@link ClosedChannelException} is reported as an
      * {@link UnprocessedRequestException}, so that the caller can send the request again on
-     * another connection.
+     * another connection, only when the tracker says that nothing was handed to the transport
+     * since the mark: the connection was closed before any byte of the request left. The
+     * exception alone does not tell: the transport fails a write with the same exception when the
+     * connection closes after part of the message was sent, e.g. a large full request of which
+     * the server read the head and some of the body before it stopped reading and closed. Such a
+     * request may have been processed, so its failure is a {@link ResponseClosedException}
+     * without headers, as when the connection closes while the response is awaited. Without a
+     * tracker, no failure is reported as unprocessed. The body chunks of a streamed request are
+     * written after the head with their own promises and are never reported as unprocessed.
      *
      * @param channel The channel
+     * @param tracker The write tracker of the connection, or {@code null} if it has none
+     * @param mark    The {@link TransportWriteTracker#mark() mark} taken before the request was
+     *                written
      * @return The promise
      */
-    private static ChannelPromise requestWritePromise(Channel channel) {
+    private static ChannelPromise requestWritePromise(Channel channel, @Nullable TransportWriteTracker tracker, long mark) {
         ChannelPromise promise = channel.newPromise();
         promise.addListener((ChannelFutureListener) future -> {
             if (future.isSuccess()) {
@@ -1937,7 +1954,13 @@ final class NettyHttpClient implements
             }
             Throwable cause = future.cause();
             if (cause instanceof ClosedChannelException) {
-                cause = new UnprocessedRequestException(UnprocessedRequestException.Reason.CLOSED_BEFORE_WRITE, "Connection closed before the request was written", cause);
+                if (tracker != null && !tracker.flushedSince(mark)) {
+                    cause = new UnprocessedRequestException(UnprocessedRequestException.Reason.CLOSED_BEFORE_WRITE, "Connection closed before the request was written", cause);
+                } else {
+                    ResponseClosedException closed = new ResponseClosedException("Connection closed while the request was written, before the response was received", false);
+                    closed.initCause(cause);
+                    cause = closed;
+                }
             }
             channel.pipeline().fireExceptionCaught(cause);
         });

@@ -971,6 +971,16 @@ public class ConnectionManager {
     abstract static class CustomizerAwareInitializer extends ChannelInitializer<Channel> {
         @Nullable
         NettyClientCustomizer bootstrappedCustomizer;
+
+        @Override
+        public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
+            // the tracker goes first, right before the transport, so that it sees every flush of
+            // the connection; before the pipeline is built, so that it stays first
+            if (ctx.pipeline().get(TransportWriteTracker.class) == null) {
+                ctx.pipeline().addFirst(TransportWriteTracker.NAME, new TransportWriteTracker());
+            }
+            super.handlerAdded(ctx);
+        }
     }
 
     /**
