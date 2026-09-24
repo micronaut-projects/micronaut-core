@@ -18,7 +18,6 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.filter.FilterPatternStyle;
-import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 
 import java.util.Objects;
@@ -65,38 +64,8 @@ record DefaultServerFilterSpec(RouteAssembly.ServerFilters serverFilters) implem
     }
 
     @Override
-    public ServerFilterSpec beforeReplacing(ContextReplacingRouteRequestFilter filter) {
-        serverFilters.filters().before(filter, null);
-        return this;
-    }
-
-    @Override
-    public ServerFilterSpec beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
-        serverFilters.filters().before(filter, RouteArguments.executorName(executorName));
-        return this;
-    }
-
-    @Override
-    public ServerFilterSpec beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
-        serverFilters.filters().beforeAsync(filter);
-        return this;
-    }
-
-    @Override
-    public ServerFilterSpec afterReplacing(ContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().after(filter, null);
-        return this;
-    }
-
-    @Override
-    public ServerFilterSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().after(filter, RouteArguments.executorName(executorName));
-        return this;
-    }
-
-    @Override
-    public ServerFilterSpec afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
-        serverFilters.filters().afterAsync(filter);
-        return this;
+    public FilterSpec<ServerFilterSpec> addFilter(FilterRegistration filter) {
+        serverFilters.filters().add(filter);
+        return new DefaultFilterSpec<>(this, filter);
     }
 }

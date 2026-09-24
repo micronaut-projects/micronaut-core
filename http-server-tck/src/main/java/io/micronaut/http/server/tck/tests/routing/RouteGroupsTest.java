@@ -246,14 +246,18 @@ public class RouteGroupsTest {
                 groups.path("/inner", inner -> {
                     inner.GET("/route", (request, pathVariables) -> text(request.getAttribute(TRACE, String.class).orElse("")))
                         .before(request -> trace(request, "route1"))
+                        .and()
                         .after((request, response) -> trace(response, "route1"))
+                        .and()
                         .before(request -> trace(request, "route2"))
+                        .and()
                         .after((request, response) -> trace(response, "route2"));
                     inner.before(request -> trace(request, "inner"));
                     inner.after((request, response) -> trace(response, "inner"));
                 });
                 groups.GET("/rejected", (request, pathVariables) -> text("not rejected"))
                     .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
+                    .and()
                     .after((request, response) -> trace(response, "route-after"));
                 groups.GET("/fails", (request, pathVariables) -> {
                     throw new GroupFailure();
@@ -281,9 +285,9 @@ public class RouteGroupsTest {
                         propagatedContext.add(new InnerTrace("i"));
                         return CompletableFuture.completedFuture(null);
                     });
-                    inner.before(TaskExecutors.IO, (request, propagatedContext) -> {
+                    inner.before((request, propagatedContext) -> {
                         propagatedContext.add(new BlockingTrace("b"));
-                    });
+                    }).executeOn(TaskExecutors.IO);
                     inner.after((request, response, propagatedContext) -> response.header("X-Context-After", describeContext()));
                     inner.afterAsync((request, response) -> CompletableFuture.completedFuture(response.header("X-Async-After", "true")));
                     inner.GET("/sync", (request, pathVariables) -> text(describeContext()));

@@ -54,8 +54,11 @@ class HttpRoutesPreMatchingTest {
             routes.filter("/**").before(request -> trace(request, "server0"));
             routes.filter("/**").preMatching().order(-5)
                 .before(request -> trace(request, "pre-5"))
+                .and()
                 .before((request, propagatedContext) -> trace(request, "pre-5-context"))
+                .and()
                 .beforeAsync(request -> CompletableFuture.completedFuture(trace(request, "pre-5-async")))
+                .and()
                 .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(trace(request, "pre-5-async-context")));
         });
 
@@ -70,6 +73,7 @@ class HttpRoutesPreMatchingTest {
             routes.GET("/ok", OK);
             routes.filter("/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .and()
                 .after((request, response) -> response.header("X-After", response.getHeaders().get("X-After") == null ? "1" : "2"));
         });
 

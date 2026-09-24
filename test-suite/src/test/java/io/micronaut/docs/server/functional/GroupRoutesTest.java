@@ -16,6 +16,8 @@ import org.junit.jupiter.api.Test;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
@@ -109,5 +111,14 @@ class GroupRoutesTest {
         HttpClientResponseException notAcceptable = assertThrows(HttpClientResponseException.class,
             () -> http.exchange(HttpRequest.GET("/notes/drafts").accept(MediaType.TEXT_PLAIN_TYPE), String.class));
         assertEquals(HttpStatus.NOT_ACCEPTABLE, notAcceptable.getStatus());
+    }
+
+    @Test
+    void aFilterRunsOnItsExecutorAndTheDeclarationContinuesWithAnd() {
+        HttpResponse<String> audited = client.toBlocking().exchange(HttpRequest.GET("/audit/1"), String.class);
+        assertEquals("true", audited.header("X-Audited"));
+        String body = audited.body();
+        assertNotEquals("audited on none", body);
+        assertFalse(body.contains("EventLoop"), body);
     }
 }

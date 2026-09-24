@@ -993,18 +993,22 @@ public class HandlerRoutesTest {
                     .beforeReplacing(request -> "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.unauthorized());
                 routes.GET("/fn/trace", (request, pathVariables) -> HttpResponse.ok(request.getAttribute(TRACE, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .before(request -> append(request, "before1"))
+                    .and()
                     .before(request -> append(request, "before2"))
+                    .and()
                     .after((request, response) -> response.getHeaders().set("X-Trace", "after1"))
+                    .and()
                     .after((request, response) -> response.getHeaders().set("X-Trace", response.getHeaders().get("X-Trace") + ",after2"));
                 routes.GET("/fn/async-guarded", (request, pathVariables) -> HttpResponse.ok("async guarded").contentType(MediaType.TEXT_PLAIN_TYPE))
                     .beforeReplacingAsync(request -> completeLater(executor, () ->
                         "secret".equals(request.getHeaders().get("X-Token")) ? null : HttpResponse.status(HttpStatus.FORBIDDEN)))
+                    .and()
                     .afterAsync((request, response) -> completeLater(executor, () -> response.header("X-Async-After", "true")));
                 routes.GET("/fn/filter-executor", (request, pathVariables) ->
                         HttpResponse.ok(request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
-                    .before("handler-filter", request -> {
+                    .before(request -> {
                         request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
-                    });
+                    }).executeOn("handler-filter");
                 routes.asyncPOST("/fn/forms/{id}", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     String fields = pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
                         + " " + form.getValues("tag") + " ";
@@ -1201,7 +1205,9 @@ public class HandlerRoutesTest {
                     .consumes(FORM_MEDIA_TYPES);
                 routes.GET("/fn/rejected", (request, pathVariables) -> HttpResponse.ok("accepted").contentType(MediaType.TEXT_PLAIN_TYPE))
                     .beforeReplacing(request -> request.getHeaders().contains("X-Token") ? null : HttpResponse.status(HttpStatus.FORBIDDEN))
+                    .and()
                     .after((request, response) -> response.header("X-After", "after1"))
+                    .and()
                     .after((request, response) -> response.getHeaders().set("X-After", response.getHeaders().get("X-After") + ",after2"));
                 routes.asyncGET("/fn/async-get", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async get").contentType(MediaType.TEXT_PLAIN_TYPE)));
@@ -1370,10 +1376,12 @@ public class HandlerRoutesTest {
         public void routes(HttpRouteBuilder routes) {
             route = routes.handle(FIND, (request, pathVariables) -> HttpResponse.ok("declared " + pathVariables.getLong("id") + " "
                     + request.getAttribute(FILTER_THREAD, String.class).orElse("")).contentType(MediaType.TEXT_PLAIN_TYPE))
-                .before("handler-filter", request -> {
+                .before(request -> {
                     request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
-                })
-                .after((request, response) -> response.header("X-Declared", "true"));
+                }).executeOn("handler-filter")
+                .and()
+                .after((request, response) -> response.header("X-Declared", "true"))
+                .and();
         }
     }
 
@@ -1419,6 +1427,7 @@ public class HandlerRoutesTest {
                     .before(request -> {
                         request.setAttribute("located-filter", "before");
                     })
+                    .and()
                     .after((request, response) -> response.header("X-Located", "after"));
                 order.locate("/customers/{name}",
                     (request, pathVariables) -> new Customer(pathVariables.locatedTarget(Order.class), pathVariables.getString("name")),

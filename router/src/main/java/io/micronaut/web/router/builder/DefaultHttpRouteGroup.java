@@ -21,7 +21,6 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
 
@@ -146,38 +145,8 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
     }
 
     @Override
-    public HttpRouteGroup beforeReplacing(ContextReplacingRouteRequestFilter filter) {
-        filters.before(filter, null);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
-        filters.before(filter, RouteArguments.executorName(executorName));
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
-        filters.beforeAsync(filter);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup afterReplacing(ContextReplacingRouteResponseFilter filter) {
-        filters.after(filter, null);
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        filters.after(filter, RouteArguments.executorName(executorName));
-        return this;
-    }
-
-    @Override
-    public HttpRouteGroup afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
-        filters.afterAsync(filter);
-        return this;
+    public FilterSpec<HttpRouteGroup> addFilter(FilterRegistration filter) {
+        filters.add(filter);
+        return new DefaultFilterSpec<>(this, filter);
     }
 }

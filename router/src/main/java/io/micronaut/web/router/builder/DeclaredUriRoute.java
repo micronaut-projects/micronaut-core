@@ -51,6 +51,7 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     private final List<Consumer<HandlerUriRoute>> configuration = new ArrayList<>();
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
     private final IntConsumer exposePort;
+    private final List<FilterRegistration> filters = new ArrayList<>(0);
     private @Nullable List<Consumer<HandlerUriRoute>> fixedConfiguration;
     private @Nullable Integer order;
     private RouteAssembly.@Nullable RouteGroup group;
@@ -87,6 +88,9 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     public void fix() {
         if (fixedConfiguration == null) {
             fixedConfiguration = List.copyOf(configuration);
+            for (FilterRegistration filter : filters) {
+                filter.fix();
+            }
         }
     }
 
@@ -171,41 +175,10 @@ public final class DeclaredUriRoute implements HandlerUriRoute {
     }
 
     @Override
-    public HandlerUriRoute before(ContextReplacingRouteRequestFilter filter) {
+    public HandlerUriRoute filter(FilterRegistration filter) {
         Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.before(filter));
-    }
-
-    @Override
-    public HandlerUriRoute after(ContextReplacingRouteResponseFilter filter) {
-        Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.after(filter));
-    }
-
-    @Override
-    public HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter) {
-        RouteArguments.executorName(executorName);
-        Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.before(executorName, filter));
-    }
-
-    @Override
-    public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-        RouteArguments.executorName(executorName);
-        Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.after(executorName, filter));
-    }
-
-    @Override
-    public HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
-        Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.beforeAsync(filter));
-    }
-
-    @Override
-    public HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
-        Objects.requireNonNull(filter, "filter");
-        return configure(r -> r.afterAsync(filter));
+        filters.add(filter);
+        return configure(r -> r.filter(filter));
     }
 
     @Override

@@ -289,6 +289,7 @@ public class FilterRequestChangesTest {
             routes.filter("/rc/**").preMatching().order(20).before(request -> trace(request, "fn20"));
             routes.filter("/rc/blocked", "/rc/echo/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/rc/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .and()
                 .after((request, response) -> response.header("X-Pre-After", response.getHeaders().contains("X-Pre-After") ? "2" : "1"));
             // a request filter returning the request it changed
             routes.filter("/rc/headers/**").beforeReplacing(request -> request.header("X-Server", "server"));

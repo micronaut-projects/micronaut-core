@@ -114,9 +114,9 @@ class HandlerRouteArgumentsTest {
     void aGroupAndAServerFilterRejectAMissingArgument() {
         router(routes -> {
             routes.group(group -> {
-                assertMissing("executorName", () -> group.beforeReplacing((String) null, (ContextReplacingRouteRequestFilter) (request, context) -> null));
-                assertBlankExecutor(() -> group.beforeReplacing(" ", (ContextReplacingRouteRequestFilter) (request, context) -> null));
-                assertBlankExecutor(() -> group.afterReplacing("", (ContextReplacingRouteResponseFilter) (request, response, context) -> null));
+                assertMissing("executorName", () -> group.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(null));
+                assertBlankExecutor(() -> group.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(" "));
+                assertBlankExecutor(() -> group.afterReplacing((ContextReplacingRouteResponseFilter) (request, response, context) -> null).executeOn(""));
                 assertMissing("filter", () -> group.beforeReplacing((ContextReplacingRouteRequestFilter) null));
                 assertMissing("condition", () -> group.where(null));
                 assertMissing("name", () -> group.attribute(null, "value"));
@@ -126,7 +126,7 @@ class HandlerRouteArgumentsTest {
             assertMissing("methods", () -> filter.methods((HttpMethod[]) null));
             assertMissing("methods must not contain null", () -> filter.methods(HttpMethod.GET, null));
             assertMissing("patternStyle", () -> filter.patternStyle(null));
-            assertBlankExecutor(() -> filter.beforeReplacing(" ", (ContextReplacingRouteRequestFilter) (request, context) -> null));
+            assertBlankExecutor(() -> filter.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(" "));
             assertMissing("filter", () -> filter.beforeReplacingAsync((AsyncContextReplacingRouteRequestFilter) null));
         });
     }
@@ -180,19 +180,19 @@ class HandlerRouteArgumentsTest {
         assertBlankExecutor(() -> route.executeOn(""));
         assertBlankExecutor(() -> route.executeOn("  "));
         assertMissing("filter", () -> route.beforeReplacing((ContextReplacingRouteRequestFilter) null));
-        assertMissing("executorName", () -> route.beforeReplacing(null, (ContextReplacingRouteRequestFilter) (request, context) -> null));
-        assertBlankExecutor(() -> route.beforeReplacing(" ", (ContextReplacingRouteRequestFilter) (request, context) -> null));
-        assertMissing("filter", () -> route.beforeReplacing("blocking", (ContextReplacingRouteRequestFilter) null));
+        assertMissing("executorName", () -> route.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(null));
+        assertBlankExecutor(() -> route.beforeReplacing((ContextReplacingRouteRequestFilter) (request, context) -> null).executeOn(" "));
+        assertMissing("filter", () -> route.beforeReplacing((ContextReplacingRouteRequestFilter) null).executeOn("blocking"));
         assertMissing("filter", () -> route.beforeReplacingAsync((AsyncContextReplacingRouteRequestFilter) null));
         assertMissing("filter", () -> route.before((ContextRouteRequestFilter) null));
         assertMissing("filter", () -> route.before((RouteRequestFilter) null));
-        assertMissing("executorName", () -> route.before(null, (RouteRequestFilter) request -> { }));
-        assertBlankExecutor(() -> route.before(" ", (ContextRouteRequestFilter) (request, context) -> { }));
+        assertMissing("executorName", () -> route.before((RouteRequestFilter) request -> { }).executeOn(null));
+        assertBlankExecutor(() -> route.before((ContextRouteRequestFilter) (request, context) -> { }).executeOn(" "));
         assertMissing("filter", () -> route.beforeAsync((AsyncRouteRequestFilter) null));
         assertMissing("filter", () -> route.beforeAsync((AsyncContextRouteRequestFilter) null));
         assertMissing("filter", () -> route.afterReplacing((ContextReplacingRouteResponseFilter) null));
-        assertMissing("executorName", () -> route.afterReplacing(null, (ContextReplacingRouteResponseFilter) (request, response, context) -> null));
-        assertMissing("filter", () -> route.afterReplacing("blocking", (ContextReplacingRouteResponseFilter) null));
+        assertMissing("executorName", () -> route.afterReplacing((ContextReplacingRouteResponseFilter) (request, response, context) -> null).executeOn(null));
+        assertMissing("filter", () -> route.afterReplacing((ContextReplacingRouteResponseFilter) null).executeOn("blocking"));
         assertMissing("filter", () -> route.afterReplacingAsync((AsyncContextReplacingRouteResponseFilter) null));
         assertMissing("condition", () -> route.where(null));
         assertMissing("name", () -> route.attribute(null, "value"));
