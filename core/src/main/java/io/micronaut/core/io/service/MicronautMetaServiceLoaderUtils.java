@@ -35,6 +35,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -45,6 +46,7 @@ import java.util.Set;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.RecursiveAction;
 import java.util.function.Predicate;
+import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -101,6 +103,10 @@ public final class MicronautMetaServiceLoaderUtils {
                 return serviceEntries;
             }
         }
+        ServiceIndex index = ServiceIndex.find(classLoader);
+        if (index != null) {
+            return index.micronautServices().getOrDefault(serviceName, Set.of());
+        }
         CacheEntry ce = cacheEntry;
         if (ce == null || ce.classLoader != classLoader) {
             ce = new CacheEntry(classLoader, findAllMicronautMetaServices(classLoader));
@@ -117,6 +123,20 @@ public final class MicronautMetaServiceLoaderUtils {
      * @throws IOException
      */
     public static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader) throws IOException {
+        return findAllMicronautMetaServices(classLoader, false);
+    }
+
+    /**
+     * Find all Micronaut services.
+     *
+     * @param classLoader The classloader
+     * @param sorted      Whether to list the entries of the directories in the order of their names, instead of the
+     *                    order of the file system, so that the result does not depend on the file system. A directory
+     *                    that cannot be read then fails the lookup instead of being skipped
+     * @return the all entries
+     * @throws IOException If a directory cannot be read and the entries are sorted
+     */
+    static Map<String, Set<String>> findAllMicronautMetaServices(ClassLoader classLoader, boolean sorted) throws IOException {
         List<URI> resourceDefs = IOUtils.getResources(classLoader, MICRONAUT_SERVICES_PATH);
         if (resourceDefs.isEmpty()) {
             return Map.of();
@@ -177,10 +197,17 @@ public final class MicronautMetaServiceLoaderUtils {
                 }
                 Path myPath = IOUtils.resolvePath(uri, MICRONAUT_SERVICES_PATH, toClose);
                 if (myPath != null) {
-                    Files.walkFileTree(myPath, Collections.emptySet(), 2, visitor);
+                    if (sorted) {
+                        collectSortedServices(myPath, services);
+                    } else {
+                        Files.walkFileTree(myPath, Collections.emptySet(), 2, visitor);
+                    }
                 }
             }
         } catch (IOException e) {
+            if (sorted) {
+                throw e;
+            }
             // ignore, can't do anything here and can't log because class used in compiler
         } finally {
             for (Closeable closeable : toClose) {
@@ -191,6 +218,34 @@ public final class MicronautMetaServiceLoaderUtils {
             }
         }
         return services;
+    }
+
+    /**
+     * Collects the services of a {@code META-INF/micronaut/} directory in the order of their names. As walking two levels
+     * of the directory does, every directory below it is a service, and every entry of a service that is not hidden is
+     * one of its entries.
+     *
+     * @param root     The {@code META-INF/micronaut/} directory
+     * @param services The services to add to
+     * @throws IOException If a directory cannot be read
+     */
+    private static void collectSortedServices(Path root, Map<String, Set<String>> services) throws IOException {
+        for (Path serviceDir : sortedChildren(root)) {
+            if (Files.isDirectory(serviceDir)) {
+                Set<String> definitions = services.computeIfAbsent(serviceDir.getFileName().toString(), name -> new LinkedHashSet<>());
+                for (Path entry : sortedChildren(serviceDir)) {
+                    if (!Files.isHidden(entry)) {
+                        definitions.add(entry.getFileName().toString());
+                    }
+                }
+            }
+        }
+    }
+
+    private static List<Path> sortedChildren(Path dir) throws IOException {
+        try (Stream<Path> children = Files.list(dir)) {
+            return children.sorted(Comparator.comparing(path -> path.getFileName().toString())).toList();
+        }
     }
 
     /**

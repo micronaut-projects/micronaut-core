@@ -1,5 +1,6 @@
 package io.micronaut.core.optim
 
+import io.micronaut.core.io.service.ServiceIndex
 import spock.lang.Specification
 
 class StaticOptimizationsTest extends Specification {
@@ -64,6 +65,31 @@ class StaticOptimizationsTest extends Specification {
 
         then:
         opt.present
+    }
+
+    def "setting an optimization again replaces it"() {
+        def second = new TestOptimizations()
+
+        when:
+        StaticOptimizations.set(new TestOptimizations())
+        StaticOptimizations.set(second)
+
+        then:
+        StaticOptimizations.get(TestOptimizations).get().is(second)
+    }
+
+    def "a second service index is rejected"() {
+        given: "the index that the core tests register through a loader"
+        def registered = StaticOptimizations.@OPTIMIZATIONS.get(ServiceIndex)
+
+        when:
+        StaticOptimizations.set(new ServiceIndex(getClass().classLoader, [:], [:]))
+
+        then:
+        IllegalStateException ex = thrown()
+        ex.message == "A ServiceIndex was already set: at most one service index can be registered"
+        registered != null
+        StaticOptimizations.get(ServiceIndex).get().is(registered)
     }
 
     static class TestOptimizations {

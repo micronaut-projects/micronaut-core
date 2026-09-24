@@ -1,1 +1,2 @@
 io.micronaut.core.optim.StaticOptimizationsTest$TestOptimizationsLoader
+io.micronaut.core.io.service.ServiceIndexTest$TestServiceIndexLoader

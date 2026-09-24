@@ -16,6 +16,8 @@
 package io.micronaut.core.optim;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.io.service.ServiceIndex;
+
 import java.util.Map;
 import java.util.Optional;
 import java.util.ServiceLoader;
@@ -88,12 +90,18 @@ public abstract class StaticOptimizations {
     /**
      * Injects an optimization. Optimizations must be immutable final
      * data classes: there's a one-to-one mapping between an optimization
-     * class and its associated data.
+     * class and its associated data. A value replaces the previous value
+     * of its class, except for a {@link ServiceIndex}, which can only be
+     * set once.
      * @param value the optimization to store
      * @param <T> the type of the optimization
      */
     public static <T> void set(T value) {
         Class<?> optimizationClass = value.getClass();
+        if (value instanceof ServiceIndex && OPTIMIZATIONS.containsKey(optimizationClass)) {
+            // two indexes would each describe the whole class path, so one of them would be wrong
+            throw new IllegalStateException("A ServiceIndex was already set: at most one service index can be registered");
+        }
         if (CHECKED.containsKey(optimizationClass)) {
             if (!CAPTURE_STACKTRACE_ON_READ) {
                 throw new IllegalStateException("Optimization state for " + optimizationClass + " was read before it was set. Run with -Dmicronaut.optimizations.capture.read.trace=true to enable stack trace capture.");
