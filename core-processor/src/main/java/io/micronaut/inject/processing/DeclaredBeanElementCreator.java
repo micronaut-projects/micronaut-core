@@ -426,15 +426,15 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata) && !classElement.isAbstract()) {
             if (methodElement.isFinal()) {
                 if (InterceptedMethodUtil.hasDeclaredAroundAdvice(methodAnnotationMetadata)) {
-                    throw new ProcessingException(methodElement, "Method defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
+                    throw new ProcessingException(methodElement, "Method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] defines AOP advice but is declared final. Change the method to be non-final in order for AOP advice to be applied.");
                 } else if (!methodElement.isSynthetic() && aopDefinedOnClassAndPublicMethod && isDeclaredInThisClass(methodElement)) {
-                    throw new ProcessingException(methodElement, "Public method inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
+                    throw new ProcessingException(methodElement, "Public method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] inherits AOP advice but is declared final. Either make the method non-public or apply AOP advice only to public methods declared on the class.");
                 }
                 return false;
             } else if (methodElement.isPrivate()) {
-                throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
+                throw new ProcessingException(methodElement, "Method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] annotated as executable but is declared private. Change the method to be non-private in order for AOP advice to be applied.");
             } else if (methodElement.isStatic()) {
-                throw new ProcessingException(methodElement, "Method defines AOP advice but is declared static");
+                throw new ProcessingException(methodElement, "Method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] defines AOP advice but is declared static");
             }
             AopProxyWriter aopProxyVisitor = getAroundAopProxyVisitor(visitor, methodElement);
             visitAroundMethod(aopProxyVisitor, classElement, methodElement);
@@ -474,7 +474,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
     private void staticMethodCheck(MethodElement methodElement) {
         if (methodElement.isStatic()) {
             if (!isExplicitlyAnnotatedAsExecutable(methodElement)) {
-                throw new ProcessingException(methodElement, "Static methods only allowed when annotated with @Executable");
+                throw new ProcessingException(methodElement, "Static methods only allowed when annotated with @Executable: [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "]");
             }
             failIfMethodNotAccessible(methodElement);
         }
@@ -482,7 +482,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
 
     private void failIfMethodNotAccessible(MethodElement methodElement) {
         if (!methodElement.isAccessible(classElement)) {
-            throw new ProcessingException(methodElement, "Method is not accessible for the invocation. To invoke the method using reflection annotate it with @ReflectiveAccess");
+            throw new ProcessingException(methodElement, "Method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] is not accessible for the invocation. To invoke the method using reflection annotate it with @ReflectiveAccess");
         }
     }
 
@@ -550,7 +550,7 @@ class DeclaredBeanElementCreator extends AbstractBeanElementCreator {
             // @Executable annotated on the method
             // Throw error if it cannot be accessed without the reflection
             if (!methodElement.isAccessible()) {
-                throw new ProcessingException(methodElement, "Method annotated as executable but is declared private. To invoke the method using reflection annotate it with @ReflectiveAccess");
+                throw new ProcessingException(methodElement, "Method [" + methodElement.getOwningType().getName() + "::" + methodElement.getName() + "] annotated as executable but is declared private. To invoke the method using reflection annotate it with @ReflectiveAccess");
             }
         } else if (!isDeclaredInThisClass(methodElement) && !methodElement.getDeclaringType().hasStereotype(Executable.class)) {
             // @Executable not annotated on the declared class or method
