@@ -112,6 +112,11 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
                         }
                     }
 
+                    if (applicationContext.getEnvironment().getProperty(ApplicationConfiguration.TRAINING_ENABLED, Boolean.class, false)) {
+                        finishTrainingRun(applicationContext, embeddedApplication);
+                        return applicationContext;
+                    }
+
                     Thread mainThread = Thread.currentThread();
                     boolean finalKeepAlive = keepAlive;
                     CountDownLatch countDownLatch = new CountDownLatch(1);
@@ -194,6 +199,29 @@ public class Micronaut extends DefaultApplicationContextBuilder implements Appli
 
     private static long elapsedMillis(long startNanos) {
         return TimeUnit.MILLISECONDS.convert(System.nanoTime() - startNanos, TimeUnit.NANOSECONDS);
+    }
+
+    /**
+     * Ends a training run ({@link ApplicationConfiguration#TRAINING_ENABLED}): the application has
+     * started and every startup listener, warm-up included, has run. Stops the application, closes
+     * the context and exits with status 0, except in the {@code test} environment.
+     *
+     * @param applicationContext The application context
+     * @param embeddedApplication The started application
+     */
+    @SuppressWarnings("java:S1147") // Exiting the JVM is the point of a training run
+    private static void finishTrainingRun(ApplicationContext applicationContext, EmbeddedApplication<?> embeddedApplication) {
+        boolean exit = !applicationContext.getEnvironment().getActiveNames().contains(Environment.TEST);
+        if (LOG.isWarnEnabled()) {
+            LOG.warn("Training run ({}=true): startup completed, stopping the application{}",
+                ApplicationConfiguration.TRAINING_ENABLED, exit ? " and exiting with status 0" : "");
+        }
+        try (applicationContext) {
+            embeddedApplication.stop();
+        }
+        if (exit) {
+            System.exit(0);
+        }
     }
 
     @Override
