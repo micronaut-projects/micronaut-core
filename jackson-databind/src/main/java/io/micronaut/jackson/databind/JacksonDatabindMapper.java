@@ -36,6 +36,7 @@ import io.micronaut.jackson.serialize.JsonNodeSerializer;
 import io.micronaut.json.JsonFeatures;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamConfig;
+import io.micronaut.json.JsonStreamWriter;
 import io.micronaut.json.JsonSyntaxException;
 import io.micronaut.json.tree.JsonNode;
 import jakarta.inject.Inject;
@@ -52,6 +53,7 @@ import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
+import tools.jackson.databind.SequenceWriter;
 import tools.jackson.databind.cfg.MapperBuilder;
 
 import java.io.IOException;
@@ -357,6 +359,30 @@ public final class JacksonDatabindMapper implements JsonMapper {
     @Override
     public <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException {
         createWriter(type).writeValue(outputStream, object);
+    }
+
+    @Override
+    public <T> JsonStreamWriter<T> createStreamWriter(OutputStream outputStream, Argument<T> type) throws IOException {
+        // a sequence writer puts a space between root values by default; the caller frames the
+        // values, so nothing goes between them
+        SequenceWriter sequenceWriter = createWriter(type).withRootValueSeparator("").writeValues(outputStream);
+        return new JsonStreamWriter<>() {
+            @Override
+            public void write(@Nullable T value) throws IOException {
+                sequenceWriter.write(value);
+                // the generator buffers its output, and FLUSH_AFTER_WRITE_VALUE may be disabled
+                sequenceWriter.flush();
+            }
+
+            @Override
+            public void close() throws IOException {
+                try {
+                    sequenceWriter.close();
+                } finally {
+                    outputStream.close();
+                }
+            }
+        };
     }
 
     @Override

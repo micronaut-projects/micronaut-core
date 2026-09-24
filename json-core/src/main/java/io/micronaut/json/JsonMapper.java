@@ -247,6 +247,41 @@ public interface JsonMapper {
     <T> void writeValue(OutputStream outputStream, Argument<T> type, @Nullable T object) throws IOException;
 
     /**
+     * Open a writer for a sequence of values of the given type that are written one at a time to
+     * the same output stream, such as the elements of a streamed response. Where each call of
+     * {@link #writeValue(OutputStream, Argument, Object)} sets up the state of a serialization,
+     * such as the generator of the mapper, the returned writer keeps that state across the values,
+     * which is cheaper when many values go to one stream. The writer emits nothing between the
+     * values, so the caller frames the sequence.
+     *
+     * <p>The default implementation calls {@link #writeValue(OutputStream, Argument, Object)} for
+     * every value.
+     *
+     * @param outputStream The stream to write to
+     * @param type         The type of the values
+     * @param <T>          The type of the values
+     * @return The writer
+     * @throws IOException If the writer cannot be created
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> JsonStreamWriter<T> createStreamWriter(OutputStream outputStream, Argument<T> type) throws IOException {
+        Objects.requireNonNull(outputStream, "Output stream cannot be null");
+        Objects.requireNonNull(type, "Type cannot be null");
+        return new JsonStreamWriter<>() {
+            @Override
+            public void write(@Nullable T value) throws IOException {
+                writeValue(outputStream, type, value);
+            }
+
+            @Override
+            public void close() throws IOException {
+                outputStream.close();
+            }
+        };
+    }
+
+    /**
      * Write an object as json.
      *
      * @param object The object to serialize.
