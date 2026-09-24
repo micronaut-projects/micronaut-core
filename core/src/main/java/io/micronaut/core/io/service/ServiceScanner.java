@@ -71,6 +71,8 @@ final class ServiceScanner<S> {
     static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
         // Image singletons only hold values in image code. On the JVM, where the GraalVM SDK is usually absent,
         // looking up the ImageSingletons class would throw and catch a NoClassDefFoundError on every scan.
+        // A native image with runtime class loading (Crema) is image code too, for the classes it loads at run
+        // time as well, so it still gets the table unless micronaut.graalvm.imagesingletons.enabled is false.
         if (NativeImageUtils.inImageCode() && NativeImageUtils.hasImageSingletons()) {
             return ImageSingletons.contains(ExclusiveStaticServiceDefinitions.class) ? ImageSingletons.lookup(ExclusiveStaticServiceDefinitions.class) : null;
         } else {
