@@ -9,6 +9,8 @@ snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="serverFilters", i
 <1> A server filter filters every request whose path matches one of its patterns, whatever answers it: a controller, a handler route, a static resource, or no route at all (`404`, `405`, ...). `methods(...)`, `order(int)`, `patternStyle(...)` and `appendContextPath(boolean)` correspond to the members of `@ServerFilter` and to `@Order`. A server filter is global wherever it is declared, also in a group: the prefix and the filters of the group do not apply to it.
 <2> A pre-matching server filter, like a `@PreMatching` filter bean, runs before the route is matched, and the route is matched with the request it continues with: here a URI rewritten in place.
 
+The filters of a route and of its groups are route filters: as with the filter methods of a controller, they need a matched route. A request under the prefix of a group that no route answers (`404`), or that a route of the group would answer with another method or media type (`405`, `415`, `406`), runs the server filters only: the `@ServerFilter` beans and the filters declared with `routes.filter(patterns...)`, pre-matching ones (`routes.filter(patterns...).preMatching()`) included.
+
 === Filter methods
 
 The request and the response filters come in the same four families, so that their lambdas are never ambiguous:

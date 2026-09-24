@@ -12,6 +12,8 @@ A request that the conditions of a route reject is answered as if the route did 
 
 The order only breaks a tie between routes that are equally good for a request. The router first selects the most specific route by its URI template, then by the media types, then prefers an explicit `HEAD` route over an implicit one, and only then compares the orders: the order never makes a less specific route win. Routes left with the same order still make the request ambiguous, which is answered with `400`. A group's order applies to its routes, and a route's own order overrides it.
 
+The order is global: it is compared between any routes left for a request, controller routes and the routes of every `HttpRoutes` bean and group alike, and the lower order wins. Controller routes have the order `0`, so a handler route with a negative order wins a tie with a controller route, and one with a positive order loses it. The order of an `HttpRoutes` bean, e.g. `@Order` on the bean, orders the beans, not their routes.
+
 === Attributes
 
 `attribute(name, value)` gives a route, or every route of a group, metadata that the code handling its requests reads from the matched route: the handler, route filters, server filters and `@ServerFilter` beans (with a api:web.router.RouteInfo[] parameter, or with `RouteAttributes.getRouteInfo(request)`).

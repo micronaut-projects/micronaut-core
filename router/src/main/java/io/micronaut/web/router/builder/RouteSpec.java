@@ -344,10 +344,13 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * routes.GET("/reports/{id}", reportHandler); // the order 0: answers the other requests
      * }</pre>
      *
-     * <p>The default order is {@code 0}, the order of a controller route. On a group, the order
-     * is the default of the routes of the group, and of its nested groups, unless they or a
-     * nested group have their own. The order of an {@link HttpRoutes} bean orders the beans, not
-     * their routes.</p>
+     * <p>The order is global: it is compared between any routes left for a request, controller
+     * routes and the routes of every {@link HttpRoutes} bean and group alike, and the lower order
+     * wins. The default order is {@code 0}, the order of a controller route, so a route with a
+     * negative order wins a tie with a controller route and one with a positive order loses it.
+     * On a group, the order is the default of the routes of the group, and of its nested groups,
+     * unless they or a nested group have their own. The order of an {@link HttpRoutes} bean orders
+     * the beans, not their routes.</p>
      *
      * @param order The order, lower wins
      * @return The route or the group

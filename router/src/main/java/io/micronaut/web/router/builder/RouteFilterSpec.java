@@ -40,6 +40,14 @@ import io.micronaut.core.annotation.Experimental;
  * {@link ReplacingRouteRequestFilter}. Each has a variant on a named executor, an asynchronous
  * variant, and variants that change the propagated context.</p>
  *
+ * <p><b>Matched routes only.</b> As with the filter methods of a controller, the filters of a
+ * route and of its groups are route filters: they run only when that route matched the request.
+ * A request under the prefix of a group that no route answers ({@code 404}), or that a route of
+ * the group would answer with another method or media type ({@code 405}, {@code 415},
+ * {@code 406}), does not run them. The filters of a server filter, declared with
+ * {@code routes.filter(patterns...)}, pre-matching or not, and the {@code @ServerFilter} beans
+ * filter every request their patterns match, those responses included.</p>
+ *
  * <p>Like a filter method, a filter runs with the propagated context of the filter chain in scope,
  * e.g. the MDC context an application filter added; to change it, see the variants that receive a
  * {@link io.micronaut.core.propagation.MutablePropagatedContext}.</p>
@@ -55,7 +63,9 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * Filter the requests, like a {@code @RequestFilter} method that returns nothing. The filters
      * of a route and of its groups run after the server filters, closest to the route: the filters
      * of the outer group first, then those of the inner groups, then those of the route, each in
-     * the order they are declared.
+     * the order they are declared. The filter of a route or a group runs only when the route, or a
+     * route of the group, matched the request: not for a {@code 404} or a {@code 405} under the
+     * prefix of the group, which only the server filters, pre-matching ones included, see.
      *
      * @param filter The filter, which can change the request in place
      * @return This
@@ -192,7 +202,10 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * Filter the responses, like a {@code @ResponseFilter} method. The response filters of a route
      * and of its groups run after the route and before the response filters of the server filters:
      * the filters of the route first, then those of the inner groups, then those of the outer group,
-     * each in the order they are declared.
+     * each in the order they are declared. The filter of a route or a group runs only when the
+     * route, or a route of the group, matched the request: not for a {@code 404} or a {@code 405}
+     * under the prefix of the group, which only the server filters, pre-matching ones included,
+     * see.
      *
      * @param filter The filter
      * @return This

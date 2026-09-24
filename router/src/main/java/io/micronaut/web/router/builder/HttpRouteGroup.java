@@ -51,12 +51,14 @@ import io.micronaut.http.MediaType;
  * or a route, request filters and response filters each run in the order they are declared, like
  * the filters of a route.</p>
  *
- * <p><b>Matched routes only.</b> A filter of the group runs only when a route of the group
- * matched the request. A request under the prefix of the group that no route answers, a
+ * <p><b>Matched routes only.</b> As with the filter methods of a controller, the filters of the
+ * group, the {@code before} and {@code after} families, are route filters: a filter of the group
+ * runs only when a route of the group matched the request. A request under the prefix of the group that no route answers, a
  * {@code 404}, or one that a route of the group would answer with another method or media type, a
  * {@code 405}, {@code 415} or {@code 406}, does not run the filters of the group; a
  * {@code @ServerFilter("/api/**")} bean, or a server filter declared with
- * {@code filter("/api/**")}, filters every request under a prefix. A server filter declared on a
+ * {@code filter("/api/**")}, pre-matching or not, filters every request under a prefix, those
+ * responses included. A server filter declared on a
  * group is global: the prefix and the filters of the group do not apply to it.</p>
  *
  * <p><b>Errors.</b> An exception of a route of the group is answered by the error routes, and the
