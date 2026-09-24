@@ -1004,6 +1004,12 @@ final class NettyHttpClient implements
             null,
             request.uri(requestURI),
             (req, resp) -> {
+                if (resp.code() >= 400 && !shouldBufferErrorBody(errorType)) {
+                    // The error body will never be consumed by the caller, so discard it right
+                    // away. Otherwise the connection would stay reserved until the read timeout.
+                    resp.close();
+                    return ExecutionFlow.error(decorate(new HttpClientResponseException(resp.reason(), toStreamingResponse(resp, Flux.empty()))));
+                }
                 ByteBody bb = resp.byteBody();
                 Publisher<HttpContent> body;
                 if (!hasBody(resp)) {
@@ -1252,8 +1258,19 @@ final class NettyHttpClient implements
         }
     }
 
+    /**
+     * Whether the body of an error response of a streaming call should be read and attached to
+     * the {@link HttpClientResponseException}.
+     *
+     * @param errorType The error type
+     * @return {@code true} if the error body should be buffered
+     */
+    private boolean shouldBufferErrorBody(@Nullable Argument<?> errorType) {
+        return errorType != null && (errorType != HttpClient.DEFAULT_ERROR_TYPE || configuration.isBufferErrorBodyForStreaming());
+    }
+
     private ExecutionFlow<HttpResponse<?>> readBodyOnError(@Nullable Argument<?> errorType, ExecutionFlow<HttpResponse<?>> publisher) {
-        if (errorType != null && (errorType != HttpClient.DEFAULT_ERROR_TYPE || configuration.isBufferErrorBodyForStreaming())) {
+        if (errorType != null && shouldBufferErrorBody(errorType)) {
             return publisher.onErrorResume(clientException -> {
                 if (clientException instanceof HttpClientResponseException exception) {
                     final HttpResponse<?> response = exception.getResponse();
@@ -1347,7 +1364,7 @@ final class NettyHttpClient implements
     ) {
         boolean errorStatus = response.code() >= 400;
         if (errorStatus && failOnError) {
-            // todo: close response properly
+            // the body is consumed by readBodyOnError, this is only reached if the error body is buffered
             return ExecutionFlow.error(decorate(new HttpClientResponseException(response.reason(), response)));
         } else {
             return ExecutionFlow.just(response);
