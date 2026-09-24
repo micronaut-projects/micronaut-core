@@ -497,8 +497,10 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     }
 
     /**
-     * The body argument of a handler, bound like a {@code @Body} argument: annotated
-     * {@code @Body}, and {@code @Nullable} if the type is nullable.
+     * The body argument of a handler, bound like a {@code @Body} argument: annotated with the
+     * annotations of the body type, e.g. a {@code @JsonView} the body is decoded with, and
+     * {@code @Body}, and {@code @Nullable} if the type is nullable, like a {@code @Body}
+     * parameter of a controller.
      *
      * @param bodyType The body type
      * @param <T>      The type
@@ -513,10 +515,16 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * The metadata of the body argument of a handler.
      *
      * @param bodyType The body type
-     * @return {@code @Body}, and {@code @Nullable} if the type is nullable
+     * @return The annotations of the body type, with {@code @Body}, and {@code @Nullable} if the type is nullable
      */
     private static AnnotationMetadata bodyMetadata(Argument<?> bodyType) {
-        return bodyType.isNullable() ? NULLABLE_BODY : BODY;
+        AnnotationMetadata body = bodyType.isNullable() ? NULLABLE_BODY : BODY;
+        AnnotationMetadata annotations = bodyType.getAnnotationMetadata();
+        if (annotations.isEmpty()) {
+            return body;
+        }
+        // both are declared on the argument, as on a parameter of a controller
+        return new AnnotationMetadataHierarchy(true, annotations, body);
     }
 
     /**
