@@ -1,6 +1,16 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== Refreshing the Logback configuration follows Logback's own lookup
+
+When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again. Previously that refresh used the first `Configurator` service regardless of its rank and of the status it returned, and otherwise the file set with `logback.configurationFile` or `logger.config`, or `logback.xml`. Now, unless a Logback XML configuration file is set in Micronaut configuration, the refresh configures Logback the same way Logback configures itself at startup:
+
+* `logback-test.xml` takes precedence over `logback.xml`, and startup no longer fails when there is no `logback.xml`: Logback falls back to its basic console configuration.
+* `Configurator` services run by rank. A `Configurator` that returns `NEUTRAL` or `INVOKE_NEXT_IF_ANY` is followed by the XML configuration file. A `Configurator` that must replace the XML configuration should return `DO_NOT_INVOKE_NEXT_IF_ANY`.
+* When the file set with the `logback.configurationFile` JVM system property does not exist, startup no longer fails: Logback falls back to `logback-test.xml`, `logback.xml` or its basic console configuration.
+
+A file set with `logger.config`, or with `logback.configurationFile` in Micronaut configuration but not as a JVM system property, now takes precedence over any `Configurator` service, and startup still fails when it does not exist. The logging system of the loggers management endpoint now honors `logback.configurationFile` as well.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.

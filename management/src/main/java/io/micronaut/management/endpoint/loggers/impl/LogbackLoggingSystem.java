@@ -27,6 +27,7 @@ import io.micronaut.logging.impl.LogbackUtils;
 import io.micronaut.management.endpoint.loggers.LoggerConfiguration;
 import io.micronaut.management.endpoint.loggers.LoggersEndpoint;
 import io.micronaut.management.endpoint.loggers.ManagedLoggingSystem;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.LoggerFactory;
 
@@ -44,12 +45,31 @@ import java.util.stream.Collectors;
 @Requires(classes = ch.qos.logback.classic.LoggerContext.class)
 @Replaces(io.micronaut.logging.impl.LogbackLoggingSystem.class)
 public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.logging.LoggingSystem {
-    private static final String DEFAULT_LOGBACK_LOCATION = "logback.xml";
+    private final @Nullable String logbackExternalConfigLocation;
+    private final @Nullable String logbackXmlLocation;
 
-    private final String logbackXmlLocation;
+    /**
+     * @param logbackExternalConfigLocation The location of the logback configuration file set via logback properties
+     * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @since 5.3.0
+     */
+    @Inject
+    public LogbackLoggingSystem(
+        @Nullable @Property(name = "logback.configurationFile") String logbackExternalConfigLocation,
+        @Nullable @Property(name = "logger.config") String logbackXmlLocation
+    ) {
+        this.logbackExternalConfigLocation = logbackExternalConfigLocation;
+        this.logbackXmlLocation = logbackXmlLocation;
+    }
 
-    public LogbackLoggingSystem(@Nullable @Property(name = "logger.config") String logbackXmlLocation) {
-        this.logbackXmlLocation = logbackXmlLocation != null ? logbackXmlLocation : DEFAULT_LOGBACK_LOCATION;
+    /**
+     * @param logbackXmlLocation The location of the logback configuration file set via micronaut properties
+     * @deprecated Use {@link #LogbackLoggingSystem(String, String)} instead, which also honours
+     * {@code logback.configurationFile}.
+     */
+    @Deprecated(since = "5.3", forRemoval = true)
+    public LogbackLoggingSystem(@Nullable String logbackXmlLocation) {
+        this(null, logbackXmlLocation);
     }
 
     @Override
@@ -125,6 +145,6 @@ public class LogbackLoggingSystem implements ManagedLoggingSystem, io.micronaut.
     public void refresh() {
         LoggerContext context = getLoggerContext();
         context.reset();
-        LogbackUtils.configure(getClass().getClassLoader(), context, logbackXmlLocation);
+        LogbackUtils.configure(getClass().getClassLoader(), context, logbackExternalConfigLocation, logbackXmlLocation);
     }
 }
