@@ -61,7 +61,6 @@ import io.micronaut.core.annotation.AnnotationMetadataResolver;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.NextMajorVersion;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
-import io.micronaut.core.convert.DefaultMutableConversionService;
 import io.micronaut.core.convert.MutableConversionService;
 import io.micronaut.core.convert.value.MutableConvertibleValues;
 import io.micronaut.core.io.scan.ClassPathResourceLoader;
@@ -345,7 +344,7 @@ public sealed class DefaultBeanContext implements ConfigurableBeanContext permit
         this.tracePatterns = traceConfiguration.classPatterns();
         this.eventsEnabled = contextConfiguration.eventsEnabled();
         this.eagerBeansEnabled = contextConfiguration.eagerBeansEnabled();
-        this.conversionService = new DefaultMutableConversionService();
+        this.conversionService = MutableConversionService.create();
         beanDefinitionProvider = new DefaultBeanDefinitionService(beanContextConfiguration);
     }
 
