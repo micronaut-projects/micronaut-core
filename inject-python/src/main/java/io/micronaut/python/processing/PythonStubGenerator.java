@@ -5258,7 +5258,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             return false;
         }
         for (int i = 0; i < parameters.length; i++) {
-            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])) {
+            if (!hasCompatibleBridgeParameter(parameters[i], interfaceParameters[i])
+                && !(isAsyncPythonMethod(method)
+                && parameters[i] instanceof PythonParameterElement pythonParameter
+                && pythonParameter.getNativeType().typeAnnotation() == null)) {
                 return false;
             }
         }
@@ -5266,10 +5269,6 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean hasCompatibleBridgeParameter(ParameterElement parameter, ParameterElement interfaceParameter) {
-        if (parameter instanceof PythonParameterElement pythonParameter
-            && pythonParameter.getNativeType().typeAnnotation() == null) {
-            return true;
-        }
         String parameterTypeName = parameter.getType().getName();
         String interfaceTypeName = interfaceParameter.getType().getName();
         if (parameterTypeName.equals(interfaceTypeName)) {
