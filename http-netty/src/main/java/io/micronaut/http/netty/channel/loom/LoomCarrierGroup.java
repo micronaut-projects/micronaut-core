@@ -61,7 +61,7 @@ import java.util.function.Consumer;
 @Internal
 @Experimental
 public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
-    private List<Runner> runners;
+    List<Runner> runners;
 
     private LoomCarrierGroup(Factory factory, int nThreads, Executor executor, IoHandlerFactory ioHandlerFactory) {
         super(nThreads, executor, ioHandlerFactory, factory);
@@ -220,15 +220,49 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
             return delegate;
         }
 
-        private boolean isOnRunner(Thread thread) {
+        /**
+         * Check whether the given virtual thread is currently carried by this runner.
+         *
+         * @param thread The thread to check
+         * @return {@code true} if the thread is a virtual thread scheduled by this runner and
+         * mounted on the {@link #carrier}
+         */
+        boolean isOnRunner(Thread thread) {
             if (!thread.isVirtual()) {
                 return false;
             }
+            Object scheduler;
             if (LoomBranchSupport.isSupported()) {
                 assert thread == Thread.currentThread();
-                return LoomBranchSupport.currentScheduler() == this;
+                scheduler = LoomBranchSupport.currentScheduler();
             } else {
-                return PrivateLoomSupport.getScheduler(thread) == Runner.this;
+                scheduler = PrivateLoomSupport.getScheduler(thread);
+            }
+            if (!ownsScheduler(scheduler)) {
+                return false;
+            }
+            // A sticky thread may temporarily run on the default scheduler (e.g. after a sleep),
+            // in which case the carrier of this runner still needs to be woken up.
+            return !PrivateLoomSupport.isCarrierThreadSupported() || PrivateLoomSupport.getCarrierThread(thread) == carrier;
+        }
+
+        /**
+         * Check whether the given virtual thread scheduler submits continuations to this runner.
+         * Virtual threads never use the runner directly as their scheduler, they use one of the
+         * {@link IoScheduler} or {@link StickyScheduler} wrappers.
+         *
+         * @param scheduler The scheduler
+         * @return {@code true} if the scheduler belongs to this runner
+         */
+        private boolean ownsScheduler(Object scheduler) {
+            if (scheduler == this) {
+                return true;
+            } else if (scheduler instanceof IoScheduler s) {
+                return s.runner == this;
+            } else if (scheduler instanceof StickyScheduler s) {
+                return s.io == this;
+            } else {
+                return false;
             }
         }
 
@@ -308,6 +342,21 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
                 if (runContinuations(null, System.nanoTime() + timeSlice()) || expediteWrite) {
                     block = false;
                 }
+            }
+
+            // The carrier is gone, so any continuation still queued here would never run. Hand
+            // those virtual threads over to the default scheduler instead.
+            globalToLocal();
+            while (!localLoomQueue.isEmpty()) {
+                runOnDefaultScheduler(localLoomQueue.pollLast().task());
+            }
+        }
+
+        private static void runOnDefaultScheduler(Runnable command) {
+            if (LoomBranchSupport.isSupported()) {
+                LoomBranchSupport.runOnDefaultScheduler(command);
+            } else {
+                PrivateLoomSupport.getDefaultScheduler().execute(command);
             }
         }
 
@@ -452,11 +501,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
         @Override
         public void execute(Thread thread, Runnable command) {
             if (delegate.isShuttingDown()) {
-                if (LoomBranchSupport.isSupported()) {
-                    LoomBranchSupport.runOnDefaultScheduler(command);
-                } else {
-                    PrivateLoomSupport.getDefaultScheduler().execute(command);
-                }
+                runOnDefaultScheduler(command);
                 return;
             }
 

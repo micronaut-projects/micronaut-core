@@ -145,6 +145,13 @@ public final class PrivateLoomSupport {
         return THREAD_SCHEDULER != null;
     }
 
+    /**
+     * @return {@code true} if {@link #getCarrierThread(Thread)} can be used
+     */
+    static boolean isCarrierThreadSupported() {
+        return CARRIER_THREAD != null;
+    }
+
     static final class PrivateLoomCondition implements Condition {
         @Override
         public boolean matches(ConditionContext context) {
