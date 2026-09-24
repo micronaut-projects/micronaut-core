@@ -294,11 +294,13 @@ public class HandlerRoutesPropagatedContextTest {
                     // a route filter runs with the context of the filters before it in scope
                     request.setAttribute("before", describeContext());
                 })
+                .and()
                 .before((request, propagatedContext) -> {
                     String trace = request.getHeaders().get(TRACE);
                     propagatedContext.add(new RouteTrace("r-" + trace));
                     propagatedContext.add(new MdcPropagationContext(Map.of("trace", "route-" + trace)));
                 })
+                .and()
                 .after((request, response) -> response
                     .header("X-Before", request.getAttribute("before", String.class).orElse("missing"))
                     .header("X-After", describeContext()));
@@ -314,20 +316,23 @@ public class HandlerRoutesPropagatedContextTest {
                     }));
 
             routes.GET("/propagation/route-filter-blocking", (request, pathVariables) -> text(describe()))
-                .before(TaskExecutors.BLOCKING, (request, propagatedContext) -> {
+                .before((request, propagatedContext) -> {
                     propagatedContext.add(new RouteTrace("blocking-" + request.getHeaders().get(TRACE)));
-                });
+                }).executeOn(TaskExecutors.BLOCKING);
 
             routes.GET("/propagation/response-filter", (request, pathVariables) -> text(describe()))
                 .before(RouteFilters::addRouteTrace)
+                .and()
                 .after((request, response, propagatedContext) -> {
                     response.header("X-First", describeContext());
                     Objects.requireNonNull(propagatedContext.getContext()).find(RouteTrace.class).ifPresent(propagatedContext::remove);
                 })
+                .and()
                 .afterAsync((request, response, propagatedContext) -> CompletableFuture.runAsync(() -> {
                     response.header("X-Second", describeContext());
                     propagatedContext.add(new RouteTrace("async-removed"));
                 }, io))
+                .and()
                 .after((request, response) -> response.header("X-Third", describeContext()));
 
             routes.GET("/propagation/fail", (request, pathVariables) -> {

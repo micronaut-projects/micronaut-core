@@ -31,8 +31,9 @@ import java.util.function.Predicate;
 
 /**
  * The settings a handler route, see {@link HttpRouteSpec}, and a group of routes, see
- * {@link HttpRouteGroup}, share: the media types, the executor, the annotations, the attributes,
- * the conditions, the order and the port, besides the filters of {@link RouteFilterSpec}.
+ * {@link HttpRouteGroup}, share: the media types, the annotations, the attributes, the conditions,
+ * the order and the port, besides the filters of {@link RouteFilterSpec} and the executor of
+ * {@link ExecutionSpec}.
  *
  * <p>On a route, a setting is the value of the route. On a group, it is the default of the
  * routes declared in the lambda of the group, and of its nested groups, wherever it is declared
@@ -53,7 +54,7 @@ import java.util.function.Predicate;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S> permits HttpRouteSpec, HttpRouteGroup {
+public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpec<S>, ExecutionSpec<S> permits HttpRouteSpec, HttpRouteGroup {
 
     /**
      * Accept requests with these media types only, like {@code @Consumes} on a controller method,
@@ -75,10 +76,10 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * });
      * }</pre>
      *
-     * <p>The media types, and the executor, of a group apply to its routes to handlers, including
-     * the implicit {@code HEAD} routes, the routes declared for several methods and the declared
-     * routes, not to its locator routes, whose located tables declare their own, nor to its error
-     * and status routes.</p>
+     * <p>The media types, and the executor, see {@link ExecutionSpec#executeOn(String)}, of a
+     * group apply to its routes to handlers, including the implicit {@code HEAD} routes, the
+     * routes declared for several methods and the declared routes, not to its locator routes,
+     * whose located tables declare their own, nor to its error and status routes.</p>
      *
      * @param mediaTypes The media types
      * @return The route or the group
@@ -103,38 +104,6 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @return The route or the group
      */
     S produces(MediaType... mediaTypes);
-
-    /**
-     * Run the route on the named executor, like {@code @ExecuteOn} on a controller method, or on
-     * a controller for a group. It applies whatever the thread selection of the server.
-     *
-     * <p>On a group, the routes of the group, and of its nested groups, run on it. A route that
-     * chooses its thread, with this method or {@link #nonBlocking()}, or a nested group that does,
-     * overrides it. The last of {@code executeOn} and {@code nonBlocking} declared on a group
-     * wins.</p>
-     *
-     * <pre>{@code
-     * routes.path("/reports", reports -> {
-     *     reports.executeOn(TaskExecutors.BLOCKING);
-     *     reports.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(repository.find(pathVariables.getLong("id"))));
-     *     reports.GET("/count", (request, pathVariables) -> HttpResponse.ok(cache.count())).nonBlocking();
-     * });
-     * }</pre>
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @return The route or the group
-     */
-    S executeOn(String executorName);
-
-    /**
-     * Run the route on the event loop, like {@code @NonBlocking} on a controller method, when the
-     * server selects threads automatically. The route must not block. On a group, the default of
-     * its routes, unless they, or a nested group, choose their thread, like
-     * {@link #executeOn(String)}.
-     *
-     * @return The route or the group
-     */
-    S nonBlocking();
 
     /**
      * Give the route the annotations of an annotated element: the features that read the

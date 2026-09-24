@@ -90,48 +90,11 @@ public interface HandlerUriRoute {
     HandlerUriRoute nonBlocking();
 
     /**
-     * @param filter The filter
+     * @param filter The filter, whose executor may be chosen until the route is built
      * @return The route
-     * @see HttpRouteSpec#beforeReplacing(ContextReplacingRouteRequestFilter)
+     * @see RouteFilterSpec
      */
-    HandlerUriRoute before(ContextReplacingRouteRequestFilter filter);
-
-    /**
-     * @param executorName The name of the executor
-     * @param filter       The filter
-     * @return The route
-     * @see HttpRouteSpec#beforeReplacing(String, ContextReplacingRouteRequestFilter)
-     */
-    HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter);
-
-    /**
-     * @param filter The filter
-     * @return The route
-     * @see HttpRouteSpec#beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter)
-     */
-    HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter);
-
-    /**
-     * @param filter The filter
-     * @return The route
-     * @see HttpRouteSpec#afterReplacing(ContextReplacingRouteResponseFilter)
-     */
-    HandlerUriRoute after(ContextReplacingRouteResponseFilter filter);
-
-    /**
-     * @param executorName The name of the executor
-     * @param filter       The filter
-     * @return The route
-     * @see HttpRouteSpec#afterReplacing(String, ContextReplacingRouteResponseFilter)
-     */
-    HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter);
-
-    /**
-     * @param filter The filter
-     * @return The route
-     * @see HttpRouteSpec#afterReplacingAsync(AsyncContextReplacingRouteResponseFilter)
-     */
-    HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter);
+    HandlerUriRoute filter(FilterRegistration filter);
 
     /**
      * Declare the route in a group: the filters of the group, and of the groups around it, run

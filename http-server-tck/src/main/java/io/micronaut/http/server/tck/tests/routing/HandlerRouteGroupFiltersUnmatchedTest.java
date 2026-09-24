@@ -114,9 +114,11 @@ public class HandlerRouteGroupFiltersUnmatchedTest {
         public void routes(HttpRouteBuilder routes) {
             routes.filter("/unmatched/**").preMatching()
                 .before(request -> trace(request, "pre"))
+                .and()
                 .after((request, response) -> response.header("X-Pre-Matching", "true"));
             routes.filter("/unmatched/**")
                 .before(request -> trace(request, "server"))
+                .and()
                 .after((request, response) -> {
                     response.header("X-Server", "true");
                     traceHeader(request, response);

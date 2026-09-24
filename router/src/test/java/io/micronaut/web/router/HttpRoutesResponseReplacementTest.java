@@ -75,7 +75,9 @@ class HttpRoutesResponseReplacementTest {
                 group.after((request, response) -> trace.add("group " + response.code() + " " + response.body()));
                 group.GET("/x", OK)
                     .after((request, response) -> trace.add("route-before " + response.code()))
+                    .and()
                     .afterReplacing((request, response) -> HttpResponse.status(HttpStatus.CREATED).body("replaced"))
+                    .and()
                     .after((request, response) -> trace.add("route-after " + response.code() + " " + response.body()));
             });
         });
@@ -89,6 +91,7 @@ class HttpRoutesResponseReplacementTest {
     void aReplacementThatIsNotMutableIsMutableForTheFiltersAfterIt() {
         Router router = router(routes -> routes.GET("/x", OK)
             .afterReplacing((request, response) -> new HttpResponseWrapper<>(HttpResponse.status(HttpStatus.ACCEPTED).header("X-Wrapped", "true")))
+            .and()
             .after((request, response) -> {
                 assertInstanceOf(MutableHttpResponse.class, response);
                 response.header("X-After", "true");
@@ -107,14 +110,17 @@ class HttpRoutesResponseReplacementTest {
                 response.header("X-Sync", "true");
                 return null;
             })
+            .and()
             .afterReplacing((request, response, propagatedContext) -> {
                 response.header("X-Context", "true");
                 return null;
             })
+            .and()
             .afterReplacingAsync((request, response) -> {
                 response.header("X-Async", "true");
                 return CompletableFuture.completedFuture(null);
             })
+            .and()
             .afterReplacingAsync((request, response, propagatedContext) -> {
                 response.header("X-Async-Context", "true");
                 return CompletableFuture.completedFuture(null);
@@ -136,6 +142,7 @@ class HttpRoutesResponseReplacementTest {
             group.afterAsync((request, response) -> CompletableFuture.completedFuture(trace.add("group " + response.code())));
             group.GET("/x", OK)
                 .afterReplacingAsync((request, response) -> CompletableFuture.completedFuture(HttpResponse.status(HttpStatus.ACCEPTED).header("X-Async", "1")))
+                .and()
                 .afterReplacingAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(
                     HttpResponse.status(HttpStatus.CREATED).header("X-Async", response.getHeaders().get("X-Async") + ",2")));
         }));
@@ -154,6 +161,7 @@ class HttpRoutesResponseReplacementTest {
                 propagatedContext.add(new Marker("replacer"));
                 return HttpResponse.status(HttpStatus.ACCEPTED);
             })
+            .and()
             .after((request, response) -> trace.add(response.code() + " " + PropagatedContext.getOrEmpty().find(Marker.class).map(Marker::name).orElse("none"))));
 
         Run run = run(router, HttpRequest.GET("/x"));
@@ -183,6 +191,7 @@ class HttpRoutesResponseReplacementTest {
             routes.GET("/ok", OK);
             routes.filter("/**").preMatching()
                 .beforeReplacing(request -> request.getPath().equals("/blocked") ? HttpResponse.status(HttpStatus.FORBIDDEN) : null)
+                .and()
                 .afterReplacing((request, response) -> response.code() == HttpStatus.OK.getCode()
                     ? null
                     : HttpResponse.status(HttpStatus.UNAUTHORIZED).header("X-Replaced", String.valueOf(response.code())));

@@ -244,7 +244,7 @@ public class HandlerRoutesConcurrencyTest {
         public void routes(HttpRouteBuilder routes) {
             routes.filter("/conc/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new RequestId(id(request)));
-            }).after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
+            }).and().after((request, response) -> response.header("X-Server-Filter", PropagatedContext.getOrEmpty().find(RequestId.class).map(RequestId::id).orElse("none")));
             RouteTable located = tables.buildLocatedHttpRoutes(table -> table.GET("/show", (request, pathVariables) ->
                     text("located " + pathVariables.locatedTarget(Located.class).id()))
                 .after((request, response) -> response.header("X-Route-Filter", pathVariables(request))));
@@ -256,9 +256,10 @@ public class HandlerRoutesConcurrencyTest {
                 group.after((request, response) -> response.header("X-Group-Filter", request.getAttribute("group-id", String.class).orElse("none")));
                 group.GET("/sync/{id}", (request, pathVariables) -> text("sync " + pathVariables.getString("id")))
                     .beforeReplacing(request -> id(request).equals(pathVariables(request)) ? null : HttpResponse.badRequest())
+                    .and()
                     .after((request, response) -> response.header("X-Route-Filter", id(request)));
                 group.asyncGET("/async/{id}", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> text("async " + pathVariables.getString("id")), executor))
-                    .after(TaskExecutors.BLOCKING, (request, response) -> response.header("X-Route-Filter", id(request)));
+                    .after((request, response) -> response.header("X-Route-Filter", id(request))).executeOn(TaskExecutors.BLOCKING);
                 group.asyncPOST("/echo/{id}", (request, pathVariables, body) -> body.text()
                         .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)))
                     .consumes(MediaType.TEXT_PLAIN_TYPE)

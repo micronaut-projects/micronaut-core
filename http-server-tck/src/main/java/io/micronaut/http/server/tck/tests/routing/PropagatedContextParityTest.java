@@ -839,8 +839,11 @@ public class PropagatedContextParityTest {
                 .before((request, propagatedContext) -> {
                     RouteFilters.before(request, propagatedContext);
                 })
+                .and()
                 .after(RouteFilters::after)
-                .after((request, response) -> RouteFilters.after2(request, response));
+                .and()
+                .after((request, response) -> RouteFilters.after2(request, response))
+                .and();
         }
 
         @Override
@@ -907,17 +910,21 @@ public class PropagatedContextParityTest {
 
             routes.GET("/parity/af/async-request", (request, pathVariables) -> text(describe()))
                 .beforeAsync((request, propagatedContext) -> RouteFilters.beforeAsync(io, request, propagatedContext))
+                .and()
                 .after((request, response) -> RouteFilters.after2(request, response));
             routes.GET("/parity/af/executor-request", (request, pathVariables) -> text(describe()))
-                .before(TaskExecutors.BLOCKING, (request, propagatedContext) -> {
+                .before((request, propagatedContext) -> {
                     RouteFilters.beforeOnExecutor(request, propagatedContext);
-                })
+                }).executeOn(TaskExecutors.BLOCKING)
+                .and()
                 .after((request, response) -> RouteFilters.after2(request, response));
             routes.GET("/parity/af/async-response", (request, pathVariables) -> text(describe()))
                 .afterAsync((request, response, propagatedContext) -> RouteFilters.afterAsync(io, request, response, propagatedContext))
+                .and()
                 .after((request, response) -> RouteFilters.after2(request, response));
             routes.GET("/parity/af/executor-response", (request, pathVariables) -> text(describe()))
-                .after(TaskExecutors.BLOCKING, RouteFilters::afterOnExecutor)
+                .after(RouteFilters::afterOnExecutor).executeOn(TaskExecutors.BLOCKING)
+                .and()
                 .after((request, response) -> RouteFilters.after2(request, response));
 
             routes.GET("/parity/get-only", (request, pathVariables) -> text(describe()));

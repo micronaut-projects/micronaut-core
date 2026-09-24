@@ -46,10 +46,7 @@ import io.micronaut.scheduling.exceptions.SchedulerConfigurationException;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
-import io.micronaut.web.router.builder.AsyncContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.AsyncContextReplacingRouteRequestFilter;
-import io.micronaut.web.router.builder.ContextReplacingRouteResponseFilter;
-import io.micronaut.web.router.builder.ContextReplacingRouteRequestFilter;
+import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HandlerUriRoute;
@@ -887,8 +884,8 @@ public final class RouteAssembly {
     @Internal
     public final class RouteFilters {
         private final Function<String, RuntimeException> noExecutor;
-        private final List<GenericHttpFilter> requestFilters = new ArrayList<>(0);
-        private final List<GenericHttpFilter> responseFilters = new ArrayList<>(0);
+        private final List<FilterRegistration> requestFilters = new ArrayList<>(0);
+        private final List<FilterRegistration> responseFilters = new ArrayList<>(0);
         private @Nullable RouteFilters group;
         private boolean closed;
 
@@ -902,37 +899,14 @@ public final class RouteAssembly {
         }
 
         /**
-         * @param filter       The filter
-         * @param executorName The name of the executor to run the filter on, or {@code null}
+         * @param filter The filter, whose executor may be chosen until the filter chain is built
          */
-        public void before(ContextReplacingRouteRequestFilter filter, @Nullable String executorName) {
+        public void add(FilterRegistration filter) {
             Objects.requireNonNull(filter, "filter");
-            add(requestFilters, GenericHttpFilter.createRouteRequestFilter(filter::filter, executor(executorName)));
-        }
-
-        /**
-         * @param filter The filter
-         */
-        public void beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
-            Objects.requireNonNull(filter, "filter");
-            add(requestFilters, GenericHttpFilter.createAsyncRouteRequestFilter(filter::filter));
-        }
-
-        /**
-         * @param filter       The filter
-         * @param executorName The name of the executor to run the filter on, or {@code null}
-         */
-        public void after(ContextReplacingRouteResponseFilter filter, @Nullable String executorName) {
-            Objects.requireNonNull(filter, "filter");
-            add(responseFilters, GenericHttpFilter.createRouteResponseFilter(filter::filter, executor(executorName)));
-        }
-
-        /**
-         * @param filter The filter
-         */
-        public void afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
-            Objects.requireNonNull(filter, "filter");
-            add(responseFilters, GenericHttpFilter.createAsyncRouteResponseFilter(filter::filter));
+            if (closed) {
+                throw new IllegalStateException("The route group is closed: declare the filters of a group in its lambda");
+            }
+            (filter.isRequestFilter() ? requestFilters : responseFilters).add(filter);
         }
 
         /**
@@ -940,6 +914,12 @@ public final class RouteAssembly {
          */
         public void close() {
             closed = true;
+            for (FilterRegistration filter : requestFilters) {
+                filter.close();
+            }
+            for (FilterRegistration filter : responseFilters) {
+                filter.close();
+            }
         }
 
         /**
@@ -985,8 +965,10 @@ public final class RouteAssembly {
             // response filters first: the chain runs them on the way back from wherever the response
             // was produced, the route or a request filter that answered instead of it, in the order
             // they were declared
-            filters.addAll(responseFilters.reversed());
-            filters.addAll(requestFilters);
+            filters.addAll(responseChain());
+            for (FilterRegistration filter : requestFilters) {
+                filters.add(filter.filter(this::executor));
+            }
             return List.copyOf(filters);
         }
 
@@ -994,27 +976,20 @@ public final class RouteAssembly {
          * @return The response filters of this level, in the order the filter chain has them, see {@link #chain()}
          */
         List<GenericHttpFilter> responseChain() {
-            return responseFilters.reversed();
-        }
-
-        private void add(List<GenericHttpFilter> filters, GenericHttpFilter filter) {
-            if (closed) {
-                throw new IllegalStateException("The route group is closed: declare the filters of a group in its lambda");
+            List<GenericHttpFilter> filters = new ArrayList<>(responseFilters.size());
+            for (FilterRegistration filter : responseFilters.reversed()) {
+                filters.add(filter.filter(this::executor));
             }
-            filters.add(filter);
+            return filters;
         }
 
         /**
          * The named executor, looked up when a filter first runs on it.
          *
-         * @param executorName The name of the executor, or {@code null}
-         * @return The executor, or {@code null}
+         * @param executorName The name of the executor
+         * @return The executor
          */
-        private @Nullable Supplier<Executor> executor(@Nullable String executorName) {
-            if (executorName == null) {
-                return null;
-            }
-            RouteArguments.executorName(executorName);
+        private Supplier<Executor> executor(String executorName) {
             return SupplierUtil.memoized(() -> {
                 ExecutorSelector selector = RouteAssembly.this.executorSelector;
                 if (selector == null) {
@@ -1577,38 +1552,8 @@ public final class RouteAssembly {
         }
 
         @Override
-        public HandlerUriRoute before(ContextReplacingRouteRequestFilter filter) {
-            filters.before(filter, null);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute before(String executorName, ContextReplacingRouteRequestFilter filter) {
-            filters.before(filter, RouteArguments.executorName(executorName));
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute beforeAsync(AsyncContextReplacingRouteRequestFilter filter) {
-            filters.beforeAsync(filter);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute after(ContextReplacingRouteResponseFilter filter) {
-            filters.after(filter, null);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute after(String executorName, ContextReplacingRouteResponseFilter filter) {
-            filters.after(filter, RouteArguments.executorName(executorName));
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute afterAsync(AsyncContextReplacingRouteResponseFilter filter) {
-            filters.afterAsync(filter);
+        public HandlerUriRoute filter(FilterRegistration filter) {
+            filters.add(filter);
             return this;
         }
 

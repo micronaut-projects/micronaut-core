@@ -56,9 +56,11 @@ class HttpRoutesServerFiltersTest {
             routes.filter("/**").before(request -> record(trace, "a0"));
             routes.filter("/**").order(10)
                 .before(request -> record(trace, "b10-1"))
+                .and()
                 .after((request, response) -> trace.add("b10-after"))
+                .and()
                 .before(request -> record(trace, "b10-2"));
-            routes.filter("/**").order(-10).before(request -> record(trace, "c-10")).after((request, response) -> trace.add("c-10-after"));
+            routes.filter("/**").order(-10).before(request -> record(trace, "c-10")).and().after((request, response) -> trace.add("c-10-after"));
             routes.filter("/**").before(request -> record(trace, "d0"));
         });
 
@@ -117,13 +119,21 @@ class HttpRoutesServerFiltersTest {
         Router router = router(null, routes -> {
             ServerFilterSpec same = routes.filter("/**")
                 .before(request -> record(trace, "before"))
+                .and()
                 .before((request, propagatedContext) -> record(trace, "context-before"))
+                .and()
                 .beforeAsync(request -> CompletableFuture.completedFuture(record(trace, "async-before")))
+                .and()
                 .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-before")))
+                .and()
                 .after((request, response) -> trace.add("after"))
+                .and()
                 .after((request, response, propagatedContext) -> trace.add("context-after"))
+                .and()
                 .afterAsync((request, response) -> CompletableFuture.completedFuture(trace.add("async-after")))
+                .and()
                 .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")))
+                .and()
                 .methods(HttpMethod.GET)
                 .order(1)
                 .patternStyle(FilterPatternStyle.ANT)

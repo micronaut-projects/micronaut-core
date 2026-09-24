@@ -114,11 +114,13 @@ record RouteFunctionFilter(
     /**
      * An asynchronous request filter.
      *
-     * @param filter Completes with a response to answer the request with, a request to continue
-     *               with, or {@code null} to proceed
+     * @param filter   Completes with a response to answer the request with, a request to continue
+     *                 with, or {@code null} to proceed
+     * @param executor The executor to call the filter on, or {@code null}: the filter chain
+     *                 continues where the stage of the filter completes
      * @return The filter
      */
-    static RouteFunctionFilter requestAsync(RouteFilterFunctions.AsyncRequest filter) {
+    static RouteFunctionFilter requestAsync(RouteFilterFunctions.AsyncRequest filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(context -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
             MutableHttpRequest<?> request = MutableServerRequest.of(context.request());
@@ -129,7 +131,7 @@ record RouteFunctionFilter(
                 stage.thenApply(result ->
                     next(withChangedContext(context, propagatedContext), request, uri, result))
             );
-        }, null, null);
+        }, null, executor);
     }
 
     /**
@@ -178,11 +180,13 @@ record RouteFunctionFilter(
     /**
      * An asynchronous response filter.
      *
-     * @param filter Completes with a response to continue with, or {@code null} to continue with
-     *               the response it was given
+     * @param filter   Completes with a response to continue with, or {@code null} to continue with
+     *                 the response it was given
+     * @param executor The executor to call the filter on, or {@code null}: the filter chain
+     *                 continues where the stage of the filter completes
      * @return The filter
      */
-    static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter) {
+    static RouteFunctionFilter responseAsync(RouteFilterFunctions.AsyncResponse filter, @Nullable Supplier<? extends Executor> executor) {
         return new RouteFunctionFilter(null, (context, response) -> {
             MutablePropagatedContext propagatedContext = MutablePropagatedContext.of(context.propagatedContext());
             CompletionStage<? extends @Nullable HttpResponse<?>> stage = Objects.requireNonNull(filter.filter(context.request(), response, propagatedContext),
@@ -190,7 +194,7 @@ record RouteFunctionFilter(
             return CompletableFutureExecutionFlow.just(
                 stage.thenApply(result -> next(withChangedContext(context, propagatedContext), response, result))
             );
-        }, null);
+        }, executor);
     }
 
     /**

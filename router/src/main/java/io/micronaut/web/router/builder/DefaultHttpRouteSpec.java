@@ -160,51 +160,11 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     }
 
     @Override
-    public HttpRouteSpec beforeReplacing(ContextReplacingRouteRequestFilter filter) {
+    public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
         for (HandlerUriRoute route : routes) {
-            route.before(filter);
+            route.filter(filter);
         }
-        return this;
-    }
-
-    @Override
-    public HttpRouteSpec beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter) {
-        for (HandlerUriRoute route : routes) {
-            route.before(executorName, filter);
-        }
-        return this;
-    }
-
-    @Override
-    public HttpRouteSpec beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter) {
-        for (HandlerUriRoute route : routes) {
-            route.beforeAsync(filter);
-        }
-        return this;
-    }
-
-    @Override
-    public HttpRouteSpec afterReplacing(ContextReplacingRouteResponseFilter filter) {
-        for (HandlerUriRoute route : routes) {
-            route.after(filter);
-        }
-        return this;
-    }
-
-    @Override
-    public HttpRouteSpec afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter) {
-        for (HandlerUriRoute route : routes) {
-            route.after(executorName, filter);
-        }
-        return this;
-    }
-
-    @Override
-    public HttpRouteSpec afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter) {
-        for (HandlerUriRoute route : routes) {
-            route.afterAsync(filter);
-        }
-        return this;
+        return new DefaultFilterSpec<>(this, filter);
     }
 
     /**

@@ -132,8 +132,11 @@ class RouteGroupsTest {
             outer.path("/api", inner -> {
                 inner.GET("/orders", RouteGroupsTest::ok)
                     .before(request -> record(trace, "route-before1"))
+                    .and()
                     .before(request -> record(trace, "route-before2"))
+                    .and()
                     .after((request, response) -> trace.add("route-after1"))
+                    .and()
                     .after((request, response) -> trace.add("route-after2"));
                 inner.after((request, response) -> trace.add("inner-after1"));
                 inner.before(request -> record(trace, "inner-before1"));
@@ -161,6 +164,7 @@ class RouteGroupsTest {
             api.after((request, response) -> trace.add("api-after " + response.code()));
             api.GET("/route-rejects", RouteGroupsTest::ok)
                 .beforeReplacing(request -> HttpResponse.status(HttpStatus.FORBIDDEN))
+                .and()
                 .after((request, response) -> trace.add("route-after " + response.code()));
             api.path("/inner", inner -> {
                 inner.beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED));
@@ -185,17 +189,27 @@ class RouteGroupsTest {
             // the lambda arity selects the variant, as it does on a route
             HttpRouteGroup same = group
                 .before(request -> record(trace, "before"))
+                .and()
                 .before((request, propagatedContext) -> record(trace, "context-before"))
+                .and()
                 .beforeAsync(request -> CompletableFuture.completedFuture(record(trace, "async-before")))
+                .and()
                 .beforeAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-before")))
+                .and()
                 .after((request, response) -> trace.add("after"))
+                .and()
                 .after((request, response, propagatedContext) -> trace.add("context-after"))
+                .and()
                 .afterAsync((request, response) -> CompletableFuture.completedFuture(trace.add("async-after")))
-                .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")));
+                .and()
+                .afterAsync((request, response, propagatedContext) -> CompletableFuture.completedFuture(trace.add("async-context-after")))
+                .and();
             assertTrue(same == group);
             HttpRouteSpec route = group.GET("/all", RouteGroupsTest::ok)
                 .before(request -> { })
+                .and()
                 .after((request, response) -> { })
+                .and()
                 .produces(MediaType.TEXT_PLAIN_TYPE);
             assertNotNull(route);
         }));
@@ -212,13 +226,18 @@ class RouteGroupsTest {
             routes.group(group -> {
                 // the four families of request filters line up with the response filters
                 group.beforeReplacing(request -> record(trace, "replacing"))
+                    .and()
                     .beforeReplacing((request, propagatedContext) -> record(trace, "context-replacing"))
+                    .and()
                     .beforeReplacingAsync(request -> CompletableFuture.completedFuture(record(trace, "async-replacing")))
+                    .and()
                     .beforeReplacingAsync((request, propagatedContext) -> CompletableFuture.completedFuture(record(trace, "async-context-replacing")))
+                    .and()
                     .before(request -> {
                         trace.add("in-place");
                         request.setAttribute("in-place", true);
                     })
+                    .and()
                     .beforeAsync(request -> CompletableFuture.completedFuture(trace.add("async-in-place")));
                 group.GET("/replacing", RouteGroupsTest::ok);
             });

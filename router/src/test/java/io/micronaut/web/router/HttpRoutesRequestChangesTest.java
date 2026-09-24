@@ -157,12 +157,14 @@ class HttpRoutesRequestChangesTest {
                 replacements.add(replacement);
                 return replacement;
             })
+            .and()
             .beforeAsync(request -> {
                 // the next filter is given a mutable wrapper of the request the previous one returned
                 assertInstanceOf(MutableHttpRequest.class, request);
                 request.header("X-Async", "true");
                 return CompletableFuture.completedFuture(null);
             })
+            .and()
             .beforeReplacing((request, propagatedContext) -> {
                 assertEquals("true", request.getHeaders().get("X-Async"));
                 HttpRequest<?> replacement = withMethod(request, HttpMethod.PATCH);
@@ -180,6 +182,7 @@ class HttpRoutesRequestChangesTest {
     void aRequestFilterThatAnswersStopsTheChainLikeBefore() {
         Router router = router(routes -> routes.GET("/x", OK)
             .beforeReplacing(request -> HttpResponse.status(HttpStatus.UNAUTHORIZED))
+            .and()
             .beforeReplacing(request -> {
                 throw new AssertionError("not called");
             }));

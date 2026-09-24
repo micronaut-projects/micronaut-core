@@ -175,15 +175,17 @@ public class HttpRoutesServerFiltersTest {
             routes.filter("/sf/**").before(request -> trace(request, "fn0"));
             routes.filter("/sf/**").order(-5)
                 .before(request -> trace(request, "fn-5"))
+                .and()
                 .after((request, response) -> trace(response, "fn-5"));
             routes.filter("/sf/**").order(20)
                 .before(request -> trace(request, "fn20"))
+                .and()
                 .after((request, response) -> trace(response, "fn20"));
             routes.filter("/sf/**").methods(HttpMethod.POST).after((request, response) -> response.header("X-Post-Only", "true"));
             routes.filter("/sf/only/**").after((request, response) -> response.header("X-Only", "true"));
-            routes.filter("/sf/**").before(TaskExecutors.IO, (request, propagatedContext) -> {
+            routes.filter("/sf/**").before((request, propagatedContext) -> {
                 propagatedContext.add(new FilterTrace("fn"));
-            });
+            }).executeOn(TaskExecutors.IO);
             routes.path("/group", group -> {
                 group.filter("/sf/**").after((request, response) -> response.header("X-In-Group", "true"));
                 group.filter("/sf/**").afterAsync((request, response) -> CompletableFuture.completedFuture(response.header("X-Async", "true")));

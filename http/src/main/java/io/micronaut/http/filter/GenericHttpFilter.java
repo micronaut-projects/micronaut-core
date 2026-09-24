@@ -78,13 +78,15 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     /**
      * Create an asynchronous filter of one route's requests.
      *
-     * @param filter Completes with a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
+     * @param filter   Completes with a response to answer the request with instead of the route, a request to continue with, or {@code null} to proceed
+     * @param executor The executor to call the filter on, or {@code null} to call it on the thread of the filter chain
      * @return The filter
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createAsyncRouteRequestFilter(RouteFilterFunctions.AsyncRequest filter) {
-        return RouteFunctionFilter.requestAsync(filter);
+    static GenericHttpFilter createAsyncRouteRequestFilter(RouteFilterFunctions.AsyncRequest filter,
+                                                           @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.requestAsync(filter, executor);
     }
 
     /**
@@ -104,13 +106,15 @@ public sealed interface GenericHttpFilter permits InternalHttpFilter {
     /**
      * Create an asynchronous filter of one route's responses.
      *
-     * @param filter Completes with a response to continue with instead of the route's response, or {@code null} to continue with it
+     * @param filter   Completes with a response to continue with instead of the route's response, or {@code null} to continue with it
+     * @param executor The executor to call the filter on, or {@code null} to call it on the thread of the filter chain
      * @return The filter
      * @since 5.3.0
      */
     @Internal
-    static GenericHttpFilter createAsyncRouteResponseFilter(RouteFilterFunctions.AsyncResponse filter) {
-        return RouteFunctionFilter.responseAsync(filter);
+    static GenericHttpFilter createAsyncRouteResponseFilter(RouteFilterFunctions.AsyncResponse filter,
+                                                            @Nullable Supplier<? extends Executor> executor) {
+        return RouteFunctionFilter.responseAsync(filter, executor);
     }
 
     /**

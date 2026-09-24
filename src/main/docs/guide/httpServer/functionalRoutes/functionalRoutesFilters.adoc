@@ -31,14 +31,23 @@ The request and the response filters come in the same four families, so that the
 |`afterReplacing(ReplacingRouteResponseFilter)`
 |A response filter that returns a replacement response, or `null` to keep the response.
 
-|`before(String executorName, ...)`, `beforeReplacing(String executorName, ...)`, `after(String executorName, ...)`, `afterReplacing(String executorName, ...)`
-|The same, run on a named executor, like `@ExecuteOn` on a filter method.
-
 |`beforeAsync(...)`, `beforeReplacingAsync(...)`, `afterAsync(...)`, `afterReplacingAsync(...)`
 |The same, returning a `CompletionStage`: the filter chain continues when it completes, for the replacing filters with what it completes with.
 |===
 
 Each method has a variant whose lambda also receives a api:core.propagation.MutablePropagatedContext[], selected by the number of parameters: `before((request, propagatedContext) -> ...)`. An element the filter adds is in scope for the filters after it, the handler and the error routes, as for a filter method with a `MutablePropagatedContext` parameter. An asynchronous filter's changes are taken when its stage completes.
+
+=== Filter executors
+
+Every filter method returns the api:web.router.builder.FilterSpec[] of the filter it added. A filter runs on the thread of the filter chain, like a filter method; `executeOn(executorName)` runs it on a named executor instead, like `@ExecuteOn` on a filter method, and `and()` goes back to the route, the group or the server filter to continue its declaration:
+
+snippet::io.micronaut.docs.server.functional.GroupRoutes[tags="filterExecutor", indent=0, title="A filter on an executor"]
+
+<1> A filter that blocks, e.g. on a database.
+<2> The filter runs on the blocking executor, and the filter chain continues on it. `nonBlocking()` keeps the filter on the thread of the filter chain, the default; the last of the two called wins. An asynchronous filter given an executor is called on it, and the chain continues where its stage completes.
+<3> `and()` returns the route, to declare its next filters or settings.
+
+A filter chooses its thread with the same methods as a route and a group, from api:web.router.builder.ExecutionSpec[]. Group filters and server filters have them too. The executor of a filter is fixed once the routes are built, or when the lambda of the group that declares the filter returns.
 
 === Changing the request and the response
 

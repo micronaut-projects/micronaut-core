@@ -57,6 +57,7 @@ public class GroupRoutes implements HttpRoutes {
                 .before(request -> { // <5>
                     request.getHeaders().add("X-Report-Format", "summary");
                 })
+                .and()
                 .afterReplacing((request, response) -> // <6>
                     response.getStatus() == HttpStatus.OK && request.getHeaders().contains("X-Legacy")
                         ? HttpResponse.status(HttpStatus.GONE)
@@ -93,6 +94,17 @@ public class GroupRoutes implements HttpRoutes {
                 request.uri(URI.create(request.getUri().toString().replaceFirst("^/v1", "/api")));
             });
         // end::serverFilters[]
+
+        // tag::filterExecutor[]
+        routes.GET("/audit/{id}", (request, pathVariables) ->
+                text("audited on " + request.getAttribute("audit-thread", String.class).orElse("none")))
+            .before(request -> { // <1>
+                request.setAttribute("audit-thread", Thread.currentThread().getName());
+            })
+            .executeOn(TaskExecutors.BLOCKING) // <2>
+            .and() // <3>
+            .after((request, response) -> response.header("X-Audited", "true"));
+        // end::filterExecutor[]
     }
 
     private static HttpResponse<?> text(String text) {

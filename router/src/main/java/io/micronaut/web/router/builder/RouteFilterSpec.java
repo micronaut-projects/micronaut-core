@@ -37,8 +37,20 @@ import io.micronaut.core.annotation.Experimental;
  * {@code afterReplacing} filters can also replace it, like a filter method returning a request or
  * a response: a request filter answers the request instead of the route with the response it
  * returns, or continues with the request it returns, e.g. with another method or body, see
- * {@link ReplacingRouteRequestFilter}. Each has a variant on a named executor, an asynchronous
- * variant, and variants that change the propagated context.</p>
+ * {@link ReplacingRouteRequestFilter}. Each has an asynchronous variant, and variants that change
+ * the propagated context.</p>
+ *
+ * <p>Every filter method returns the {@link FilterSpec} of the filter it added: a filter runs on
+ * the thread of the filter chain, or on an executor chosen with
+ * {@link FilterSpec#executeOn(String)}, like a filter method annotated {@code @ExecuteOn}, and
+ * {@link FilterSpec#and()} goes back to the route or the group to continue its declaration.</p>
+ *
+ * <pre>{@code
+ * routes.GET("/orders/{id}", orderHandler)
+ *     .before(request -> tenants.check(request)).executeOn(TaskExecutors.BLOCKING)
+ *     .and()
+ *     .after((request, response) -> response.header("X-Tenant", tenantOf(request)));
+ * }</pre>
  *
  * <p><b>Matched routes only.</b> As with the filter methods of a controller, the filters of a
  * route and of its groups are route filters: they run only when that route matched the request.
@@ -68,31 +80,20 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * prefix of the group, which only the server filters, pre-matching ones included, see.
      *
      * @param filter The filter, which can change the request in place
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see RouteRequestFilter
      */
-    S before(RouteRequestFilter filter);
-
-    /**
-     * Filter the requests on the named executor, like a {@code @RequestFilter} method annotated
-     * {@code @ExecuteOn}: use it for a filter that blocks, e.g. on a database. The filter chain
-     * continues on that executor.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can change the request in place
-     * @return This
-     */
-    S before(String executorName, RouteRequestFilter filter);
+    FilterSpec<S> before(RouteRequestFilter filter);
 
     /**
      * Filter the requests asynchronously, like a {@code @RequestFilter} method returning a
      * {@code CompletionStage}: the filter chain continues when the stage completes.
      *
      * @param filter The filter, which can change the request in place until its stage completes
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see AsyncRouteRequestFilter
      */
-    S beforeAsync(AsyncRouteRequestFilter filter);
+    FilterSpec<S> beforeAsync(AsyncRouteRequestFilter filter);
 
     /**
      * Filter the requests with a filter that changes the propagated context, like a
@@ -101,32 +102,21 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * Otherwise the same as {@link #before(RouteRequestFilter)}.
      *
      * @param filter The filter, which can change the request and the propagated context in place
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see ContextRouteRequestFilter
      */
-    S before(ContextRouteRequestFilter filter);
-
-    /**
-     * Filter the requests on the named executor with a filter that changes the propagated context.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can change the request and the propagated context in place
-     * @return This
-     * @see #before(String, RouteRequestFilter)
-     * @see ContextRouteRequestFilter
-     */
-    S before(String executorName, ContextRouteRequestFilter filter);
+    FilterSpec<S> before(ContextRouteRequestFilter filter);
 
     /**
      * Filter the requests asynchronously with a filter that changes the propagated context until
      * its stage completes.
      *
      * @param filter The filter, which can change the request and the propagated context in place
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #beforeAsync(AsyncRouteRequestFilter)
      * @see AsyncContextRouteRequestFilter
      */
-    S beforeAsync(AsyncContextRouteRequestFilter filter);
+    FilterSpec<S> beforeAsync(AsyncContextRouteRequestFilter filter);
 
     /**
      * Filter the requests with a filter that can answer the request or replace it, like a
@@ -137,66 +127,43 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * nothing, so that its lambdas are never ambiguous.
      *
      * @param filter The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see ReplacingRouteRequestFilter
      */
-    S beforeReplacing(ReplacingRouteRequestFilter filter);
-
-    /**
-     * Filter the requests on the named executor with a filter that can answer or replace the request.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
-     * @see #before(String, RouteRequestFilter)
-     * @see ReplacingRouteRequestFilter
-     */
-    S beforeReplacing(String executorName, ReplacingRouteRequestFilter filter);
+    FilterSpec<S> beforeReplacing(ReplacingRouteRequestFilter filter);
 
     /**
      * Filter the requests asynchronously with a filter that can answer or replace the request: the
      * filter chain continues when the stage completes, with what it completes with.
      *
      * @param filter The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #beforeAsync(AsyncRouteRequestFilter)
      * @see AsyncReplacingRouteRequestFilter
      */
-    S beforeReplacingAsync(AsyncReplacingRouteRequestFilter filter);
+    FilterSpec<S> beforeReplacingAsync(AsyncReplacingRouteRequestFilter filter);
 
     /**
      * Filter the requests with a filter that can answer or replace the request and changes the
      * propagated context.
      *
      * @param filter The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #beforeReplacing(ReplacingRouteRequestFilter)
      * @see ContextReplacingRouteRequestFilter
      */
-    S beforeReplacing(ContextReplacingRouteRequestFilter filter);
-
-    /**
-     * Filter the requests on the named executor with a filter that can answer or replace the
-     * request and changes the propagated context.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
-     * @see #beforeReplacing(String, ReplacingRouteRequestFilter)
-     * @see ContextReplacingRouteRequestFilter
-     */
-    S beforeReplacing(String executorName, ContextReplacingRouteRequestFilter filter);
+    FilterSpec<S> beforeReplacing(ContextReplacingRouteRequestFilter filter);
 
     /**
      * Filter the requests asynchronously with a filter that can answer or replace the request and
      * changes the propagated context until its stage completes.
      *
      * @param filter The filter, which can answer the request instead of the route, or change or replace the request
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #beforeReplacingAsync(AsyncReplacingRouteRequestFilter)
      * @see AsyncContextReplacingRouteRequestFilter
      */
-    S beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter);
+    FilterSpec<S> beforeReplacingAsync(AsyncContextReplacingRouteRequestFilter filter);
 
     /**
      * Filter the responses, like a {@code @ResponseFilter} method. The response filters of a route
@@ -208,27 +175,17 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * see.
      *
      * @param filter The filter
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      */
-    S after(RouteResponseFilter filter);
-
-    /**
-     * Filter the responses on the named executor, like a {@code @ResponseFilter} method annotated
-     * {@code @ExecuteOn}.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter
-     * @return This
-     */
-    S after(String executorName, RouteResponseFilter filter);
+    FilterSpec<S> after(RouteResponseFilter filter);
 
     /**
      * Filter the responses asynchronously: the filter chain continues when the stage completes.
      *
      * @param filter The filter
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      */
-    S afterAsync(AsyncRouteResponseFilter filter);
+    FilterSpec<S> afterAsync(AsyncRouteResponseFilter filter);
 
     /**
      * Filter the responses with a filter that changes the propagated context of the response
@@ -236,33 +193,22 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * {@code MutablePropagatedContext} parameter.
      *
      * @param filter The filter
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #after(RouteResponseFilter)
      * @see ContextRouteResponseFilter
      */
-    S after(ContextRouteResponseFilter filter);
-
-    /**
-     * Filter the responses on the named executor with a filter that changes the propagated context.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter
-     * @return This
-     * @see #after(String, RouteResponseFilter)
-     * @see ContextRouteResponseFilter
-     */
-    S after(String executorName, ContextRouteResponseFilter filter);
+    FilterSpec<S> after(ContextRouteResponseFilter filter);
 
     /**
      * Filter the responses asynchronously with a filter that changes the propagated context until
      * its stage completes.
      *
      * @param filter The filter
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #afterAsync(AsyncRouteResponseFilter)
      * @see AsyncContextRouteResponseFilter
      */
-    S afterAsync(AsyncContextRouteResponseFilter filter);
+    FilterSpec<S> afterAsync(AsyncContextRouteResponseFilter filter);
 
     /**
      * Filter the responses with a filter that can replace the response, like a
@@ -272,21 +218,10 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * takes a filter that returns nothing, so that its lambdas are never ambiguous.
      *
      * @param filter The filter, which can change the response in place or replace it
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see ReplacingRouteResponseFilter
      */
-    S afterReplacing(ReplacingRouteResponseFilter filter);
-
-    /**
-     * Filter the responses on the named executor with a filter that can replace the response.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can change the response in place or replace it
-     * @return This
-     * @see #after(String, RouteResponseFilter)
-     * @see ReplacingRouteResponseFilter
-     */
-    S afterReplacing(String executorName, ReplacingRouteResponseFilter filter);
+    FilterSpec<S> afterReplacing(ReplacingRouteResponseFilter filter);
 
     /**
      * Filter the responses asynchronously with a filter that can replace the response, like a
@@ -295,43 +230,31 @@ public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits Ro
      * was given if it completes with {@code null}.
      *
      * @param filter The filter, which can change the response in place or replace it
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #afterAsync(AsyncRouteResponseFilter)
      * @see AsyncReplacingRouteResponseFilter
      */
-    S afterReplacingAsync(AsyncReplacingRouteResponseFilter filter);
+    FilterSpec<S> afterReplacingAsync(AsyncReplacingRouteResponseFilter filter);
 
     /**
      * Filter the responses with a filter that can replace the response and changes the propagated
      * context of the response filters after it.
      *
      * @param filter The filter, which can change the response in place or replace it
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #afterReplacing(ReplacingRouteResponseFilter)
      * @see ContextReplacingRouteResponseFilter
      */
-    S afterReplacing(ContextReplacingRouteResponseFilter filter);
-
-    /**
-     * Filter the responses on the named executor with a filter that can replace the response and
-     * changes the propagated context.
-     *
-     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
-     * @param filter       The filter, which can change the response in place or replace it
-     * @return This
-     * @see #afterReplacing(String, ReplacingRouteResponseFilter)
-     * @see ContextReplacingRouteResponseFilter
-     */
-    S afterReplacing(String executorName, ContextReplacingRouteResponseFilter filter);
+    FilterSpec<S> afterReplacing(ContextReplacingRouteResponseFilter filter);
 
     /**
      * Filter the responses asynchronously with a filter that can replace the response and changes
      * the propagated context until its stage completes.
      *
      * @param filter The filter, which can change the response in place or replace it
-     * @return This
+     * @return The filter, to choose where it runs and to go back to the route or the group, see {@link FilterSpec}
      * @see #afterReplacingAsync(AsyncReplacingRouteResponseFilter)
      * @see AsyncContextReplacingRouteResponseFilter
      */
-    S afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter);
+    FilterSpec<S> afterReplacingAsync(AsyncContextReplacingRouteResponseFilter filter);
 }
