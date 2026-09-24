@@ -131,7 +131,7 @@ public class NettyClientHttpRequest<B> implements MutableHttpRequest<B>, NettyHt
                 String value = ClientCookieEncoder.INSTANCE.encode(cookie);
                 this.cookies.put(cookie.getName(), value);
             }
-            headers.set(HttpHeaderNames.COOKIE, String.join(";", this.cookies.values()));
+            headers.set(HttpHeaderNames.COOKIE, String.join("; ", this.cookies.values()));
         } else if (!cookies.isEmpty()) {
             cookie(cookies.iterator().next());
         }
