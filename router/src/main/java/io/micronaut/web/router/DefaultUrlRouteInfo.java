@@ -54,24 +54,22 @@ import java.util.function.Predicate;
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
 
     /**
-     * The filters of this route only, in the order the filter chain runs them. Set when the route
-     * is built, before the route info is published.
+     * The filters of this route only, in the order the filter chain runs them.
      */
-    List<GenericHttpFilter> routeFilters = List.of();
-    /**
-     * The order of the route among equally good routes. Set when the route is built, before the
-     * route info is published.
-     */
-    int order;
-    /**
-     * The attributes of the route. Set when the route is built, before the route info is published.
-     */
-    Map<String, Object> attributes = Map.of();
+    final List<GenericHttpFilter> routeFilters;
     /**
      * The innermost group of the route that has error or status routes, in it or around it, or
-     * {@code null}. Set when the route is built, before the route info is published.
+     * {@code null}.
      */
-    RouteAssembly.@Nullable RouteGroup errorScope;
+    final RouteAssembly.@Nullable RouteGroup errorScope;
+    /**
+     * The order of the route among equally good routes.
+     */
+    private final int order;
+    /**
+     * The attributes of the route.
+     */
+    private final Map<String, Object> attributes;
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
@@ -162,6 +160,54 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                ExecutorSelector executorSelector,
                                MessageBodyHandlerRegistry messageBodyHandlerRegistry,
                                boolean implicitHead) {
+        this(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
+            consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null);
+    }
+
+    /**
+     * A route to a handler function, with its filters, order, attributes and error scope.
+     *
+     * @param httpMethod                 The HTTP method
+     * @param httpMethodName             The actual name of the method - may differ from {@link HttpMethod#name()} for non-standard http methods
+     * @param uriMatchTemplate           The URI match template
+     * @param defaultCharset             The default charset
+     * @param targetMethod               The target method
+     * @param bodyArgumentName           The body argument name
+     * @param bodyArgument               The body argument
+     * @param consumesMediaTypes         The consumed media types
+     * @param producesMediaTypes         The produced media types
+     * @param predicates                 The predicates
+     * @param port                       The port
+     * @param conversionService          The conversion service
+     * @param executorSelector           The executor selector
+     * @param messageBodyHandlerRegistry The message body handler registry
+     * @param implicitHead               Whether this is an implicit {@code HEAD} route
+     * @param routeFilters               The filters of this route only, in the order the filter chain runs them
+     * @param order                      The order of the route among equally good routes
+     * @param attributes                 The attributes of the route
+     * @param errorScope                 The innermost group of the route that has error or status routes, or {@code null}
+     */
+    @SuppressWarnings("ParameterNumber")
+    DefaultUrlRouteInfo(HttpMethod httpMethod,
+                        String httpMethodName,
+                        UriMatchTemplate uriMatchTemplate,
+                        Charset defaultCharset,
+                        MethodExecutionHandle<T, R> targetMethod,
+                        @Nullable String bodyArgumentName,
+                        @Nullable Argument<?> bodyArgument,
+                        List<MediaType> consumesMediaTypes,
+                        List<MediaType> producesMediaTypes,
+                        List<Predicate<HttpRequest<?>>> predicates,
+                        @Nullable Integer port,
+                        ConversionService conversionService,
+                        ExecutorSelector executorSelector,
+                        MessageBodyHandlerRegistry messageBodyHandlerRegistry,
+                        boolean implicitHead,
+                        List<GenericHttpFilter> routeFilters,
+                        int order,
+                        Map<String, Object> attributes,
+                        RouteAssembly.@Nullable RouteGroup errorScope) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -172,6 +218,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.port = port;
         this.conversionService = conversionService;
         this.executorSelector = executorSelector;
+        this.routeFilters = routeFilters;
+        this.order = order;
+        this.attributes = attributes;
+        this.errorScope = errorScope;
     }
 
     @Override

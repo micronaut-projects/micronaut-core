@@ -1350,6 +1350,7 @@ public final class RouteAssembly {
             }
             checkBlockingBody();
             Integer effectivePort = effectivePort();
+            RouteGroup errorScope = group != null && group.hasErrorOrStatusRoutes() ? group : null;
             DefaultUrlRouteInfo<Object, Object> routeInfo = new DefaultUrlRouteInfo<>(
                 httpMethod,
                 httpMethodName,
@@ -1367,15 +1368,15 @@ public final class RouteAssembly {
                 // the executor choice as it is now: a later change to the route does not change the route info
                 new RouteExecutorSelector(settings.getExecutorName(), settings.isNonBlocking()),
                 messageBodyHandlerRegistry,
-                implicitHead
+                implicitHead,
+                routeFilters(),
+                effectiveOrder(settings.getOrder(), group),
+                attributes(),
+                errorScope
             );
-            routeInfo.routeFilters = routeFilters();
-            routeInfo.order = effectiveOrder(settings.getOrder(), group);
-            routeInfo.attributes = attributes();
-            if (group != null && group.hasErrorOrStatusRoutes()) {
+            if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
-                group.buildErrorAndStatusRoutes();
-                routeInfo.errorScope = group;
+                errorScope.buildErrorAndStatusRoutes();
             }
             return routeInfo;
         }
