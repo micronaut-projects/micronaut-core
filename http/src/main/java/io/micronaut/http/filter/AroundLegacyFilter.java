@@ -117,26 +117,32 @@ record AroundLegacyFilter(HttpFilter bean, FilterOrder order) implements Interna
         @Override
         public Publisher<? extends HttpResponse<?>> proceed(MutableHttpRequest<?> request) {
             filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
-            return ReactiveExecutionFlow.fromFlow(
+            return ReactiveExecutionFlow.toPublisher(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
                     return newFilterContext.response();
                 })
-            ).toPublisher();
+            );
         }
 
         @Override
         public Publisher<MutableHttpResponse<?>> proceed(HttpRequest<?> request) {
             filterContext = filterContext.withRequest(request).withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
-            return ReactiveExecutionFlow.fromFlow(
+            return ReactiveExecutionFlow.toPublisher(
                 downstream.apply(filterContext).<MutableHttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;
                     return (MutableHttpResponse<?>) newFilterContext.response();
                 })
-            ).toPublisher();
+            );
         }
 
         private ExecutionFlow<FilterContext> processResult(Publisher<? extends HttpResponse<?>> publisher, PropagatedContext propagatedContext) {
+            ExecutionFlow<? extends HttpResponse<?>> immediate = ReactiveExecutionFlow.fromPublisherImmediate(publisher);
+            if (immediate != null) {
+                // Mono.just, Mono.error or the chain publisher itself: no Reactor chain is needed
+                return immediate.map(httpResponse -> httpResponse == null ? null : filterContext.withResponse(httpResponse));
+            }
+            // a lazy publisher keeps the chain reactive: the Reactor context of an upstream filter has to reach it
             return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, publisher))
                 .map(httpResponse -> filterContext.withResponse(httpResponse));
         }
