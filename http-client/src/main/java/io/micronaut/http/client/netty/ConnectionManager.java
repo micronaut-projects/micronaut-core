@@ -929,6 +929,10 @@ public class ConnectionManager {
                     // this is fine
                     return;
                 }
+                if (msg instanceof Http2SettingsFrame settingsFrame) {
+                    connectionHolder.onRemoteSettings(settingsFrame.settings());
+                    return;
+                }
                 if (msg instanceof Http2GoAwayFrame goAway) {
                     connectionHolder.windDownConnection();
                     if (log.isDebugEnabled()) {
@@ -1701,6 +1705,7 @@ public class ConnectionManager {
         sealed class Http2ConnectionHolder extends ConnectionHolder {
             private final Pool.Http2PoolEntry poolEntry;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
+            private final Http2StreamLimit streamLimit = new Http2StreamLimit(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
@@ -1712,15 +1717,11 @@ public class ConnectionManager {
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                // the configured limit, capped by SETTINGS_MAX_CONCURRENT_STREAMS of the server.
-                // Later SETTINGS updates from the server are not applied to the pool.
-                int maxStreams = configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection();
-                Long remoteLimit = remoteSettings == null ? null : remoteSettings.maxConcurrentStreams();
-                if (remoteLimit != null && remoteLimit < maxStreams) {
-                    // allow at least one stream even if the server advertises 0, so requests don't hang
-                    maxStreams = (int) Math.max(1, remoteLimit);
-                }
-                poolEntry.onConnectionEstablished(maxStreams);
+                poolEntry.onConnectionEstablished(streamLimit.update(remoteSettings));
+            }
+
+            void onRemoteSettings(Http2Settings remoteSettings) {
+                poolEntry.updateMaxStreamCount(streamLimit.update(remoteSettings));
             }
 
             void addTimeoutHandlers() {
@@ -1804,10 +1805,8 @@ public class ConnectionManager {
                                 if (windDownConnection && newCount <= 0) {
                                     Http2ConnectionHolder.this.channel.close();
                                 } else if (!windDownConnection) {
-                                    // release() may run while the frame codec is still delivering the
-                                    // final frame of this stream, so netty only closes the stream after
-                                    // this returns. Defer marking the slot available so that the next
-                                    // request does not exceed the stream limit of the connection.
+                                    // netty only closes the stream after the final frame has been
+                                    // delivered, i.e. after this returns, so defer freeing the slot
                                     Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }

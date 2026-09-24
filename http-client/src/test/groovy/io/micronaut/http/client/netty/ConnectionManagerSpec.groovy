@@ -57,6 +57,7 @@ import io.netty.handler.codec.http2.DefaultHttp2GoAwayFrame
 import io.netty.handler.codec.http2.DefaultHttp2Headers
 import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame
 import io.netty.handler.codec.http2.DefaultHttp2PingFrame
+import io.netty.handler.codec.http2.DefaultHttp2SettingsFrame
 import io.netty.handler.codec.http2.Http2Error
 import io.netty.handler.codec.http2.Http2FrameCodec
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder
@@ -482,6 +483,180 @@ class ConnectionManagerSpec extends Specification {
         conn.serverChannel.readInbound() == null
 
         // the same connection is reused for all requests
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server max concurrent streams of zero queues requests until raised'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        // the server initially does not allow any streams
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(0))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // the request stays pending in the pool
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+
+        when:
+        // the server raises the limit, the pending request is dispatched
+        conn.sendMaxConcurrentStreams(1)
+        then:
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server lowers max concurrent streams while streams are in flight'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(3))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // all three requests are dispatched immediately
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        // the server lowers the limit while the three streams are in flight
+        conn.sendMaxConcurrentStreams(1)
+        def f4 = Mono.from(client.exchange('https://example.com/r4')).toFuture()
+        f4.exceptionally(t -> t.printStackTrace())
+        conn.advance()
+        then:
+        // in-flight streams are unaffected, but no new stream is opened
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        // two streams are still in flight, which is above the new limit
+        f1.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req2.stream())
+        conn.advance()
+        then:
+        // one stream in flight, still at the limit
+        f2.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
+        !f4.isDone()
+
+        when:
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        // now the fourth request can be dispatched
+        f3.get().status() == HttpStatus.OK
+        def req4 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req4.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r4'
+
+        when:
+        conn.respondOk(req4.stream())
+        conn.advance()
+        then:
+        f4.get().status() == HttpStatus.OK
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server raises max concurrent streams dispatches pending requests'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(1))
+        patch(client, conn)
+
+        when:
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // only the first request is dispatched
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        // the server raises the limit, the pending requests are dispatched
+        conn.sendMaxConcurrentStreams(3)
+        then:
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.respondOk(req2.stream())
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        f2.get().status() == HttpStatus.OK
+        f3.get().status() == HttpStatus.OK
         assertPoolConnections(client, 1)
 
         cleanup:
@@ -1807,6 +1982,12 @@ class ConnectionManagerSpec extends Specification {
 
             assert serverChannel.readInbound() instanceof Http2SettingsFrame
             assert serverChannel.readInbound() instanceof Http2ResetFrame
+            assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
+        }
+
+        void sendMaxConcurrentStreams(int maxConcurrentStreams) {
+            serverChannel.writeOutbound(new DefaultHttp2SettingsFrame(new Http2Settings().maxConcurrentStreams(maxConcurrentStreams)))
+            advance()
             assert serverChannel.readInbound() instanceof Http2SettingsAckFrame
         }
 

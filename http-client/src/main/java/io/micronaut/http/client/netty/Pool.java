@@ -179,6 +179,14 @@ sealed interface Pool permits Pool49, Pool40 {
         void onConnectionEstablished(int maxStreamCount);
 
         /**
+         * The maximum stream count of this connection changed, e.g. because the peer sent new
+         * settings. A count of zero means no new streams may be opened until it is raised again.
+         *
+         * @param maxStreamCount The new maximum HTTP/2 stream count
+         */
+        void updateMaxStreamCount(int maxStreamCount);
+
+        /**
          * Connection becomes inactive.
          */
         void onConnectionInactive();
