@@ -17,6 +17,7 @@ package io.micronaut.python.annotation.processing.test.reactive;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Consumer;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -26,6 +27,10 @@ import reactor.core.publisher.Mono;
 public interface ReactiveFinder {
 
     Mono<String> find(String id);
+
+    default Mono<String> findWithCallback(String id, Consumer<String> callback) {
+        return Mono.just("default");
+    }
 
     Flux<String> findAll();
 

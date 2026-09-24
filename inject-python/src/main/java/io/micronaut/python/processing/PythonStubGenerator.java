@@ -89,6 +89,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.processing.element.AbstractPythonClassElement;
 import io.micronaut.python.processing.element.PythonClassElement;
 import io.micronaut.python.processing.element.PythonMethodElement;
+import io.micronaut.python.processing.element.PythonParameterElement;
 import io.micronaut.python.processing.element.PythonPropertyElement;
 import io.micronaut.python.processing.element.PythonScriptElement;
 import io.micronaut.python.processing.model.ScriptDef;
@@ -5264,6 +5265,10 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
     }
 
     private static boolean hasCompatibleBridgeParameter(ParameterElement parameter, ParameterElement interfaceParameter) {
+        if (parameter instanceof PythonParameterElement pythonParameter
+            && pythonParameter.getNativeType().typeAnnotation() == null) {
+            return true;
+        }
         String parameterTypeName = parameter.getType().getName();
         String interfaceTypeName = interfaceParameter.getType().getName();
         if (parameterTypeName.equals(interfaceTypeName)) {
