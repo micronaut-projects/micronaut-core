@@ -9,6 +9,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
@@ -27,7 +28,11 @@ class LoomCarrierGroupTest {
     void setUp() {
         assumeTrue(PrivateLoomSupport.isSupported() || LoomBranchSupport.isSupported(),
             "Loom internals are not accessible, run with --add-opens=java.base/java.lang=ALL-UNNAMED");
+        group = createGroup();
+        runner = group.runners.get(0);
+    }
 
+    private static LoomCarrierGroup createGroup() {
         LoomCarrierConfiguration configuration = new LoomCarrierConfiguration(
             Duration.ofNanos(1), // one continuation per carrier loop iteration
             Duration.ofNanos(1),
@@ -39,8 +44,7 @@ class LoomCarrierGroupTest {
             0 // no warmup, every thread goes straight to the runner
         );
         LoomCarrierGroup.Factory factory = new LoomCarrierGroup.Factory(new EventLoopLoomFactory(), configuration);
-        group = (LoomCarrierGroup) factory.create(1, new ThreadPerTaskExecutor(new DefaultThreadFactory("loom-carrier-test")), NioIoHandler.newFactory());
-        runner = group.runners.get(0);
+        return (LoomCarrierGroup) factory.create(1, new ThreadPerTaskExecutor(new DefaultThreadFactory("loom-carrier-test")), NioIoHandler.newFactory());
     }
 
     @AfterEach
@@ -116,5 +120,48 @@ class LoomCarrierGroupTest {
         }
         blocker.join(10_000);
         assertFalse(blocker.isAlive());
+    }
+
+    @Test
+    void continuationsSubmittedDuringTerminationRun() throws Exception {
+        // The group created by setUp is not used here, every iteration gets a fresh one so
+        // that the submissions race against the final drain of the carrier.
+        int iterations = 30;
+        int producers = 4;
+        for (int i = 0; i < iterations; i++) {
+            LoomCarrierGroup raceGroup = createGroup();
+            LoomCarrierGroup.Runner raceRunner = raceGroup.runners.get(0);
+            List<Thread> submitted = Collections.synchronizedList(new ArrayList<>());
+            CountDownLatch producersStarted = new CountDownLatch(producers);
+            List<Thread> producerThreads = new ArrayList<>();
+            for (int p = 0; p < producers; p++) {
+                Thread producer = new Thread(() -> {
+                    producersStarted.countDown();
+                    // keep submitting until the loop is terminated, so some submissions land
+                    // before, some during and some after the carrier exits
+                    while (!raceGroup.isTerminated()) {
+                        Thread thread = raceRunner.newThread(() -> { });
+                        thread.start();
+                        submitted.add(thread);
+                        Thread.onSpinWait();
+                    }
+                }, "loom-carrier-test-producer-" + p);
+                producer.start();
+                producerThreads.add(producer);
+            }
+            assertTrue(producersStarted.await(10, TimeUnit.SECONDS));
+            Thread.sleep(2);
+            raceGroup.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+            assertTrue(raceGroup.awaitTermination(10, TimeUnit.SECONDS));
+            for (Thread producer : producerThreads) {
+                producer.join(10_000);
+                assertFalse(producer.isAlive());
+            }
+            assertFalse(submitted.isEmpty());
+            for (Thread thread : submitted) {
+                thread.join(10_000);
+                assertFalse(thread.isAlive(), "virtual thread submitted around termination never ran in iteration " + i);
+            }
+        }
     }
 }
