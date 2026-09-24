@@ -396,7 +396,8 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
         if (!(reader instanceof ChunkedMessageBodyReader<T> chunked)) {
             throw new UnsupportedMediaException(String.valueOf(contentType), ELEMENT_MEDIA_TYPES);
         }
-        return chunked.readChunked(type, contentType, request.getHeaders(), body.toByteBufferPublisher());
+        // an element is decoded in memory: it is limited like buffered content
+        return chunked.readChunked(type, contentType, request.getHeaders(), body.toByteBufferPublisher(), uploadContext().maxBufferSize());
     }
 
     /**
