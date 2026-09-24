@@ -55,15 +55,23 @@ final class ServiceScanner<S> {
     private final Predicate<String> lineCondition;
     private final Function<String, S> transformer;
 
-    public ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer) {
+    /**
+     * @param classLoader   The class loader
+     * @param serviceName   The name of the service type
+     * @param lineCondition The condition tested on the name of each service entry, or null to accept every entry
+     * @param transformer   The transformer of the entry names
+     */
+    public ServiceScanner(ClassLoader classLoader, String serviceName, @Nullable Predicate<String> lineCondition, Function<String, S> transformer) {
         this.classLoader = classLoader;
         this.serviceName = serviceName;
-        this.lineCondition = lineCondition;
+        this.lineCondition = lineCondition == null ? name -> true : lineCondition;
         this.transformer = transformer;
     }
 
     static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
-        if (NativeImageUtils.hasImageSingletons()) {
+        // Image singletons only hold values in image code. On the JVM, where the GraalVM SDK is usually absent,
+        // looking up the ImageSingletons class would throw and catch a NoClassDefFoundError on every scan.
+        if (NativeImageUtils.inImageCode() && NativeImageUtils.hasImageSingletons()) {
             return ImageSingletons.contains(ExclusiveStaticServiceDefinitions.class) ? ImageSingletons.lookup(ExclusiveStaticServiceDefinitions.class) : null;
         } else {
             return null;
@@ -143,15 +151,7 @@ final class ServiceScanner<S> {
         protected void compute() {
             try {
                 if (serviceEntries != null) {
-                    for (String serviceEntry : serviceEntries) {
-                        final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
-                        tasks.add(task);
-                        if (fork) {
-                            task.fork();
-                        } else {
-                            task.compute();
-                        }
-                    }
+                    loadEntries(serviceEntries);
                     return;
                 }
                 Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
@@ -165,18 +165,24 @@ final class ServiceScanner<S> {
                         task.compute();
                     }
                 }
-                Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
-                for (String serviceEntry : serviceEntries) {
-                    final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
-                    tasks.add(task);
-                    if (fork) {
-                        task.fork();
-                    } else {
-                        task.compute();
-                    }
-                }
+                loadEntries(MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName));
             } catch (IOException e) {
                 throw new ServiceConfigurationError("Failed to load resources for service: " + serviceName, e);
+            }
+        }
+
+        private void loadEntries(Collection<String> entries) {
+            for (String serviceEntry : entries) {
+                if (!lineCondition.test(serviceEntry)) {
+                    continue;
+                }
+                final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
+                tasks.add(task);
+                if (fork) {
+                    task.fork();
+                } else {
+                    task.compute();
+                }
             }
         }
 
@@ -256,12 +262,12 @@ final class ServiceScanner<S> {
                         if (line.isEmpty() || line.charAt(0) == '#') {
                             continue;
                         }
-                        if (!lineCondition.test(line)) {
-                            continue;
-                        }
                         int i = line.indexOf('#');
                         if (i > -1) {
                             line = line.substring(0, i);
+                        }
+                        if (!lineCondition.test(line)) {
+                            continue;
                         }
                         typeNames.add(line);
                     }
