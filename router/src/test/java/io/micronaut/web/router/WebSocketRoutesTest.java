@@ -20,9 +20,11 @@ import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.annotation.Produces;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.DefaultAnnotationMetadata;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.websocket.CloseReason;
@@ -148,6 +150,23 @@ class WebSocketRoutesTest {
         assertEquals(1, route.getAttributes().get("own"));
         assertEquals("WebSocket route /rooms/{id}", endpoint(route).toString());
         assertTrue(route.isWebSocketRoute());
+    }
+
+    @Test
+    void theRouteOfAGroupHasTheExecutorOfTheGroupButNotItsMediaTypes() {
+        Router plain = router(routes -> routes.webSocket("/rooms/{id}", ws -> ws.onOpen((session, request) -> null)));
+        Router grouped = router(routes -> routes.path("/rooms", rooms -> {
+            rooms.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE).executeOn("group-executor");
+            rooms.webSocket("/{id}", ws -> ws.onOpen((session, request) -> null));
+        }));
+        UriRouteInfo<?, ?> route = route(grouped, HttpRequest.GET("/rooms/7").accept(MediaType.APPLICATION_JSON_TYPE));
+        UriRouteInfo<?, ?> expected = route(plain, HttpRequest.GET("/rooms/7"));
+        assertTrue(route.isWebSocketRoute());
+        assertEquals(expected.getConsumes(), route.getConsumes());
+        assertEquals(expected.getProduces(), route.getProduces());
+        // no executor of that name in this router
+        Exception error = assertThrows(Exception.class, () -> route.getExecutor(ThreadSelection.MANUAL));
+        assertTrue(error.getMessage().contains("group-executor"), error.getMessage());
     }
 
     @Test
