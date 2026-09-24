@@ -20,6 +20,8 @@ import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.event.BeanCreatedEvent;
 import io.micronaut.context.event.BeanCreatedEventListener;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Order;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.web.router.filter.RouteMatchFilter;
@@ -29,7 +31,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Decorates the {@link Router} to consult the {@link RouteSource} beans, if there are any.
+ * Gives the {@link RouteSource} beans, if there are any, to the {@link DefaultRouter} bean, also
+ * to one that replaces it and calls a public constructor. It runs before the listeners that
+ * decorate the router, e.g. with a {@link io.micronaut.web.router.filter.FilteredRouter} for
+ * versioning, so that it sees the router itself.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -37,23 +42,26 @@ import java.util.List;
 @Singleton
 @Internal
 @Requires(beans = RouteSource.class)
-final class RouteSourceRouterListener implements BeanCreatedEventListener<Router> {
+@Order(Ordered.HIGHEST_PRECEDENCE)
+final class RouteSourcesListener implements BeanCreatedEventListener<DefaultRouter> {
 
     private final BeanProvider<RouteSource> routeSources;
     private final BeanProvider<RouteMatchFilter> routeMatchFilters;
 
-    RouteSourceRouterListener(BeanProvider<RouteSource> routeSources, BeanProvider<RouteMatchFilter> routeMatchFilters) {
+    RouteSourcesListener(BeanProvider<RouteSource> routeSources, BeanProvider<RouteMatchFilter> routeMatchFilters) {
         this.routeSources = routeSources;
         this.routeMatchFilters = routeMatchFilters;
     }
 
     @Override
-    public Router onCreated(BeanCreatedEvent<Router> event) {
+    public DefaultRouter onCreated(BeanCreatedEvent<DefaultRouter> event) {
+        DefaultRouter router = event.getBean();
         // resolved on first use: a route source may itself depend on beans that need the router
-        return new RouteSourceRouter(event.getBean(), SupplierUtil.memoized(() -> {
+        router.useRouteSources(SupplierUtil.memoized(() -> {
             List<RouteSource> sources = new ArrayList<>(routeSources.stream().toList());
             OrderUtil.sort(sources);
             return List.copyOf(sources);
         }), SupplierUtil.memoized(() -> routeMatchFilters.stream().toList()));
+        return router;
     }
 }

@@ -45,9 +45,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 
 /**
  * Route match filters, such as versioning, apply to the candidates of a tier before its ambiguity
- * is resolved, and the tiers keep their precedence, whichever decorator is outside: the
- * {@link FilteredRouter} lets the {@link RouteSourceRouter} resolve the ambiguity tier by tier
- * instead of resolving it across the tiers.
+ * is resolved, and the tiers keep their precedence, whether a {@link FilteredRouter} decorates the
+ * router or not: the {@link FilteredRouter} lets the {@link DefaultRouter} resolve the ambiguity
+ * tier by tier instead of resolving it across the tiers.
  */
 class RouteSourceRouterAmbiguityTest {
     private static final String SPEC_NAME = "RouteSourceRouterAmbiguityTest";
@@ -122,13 +122,11 @@ class RouteSourceRouterAmbiguityTest {
     }
 
     private Router router(boolean filteredRouterOutside) {
-        Router application = new DefaultRouter(context.getBeansOfType(RouteBuilder.class));
         VersionRouteMatchFilter versionFilter = context.getBean(VersionRouteMatchFilter.class);
         List<RouteMatchFilter> filters = List.of(versionFilter);
         List<RouteSource> sources = List.of(context.getBean(Routes.class));
-        return filteredRouterOutside
-            ? new FilteredRouter(new RouteSourceRouter(application, () -> sources, () -> filters), versionFilter)
-            : new RouteSourceRouter(new FilteredRouter(application, versionFilter), () -> sources, () -> filters);
+        Router tiered = DefaultRouter.withRouteSources(context.getBeansOfType(RouteBuilder.class), () -> sources, () -> filters);
+        return filteredRouterOutside ? new FilteredRouter(tiered, versionFilter) : tiered;
     }
 
     private static String closestMethod(Router router, HttpRequest<?> request) {
