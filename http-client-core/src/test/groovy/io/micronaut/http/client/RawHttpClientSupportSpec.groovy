@@ -12,6 +12,7 @@ import io.micronaut.http.client.exceptions.ReadTimeoutException
 import spock.lang.Specification
 import spock.util.concurrent.PollingConditions
 
+import java.lang.ref.WeakReference
 import java.time.Duration
 
 class RawHttpClientSupportSpec extends Specification {
@@ -54,6 +55,45 @@ class RawHttpClientSupportSpec extends Specification {
 
         then:
         late.closed()
+    }
+
+    void "a completed exchange does not stay reachable until the timeout elapses"() {
+        given:
+        WeakReference<Object> timed = completeWithLongTimeout()
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            System.gc()
+            assert timed.get() == null
+        }
+    }
+
+    void "a cancelled exchange does not stay reachable until the timeout elapses"() {
+        given:
+        WeakReference<Object> exchange = cancelWithLongTimeout()
+
+        expect:
+        new PollingConditions(timeout: 10).eventually {
+            System.gc()
+            assert exchange.get() == null
+        }
+    }
+
+    private static WeakReference<Object> completeWithLongTimeout() {
+        DelayedExecutionFlow<HttpResponse<?>> exchange = DelayedExecutionFlow.create()
+        ExecutionFlow<HttpResponse<?>> timed = RawHttpClientSupport.withResponseTimeout(exchange, Duration.ofHours(1))
+        HttpResponse<?> received = null
+        timed.onComplete { r, e -> received = r }
+        exchange.complete(HttpResponse.ok())
+        assert received != null
+        return new WeakReference<Object>(timed)
+    }
+
+    private static WeakReference<Object> cancelWithLongTimeout() {
+        DelayedExecutionFlow<HttpResponse<?>> exchange = DelayedExecutionFlow.create()
+        RawHttpClientSupport.withResponseTimeout(exchange, Duration.ofHours(1)).cancel()
+        assert exchange.isCancelled()
+        return new WeakReference<Object>(exchange)
     }
 
     private static Map response() {

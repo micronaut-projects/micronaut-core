@@ -204,7 +204,7 @@ public final class ForwardedHeaders {
             } else if (host != null) {
                 out.set(X_FORWARDED_HOST, host);
             }
-            out.set(X_FORWARDED_PORT, inboundPort == null ? String.valueOf(port) : inboundPort);
+            out.set(X_FORWARDED_PORT, inboundPort == null ? String.valueOf(externalPort(inboundHost, inboundProto, proto, port)) : inboundPort);
             String forwardedPrefix = inboundPrefix == null ? prefix : prefix == null ? inboundPrefix : inboundPrefix + prefix;
             if (forwardedPrefix != null) {
                 out.set(X_FORWARDED_PREFIX, forwardedPrefix);
@@ -350,6 +350,31 @@ public final class ForwardedHeaders {
             return portSeparator;
         }
         return -1;
+    }
+
+    /**
+     * The port of the origin a trusted proxy received the request on, when it forwarded the host
+     * or the scheme but not the port: the port of the forwarded host, else the default port of
+     * the forwarded scheme, or of this hop's scheme. The port of this hop only belongs to its own
+     * host and scheme.
+     */
+    private static int externalPort(@Nullable String forwardedHost, @Nullable String forwardedProto, String proto, int port) {
+        if (forwardedHost != null) {
+            String trimmed = forwardedHost.trim();
+            int portSeparator = portSeparator(trimmed);
+            if (portSeparator >= 0) {
+                try {
+                    return Integer.parseInt(trimmed.substring(portSeparator + 1));
+                } catch (NumberFormatException e) {
+                    // not a port, fall back to the scheme
+                }
+            }
+        }
+        if (forwardedHost == null && forwardedProto == null) {
+            return port;
+        }
+        Integer defaultPort = defaultPort(forwardedProto == null ? proto : forwardedProto);
+        return defaultPort == null ? port : defaultPort;
     }
 
     private static @Nullable Integer defaultPort(@Nullable String proto) {

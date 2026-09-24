@@ -40,6 +40,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -160,13 +161,18 @@ public final class RawHttpClientSupport {
         }
         AtomicBoolean done = new AtomicBoolean();
         DelayedExecutionFlow<HttpResponse<?>> result = DelayedExecutionFlow.create();
-        CompletableFuture.delayedExecutor(timeout.toNanos(), TimeUnit.NANOSECONDS).execute(() -> {
-            if (done.compareAndSet(false, true)) {
+        // completing the timer early cancels its scheduled task, so that the task does not keep
+        // the flows, and the response, reachable until the timeout elapses
+        CompletableFuture<@Nullable Void> timer = new CompletableFuture<@Nullable Void>()
+            .orTimeout(timeout.toNanos(), TimeUnit.NANOSECONDS);
+        timer.whenComplete((ignored, error) -> {
+            if (error instanceof TimeoutException && done.compareAndSet(false, true)) {
                 result.completeExceptionally(ReadTimeoutException.TIMEOUT_EXCEPTION);
                 flow.cancel();
             }
         });
         flow.onComplete((response, error) -> {
+            timer.complete(null);
             if (done.compareAndSet(false, true)) {
                 result.complete(response, error);
             } else if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
@@ -175,6 +181,7 @@ public final class RawHttpClientSupport {
         });
         // forward a cancel from downstream, and close a response that arrives after it
         result.onCancel(() -> {
+            timer.complete(null);
             if (done.compareAndSet(false, true)) {
                 flow.cancel();
             }
