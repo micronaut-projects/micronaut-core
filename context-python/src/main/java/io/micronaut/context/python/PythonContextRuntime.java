@@ -346,7 +346,7 @@ public final class PythonContextRuntime {
      */
     static @Nullable Value asyncBeanValue(ValueCoercible bean, Context targetContext) {
         Value source = bean.asPolyglotValue();
-        if (source == null || PythonConversion.isNone(source)) {
+        if (PythonConversion.isNone(source)) {
             return null;
         }
         PythonClassReference classReference = PYTHON_CLASS_REFERENCES.get(bean.getClass()).orElse(null);
@@ -1439,32 +1439,52 @@ public final class PythonContextRuntime {
     }
 
     private static Value importPackageMember(Context ctx, String packageName, String importName) {
-        // A package that is imported already serves the class without importing anything, so a
-        // submodule that happens to carry the class name is not executed for a class the package
-        // defines. Otherwise the module named after the class is tried before the package is imported:
-        // importing a module of a package whose __init__ is being executed by another thread does not
-        // wait for that thread, importing the package does, so a class instantiated on another thread
-        // while its package is being imported (a service the parallel service loader creates for a
-        // call made at import time) would otherwise wait for the import lock the importing thread
-        // holds while it waits for the instantiation. Only a missing submodule is tolerated on the way:
-        // an error raised while executing one propagates.
-        Value module = loadedModule(ctx, packageName);
-        Value member = module != null ? module.getMember(importName) : null;
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
+        // The package is imported first, unless its import is running already: a package that is
+        // imported serves the class without importing anything, so a submodule that happens to carry
+        // the class name is not executed for a class the package defines, and the import holds the
+        // lock of the package alone. Importing the module named after the class first would take the
+        // lock of the module and then wait for the package, which a second thread resolving another
+        // class of the package the same way waits for while holding the lock of its module; the
+        // initialiser of a generated package imports every module of the package, so the threads
+        // would wait for each other (_DeadlockError). While the import of the package runs, on this
+        // thread or on another one, the module named after the class is imported instead, which the
+        // import system executes without the lock of its package: a class instantiated on another
+        // thread while its package is being imported (a service the parallel service loader creates
+        // for a call made at import time) does not wait for the import lock the importing thread holds
+        // while it waits for the instantiation. Only a missing submodule is tolerated on the way: an
+        // error raised while executing one propagates.
+        Value module = importPackageOfMember(ctx, packageName);
+        if (PythonConversion.isNone(module)) {
+            // The import of the package runs on this thread or on another one.
+            return importMemberWhilePackageImports(ctx, packageName, importName);
         }
-        member = importPackageSubmoduleMember(ctx, packageName, importName);
-        if (member != null && isPythonClass(ctx, member)) {
-            return member;
+        Value member = classMember(ctx, module, importName);
+        if (member == null) {
+            member = importPackageSubmoduleMember(ctx, packageName, importName);
         }
-        if (module == null) {
-            module = importModule(ctx, packageName);
-            member = module.getMember(importName);
-            if (member != null && isPythonClass(ctx, member)) {
-                return member;
-            }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
         }
-        member = findClassInPackageModules(ctx, packageName, importName);
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static Value importMemberWhilePackageImports(Context ctx, String packageName, String importName) {
+        Value member = importPackageSubmoduleMember(ctx, packageName, importName);
+        if (member == null) {
+            member = classMember(ctx, importModule(ctx, packageName), importName);
+        }
+        if (member == null) {
+            member = findClassInPackageModules(ctx, packageName, importName);
+        }
+        return requireMember(ctx, member, packageName, importName);
+    }
+
+    private static @Nullable Value classMember(Context ctx, Value module, String importName) {
+        Value member = module.getMember(importName);
+        return isPythonClass(ctx, member) ? member : null;
+    }
+
+    private static Value requireMember(Context ctx, @Nullable Value member, String packageName, String importName) {
         if (member != null && isPythonClass(ctx, member)) {
             return member;
         }
@@ -1520,12 +1540,11 @@ public final class PythonContextRuntime {
     }
 
     /**
-     * A module that is imported and initialized: {@code null} when it was never imported, or while
-     * another thread is still executing it.
+     * The package a class is resolved from, imported unless its import is running already:
+     * {@code None} while this or another thread is still executing it.
      */
-    private static @Nullable Value loadedModule(Context ctx, String moduleName) {
-        Value module = helper(ctx, "__micronaut_loaded_module").execute(moduleName);
-        return PythonConversion.isNone(module) ? null : module;
+    private static Value importPackageOfMember(Context ctx, String packageName) {
+        return withContextClassLoader(() -> helper(ctx, "__micronaut_import_package_of_member").execute(packageName));
     }
 
     private static @Nullable Value findClassInPackageModules(Context ctx, String packageName, String importName) {

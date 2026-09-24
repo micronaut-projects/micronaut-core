@@ -71,7 +71,7 @@ public class SimpleHttpRequest<B> implements MutableHttpRequest<B> {
      * @param url        the URI of the request
      * @param body       the optional body of the request
      * @param methodName the name of the method, e.g. {@code PROPFIND}
-     * @since 5.3.0
+     * @since 5.2.4
      */
     public SimpleHttpRequest(HttpMethod method, String url, @Nullable B body, String methodName) {
         this.method = method;

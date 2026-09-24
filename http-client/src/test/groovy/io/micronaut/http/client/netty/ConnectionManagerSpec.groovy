@@ -4,12 +4,18 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.io.buffer.ByteArrayBufferFactory
+import io.micronaut.core.io.buffer.ReadBuffer
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.HttpVersion
 import io.micronaut.http.MediaType
+import io.micronaut.http.body.ByteBodyFactory
+import io.micronaut.http.body.CloseableByteBody
+import io.micronaut.http.body.stream.BodySizeLimits
 import io.micronaut.http.client.HttpClient
+import io.micronaut.http.client.RawHttpClient
 import io.micronaut.http.client.StreamingHttpClient
 import io.micronaut.http.client.exceptions.ReadTimeoutException
 import io.micronaut.http.client.multipart.MultipartBody
@@ -74,6 +80,7 @@ import jakarta.inject.Singleton
 import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.function.Executable
 import org.spockframework.runtime.model.parallel.ExecutionMode
+import reactor.core.Disposable
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import spock.lang.Execution
@@ -1322,6 +1329,215 @@ class ConnectionManagerSpec extends Specification {
         cleanup:
         client.close()
         ctx.close()
+    }
+
+    def 'raw exchange cancelled before the response closes the http1 connection'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        def body = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).copyOf('foo', StandardCharsets.UTF_8)
+        def exchange = new RawExchange(client, HttpRequest.POST(conn.scheme + '://example.com/foo', null), body)
+        conn.advance()
+
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        assert request.method() == HttpMethod.POST
+        LastHttpContent content = conn.serverChannel.readInbound()
+        assert content.content().toString(StandardCharsets.UTF_8) == 'foo'
+        content.release()
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the connection is closed, and nothing is delivered, not even the error of the closed connection
+        !conn.clientChannel.isOpen()
+        !exchange.done
+        assertPoolConnections(client, 0)
+
+        when:
+        // a response that arrives anyway is dropped
+        conn.respondOk()
+        conn.advance()
+
+        then:
+        !exchange.done
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled while its response is on the wire discards the response'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        patch(client, conn)
+
+        def exchange = new RawExchange(client, HttpRequest.GET(conn.scheme + '://example.com/foo'), null)
+        conn.advance()
+
+        io.netty.handler.codec.http.HttpRequest request = conn.serverChannel.readInbound()
+        assert request.uri() == '/foo'
+        def tail = conn.serverChannel.readInbound()
+        assert tail == null || tail instanceof LastHttpContent
+
+        def response = new DefaultFullHttpResponse(io.netty.handler.codec.http.HttpVersion.HTTP_1_1, HttpResponseStatus.OK, Unpooled.wrappedBuffer('foo'.bytes))
+        response.headers().add('content-length', 3)
+        conn.serverChannel.writeOutbound(response)
+
+        when:
+        // the response is sent, but the client has not read it yet
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the response is not delivered, but it was read completely, so the connection is kept
+        !exchange.done
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        and:
+        // and it is reused
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled before the response resets only the http2 stream'() {
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        conn.setupHttp2Tls()
+        patch(client, conn)
+
+        def exchange = new RawExchange(client, HttpRequest.GET(conn.scheme + '://example.com/foo'), null)
+        conn.exchangeSettings()
+
+        Http2HeadersFrame request = conn.serverChannel.readInbound()
+        assert request.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/foo'
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        // the stream is reset, nothing is delivered
+        Http2ResetFrame reset = conn.serverChannel.readInbound()
+        reset.stream().id() == request.stream().id()
+        !exchange.done
+
+        and:
+        // the connection is kept and reused
+        conn.clientChannel.isOpen()
+        assertPoolConnections(client, 1)
+
+        when:
+        def future = conn.testExchangeRequest(client)
+        conn.advance()
+        conn.testExchangeResponse(future)
+
+        then:
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange cancelled while it waits for a connection closes its body'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp1()
+        conn.setupHttp1()
+        conn.openFuture = new CompletableFuture<>() // delay open
+        patch(client, conn)
+
+        boolean discarded = false
+        def body = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE)
+                .adapt(Flux.<ReadBuffer> never(), BodySizeLimits.UNLIMITED, null, { discarded = true })
+        def exchange = new RawExchange(client, HttpRequest.POST(conn.scheme + '://example.com/foo', null), body)
+        conn.advance()
+        assert !discarded
+
+        when:
+        exchange.cancel()
+        conn.advance()
+
+        then:
+        discarded
+        !exchange.done
+
+        when:
+        // the connection that opens later serves the next exchange
+        conn.openFuture.complete(null)
+        conn.advance()
+
+        then:
+        conn.testExchangeResponse(conn.testExchangeRequest(client))
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'raw exchange that cannot be sent closes its body'() {
+        def ctx = ApplicationContext.run('spec.name': ConnectionManagerSpec.simpleName)
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def request = Stub(HttpRequest) {
+            toMutableRequest() >> { throw new IllegalStateException('not mutable') }
+        }
+        def body = Mock(CloseableByteBody)
+
+        when:
+        client.exchange(request, body, (Thread) null)
+
+        then:
+        def e = thrown IllegalStateException
+        e.message == 'not mutable'
+        1 * body.close()
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    /**
+     * An exchange of the raw client, subscribed to until {@link #cancel}.
+     */
+    static class RawExchange {
+        final Disposable subscription
+        volatile HttpResponse<?> response
+        volatile Throwable error
+
+        RawExchange(RawHttpClient client, HttpRequest<?> request, CloseableByteBody body) {
+            subscription = Mono.from(client.exchange(request, body, (Thread) null))
+                    .subscribe(r -> response = r, e -> error = e)
+        }
+
+        boolean isDone() {
+            return response != null || error != null
+        }
+
+        void cancel() {
+            subscription.dispose()
+        }
     }
 
     void assertPoolConnections(DefaultHttpClient client, int count) {

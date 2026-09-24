@@ -126,7 +126,7 @@ class PythonBootstrapBenchmarkTest {
                 Context context = GraalPyContextFactory.buildContext(hostAccess, engine, classLoader);
                 // the runtime module is imported on the first bridge call at the latest; the bootstrap of this
                 // revision may import it earlier, so both count it
-                PythonContextRuntime.helper(context, "__micronaut_loaded_module");
+                PythonContextRuntime.helper(context, "__micronaut_inspect_isclass");
                 long buildMillis = (System.nanoTime() - start) / 1_000_000;
                 try {
                     Value counts = context.eval(PythonContextRuntime.PYTHON, COUNT_MODULES);

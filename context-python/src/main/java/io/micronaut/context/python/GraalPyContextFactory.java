@@ -135,33 +135,38 @@ public class GraalPyContextFactory implements BeanDestroyedEventListener<org.gra
      * interop type as an instance of the registered Python class, so the view makes the wrapper
      * report the class of, compare equal to, hash like and print as the Python object it wraps,
      * while its attributes and methods remain those of the wrapper (which delegates to the object).
+     * <p>
+     * The view reads {@link ValueCoercible#PYTHON_OBJECT_MEMBER} rather than the public
+     * {@code asPolyglotValue()}: a wrapper built by another application's context has no object of
+     * this context, and the synthetic member answers with the one of the context the caller runs in
+     * without changing what {@code asPolyglotValue()} hands to Python code that calls it itself.
      */
     private static final Source JAVA_WRAPPER_VIEW_SOURCE = Source.newBuilder(PYTHON, """
         def __micronaut_register_java_wrapper_view(wrapper_class):
             import polyglot
 
             def unwrap(value):
-                return value.asPolyglotValue() if isinstance(value, JavaWrapperView) else value
+                return value.__micronaut_python_object__() if isinstance(value, JavaWrapperView) else value
 
             class JavaWrapperView:
                 @property
                 def __class__(self):
-                    return type(self.asPolyglotValue())
+                    return type(self.__micronaut_python_object__())
 
                 def __eq__(self, other):
-                    return self.asPolyglotValue() == unwrap(other)
+                    return self.__micronaut_python_object__() == unwrap(other)
 
                 def __ne__(self, other):
-                    return self.asPolyglotValue() != unwrap(other)
+                    return self.__micronaut_python_object__() != unwrap(other)
 
                 def __hash__(self):
-                    return hash(self.asPolyglotValue())
+                    return hash(self.__micronaut_python_object__())
 
                 def __repr__(self):
-                    return repr(self.asPolyglotValue())
+                    return repr(self.__micronaut_python_object__())
 
                 def __str__(self):
-                    return str(self.asPolyglotValue())
+                    return str(self.__micronaut_python_object__())
 
             try:
                 polyglot.register_interop_type(wrapper_class, JavaWrapperView)
