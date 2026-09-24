@@ -1595,7 +1595,7 @@ final class NettyHttpClient implements
 
         // first: connect
         return connectionManager.connect(requestKey, blockHint, preferredScheduler)
-            .onErrorResume(e -> ExecutionFlow.error(failedBeforeSending(e, request, instance)))
+            .onErrorResume(e -> ExecutionFlow.error(failedBeforeSending(connectFailure(e), request, instance)))
             .flatMap(poolHandle -> {
                 poolHandle.touch();
                 preferredScheduler.set(poolHandle.channel.eventLoop());
@@ -2201,6 +2201,21 @@ final class NettyHttpClient implements
         }
         failedBeforeSending(result, finalRequest, instance);
         return result;
+    }
+
+    /**
+     * Classify a failure to get a connection for a request: a connection pool acquire timeout
+     * fails the flow with a plain {@link TimeoutException}, but no byte of the request was sent.
+     *
+     * @param failure The failure
+     * @return The failure, an {@link UnprocessedRequestException} for an acquire timeout
+     */
+    private Throwable connectFailure(Throwable failure) {
+        if (failure instanceof TimeoutException) {
+            return new UnprocessedRequestException(UnprocessedRequestException.Reason.POOL_ACQUIRE,
+                "Cannot acquire connection: the acquire timeout of " + configuration.getConnectionPoolConfiguration().getAcquireTimeout().orElse(null) + " elapsed", failure);
+        }
+        return failure;
     }
 
     /**

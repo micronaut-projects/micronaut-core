@@ -1379,16 +1379,12 @@ public class ConnectionManager {
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
             // the request was never sent: the caller may retry it on another connection
-            UnprocessedRequestException wrapped;
             if (error == null) {
                 // no failure observed, but channel closed
-                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Unknown connect error", null);
-            } else if (error instanceof ConnectTimeoutException) {
-                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + error.getMessage(), error);
-            } else {
-                wrapped = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + error.getMessage(), error);
+                return new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Unknown connect error", null);
             }
-            return wrapped;
+            UnprocessedRequestException.Reason reason = error instanceof ConnectTimeoutException ? UnprocessedRequestException.Reason.CONNECT_TIMEOUT : UnprocessedRequestException.Reason.CONNECT;
+            return new UnprocessedRequestException(reason, "Connect Error: " + error.getMessage(), error);
         }
 
         @Override

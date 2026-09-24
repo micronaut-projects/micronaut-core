@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.client.tck.tests;
 
+import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
 import io.micronaut.discovery.exceptions.NoAvailableServiceException;
@@ -39,6 +40,7 @@ import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.URI;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
@@ -77,6 +79,37 @@ class RawFailurePhaseTest {
         Assertions.assertTrue(UnprocessedRequestException.isUnprocessed(new NoAvailableServiceException("orders")));
         Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(new ResponseClosedException("closed")));
         Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(null));
+    }
+
+    @Test
+    void poolAcquireTimeoutIsUnprocessed() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             ApplicationContext clients = ApplicationContext.run(Map.of(
+                 "spec.name", SPEC_NAME + "-pool",
+                 "micronaut.http.client.pool.max-concurrent-http1-connections", 1,
+                 "micronaut.http.client.pool.acquire-timeout", "300ms"
+             ));
+             RawHttpClient client = clients.createBean(RawHttpClient.class)) {
+            if (client.getClass().getName().contains(".jdk.")) {
+                // the JDK client has no connection pool of its own
+                return;
+            }
+            // the only connection is busy: the upstream never answers the first request
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(HttpRequest.GET(upstream.uri("/slow")), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+
+            URI uri = upstream.uri("/queued");
+            UnprocessedRequestException failure = Assertions.assertThrows(UnprocessedRequestException.class,
+                () -> exchange(client, HttpRequest.GET(uri)).close());
+            Assertions.assertEquals(UnprocessedRequestException.Reason.POOL_ACQUIRE, failure.getReason());
+            Assertions.assertEquals(uri, failure.getUri().orElseThrow());
+            Assertions.assertFalse(pending.isDone(), "The first request should still be waiting for its response");
+            pending.cancel(true);
+        }
     }
 
     @Test

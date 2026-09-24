@@ -376,15 +376,24 @@ abstract class AbstractJdkHttpClient {
      * @return A JDK request object
      */
     protected <I> Mono<HttpRequest> mapToHttpRequest(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<?> bodyType) {
-        return resolveRequestUri(request)
-            .map(uri -> {
-                cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
-                    HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
-                    cookieManager.getCookieStore().add(uri, newCookie);
-                }));
+        return resolveRequestUri(request).map(uri -> toJdkRequest(uri, request, bodyType));
+    }
 
-                return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
-            });
+    /**
+     * Convert the Micronaut request to a JDK request for the given absolute URI.
+     *
+     * @param uri      The absolute URI to send the request to
+     * @param request  The Micronaut request object
+     * @param bodyType The body type
+     * @return A JDK request object
+     */
+    HttpRequest toJdkRequest(URI uri, io.micronaut.http.HttpRequest<?> request, @Nullable Argument<?> bodyType) {
+        cookieDecoder.decode(request).ifPresent(cookies -> cookies.getAll().forEach(cookie -> {
+            HttpCookie newCookie = toJdkCookie(cookie, request, uri.getHost());
+            cookieManager.getCookieStore().add(uri, newCookie);
+        }));
+
+        return HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry).build();
     }
 
     protected Mono<URI> resolveRequestUri(io.micronaut.http.HttpRequest<?> request) {
@@ -480,7 +489,7 @@ abstract class AbstractJdkHttpClient {
 
     protected <I, O> Flux<HttpResponse<O>> exchangeImpl(io.micronaut.http.HttpRequest<I> request, @Nullable Argument<O> bodyType) {
         return resolveTarget(request)
-            .flatMapMany(target -> applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target.instance(), bodyType)));
+            .flatMapMany(target -> applyFilterToResponsePublisher(request, target.uri(), responsePublisher(request, target, bodyType)));
     }
 
     protected <I, R extends io.micronaut.http.HttpResponse<?>> Publisher<R> applyFilterToResponsePublisher(
@@ -515,30 +524,31 @@ abstract class AbstractJdkHttpClient {
         io.micronaut.http.HttpRequest<?> request,
         @Nullable Argument<O> bodyType
     ) {
-        return responsePublisher(request, null, bodyType);
+        return Flux.defer(() -> resolveTarget(request).flatMapMany(target -> responsePublisher(request, target, bodyType)));
     }
 
     /**
-     * Send the request and publish the response.
+     * Send the request to the resolved target and publish the response. The target is resolved
+     * once, so that the instance a failure names is the instance the request was sent to.
      *
-     * @param request  The request, with its absolute URI
-     * @param instance The service instance the load balancer selected, or {@code null} if the
-     *                 request was not load balanced
+     * @param request  The request
+     * @param target   The absolute URI to send the request to, and the service instance the load
+     *                 balancer selected for it, if any
      * @param bodyType The body type
      * @param <O>      The body type
      * @return The response publisher
-     * @since 5.3.0
      */
-    protected <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
+    <O> Publisher<io.micronaut.http.HttpResponse<O>> responsePublisher(
         io.micronaut.http.HttpRequest<?> request,
-        @Nullable ServiceInstance instance,
+        ResolvedTarget target,
         @Nullable Argument<O> bodyType
     ) {
         if (clientId != null && BasicHttpAttributes.getServiceId(request).isEmpty()) {
             ClientAttributes.setServiceId(request, clientId);
         }
 
-        return Flux.defer(() -> mapToHttpRequest(request, bodyType)) // defered so any client filter changes are used
+        // built on subscription, so that any client filter changes are used
+        return Flux.defer(() -> Mono.just(toJdkRequest(target.uri(), request, bodyType)))
             .map(httpRequest -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
@@ -549,7 +559,7 @@ abstract class AbstractJdkHttpClient {
                 return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
             })
             .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(IOException.class, e -> sendError(instance, request.getUri(), e))
+            .onErrorMap(IOException.class, e -> sendError(target.instance(), target.uri(), e))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {
