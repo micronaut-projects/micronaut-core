@@ -98,13 +98,13 @@ class RouteSourceRouterTest {
     @ParameterizedTest
     @ValueSource(booleans = {true, false})
     void versionFilteringDoesNotDependOnTheOrderOfTheDecorators(boolean filteredRouterOutside) {
-        Router application = new DefaultRouter(context.getBeansOfType(RouteBuilder.class));
         VersionRouteMatchFilter versionFilter = context.getBean(VersionRouteMatchFilter.class);
         List<RouteMatchFilter> filters = List.of(versionFilter);
         List<RouteSource> sources = List.of(context.getBean(DynamicRoutes.class));
-        Router router = filteredRouterOutside
-            ? new FilteredRouter(new RouteSourceRouter(application, () -> sources, () -> filters), versionFilter)
-            : new RouteSourceRouter(new FilteredRouter(application, versionFilter), () -> sources, () -> filters);
+        // the router applies the route match filters to every tier itself: a FilteredRouter that
+        // decorates it changes nothing
+        Router tiered = DefaultRouter.withRouteSources(context.getBeansOfType(RouteBuilder.class), () -> sources, () -> filters);
+        Router router = filteredRouterOutside ? new FilteredRouter(tiered, versionFilter) : tiered;
 
         assertEquals("v1", closestMethod(router, HttpRequest.GET("/versioned/x").header(VERSION_HEADER, "1")));
         assertEquals("v2", closestMethod(router, HttpRequest.GET("/versioned/x").header(VERSION_HEADER, "2")));
@@ -113,7 +113,7 @@ class RouteSourceRouterTest {
 
     @Test
     void defaultPortsApplyToTheTables() {
-        RouteSourceRouter router = new RouteSourceRouter(new DefaultRouter(List.of()), () -> List.of(context.getBean(DynamicRoutes.class)), List::of);
+        DefaultRouter router = DefaultRouter.withRouteSources(List.of(), () -> List.of(context.getBean(DynamicRoutes.class)), List::of);
         router.applyDefaultPorts(List.of(8080));
 
         assertNotNull(router.findClosest(onPort(HttpRequest.GET("/dynamic/x"), 8080)));
@@ -203,7 +203,7 @@ class RouteSourceRouterTest {
     }
 
     private static Router tableRouter(RouteTable table) {
-        return new RouteSourceRouter(new DefaultRouter(List.of()), () -> List.of(() -> table), List::of);
+        return DefaultRouter.withRouteSources(List.of(), () -> List.of(() -> table), List::of);
     }
 
     private static String closestMethod(Router router, HttpRequest<?> request) {

@@ -16,56 +16,31 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
-import org.jspecify.annotations.Nullable;
-
-import java.util.List;
 
 /**
- * The {@link RouteTable} built by the {@link RouteTableFactory}: an indexed router of the table's
- * routes.
+ * The {@link RouteTable} built by the {@link RouteTableFactory}: an immutable set of URI routes,
+ * sorted for each HTTP method, that the {@link DefaultRouter} matches after the application routes.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 final class DefaultRouteTable implements RouteTable {
-    static final DefaultRouteTable EMPTY = new DefaultRouteTable(new DefaultRouter(List.of()));
+    static final DefaultRouteTable EMPTY = new DefaultRouteTable(UriRouteSet.NONE);
 
-    private final DefaultRouter router;
-    private final boolean empty;
-    @Nullable
-    private volatile List<Integer> appliedDefaultPorts;
+    private final UriRouteSet routes;
 
     /**
-     * @param router The router of the table's routes
+     * @param routes The routes of the table
      */
-    DefaultRouteTable(DefaultRouter router) {
-        this.router = router;
-        this.empty = router.uriRoutes().findAny().isEmpty();
+    DefaultRouteTable(UriRouteSet routes) {
+        this.routes = routes;
     }
 
     /**
-     * @return Whether the table has no routes
+     * @return The routes of the table
      */
-    boolean isEmpty() {
-        return empty;
-    }
-
-    /**
-     * The router of the table, with the default ports of the application applied once.
-     *
-     * @param defaultPorts The default ports of the application, or {@code null} if not known yet
-     * @return The router
-     */
-    DefaultRouter router(@Nullable List<Integer> defaultPorts) {
-        if (defaultPorts != null && defaultPorts != appliedDefaultPorts) {
-            synchronized (this) {
-                if (defaultPorts != appliedDefaultPorts) {
-                    router.applyDefaultPorts(defaultPorts);
-                    appliedDefaultPorts = defaultPorts;
-                }
-            }
-        }
-        return router;
+    UriRouteSet routes() {
+        return routes;
     }
 }

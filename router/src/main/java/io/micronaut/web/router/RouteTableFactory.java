@@ -23,7 +23,6 @@ import io.micronaut.http.annotation.Consumes;
 import io.micronaut.http.annotation.Produces;
 import jakarta.inject.Singleton;
 
-import java.util.List;
 import java.util.Objects;
 import java.util.function.Consumer;
 
@@ -97,6 +96,6 @@ public final class RouteTableFactory {
         if (!builder.getExposedPorts().isEmpty()) {
             throw new IllegalArgumentException("A route table cannot expose ports: " + builder.getExposedPorts());
         }
-        return new DefaultRouteTable(new DefaultRouter(List.of(builder)));
+        return new DefaultRouteTable(UriRouteSet.of(builder.getUriRoutes()));
     }
 }

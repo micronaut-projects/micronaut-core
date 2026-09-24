@@ -33,6 +33,7 @@ import io.micronaut.http.filter.HttpServerFilterResolver;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
 import io.micronaut.web.router.exceptions.RoutingException;
+import io.micronaut.web.router.filter.RouteMatchFilter;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 
@@ -40,13 +41,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -61,10 +61,25 @@ import java.util.stream.Stream;
 @Singleton
 public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatch<?>> {
 
-    private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+    private static final String SNAPSHOT_ATTRIBUTE = "micronaut.router.route-source.snapshot";
+    private static final Supplier<List<RouteSource>> NO_ROUTE_SOURCES = List::of;
+    private static final Supplier<List<RouteMatchFilter>> NO_ROUTE_MATCH_FILTERS = List::of;
 
-    private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
-    private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
+    /**
+     * The routes of the application: the first tier.
+     */
+    private final UriRouteSet routes;
+    /**
+     * The route sources, in order: the tables they publish are the next tiers. Given by the
+     * {@link RouteSourcesListener} when the router bean is created, before it is published, so
+     * that a router that replaces this one and calls a public constructor has them too.
+     */
+    private Supplier<List<RouteSource>> routeSources;
+    /**
+     * The route match filters (e.g. versioning), applied to the candidates of every tier when
+     * there are route sources.
+     */
+    private Supplier<List<RouteMatchFilter>> routeMatchFilters;
     private final StatusRouteInfo<Object, Object>[] statusRoutes;
     private final ErrorRouteInfo<Object, Object>[] errorRoutes;
     private final Set<Integer> exposedPorts;
@@ -94,10 +109,14 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      */
     @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
+        this(builders, NO_ROUTE_SOURCES, NO_ROUTE_MATCH_FILTERS);
+    }
+
+    private DefaultRouter(Collection<RouteBuilder> builders, Supplier<List<RouteSource>> routeSources, Supplier<List<RouteMatchFilter>> routeMatchFilters) {
+        this.routeSources = routeSources;
+        this.routeMatchFilters = routeMatchFilters;
         Set<Integer> exposedPorts = new HashSet<>(5);
-        Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
-        HttpMethod[] httpMethods = HttpMethod.values();
-        Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newEnumMap(httpMethods);
+        UriRouteSet.Builder uriRoutes = new UriRouteSet.Builder();
         Set<StatusRouteInfo<Object, Object>> statusRoutes = new LinkedHashSet<>();
         Set<ErrorRouteInfo<Object, Object>> errorRoutes = new LinkedHashSet<>();
         alwaysMatchesFilterRoutes = new ArrayList<>(20);
@@ -107,14 +126,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         for (RouteBuilder builder : builders) {
             List<UriRoute> constructedRoutes = builder.getUriRoutes();
             for (UriRoute route : constructedRoutes) {
-                HttpMethod httpMethod = route.getHttpMethod();
-                UriRouteInfo<Object, Object> uriRouteInfo = route.toRouteInfo();
-                if (httpMethod == HttpMethod.CUSTOM) {
-                    String key = route.getHttpMethodName();
-                    customRoutesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(uriRouteInfo);
-                } else {
-                    routesByMethod.computeIfAbsent(httpMethod, x -> new ArrayList<>()).add(uriRouteInfo);
-                }
+                uriRoutes.add(route);
             }
 
             for (StatusRoute statusRoute : builder.getStatusRoutes()) {
@@ -154,18 +166,7 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         } else {
             this.exposedPorts = Collections.emptySet();
         }
-        Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(httpMethods);
-        Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
-        for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
-            UriRouteInfo<Object, Object>[] values = finalizeRoutes(e.getValue());
-            methodMap.put(e.getKey(), values);
-            customMethodMap.put(e.getKey().name(), values);
-        }
-        for (Map.Entry<String, List<UriRouteInfo<Object, Object>>> e : customRoutesByMethod.entrySet()) {
-            customMethodMap.put(e.getKey(), finalizeRoutes(e.getValue()));
-        }
-        this.methodRoutesByMethod = methodMap;
-        this.allRoutesByMethod = customMethodMap;
+        this.routes = uriRoutes.build();
         this.statusRoutes = statusRoutes.toArray(StatusRouteInfo[]::new);
         this.errorRoutes = errorRoutes.toArray(ErrorRouteInfo[]::new);
         this.alwaysMatchesHttpFilters = SupplierUtil.memoized(() -> {
@@ -190,6 +191,32 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             FilterRunner.sort(httpFilters);
             return httpFilters;
         });
+    }
+
+    /**
+     * Construct a new router for the given route builders and route sources.
+     *
+     * @param builders          The builders
+     * @param routeSources      Supplies the route sources, in order
+     * @param routeMatchFilters Supplies the route match filters, applied to every tier when there are route sources
+     * @return The router
+     */
+    static DefaultRouter withRouteSources(Collection<RouteBuilder> builders,
+                                          Supplier<List<RouteSource>> routeSources,
+                                          Supplier<List<RouteMatchFilter>> routeMatchFilters) {
+        return new DefaultRouter(builders, routeSources, routeMatchFilters);
+    }
+
+    /**
+     * Give the router the route sources, whose tables are the tiers after the routes of the
+     * router. Called when the router bean is created, before it is published.
+     *
+     * @param routeSources      Supplies the route sources, in order
+     * @param routeMatchFilters Supplies the route match filters, applied to every tier
+     */
+    void useRouteSources(Supplier<List<RouteSource>> routeSources, Supplier<List<RouteMatchFilter>> routeMatchFilters) {
+        this.routeSources = routeSources;
+        this.routeMatchFilters = routeMatchFilters;
     }
 
     private boolean isMatchesAll(FilterRoute filterRoute) {
@@ -219,108 +246,214 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         this.ports = new HashSet<>(ports);
     }
 
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
-        return this.<T, R>toMatches(uri.toString(), findInternal(request)).stream();
-    }
-
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
-        return this.<T, R>toMatches(request.getPath(), findInternal(request)).stream();
-    }
-
-    @Override
-    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri, @Nullable HttpRequest<?> context) {
-        return this.<T, R>toMatches(
-                uri.toString(),
-            allRoutesByMethod.getOrDefault(httpMethod.name(), EMPTY)
-        ).stream();
-    }
-
-    @Override
-    public Stream<UriRouteInfo<?, ?>> uriRoutes() {
-        return allRoutesByMethod.values().stream().flatMap(Arrays::stream);
-    }
-
-    @Override
-    public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request);
-        if (routes.isEmpty()) {
-            return null;
+    /**
+     * The route sets of the tables of the route sources for a request: captured once and reused
+     * for the rest of the request, so that every lookup of a request sees the same tables.
+     *
+     * @param request The request, or {@code null} to capture the tables for one lookup
+     * @return The route sets of the tables that have routes, in the order of their sources
+     */
+    private List<UriRouteSet> tables(@Nullable HttpRequest<?> request) {
+        if (request != null && request.getAttribute(SNAPSHOT_ATTRIBUTE).orElse(null) instanceof Snapshot snapshot) {
+            return snapshot.tables;
         }
-        String path = request.getPath();
-        if (routes.size() == 1) {
-            Object o = routes.iterator().next();
-            // avoid type pollution perf issues
-            UriRouteInfo next = o instanceof DefaultUrlRouteInfo def ? def : (UriRouteInfo<Object, Object>) o;
-            return (UriRouteMatch) next.tryMatch(path);
-        }
-        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
+        List<RouteSource> sources = routeSources.get();
+        List<UriRouteSet> tables = new ArrayList<>(sources.size());
+        for (RouteSource source : sources) {
+            RouteTable table = source.snapshot();
+            if (table == null) {
+                throw new IllegalStateException("Route source " + source + " returned no route table");
+            }
+            // sealed: the RouteTableFactory builds every table
+            UriRouteSet tableRoutes = ((DefaultRouteTable) table).routes();
+            if (!tableRoutes.isEmpty()) {
+                tables.add(tableRoutes);
             }
         }
-        if (uriRoutes.size() == 1) {
-            Object obj = uriRoutes.get(0);
-            // type pollution avoidance (should be covered by type pollution test)
-            return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
+        if (request != null) {
+            request.setAttribute(SNAPSHOT_ATTRIBUTE, new Snapshot(tables));
         }
-        uriRoutes = resolveAmbiguity(request, uriRoutes);
-        if (uriRoutes.size() > 1) {
-            uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
-        }
-        if (uriRoutes.size() > 1) {
-            throw new DuplicateRouteException(path, (List) uriRoutes);
-        } else if (uriRoutes.size() == 1) {
-            return uriRoutes.get(0);
-        }
-        return null;
-    }
-
-    @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        return findAllClosestRoutes(request, null);
-    }
-
-    @Override
-    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
-        return findAllClosestRoutes(request, filter);
+        return tables;
     }
 
     /**
-     * The closest matches of a request.
-     *
-     * @param request The request
-     * @param filter  The filter of the candidates, applied before the ambiguity is resolved
-     * @param <T>     The target type
-     * @param <R>     The result type
-     * @return The closest matches
+     * @return Whether there are route sources: then their tables are the tiers after the
+     * application routes, and the route match filters apply to every tier
      */
-    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request);
-        if (routes.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
-        if (uriRoutes.size() < 2) {
-            return uriRoutes;
-        }
-        return resolveAmbiguity(request, uriRoutes);
+    private boolean hasRouteSources() {
+        return !routeSources.get().isEmpty();
     }
 
-    private static <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
-        if (filter == null || matches.isEmpty()) {
+    /**
+     * The route match filters for a request, combined with the given filter. They are applied to
+     * the candidates of each tier before its ambiguity is resolved and before deciding whether it
+     * has a match: a more specific route rejected by a filter does not hide a less specific one, a
+     * tier whose routes are rejected falls through to the next tier, and the routes of a table are
+     * filtered like the application routes. Applying a filter again, e.g. by a
+     * {@link io.micronaut.web.router.filter.FilteredRouter} that decorates this router, is harmless.
+     *
+     * @param request The request, or {@code null}
+     * @param filter  The filter to combine them with, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The combined filter, or {@code null} to accept every route
+     */
+    private <T, R> @Nullable Predicate<UriRouteMatch<T, R>> withRouteMatchFilters(@Nullable HttpRequest<?> request,
+                                                                                @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (request == null) {
+            return filter;
+        }
+        Predicate<UriRouteMatch<T, R>> predicate = filter;
+        for (RouteMatchFilter routeMatchFilter : routeMatchFilters.get()) {
+            Predicate<UriRouteMatch<T, R>> next = routeMatchFilter.filter(request);
+            predicate = predicate == null ? next : predicate.and(next);
+        }
+        return predicate;
+    }
+
+    private static <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> predicate) {
+        if (predicate == null || matches.isEmpty()) {
             return matches;
         }
         var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
         for (UriRouteMatch<T, R> match : matches) {
-            if (filter.test(match)) {
+            if (predicate.test(match)) {
                 filtered.add(match);
             }
         }
         return filtered;
+    }
+
+    /**
+     * The matches of the application routes followed by the matches of the tables, each filtered
+     * by the route match filters when there are route sources.
+     *
+     * @param request            The request, or {@code null}
+     * @param applicationMatches The matches of the application routes
+     * @param tableMatches       Finds the matches of a table
+     * @param <T>                The target type
+     * @param <R>                The result type
+     * @return The matches of every tier
+     */
+    private <T, R> Stream<UriRouteMatch<T, R>> ofEveryTier(@Nullable HttpRequest<?> request,
+                                                           List<UriRouteMatch<T, R>> applicationMatches,
+                                                           Function<UriRouteSet, List<UriRouteMatch<T, R>>> tableMatches) {
+        if (!hasRouteSources()) {
+            return applicationMatches.stream();
+        }
+        Predicate<UriRouteMatch<T, R>> predicate = withRouteMatchFilters(request, null);
+        Stream<UriRouteMatch<T, R>> matches = filter(applicationMatches, predicate).stream();
+        for (UriRouteSet table : tables(request)) {
+            matches = Stream.concat(matches, filter(tableMatches.apply(table), predicate).stream());
+        }
+        return matches;
+    }
+
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
+        String path = uri.toString();
+        return ofEveryTier(request, routes.find(request, path, ports), table -> table.find(request, path, ports));
+    }
+
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
+        String path = request.getPath();
+        return ofEveryTier(request, routes.find(request, path, ports), table -> table.find(request, path, ports));
+    }
+
+    @Override
+    public <T, R> Stream<UriRouteMatch<T, R>> find(HttpMethod httpMethod, CharSequence uri, @Nullable HttpRequest<?> context) {
+        String path = uri.toString();
+        return ofEveryTier(context, routes.find(httpMethod, path), table -> table.find(httpMethod, path));
+    }
+
+    @Override
+    public Stream<UriRouteInfo<?, ?>> uriRoutes() {
+        Stream<UriRouteInfo<?, ?>> uriRoutes = routes.uriRoutes();
+        if (!hasRouteSources()) {
+            return uriRoutes;
+        }
+        for (UriRouteSet table : tables(null)) {
+            uriRoutes = Stream.concat(uriRoutes, table.uriRoutes().distinct());
+        }
+        return uriRoutes;
+    }
+
+    @Override
+    public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
+        if (!hasRouteSources()) {
+            return routes.findClosest(request, ports);
+        }
+        Predicate<UriRouteMatch<T, R>> filter = withRouteMatchFilters(request, null);
+        UriRouteMatch<T, R> match = closest(routes, request, filter);
+        if (match != null) {
+            return match;
+        }
+        for (UriRouteSet table : tables(request)) {
+            match = closest(table, request, filter);
+            if (match != null) {
+                return match;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * The closest match of a tier.
+     *
+     * @param tier    The routes of the tier
+     * @param request The request
+     * @param filter  The filter of the candidates, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The match, or {@code null}
+     * @throws DuplicateRouteException if several routes of the tier match equally closely
+     */
+    private <T, R> @Nullable UriRouteMatch<T, R> closest(UriRouteSet tier, HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (filter == null) {
+            return tier.findClosest(request, ports);
+        }
+        return UriRouteSet.closest(request.getPath(), tier.findAllClosest(request, filter, ports));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        return findAllClosestOfTiers(request, null);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return findAllClosestOfTiers(request, filter);
+    }
+
+    /**
+     * The closest matches of the first tier that has a match. The filter applies to the
+     * candidates of a tier before its ambiguity is resolved, so a more specific route it rejects
+     * does not hide a less specific one it accepts, and a tier whose routes it rejects falls
+     * through to the next.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestOfTiers(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (!hasRouteSources()) {
+            return routes.findAllClosest(request, filter, ports);
+        }
+        Predicate<UriRouteMatch<T, R>> predicate = withRouteMatchFilters(request, filter);
+        List<UriRouteMatch<T, R>> matches = routes.findAllClosest(request, predicate, ports);
+        if (!matches.isEmpty()) {
+            return matches;
+        }
+        for (UriRouteSet table : tables(request)) {
+            List<UriRouteMatch<T, R>> tableMatches = table.findAllClosest(request, predicate, ports);
+            if (!tableMatches.isEmpty()) {
+                return tableMatches;
+            }
+        }
+        return matches;
     }
 
     /**
@@ -400,48 +533,17 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return uriRoutes;
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
-        if (routes.size() == 1) {
-            UriRouteMatch match = routes.iterator().next().tryMatch(path);
-            if (match != null) {
-                return List.of(match);
-            }
-            return List.of();
-        }
-        var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.size());
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
-            }
-        }
-        return uriRoutes;
-    }
-
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, UriRouteInfo<Object, Object>[] routes) {
-        if (routes.length == 1) {
-            UriRouteMatch match = routes[0].tryMatch(path);
-            if (match != null) {
-                return List.of(match);
-            }
-            return List.of();
-        }
-        var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.length);
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
-            }
-        }
-        return uriRoutes;
-    }
-
     @Override
     public <T, R> Optional<UriRouteMatch<T, R>> route(HttpMethod httpMethod, CharSequence uri) {
-        for (UriRouteInfo<Object, Object> uriRouteInfo : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY)) {
-            Optional<UriRouteMatch<Object, Object>> match = uriRouteInfo.match(uri.toString());
+        String path = uri.toString();
+        Optional<UriRouteMatch<T, R>> match = routes.route(httpMethod, path);
+        if (match.isPresent() || !hasRouteSources()) {
+            return match;
+        }
+        for (UriRouteSet table : tables(null)) {
+            match = table.route(httpMethod, path);
             if (match.isPresent()) {
-                return (Optional) match;
+                return match;
             }
         }
         return Optional.empty();
@@ -684,105 +786,31 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return Collections.unmodifiableList(httpFilters);
     }
 
-    @SuppressWarnings("unchecked")
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> findAny(CharSequence uri, @Nullable HttpRequest<?> request) {
-        var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
-        final String uriStr = uri.toString();
-        for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {
-            for (UriRouteInfo<Object, Object> route : routes) {
-                if (request != null) {
-                    if (shouldSkipForPort(request, route)) {
-                        continue;
-                    }
-                    if (!route.matching(request)) {
-                        continue;
-                    }
-                }
-                UriRouteMatch match = route.tryMatch(uriStr);
-                if (match != null) {
-                    matchedRoutes.add(match);
-                }
-            }
-        }
-        return matchedRoutes.stream();
+        String path = uri.toString();
+        return ofEveryTier(request, routes.findAny(path, request, ports), table -> table.findAny(path, request, ports));
     }
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request) {
-        String path = request.getPath();
-        var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
-        for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {
-            for (UriRouteInfo<Object, Object> route : routes) {
-                if (shouldSkipForPort(request, route)) {
-                    continue;
+        List<UriRouteMatch<T, R>> matches = routes.findAny(request, ports);
+        if (!hasRouteSources()) {
+            return matches;
+        }
+        Predicate<UriRouteMatch<T, R>> predicate = withRouteMatchFilters(request, null);
+        matches = filter(matches, predicate);
+        List<UriRouteMatch<T, R>> all = null;
+        for (UriRouteSet table : tables(request)) {
+            List<UriRouteMatch<T, R>> tableMatches = filter(table.findAny(request, ports), predicate);
+            if (!tableMatches.isEmpty()) {
+                if (all == null) {
+                    all = new ArrayList<>(matches);
                 }
-                if (!route.matching(request)) {
-                    continue;
-                }
-                UriRouteMatch match = route.tryMatch(path);
-                if (match != null) {
-                    matchedRoutes.add(match);
-                }
+                all.addAll(tableMatches);
             }
         }
-        return matchedRoutes;
-    }
-
-    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
-        HttpMethod httpMethod = request.getMethod();
-        boolean permitsBody = httpMethod.permitsRequestBody();
-        Collection<MediaType> acceptedProducedTypes = null;
-        MediaType contentType = null;
-        UriRouteInfo<Object, Object>[] routes = httpMethod == HttpMethod.CUSTOM ?
-            allRoutesByMethod.getOrDefault(request.getMethodName(), EMPTY) : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY);
-        if (routes.length == 0) {
-            return Collections.emptyList();
-        }
-        var result = new ArrayList<UriRouteInfo<Object, Object>>(routes.length);
-        for (UriRouteInfo<Object, Object> route : routes) {
-            if (shouldSkipForPort(request, route)) {
-                continue;
-            }
-            if (permitsBody) {
-                if (!route.isPermitsRequestBody()) {
-                    continue;
-                }
-                if (!route.consumesAll()) {
-                    if (contentType == null) {
-                        contentType = request.getContentType().orElse(null);
-                    }
-                    if (!route.doesConsume(contentType)) {
-                        continue;
-                    }
-                }
-            }
-            if (!route.producesAll()) {
-                if (acceptedProducedTypes == null) {
-                    acceptedProducedTypes = request.accept();
-                }
-                if (!route.doesProduce(acceptedProducedTypes)) {
-                    continue;
-                }
-            }
-            if (!route.matching(request)) {
-                continue;
-            }
-            result.add(route);
-        }
-        return result;
-    }
-
-    private boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
-        if (ports == null || route.getPort() != null) {
-            return false;
-        }
-        return !ports.contains(request.getServerAddress().getPort());
-    }
-
-    private UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
-        Collections.sort(routes);
-        return routes.toArray(EMPTY);
+        return all == null ? matches : all;
     }
 
     private <T> Optional<RouteMatch<T>> findRouteMatch(List<RouteMatch<T>> matchedRoutes, Throwable error) {
@@ -870,5 +898,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             return true;
         }
         return context.getRouteInfo().getAnnotationMetadata().hasStereotype(matchingAnnotation);
+    }
+
+    /**
+     * The tables of one request.
+     *
+     * @param tables The route sets of the tables
+     */
+    private record Snapshot(List<UriRouteSet> tables) {
     }
 }
