@@ -594,6 +594,11 @@ def apply_delegation(tree, targets):
                 return __mn_java.total(quantity, unit_price)
             ...the original body, for objects created in Python...
 
+    The Java body of a compiled function raises the generated Java class of an exception class of
+    the compilation, which the Python caller catches as the Python class: the prologue raises the
+    Python exception the Java one carries (see ``_mn_python_exception``), and any other exception
+    as it is.
+
     ``targets`` are ``Class#method`` strings, a nested class as ``Outer$Inner``, with ``#list``,
     ``#set`` or ``#dict`` appended when the Java body returns a collection, which a Python caller
     receives as a Python one. A static method carries ``#static=<the generated class>``, and a
@@ -615,7 +620,6 @@ def apply_delegation(tree, targets):
         conversion = next((part for part in rest if part in ("list", "set", "dict")), None)
         wanted.setdefault(class_name, {})[method] = (conversion, static_class)
     count = 0
-    statics = False
     for class_node, path in _classes(tree):
         methods = wanted.get("$".join(path))
         if not methods:
@@ -625,7 +629,6 @@ def apply_delegation(tree, targets):
                 conversion, static_class = methods[statement.name]
                 if static_class is not None:
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, conversion)
-                    statics = True
                 else:
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _delegation(statement, conversion)
                 ast.fix_missing_locations(statement)
@@ -638,13 +641,12 @@ def apply_delegation(tree, targets):
                 if static_class is not None:
                     statement.body[_docstring_offset(statement):_docstring_offset(statement)] = _static_delegation(statement, static_class, conversion)
                     ast.fix_missing_locations(statement)
-                    statics = True
                     count += 1
-    if statics and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
+    if count and not any(isinstance(statement, ast.FunctionDef) and statement.name == STATIC_LOOKUP for statement in tree.body):
         offset = _docstring_offset(tree)
         while offset < len(tree.body) and isinstance(tree.body[offset], ast.ImportFrom) and tree.body[offset].module == "__future__":
             offset += 1
-        lookup = ast.parse(STATIC_LOOKUP_SOURCE).body
+        lookup = ast.parse(HELPERS_SOURCE).body
         for statement in lookup:
             for node in ast.walk(statement):
                 if isinstance(node, (ast.stmt, ast.expr, ast.arg)):
@@ -654,9 +656,12 @@ def apply_delegation(tree, targets):
     return count
 
 
-# the module-level lookup of the generated class a static Java method belongs to, cached per module
+# the helpers of the rewritten functions, added once to a module with a rewritten function: the lookup of
+# the generated class a static Java method belongs to, cached per module, and the Python exception a Java
+# exception carries
 STATIC_LOOKUP = "_mn_static_class"
-STATIC_LOOKUP_SOURCE = """
+PYTHON_EXCEPTION = "_mn_python_exception"
+HELPERS_SOURCE = """
 _mn_static_classes = {}
 
 
@@ -670,6 +675,18 @@ def _mn_static_class(name):
             found = None
         _mn_static_classes[name] = found
     return found
+
+
+def _mn_python_exception(error):
+    try:
+        unwrap = error.asPolyglotValue
+    except Exception:
+        return None
+    try:
+        found = unwrap()
+    except Exception:
+        return None
+    return found if isinstance(found, BaseException) else None
 """
 
 
@@ -722,17 +739,52 @@ def _static_delegation(function, static_class, conversion=None):
         keywords=[],
     )
     result = _converted(result, conversion, temporary, function.name, names)
-    guard = ast.If(
-        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[ast.Return(value=result)],
-        orelse=[],
-    )
-    statements = [lookup, guard]
+    statements = [lookup, _guarded_return(temporary, result)]
     for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
         if isinstance(statement, (ast.stmt, ast.expr)):
             statement.lineno = statement.end_lineno = line
             statement.col_offset = statement.end_col_offset = column
     return statements
+
+
+def _guarded_return(temporary, result):
+    """
+    ``if <temporary> is not None: return <result>``, raising the Python exception a Java exception of
+    the call carries::
+
+        if __mn_java is not None:
+            try:
+                return __mn_java.total(quantity, unit_price)
+            except BaseException as __mn_e:
+                __mn_p = _mn_python_exception(__mn_e)
+                if __mn_p is None:
+                    raise
+                raise __mn_p from __mn_p.__cause__
+    """
+    caught = temporary + "_e"
+    found = temporary + "_p"
+    handler = ast.ExceptHandler(
+        type=ast.Name(id="BaseException", ctx=ast.Load()),
+        name=caught,
+        body=[
+            ast.Assign(
+                targets=[ast.Name(id=found, ctx=ast.Store())],
+                value=ast.Call(func=ast.Name(id=PYTHON_EXCEPTION, ctx=ast.Load()), args=[ast.Name(id=caught, ctx=ast.Load())], keywords=[]),
+            ),
+            ast.If(
+                test=ast.Compare(left=ast.Name(id=found, ctx=ast.Load()), ops=[ast.Is()], comparators=[ast.Constant(value=None)]),
+                body=[ast.Raise(exc=None, cause=None)],
+                orelse=[],
+            ),
+            ast.Raise(exc=ast.Name(id=found, ctx=ast.Load()), cause=ast.Attribute(value=ast.Name(id=found, ctx=ast.Load()), attr="__cause__", ctx=ast.Load())),
+        ],
+    )
+    attempt = ast.Try(body=[ast.Return(value=result)], handlers=[handler], orelse=[], finalbody=[])
+    return ast.If(
+        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
+        body=[attempt],
+        orelse=[],
+    )
 
 
 def _converted(result, conversion, temporary, name, names):
@@ -752,12 +804,12 @@ def _converted(result, conversion, temporary, name, names):
 
 
 def _temporary(function):
-    """A name for the delegate that no parameter or name of the function uses."""
+    """A name for the delegate, and with the _e and _p suffixes for the exception it translates, that no parameter or name of the function uses."""
     used = {node.arg for node in ast.walk(function.args) if isinstance(node, ast.arg)}
     used |= {node.id for node in ast.walk(function) if isinstance(node, ast.Name)}
     name = DELEGATE_LOCAL
     suffix = 0
-    while name in used:
+    while name in used or f"{name}_e" in used or f"{name}_p" in used:
         suffix += 1
         name = f"{DELEGATE_LOCAL}_{suffix}"
     return name
@@ -797,13 +849,7 @@ def _delegation(function, conversion=None):
             )],
             keywords=[],
         )
-    call = ast.Return(value=result)
-    guard = ast.If(
-        test=ast.Compare(left=ast.Name(id=temporary, ctx=ast.Load()), ops=[ast.IsNot()], comparators=[ast.Constant(value=None)]),
-        body=[call],
-        orelse=[],
-    )
-    statements = [lookup, guard]
+    statements = [lookup, _guarded_return(temporary, result)]
     for statement in ast.walk(ast.Module(body=statements, type_ignores=[])):
         if isinstance(statement, (ast.stmt, ast.expr)):
             statement.lineno = statement.end_lineno = line

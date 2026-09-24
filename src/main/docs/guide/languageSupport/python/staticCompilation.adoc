@@ -112,7 +112,7 @@ A method is compiled when it is a candidate, its signature has a Java layout, an
 |A builtin, a method of a Python value, a statement kind or an expression kind outside the supported subset below.
 
 |`unbounded-integer-op`, `equality-on-object`, `truthiness-of-java-object`, `python-exception`
-|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception.
+|An operation whose Python semantics the lowering does not reproduce: `**` on integers or an integer literal outside `long`, `==` between Java objects, `if x:` on a Java object that is not a collection or a string, raising or catching a Python exception that is neither a Java exception nor an exception class of the compilation (a `ValueError`, a bare `except`).
 |===
 
 === The Supported Subset
@@ -131,6 +131,9 @@ Python integers are compiled as `long`, floats as `double`, strings as `String`,
 
 |`raise JavaException(...)`, `try`/`except JavaType as e`/`finally`
 |`throw` and `try` with typed catches. A checked exception a Java call declares reaches the caller wrapped in `IllegalStateException`, as it does through the bridge.
+
+|`raise OwnError(...)`, `except OwnError as e`, for a class of the compilation extending `Exception`
+|`throw` and `catch` of the generated Java class of the exception class, which extends `RuntimeException` (see the exception handling documentation): a Python caller of the compiled method catches the Python class as before, a Java caller the generated class. A class without an `__init__` takes a message, or nothing; a class with a hinted `__init__` takes its parameters. `str(e)` of the exception is not compiled, since the Java `toString()` names the class. Clauses follow Java's rule that a clause for a base cannot precede one for its subclass; a Java base of the class (`RuntimeException`) counts.
 
 |`+`, `-`, `*` on integers
 |`Math.addExact` and friends: an overflow raises `ArithmeticException` where Python would promote to a big integer. This is the one accepted difference.

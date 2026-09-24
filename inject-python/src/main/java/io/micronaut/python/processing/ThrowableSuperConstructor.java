@@ -74,7 +74,10 @@ final class ThrowableSuperConstructor {
      * @throws ProcessingException When no constructor of the base matches the super call
      */
     static ThrowableSuperConstructor resolve(ClassElement element, ClassElement superType, PythonVisitorContext visitorContext) {
-        List<SuperArgumentDef> superArguments = superArguments(element);
+        // a Python exception class: str(exception) is its message, whatever its __init__ passes to Exception
+        List<SuperArgumentDef> superArguments = element instanceof AbstractPythonClassElement pythonClass && pythonClass.extendsPythonException()
+            ? null
+            : superArguments(element);
         List<ConstructorElement> constructors = superType.getAccessibleConstructors()
             .stream()
             .filter(candidate -> candidate.isPublic() || candidate.isProtected() || candidate.getDeclaringType().getPackageName().equals(element.getPackageName()))

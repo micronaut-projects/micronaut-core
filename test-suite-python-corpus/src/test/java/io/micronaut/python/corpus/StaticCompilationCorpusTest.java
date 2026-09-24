@@ -42,7 +42,7 @@ class StaticCompilationCorpusTest {
 
     @ParameterizedTest(name = "{0}")
     @CsvSource({
-        "fullstack, 39",
+        "fullstack, 41",
         "petclinic, 32",
     })
     void theCorpusBuildsInModeAllWithTheCheckerSilent(String corpus, int compiledAtLeast) {
