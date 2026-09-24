@@ -813,8 +813,9 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * <p>The route is a route of the upgrade request: its conditions, filters, groups, order, port
      * and attributes apply to the upgrade request, e.g. a filter that answers with a response
      * rejects the upgrade, and a request that is not an upgrade is answered with an error. Its
-     * executor, see {@link HttpRouteSpec#executeOn(String)}, runs the handlers of the connections;
-     * by default they run like a controller method that returns a stage.</p>
+     * executor, see {@link HttpRouteSpec#executeOn(String)}, or the executor of its group, runs
+     * the handlers of the connections; by default they run like a controller method that returns
+     * a stage. The media types of its group do not apply to it.</p>
      *
      * @param uri      The URI template
      * @param endpoint Declares the handlers of the WebSocket connections

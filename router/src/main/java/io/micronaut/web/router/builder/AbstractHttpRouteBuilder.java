@@ -253,7 +253,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         RouteSettings route = grouped(assembly.addRoute(HttpMethod.GET.name(), HttpMethod.GET, template, DEFAULT_CONSUMES,
             handle(HandlerMethod.webSocket(webSocket, WebSocketRouteEndpoint.ROUTE_METADATA))).settings());
         route.attribute(WebSocketRouteEndpoint.ROUTE_ATTRIBUTE, webSocket);
-        return spec(route);
+        // the upgrade request has no body and the connection no response body: the media types
+        // of a group do not apply, its executor runs the handlers of the connections
+        return spec(RouteGroupDefaults.CONSUMES | RouteGroupDefaults.PRODUCES, route);
     }
 
     @Override
