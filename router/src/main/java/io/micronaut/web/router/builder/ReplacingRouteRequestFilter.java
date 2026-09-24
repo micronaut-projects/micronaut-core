@@ -45,7 +45,7 @@ import org.jspecify.annotations.Nullable;
  *     its body. A request with another body is a {@link io.micronaut.http.ServerHttpRequest} whose
  *     {@link io.micronaut.http.ServerHttpRequest#byteBody() byteBody()} is the new body: the body
  *     binders of the route, e.g. of a {@code @Body} parameter or of a {@link BodyRequestHandler},
- *     and {@link io.micronaut.http.AsyncServerHttpRequest} read it.</li>
+ *     and the {@link io.micronaut.http.body.AsyncRequestBody} of an asynchronous handler read it.</li>
  * </ul>
  *
  * <pre>{@code

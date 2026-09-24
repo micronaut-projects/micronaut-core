@@ -140,7 +140,7 @@ class TypedHandlerRoutesTest {
             order.handle(HttpMethod.GET, "/id", (request, pathVariables, target) -> HttpResponse.ok(target.id()));
             order.handle(HttpMethod.POST, "/items", Argument.of(Item.class), (request, pathVariables, target, item) ->
                 HttpResponse.ok(target.id() + " " + item.name()));
-            order.handleAsync(HttpMethod.GET, "/async", (request, pathVariables, target) ->
+            order.handleAsync(HttpMethod.GET, "/async", (request, pathVariables, target, body) ->
                 CompletableFuture.completedFuture(HttpResponse.ok("async " + target.id())));
             order.handle(RouteDeclaration.of(HttpMethod.GET, "/declared"), (request, pathVariables, target) ->
                 HttpResponse.ok("declared " + target.id()));

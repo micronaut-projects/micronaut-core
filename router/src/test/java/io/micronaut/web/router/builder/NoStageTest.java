@@ -17,10 +17,10 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.filter.FilterRunner;
 import io.micronaut.web.router.DefaultRouter;
 import io.micronaut.web.router.RouteAssembly;
@@ -49,28 +49,37 @@ class NoStageTest {
 
     @Test
     void anAsynchronousHandlerThatReturnsNoStageFailsWhateverTheRequest() {
-        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> null);
+        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncBodyRequestHandler) (request, pathVariables, body) -> null);
 
-        // a request that has no body to release
-        NullPointerException plain = assertThrows(NullPointerException.class, () -> invoke(method, request(null)));
+        // a body that has nothing to release
+        NullPointerException plain = assertThrows(NullPointerException.class, () -> invoke(method, body(null)));
         assertEquals("The asynchronous handler returned no stage", plain.getMessage());
 
         AtomicInteger released = new AtomicInteger();
         NullPointerException handlerRequest = assertThrows(NullPointerException.class,
-            () -> invoke(method, request(() -> released.incrementAndGet())));
+            () -> invoke(method, body(() -> released.incrementAndGet())));
         assertEquals("The asynchronous handler returned no stage", handlerRequest.getMessage());
         assertEquals(1, released.get());
     }
 
     @Test
+    void anAsynchronousHandlerWithoutTheBodyThatReturnsNoStageFails() {
+        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> null);
+
+        NullPointerException noStage = assertThrows(NullPointerException.class,
+            () -> method.invoke(new Object[] {HttpRequest.GET("/x"), pathVariables()}));
+        assertEquals("The asynchronous handler returned no stage", noStage.getMessage());
+    }
+
+    @Test
     void anErrorOfTheHandlerReleasesTheBody() {
         StackOverflowError error = new StackOverflowError("handler");
-        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> {
+        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncBodyRequestHandler) (request, pathVariables, body) -> {
             throw error;
         });
         AtomicInteger released = new AtomicInteger();
 
-        StackOverflowError thrown = assertThrows(StackOverflowError.class, () -> invoke(method, request(() -> released.incrementAndGet())));
+        StackOverflowError thrown = assertThrows(StackOverflowError.class, () -> invoke(method, body(() -> released.incrementAndGet())));
         assertSame(error, thrown);
         assertEquals(1, released.get());
     }
@@ -79,17 +88,17 @@ class NoStageTest {
     void aFailureToReleaseIsSuppressedByTheFailureOfTheHandler() {
         IllegalStateException failure = new IllegalStateException("handler");
         IllegalArgumentException releaseFailure = new IllegalArgumentException("release");
-        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> {
+        HandlerMethod<CompletionStage<? extends HttpResponse<?>>> method = HandlerMethod.of((AsyncBodyRequestHandler) (request, pathVariables, body) -> {
             throw failure;
         });
 
-        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> invoke(method, request(() -> {
+        IllegalStateException thrown = assertThrows(IllegalStateException.class, () -> invoke(method, body(() -> {
             throw releaseFailure;
         })));
         assertSame(failure, thrown);
         assertArrayEquals(new Throwable[] {releaseFailure}, thrown.getSuppressed());
 
-        NullPointerException noStage = assertThrows(NullPointerException.class, () -> invoke(HandlerMethod.of((AsyncRequestHandler) (request, pathVariables) -> null), request(() -> {
+        NullPointerException noStage = assertThrows(NullPointerException.class, () -> invoke(HandlerMethod.of((AsyncBodyRequestHandler) (request, pathVariables, body) -> null), body(() -> {
                 throw releaseFailure;
             })));
         assertArrayEquals(new Throwable[] {releaseFailure}, noStage.getSuppressed());
@@ -125,8 +134,8 @@ class NoStageTest {
         assertEquals(message, cause.getMessage());
     }
 
-    private static Object invoke(HandlerMethod<?> method, AsyncServerHttpRequest<?> request) {
-        return method.invoke(new Object[] {request, pathVariables()});
+    private static Object invoke(HandlerMethod<?> method, AsyncRequestBody body) {
+        return method.invoke(new Object[] {HttpRequest.GET("/x"), pathVariables(), body});
     }
 
     private static PathVariables pathVariables() {
@@ -134,14 +143,14 @@ class NoStageTest {
     }
 
     /**
-     * @param release Releases the body, or {@code null} for a request without a body to release
-     * @return The request of an asynchronous handler
+     * @param release Releases the body, or {@code null} for a body without anything to release
+     * @return The body of an asynchronous handler
      */
-    private static AsyncServerHttpRequest<?> request(Runnable release) {
+    private static AsyncRequestBody body(Runnable release) {
         Class<?>[] types = release == null
-            ? new Class<?>[] {AsyncServerHttpRequest.class}
-            : new Class<?>[] {AsyncServerHttpRequest.class, AsyncHandlerRequest.class};
-        return (AsyncServerHttpRequest<?>) Proxy.newProxyInstance(NoStageTest.class.getClassLoader(), types, (proxy, method, args) -> {
+            ? new Class<?>[] {AsyncRequestBody.class}
+            : new Class<?>[] {AsyncRequestBody.class, AsyncHandlerBody.class};
+        return (AsyncRequestBody) Proxy.newProxyInstance(NoStageTest.class.getClassLoader(), types, (proxy, method, args) -> {
             if (method.getName().equals("releaseBody") && release != null) {
                 release.run();
                 return CompletableFuture.completedFuture(null);

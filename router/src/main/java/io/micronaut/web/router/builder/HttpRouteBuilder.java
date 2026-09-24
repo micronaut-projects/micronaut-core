@@ -278,6 +278,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route a {@code GET} request to a handler function that reads the body and completes the
+     * response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncGET(String uri, AsyncBodyRequestHandler handler) {
+        return handleAsync(HttpMethod.GET, uri, handler);
+    }
+
+    /**
      * Route a {@code POST} request to a handler function that completes the response later.
      *
      * @param uri     The URI template
@@ -286,6 +300,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
     default HttpRouteSpec asyncPOST(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.POST, uri, handler);
+    }
+
+    /**
+     * Route a {@code POST} request to a handler function that reads the body and completes the
+     * response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPOST(String uri, AsyncBodyRequestHandler handler) {
         return handleAsync(HttpMethod.POST, uri, handler);
     }
 
@@ -302,6 +330,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route a {@code PUT} request to a handler function that reads the body and completes the
+     * response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPUT(String uri, AsyncBodyRequestHandler handler) {
+        return handleAsync(HttpMethod.PUT, uri, handler);
+    }
+
+    /**
      * Route a {@code PATCH} request to a handler function that completes the response later.
      *
      * @param uri     The URI template
@@ -314,6 +356,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Route a {@code PATCH} request to a handler function that reads the body and completes the
+     * response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPATCH(String uri, AsyncBodyRequestHandler handler) {
+        return handleAsync(HttpMethod.PATCH, uri, handler);
+    }
+
+    /**
      * Route a {@code DELETE} request to a handler function that completes the response later.
      *
      * @param uri     The URI template
@@ -322,6 +378,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
     default HttpRouteSpec asyncDELETE(String uri, AsyncRequestHandler handler) {
+        return handleAsync(HttpMethod.DELETE, uri, handler);
+    }
+
+    /**
+     * Route a {@code DELETE} request to a handler function that reads the body and completes the
+     * response later.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncDELETE(String uri, AsyncBodyRequestHandler handler) {
         return handleAsync(HttpMethod.DELETE, uri, handler);
     }
 
@@ -348,6 +418,19 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #handle(Set, String, RequestHandler)
      */
     HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncRequestHandler handler);
+
+    /**
+     * Route requests of several HTTP methods to one handler function that reads the body and
+     * completes the response later.
+     *
+     * @param methods The HTTP methods
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler);
 
     /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function. Where it is
@@ -482,6 +565,18 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     HttpRouteSpec handleAsync(RouteDeclaration route, AsyncRequestHandler handler);
 
     /**
+     * Bind a handler function that reads the body and completes the response later to a
+     * declared route.
+     *
+     * @param route   The declared route
+     * @param handler The handler
+     * @return The route, to configure further
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    HttpRouteSpec handleAsync(RouteDeclaration route, AsyncBodyRequestHandler handler);
+
+    /**
      * Bind a form handler function to a declared route.
      *
      * @param route   The declared route
@@ -493,9 +588,8 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
 
     /**
      * Route requests to a handler function that completes the response later. The executor is
-     * selected like for a controller method returning a {@code CompletionStage}. The handler
-     * receives no decoded body: it reads the body with the methods of its
-     * {@link io.micronaut.http.AsyncServerHttpRequest}, see {@link AsyncRequestHandler}.
+     * selected like for a controller method returning a {@code CompletionStage}. The handler does
+     * not read the body, like a {@link RequestHandler}, see {@link AsyncRequestHandler}.
      *
      * @param method  The HTTP method
      * @param uri     The URI template
@@ -503,6 +597,20 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @return The route
      */
     HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncRequestHandler handler);
+
+    /**
+     * Route requests to a handler function that reads the body and completes the response later.
+     * The executor is selected like for a controller method returning a {@code CompletionStage}.
+     * The handler receives no decoded body: it reads the body with the methods of its
+     * {@link io.micronaut.http.body.AsyncRequestBody} parameter, see {@link AsyncBodyRequestHandler}.
+     *
+     * @param method  The HTTP method
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    HttpRouteSpec handleAsync(HttpMethod method, String uri, AsyncBodyRequestHandler handler);
 
     /**
      * Route requests of a method by its name, including a custom HTTP method such as
@@ -557,6 +665,19 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
      */
     HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncRequestHandler handler);
+
+    /**
+     * Route requests of a method by its name, including a custom HTTP method, to a handler function
+     * that reads the body and completes the response later.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param uri            The URI template
+     * @param handler        The handler
+     * @return The route
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
+     * @since 5.3.0
+     */
+    HttpRouteSpec handleAsync(String httpMethodName, String uri, AsyncBodyRequestHandler handler);
 
     /**
      * Route requests of a method by its name, including a custom HTTP method, with a submitted
@@ -921,6 +1042,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like {@link #asyncGET(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncGET(AsyncBodyRequestHandler handler) {
+        return asyncGET("/", handler);
+    }
+
+    /**
      * Like {@link #asyncPOST(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param handler        The handler
@@ -928,6 +1060,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @since 5.3.0
      */
     default HttpRouteSpec asyncPOST(AsyncRequestHandler handler) {
+        return asyncPOST("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncPOST(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPOST(AsyncBodyRequestHandler handler) {
         return asyncPOST("/", handler);
     }
 
@@ -943,6 +1086,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like {@link #asyncPUT(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPUT(AsyncBodyRequestHandler handler) {
+        return asyncPUT("/", handler);
+    }
+
+    /**
      * Like {@link #asyncPATCH(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param handler        The handler
@@ -954,6 +1108,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like {@link #asyncPATCH(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncPATCH(AsyncBodyRequestHandler handler) {
+        return asyncPATCH("/", handler);
+    }
+
+    /**
      * Like {@link #asyncDELETE(String, AsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param handler        The handler
@@ -961,6 +1126,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @since 5.3.0
      */
     default HttpRouteSpec asyncDELETE(AsyncRequestHandler handler) {
+        return asyncDELETE("/", handler);
+    }
+
+    /**
+     * Like {@link #asyncDELETE(String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec asyncDELETE(AsyncBodyRequestHandler handler) {
         return asyncDELETE("/", handler);
     }
 
@@ -1029,6 +1205,18 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like {@link #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param method         The HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(HttpMethod method, AsyncBodyRequestHandler handler) {
+        return handleAsync(method, "/", handler);
+    }
+
+    /**
      * Like {@link #handle(Set, String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param methods        The HTTP methods
@@ -1049,6 +1237,18 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * @since 5.3.0
      */
     default HttpRouteSpec handleAsync(Set<HttpMethod> methods, AsyncRequestHandler handler) {
+        return handleAsync(methods, "/", handler);
+    }
+
+    /**
+     * Like {@link #handleAsync(Set, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param methods        The HTTP methods
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(Set<HttpMethod> methods, AsyncBodyRequestHandler handler) {
         return handleAsync(methods, "/", handler);
     }
 
@@ -1105,6 +1305,18 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     }
 
     /**
+     * Like {@link #handleAsync(String, String, AsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     *
+     * @param httpMethodName The name of the HTTP method
+     * @param handler        The handler
+     * @return The route
+     * @since 5.3.0
+     */
+    default HttpRouteSpec handleAsync(String httpMethodName, AsyncBodyRequestHandler handler) {
+        return handleAsync(httpMethodName, "/", handler);
+    }
+
+    /**
      * Like {@link #handleForm(String, String, FormRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param httpMethodName The name of the HTTP method
@@ -1120,7 +1332,7 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * A body type that is {@code null} when the request has no body, for the handlers that
      * receive the decoded body: {@code routes.POST(uri, HttpRouteBuilder.nullableBody(Argument.of(Item.class)), handler)},
      * and for the body an asynchronous handler reads:
-     * {@code request.body(HttpRouteBuilder.nullableBody(Argument.of(Item.class)))}.
+     * {@code body.body(HttpRouteBuilder.nullableBody(Argument.of(Item.class)))}.
      *
      * @param bodyType The body type
      * @param <T>      The type

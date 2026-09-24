@@ -23,7 +23,7 @@ import java.util.function.Function;
 
 /**
  * The elements of a body, decoded one at a time as they are asked for, like a cursor: a JSON
- * array or a JSON stream read with {@link io.micronaut.http.AsyncServerHttpRequest#elements}.
+ * array or a JSON stream read with {@link AsyncRequestBody#elements}.
  * Nothing is read ahead of the caller: the next element is received and decoded when
  * {@link #next()} is called, or when the stage the {@link #forEach} consumer returned for the
  * previous element completes.
