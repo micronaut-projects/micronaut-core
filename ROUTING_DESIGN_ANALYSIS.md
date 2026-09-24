@@ -1090,3 +1090,55 @@ private), except where noted.
 Steps 1, 2, 4, 6 and 7 also remove per-request allocations (two lifecycle objects, two
 byte-body factories, three lambdas, three `PropagatedContext` copies); the rest are
 structure and correctness.
+
+---
+
+## 11. Using the declared sync/async information of functional routes
+
+### 11.1 What the branch knows at build time
+
+| Fact | Where it is declared | How it is represented |
+|------|----------------------|-----------------------|
+| handler kind | `RequestHandler` vs `AsyncRequestHandler` (and the body/form/error/status variants) | `HandlerMethod.of(...)` synthesises `HttpResponse<?>` or `CompletionStage<HttpResponse<?>>` as the return type |
+| thread choice | `executeOn(name)` / `nonBlocking()` on a route or group | frozen into `RouteAssembly.RouteExecutorSelector(executorName, eventLoop)`; otherwise the application `ExecutorSelector` decides from the synthesised return type, so `AUTO` sends a sync handler to the blocking executor and keeps an async handler on the event loop |
+| body mode | typed body, form, `AsyncRequestBody` | arguments of the `HandlerMethod`; an async body is handed to the handler and never awaited by the framework |
+| filter step kind | `before` / `before(executor, ...)` / `beforeAsync` and the `after` variants | `RouteFunctionFilter(requestStep, responseStep, executor, order)`: inline, `ExecutionFlow.async(executor)`, or `CompletableFutureExecutionFlow` |
+
+The branch already uses this once: `checkBlockingBody` refuses an `InputStream` body
+handler that would run on the event loop.
+
+### 11.2 Where it pays off
+
+1. **Per-route execution plan.** Compute once per route: handler kind, thread choice,
+   body mode, whether the resolved `MessageBodyWriter` is blocking, and the ordered
+   filter steps with their kinds. `RouteExecutor.callRoute` and `createResponseForBody`
+   become a switch on the plan (the `ResponseStrategy` of section 4.3), the per-response
+   `findExecutor` and `Scheduler` creation for streaming bodies go away, and async
+   functional routes are adapted with `CompletableFutureExecutionFlow` without any
+   Reactor operators.
+2. **Fully synchronous fast path.** If the plan says event loop, sync handler, no
+   buffered-body wait, and every step of the route's filter chain (application and route
+   filters) is inline with no legacy around filter, the request is a plain call chain.
+   `FilterRunner` can run an imperative loop for that case, skipping the `ExecutionFlow`
+   wrapping, the shared `ListIterator` state and the `DelayedExecutionFlow` steps. This
+   is one boolean per route, computed with the per-route filter chain cache of
+   section 6.4.
+3. **Merged thread hops.** Consecutive steps with the same executor (a `before(BLOCKING)`
+   filter and an `executeOn(BLOCKING)` route) can be submitted as one task; whether to hop
+   back to the event loop before encoding is decided once from the writer's
+   `isBlocking()`.
+4. **Skipping binding machinery.** A sync route without a body, or an async-body route,
+   needs neither the `ROUTE_WAITS_FOR` lookup nor the form-completer check in
+   `RequestLifecycle.fulfillArguments`; both run today for every request.
+5. **Startup validation.** "Blocking step on the event loop" (today an
+   `IllegalStateException` at request time in `MethodFilter`), "async route with a
+   pointless `executeOn` hop" and "blocking writer on a `nonBlocking()` route" can be
+   reported when the table is built, like `checkBlockingBody`.
+6. **Controllers get the same plan.** `DefaultExecutorSelector` derives the same facts
+   from `@ExecuteOn`, `@Blocking`, `@NonBlocking` and the return type, but per call.
+   Computing them once into the same plan gives annotated routes the same switch-based
+   executor and the same fast path.
+
+The information is declarative: a `nonBlocking()` handler can still block, exactly like
+`@NonBlocking`, so the runtime should trust it the same way and leave blocking detection
+to tooling.
