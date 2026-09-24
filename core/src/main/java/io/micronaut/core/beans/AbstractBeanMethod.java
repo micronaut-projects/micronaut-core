@@ -20,6 +20,8 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
+import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ImmutableStringIntMap;
 
 import java.util.Map;
 
@@ -39,6 +41,12 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
     private final Argument<?>[] arguments;
     private final Argument<T> returnType;
     private final BeanIntrospection<B> introspection;
+
+    // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+    // its constructor and only has final fields, so it is safe to share via a data race.
+    // Concurrent first calls may each build an equal table; that is harmless.
+    @Nullable
+    private ImmutableStringIntMap argumentIndex;
 
     /**
      * Default constructor.
@@ -104,6 +112,17 @@ public abstract class AbstractBeanMethod<B, T> implements BeanMethod<B, T> {
     @Override
     public final Argument<?>[] getArguments() {
         return arguments;
+    }
+
+    @Override
+    public final int argumentIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        ImmutableStringIntMap index = argumentIndex;
+        if (index == null) {
+            index = ImmutableStringIntMap.of(arguments, Argument::getName);
+            argumentIndex = index;
+        }
+        return index.get(name, -1);
     }
 
     @SuppressWarnings("java:S2638")

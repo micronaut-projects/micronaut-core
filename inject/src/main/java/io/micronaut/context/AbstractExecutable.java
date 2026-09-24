@@ -20,7 +20,9 @@ import io.micronaut.core.annotation.UsedByGeneratedCode;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
+import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
+import io.micronaut.core.util.ImmutableStringIntMap;
 import io.micronaut.core.util.ObjectUtils;
 import org.jspecify.annotations.Nullable;
 
@@ -46,6 +48,12 @@ abstract class AbstractExecutable<T, R> implements Executable<T, R> {
     private final Argument<?>[] arguments;
     @Nullable
     private Method method;
+
+    // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+    // its constructor and only has final fields, so it is safe to share via a data race.
+    // Concurrent first calls may each build an equal table; that is harmless.
+    @Nullable
+    private ImmutableStringIntMap argumentIndex;
 
     /**
      * @param declaringType The declaring type
@@ -91,6 +99,17 @@ abstract class AbstractExecutable<T, R> implements Executable<T, R> {
     @Override
     public Argument<?>[] getArguments() {
         return arguments;
+    }
+
+    @Override
+    public final int argumentIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        ImmutableStringIntMap index = argumentIndex;
+        if (index == null) {
+            index = ImmutableStringIntMap.of(getArguments(), Argument::getName);
+            argumentIndex = index;
+        }
+        return index.get(name, -1);
     }
 
     /**

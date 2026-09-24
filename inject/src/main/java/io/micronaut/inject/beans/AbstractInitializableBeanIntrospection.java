@@ -46,6 +46,7 @@ import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ArgumentUtils;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.core.util.CollectionUtils;
+import io.micronaut.core.util.ImmutableStringIntMap;
 import io.micronaut.core.util.StringIntMap;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.annotation.EvaluatedAnnotationMetadata;
@@ -91,7 +92,14 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
     private final List<BeanReadProperty<B, Object>> beanReadPropertiesList;
     private final List<BeanWriteProperty<B, Object>> beanWritePropertiesList;
     private final List<BeanMethod<B, Object>> beanMethodsList;
-    private final StringIntMap beanPropertyIndex;
+
+    // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+    // its constructor and only has final fields, so it is safe to share via a data race.
+    // Concurrent first calls may each build an equal table; that is harmless.
+    @Nullable
+    private ImmutableStringIntMap beanPropertyIndex;
+    @Nullable
+    private ImmutableStringIntMap constructorArgumentIndex;
 
     private final BeanConstructorRef @Nullable [] constructorsRefs;
 
@@ -178,10 +186,6 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
             this.beanPropertiesList = Collections.emptyList();
             this.beanReadPropertiesList = Collections.emptyList();
             this.beanWritePropertiesList = Collections.emptyList();
-        }
-        this.beanPropertyIndex = new StringIntMap(beanProperties.length);
-        for (int i = 0; i < beanProperties.length; i++) {
-            beanPropertyIndex.put(beanProperties[i].getName(), i);
         }
         if (methodsRefs != null) {
             List<BeanMethod<B, Object>> beanMethods = new ArrayList<>(methodsRefs.length);
@@ -270,7 +274,13 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
     @Override
     public int propertyIndexOf(String name) {
-        return beanPropertyIndex.get(name, -1);
+        ArgumentUtils.requireNonNull("name", name);
+        ImmutableStringIntMap index = beanPropertyIndex;
+        if (index == null) {
+            index = ImmutableStringIntMap.of(beanProperties, BeanProperty::getName);
+            beanPropertyIndex = index;
+        }
+        return index.get(name, -1);
     }
 
     /**
@@ -966,6 +976,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         } else {
             return hasBuilder() ? getBuilderData().constructorArguments : constructorArguments;
         }
+    }
+
+    @Override
+    public int constructorArgumentIndexOf(String name) {
+        ArgumentUtils.requireNonNull("name", name);
+        ImmutableStringIntMap index = constructorArgumentIndex;
+        if (index == null) {
+            index = ImmutableStringIntMap.of(getConstructorArguments(), Argument::getName);
+            constructorArgumentIndex = index;
+        }
+        return index.get(name, -1);
     }
 
     @Override
@@ -2101,6 +2122,12 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
 
         private final BeanMethodRef<P> ref;
 
+        // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+        // its constructor and only has final fields, so it is safe to share via a data race.
+        // Concurrent first calls may each build an equal table; that is harmless.
+        @Nullable
+        private ImmutableStringIntMap argumentIndex;
+
         private BeanMethodImpl(BeanMethodRef<P> ref) {
             this.ref = ref;
         }
@@ -2148,6 +2175,17 @@ public abstract class AbstractInitializableBeanIntrospection<B> implements Unsaf
         @Override
         public Argument<?>[] getArguments() {
             return ref.arguments == null ? Argument.ZERO_ARGUMENTS : ref.arguments;
+        }
+
+        @Override
+        public int argumentIndexOf(String name) {
+            ArgumentUtils.requireNonNull("name", name);
+            ImmutableStringIntMap index = argumentIndex;
+            if (index == null) {
+                index = ImmutableStringIntMap.of(getArguments(), Argument::getName);
+                argumentIndex = index;
+            }
+            return index.get(name, -1);
         }
 
         @Override
