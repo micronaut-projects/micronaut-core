@@ -173,6 +173,9 @@ public interface Router {
             uriRoutes = ImplicitHeadRoutes.preferExplicit(uriRoutes);
         }
         if (uriRoutes.size() > 1) {
+            uriRoutes = RouteOrders.preferLowest(uriRoutes);
+        }
+        if (uriRoutes.size() > 1) {
             throw new DuplicateRouteException(request.getPath(), (List) uriRoutes);
         } else if (uriRoutes.size() == 1) {
             return uriRoutes.get(0);

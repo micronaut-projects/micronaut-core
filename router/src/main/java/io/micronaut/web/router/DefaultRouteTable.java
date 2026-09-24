@@ -16,6 +16,8 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.type.Argument;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The {@link RouteTable} built by the {@link RouteTableFactory}: an immutable set of URI routes,
@@ -29,12 +31,30 @@ final class DefaultRouteTable implements RouteTable {
     static final DefaultRouteTable EMPTY = new DefaultRouteTable(UriRouteSet.NONE);
 
     private final UriRouteSet routes;
+    private final @Nullable Argument<?> locatedTargetType;
 
     /**
      * @param routes The routes of the table
      */
     DefaultRouteTable(UriRouteSet routes) {
+        this(routes, null);
+    }
+
+    /**
+     * @param routes            The routes of the table
+     * @param locatedTargetType The type of the located targets the table routes, or {@code null}
+     */
+    DefaultRouteTable(UriRouteSet routes, @Nullable Argument<?> locatedTargetType) {
         this.routes = routes;
+        this.locatedTargetType = locatedTargetType;
+    }
+
+    /**
+     * @return The type of the located targets the table routes, or {@code null} if the table
+     * routes any target
+     */
+    @Nullable Argument<?> locatedTargetType() {
+        return locatedTargetType;
     }
 
     /**

@@ -22,17 +22,21 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
+import io.micronaut.http.filter.GenericHttpFilter;
 import io.micronaut.http.uri.UriMatchInfo;
 import io.micronaut.http.uri.UriMatchTemplate;
+import io.micronaut.http.uri.UriMatchVariable;
 import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.spi.CompiledRouteMatcher;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.charset.Charset;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
@@ -47,8 +51,27 @@ import java.util.function.Predicate;
  * @since 4.0.0
  */
 @Internal
-public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R> {
+public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
 
+    /**
+     * The filters of this route only, in the order the filter chain runs them. Set when the route
+     * is built, before the route info is published.
+     */
+    List<GenericHttpFilter> routeFilters = List.of();
+    /**
+     * The order of the route among equally good routes. Set when the route is built, before the
+     * route info is published.
+     */
+    int order;
+    /**
+     * The attributes of the route. Set when the route is built, before the route info is published.
+     */
+    Map<String, Object> attributes = Map.of();
+    /**
+     * The innermost group of the route that has error or status routes, in it or around it, or
+     * {@code null}. Set when the route is built, before the route info is published.
+     */
+    RouteAssembly.@Nullable RouteGroup errorScope;
     private final HttpMethod httpMethod;
     private final String httpMethodName;
     private final UriMatchTemplate uriMatchTemplate;
@@ -156,6 +179,35 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return httpMethod;
     }
 
+    /**
+     * @return A literal that every path this route matches starts with, see
+     * {@link UriTemplateMatcher#getRequiredPrefix()}
+     * @since 5.3.0
+     */
+    @Internal
+    @Override
+    public String getRequiredPathPrefix() {
+        return uriTemplateMatcher.getRequiredPrefix();
+    }
+
+    @Internal
+    @Override
+    public int getRawLength() {
+        return uriTemplateMatcher.getRawLength();
+    }
+
+    @Internal
+    @Override
+    public int getPathVariableCount() {
+        return uriTemplateMatcher.getPathVariableCount();
+    }
+
+    @Internal
+    @Override
+    public int getPatternVariableCount() {
+        return uriTemplateMatcher.getPatternVariableCount();
+    }
+
     @Override
     public String getHttpMethodName() {
         return httpMethodName;
@@ -180,6 +232,32 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         return null;
     }
 
+    /**
+     * A match of this route whose path variables were captured by a {@link CompiledRouteMatcher}.
+     *
+     * @param path     The matched path
+     * @param captured The raw values of the path variables, in the order of the template
+     * @return The match, or the match of the template if the route has more variables than were
+     * captured: the matcher answered a route it cannot match, see {@link CompiledRouteMatcher}
+     */
+    @Nullable UriRouteMatch<T, R> capturedMatch(String path, String[] captured) {
+        List<UriMatchVariable> variables = uriMatchTemplate.getVariables();
+        if (variables.size() > captured.length) {
+            return tryMatch(path);
+        }
+        return new DefaultUriRouteMatch<>(new CapturedUriMatchInfo(path, variables, captured), this, defaultCharset, conversionService);
+    }
+
+    /**
+     * A match of this route located by a {@link RouteLocator}.
+     *
+     * @param matchInfo The match info with the variables of the prefixes and the target
+     * @return The match
+     */
+    UriRouteMatch<T, R> locatedMatch(UriMatchInfo matchInfo) {
+        return new DefaultUriRouteMatch<>(matchInfo, this, defaultCharset, conversionService);
+    }
+
     @Override
     public @Nullable Integer getPort() {
         return port;
@@ -191,15 +269,28 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     }
 
     @Override
+    public int getOrder() {
+        return order;
+    }
+
+    @Override
+    public Map<String, Object> getAttributes() {
+        return attributes;
+    }
+
+    @Override
     public int compareTo(UriRouteInfo o) {
-        return uriTemplateMatcher.compareTo(((DefaultUrlRouteInfo) o).uriTemplateMatcher);
+        if (o instanceof DefaultUrlRouteInfo<?, ?> other) {
+            return uriTemplateMatcher.compareTo(other.uriTemplateMatcher);
+        }
+        // e.g. a declared route that is not built yet
+        return IndexedRoute.compare(this, (IndexedRoute) o);
     }
 
     @Override
     public String toString() {
         return getHttpMethodName() + ' '
-                + uriMatchTemplate + " -> " + getTargetMethod().getDeclaringType().getSimpleName()
-                + '#' + getTargetMethod().getName()
+                + uriMatchTemplate + " -> " + RouteAssembly.target(getTargetMethod())
                 + " (" + String.join(",", consumesMediaTypes) + ')';
     }
 

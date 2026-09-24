@@ -1,0 +1,353 @@
+/*
+ * Copyright 2017-2026 original authors
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+package io.micronaut.web.router.builder;
+
+import io.micronaut.core.annotation.AnnotationValue;
+import io.micronaut.core.annotation.AnnotationValueBuilder;
+import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpMethod;
+import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
+
+import java.lang.annotation.Annotation;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Predicate;
+
+/**
+ * A group of routes, declared with {@link HttpRouteBuilder#group} or, under a prefix, with
+ * {@link HttpRouteBuilder#path}: the routes declared on the group, and in the groups nested in it,
+ * are the routes of the group, and the filters of the group apply to each of them.
+ *
+ * <pre>{@code
+ * routes.path("/api", api -> {
+ *     api.GET("/orders", (request, pathVariables) -> HttpResponse.ok(orders.all()));
+ *     api.path("/admin", admin -> {
+ *         admin.GET("/users", (request, pathVariables) -> HttpResponse.ok(users.all()));
+ *         admin.beforeReplacing(request -> isAdmin(request) ? null : HttpResponse.forbidden());
+ *     });
+ *     api.beforeReplacing((request, propagatedContext) -> {
+ *         propagatedContext.add(new MdcPropagationContext(Map.of("tenant", tenantOf(request))));
+ *         return null;
+ *     });
+ * });
+ * }</pre>
+ *
+ * <p><b>Coverage.</b> A filter of the group applies to every route declared in the lambda of the
+ * group, wherever the filter is declared in it: before the routes, after them, or in between.
+ * The filters are resolved when the routes are built. The group is closed when its lambda
+ * returns: declaring a route or a filter on it afterwards fails.</p>
+ *
+ * <p><b>Order.</b> The server filters, the {@code @ServerFilter} beans and the filters declared
+ * with {@link #filter(String...)}, run first. Then the
+ * filters of the outer group, then those of the inner groups, then those of the route, then the
+ * handler. Response filters run the other way: the filters of the route, then those of the inner
+ * groups, then those of the outer group, then the application's response filters. Within a group
+ * or a route, request filters and response filters each run in the order they are declared, like
+ * the filters of a route.</p>
+ *
+ * <p><b>Matched routes only.</b> A filter of the group runs only when a route of the group
+ * matched the request. A request under the prefix of the group that no route answers, a
+ * {@code 404}, or one that a route of the group would answer with another method or media type, a
+ * {@code 405}, {@code 415} or {@code 406}, does not run the filters of the group; a
+ * {@code @ServerFilter("/api/**")} bean, or a server filter declared with
+ * {@code filter("/api/**")}, filters every request under a prefix. A server filter declared on a
+ * group is global: the prefix and the filters of the group do not apply to it.</p>
+ *
+ * <p><b>Errors.</b> An exception of a route of the group is answered by the error routes, and the
+ * response filters of the group, like those of the route, filter the response of the error route.
+ * The error and status routes declared on a group, {@link #error}, {@link #errorAsync},
+ * {@link #status} and {@link #statusAsync}, are local to the routes of the group and of its
+ * nested groups, like the {@code @Error} methods of a controller that are not global: the error
+ * of a route is answered by an error route of its innermost group, then of the groups around it,
+ * then by a global one, declared on the builder of an {@link HttpRoutes} bean or on a controller
+ * with {@code global = true}. A request no route of the group matched, e.g. a {@code 404} under
+ * the prefix of the group, is answered by the global error and status routes only.</p>
+ *
+ * <p><b>Settings.</b> The media types, the executor, the port, the conditions, the order, the
+ * attributes and the annotations of a group, see {@link #consumes(MediaType...)},
+ * {@link #executeOn(String)}, {@link #port(int)} and the others, apply to the routes declared in
+ * the lambda of the group, and of its nested groups, wherever they are declared in the lambda,
+ * like its filters. A route, or a nested group, with its own value overrides the one of the
+ * group. The media types and the executor apply to the routes to handlers, not to the locator
+ * routes of the group.</p>
+ *
+ * <p><b>Locators.</b> A {@link #locate locator route} declared in a group is under the prefix of
+ * the group, and the filters of the group apply to every route of the located tables, before the
+ * filters of the located route.</p>
+ *
+ * <p><b>Declared routes.</b> A {@link RouteDeclaration} is bound with its own URI template: its
+ * index keys are computed for that template, e.g. at compile time. It can be bound in a group
+ * without a prefix, whose filters apply to it, but not in a group with a prefix.</p>
+ *
+ * @author Denis Stepanov
+ * @since 5.3.0
+ */
+@Experimental
+public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
+
+    /**
+     * Accept requests with these media types only, like {@code @Consumes} on a controller, see
+     * {@link HttpRouteSpec#consumes(MediaType...)}: the routes of the group, and of its nested
+     * groups, consume them instead of {@code application/json}, wherever they are declared in the
+     * lambda. A route that declares what it consumes, with {@link HttpRouteSpec#consumes(MediaType...)}
+     * or {@link HttpRouteSpec#consumesAll()}, and a nested group that does, replace them, like a
+     * method-level {@code @Consumes} replaces the one of its controller. So does a form route,
+     * e.g. {@link #handleForm(HttpMethod, String, FormRequestHandler)}, which consumes the form
+     * media types: a form handler reads a form.
+     *
+     * <pre>{@code
+     * routes.path("/notes", notes -> {
+     *     notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
+     *     notes.POST("/", String.class, (request, pathVariables, text) -> HttpResponse.ok(notes.save(text)));
+     *     notes.POST("/json", Note.class, (request, pathVariables, note) -> HttpResponse.ok(notes.save(note)))
+     *         .consumes(MediaType.APPLICATION_JSON_TYPE);
+     * });
+     * }</pre>
+     *
+     * <p>The media types, and the executor, of a group apply to its routes to handlers, including
+     * the implicit {@code HEAD} routes, the routes declared for several methods and the declared
+     * routes, not to its locator routes, whose located tables declare their own, nor to its error
+     * and status routes.</p>
+     *
+     * @param mediaTypes The media types
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup consumes(MediaType... mediaTypes);
+
+    /**
+     * Accept requests with any media type, see {@link HttpRouteSpec#consumesAll()}, for the
+     * routes of the group, like {@link #consumes(MediaType...)}.
+     *
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup consumesAll();
+
+    /**
+     * Produce these media types, like {@code @Produces} on a controller, see
+     * {@link HttpRouteSpec#produces(MediaType...)}: the routes of the group, and of its nested
+     * groups, produce them, wherever they are declared in the lambda. A route that declares what
+     * it produces, or a nested group that does, replaces them.
+     *
+     * @param mediaTypes The media types
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup produces(MediaType... mediaTypes);
+
+    /**
+     * Run the routes of the group on the named executor, like {@code @ExecuteOn} on a controller,
+     * see {@link HttpRouteSpec#executeOn(String)}: the routes of the group, and of its nested
+     * groups, run on it, wherever it is declared in the lambda. A route that chooses its thread,
+     * with {@link HttpRouteSpec#executeOn(String)} or {@link HttpRouteSpec#nonBlocking()}, or a
+     * nested group that does, overrides it. The last of {@code executeOn} and
+     * {@link #nonBlocking()} declared on the group wins.
+     *
+     * <pre>{@code
+     * routes.path("/reports", reports -> {
+     *     reports.executeOn(TaskExecutors.BLOCKING);
+     *     reports.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(repository.find(pathVariables.getLong("id"))));
+     *     reports.GET("/count", (request, pathVariables) -> HttpResponse.ok(cache.count())).nonBlocking();
+     * });
+     * }</pre>
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup executeOn(String executorName);
+
+    /**
+     * Run the routes of the group on the event loop, like {@code @NonBlocking} on a controller,
+     * when the server selects threads automatically, see {@link HttpRouteSpec#nonBlocking()}: the
+     * routes of the group, and of its nested groups, wherever it is declared in the lambda, unless
+     * they, or a nested group, choose their thread, like {@link #executeOn(String)}.
+     *
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup nonBlocking();
+
+    /**
+     * Route the requests of the routes of the group on this port only, like
+     * {@code @Controller(port = ...)} for the methods of a controller, see
+     * {@link HttpRouteSpec#port(int)}. The routes of the group, including its locator routes and
+     * the routes of its nested groups, inherit it, wherever it is declared in the lambda; a nested
+     * group or a route with its own port overrides it.
+     *
+     * <pre>{@code
+     * routes.path("/management", management -> {
+     *     management.port(9090);
+     *     management.GET("/health", healthHandler);
+     *     management.GET("/metrics", metricsHandler);
+     * });
+     * }</pre>
+     *
+     * @param port The port, between {@code 1} and {@code 65535}, see {@link HttpRouteSpec#port(int)}
+     * @return This group
+     * @throws IllegalArgumentException if the port is not between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(int port);
+
+    /**
+     * Route the requests on the port of a property, like {@code @Controller(port = "${my.admin.port}")},
+     * whose {@code port} member is a string: a number, or an expression with property
+     * placeholders, with defaults, e.g. {@code ${my.admin.port:8081}}, resolved with the
+     * environment of the application like the port of a controller, when the routes are declared.
+     * Otherwise the same as {@link #port(int)}.
+     *
+     * <pre>{@code
+     * routes.GET("/metrics", metricsHandler).port("${management.port:9090}");
+     * }</pre>
+     *
+     * @param port The port, or an expression that resolves to it
+     * @return This group
+     * @throws io.micronaut.context.exceptions.ConfigurationException if a placeholder cannot be resolved
+     * @throws IllegalArgumentException if the port is not a number between {@code 1} and {@code 65535}
+     * @since 5.3.0
+     */
+    HttpRouteGroup port(String port);
+
+    /**
+     * Match the requests of the routes of the group that meet a condition only, see
+     * {@link HttpRouteSpec#where(Predicate)}: a route of the group, including its locator routes
+     * and the routes of its nested groups, matches a request that meets the conditions of its
+     * groups, outer group first, and its own, wherever they are declared in the lambda.
+     *
+     * <pre>{@code
+     * routes.path("/beta", beta -> {
+     *     beta.where(RequestPredicates.header("X-Beta"));
+     *     beta.GET("/search", betaSearchHandler);
+     * });
+     * }</pre>
+     *
+     * @param condition The condition
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * The order of the routes of the group, see {@link HttpRouteSpec#order(int)}: the routes of
+     * the group, and of its nested groups, have it, wherever it is declared in the lambda,
+     * unless they or a nested group have their own.
+     *
+     * <pre>{@code
+     * routes.group(fallbacks -> {
+     *     fallbacks.order(100);
+     *     fallbacks.GET("/{+path}", notFoundPage);
+     * });
+     * }</pre>
+     *
+     * @param order The order, lower wins
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup order(int order);
+
+    /**
+     * Give the routes of the group an attribute, see {@link HttpRouteSpec#attribute(String, Object)}:
+     * the routes of the group, and of its nested groups, have it, wherever it is declared in the
+     * lambda; the attribute of a nested group or of a route with the same name overrides it.
+     *
+     * @param name  The name of the attribute
+     * @param value The value of the attribute
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup attribute(String name, Object value);
+
+    /**
+     * Annotate the routes of the group, see {@link HttpRouteSpec#annotate(AnnotationValue)}:
+     * the routes of the group, and of its nested groups, have the annotation, wherever it is
+     * declared in the lambda; the annotation of a nested group or of a route overrides the members
+     * it sets.
+     *
+     * <pre>{@code
+     * routes.path("/payments", payments -> {
+     *     payments.annotate(Audited.class);
+     *     payments.POST("/{amount}", payHandler);
+     * });
+     * }</pre>
+     *
+     * @param annotationValue The annotation
+     * @param <T>             The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue);
+
+    /**
+     * Annotate the routes of the group, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(String annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the routes of the group with an annotation without members, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default HttpRouteGroup annotate(String annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+
+    /**
+     * Annotate the routes of the group, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param consumer       A function that receives the {@link AnnotationValueBuilder}
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(Class<T> annotationType, Consumer<AnnotationValueBuilder<T>> consumer) {
+        Objects.requireNonNull(annotationType, "annotationType");
+        Objects.requireNonNull(consumer, "consumer");
+        AnnotationValueBuilder<T> builder = AnnotationValue.builder(annotationType);
+        consumer.accept(builder);
+        return annotate(builder.build());
+    }
+
+    /**
+     * Annotate the routes of the group with an annotation without members, e.g. a {@code @FilterMatcher}
+     * annotation, see {@link #annotate(AnnotationValue)}.
+     *
+     * @param annotationType The annotation type
+     * @param <T>            The annotation type
+     * @return This group
+     * @since 5.3.0
+     */
+    default <T extends Annotation> HttpRouteGroup annotate(Class<T> annotationType) {
+        return annotate(annotationType, builder -> { });
+    }
+}
