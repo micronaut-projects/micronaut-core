@@ -945,3 +945,148 @@ Rows 1 to 6 are self-contained and measurable with the benchmarks described in 7
 Row 8 is the single change that most simplifies everything after it, because the binding
 plan and the split match are what the builder, the tables and the compiled routes all
 attach to.
+
+---
+
+## 10. The Netty entry point: `RoutingInBoundHandler`, `NettyRequestLifecycle`, `NettyResponseLifecycle`
+
+### 10.1 What the three classes do today
+
+```
+PipeliningServerHandler / MultiplexedServerHandler
+  → RoutingInBoundHandler.accept(ctx, nettyRequest, body, outboundAccess)      (RequestHandler)
+      new NettyHttpRequest  (IllegalArgumentException → fake "/" request + handleException)
+      access-log channel attribute, outboundAccess.attachment(request)
+      HttpRequestReceivedEvent (async on the request-event executor)
+      PropagatedContext.plus(new ServerHttpRequestContext(request)).propagate(
+        new NettyRequestLifecycle(this, outboundAccess).handleNormal(request))
+          → RequestLifecycle.normalFlow → filters → route → response flow
+          → rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler)
+              createDefaultErrorResponse if throwable
+              new NettyResponseLifecycle(this, request).encodeHttpResponseSafe(...)
+                  → ResponseLifecycle: HEAD handling, byte-body pass-through, writers, streaming
+              fallback-of-fallback, closeConnectionIfError, HEAD write, outboundAccess.write
+  → RoutingInBoundHandler.responseWritten(attachment) → release request, HttpRequestTerminatedEvent
+```
+
+`RoutingInBoundHandler` (457 lines) is four things at once:
+
+1. the `RequestHandler` entry point (`accept`, `handleUnboundError`, `responseWritten`);
+2. a **service bag** for the Netty server: its package-private fields are read directly by
+   `NettyRequestLifecycle` (`rib.routeExecutor`, `rib.staticResourceResolver`),
+   `NettyResponseLifecycle` (`routeExecutor`, `messageBodyHandlerRegistry`,
+   `conversionService`, `getIoExecutor()`), `HttpPipelineBuilder`
+   (`supportLoggingHandler = true`, `serverConfiguration`, `conversionService`,
+   `isIgnorable`) and `NettyServerWebSocketUpgradeHandler` (`setNext(RoutingInBoundHandler)`
+   only to call `writeResponse`);
+3. the **response writer** (`writeResponse`, 85 lines: default error response, encoding,
+   fallback-of-fallback, connection-close policy, HEAD write, debug log);
+4. request event publishing with slow-listener detection, and the access-log channel
+   attribute for Micronaut Session.
+
+It is still annotated `@Sharable` and documented as "the `ChannelInboundHandler`
+implementation" although it has not been a channel handler since the
+`PipeliningServerHandler` rewrite; the name is stale for the same reason. Two fields are
+dead (`requestArgumentSatisfier`, `multipartEnabled`, assigned in the constructor and
+never read; the multipart check lives in `RequestLifecycle` now), and `getIoExecutor` /
+`getRequestEventExecutor` hand-roll double-checked locking that `SupplierUtil.memoized`
+already provides. `isIgnorable` exists three times (`RouteExecutor`,
+`RoutingInBoundHandler`, and a comment in `PipeliningServerHandler:781` saying it "has to
+match"). A `ServerHttpRequestContext` is constructed and `plus`-ed four times per request
+lifetime (`accept`, `handleException`, received event, terminated event), on top of the
+one `RouteExecutor` adds.
+
+`NettyRequestLifecycle` (149 lines) is a per-request object holding `rib`,
+`outboundAccess` and a `@Nullable nettyRequest` that is set in `handleNormal` and
+`requireNonNull`-ed later. `handleNormal` and `handleException` are asymmetric: only the
+first has the imperative fast path and the write-error handler. The `fulfillArguments`
+override re-checks `decoderResult().isFailure()`, which `handleNormal` already rejected
+before entering `normalFlow`, and the head's decoder result does not change afterwards
+(body failures arrive through the `ByteBody`), so the override looks unreachable.
+`findFile` does blocking filesystem work (`Paths.get(url.toURI())`, `exists`,
+`isDirectory`, `canRead`) **on the event loop, on every route miss** when static
+resources are configured, after the full route scan of section 3.3. The base
+`RequestLifecycle` still carries the constructor, `request()`, `normalFlow()` and
+`findFile()` members deprecated "for removal after 4.3.0".
+
+`NettyResponseLifecycle` (137 lines) is created per response. Its constructor builds a
+`NettyByteBodyFactory`, and because the base class keeps its factory private, every
+`concatenate` / `concatenateJson` / streamed `encodeNoBody` call builds another one
+(`byteBodyFactory()` at line 86). The `encodeNoBody` override exists only to adapt a
+legacy `NettyHttpResponseBuilder` whose native response is a `StreamedHttpResponse`,
+which is really a response-construction concern, not an encoding one. `ioExecutor()`
+goes back through `routingInBoundHandler.getIoExecutor()` and its lock on every blocking
+write.
+
+### 10.2 Suggested shape
+
+```
+NettyRequestDispatcher        implements RequestHandler; ~120 lines
+  ├─ RequestEventPublisher    received/terminated events, slow-listener check, memoised executor
+  ├─ AccessLogRequestAttribute set/clear of the channel attribute (or fold into StreamPipeline)
+  ├─ NettyRequestLifecycle    final request field, one run() method, no field access into the dispatcher
+  └─ NettyResponseWriter      encode via a per-server NettyResponseEncoder, close policy, HEAD, fallback
+NettyResponseEncoder          extends ResponseLifecycle, one instance per server, factory per call
+ConnectionErrors              one isIgnorable(Throwable) in http-server, Netty adds PrematureChannelClosureException
+```
+
+Concrete steps, in the order I would do them; all are internal (`@Internal`, package
+private), except where noted.
+
+1. **Extract `NettyResponseWriter`** from `RoutingInBoundHandler.writeResponse`,
+   `closeConnectionIfError` and the fallback branches. Give it `write(outboundAccess,
+   request, response, throwable, writeErrorHandler)`. `NettyServerWebSocketUpgradeHandler`
+   then takes the writer instead of `setNext(RoutingInBoundHandler)`, which removes the
+   only reason for that cyclic dependency. Low risk; behaviour unchanged.
+2. **Make `ResponseLifecycle` reusable across requests.** Add a constructor without the
+   `ByteBodyFactory` plus `encodeHttpResponseSafe(..., ByteBodyFactory)` overloads (the
+   existing constructor stays because servlet uses it), expose the factory to subclasses
+   (`protected ByteBodyFactory byteBodyFactory()`), and cache one `NettyByteBodyFactory`
+   per channel on the `StreamPipeline` / `OutboundAccess`. `NettyResponseLifecycle`
+   becomes a per-server singleton that only supplies `ioExecutor()` and the two
+   concatenation strategies; the double factory construction and the per-response
+   allocation disappear.
+3. **Move the `StreamedHttpResponse` adaptation out of `encodeNoBody`**: convert a
+   `NettyHttpResponseBuilder` with a streamed native response into a
+   `ByteBodyHttpResponse` where such responses are produced (raw client responses,
+   `NettyMutableHttpResponse`), so the base `encodeByteBodyResponse` pass-through handles
+   it and the override goes away.
+4. **Give `NettyRequestLifecycle` a final request.** Construct it with the request,
+   replace `handleNormal(request)` / `handleException(request, cause)` with `run()` /
+   `fail(cause)` that share one `complete(flow)` that has the imperative fast path and
+   the write-error handler in both cases. Store the `PropagatedContext` and the
+   `writeErrorHandler` as fields instead of per-call lambdas. Delete the deprecated
+   members of `RequestLifecycle` (it is `@Internal`) and the `fulfillArguments` override
+   once a test confirms it is unreachable (the `PipeliningServerHandler` already rejects
+   a failed head at line 219).
+5. **Take static files off the event loop and off the miss path.** Either register the
+   static-resource mappings as a lowest-priority route source (section 8, the
+   `fn-routes-static-resources` line), or keep `findFile` but resolve the `URL` on the
+   IO executor and cache `URL → SystemFile` metadata. Today a scanner hitting missing
+   paths pays a route scan plus filesystem syscalls per request on the event loop.
+6. **Split `RoutingInBoundHandler` into dispatcher + collaborators**: extract
+   `RequestEventPublisher` (both `ExecutionFlow.async(...)` blocks are the same shape),
+   extract the access-log attribute handling next to `StreamPipeline.hasAccessLogHandler`
+   (which already knows the answer per pipeline, so the mutable `supportLoggingHandler`
+   flag set from `HttpPipelineBuilder` becomes a constructor argument or goes away),
+   delete the dead fields, replace the hand-rolled double-checked locking with
+   `SupplierUtil.memoized`, rename the class and drop `@Sharable` and the stale Javadoc.
+   Replace the "service bag" reads from `HttpPipelineBuilder` and the lifecycles with
+   explicit constructor arguments (they all come from `NettyEmbeddedServices` anyway).
+7. **One `PropagatedContext` per request.** Build `PropagatedContext.getOrEmpty().plus(new
+   ServerHttpRequestContext(request))` once in `accept`, pass it to the lifecycle, the
+   event publisher and the terminated-event hook, and make `RouteExecutor`'s second
+   `plus` conditional on the request having been replaced by a filter (section 4.2).
+8. **One `isIgnorable`.** A `ConnectionErrors` utility in `http-server` used by
+   `RouteExecutor` and the dispatcher, with the Netty-specific
+   `PrematureChannelClosureException` case layered in `http-server-netty`, and the
+   `PipeliningServerHandler` comment replaced by a call.
+9. **Handle an invalid request URI without a fake request.** Today `accept` builds a
+   second `NettyHttpRequest` for `/`, publishes a received event for it, and drives the
+   normal error path. A direct `onStatusError(400)` on a minimal request object (or a
+   `RequestLifecycle.reject(status)` entry) is simpler and does not emit a misleading
+   event.
+
+Steps 1, 2, 4, 6 and 7 also remove per-request allocations (two lifecycle objects, two
+byte-body factories, three lambdas, three `PropagatedContext` copies); the rest are
+structure and correctness.
