@@ -77,6 +77,7 @@ import java.net.URISyntaxException;
 import java.net.http.HttpClient;
 import java.net.http.HttpConnectTimeoutException;
 import java.net.http.HttpRequest;
+import java.net.http.HttpTimeoutException;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -507,22 +508,40 @@ abstract class AbstractJdkHttpClient {
      * @param e        The failure
      * @return The client exception
      */
-    static HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e) {
+    HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e) {
         HttpClientException result;
         if (e instanceof HttpConnectTimeoutException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
+            report(instance, LoadBalancer.Outcome.CONNECT_FAILURE);
         } else if (e instanceof ConnectException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Connect Error: " + e.getMessage(), e);
+            report(instance, LoadBalancer.Outcome.CONNECT_FAILURE);
         } else if (e.getMessage() != null && e.getMessage().contains("header parser received no bytes")) {
             // the JDK client reports a connection closed before the response headers with this message
             result = new ResponseClosedException("Connection closed before response was received", false);
+            report(instance, LoadBalancer.Outcome.RESET);
         } else {
+            if (e instanceof HttpTimeoutException) {
+                report(instance, LoadBalancer.Outcome.TIMEOUT);
+            }
             result = new HttpClientException("Error sending request: " + e.getMessage(), e);
         }
         if (result instanceof UnprocessedRequestException unprocessed) {
             unprocessed.setTarget(uri, instance);
         }
         return result;
+    }
+
+    /**
+     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
+     *
+     * @param instance The service instance the load balancer selected, or {@code null}
+     * @param outcome  The outcome
+     */
+    void report(@Nullable ServiceInstance instance, LoadBalancer.Outcome outcome) {
+        if (instance != null && loadBalancer != null) {
+            loadBalancer.report(instance, outcome);
+        }
     }
 
     /**
@@ -616,6 +635,7 @@ abstract class AbstractJdkHttpClient {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
+                report(target.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus && configuration.isExceptionOnErrorStatus()) {
                     sink.error(HttpClientExceptionUtils.populateServiceId(

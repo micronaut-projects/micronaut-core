@@ -83,6 +83,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
@@ -1665,6 +1666,7 @@ final class NettyHttpClient implements
                             return sendRequestWithRedirects(propagatedContext, blockHint, redirectRequest.uri(target.uri()), target.instance(), readResponse);
                         });
                 } else {
+                    report(instance, code >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
                     io.micronaut.http.HttpHeaders headers = byteBodyResponse.getHeaders();
                     if (log.isTraceEnabled()) {
                         log.trace("HTTP Client Response Received ({}) for Request: {} {}", byteBodyResponse.code(), request.getMethodName(), request.getUri());
@@ -2213,7 +2215,13 @@ final class NettyHttpClient implements
         } else {
             result = decorate(new HttpClientException("Error occurred reading HTTP response: " + message, cause));
         }
-        failedBeforeSending(result, finalRequest, instance);
+        if (result instanceof UnprocessedRequestException) {
+            failedBeforeSending(result, finalRequest, instance);
+        } else if (result instanceof ReadTimeoutException) {
+            report(instance, LoadBalancer.Outcome.TIMEOUT);
+        } else if (result instanceof ResponseClosedException || result instanceof StreamResetException) {
+            report(instance, LoadBalancer.Outcome.RESET);
+        }
         return result;
     }
 
@@ -2247,8 +2255,26 @@ final class NettyHttpClient implements
             if (unprocessed.getServiceId() == null) {
                 decorate(unprocessed);
             }
+            switch (unprocessed.getReason()) {
+                case CONNECT, CONNECT_TIMEOUT -> report(instance, LoadBalancer.Outcome.CONNECT_FAILURE);
+                case STREAM_REFUSED -> report(instance, LoadBalancer.Outcome.RESET);
+                // a pool that is full, or a keep-alive connection the server closed, say nothing about the instance
+                default -> { }
+            }
         }
         return failure;
+    }
+
+    /**
+     * Report the outcome of an exchange to the load balancer that selected its instance, if any.
+     *
+     * @param instance The service instance the load balancer selected, or {@code null}
+     * @param outcome  The outcome
+     */
+    private void report(@Nullable ServiceInstance instance, LoadBalancer.Outcome outcome) {
+        if (instance != null && loadBalancer != null) {
+            loadBalancer.report(instance, outcome);
+        }
     }
 
     private void setRedirectHeaders(io.micronaut.http.HttpRequest<?> request,

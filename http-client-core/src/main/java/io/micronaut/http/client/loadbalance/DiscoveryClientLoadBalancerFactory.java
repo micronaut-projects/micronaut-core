@@ -18,6 +18,7 @@ package io.micronaut.http.client.loadbalance;
 import io.micronaut.discovery.DiscoveryClient;
 import io.micronaut.http.client.LoadBalancer;
 import jakarta.inject.Singleton;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A factory class that can be replaced at runtime for creating {@link LoadBalancer} instances that load balance
@@ -45,7 +46,19 @@ public class DiscoveryClientLoadBalancerFactory {
      * @return The {@link LoadBalancer}
      */
     public LoadBalancer create(String serviceID) {
-        return new DiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient);
+        return create(serviceID, null);
+    }
+
+    /**
+     * Creates a {@link LoadBalancer} for the given service ID, with outlier detection.
+     *
+     * @param serviceID        The service ID
+     * @param outlierDetection The outlier detection configuration, or {@code null} for none
+     * @return The {@link LoadBalancer}
+     * @since 5.3.0
+     */
+    public LoadBalancer create(String serviceID, @Nullable OutlierDetectionConfiguration outlierDetection) {
+        return new DiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient, outlierDetection);
     }
 
     /**

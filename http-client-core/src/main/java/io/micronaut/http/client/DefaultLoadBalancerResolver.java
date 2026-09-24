@@ -23,7 +23,10 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.discovery.ServiceInstanceList;
 import io.micronaut.http.client.loadbalance.DiscoveryClientLoadBalancerFactory;
+import io.micronaut.http.client.loadbalance.OutlierDetectionConfiguration;
 import io.micronaut.http.client.loadbalance.ServiceInstanceListLoadBalancerFactory;
+import io.micronaut.inject.qualifiers.Qualifiers;
+import org.jspecify.annotations.Nullable;
 import io.micronaut.runtime.server.EmbeddedServer;
 import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
@@ -35,6 +38,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * <p>Abstraction over {@link LoadBalancer} lookup. The strategy is as follows:</p>
@@ -53,6 +57,7 @@ import java.util.Optional;
 public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
 
     private final Map<String, ServiceInstanceList> serviceInstanceLists;
+    private final Map<String, LoadBalancer> loadBalancers = new ConcurrentHashMap<>();
     private final BeanContext beanContext;
 
     /**
@@ -121,13 +126,21 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
      * @return An {@link Optional} with the load balancer
      */
     protected Optional<? extends LoadBalancer> resolveLoadBalancerForServiceID(String serviceID) {
+        // one balancer per service, shared by its clients: the round robin and the outlier
+        // detection see every exchange of the service
+        return Optional.ofNullable(loadBalancers.computeIfAbsent(serviceID, this::createLoadBalancerForServiceID));
+    }
+
+    @Nullable
+    private LoadBalancer createLoadBalancerForServiceID(String serviceID) {
+        OutlierDetectionConfiguration outlierDetection = beanContext.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(serviceID))
+            .map(ServiceHttpClientConfiguration::getOutlierDetection)
+            .orElse(null);
         if (serviceInstanceLists.containsKey(serviceID)) {
             ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
-            LoadBalancer loadBalancer = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList);
-            return Optional.ofNullable(loadBalancer);
+            return beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList, outlierDetection);
         } else {
-            LoadBalancer loadBalancer = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceID);
-            return Optional.of(loadBalancer);
+            return beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceID, outlierDetection);
         }
     }
 }

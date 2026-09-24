@@ -36,6 +36,7 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.ByteBodyHttpResponse;
+import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -232,7 +233,10 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits)))
                     .onErrorMap(
                         e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
-                        e -> ReadTimeoutException.TIMEOUT_EXCEPTION
+                        e -> {
+                            report(target.instance(), LoadBalancer.Outcome.TIMEOUT);
+                            return ReadTimeoutException.TIMEOUT_EXCEPTION;
+                        }
                     )
                     .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
             })
@@ -241,6 +245,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
+                report(target.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
 
                 ByteBodyHttpResponse<?> response = ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
                     @Override

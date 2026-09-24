@@ -41,6 +41,17 @@ public class DiscoveryClientRoundRobinLoadBalancer extends AbstractRoundRobinLoa
      * @param discoveryClient The discovery client
      */
     public DiscoveryClientRoundRobinLoadBalancer(String serviceID, DiscoveryClient discoveryClient) {
+        this(serviceID, discoveryClient, null);
+    }
+
+    /**
+     * @param serviceID        The service ID
+     * @param discoveryClient  The discovery client
+     * @param outlierDetection The outlier detection configuration, or {@code null} for none
+     * @since 5.3.0
+     */
+    public DiscoveryClientRoundRobinLoadBalancer(String serviceID, DiscoveryClient discoveryClient, @Nullable OutlierDetectionConfiguration outlierDetection) {
+        super(outlierDetection);
         this.serviceID = serviceID;
         this.discoveryClient = discoveryClient;
     }
