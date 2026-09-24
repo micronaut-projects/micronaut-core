@@ -15,6 +15,8 @@
  */
 package io.micronaut.jackson.databind;
 
+import com.fasterxml.jackson.annotation.JsonIdentityInfo;
+import com.fasterxml.jackson.annotation.ObjectIdGenerators;
 import io.micronaut.core.type.Argument;
 import io.micronaut.json.JsonMapper;
 import io.micronaut.json.JsonStreamWriter;
@@ -128,7 +130,39 @@ class JacksonDatabindMapperStreamWriterTest {
         }
     }
 
+    /**
+     * The elements of a stream are decoded independently, so the same object appearing in two
+     * elements must be written in full both times, not as a reference to its id in the second.
+     */
+    @Test
+    void objectIdsDoNotCarryOverBetweenValues() throws IOException {
+        JacksonDatabindMapper mapper = new JacksonDatabindMapper();
+        Argument<Identified> type = Argument.of(Identified.class);
+        Identified same = new Identified(7);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (JsonStreamWriter<Identified> writer = mapper.createStreamWriter(out, type)) {
+            writer.write(same);
+            writer.write(same);
+        }
+        String one = mapper.writeValueAsString(type, same);
+        assertEquals(one + one, out.toString(StandardCharsets.UTF_8));
+        assertEquals("{\"@id\":1,\"value\":7}{\"@id\":1,\"value\":7}", out.toString(StandardCharsets.UTF_8));
+    }
+
     public record Item(int id, String name, List<Integer> values) {
+    }
+
+    @JsonIdentityInfo(generator = ObjectIdGenerators.IntSequenceGenerator.class, property = "@id")
+    public static final class Identified {
+        private final int value;
+
+        Identified(int value) {
+            this.value = value;
+        }
+
+        public int getValue() {
+            return value;
+        }
     }
 
     public static final class Failing {
