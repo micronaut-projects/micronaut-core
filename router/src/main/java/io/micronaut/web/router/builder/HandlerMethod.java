@@ -21,11 +21,9 @@ import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationUtil;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
-import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
-import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
@@ -47,7 +45,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
-import java.util.function.Supplier;
 
 /**
  * A route handler function presented as an executable method, so that a route to it binds
@@ -112,7 +109,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     private final Object handler;
     private final Class<?> handlerType;
-    private final Supplier<Method> method;
     private final Argument<?>[] arguments;
     private ReturnType<R> returnType;
     private final Invoker<R> invoker;
@@ -128,11 +124,9 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
     private @Nullable DefaultRouteAnnotations groupAnnotations;
     private @Nullable ReturnType<R> annotatedReturnType;
 
-    private HandlerMethod(Object handler, Class<?> handlerType, Class<?>[] parameterTypes, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
+    private HandlerMethod(Object handler, Class<?> handlerType, Argument<?>[] arguments, ReturnType<R> returnType, Invoker<R> invoker) {
         this.handler = Objects.requireNonNull(handler, "handler");
         this.handlerType = handlerType;
-        // looked up only if asked for: routing never needs the method itself
-        this.method = SupplierUtil.memoized(() -> ReflectionUtils.getRequiredMethod(handlerType, HANDLE, parameterTypes));
         this.arguments = arguments;
         this.returnType = returnType;
         this.invoker = invoker;
@@ -146,7 +140,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             RequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class},
             new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1])
@@ -161,7 +154,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class},
             // like a RequestHandler: nothing reads the body
             new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
@@ -177,7 +169,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncBodyRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, AsyncRequestBody.class},
             // the handler reads the body itself: no binder decodes it
             new Argument<?>[]{REQUEST, PATH_VARIABLES, ASYNC_BODY},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
@@ -197,7 +188,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             BodyRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, Object.class},
             new Argument<?>[]{REQUEST, PATH_VARIABLES, bodyArgument(bodyType)},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (B) args[2])
@@ -212,7 +202,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             FormRequestHandler.class,
-            new Class<?>[]{HttpRequest.class, PathVariables.class, FormData.class},
             new Argument<?>[]{REQUEST, PATH_VARIABLES, FORM},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (FormData) args[2])
@@ -231,7 +220,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             ErrorRouteHandler.class,
-            new Class<?>[]{HttpRequest.class, Throwable.class},
             new Argument<?>[]{REQUEST, Argument.of(errorType, "error")},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0], (E) args[1])
@@ -250,7 +238,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncErrorRouteHandler.class,
-            new Class<?>[]{HttpRequest.class, Throwable.class},
             new Argument<?>[]{REQUEST, Argument.of(errorType, "error")},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> stage(handler.handle((HttpRequest<?>) args[0], (E) args[1]))
@@ -265,7 +252,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncStatusRouteHandler.class,
-            new Class<?>[]{HttpRequest.class},
             new Argument<?>[]{REQUEST},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
             args -> stage(handler.handle((HttpRequest<?>) args[0]))
@@ -280,7 +266,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             StatusRouteHandler.class,
-            new Class<?>[]{HttpRequest.class},
             new Argument<?>[]{REQUEST},
             returnType(HttpResponse.class, Argument.OBJECT_ARGUMENT),
             args -> handler.handle((HttpRequest<?>) args[0])
@@ -298,7 +283,6 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             locator,
             RouteLocator.class,
-            new Class<?>[0],
             new Argument<?>[0],
             returnType(Object.class),
             args -> {
@@ -337,10 +321,21 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return invoke(arguments);
     }
 
+    /**
+     * A route to a handler function has no Java method: the router, the binding and the
+     * execution of the route never need one. Only a route that implements a bean method, see
+     * {@link HttpRouteSpec#annotationMetadata}, has the target method of that bean method.
+     *
+     * @return The target method of the bean method the route implements
+     * @throws UnsupportedOperationException if the route implements no bean method
+     */
     @Override
     public Method getTargetMethod() {
         ExecutableMethod<?, ?> target = implemented();
-        return target == null ? method.get() : target.getTargetMethod();
+        if (target == null) {
+            throw new UnsupportedOperationException("The route to " + this + " calls a handler function, which has no Java method");
+        }
+        return target.getTargetMethod();
     }
 
     @Override
