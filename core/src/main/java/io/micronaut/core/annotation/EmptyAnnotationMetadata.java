@@ -18,10 +18,20 @@ package io.micronaut.core.annotation;
 import io.micronaut.core.reflect.ReflectionUtils;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.StringUtils;
+import io.micronaut.core.util.memo.AbstractMemoizer;
+import io.micronaut.core.util.memo.MemoizerNamespace;
 import io.micronaut.core.value.OptionalValues;
+
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
-import java.util.*;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalDouble;
+import java.util.OptionalInt;
+import java.util.OptionalLong;
+import java.util.Set;
 
 /**
  * An empty representation of {@link AnnotationMetadata}.
@@ -30,7 +40,11 @@ import java.util.*;
  * @since 1.0
  */
 @Internal
-final class EmptyAnnotationMetadata implements AnnotationMetadata {
+final class EmptyAnnotationMetadata extends AbstractMemoizer<AnnotationMetadata> implements AnnotationMetadata {
+    @Override
+    protected MemoizerNamespace<AnnotationMetadata> getMemoizerNamespace() {
+        return MEMOIZER_NAMESPACE;
+    }
 
     @Override
     public boolean hasPropertyExpressions() {
