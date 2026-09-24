@@ -100,11 +100,31 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     }
 
     /**
+     * @return The media types and the executor of the group the routes are declared in, which
+     * they inherit, or {@code null} outside a group
+     */
+    @Nullable RouteGroupDefaults groupDefaults() {
+        return null;
+    }
+
+    /**
      * @param routes The routes of a handler
      * @return Their spec
      */
     private HttpRouteSpec spec(HandlerUriRoute... routes) {
-        return new DefaultHttpRouteSpec(List.of(routes), this::resolvePort);
+        return spec(0, routes);
+    }
+
+    /**
+     * @param own    The settings the routes have of their own, which they do not inherit from
+     *               their group, e.g. {@link RouteGroupDefaults#CONSUMES} for a form handler
+     * @param routes The routes of a handler
+     * @return Their spec
+     */
+    final HttpRouteSpec spec(int own, HandlerUriRoute... routes) {
+        List<HandlerUriRoute> handlerRoutes = List.of(routes);
+        RouteGroupDefaults defaults = groupDefaults();
+        return new DefaultHttpRouteSpec(handlerRoutes, this::resolvePort, defaults == null ? null : defaults.add(handlerRoutes, own));
     }
 
     @Override
@@ -130,7 +150,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleForm(HttpMethod method, String uri, FormRequestHandler handler) {
-        return spec(route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return spec(RouteGroupDefaults.CONSUMES, route(method, uri, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -170,7 +190,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleForm(RouteDeclaration route, FormRequestHandler handler) {
-        return spec(declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
+        return spec(RouteGroupDefaults.CONSUMES, declare(route, HandlerMethod.of(handler), FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -217,7 +237,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        return spec(route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+        return spec(RouteGroupDefaults.CONSUMES, route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
     }
 
     @Override
@@ -267,7 +287,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     private void declareGroup(@Nullable RoutePrefix groupPrefix, Consumer<HttpRouteGroup> routes) {
         checkOpen();
         DefaultHttpRouteGroup group = new DefaultHttpRouteGroup(assembly, assembly.groupFilters(groupFilters),
-            assembly.routeGroup(groupSettings), groupPrefix, placeholderResolver);
+            assembly.routeGroup(groupSettings), new RouteGroupDefaults(groupDefaults()), groupPrefix, placeholderResolver);
         try {
             routes.accept(group);
         } finally {
