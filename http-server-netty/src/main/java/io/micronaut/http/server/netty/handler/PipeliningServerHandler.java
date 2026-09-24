@@ -150,6 +150,11 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      */
     private boolean flushPending = false;
     /**
+     * Flushes requested outside a read are coalesced into one per event loop turn.
+     */
+    @Nullable
+    private FlushCoalescer flushCoalescer;
+    /**
      * {@code true} inside {@link #writeSome()} to avoid reentrancy.
      */
     private boolean writing = false;
@@ -252,6 +257,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     @Override
     public void handlerAdded(ChannelHandlerContext ctx) {
         this.ctx = ctx;
+        this.flushCoalescer = new FlushCoalescer(ctx.executor(), this::flushNow);
         // we take control of reading now.
         ctx.channel().config().setAutoRead(false);
         refreshNeedMore();
@@ -286,10 +292,25 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         // only unset readCalled now. This ensures no read call is done before channelReadComplete
         readCalled = false;
         if (flushPending) {
+            // this flush also covers a flush that was scheduled before this read
+            requiredFlushCoalescer().cancel();
             ctx.flush();
             flushPending = false;
         }
         refreshNeedMore();
+    }
+
+    private FlushCoalescer requiredFlushCoalescer() {
+        return Objects.requireNonNull(flushCoalescer, "flushCoalescer");
+    }
+
+    /**
+     * Perform a flush that was scheduled by the {@link #flushCoalescer}.
+     */
+    private void flushNow() {
+        if (!removed) {
+            requiredCtx().flush();
+        }
     }
 
     @Override
@@ -329,8 +350,12 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
      * Write a message.
      *
      * @param message The message to write
-     * @param flush   {@code true} iff we should flush after this message
-     * @param close   {@code true} iff the channel should be closed after this message
+     * @param flush   {@code true} iff we should flush after this message. The flush is delayed
+     *                until {@link #channelReadComplete} inside a read, and to the end of the
+     *                current event loop turn otherwise, so that the messages written in one turn
+     *                share a flush
+     * @param close   {@code true} iff the channel should be closed after this message. The
+     *                message is flushed immediately in that case
      */
     private ChannelFuture write(Object message, boolean flush, boolean close, boolean needsPromise) {
         assert ctx != null;
@@ -342,18 +367,15 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             ChannelPromise promise = needsPromise ?
                 requiredCtx().newPromise().addListener(ChannelFutureListener.FIRE_EXCEPTION_ON_FAILURE) :
                 requiredCtx().voidPromise();
+            ChannelFuture future = requiredCtx().write(message, promise);
             if (flush) {
-                // delay flush until readComplete if possible
                 if (reading) {
-                    requiredCtx().write(message, promise);
                     flushPending = true;
-                    return promise;
                 } else {
-                    return requiredCtx().writeAndFlush(message, promise);
+                    requiredFlushCoalescer().schedule();
                 }
-            } else {
-                return requiredCtx().write(message, promise);
             }
+            return future;
         }
     }
 
@@ -1578,6 +1600,8 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             // this releases the resources of the failed response (the compression session and the
             // remaining data of the body) and cleans up the request exactly once.
             discardOutbound();
+            // the data written so far still goes out before the connection is closed
+            requiredFlushCoalescer().flushNow();
             requiredCtx().close();
         }
 
