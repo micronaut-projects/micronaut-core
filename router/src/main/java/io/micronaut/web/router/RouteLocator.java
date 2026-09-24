@@ -36,6 +36,8 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
@@ -222,8 +224,7 @@ public final class RouteLocator {
         Object target;
         DefaultPathVariables pathVariables = new DefaultPathVariables(decoded, locatorMatch.conversionService, owner);
         try {
-            LocatorHandler<?> syncLocator = locator;
-            target = syncLocator != null ? syncLocator.locate(original, pathVariables) : locateAsync(original, request.getPath(), pathVariables);
+            target = locator != null ? locateSync(original, request.getPath(), pathVariables) : locateAsync(original, request.getPath(), pathVariables);
         } catch (Exception e) {
             // like a controller method: the error routes see the exception the locator threw
             return ExceptionUtils.sneakyThrow(e);
@@ -246,6 +247,32 @@ public final class RouteLocator {
     }
 
     /**
+     * The target of the synchronous locator, located once per request and level: the outcome of
+     * the locator is kept in an attribute of the request, so that matching the request again,
+     * e.g. to find the allowed methods of a {@code 405}, does not run the locator again.
+     *
+     * @param original      The original request
+     * @param levelPath     The path matched by the locator route, which tells the levels of nested locators apart
+     * @param pathVariables The path variables of the locator
+     * @return The target, or {@code null}
+     * @throws Exception The error of the locator
+     */
+    private @Nullable Object locateSync(HttpRequest<?> original, String levelPath, PathVariables pathVariables) throws Exception {
+        Map<LocationKey, Outcome> outcomes = outcomes(original);
+        LocationKey key = new LocationKey(this, levelPath);
+        Outcome outcome = outcomes.get(key);
+        if (outcome == null) {
+            try {
+                outcome = new Outcome(Objects.requireNonNull(locator, "locator").locate(original, pathVariables), null, null, null);
+            } catch (Exception e) {
+                outcome = new Outcome(null, e, null, null);
+            }
+            outcomes.put(key, outcome);
+        }
+        return outcome.located();
+    }
+
+    /**
      * The target of the asynchronous locator, located once per request and level: the outcome
      * of the stage is kept in an attribute of the request. If the stage does not complete now,
      * the router cannot match the request yet, see {@link #pendingLocation(Throwable)}.
@@ -265,12 +292,16 @@ public final class RouteLocator {
             if (stage == null) {
                 throw new NullPointerException("The locator returned no stage: " + this);
             }
-            CompletionStage<Boolean> located = stage.handle((value, error) -> {
-                outcomes.put(key, new Outcome(value, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error, null));
-                return Boolean.TRUE;
+            // completed when the outcome is known: by the stage, or when the location is cancelled
+            CompletableFuture<Boolean> located = new CompletableFuture<>();
+            Outcome pending = new Outcome(null, null, located, stage);
+            // the locator is not called again until the stage completes
+            outcomes.put(key, pending);
+            stage.whenComplete((value, error) -> {
+                outcomes.replace(key, pending, new Outcome(value, error instanceof CompletionException && error.getCause() != null ? error.getCause() : error, null, null));
+                located.complete(Boolean.TRUE);
             });
-            // unless the stage completed already: the locator is not called again until it does
-            outcomes.putIfAbsent(key, new Outcome(null, null, located));
+            // the stage may have completed already
             outcome = Objects.requireNonNull(outcomes.get(key));
         }
         CompletionStage<Boolean> pending = outcome.pending();
@@ -278,11 +309,68 @@ public final class RouteLocator {
             // not located yet: the router matches the request again when it is
             throw new PendingLocation(pending);
         }
-        Throwable error = outcome.error();
-        if (error != null) {
-            return ExceptionUtils.sneakyThrow(error);
+        return outcome.located();
+    }
+
+    /**
+     * Whether an asynchronous locator has not located its target for the request yet: until it
+     * has, the router does not know the routes of the target, e.g. for
+     * {@link Router#findAny(HttpRequest)}. Matching the request with
+     * {@link Router#findClosest(HttpRequest)} waits for it, see {@link #pendingLocation(Throwable)}.
+     *
+     * @param request The request
+     * @return Whether a locator of the request is still locating its target
+     * @since 5.3.0
+     */
+    public static boolean isLocating(HttpRequest<?> request) {
+        Map<LocationKey, Outcome> outcomes = existingOutcomes(request);
+        if (outcomes == null) {
+            return false;
         }
-        return outcome.target();
+        for (Outcome outcome : outcomes.values()) {
+            if (outcome.pending() != null) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Cancel the asynchronous locators that have not located their targets for the request yet,
+     * e.g. when the client went away: the stage each of them returned is cancelled, and matching
+     * the request fails with a {@link CancellationException} instead of waiting for the target.
+     *
+     * @param request The request
+     * @since 5.3.0
+     */
+    public static void cancelPendingLocations(HttpRequest<?> request) {
+        Map<LocationKey, Outcome> outcomes = existingOutcomes(request);
+        if (outcomes == null) {
+            return;
+        }
+        for (Map.Entry<LocationKey, Outcome> entry : outcomes.entrySet()) {
+            Outcome outcome = entry.getValue();
+            CompletableFuture<Boolean> pending = outcome.pending();
+            if (pending == null
+                || !outcomes.replace(entry.getKey(), outcome, new Outcome(null, new CancellationException("The route locator was cancelled"), null, null))) {
+                continue;
+            }
+            CompletionStage<?> stage = outcome.stage();
+            if (stage != null) {
+                try {
+                    stage.toCompletableFuture().cancel(false);
+                } catch (UnsupportedOperationException e) {
+                    // a stage that cannot be cancelled: its outcome is ignored
+                }
+            }
+            pending.complete(Boolean.TRUE);
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private static @Nullable Map<LocationKey, Outcome> existingOutcomes(HttpRequest<?> request) {
+        Object attribute = request.getAttribute(LOCATED_ATTRIBUTE).orElse(null);
+        return attribute instanceof Map<?, ?> map ? (Map<LocationKey, Outcome>) map : null;
     }
 
     @SuppressWarnings("unchecked")
@@ -311,13 +399,27 @@ public final class RouteLocator {
     }
 
     /**
-     * The outcome of an asynchronous locator.
+     * The outcome of a locator.
      *
      * @param target  The target, or {@code null}
      * @param error   The error, or {@code null}
-     * @param pending The stage that completes when the target is located, or {@code null} if it is
+     * @param pending Completes when the target is located, or {@code null} if it is
+     * @param stage   The stage the asynchronous locator returned, while it is pending
      */
-    private record Outcome(@Nullable Object target, @Nullable Throwable error, @Nullable CompletionStage<Boolean> pending) {
+    private record Outcome(@Nullable Object target, @Nullable Throwable error, @Nullable CompletableFuture<Boolean> pending,
+                           @Nullable CompletionStage<?> stage) {
+
+        /**
+         * @return The target, or {@code null}
+         * @throws Exception The error of the locator
+         */
+        @Nullable Object located() throws Exception {
+            Throwable failure = error;
+            if (failure != null) {
+                return ExceptionUtils.sneakyThrow(failure);
+            }
+            return target;
+        }
     }
 
     /**

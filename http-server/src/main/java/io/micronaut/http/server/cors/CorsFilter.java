@@ -37,6 +37,7 @@ import io.micronaut.http.filter.ServerFilterPhase;
 import io.micronaut.http.server.HttpServerConfiguration;
 import io.micronaut.http.server.annotation.PreMatching;
 import io.micronaut.http.server.util.HttpHostResolver;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.UriRouteMatch;
 import io.micronaut.web.router.resource.StaticResourceResolver;
@@ -81,6 +82,10 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     public static final int CORS_FILTER_ORDER = ServerFilterPhase.METRICS.after();
 
     private static final Logger LOG = LoggerFactory.getLogger(CorsFilter.class);
+    /**
+     * The request attribute of a preflight request answered after the route is matched.
+     */
+    private static final String DEFERRED_PREFLIGHT_ATTRIBUTE = "micronaut.cors.preflight.deferred";
     private static final ArgumentConversionContext<HttpMethod> CONVERSION_CONTEXT_HTTP_METHOD = ImmutableArgumentConversionContext.of(HttpMethod.class);
 
     protected final HttpServerConfiguration.CorsConfiguration corsConfiguration;
@@ -127,6 +132,12 @@ public class CorsFilter implements Ordered, ConditionalFilter {
     public final HttpResponse<?> filterPreFlightRequest(HttpRequest<?> request) {
         if (isEnabled(request) && CorsUtil.isPreflightRequest(request)) {
             CorsOriginConfiguration corsOriginConfiguration = getAnyConfiguration(request).orElse(null);
+            if (RouteLocator.isLocating(request)) {
+                // an asynchronous route locator of the path has not located its target yet: the
+                // routes of the path are known once the request is matched, see filterRequest
+                request.setAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.TRUE);
+                return null; // proceed
+            }
             if (corsOriginConfiguration != null) {
                 return handlePreflightRequest(request, corsOriginConfiguration);
             }
@@ -142,6 +153,15 @@ public class CorsFilter implements Ordered, ConditionalFilter {
         if (origin == null) {
             LOG.trace("Http Header {} not present. Proceeding with the request.", HttpHeaders.ORIGIN);
             return null; // proceed
+        }
+        if (request.getAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE).isPresent()) {
+            // the preflight request of a path an asynchronous route locator serves, now that the
+            // locator located its target
+            request.removeAttribute(DEFERRED_PREFLIGHT_ATTRIBUTE, Boolean.class);
+            CorsOriginConfiguration anyConfiguration = getAnyConfiguration(request).orElse(null);
+            if (anyConfiguration != null) {
+                return handlePreflightRequest(request, anyConfiguration);
+            }
         }
         CorsOriginConfiguration corsOriginConfiguration = getConfiguration(request).orElse(null);
         if (corsOriginConfiguration != null) {

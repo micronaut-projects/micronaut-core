@@ -477,6 +477,7 @@ public class RequestLifecycle {
                             throw e;
                         }
                         // an asynchronous locator locates its target: match again when it has
+                        onPendingLocation(request, pending);
                         PropagatedContext context = PropagatedContext.getOrEmpty();
                         return CompletableFutureExecutionFlow.just(pending).flatMap(located -> context.propagate(() -> {
                             ExecutionFlow<?> next = doRouteMatchAsync(request);
@@ -651,6 +652,19 @@ public class RequestLifecycle {
             }
         }
         return ExecutionFlow.just(defaultResponse);
+    }
+
+    /**
+     * Called when matching the request waits for an asynchronous route locator to locate its
+     * target. A server that can tell when the client goes away, e.g. closes the connection,
+     * cancels the locators of the request with {@link RouteLocator#cancelPendingLocations} then,
+     * so that the request fails instead of waiting for a target no one receives a response for.
+     *
+     * @param request The request
+     * @param located Completes when the target is located, or the location is cancelled
+     * @since 5.3.0
+     */
+    protected void onPendingLocation(HttpRequest<?> request, CompletionStage<?> located) {
     }
 
     /**

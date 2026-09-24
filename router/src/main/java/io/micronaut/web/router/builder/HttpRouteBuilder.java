@@ -722,7 +722,9 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * No other route of the application is tried. The filters of the matched route of the table
      * apply, and the server filters apply to the full path.</p>
      *
-     * <p>The locator runs while the request is matched, see {@link LocatorHandler}. Its tables
+     * <p>The locator runs while the request is matched, see {@link LocatorHandler}, at most once
+     * per request: matching the request again, e.g. to find the allowed methods of a
+     * {@code 405}, reuses the target, or the exception, of the first call. Its tables
      * are built with {@link io.micronaut.web.router.RouteTableFactory#buildLocatedHttpRoutes},
      * whose URIs are relative to the prefix, and should be built once per type of target, not per
      * request: the target reaches the handlers as an argument, see {@link LocatedHttpRouteBuilder},
@@ -758,7 +760,9 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      * locate again, synchronously or asynchronously. The target is located once per request.
      * {@link io.micronaut.web.router.Router#findClosest} of an application with an asynchronous
      * locator that has not located its target yet fails: the server matches such a request
-     * again when the stage completes.</p>
+     * again when the stage completes. The server cancels the stage when the client closes the
+     * connection before it completes, and a CORS preflight request of the prefix is answered
+     * once the target is located, with the methods of its routes.</p>
      *
      * @param prefixUri The URI template of the prefix
      * @param locator   Locates the target later, or completes with {@code null} for {@code 404}
