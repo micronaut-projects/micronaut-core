@@ -221,17 +221,17 @@ public class FilterMutatedBodyTest {
                     default -> null;
                 };
             });
-            routes.asyncPOST("/mb/async/text-body", (request, pathVariables) -> read(request::text)
-                .thenCompose(text -> read(() -> request.body(String.class)).thenApply(body -> textResponse(text + "|" + body)))).consumesAll();
-            routes.asyncPOST("/mb/async/body-text", (request, pathVariables) -> read(() -> request.body(String.class))
-                .thenCompose(body -> read(request::text).thenApply(text -> textResponse(body + "|" + text)))).consumesAll();
-            routes.asyncPOST("/mb/async/header-text", (request, pathVariables) -> read(request::text)
+            routes.asyncPOST("/mb/async/text-body", (request, pathVariables, body) -> read(body::text)
+                .thenCompose(text -> read(() -> body.body(String.class)).thenApply(value -> textResponse(text + "|" + value)))).consumesAll();
+            routes.asyncPOST("/mb/async/body-text", (request, pathVariables, body) -> read(() -> body.body(String.class))
+                .thenCompose(value -> read(body::text).thenApply(text -> textResponse(value + "|" + text)))).consumesAll();
+            routes.asyncPOST("/mb/async/header-text", (request, pathVariables, body) -> read(body::text)
                 .thenApply(text -> textResponse(header(request) + " " + text))).consumesAll();
-            routes.asyncPOST("/mb/async/header-body", (request, pathVariables) -> read(() -> request.body(String.class))
-                .thenApply(body -> textResponse(header(request) + " " + body))).consumesAll();
-            routes.asyncPOST("/mb/async/has-body", (request, pathVariables) -> {
-                String hasBody = String.valueOf(request.hasBody());
-                return request.discardBody().thenApply(ignored -> textResponse(hasBody));
+            routes.asyncPOST("/mb/async/header-body", (request, pathVariables, body) -> read(() -> body.body(String.class))
+                .thenApply(value -> textResponse(header(request) + " " + value))).consumesAll();
+            routes.asyncPOST("/mb/async/has-body", (request, pathVariables, body) -> {
+                String hasBody = String.valueOf(body.hasBody());
+                return body.discardBody().thenApply(ignored -> textResponse(hasBody));
             }).consumesAll();
             routes.POST("/mb/handler", Argument.STRING, (request, pathVariables, body) ->
                 HttpResponse.ok(body).contentType(MediaType.TEXT_PLAIN_TYPE)

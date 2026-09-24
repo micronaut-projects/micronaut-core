@@ -21,6 +21,7 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.form.FormData;
 import io.micronaut.web.router.builder.AsyncRequestHandler;
 import io.micronaut.web.router.builder.BodyRequestHandler;
@@ -30,7 +31,6 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import io.micronaut.web.router.naming.HyphenatedUriNamingStrategy;
-import io.micronaut.http.AsyncServerHttpRequest;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -151,6 +151,13 @@ class HandlerRoutePathlessTest {
                 async.asyncPATCH(HandlerRoutePathlessTest::async);
                 async.asyncDELETE(HandlerRoutePathlessTest::async);
                 async.asyncGET("/p", HandlerRoutePathlessTest::async);
+                async.asyncPOST((request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                async.asyncGET(HandlerRoutePathlessTest::asyncBody);
+                async.asyncPOST(HandlerRoutePathlessTest::asyncBody);
+                async.asyncPUT(HandlerRoutePathlessTest::asyncBody);
+                async.asyncPATCH(HandlerRoutePathlessTest::asyncBody);
+                async.asyncDELETE(HandlerRoutePathlessTest::asyncBody);
+                async.asyncPOST("/p", HandlerRoutePathlessTest::asyncBody);
             });
             all.path("/method", method -> {
                 method.handle(HttpMethod.OPTIONS, (request, pathVariables) -> HttpResponse.ok());
@@ -161,6 +168,8 @@ class HandlerRoutePathlessTest {
                 method.handleAsync(HttpMethod.DELETE, HandlerRoutePathlessTest::async);
                 method.handle(Set.of(HttpMethod.TRACE), HandlerRoutePathlessTest::plain);
                 method.handleAsync(Set.of(HttpMethod.GET), (request, pathVariables) -> CompletableFuture.completedFuture(HttpResponse.ok()));
+                method.handleAsync(HttpMethod.PUT, HandlerRoutePathlessTest::asyncBody);
+                method.handleAsync(Set.of(HttpMethod.PATCH), (request, pathVariables, body) -> CompletableFuture.completedFuture(HttpResponse.ok()));
             });
             all.path("/named", named -> {
                 named.handle("PROPFIND", (request, pathVariables) -> HttpResponse.ok());
@@ -168,6 +177,7 @@ class HandlerRoutePathlessTest {
                 named.handle("PROPPATCH", Item.class, HandlerRoutePathlessTest::body);
                 named.handle("COPY", Argument.of(Item.class), (request, pathVariables, item) -> HttpResponse.ok());
                 named.handleAsync("MOVE", HandlerRoutePathlessTest::async);
+                named.handleAsync("MKCOL", HandlerRoutePathlessTest::asyncBody);
                 named.handleForm("LOCK", HandlerRoutePathlessTest::form);
             });
         }), uri -> uri);
@@ -190,7 +200,11 @@ class HandlerRoutePathlessTest {
         return HttpResponse.ok();
     }
 
-    private static CompletionStage<? extends HttpResponse<?>> async(AsyncServerHttpRequest<?> request, PathVariables pathVariables) {
+    private static CompletionStage<? extends HttpResponse<?>> async(HttpRequest<?> request, PathVariables pathVariables) {
+        return CompletableFuture.completedFuture(HttpResponse.ok());
+    }
+
+    private static CompletionStage<? extends HttpResponse<?>> asyncBody(HttpRequest<?> request, PathVariables pathVariables, AsyncRequestBody body) {
         return CompletableFuture.completedFuture(HttpResponse.ok());
     }
 

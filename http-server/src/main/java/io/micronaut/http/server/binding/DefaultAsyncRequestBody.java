@@ -23,18 +23,16 @@ import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.LifecycleHttpRequest;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.BodyElements;
 import io.micronaut.http.body.ByteBody;
-import io.micronaut.http.body.ByteBodyFactory;
 import io.micronaut.http.body.ChunkedMessageBodyReader;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.MessageBodyReader;
@@ -44,7 +42,7 @@ import io.micronaut.http.form.FormData;
 import io.micronaut.http.form.FormPart;
 import io.micronaut.http.form.FormParts;
 import io.micronaut.http.server.exceptions.UnsupportedMediaException;
-import io.micronaut.web.router.builder.AsyncHandlerRequest;
+import io.micronaut.web.router.builder.AsyncHandlerBody;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
@@ -64,9 +62,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The {@link AsyncServerHttpRequest} of a route invocation: a view of the server request that
- * owns the one read of its body. Everything but the body is the request's, so the view works
- * over any server request, and filters see the same request.
+ * The {@link AsyncRequestBody} of a route invocation: the body of the request the route is
+ * invoked with, which it owns the one read of.
  *
  * <p>The request can be one a filter continued with, e.g. with another method: the body is that of
  * the server request it is or wraps, see {@link ServerRequestBody}.</p>
@@ -79,19 +76,18 @@ import java.util.function.Supplier;
  * {@link BodyChangeAwareRequest}, replaced those bytes: a body set to {@code null} is no body,
  * and a body set to an object is only read with {@link #body(Argument)}, which converts it.</p>
  *
- * @param <B> The body type
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> implements AsyncServerHttpRequest<B>, AsyncHandlerRequest {
+final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBody {
 
     private static final List<String> ELEMENT_MEDIA_TYPES = List.of(MediaType.APPLICATION_JSON, MediaType.APPLICATION_JSON_STREAM);
     private static final List<String> FORM_MEDIA_TYPES = List.of(MediaType.APPLICATION_FORM_URLENCODED, MediaType.MULTIPART_FORM_DATA);
 
-    private final HttpRequest<B> request;
+    private final HttpRequest<?> request;
     private final ServerHttpRequest<?> server;
-    private final AsyncServerHttpRequestArgumentBinder binder;
+    private final AsyncRequestBodyArgumentBinder binder;
     /**
      * The empty body of a request whose body a filter set to {@code null}, or {@code null}.
      */
@@ -110,8 +106,7 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
      * @param server  The server request whose bytes are the body of the request, see {@link ServerRequestBody}
      * @param binder  The binder
      */
-    DefaultAsyncServerHttpRequest(HttpRequest<B> request, ServerHttpRequest<?> server, AsyncServerHttpRequestArgumentBinder binder) {
-        super(request);
+    DefaultAsyncRequestBody(HttpRequest<?> request, ServerHttpRequest<?> server, AsyncRequestBodyArgumentBinder binder) {
         this.request = request;
         this.server = server;
         this.binder = binder;
@@ -126,60 +121,11 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
         }
     }
 
-    @Override
-    public ByteBody byteBody() {
+    /**
+     * @return The bytes of the body: of the server request, or none if a filter cleared the body
+     */
+    private ByteBody byteBody() {
         return cleared == null ? server.byteBody() : cleared;
-    }
-
-    @Override
-    public ByteBodyFactory byteBodyFactory() {
-        return server.byteBodyFactory();
-    }
-
-    @Override
-    public MutableHttpRequest<B> mutate() {
-        return request.mutate();
-    }
-
-    @Override
-    public Optional<Object> getAttribute(CharSequence name) {
-        return request.getAttribute(name);
-    }
-
-    @Override
-    public Charset getCharacterEncoding() {
-        return request.getCharacterEncoding();
-    }
-
-    @Override
-    public Optional<MediaType> getContentType() {
-        return request.getContentType();
-    }
-
-    @Override
-    public long getContentLength() {
-        return request.getContentLength();
-    }
-
-    @Override
-    public Optional<B> getBody() {
-        // no binder decodes a body for an asynchronous handler: it reads the body itself
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> getBody(Class<T> type) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> getBody(Argument<T> type) {
-        return Optional.empty();
-    }
-
-    @Override
-    public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
-        return Optional.empty();
     }
 
     @Override
@@ -220,10 +166,11 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
             ArgumentBinder<T, HttpRequest<?>> argumentBinder = binder.binderRegistry().findArgumentBinder(argument)
                 .orElseThrow(() -> UnsatisfiedRouteException.create(argument));
             ArgumentConversionContext<T> context = ConversionContext.of(argument, request.getLocale().orElse(null), request.getCharacterEncoding());
+            HttpRequest<?> source = bindingSource();
             @SuppressWarnings("unchecked")
             ArgumentBinder.BindingResult<T>[] bound = new ArgumentBinder.BindingResult[1];
             // the binder waits for the body: this waits for it here, not the route, which is running
-            ExecutionFlow<?> waitsFor = BasicHttpAttributes.detachRouteWaitsFor(request, () -> bound[0] = argumentBinder.bind(context, request));
+            ExecutionFlow<?> waitsFor = BasicHttpAttributes.detachRouteWaitsFor(request, () -> bound[0] = argumentBinder.bind(context, source));
             waitsFor.onComplete((ignored, error) -> {
                 if (error != null) {
                     result.completeExceptionally(error);
@@ -362,7 +309,22 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
 
     @Override
     public String toString() {
-        return request.toString();
+        return "the body of " + request;
+    }
+
+    /**
+     * The request the body is decoded from by the {@code @Body} binders: the decoded body is the
+     * handler's, not a body of the request, so a server request is bound through a view, which the
+     * binders do not keep the decoded body in; {@link HttpRequest#getBody()} of the request does
+     * not change. A request whose body a filter set to an object is bound itself, from that object.
+     *
+     * @return The request to bind the body from
+     */
+    private HttpRequest<?> bindingSource() {
+        if (!decoded && request instanceof ServerHttpRequest<?>) {
+            return new BindingView<>(request);
+        }
+        return request;
     }
 
     /**
@@ -490,6 +452,60 @@ final class DefaultAsyncServerHttpRequest<B> extends HttpRequestWrapper<B> imple
             return null;
         }
         throw UnsatisfiedRouteException.create(argument);
+    }
+
+    /**
+     * A view of a server request for the {@code @Body} binders: they read the bytes of the server
+     * request it wraps, see {@link ServerRequestBody}, and keep no decoded body in it.
+     *
+     * @param <B> The body type
+     */
+    private static final class BindingView<B> extends HttpRequestWrapper<B> {
+
+        BindingView(HttpRequest<B> request) {
+            super(request);
+        }
+
+        @Override
+        public Optional<Object> getAttribute(CharSequence name) {
+            return getDelegate().getAttribute(name);
+        }
+
+        @Override
+        public Charset getCharacterEncoding() {
+            return getDelegate().getCharacterEncoding();
+        }
+
+        @Override
+        public Optional<MediaType> getContentType() {
+            return getDelegate().getContentType();
+        }
+
+        @Override
+        public long getContentLength() {
+            return getDelegate().getContentLength();
+        }
+
+        @Override
+        public Optional<B> getBody() {
+            // the body is read from the bytes, not from a body a binder decoded before, e.g. for a filter
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<T> getBody(Class<T> type) {
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<T> getBody(Argument<T> type) {
+            return Optional.empty();
+        }
+
+        @Override
+        public <T> Optional<T> getBody(ArgumentConversionContext<T> conversionContext) {
+            return Optional.empty();
+        }
     }
 
     /**

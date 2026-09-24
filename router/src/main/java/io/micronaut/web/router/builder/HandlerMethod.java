@@ -26,10 +26,10 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.util.ExceptionUtils;
 import io.micronaut.core.util.SupplierUtil;
-import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.annotation.Body;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
@@ -73,7 +73,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
 
     private static final Argument<HttpRequest> REQUEST = Argument.of(HttpRequest.class, "request");
     private static final Argument<PathVariables> PATH_VARIABLES = Argument.of(PathVariables.class, "pathVariables");
-    private static final Argument<AsyncServerHttpRequest> ASYNC_REQUEST = Argument.of(AsyncServerHttpRequest.class, "request");
+    private static final Argument<AsyncRequestBody> ASYNC_BODY = Argument.of(AsyncRequestBody.class, BODY_ARGUMENT);
     private static final Argument<FormData> FORM = Argument.of(FormData.class, "form");
 
     /**
@@ -161,11 +161,27 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
         return new HandlerMethod<>(
             handler,
             AsyncRequestHandler.class,
-            new Class<?>[]{AsyncServerHttpRequest.class, PathVariables.class},
-            // the request reads the body for the handler: no binder decodes it
-            new Argument<?>[]{ASYNC_REQUEST, PATH_VARIABLES},
+            new Class<?>[]{HttpRequest.class, PathVariables.class},
+            // like a RequestHandler: nothing reads the body
+            new Argument<?>[]{REQUEST, PATH_VARIABLES},
             returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
-            args -> releaseWhenDone((AsyncServerHttpRequest<?>) args[0], () -> handler.handle((AsyncServerHttpRequest<?>) args[0], (PathVariables) args[1]))
+            args -> handlerStage(handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1]))
+        );
+    }
+
+    /**
+     * @param handler The handler
+     * @return The method that calls it
+     */
+    public static HandlerMethod<CompletionStage<? extends HttpResponse<?>>> of(AsyncBodyRequestHandler handler) {
+        return new HandlerMethod<>(
+            handler,
+            AsyncBodyRequestHandler.class,
+            new Class<?>[]{HttpRequest.class, PathVariables.class, AsyncRequestBody.class},
+            // the handler reads the body itself: no binder decodes it
+            new Argument<?>[]{REQUEST, PATH_VARIABLES, ASYNC_BODY},
+            returnType(CompletionStage.class, Argument.of(HttpResponse.class, Argument.OBJECT_ARGUMENT)),
+            args -> releaseWhenDone((AsyncRequestBody) args[2], () -> handler.handle((HttpRequest<?>) args[0], (PathVariables) args[1], (AsyncRequestBody) args[2]))
         );
     }
 
@@ -530,14 +546,14 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * released: a failure to release fails a successful result, and is added as suppressed to a
      * failure of the handler.
      *
-     * @param request The request of the handler
+     * @param body    The body of the handler
      * @param handler Calls the handler
      * @return The stage of the handler
      * @throws Exception If the handler fails
      */
-    private static CompletionStage<? extends HttpResponse<?>> releaseWhenDone(AsyncServerHttpRequest<?> request,
+    private static CompletionStage<? extends HttpResponse<?>> releaseWhenDone(AsyncRequestBody body,
                                                                              Callable<CompletionStage<? extends HttpResponse<?>>> handler) throws Exception {
-        AsyncHandlerRequest handlerRequest = request instanceof AsyncHandlerRequest r ? r : null;
+        AsyncHandlerBody handlerRequest = body instanceof AsyncHandlerBody b ? b : null;
         CompletionStage<? extends HttpResponse<?>> stage;
         try {
             stage = handler.call();
@@ -549,7 +565,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
             throw e;
         }
         if (stage == null) {
-            NullPointerException noStage = new NullPointerException("The asynchronous handler returned no stage");
+            NullPointerException noStage = noStage();
             if (handlerRequest != null) {
                 release(handlerRequest, noStage);
             }
@@ -587,10 +603,10 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * Release the body when the handler failed without a stage: a failure to release is added as
      * suppressed to the failure of the handler, which it does not replace.
      *
-     * @param request The request of the handler
+     * @param request The body of the handler
      * @param failure The failure of the handler
      */
-    private static void release(AsyncHandlerRequest request, Throwable failure) {
+    private static void release(AsyncHandlerBody request, Throwable failure) {
         try {
             request.releaseBody();
         } catch (Throwable releaseError) {
@@ -599,6 +615,24 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
                 failure.addSuppressed(releaseError);
             }
         }
+    }
+
+    /**
+     * The stage of an asynchronous handler that does not read the body: a handler that answers
+     * with no stage fails, like one that throws.
+     *
+     * @param stage The stage the handler returned
+     * @return The stage
+     */
+    private static CompletionStage<? extends HttpResponse<?>> handlerStage(@Nullable CompletionStage<? extends HttpResponse<?>> stage) {
+        if (stage == null) {
+            throw noStage();
+        }
+        return stage;
+    }
+
+    private static NullPointerException noStage() {
+        return new NullPointerException("The asynchronous handler returned no stage");
     }
 
     /**

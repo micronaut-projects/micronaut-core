@@ -80,7 +80,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * The controllers of the documentation about request bodies, answered the same by handler
  * routes: asynchronous handlers that read the body with
- * {@link io.micronaut.http.AsyncServerHttpRequest}, and, where it applies, synchronous handlers
+ * {@link io.micronaut.http.body.AsyncRequestBody}, and, where it applies, synchronous handlers
  * that receive the decoded body. Each request is sent to the controller, under {@code /ctl}, and
  * to the handler routes, under {@code /fn} and {@code /fn-sync}, and the responses are compared.
  */
@@ -643,24 +643,24 @@ public class HandlerRoutesDocsParityTest {
 
         private void messageRoutes(HttpRouteBuilder routes) {
             // @Size(max = 1024) @Body String: the handler reads at most 1024 bytes
-            routes.asyncPOST(ASYNC + "/receive/echo", (request, pathVariables) -> request.text(1024).thenApply(HttpResponse::ok))
+            routes.asyncPOST(ASYNC + "/receive/echo", (request, pathVariables, body) -> body.text(1024).thenApply(HttpResponse::ok))
                 .consumes(MediaType.TEXT_PLAIN_TYPE);
             routes.POST(SYNC + "/receive/echo", Argument.STRING, (request, pathVariables, text) -> HttpResponse.ok(text))
                 .consumes(MediaType.TEXT_PLAIN_TYPE);
             // @Body Publisher<String>, collected: the text of the body
-            routes.asyncPOST(ASYNC + "/receive/echo-publisher", (request, pathVariables) -> request.text().thenApply(HttpResponse::ok))
+            routes.asyncPOST(ASYNC + "/receive/echo-publisher", (request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok))
                 .consumes(MediaType.TEXT_PLAIN_TYPE);
         }
 
         private void jsonRoutes(HttpRouteBuilder routes) {
             // @Body Person, @Body Publisher<Person> and @Body CompletableFuture<Person>
             for (String path : List.of("", "/saveReactive", "/saveFuture")) {
-                routes.asyncPOST(ASYNC + "/json/people" + path, (request, pathVariables) -> request.body(JsonPerson.class).thenApply(this::created));
+                routes.asyncPOST(ASYNC + "/json/people" + path, (request, pathVariables, body) -> body.body(JsonPerson.class).thenApply(this::created));
             }
             routes.POST(SYNC + "/json/people", Argument.of(JsonPerson.class), (request, pathVariables, person) -> created(person));
             // the fields of the body as arguments: a record
-            routes.asyncPOST(ASYNC + "/json/people/saveWithArgs", (request, pathVariables) ->
-                request.body(SaveArgs.class).thenApply(args -> created(args.person())));
+            routes.asyncPOST(ASYNC + "/json/people/saveWithArgs", (request, pathVariables, body) ->
+                body.body(SaveArgs.class).thenApply(args -> created(args.person())));
             routes.POST(SYNC + "/json/people/saveWithArgs", Argument.of(SaveArgs.class), (request, pathVariables, args) -> created(args.person()));
             // the @Error route of the controller: a global error route
             routes.error(JsonSyntaxException.class, JsonPersonController::invalidJson);
@@ -669,13 +669,13 @@ public class HandlerRoutesDocsParityTest {
         private void formRoutes(HttpRouteBuilder routes) {
             MediaType form = MediaType.APPLICATION_FORM_URLENCODED_TYPE;
             // a form decoded to a type
-            routes.asyncPOST(ASYNC + "/form/people", (request, pathVariables) -> request.body(JsonPerson.class).thenApply(this::created))
+            routes.asyncPOST(ASYNC + "/form/people", (request, pathVariables, body) -> body.body(JsonPerson.class).thenApply(this::created))
                 .consumes(form);
             routes.POST(SYNC + "/form/people", Argument.of(JsonPerson.class), (request, pathVariables, person) -> created(person))
                 .consumes(form);
             // the fields of the form
             for (String path : List.of("/saveWithArgs", "/saveWithArgsOptional")) {
-                routes.asyncPOST(ASYNC + "/form/people" + path, (request, pathVariables) -> request.form().thenApply(fields ->
+                routes.asyncPOST(ASYNC + "/form/people" + path, (request, pathVariables, body) -> body.form().thenApply(fields ->
                     created(new SaveArgs(fields.getString("firstName"), fields.getString("lastName"), fields.find("age", Integer.class).orElse(null)).person())))
                     .consumes(form);
                 routes.POST(SYNC + "/form/people" + path, (request, pathVariables, fields) ->
@@ -691,7 +691,7 @@ public class HandlerRoutesDocsParityTest {
                 .produces(MediaType.TEXT_PLAIN_TYPE)
                 .executeOn(TaskExecutors.IO);
             // an asynchronous handler does not block: it reads the text
-            routes.asyncPOST(ASYNC + "/stream/read", (request, pathVariables) -> request.text().thenApply(HttpResponse::ok))
+            routes.asyncPOST(ASYNC + "/stream/read", (request, pathVariables, body) -> body.text().thenApply(HttpResponse::ok))
                 .consumes(MediaType.TEXT_PLAIN_TYPE)
                 .produces(MediaType.TEXT_PLAIN_TYPE);
         }
@@ -700,19 +700,19 @@ public class HandlerRoutesDocsParityTest {
             MediaType multipart = MediaType.MULTIPART_FORM_DATA_TYPE;
             MediaType text = MediaType.TEXT_PLAIN_TYPE;
             // StreamingFileUpload.transferTo(File)
-            routes.asyncPOST(ASYNC + "/upload", (request, pathVariables) -> request.parts()
+            routes.asyncPOST(ASYNC + "/upload", (request, pathVariables, body) -> body.parts()
                     .part("file", part -> part.file().transferTo(newFile(part.file().fileName())))
                     .thenApply(found -> found ? HttpResponse.ok("Uploaded") : HttpResponse.<String>status(HttpStatus.CONFLICT).body("Upload Failed"))
                     .exceptionally(error -> HttpResponse.<String>status(HttpStatus.CONFLICT).body("Upload Failed")))
                 .consumes(multipart).produces(text);
             // StreamingFileUpload.transferTo(OutputStream)
-            routes.asyncPOST(ASYNC + "/upload/outputStream", (request, pathVariables) -> request.parts()
+            routes.asyncPOST(ASYNC + "/upload/outputStream", (request, pathVariables, body) -> body.parts()
                     .part("file", part -> part.file().transferTo(new ByteArrayOutputStream()))
                     .thenApply(found -> found ? HttpResponse.ok("Uploaded") : HttpResponse.<String>status(HttpStatus.CONFLICT).body("Upload Failed"))
                     .exceptionally(error -> HttpResponse.<String>status(HttpStatus.CONFLICT).body("Upload Failed")))
                 .consumes(multipart).produces(text);
             // CompletedFileUpload: the whole form, then the bytes of the file
-            routes.asyncPOST(ASYNC + "/upload/completed", (request, pathVariables) -> request.form().thenCompose(form -> {
+            routes.asyncPOST(ASYNC + "/upload/completed", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     FileUpload file = form.getFile("file");
                     return file.bytes(Integer.MAX_VALUE).thenApply(bytes -> write(file.fileName(), bytes));
                 }))
@@ -724,13 +724,13 @@ public class HandlerRoutesDocsParityTest {
                 .consumes(multipart).produces(text)
                 .executeOn(TaskExecutors.BLOCKING);
             // byte[] file, String fileName
-            routes.asyncPOST(ASYNC + "/upload/bytes", (request, pathVariables) -> request.form().thenCompose(form ->
+            routes.asyncPOST(ASYNC + "/upload/bytes", (request, pathVariables, body) -> body.form().thenCompose(form ->
                     form.getFile("file").bytes(Integer.MAX_VALUE).thenApply(bytes -> write(form.getString("fileName"), bytes))))
                 .consumes(multipart).produces(text);
             routes.POST(SYNC + "/upload/bytes", (request, pathVariables, form) -> write(form.getString("fileName"), form.getFile("file").readAllBytes()))
                 .consumes(multipart).produces(text);
             // @Body MultipartBody, part by part
-            routes.asyncPOST(ASYNC + "/upload/whole-body", (request, pathVariables) -> request.parts()
+            routes.asyncPOST(ASYNC + "/upload/whole-body", (request, pathVariables, body) -> body.parts()
                     .forEach(FormPart::closeAsync)
                     .thenApply(done -> HttpResponse.ok("Uploaded")))
                 .consumes(multipart).produces(text);

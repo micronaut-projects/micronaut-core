@@ -40,7 +40,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /**
  * An asynchronous handler that reads the body of a request that expects {@code 100 Continue}
  * gets the body after the server answered {@code 100 Continue}; a handler that answers without
- * reading the body never makes the server ask the client for it.
+ * reading the body, or that does not receive it, never makes the server ask the client for it.
  */
 class AsyncRequestContinueTest {
     private static final String SPEC_NAME = "AsyncRequestContinueTest";
@@ -57,6 +57,24 @@ class AsyncRequestContinueTest {
                 // the body is never sent: the response must not wait for it
                 String head = readHead(socket.getInputStream());
                 assertTrue(head.startsWith("HTTP/1.1 401 "), head);
+            }
+        }
+    }
+
+    @Test
+    void aHandlerWithoutTheBodyNeverAsksForIt() throws Exception {
+        try (ApplicationContext ctx = ApplicationContext.run(Map.of("spec.name", SPEC_NAME, "micronaut.server.port", -1))) {
+            EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
+            try (Socket socket = new Socket(server.getHost(), server.getPort())) {
+                socket.setSoTimeout(30_000);
+                OutputStream out = socket.getOutputStream();
+                InputStream in = socket.getInputStream();
+                out.write(headers(server, "/continue/no-body", 5).getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                // the handler does not claim the body: the response is not a 100 Continue, and does not wait for the body
+                String head = readHead(in);
+                assertTrue(head.startsWith("HTTP/1.1 200 "), head);
+                assertEquals("no body", new String(in.readNBytes(7), StandardCharsets.US_ASCII));
             }
         }
     }
@@ -114,10 +132,12 @@ class AsyncRequestContinueTest {
         @Singleton
         HttpRoutes continueRoutes() {
             return routes -> {
-                routes.asyncPOST("/continue/reject", (request, pathVariables) ->
+                routes.asyncPOST("/continue/reject", (request, pathVariables, body) ->
                     CompletableFuture.completedFuture(HttpResponse.unauthorized())).consumesAll();
-                routes.asyncPOST("/continue/read", (request, pathVariables) ->
-                    request.text().thenApply(text -> HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
+                routes.asyncPOST("/continue/no-body", (request, pathVariables) ->
+                    CompletableFuture.completedFuture(HttpResponse.ok("no body").contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
+                routes.asyncPOST("/continue/read", (request, pathVariables, body) ->
+                    body.text().thenApply(text -> HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
             };
         }
     }

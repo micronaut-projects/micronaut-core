@@ -62,7 +62,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * Asynchronous handlers read the body of the request themselves, once, with
- * {@link io.micronaut.http.AsyncServerHttpRequest}: decoded like a controller's {@code @Body}
+ * {@link io.micronaut.http.body.AsyncRequestBody}: decoded like a controller's {@code @Body}
  * argument, with the same responses for failures, or streamed, with the limits of the server for
  * buffered content applying only to what is decoded in memory.
  */
@@ -349,14 +349,14 @@ public class AsyncRequestBodyTest {
         @Named("async-body")
         HttpRoutes asyncBodyRoutes(@Named("async-body-consumer") ExecutorService executor) {
             return routes -> {
-                routes.asyncPOST("/fn/async-body/person", (request, pathVariables) -> request.body(Person.class).thenApply(HttpResponse::created));
+                routes.asyncPOST("/fn/async-body/person", (request, pathVariables, body) -> body.body(Person.class).thenApply(HttpResponse::created));
                 routes.error(JsonSyntaxException.class, (request, error) ->
                     HttpResponse.badRequest("Invalid JSON: " + error.getMessage()).contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.asyncPOST("/fn/async-body/one-read", (request, pathVariables) -> {
-                    var text = request.text();
+                routes.asyncPOST("/fn/async-body/one-read", (request, pathVariables, body) -> {
+                    var text = body.text();
                     String second;
                     try {
-                        request.bytes(10);
+                        body.bytes(10);
                         second = "read twice";
                     } catch (IllegalStateException e) {
                         second = e.getMessage();
@@ -364,56 +364,56 @@ public class AsyncRequestBodyTest {
                     String message = second;
                     return text.thenApply(value -> HttpResponse.ok(value + "|" + message).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumesAll();
-                routes.asyncPOST("/fn/async-body/get-body", (request, pathVariables) -> {
+                routes.asyncPOST("/fn/async-body/get-body", (request, pathVariables, body) -> {
                     boolean before = request.getBody().isEmpty();
-                    return request.body(Argument.mapOf(String.class, String.class)).thenApply(body ->
-                        HttpResponse.ok(before + " " + request.getBody().isEmpty() + " " + body.get("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
+                    return body.body(Argument.mapOf(String.class, String.class)).thenApply(value ->
+                        HttpResponse.ok(before + " " + request.getBody().isEmpty() + " " + value.get("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
                 routes.asyncPOST("/fn/async-body/unread", (request, pathVariables) ->
                     CompletableFuture.completedFuture(HttpResponse.accepted())).consumesAll();
-                routes.asyncPOST("/fn/async-body/size", (request, pathVariables) ->
-                    CompletableFuture.completedFuture(HttpResponse.ok(request.hasBody() + " " + request.expectedBodySize()).contentType(MediaType.TEXT_PLAIN_TYPE)))
+                routes.asyncPOST("/fn/async-body/size", (request, pathVariables, body) ->
+                    CompletableFuture.completedFuture(HttpResponse.ok(body.hasBody() + " " + body.expectedBodySize()).contentType(MediaType.TEXT_PLAIN_TYPE)))
                     .consumesAll();
-                routes.asyncPOST("/fn/async-body/text", (request, pathVariables) ->
-                    request.text().thenApply(text -> HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
-                routes.asyncPOST("/fn/async-body/file", (request, pathVariables) -> {
+                routes.asyncPOST("/fn/async-body/text", (request, pathVariables, body) ->
+                    body.text().thenApply(text -> HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
+                routes.asyncPOST("/fn/async-body/file", (request, pathVariables, body) -> {
                     Path file = temporaryFile();
-                    return request.transferTo(file).thenApply(done -> HttpResponse.ok(String.valueOf(size(file))).contentType(MediaType.TEXT_PLAIN_TYPE));
+                    return body.transferTo(file).thenApply(done -> HttpResponse.ok(String.valueOf(size(file))).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumesAll();
-                routes.asyncPOST("/fn/async-body/bytes/{max}", (request, pathVariables) ->
-                    request.bytes(pathVariables.getInt("max")).thenApply(bytes -> HttpResponse.ok(String.valueOf(bytes.length)).contentType(MediaType.TEXT_PLAIN_TYPE)))
+                routes.asyncPOST("/fn/async-body/bytes/{max}", (request, pathVariables, body) ->
+                    body.bytes(pathVariables.getInt("max")).thenApply(bytes -> HttpResponse.ok(String.valueOf(bytes.length)).contentType(MediaType.TEXT_PLAIN_TYPE)))
                     .consumesAll();
-                routes.asyncPOST("/fn/async-body/filtered", (request, pathVariables) ->
-                    request.text().thenApply(text -> HttpResponse.ok(request.getAttribute(FILTER_BODY, String.class).orElse("none") + "|" + text)
+                routes.asyncPOST("/fn/async-body/filtered", (request, pathVariables, body) ->
+                    body.text().thenApply(text -> HttpResponse.ok(request.getAttribute(FILTER_BODY, String.class).orElse("none") + "|" + text)
                         .contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
-                routes.asyncPOST("/fn/async-body/reactive", (request, pathVariables) -> {
+                routes.asyncPOST("/fn/async-body/reactive", (request, pathVariables, body) -> {
                     String refused;
                     try {
-                        request.body(Argument.of(Publisher.class, String.class));
+                        body.body(Argument.of(Publisher.class, String.class));
                         refused = "accepted";
                     } catch (IllegalArgumentException e) {
                         refused = e.getMessage();
                     }
                     String message = refused;
-                    return request.text().thenApply(text -> HttpResponse.ok(message + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
+                    return body.text().thenApply(text -> HttpResponse.ok(message + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumesAll();
-                routes.asyncPOST("/fn/async-body/reactive-elements", (request, pathVariables) -> {
+                routes.asyncPOST("/fn/async-body/reactive-elements", (request, pathVariables, body) -> {
                     List<String> refused = new ArrayList<>();
                     for (Argument<?> type : List.of(Argument.of(Publisher.class, String.class), Argument.of(CompletableFuture.class, String.class), Argument.of(InputStream.class))) {
                         try {
-                            request.elements(type);
+                            body.elements(type);
                             refused.add("accepted");
                         } catch (IllegalArgumentException e) {
                             refused.add(e.getMessage());
                         }
                     }
-                    return request.text().thenApply(text -> HttpResponse.ok(String.join("|", refused) + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
+                    return body.text().thenApply(text -> HttpResponse.ok(String.join("|", refused) + "|" + text).contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumesAll();
-                routes.asyncPOST("/fn/async-body/items", (request, pathVariables) -> {
+                routes.asyncPOST("/fn/async-body/items", (request, pathVariables, body) -> {
                     List<String> names = new CopyOnWriteArrayList<>();
                     AtomicInteger inFlight = new AtomicInteger();
                     AtomicInteger maxInFlight = new AtomicInteger();
-                    return request.elements(Item.class).forEach(item -> {
+                    return body.elements(Item.class).forEach(item -> {
                         maxInFlight.accumulateAndGet(inFlight.incrementAndGet(), Math::max);
                         // the consumer completes later: the next element waits for it
                         return CompletableFuture.runAsync(() -> {
@@ -423,24 +423,24 @@ public class AsyncRequestBodyTest {
                     }).thenApply(done -> HttpResponse.ok(names.size() + " " + maxInFlight.get() + " " + (names.size() > 3 ? "" : names))
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
                 }).consumes(MediaType.APPLICATION_JSON_TYPE, MediaType.APPLICATION_JSON_STREAM_TYPE);
-                routes.asyncPOST("/fn/async-body/first-item", (request, pathVariables) -> {
-                    BodyElements<Item> elements = request.elements(Item.class);
+                routes.asyncPOST("/fn/async-body/first-item", (request, pathVariables, body) -> {
+                    BodyElements<Item> elements = body.elements(Item.class);
                     return elements.next().thenApply(first -> HttpResponse.ok(first.map(Item::name).orElse("none")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 });
-                routes.asyncPOST("/fn/async-body/any-items", (request, pathVariables) ->
-                    request.elements(Item.class).next().thenApply(first -> HttpResponse.ok("read"))).consumesAll();
-                routes.asyncPOST("/fn/async-body/any-form", (request, pathVariables) ->
-                    request.form().thenApply(form -> HttpResponse.ok("read"))).consumesAll();
-                routes.asyncPOST("/fn/async-body/take", (request, pathVariables) -> {
-                    CloseableByteBody body = request.takeBody();
-                    return body.buffer().thenApply(available -> {
+                routes.asyncPOST("/fn/async-body/any-items", (request, pathVariables, body) ->
+                    body.elements(Item.class).next().thenApply(first -> HttpResponse.ok("read"))).consumesAll();
+                routes.asyncPOST("/fn/async-body/any-form", (request, pathVariables, body) ->
+                    body.form().thenApply(form -> HttpResponse.ok("read"))).consumesAll();
+                routes.asyncPOST("/fn/async-body/take", (request, pathVariables, body) -> {
+                    CloseableByteBody taken = body.takeBody();
+                    return taken.buffer().thenApply(available -> {
                         try (available) {
                             return HttpResponse.ok(String.valueOf(available.length())).contentType(MediaType.TEXT_PLAIN_TYPE);
                         }
                     });
                 }).consumesAll();
-                routes.asyncPOST("/fn/async-body/discard", (request, pathVariables) ->
-                    request.discardBody().thenApply(done -> HttpResponse.ok("discarded").contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
+                routes.asyncPOST("/fn/async-body/discard", (request, pathVariables, body) ->
+                    body.discardBody().thenApply(done -> HttpResponse.ok("discarded").contentType(MediaType.TEXT_PLAIN_TYPE))).consumesAll();
             };
         }
     }
