@@ -27,7 +27,7 @@ import io.micronaut.web.router.UriRouteMatch;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.function.Predicate;
 import java.util.stream.Stream;
 
 /**
@@ -95,14 +95,19 @@ public class FilteredRouter implements Router {
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        List<UriRouteMatch<T, R>> closestMatches = router.findAllClosest(request);
-        return closestMatches.stream().filter(routeFilter.filter(request))
-                    .collect(Collectors.toList());
+        // filter before resolving the ambiguity, otherwise a route removed by the filter can hide a less specific one;
+        // the decorated router resolves it, e.g. tier by tier
+        return router.findAllClosest(request, routeFilter.<T, R>filter(request));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return router.findAllClosest(request, filter.and(routeFilter.<T, R>filter(request)));
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
-        return router.find(request, uri);
+        return router.<T, R>find(request, uri).filter(routeFilter.filter(request));
     }
 
     @Override

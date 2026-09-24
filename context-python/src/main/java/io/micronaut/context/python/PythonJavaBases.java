@@ -94,9 +94,11 @@ public final class PythonJavaBases {
      * @param name The method name
      * @param arguments The Python arguments
      * @return The result, converted for Python
+     * @throws Exception The checked exception the base method declares, raised in Python as a host exception
      */
+    @SuppressWarnings("java:S112") // the base method may declare any checked exception
     @UsedByGeneratedCode
-    public static @Nullable Object invoke(Value self, String name, Value arguments) {
+    public static @Nullable Object invoke(Value self, String name, Value arguments) throws Exception {
         ValueCoercible.JavaBaseMembers javaInstance = javaInstance(self);
         int count = (int) arguments.getArraySize();
         List<Value> values = new ArrayList<>(count);

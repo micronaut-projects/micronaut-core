@@ -35,9 +35,11 @@ import java.util.stream.Stream;
 /**
  * Decorates the application {@link Router} with the tables of the {@link RouteSource}s.
  * <p>Requests are matched tier by tier: first the application routes, then each source in order.
- * The {@link RouteMatchFilter}s (e.g. versioning) are applied to each tier before deciding whether
- * it has a match, so a route rejected by a filter falls through to the next tier, and the routes of
- * a source are filtered like the application routes. Applying a filter again is harmless, so this
+ * The {@link RouteMatchFilter}s (e.g. versioning) are applied to the candidates of each tier before
+ * the ambiguity between them is resolved and before deciding whether the tier has a match, so a
+ * more specific route rejected by a filter does not hide a less specific one, a tier whose routes
+ * are rejected falls through to the next tier, and the routes of a source are filtered like the
+ * application routes. Applying a filter again is harmless, so this
  * holds whether a {@link io.micronaut.web.router.filter.FilteredRouter} wraps this router or the
  * application router.
  * <p>The tables are captured once per request and kept in a request attribute, so every lookup for
@@ -124,18 +126,37 @@ final class RouteSourceRouter implements Router {
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        return findAllClosestOfTiers(request, predicate(request));
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
         Predicate<UriRouteMatch<T, R>> predicate = predicate(request);
-        List<UriRouteMatch<T, R>> matches = filter(router.findAllClosest(request), predicate);
+        return findAllClosestOfTiers(request, predicate == null ? filter : filter.and(predicate));
+    }
+
+    /**
+     * The closest matches of the first tier that has a match. The filter applies to the
+     * candidates of a tier before its ambiguity is resolved, so a more specific route it rejects
+     * does not hide a less specific one it accepts, and a tier whose routes it rejects falls
+     * through to the next.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestOfTiers(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        List<UriRouteMatch<T, R>> matches = closestOf(router, request, filter);
         if (!matches.isEmpty()) {
             return matches;
         }
         for (DefaultRouter table : tables(request)) {
-            List<UriRouteMatch<T, R>> tableMatches = filter(table.findAllClosest(request), predicate);
+            List<UriRouteMatch<T, R>> tableMatches = closestOf(table, request, filter);
             if (!tableMatches.isEmpty()) {
                 return tableMatches;
             }
         }
         return matches;
+    }
+
+    private static <T, R> List<UriRouteMatch<T, R>> closestOf(Router router, HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        return filter == null ? router.findAllClosest(request) : router.findAllClosest(request, filter);
     }
 
     @Override
