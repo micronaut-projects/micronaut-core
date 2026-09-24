@@ -542,12 +542,44 @@ public class JavaClassElement extends AbstractTypeAwareJavaElement implements Ar
             methodElements.add(
                 new JavaMethodElement(
                     JavaClassElement.this,
-                    new JavaNativeElement.Method(recordComponent.getAccessor()),
+                    new JavaNativeElement.Method(resolveRecordAccessor(recordComponent)),
                     elementAnnotationMetadataFactory,
                     visitorContext)
             );
         }
         return methodElements;
+    }
+
+    /**
+     * Resolves the accessor declared for a record component.
+     * <p>
+     * When a record implements an interface that declares the accessor with a supertype
+     * return type, javac emits a synthetic bridge method next to the real accessor. For a
+     * record read from a class file javac resolves {@link RecordComponentElement#getAccessor()}
+     * by name only and can hand back that bridge, whose return type is the interface's type
+     * rather than the component's. The declaration whose return type matches the component
+     * is the accessor the record declares.
+     *
+     * @param recordComponent The record component
+     * @return The accessor returning the component type
+     */
+    private ExecutableElement resolveRecordAccessor(RecordComponentElement recordComponent) {
+        ExecutableElement accessor = recordComponent.getAccessor();
+        Types types = visitorContext.getTypes();
+        TypeMirror componentType = recordComponent.asType();
+        if (types.isSameType(accessor.getReturnType(), componentType)) {
+            return accessor;
+        }
+        for (Element enclosedElement : classElement.getEnclosedElements()) {
+            if (enclosedElement.getKind() == ElementKind.METHOD
+                && enclosedElement instanceof ExecutableElement candidate
+                && candidate.getParameters().isEmpty()
+                && candidate.getSimpleName().contentEquals(recordComponent.getSimpleName())
+                && types.isSameType(candidate.getReturnType(), componentType)) {
+                return candidate;
+            }
+        }
+        return accessor;
     }
 
     private List<FieldElement> getRecordFields() {
