@@ -18,7 +18,6 @@ package io.micronaut.http.server.netty.handler;
 import io.micronaut.buffer.netty.NettyReadBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ReadBuffer;
-import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.http.body.AvailableByteBody;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
@@ -26,6 +25,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.micronaut.http.netty.EventLoopFlow;
+import io.micronaut.http.netty.JfrSupport;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.micronaut.http.netty.stream.StreamedHttpResponse;
@@ -986,7 +986,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         private OutboundAccessImpl(HttpRequest request) {
             this.request = request;
-            if (NativeImageUtils.JFR_AVAILABLE && Http1RequestEvent.isTurnedOn()) {
+            if (JfrSupport.isRecorderInitialized() && Http1RequestEvent.isTurnedOn()) {
                 this.jfrEvent = new Http1RequestEvent();
                 jfrEvent.begin();
             } else {
