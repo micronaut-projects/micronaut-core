@@ -59,9 +59,9 @@ final class RouteGroupDefaults {
      * inherit their settings when the outermost group is closed.
      */
     private final List<Inheriting> routes;
-    private @Nullable Consumer<HandlerUriRoute> consumes;
-    private @Nullable Consumer<HandlerUriRoute> produces;
-    private @Nullable Consumer<HandlerUriRoute> executor;
+    private @Nullable Consumer<RouteSettings> consumes;
+    private @Nullable Consumer<RouteSettings> produces;
+    private @Nullable Consumer<RouteSettings> executor;
     private boolean closed;
 
     /**
@@ -87,7 +87,7 @@ final class RouteGroupDefaults {
      */
     void consumesAll() {
         checkOpen();
-        consumes = HandlerUriRoute::consumesAll;
+        consumes = RouteSettings::consumesAll;
     }
 
     /**
@@ -115,7 +115,7 @@ final class RouteGroupDefaults {
      */
     void nonBlocking() {
         checkOpen();
-        executor = HandlerUriRoute::nonBlocking;
+        executor = RouteSettings::nonBlocking;
     }
 
     /**
@@ -126,7 +126,7 @@ final class RouteGroupDefaults {
      *                      form handler, which consumes forms: they do not inherit them
      * @return The routes, whose settings the spec of the routes marks as their own
      */
-    Inheriting add(List<HandlerUriRoute> handlerRoutes, int own) {
+    Inheriting add(List<RouteSettings> handlerRoutes, int own) {
         Inheriting inheriting = new Inheriting(this, handlerRoutes, own);
         routes.add(inheriting);
         return inheriting;
@@ -156,10 +156,10 @@ final class RouteGroupDefaults {
      * @param setting A setting, e.g. {@link #CONSUMES}
      * @return The setting of this group, or of the closest enclosing group that has it, or {@code null}
      */
-    private @Nullable Consumer<HandlerUriRoute> resolve(int setting) {
+    private @Nullable Consumer<RouteSettings> resolve(int setting) {
         RouteGroupDefaults group = this;
         while (group != null) {
-            Consumer<HandlerUriRoute> value = switch (setting) {
+            Consumer<RouteSettings> value = switch (setting) {
                 case CONSUMES -> group.consumes;
                 case PRODUCES -> group.produces;
                 default -> group.executor;
@@ -177,10 +177,10 @@ final class RouteGroupDefaults {
      */
     static final class Inheriting {
         private final RouteGroupDefaults group;
-        private final List<HandlerUriRoute> routes;
+        private final List<RouteSettings> routes;
         private int own;
 
-        private Inheriting(RouteGroupDefaults group, List<HandlerUriRoute> routes, int own) {
+        private Inheriting(RouteGroupDefaults group, List<RouteSettings> routes, int own) {
             this.group = group;
             this.routes = routes;
             this.own = own;
@@ -205,9 +205,9 @@ final class RouteGroupDefaults {
             if ((own & setting) != 0) {
                 return;
             }
-            Consumer<HandlerUriRoute> value = group.resolve(setting);
+            Consumer<RouteSettings> value = group.resolve(setting);
             if (value != null) {
-                for (HandlerUriRoute route : routes) {
+                for (RouteSettings route : routes) {
                     value.accept(route);
                 }
             }

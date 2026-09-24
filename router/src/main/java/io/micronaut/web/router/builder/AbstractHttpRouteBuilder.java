@@ -111,7 +111,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * @param routes The routes of a handler
      * @return Their spec
      */
-    private HttpRouteSpec spec(HandlerUriRoute... routes) {
+    private HttpRouteSpec spec(RouteSettings... routes) {
         return spec(0, routes);
     }
 
@@ -121,8 +121,8 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
      * @param routes The routes of a handler
      * @return Their spec
      */
-    final HttpRouteSpec spec(int own, HandlerUriRoute... routes) {
-        List<HandlerUriRoute> handlerRoutes = List.of(routes);
+    final HttpRouteSpec spec(int own, RouteSettings... routes) {
+        List<RouteSettings> handlerRoutes = List.of(routes);
         RouteGroupDefaults defaults = groupDefaults();
         return new DefaultHttpRouteSpec(handlerRoutes, this::resolvePort, defaults == null ? null : defaults.add(handlerRoutes, own));
     }
@@ -237,7 +237,9 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
 
     @Override
     public final HttpRouteSpec handleForm(String httpMethodName, String uri, FormRequestHandler handler) {
-        return spec(RouteGroupDefaults.CONSUMES, route(httpMethodName, uri, HandlerMethod.of(handler)).consumes(FORM_MEDIA_TYPES));
+        RouteSettings route = route(httpMethodName, uri, HandlerMethod.of(handler));
+        route.consumes(FORM_MEDIA_TYPES);
+        return spec(RouteGroupDefaults.CONSUMES, route);
     }
 
     @Override
@@ -259,7 +261,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
                 if (method != HttpMethod.CUSTOM) {
                     // the routes of the target decide which media types they consume and produce
                     // the located route carries the filters of the groups of the locator route
-                    grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).consumesAll());
+                    grouped(assembly.addRoute(method.name(), method, template, DEFAULT_CONSUMES, target).settings()).consumesAll();
                 }
             }
         }
@@ -321,7 +323,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return routePrefix == null ? uri : routePrefix.prefix(uri);
     }
 
-    private HandlerUriRoute grouped(HandlerUriRoute route) {
+    private RouteSettings grouped(RouteSettings route) {
         RouteAssembly.RouteFilters filters = groupFilters;
         if (filters != null) {
             route.inGroup(filters);
@@ -333,7 +335,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return route;
     }
 
-    private HandlerUriRoute declare(RouteDeclaration route, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+    private RouteSettings declare(RouteDeclaration route, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
         Objects.requireNonNull(route, "route");
         checkOpen();
         if (prefix != null) {
@@ -364,18 +366,21 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return new DefaultStatusRouteSpec(route, handler);
     }
 
-    private HandlerUriRoute route(String httpMethodName, String uri, HandlerMethod<?> handler) {
+    private RouteSettings route(String httpMethodName, String uri, HandlerMethod<?> handler) {
         RouteArguments.httpMethodName(httpMethodName);
         HttpMethod method = HttpMethod.parse(httpMethodName);
         // a standard method by its canonical name, a custom one by the given name
         String name = method == HttpMethod.CUSTOM ? httpMethodName : method.name();
-        return grouped(assembly.addRoute(name, method, uri(uri), DEFAULT_CONSUMES, handle(handler)));
+        return grouped(assembly.addRoute(name, method, uri(uri), DEFAULT_CONSUMES, handle(handler)).settings());
     }
 
-    private HandlerUriRoute route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
+    private RouteSettings route(HttpMethod method, String uri, HandlerMethod<?> handler, MediaType @Nullable [] consumes) {
         standardMethod(method);
-        RouteAssembly.DefaultUriRoute route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler));
-        return grouped(consumes == null ? route : route.consumes(consumes));
+        RouteSettings route = assembly.addRoute(method.name(), method, uri(uri), DEFAULT_CONSUMES, handle(handler)).settings();
+        if (consumes != null) {
+            route.consumes(consumes);
+        }
+        return grouped(route);
     }
 
     @SuppressWarnings("unchecked")
@@ -383,7 +388,7 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
         return (MethodExecutionHandle<Object, Object>) method;
     }
 
-    private HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, HandlerUriRoute> route) {
+    private HttpRouteSpec forEach(Set<HttpMethod> methods, String uri, Function<HttpMethod, RouteSettings> route) {
         Objects.requireNonNull(methods, "methods");
         if (methods.isEmpty()) {
             throw new IllegalArgumentException("No HTTP method for route: " + uri);
@@ -392,11 +397,11 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
             // before any route is added
             standardMethod(Objects.requireNonNull(method, "methods must not contain null"));
         }
-        List<HandlerUriRoute> routes = new ArrayList<>(methods.size());
+        List<RouteSettings> routes = new ArrayList<>(methods.size());
         for (HttpMethod method : methods) {
             routes.add(route.apply(method));
         }
-        return spec(routes.toArray(new HandlerUriRoute[0]));
+        return spec(routes.toArray(new RouteSettings[0]));
     }
 
     /**

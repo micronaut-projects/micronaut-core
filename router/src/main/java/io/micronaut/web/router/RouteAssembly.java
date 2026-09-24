@@ -19,7 +19,6 @@ import io.micronaut.context.ApplicationContext;
 import io.micronaut.context.env.Environment;
 import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ConversionService;
@@ -49,7 +48,7 @@ import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.DeclaredUriRoute;
 import io.micronaut.web.router.builder.HandlerMethod;
-import io.micronaut.web.router.builder.HandlerUriRoute;
+import io.micronaut.web.router.builder.RouteSettings;
 import io.micronaut.web.router.builder.DefaultRouteAnnotations;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -294,25 +293,30 @@ public final class RouteAssembly {
      * @param consumes         The media types the route consumes, or {@code null} for the default
      * @return The route
      */
-    public HandlerUriRoute declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
+    public RouteSettings declare(RouteDeclaration declaration, MethodExecutionHandle<Object, Object> executableHandle, MediaType @Nullable [] consumes) {
         HttpMethod httpMethod = declaration.httpMethod();
         String httpMethodName = declaration.httpMethodName();
         String uri = declaration.uriTemplate();
+        RouteSettings settings;
         if (!(declaration instanceof IndexedRouteDeclaration indexed) || currentParentRoute != null || !routeUri.apply(uri).equals(uri)) {
             // no index keys, or they do not describe the route: an ordinary route
-            DefaultUriRoute route = addRoute(httpMethodName, httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle);
-            return consumes == null ? route : route.consumes(consumes);
+            settings = addRoute(httpMethodName, httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle).settings();
+        } else {
+            DeclaredUriRoute route = new DeclaredUriRoute(indexed, recorded -> {
+                DefaultUriRoute created = new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService);
+                created.settings = recorded;
+                if (executableHandle instanceof HandlerMethod<?> handler) {
+                    recorded.applyTo(handler);
+                }
+                return created;
+            }, exposedPorts::add);
+            declaredRoutes.add(route);
+            settings = route.settings();
         }
-        DeclaredUriRoute route = new DeclaredUriRoute(
-            indexed,
-            () -> new DefaultUriRoute(httpMethod, uri, List.of(MediaType.APPLICATION_JSON_TYPE), executableHandle, httpMethodName, conversionService),
-            exposedPorts::add
-        );
         if (consumes != null) {
-            route.consumes(consumes);
+            settings.consumes(consumes);
         }
-        declaredRoutes.add(route);
-        return route;
+        return settings;
     }
 
     /**
@@ -886,7 +890,7 @@ public final class RouteAssembly {
         private final Function<String, RuntimeException> noExecutor;
         private final List<FilterRegistration> requestFilters = new ArrayList<>(0);
         private final List<FilterRegistration> responseFilters = new ArrayList<>(0);
-        private @Nullable RouteFilters group;
+        private final @Nullable RouteFilters group;
         private boolean closed;
 
         /**
@@ -927,22 +931,6 @@ public final class RouteAssembly {
          */
         public boolean isClosed() {
             return closed;
-        }
-
-        /**
-         * @param enclosing The filters of the group of the route
-         */
-        void inGroup(RouteFilters enclosing) {
-            this.group = Objects.requireNonNull(enclosing, "group");
-        }
-
-        /**
-         * @param other The filters to copy, e.g. of the {@code GET} route of an implicit {@code HEAD} route
-         */
-        void copy(RouteFilters other) {
-            requestFilters.addAll(other.requestFilters);
-            responseFilters.addAll(other.responseFilters);
-            group = other.group;
         }
 
         /**
@@ -1249,20 +1237,17 @@ public final class RouteAssembly {
      * The default route impl.
      */
     @Internal
-    public final class DefaultUriRoute extends AbstractRoute implements UriRoute, HandlerUriRoute {
+    public final class DefaultUriRoute extends AbstractRoute implements UriRoute {
         final String httpMethodName;
         final HttpMethod httpMethod;
         final UriMatchTemplate uriMatchTemplate;
         final List<DefaultUriRoute> nestedRoutes = new ArrayList<>(2);
-        private @Nullable Integer port;
-        private @Nullable String executeOn;
-        private boolean nonBlocking;
-        private final RouteFilters filters = new RouteFilters(null, executorName -> new SchedulerConfigurationException(
-            targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
+        /**
+         * The settings of the route to a handler, and the port of a route to a bean method: the
+         * route info is built from them.
+         */
+        private RouteSettings settings;
         private boolean implicitHead;
-        private @Nullable RouteGroup group;
-        private @Nullable Integer order;
-        private Map<String, Object> attributes = new LinkedHashMap<>(0);
 
         /**
          * @param httpMethod The HTTP method
@@ -1346,10 +1331,20 @@ public final class RouteAssembly {
             this.httpMethod = httpMethod;
             this.uriMatchTemplate = uriTemplate;
             this.httpMethodName = httpMethodName;
+            // the handler is given the settings of the handler at once
+            this.settings = new RouteSettings(RouteAssembly.this.exposedPorts::add, targetMethod instanceof HandlerMethod<?> handler ? handler : null);
+        }
+
+        /**
+         * @return The settings of the route, which the route info is built from
+         */
+        public RouteSettings settings() {
+            return settings;
         }
 
         @Override
         public UriRouteInfo<Object, Object> toRouteInfo() {
+            RouteGroup group = settings.getGroup();
             if (group != null && targetMethod instanceof HandlerMethod<?> handlerMethod) {
                 handlerMethod.groupAnnotations(group.annotations); // before the executor reads them
             }
@@ -1363,25 +1358,24 @@ public final class RouteAssembly {
                 targetMethod,
                 bodyArgumentName,
                 bodyArgument,
-                consumesMediaTypes,
-                producesMediaTypes,
+                getConsumes(),
+                getProduces(),
                 // a copy: the route info must not change with the route it was built from
                 predicates(effectivePort),
                 effectivePort,
                 conversionService,
                 // the executor choice as it is now: a later change to the route does not change the route info
-                new RouteExecutorSelector(executeOn, nonBlocking),
+                new RouteExecutorSelector(settings.getExecutorName(), settings.isNonBlocking()),
                 messageBodyHandlerRegistry,
                 implicitHead
             );
             routeInfo.routeFilters = routeFilters();
-            routeInfo.order = effectiveOrder(order, group);
+            routeInfo.order = effectiveOrder(settings.getOrder(), group);
             routeInfo.attributes = attributes();
-            RouteGroup routeGroup = group;
-            if (routeGroup != null && routeGroup.hasErrorOrStatusRoutes()) {
+            if (group != null && group.hasErrorOrStatusRoutes()) {
                 // built now: a duplicate fails when the router is built
-                routeGroup.buildErrorAndStatusRoutes();
-                routeInfo.errorScope = routeGroup;
+                group.buildErrorAndStatusRoutes();
+                routeInfo.errorScope = group;
             }
             return routeInfo;
         }
@@ -1391,7 +1385,8 @@ public final class RouteAssembly {
          * each overriding the ones before
          */
         private Map<String, Object> attributes() {
-            RouteGroup routeGroup = group;
+            RouteGroup routeGroup = settings.getGroup();
+            Map<String, Object> attributes = settings.getAttributes();
             if (routeGroup == null && attributes.isEmpty()) {
                 return Map.of();
             }
@@ -1407,11 +1402,11 @@ public final class RouteAssembly {
          * @return The port of the route, or of its group, or {@code null}
          */
         private @Nullable Integer effectivePort() {
-            Integer own = port;
+            Integer own = settings.getPort();
             if (own != null) {
                 return own;
             }
-            RouteGroup routeGroup = group;
+            RouteGroup routeGroup = settings.getGroup();
             return routeGroup == null ? null : routeGroup.port();
         }
 
@@ -1425,8 +1420,8 @@ public final class RouteAssembly {
          * @return The conditions
          */
         private List<Predicate<HttpRequest<?>>> predicates(@Nullable Integer effectivePort) {
-            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + 2);
-            RouteGroup routeGroup = group;
+            List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(conditions.size() + settings.getConditions().size() + 2);
+            RouteGroup routeGroup = settings.getGroup();
             if (routeGroup != null) {
                 routeGroup.addPredicates(predicates);
             }
@@ -1437,6 +1432,7 @@ public final class RouteAssembly {
                 }
             }
             predicates.addAll(conditions);
+            predicates.addAll(settings.getConditions());
             if (effectivePort != null) {
                 int routePort = effectivePort;
                 predicates.add(httpRequest -> httpRequest.getServerAddress().getPort() == routePort);
@@ -1450,13 +1446,13 @@ public final class RouteAssembly {
          * run on an executor.
          */
         private void checkBlockingBody() {
-            if (!(targetMethod instanceof HandlerMethod<?>) || executeOn != null) {
+            if (!(targetMethod instanceof HandlerMethod<?>) || settings.getExecutorName() != null) {
                 return;
             }
             for (Argument<?> argument : targetMethod.getArguments()) {
                 if (argument.getAnnotationMetadata().hasAnnotation(Body.class)
                     && InputStream.class.isAssignableFrom(argument.getType())
-                    && new RouteExecutorSelector(null, nonBlocking).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
+                    && new RouteExecutorSelector(null, settings.isNonBlocking()).select(targetMethod.getExecutableMethod(), threadSelection).isEmpty()) {
                     throw new RoutingException("The route " + this + " reads the body as an InputStream, which blocks, on the event loop"
                         + ": run it on an executor, e.g. with executeOn(TaskExecutors.BLOCKING)");
                 }
@@ -1476,13 +1472,7 @@ public final class RouteAssembly {
             head.producesMediaTypes = producesMediaTypes;
             head.bodyArgumentName = bodyArgumentName;
             head.bodyArgument = bodyArgument;
-            head.port = port;
-            head.executeOn = executeOn;
-            head.nonBlocking = nonBlocking;
-            head.filters.copy(filters);
-            head.group = group;
-            head.order = order;
-            head.attributes = new LinkedHashMap<>(attributes);
+            head.settings = settings.copy();
             head.implicitHead = true;
             return head;
         }
@@ -1506,7 +1496,7 @@ public final class RouteAssembly {
             return getHttpMethodName() + ' '
                     + uriMatchTemplate
                     + " -> " + target(targetMethod)
-                    + " (" + String.join(",", consumesMediaTypes) + ')';
+                    + " (" + String.join(",", getConsumes()) + ')';
         }
 
         @Override
@@ -1519,100 +1509,41 @@ public final class RouteAssembly {
             return (UriRoute) super.body(argument);
         }
 
-        @Override
-        public HandlerUriRoute annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-            handlerMethod("annotations").annotationMetadata(annotationMetadata);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute annotate(AnnotationValue<?> annotation) {
-            handlerMethod("annotations").annotate(annotation);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute responseType(Argument<?> responseType) {
-            handlerMethod("return type").responseType(responseType);
-            return this;
-        }
-
-        private HandlerMethod<?> handlerMethod(String what) {
-            if (!(targetMethod instanceof HandlerMethod<?> handlerMethod)) {
-                throw new IllegalStateException("A route to a bean method has the " + what + " of the method: " + this);
-            }
-            return handlerMethod;
-        }
-
-        @Override
-        public HandlerUriRoute executeOn(String executorName) {
-            this.executeOn = RouteArguments.executorName(executorName);
-            this.nonBlocking = false;
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute filter(FilterRegistration filter) {
-            filters.add(filter);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute inGroup(RouteFilters group) {
-            filters.inGroup(group);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute inGroup(RouteGroup group) {
-            this.group = Objects.requireNonNull(group, "group");
-            return this;
-        }
-
         /**
          * @return The filters of the route in the order the filter chain runs them: the filters of
          * the outer group, then of the inner groups, then of the route, see {@link RouteFilters#chain()}
          */
         List<GenericHttpFilter> routeFilters() {
+            RouteFilters filters = new RouteFilters(settings.getGroupFilters(), executorName -> new SchedulerConfigurationException(
+                targetMethod.getExecutableMethod(), "No executor configured for name: " + executorName));
+            for (FilterRegistration filter : settings.getFilters()) {
+                filters.add(filter);
+            }
             return filters.chain();
-        }
-
-        @Override
-        public HandlerUriRoute nonBlocking() {
-            this.nonBlocking = true;
-            this.executeOn = null;
-            return this;
         }
 
         @Override
         public UriRoute exposedPort(int port) {
             // the route info matches the requests on the port only, see predicates(Integer)
-            this.port = port;
-            RouteAssembly.this.exposedPorts.add(port);
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute port(int port) {
-            exposedPort(RouteArguments.port(port));
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute order(int order) {
-            this.order = order;
-            return this;
-        }
-
-        @Override
-        public HandlerUriRoute attribute(String name, Object value) {
-            attributes.put(Objects.requireNonNull(name, "name"), Objects.requireNonNull(value, "value"));
+            settings.port(port);
             return this;
         }
 
         @Override
         public @Nullable Integer getPort() {
-            return port;
+            return settings.getPort();
+        }
+
+        @Override
+        public List<MediaType> getConsumes() {
+            List<MediaType> consumes = settings.getConsumes();
+            return consumes != null ? consumes : consumesMediaTypes;
+        }
+
+        @Override
+        public List<MediaType> getProduces() {
+            List<MediaType> produces = settings.getProduces();
+            return produces != null ? produces : producesMediaTypes;
         }
 
         @Override
