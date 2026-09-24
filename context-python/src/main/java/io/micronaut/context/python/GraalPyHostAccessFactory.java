@@ -403,12 +403,12 @@ final class GraalPyHostAccessFactory {
             || value.isString() || value.isNumber() || value.isBoolean() || !value.hasMembers()) {
             return null;
         }
-        Value type = value.getMember("__class__");
+        Value type = value.getMember(CLASS_META);
         if (type == null || !type.hasMembers()) {
             return null;
         }
-        String module = PythonConversion.stringMember(type, "__module__");
-        String name = PythonConversion.stringMember(type, "__name__");
+        String module = PythonConversion.stringMember(type, PYTHON_MODULE);
+        String name = PythonConversion.stringMember(type, PYTHON_NAME);
         if (module == null || name == null) {
             return null;
         }
@@ -911,6 +911,18 @@ final class GraalPyHostAccessFactory {
      * @param targetType The Java type
      * @param converter The conversion
      * @param <T> The Java type
+     */
+    /**
+     * A Python standard library type with a Java counterpart, and what it takes to get there.
+     *
+     * @param module      the Python module the type is defined in
+     * @param typeName    the Python type name
+     * @param targetType  the Java type it converts to
+     * @param converter   the conversion
+     * @param convertible whether a given value is one the converter can take. A value it cannot --
+     *                    an aware {@code datetime}, an offset finer than a second -- must not match,
+     *                    so that it keeps the mapping it would otherwise have had
+     * @param <T>         the Java type
      */
     private record StandardLibraryType<T>(String module, String typeName, Class<T> targetType,
                                          Function<Value, T> converter, Predicate<Value> convertible) {
