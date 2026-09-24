@@ -546,6 +546,9 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
                     writeJavaImportsManifest(filesList, allDecorators, allImports, originatingElement);
                     writeFilesList(filesList, originatingElement);
                 }
+                try (var _ = CompilationProfiler.span(profiler, "python.functional-interfaces")) {
+                    generateFunctionalInterfaceProvider(allImports, processingEnvironment, originatingElement);
+                }
             }
             CompilationProfiler.increment(profiler, "python.unique-decorators", allDecorators.size());
 
@@ -656,7 +659,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             }
             String packageName = PYTHON_LANGUAGE;
             for (String srcDir : srcDirs) {
-                if (source.getPath() != null && source.getPath().startsWith(srcDir)) {
+                if (source.getPath() != null && PythonAstParser.isWithinSourceDir(srcDir, source.getPath())) {
                     packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
                     break;
                 }
@@ -705,7 +708,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
             Source source = transformed.originalSource();
             String packageName = "";
             for (String srcDir : values.src()) {
-                if (source.getPath() == null || source.getPath().startsWith(srcDir)) {
+                if (source.getPath() == null || PythonAstParser.isWithinSourceDir(srcDir, source.getPath())) {
                     packageName = PythonAstParser.getPackageNameOfSource(srcDir, source);
                     break;
                 }
@@ -1006,7 +1009,8 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         return path.replace('\\', '/');
     }
 
-    private static String cacheFilePath(String sourcePath, String cachePath) {
+    static String cacheFilePath(String sourcePath, String cachePath) {
+        cachePath = normalizeResourcePath(cachePath);
         int sourceSeparator = sourcePath.lastIndexOf('/');
         int cacheSeparator = cachePath.lastIndexOf('/');
         String parent = sourceSeparator == -1 ? "" : sourcePath.substring(0, sourceSeparator + 1);
@@ -1173,6 +1177,32 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         source.append(members.isEmpty() ? "}\n" : "\n}\n");
         String content = source.toString();
         writePythonToVfs(filesList, APPLICATION_SRC_PATH + JAVA_IMPORTS_MANIFEST_PREFIX + contentHash(content) + ".py", content, originatingElement);
+    }
+
+    /**
+     * Generates the provider of the functional interfaces found in the Java types the Python sources
+     * reference (see {@link PythonFunctionalInterfaceProviderGenerator}).
+     */
+    private void generateFunctionalInterfaceProvider(Map<String, List<Map<String, String>>> javaClassImports,
+                                                     PythonProcessingEnvironment processingEnvironment,
+                                                     ClassElement originatingElement) {
+        PythonFunctionalInterfaceProviderGenerator generator = new PythonFunctionalInterfaceProviderGenerator(javaVisitorContext);
+        for (List<Map<String, String>> imports : javaClassImports.values()) {
+            for (Map<String, String> importInfo : imports) {
+                String className = importInfo.get("class_name");
+                if (className != null) {
+                    generator.referenceImport(className);
+                }
+            }
+        }
+        if (processingEnvironment.environment() != null) {
+            processingEnvironment.classes().values().forEach(generator::referencePythonType);
+            processingEnvironment.scripts().values().forEach(generator::referencePythonType);
+        }
+        String className = generator.generate(originatingElement);
+        if (className != null && profiler != null) {
+            profiler.count("python.functional-interfaces", generator.entries().size());
+        }
     }
 
     /**

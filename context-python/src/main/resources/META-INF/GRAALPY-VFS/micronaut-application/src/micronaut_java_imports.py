@@ -418,12 +418,22 @@ def _micronaut_java_package_member(module_name, name):
     return member
 
 
+def _micronaut_module_file(path_without_suffix):
+    """Whether a Python module file of the path exists, under any suffix the import system loads."""
+    for suffix in _micronaut_importlib_machinery.all_suffixes():
+        if _micronaut_os.path.isfile(path_without_suffix + suffix):
+            return True
+    return False
+
+
 class _MicronautJavaImportFinder:
     """
-    Serves the Java packages and types the manifests record as modules. An application package of the
-    same name (a directory with an initialiser on the path) is left to the path finder: its generated
-    initialiser falls back to the Java members. A directory without an initialiser becomes part of the
-    Java package's path, so the Python modules in it import as usual.
+    Serves the Java packages and types the manifests record as modules. An application module or
+    package of the same name is left to the path finder: a directory with an initialiser on the path
+    is the application package, whose generated initialiser falls back to the Java members, and a
+    module file on the path is the application module, which is what its own name imports even when a
+    generated Java type shares it. A directory without an initialiser becomes part of the Java
+    package's path, so the Python modules in it import as usual.
     """
 
     # identifies the finder across reloads of this module, which define the class anew
@@ -446,6 +456,10 @@ class _MicronautJavaImportFinder:
                 if _micronaut_os.path.isfile(_micronaut_os.path.join(directory, '__init__.py')):
                     return None
                 directories.append(directory)
+            elif _micronaut_module_file(directory):
+                # a Python module of the name: the class the compiler generated for one of its own
+                # classes is not what `import <module>` means, so the path finder serves the module
+                return None
         spec = _micronaut_importlib_machinery.ModuleSpec(fullname, self, origin='java:' + java_name, is_package=True)
         spec.submodule_search_locations = directories
         return spec

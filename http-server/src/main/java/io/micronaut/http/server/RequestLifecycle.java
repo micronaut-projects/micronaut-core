@@ -610,7 +610,7 @@ public class RequestLifecycle {
      */
     protected final ExecutionFlow<HttpResponse<?>> onStatusError(HttpRequest<?> request, MutableHttpResponse<?> defaultResponse, String message) {
 
-        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus());
+        ExecutionFlow<HttpResponse<?>> flow = executionFlowWithStatusRoute(request, defaultResponse.getStatus(), PropagatedContext.getOrEmpty());
         if (flow != null) {
             return flow;
         }
@@ -684,7 +684,8 @@ public class RequestLifecycle {
                                                          HttpStatusException cause,
                                                          @Nullable Class<?> declaringType,
                                                          PropagatedContext propagatedContext) {
-        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus());
+        // the status route runs with the propagated context of the filters, like the error routes
+        ExecutionFlow<HttpResponse<?>> flow  = executionFlowWithStatusRoute(request, cause.getStatus(), propagatedContext);
         if (flow != null) {
             return flow;
         }
@@ -724,9 +725,10 @@ public class RequestLifecycle {
 
     @Nullable
     private ExecutionFlow<HttpResponse<?>> executionFlowWithStatusRoute(HttpRequest<?> request,
-                                                                        HttpStatus status) {
+                                                                        HttpStatus status,
+                                                                        PropagatedContext propagatedContext) {
         return routeExecutor.router.findStatusRoute(status, request)
-                .map(routeMatch -> executeRoute(request, PropagatedContext.getOrEmpty(), routeMatch))
+                .map(routeMatch -> executeRoute(request, propagatedContext, routeMatch))
                 .orElse(null);
     }
 }

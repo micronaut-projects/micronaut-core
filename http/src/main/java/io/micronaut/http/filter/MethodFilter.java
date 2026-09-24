@@ -389,7 +389,12 @@ record MethodFilter<T>(FilterOrder order,
                 returnValue = Objects.requireNonNull(method).invoke(bean, args);
             }
             ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
-            PropagatedContext mutatedPropagatedContext = methodContext.mutablePropagatedContext.getContext();
+            MutablePropagatedContext mutablePropagatedContext = methodContext.mutablePropagatedContext;
+            if (!(executionFlow instanceof ImperativeExecutionFlow<FilterContext>)) {
+                // an asynchronous filter can change the context until its result completes
+                return executionFlow.map(fc -> withMutatedContext(fc, filterContext.propagatedContext(), mutablePropagatedContext));
+            }
+            PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
             if (mutatedPropagatedContext != filterContext.propagatedContext() && mutatedPropagatedContext != null) {
                 executionFlow = executionFlow.map(fc -> fc.withPropagatedContext(mutatedPropagatedContext));
             }
@@ -397,6 +402,16 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    private static FilterContext withMutatedContext(FilterContext filterContext,
+                                                    PropagatedContext propagatedContext,
+                                                    MutablePropagatedContext mutablePropagatedContext) {
+        PropagatedContext mutatedPropagatedContext = mutablePropagatedContext.getContext();
+        if (mutatedPropagatedContext != propagatedContext && mutatedPropagatedContext != null) {
+            return filterContext.withPropagatedContext(mutatedPropagatedContext);
+        }
+        return filterContext;
     }
 
     private Object[] bindArgsSync(FilterMethodContext context) {
@@ -659,13 +674,16 @@ record MethodFilter<T>(FilterOrder order,
                     }
                     return next.handle(context, doneFlow.getValue(), continuation);
                 } else {
-                    return delayedFlow.flatMap(v -> {
-                        try {
-                            return next.handle(context, v, continuation);
-                        } catch (Throwable e) {
-                            return ExecutionFlow.error(e);
-                        }
-                    });
+                    // flatMap skips an empty value, a stage completed with null is handled like a returned null
+                    return delayedFlow
+                        .map(v -> v == null ? EMPTY_RESULT : v)
+                        .flatMap(v -> {
+                            try {
+                                return next.handle(context, v == EMPTY_RESULT ? null : v, continuation);
+                            } catch (Throwable e) {
+                                return ExecutionFlow.error(e);
+                            }
+                        });
                 }
             } catch (Throwable e) {
                 return ExecutionFlow.error(e);

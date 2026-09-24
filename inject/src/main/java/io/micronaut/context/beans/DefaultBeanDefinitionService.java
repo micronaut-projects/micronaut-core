@@ -192,6 +192,11 @@ public final class DefaultBeanDefinitionService implements BeanDefinitionService
         Class<?> beanType = reference.getBeanType();
         boolean beanTypeIndexAdded = false;
         Set<Class<?>> exposedTypes = reference.getExposedTypes();
+        if (exposedTypes.isEmpty() && reference instanceof RuntimeBeanDefinition<?>) {
+            // Without restricted exposed types the bean is a candidate for its whole hierarchy,
+            // including index entries already created by earlier lookups
+            exposedTypes = ReflectionUtils.getAllClassesInHierarchy(beanType);
+        }
         for (Class<?> exposedType : exposedTypes) {
             resolveTypeIndex(exposedType).add(producer);
             if (beanType.equals(exposedType)) {
