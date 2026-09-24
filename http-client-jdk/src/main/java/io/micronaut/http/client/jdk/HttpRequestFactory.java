@@ -38,11 +38,14 @@ import java.net.URLEncoder;
 import java.net.http.HttpRequest;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.Flow;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Utility class to create {@link HttpRequest.Builder} from a Micronaut HTTP Request.
@@ -165,7 +168,13 @@ public final class HttpRequestFactory {
             .entrySet()
             .stream()
             .filter(entry -> entry.getKey() != null && entry.getValue() != null)
-            .map(entry -> URLEncoder.encode(entry.getKey().toString(), characterEncoding) + "=" + URLEncoder.encode(entry.getValue().toString(), characterEncoding))
+            .flatMap(entry -> {
+                String key = URLEncoder.encode(entry.getKey().toString(), characterEncoding);
+                Stream<?> values = entry.getValue() instanceof Collection<?> collection ? collection.stream() : Stream.of(entry.getValue());
+                return values
+                    .filter(Objects::nonNull)
+                    .map(value -> key + "=" + URLEncoder.encode(value.toString(), characterEncoding));
+            })
             .collect(Collectors.joining("&"));
     }
 

@@ -32,6 +32,7 @@ import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpResponseWrapper;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
@@ -64,6 +65,7 @@ import java.util.OptionalLong;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BooleanSupplier;
+import java.util.function.Function;
 
 /**
  * This class handles encoding of the HTTP response in a server-agnostic way. Note that while this
@@ -134,10 +136,50 @@ public abstract class ResponseLifecycle {
         }
     }
 
+    /**
+     * Encode the response. If writing the body fails before anything was sent, the given handler
+     * gives the error response for the failure, e.g. from the exception handlers and the error and
+     * status routes, and that response is encoded instead. The handler runs at most once: if the
+     * error response fails to encode too, this falls back like
+     * {@link #encodeHttpResponseSafe(HttpRequest, HttpResponse)}.
+     *
+     * @param httpRequest       The request that triggered this response
+     * @param response          The unencoded response
+     * @param writeErrorHandler Gives the error response for a failure to write the body
+     * @return The encoded response
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public final ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponseSafe(HttpRequest<?> httpRequest,
+                                                                                        HttpResponse<?> response,
+                                                                                        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler) {
+        ExecutionFlow<ByteBodyHttpResponse<?>> flow;
+        try {
+            flow = (ExecutionFlow<ByteBodyHttpResponse<?>>) encodeHttpResponse(httpRequest, response);
+        } catch (Throwable e) {
+            flow = ExecutionFlow.error(e);
+        }
+        // a failure after the first byte was sent does not complete this flow, it fails the body
+        return flow.onErrorResume(e -> {
+            ExecutionFlow<HttpResponse<?>> errorResponse;
+            try {
+                errorResponse = writeErrorHandler.apply(e);
+            } catch (Throwable f) {
+                f.addSuppressed(e);
+                return ExecutionFlow.error(f);
+            }
+            return errorResponse.flatMap(r -> encodeHttpResponseSafe(httpRequest, r));
+        });
+    }
+
     @SuppressWarnings("unchecked")
     private ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeHttpResponse(
         HttpRequest<?> nettyRequest,
         HttpResponse<?> httpResponse) {
+        ExecutionFlow<? extends ByteBodyHttpResponse<?>> byteBodyResponse = encodeByteBodyResponse(nettyRequest, httpResponse);
+        if (byteBodyResponse != null) {
+            return byteBodyResponse;
+        }
         Object body = httpResponse.body();
         MutableHttpResponse<?> response = httpResponse.toMutableResponse();
         if (nettyRequest.getMethod() == HttpMethod.HEAD) {
@@ -232,6 +274,70 @@ public abstract class ResponseLifecycle {
             messageBodyWriter = messageBodyHandlerRegistry.getWriter(responseBodyType, List.of(responseMediaType));
         }
         return buildFinalResponse(nettyRequest, (MutableHttpResponse<Object>) response, responseBodyType, responseMediaType, body, messageBodyWriter, false);
+    }
+
+    /**
+     * Pass through a response that already carries its body bytes, e.g. a response of the raw HTTP
+     * client returned by a route. The response may be wrapped in {@link HttpResponseWrapper}s, in
+     * which case the outermost wrapper provides the status and headers.
+     *
+     * @param request  The request
+     * @param response The response
+     * @return The encoded response, or {@code null} if the response does not carry body bytes
+     */
+    private @Nullable ExecutionFlow<? extends ByteBodyHttpResponse<?>> encodeByteBodyResponse(HttpRequest<?> request, HttpResponse<?> response) {
+        ByteBodyHttpResponse<?> byteBodyResponse;
+        if (response instanceof ByteBodyHttpResponse<?> direct) {
+            byteBodyResponse = direct;
+        } else if (response instanceof HttpResponseWrapper<?> wrapper) {
+            byteBodyResponse = HttpResponseWrapper.wrappedByteBodyResponse(wrapper);
+            if (byteBodyResponse == null) {
+                return null;
+            }
+            if (!objectBodyOfWrappers(response).isEmpty()) {
+                // the object body of a wrapper replaces the bytes of the wrapped response
+                byteBodyResponse.close();
+                return null;
+            }
+        } else {
+            return null;
+        }
+        if (!byteBodyResponse.hasByteBody()) {
+            // an object body replaced the bytes, see MutableByteBodyHttpResponse
+            return null;
+        }
+        if (response.getHeaders() instanceof MutableHttpHeaders headers) {
+            // the transfer coding of the connection the bytes were received on (e.g. from an
+            // upstream server) does not apply to this one, whose framing the server decides
+            headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        }
+        if (request.getMethod() == HttpMethod.HEAD) {
+            byteBodyResponse.close();
+            return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyFactory.createEmpty()));
+        }
+        if (byteBodyResponse == response) {
+            return ExecutionFlow.just(byteBodyResponse);
+        }
+        return ExecutionFlow.just(ByteBodyHttpResponseWrapper.wrap(response, byteBodyResponse.byteBody().move()));
+    }
+
+    /**
+     * The object body of the outermost wrapper that has one, above the wrapped
+     * {@link ByteBodyHttpResponse}.
+     *
+     * @param response The response
+     * @return The body, or empty
+     */
+    private static Optional<?> objectBodyOfWrappers(HttpResponse<?> response) {
+        HttpResponse<?> current = response;
+        while (current instanceof HttpResponseWrapper<?> wrapper) {
+            Optional<?> body = wrapper.getBody();
+            if (body.isPresent()) {
+                return body;
+            }
+            current = wrapper.getDelegate();
+        }
+        return Optional.empty();
     }
 
     /**
