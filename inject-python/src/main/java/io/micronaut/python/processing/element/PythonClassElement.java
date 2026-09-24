@@ -885,10 +885,49 @@ public sealed class PythonClassElement extends AbstractPythonClassElement permit
                     if (javaSuper != null && !javaSuper.isInterface()) {
                         return Optional.of(javaSuper);
                     }
+                    if (isPythonException(base)) {
+                        // a Python exception class: its generated class is a RuntimeException, so Java
+                        // code, exception handlers and compiled bodies catch it as one
+                        return environment.visitorContext().getClassElement(RuntimeException.class).map(ClassElement.class::cast);
+                    }
                 }
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Whether the class extends the Python builtin {@code Exception} (directly, or through a Python
+     * class of the compilation that does), rather than a Java exception class: its generated class
+     * extends {@link RuntimeException}, with the Java message the {@code str()} of the Python exception.
+     *
+     * @return {@code true} for a Python exception class
+     */
+    @Override
+    public boolean extendsPythonException() {
+        // the same walk as getSuperType(): the first base that resolves is the superclass
+        for (TypeRef base : getNativeType().bases()) {
+            ClassElement baseElement = findPythonClass(base);
+            if (baseElement != null) {
+                if (!baseElement.isInterface()) {
+                    return baseElement instanceof AbstractPythonClassElement pythonBase && pythonBase.extendsPythonException();
+                }
+                continue;
+            }
+            ClassElement javaSuper = toJavaType(base).orElse(null);
+            if (javaSuper != null && !javaSuper.isInterface()) {
+                return false;
+            }
+            if (isPythonException(base)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean isPythonException(TypeRef base) {
+        String name = base.name();
+        return "Exception".equals(name) || "builtins.Exception".equals(name);
     }
 
     private ClassElement resolveTypeArguments(ClassElement baseElement, TypeRef base) {

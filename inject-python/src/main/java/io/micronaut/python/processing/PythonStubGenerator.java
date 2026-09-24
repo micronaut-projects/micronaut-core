@@ -2026,6 +2026,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
                     return pythonInstanceConstructorBody(model, isAbstractIntroNoArg, aThis, methodParameters);
                 }
             })));
+            if (!isJunit5Test && element instanceof AbstractPythonClassElement pythonClass && pythonClass.extendsPythonException() && pythonClass.getNativeType().constructor() == null) {
+                // Exception(*args) in Python, for a class extending Exception or a Python class that does: a
+                // message constructor for Java callers and for the compiled bodies that raise the class,
+                // creating the Python exception with the message as its argument
+                builder.addMethod(MethodDef.constructor()
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(ParameterDef.of("message", TypeDef.STRING))
+                    .build((aThis, methodParameters) -> invokeValueConstructor(aThis, PYTHON_CONTEXT_RUNTIME.invokeStatic(
+                        NEW_INSTANCE,
+                        POLYGLOT_VALUE,
+                        List.of(pythonClassReference(element, pythonClassReference), methodParameters.get(0).cast(TypeDef.OBJECT))
+                    )))
+                );
+            }
         }
 
     }
