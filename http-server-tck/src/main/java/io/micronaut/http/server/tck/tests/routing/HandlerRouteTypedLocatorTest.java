@@ -186,7 +186,7 @@ public class HandlerRouteTypedLocatorTest {
                     text(HttpStatus.CREATED, "shop " + target.id() + " adds " + item.name()));
                 shop.handleForm(HttpMethod.POST, "/form", (request, pathVariables, target, form) ->
                     text(HttpStatus.OK, "shop " + target.id() + " form " + form.getString("item")));
-                shop.handleAsync(HttpMethod.GET, "/async", (request, pathVariables, target) ->
+                shop.handleAsync(HttpMethod.GET, "/async", (request, pathVariables, target, body) ->
                     CompletableFuture.supplyAsync(() -> text(HttpStatus.OK, "async shop " + target.id()), executor));
             });
             // the type of the target is the type the locator returns

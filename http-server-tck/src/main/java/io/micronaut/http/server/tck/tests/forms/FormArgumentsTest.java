@@ -581,7 +581,7 @@ public class FormArgumentsTest {
         HttpRoutes formArgumentsRoutes() {
             return routes -> {
                 for (String path : List.of("/file", "/by-name")) {
-                    routes.asyncPOST(FN + path, (request, pathVariables) -> request.form().thenCompose(form ->
+                    routes.asyncPOST(FN + path, (request, pathVariables, body) -> body.form().thenCompose(form ->
                             describe(form.getString("name"), form.getFile("avatar")).thenApply(FormArgumentsTest::ok)))
                         .consumes(FORM_MEDIA_TYPES);
                 }
@@ -591,25 +591,25 @@ public class FormArgumentsTest {
                         + " " + form.findFile("cover").map(FileUpload::fileName).orElse("empty")
                         + " " + (docs.isEmpty() ? "no-docs" : docs.size()));
                 });
-                routes.asyncPOST(FN + "/files", (request, pathVariables) -> request.form().thenCompose(form ->
+                routes.asyncPOST(FN + "/files", (request, pathVariables, body) -> body.form().thenCompose(form ->
                         contents(form.getFiles("docs")).thenApply(contents -> ok(form.getString("name") + " " + contents))))
                     .consumes(FORM_MEDIA_TYPES);
                 for (String path : List.of("/shared", "/shared-reversed")) {
-                    routes.asyncPOST(FN + path, (request, pathVariables) -> request.form().thenCompose(form -> {
+                    routes.asyncPOST(FN + path, (request, pathVariables, body) -> body.form().thenCompose(form -> {
                             FileUpload avatar = form.getFile("avatar");
                             return avatar.bytes(1024).thenApply(bytes -> ok("same " + form.getString("name") + " " + form.getString("name") + " " + text(bytes)));
                         }))
                         .consumes(FORM_MEDIA_TYPES);
                 }
-                routes.asyncPOST(FN + "/data", (request, pathVariables) -> request.form().thenCompose(form ->
+                routes.asyncPOST(FN + "/data", (request, pathVariables, body) -> body.form().thenCompose(form ->
                         form.getFile("avatar").bytes(1024).thenApply(bytes -> ok(form.getString("name") + " [avatar] " + text(bytes)))))
                     .consumes(FORM_MEDIA_TYPES);
                 for (String path : List.of("/text", "/text-reversed")) {
                     routes.POST(FN + path, (request, pathVariables, form) ->
                         ok(form.getString("name") + " " + form.getString("city") + " " + (form.getInt("age") + 1) + " " + form.getString("name")));
                 }
-                routes.asyncPOST(FN + "/part", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST(FN + "/part", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     List<String> result = new ArrayList<>();
                     return parts.part("name", part -> part.text().thenAccept(result::add))
                         .thenCompose(found -> parts.part("avatar", part -> part.file().bytes(1024)
@@ -617,15 +617,15 @@ public class FormArgumentsTest {
                         .thenApply(found -> ok(String.join(" ", result)));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST(FN + "/text-part", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST(FN + "/text-part", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     List<String> result = new ArrayList<>();
                     return parts.part("name", part -> part.text().thenAccept(value -> result.add(part.name() + "=" + value + " " + part.isFile())))
                         .thenApply(found -> ok(String.join(" ", result)));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST(FN + "/optional-part", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST(FN + "/optional-part", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     List<String> result = new ArrayList<>();
                     return parts.part("cover", part -> {
                         result.add("cover " + part.fileName());
@@ -633,7 +633,7 @@ public class FormArgumentsTest {
                     }).thenApply(found -> ok(found ? String.join(" ", result) : "no cover"));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST(FN + "/parts", (request, pathVariables) -> forEach(request.parts()).thenApply(FormArgumentsTest::ok))
+                routes.asyncPOST(FN + "/parts", (request, pathVariables, body) -> forEach(body.parts()).thenApply(FormArgumentsTest::ok))
                     .consumes(FORM_MEDIA_TYPES);
             };
         }

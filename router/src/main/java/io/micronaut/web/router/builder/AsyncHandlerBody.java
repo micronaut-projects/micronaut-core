@@ -20,15 +20,16 @@ import io.micronaut.core.annotation.Internal;
 import java.util.concurrent.CompletionStage;
 
 /**
- * The request an asynchronous handler receives, as its route sees it: when the stage the handler
- * returned completes, the route releases what the handler's read of the body left open, e.g. the
- * parts of a form it did not read, before the response is written.
+ * The body an asynchronous handler receives, see {@link AsyncBodyRequestHandler}, as its route
+ * sees it: when the stage the handler returned completes, the route releases what the handler's
+ * read of the body left open, e.g. the parts of a form it did not read, before the response is
+ * written.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public interface AsyncHandlerRequest {
+public interface AsyncHandlerBody {
 
     /**
      * Release what the read of the body left open: the parts of a form, the elements of the

@@ -283,9 +283,9 @@ public class HandlerRoutesPropagatedContextTest {
                 // the IO executor propagates the context of the thread that submits the task
                 CompletableFuture.supplyAsync(HandlerRoutesPropagatedContextTest::describe, io)
                     .thenApply(onExecutor -> text(onExecutor + ";" + describe())));
-            routes.asyncPOST("/propagation/async-body", (request, pathVariables) -> {
+            routes.asyncPOST("/propagation/async-body", (request, pathVariables, body) -> {
                 String handler = describe();
-                return request.text().thenApply(body -> text(body + ":" + handler));
+                return body.text().thenApply(value -> text(value + ":" + handler));
             })
                 .consumes(MediaType.TEXT_PLAIN_TYPE);
 

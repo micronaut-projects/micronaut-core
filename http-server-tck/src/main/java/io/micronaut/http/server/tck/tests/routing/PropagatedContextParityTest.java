@@ -852,30 +852,30 @@ public class PropagatedContextParityTest {
             filtered(routes.asyncGET("/parity/r/thread", (request, pathVariables) -> continuationOnAPlainThread().thenApply(PropagatedContextParityTest::text)));
             filtered(routes.asyncGET("/parity/r/io", (request, pathVariables) -> continuationOnTheIoExecutor(io).thenApply(PropagatedContextParityTest::text)));
 
-            filtered(routes.asyncPOST("/parity/r/text", (request, pathVariables) -> {
+            filtered(routes.asyncPOST("/parity/r/text", (request, pathVariables, body) -> {
                 reading.reading();
-                return request.text().thenApply(value -> text(value + ":" + describe()));
+                return body.text().thenApply(value -> text(value + ":" + describe()));
             }).consumes(MediaType.TEXT_PLAIN_TYPE));
-            filtered(routes.asyncPOST("/parity/r/json", (request, pathVariables) -> {
+            filtered(routes.asyncPOST("/parity/r/json", (request, pathVariables, body) -> {
                 reading.reading();
-                return request.body(Argument.mapOf(String.class, String.class)).thenApply(value -> text(value.get("name") + ":" + describe()));
+                return body.body(Argument.mapOf(String.class, String.class)).thenApply(value -> text(value.get("name") + ":" + describe()));
             }).consumes(MediaType.APPLICATION_JSON_TYPE));
-            filtered(routes.asyncPOST("/parity/r/form", (request, pathVariables) -> {
+            filtered(routes.asyncPOST("/parity/r/form", (request, pathVariables, body) -> {
                 reading.reading();
-                return request.form().thenApply(form -> text(form.find("name", String.class).orElse("none") + ":" + describe()));
+                return body.form().thenApply(form -> text(form.find("name", String.class).orElse("none") + ":" + describe()));
             }).consumes(MediaType.APPLICATION_FORM_URLENCODED_TYPE));
-            filtered(routes.asyncPOST("/parity/r/elements", (request, pathVariables) -> {
+            filtered(routes.asyncPOST("/parity/r/elements", (request, pathVariables, body) -> {
                 reading.reading();
                 AtomicReference<String> first = new AtomicReference<>();
-                return request.elements(String.class).forEach(element -> {
+                return body.elements(String.class).forEach(element -> {
                     first.compareAndSet(null, describe());
                     return CompletableFuture.completedFuture(null);
                 }).thenApply(ignored -> text("elem=" + first.get() + ";done=" + describe()));
             }).consumes(MediaType.APPLICATION_JSON_TYPE));
-            filtered(routes.asyncPOST("/parity/r/parts", (request, pathVariables) -> {
+            filtered(routes.asyncPOST("/parity/r/parts", (request, pathVariables, body) -> {
                 reading.reading();
                 AtomicReference<String> first = new AtomicReference<>();
-                return request.parts().forEach(part -> {
+                return body.parts().forEach(part -> {
                     first.compareAndSet(null, describe());
                     return part.text();
                 }).thenApply(ignored -> text("elem=" + first.get() + ";done=" + describe()));

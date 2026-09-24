@@ -20,11 +20,11 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
-import io.micronaut.http.AsyncServerHttpRequest;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
 import jakarta.inject.Singleton;
@@ -32,29 +32,28 @@ import jakarta.inject.Singleton;
 import java.util.Optional;
 
 /**
- * Binds the {@link AsyncServerHttpRequest} of an asynchronous handler: a view of the request,
+ * Binds the {@link AsyncRequestBody} of an asynchronous handler: the body of the request,
  * created for the route invocation, that owns the one read of the body. What a read left open,
  * e.g. the parts of a form, is released when the stage returned by a handler route completes,
- * and for a controller method that declares the request, when the request ends.
+ * and for a controller method that declares the body, when the request ends.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
 @Singleton
-final class AsyncServerHttpRequestArgumentBinder implements TypedRequestArgumentBinder<AsyncServerHttpRequest<?>> {
-    @SuppressWarnings({"unchecked", "rawtypes"})
-    private static final Argument<AsyncServerHttpRequest<?>> ARGUMENT = (Argument) Argument.of(AsyncServerHttpRequest.class);
+final class AsyncRequestBodyArgumentBinder implements TypedRequestArgumentBinder<AsyncRequestBody> {
+    private static final Argument<AsyncRequestBody> ARGUMENT = Argument.of(AsyncRequestBody.class);
 
     final ConversionService conversionService;
     private final BeanProvider<RequestArgumentSatisfier> argumentSatisfier;
     private final BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry;
     private final BeanProvider<FormFactory> formFactory;
 
-    AsyncServerHttpRequestArgumentBinder(BeanProvider<RequestArgumentSatisfier> argumentSatisfier,
-                                         BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
-                                         BeanProvider<FormFactory> formFactory,
-                                         ConversionService conversionService) {
+    AsyncRequestBodyArgumentBinder(BeanProvider<RequestArgumentSatisfier> argumentSatisfier,
+                                   BeanProvider<MessageBodyHandlerRegistry> bodyHandlerRegistry,
+                                   BeanProvider<FormFactory> formFactory,
+                                   ConversionService conversionService) {
         this.argumentSatisfier = argumentSatisfier;
         this.bodyHandlerRegistry = bodyHandlerRegistry;
         this.formFactory = formFactory;
@@ -62,19 +61,19 @@ final class AsyncServerHttpRequestArgumentBinder implements TypedRequestArgument
     }
 
     @Override
-    public Argument<AsyncServerHttpRequest<?>> argumentType() {
+    public Argument<AsyncRequestBody> argumentType() {
         return ARGUMENT;
     }
 
     @Override
-    public BindingResult<AsyncServerHttpRequest<?>> bind(ArgumentConversionContext<AsyncServerHttpRequest<?>> context, HttpRequest<?> source) {
+    public BindingResult<AsyncRequestBody> bind(ArgumentConversionContext<AsyncRequestBody> context, HttpRequest<?> source) {
         // the request a filter continued with reads the body of the server request it wraps
         ServerHttpRequest<?> server = ServerRequestBody.of(source);
         if (server == null) {
             return BindingResult.unsatisfied();
         }
-        AsyncServerHttpRequest<?> asyncRequest = new DefaultAsyncServerHttpRequest<>(source, server, this);
-        return () -> Optional.of(asyncRequest);
+        AsyncRequestBody body = new DefaultAsyncRequestBody(source, server, this);
+        return () -> Optional.of(body);
     }
 
     /**
