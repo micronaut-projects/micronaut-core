@@ -50,8 +50,12 @@ import java.util.function.Supplier;
 final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
 
     private Mono<Object> value;
+    private boolean cancelled;
+    /**
+     * The subscriptions to cancel when this flow is cancelled, allocated with the first subscription.
+     */
     @Nullable
-    private List<Subscription> subscriptionsToCancel = new ArrayList<>(1);
+    private List<Subscription> subscriptionsToCancel;
 
     <K> ReactorExecutionFlowImpl(Publisher<K> value) {
         this(value instanceof Flux<K> flux ? flux.next() : Mono.from(value));
@@ -61,7 +65,15 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
         this.value = (Mono<Object>) value;
     }
 
-    public static <T> ExecutionFlow<T> defuse(Publisher<T> publisher, PropagatedContext propagatedContext) {
+    /**
+     * Unwrap a publisher that already holds its result, without subscribing to it.
+     *
+     * @param publisher The publisher
+     * @param <T>       The value type
+     * @return The immediate flow, or {@code null} if the publisher has to be subscribed to
+     */
+    @Nullable
+    static <T> ExecutionFlow<T> immediate(Publisher<T> publisher) {
         if (publisher instanceof Fuseable.ScalarCallable<?> sc) {
             // Mono.just, Mono.error. No need for context propagation
             try {
@@ -75,100 +87,36 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
             //noinspection unchecked
             return (ExecutionFlow<T>) flowAsMono.flow;
         }
+        return null;
+    }
 
-        // special subscriber that (a) contains the propagated context and (b) can return an
-        // imperative flow if the result is provided immediately in subscribe()
-        var s = new CoreSubscriber<T>() {
-            final AtomicReference<@Nullable ExecutionFlow<T>> flow = new AtomicReference<>();
-
-            boolean complete = false;
-
-            @Override
-            public Context currentContext() {
-                return ReactorPropagation.addPropagatedContext(Context.empty(), propagatedContext);
-            }
-
-            @Override
-            public void onSubscribe(Subscription s) {
-                if (s instanceof Fuseable.QueueSubscription<?> qs && qs.requestFusion(Fuseable.SYNC) == Fuseable.SYNC) {
-                    // we can avoid the subscribe / WIP dance. This is for example Mono.just(…).map(…)
-                    T result;
-                    try {
-                        //noinspection unchecked
-                        result = (T) qs.poll();
-                    } catch (Throwable t) {
-                        completeError(t);
-                        return;
-                    }
-                    complete(result);
-                    return;
-                }
-                // fallback, normal reactive subscription
-                s.request(Long.MAX_VALUE);
-            }
-
-            private void complete(@Nullable T result) {
-                if (!flow.compareAndSet(null, ExecutionFlow.just(result))) {
-                    DelayedExecutionFlow<T> delayedFlow = (DelayedExecutionFlow<T>) flow.get();
-                    if (delayedFlow != null) {
-                        delayedFlow.complete(result);
-                    }
-                }
-                complete = true;
-            }
-
-            private void completeError(Throwable t) {
-                if (!flow.compareAndSet(null, ExecutionFlow.error(t))) {
-                    DelayedExecutionFlow<?> delayedFlow = (DelayedExecutionFlow<?>) flow.get();
-                    if (delayedFlow != null) {
-                        delayedFlow.completeExceptionally(t);
-                    }
-                }
-                complete = true;
-            }
-
-            @Override
-            public void onNext(T t) {
-                if (complete) {
-                    Operators.onNextDropped(t, Context.empty());
-                    return;
-                }
-                complete(t);
-            }
-
-            @Override
-            public void onError(Throwable t) {
-                if (complete) {
-                    Operators.onErrorDropped(t, Context.empty());
-                    return;
-                }
-                completeError(t);
-            }
-
-            @Override
-            public void onComplete() {
-                if (!complete) {
-                    complete(null);
-                }
-            }
-        };
-        if (propagatedContext.isBound()) {
-            publisher.subscribe(s);
-        } else {
-            propagatedContext.propagate(() -> publisher.subscribe(s));
-        }
-        ExecutionFlow<T> immediate = s.flow.getPlain();
+    public static <T> ExecutionFlow<T> defuse(Publisher<T> publisher, PropagatedContext propagatedContext) {
+        ExecutionFlow<T> immediate = immediate(publisher);
         if (immediate != null) {
             return immediate;
-        } else {
-            DelayedExecutionFlow<T> flow = DelayedExecutionFlow.create();
-            if (s.flow.compareAndSet(null, flow)) {
-                return flow;
-            } else {
-                // data race
-                return s.flow.getPlain();
-            }
         }
+        // the flow has a single result: for a multi-valued publisher take the first item and
+        // cancel the rest, like Mono.from does
+        Mono<T> mono = Mono.from(publisher);
+
+        DefusingSubscriber<T> s = new DefusingSubscriber<>(propagatedContext);
+        if (propagatedContext.isBound()) {
+            mono.subscribe(s);
+        } else {
+            propagatedContext.propagate(() -> mono.subscribe(s));
+        }
+        immediate = s.flow.getPlain();
+        if (immediate != null) {
+            return immediate;
+        }
+        DelayedExecutionFlow<T> flow = DelayedExecutionFlow.create();
+        if (s.flow.compareAndSet(null, flow)) {
+            // a cancelled flow cancels the publisher
+            flow.onCancel(s::cancel);
+            return flow;
+        }
+        // data race, the publisher completed in the meantime
+        return s.flow.getPlain();
     }
 
     @Override
@@ -217,6 +165,7 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     public void cancel() {
         List<Subscription> stc;
         synchronized (this) {
+            cancelled = true;
             stc = subscriptionsToCancel;
             subscriptionsToCancel = null;
         }
@@ -252,9 +201,12 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
                 this.subscription = s;
                 boolean cancel;
                 synchronized (ReactorExecutionFlowImpl.this) {
-                    if (subscriptionsToCancel == null) {
+                    if (cancelled) {
                         cancel = true;
                     } else {
+                        if (subscriptionsToCancel == null) {
+                            subscriptionsToCancel = new ArrayList<>(1);
+                        }
                         subscriptionsToCancel.add(subscription);
                         cancel = false;
                     }
@@ -382,5 +334,121 @@ final class ReactorExecutionFlowImpl implements ReactiveExecutionFlow<Object> {
     @Override
     public CompletableFuture<Object> toCompletableFuture() {
         return value.toFuture();
+    }
+
+    /**
+     * Subscriber that (a) carries the propagated context in the Reactor context, (b) binds it as a
+     * thread-local while a signal is handled, so that the steps of a delayed flow run in it when the
+     * publisher completes on another thread, and (c) can return an imperative flow if the result is
+     * provided immediately in subscribe().
+     *
+     * @param <T> The value type
+     */
+    private static final class DefusingSubscriber<T> implements CoreSubscriber<T> {
+        final AtomicReference<@Nullable ExecutionFlow<T>> flow = new AtomicReference<>();
+        private final PropagatedContext propagatedContext;
+        @Nullable
+        private volatile Subscription subscription;
+        private volatile boolean cancelled;
+        private boolean complete;
+
+        private DefusingSubscriber(PropagatedContext propagatedContext) {
+            this.propagatedContext = propagatedContext;
+        }
+
+        @Override
+        public Context currentContext() {
+            return ReactorPropagation.addPropagatedContext(Context.empty(), propagatedContext);
+        }
+
+        @Override
+        public void onSubscribe(Subscription s) {
+            if (s instanceof Fuseable.QueueSubscription<?> qs && qs.requestFusion(Fuseable.SYNC) == Fuseable.SYNC) {
+                // we can avoid the subscribe / WIP dance. This is for example Mono.just(…).map(…)
+                T result;
+                try {
+                    //noinspection unchecked
+                    result = (T) qs.poll();
+                } catch (Throwable t) {
+                    completeError(t);
+                    return;
+                }
+                complete(result);
+                return;
+            }
+            // fallback, normal reactive subscription
+            subscription = s;
+            if (cancelled) {
+                s.cancel();
+            } else {
+                s.request(Long.MAX_VALUE);
+            }
+        }
+
+        private void cancel() {
+            cancelled = true;
+            Subscription s = subscription;
+            if (s != null) {
+                s.cancel();
+            }
+        }
+
+        private void complete(@Nullable T result) {
+            if (!flow.compareAndSet(null, ExecutionFlow.just(result))) {
+                DelayedExecutionFlow<T> delayedFlow = (DelayedExecutionFlow<T>) flow.get();
+                if (delayedFlow != null) {
+                    delayedFlow.complete(result);
+                }
+            }
+            complete = true;
+        }
+
+        private void completeError(Throwable t) {
+            if (!flow.compareAndSet(null, ExecutionFlow.error(t))) {
+                DelayedExecutionFlow<?> delayedFlow = (DelayedExecutionFlow<?>) flow.get();
+                if (delayedFlow != null) {
+                    delayedFlow.completeExceptionally(t);
+                }
+            }
+            complete = true;
+        }
+
+        @Override
+        public void onNext(T t) {
+            if (complete) {
+                Operators.onNextDropped(t, Context.empty());
+                return;
+            }
+            if (propagatedContext.isBound()) {
+                complete(t);
+            } else {
+                propagatedContext.propagate(() -> complete(t));
+            }
+        }
+
+        @Override
+        public void onError(Throwable t) {
+            if (complete) {
+                Operators.onErrorDropped(t, Context.empty());
+                return;
+            }
+            if (propagatedContext.isBound()) {
+                completeError(t);
+            } else {
+                propagatedContext.propagate(() -> completeError(t));
+            }
+        }
+
+        @Override
+        public void onComplete() {
+            if (complete) {
+                return;
+            }
+            if (propagatedContext.isBound()) {
+                complete(null);
+            } else {
+                propagatedContext.propagate(() -> complete(null));
+            }
+        }
     }
 }
