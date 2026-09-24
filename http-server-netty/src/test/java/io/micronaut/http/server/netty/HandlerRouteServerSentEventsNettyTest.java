@@ -22,7 +22,7 @@ import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
-import io.micronaut.http.client.sse.SseClient;
+import io.micronaut.http.client.netty.DefaultHttpClient;
 import io.micronaut.http.sse.Event;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.web.router.builder.HttpRoutes;
@@ -103,10 +103,11 @@ class HandlerRouteServerSentEventsNettyTest {
             "micronaut.server.http-version", "2.0",
             "micronaut.http.client.http-version", "2.0",
             "micronaut.http.client.ssl.insecure-trust-all-certificates", true
-        ))) {
-            EmbeddedServer server = ctx.getBean(EmbeddedServer.class);
+        ));
+             // a client created for a URL is not closed with the context: closing it releases its
+             // TLS context and the native sessions the server's tickets put in its session cache
+             DefaultHttpClient client = ctx.createBean(DefaultHttpClient.class, ctx.getBean(EmbeddedServer.class).getURL())) {
             Recorder recorder = ctx.getBean(Recorder.class);
-            SseClient client = ctx.createBean(SseClient.class, server.getURL());
             // the handler sends the second event only once the client received the first
             List<String> events = Flux.from(client.eventStream(HttpRequest.GET("/netty-sse/steps"), String.class))
                 .map(Event::getData)
