@@ -66,6 +66,12 @@ A method whose body is only `...` is abstract where Python itself would not inst
 * in a class extending `abc.ABC` or `typing.Protocol`, or when decorated with `@abstractmethod`;
 * in a class carrying an api:aop.Introduction[] stereotype, such as a declarative HTTP client, a Micronaut Data repository or an AI service, whose methods are implemented by the introduction advice.
 
+A docstring before the `...` documents the declared method and keeps the body a placeholder:
+
+snippet::micronaut.docs.placeholders.BookClient[tags="imports,class", indent=0, title="A documented placeholder method"]
+
+A body of `pass`, or one raising `NotImplementedError`, is not a placeholder: such a method is a concrete method with that body.
+
 In any other class the placeholder is a method body that returns `None`, so a concrete bean whose methods are placeholders, such as a messaging listener written before its handlers, is a concrete, injectable bean:
 
 [source,python]

@@ -17,7 +17,7 @@ package io.micronaut.http.client.jdk;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.execution.ExecutionFlow;
-import io.micronaut.core.io.buffer.ByteArrayBufferFactory;
+import io.micronaut.core.io.buffer.ReadBufferFactory;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
@@ -82,11 +82,12 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     @Override
     public Publisher<? extends HttpResponse<?>> exchange(HttpRequest<?> request, @Nullable CloseableByteBody requestBody, @Nullable Thread blockedThread) {
         // null is equivalent to an empty body
-        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ByteArrayBufferFactory.INSTANCE, new byte[0]) : requestBody;
+        CloseableByteBody body = requestBody == null ? AvailableByteArrayBody.create(ReadBufferFactory.getJdkFactory().createEmpty()) : requestBody;
         Flux<? extends HttpResponse<?>> response;
         try {
             response = exchangeImpl(new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), body), null);
         } catch (RuntimeException | Error e) {
+            // building the exchange failed, so nothing else releases the body
             body.close();
             throw e;
         }

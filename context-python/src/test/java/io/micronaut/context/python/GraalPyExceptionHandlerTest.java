@@ -20,9 +20,12 @@ import org.graalvm.polyglot.Engine;
 import org.graalvm.polyglot.Value;
 import org.junit.jupiter.api.Test;
 
+import java.util.Arrays;
+
 import static io.micronaut.context.python.PythonContextRuntime.PYTHON;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class GraalPyExceptionHandlerTest {
 
@@ -136,9 +139,75 @@ class GraalPyExceptionHandlerTest {
         }
     }
 
+    /**
+     * A Java exception that Python creates and raises crosses back to Java with Truffle bookkeeping in
+     * its suppressed exceptions: {@code HostException.wrap} shares the lazy guest stack trace with the
+     * host throwable by attaching a {@code TruffleStackTrace.LazyStackTrace} to it. That entry is not
+     * an exception the application suppressed, and a serializer rendering the suppressed exceptions of
+     * an error response fails on it, for example the problem+json body provider with
+     * {@code No serializable introspection present for type LazyStackTrace}.
+     */
+    @Test
+    void truffleBookkeepingIsNotReportedAmongTheSuppressedExceptions() {
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.eval(PYTHON, """
+                import java
+                IllegalStateException = java.type("java.lang.IllegalStateException")
+
+                def raise_java():
+                    raise IllegalStateException("boom")
+                """);
+            Value callback = context.getBindings(PYTHON).getMember("raise_java");
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, callback::execute);
+
+            assertEquals("boom", exception.getMessage());
+            assertEquals(1, exception.getSuppressed().length,
+                "Truffle attaches its guest stack trace to the host throwable and it cannot be taken off again");
+            assertTrue(PythonExceptions.isTruffleStackTrace(exception.getSuppressed()[0]),
+                "the attached entry: " + Arrays.toString(exception.getSuppressed()));
+            assertEquals(0, PythonExceptions.suppressed(exception).length,
+                "reported suppressed exceptions: " + Arrays.toString(PythonExceptions.suppressed(exception)));
+        }
+    }
+
+    /**
+     * The exceptions the application itself suppressed are not lost when the throwable crosses Python.
+     */
+    @Test
+    void genuineSuppressedExceptionsSurviveTheCrossing() {
+        try (Engine engine = GraalPyEngineFactory.buildPythonEngine();
+             Context context = Context.newBuilder(PYTHON)
+                 .allowAllAccess(true)
+                 .engine(engine)
+                 .exceptionHandler(GraalPyExceptionHandler.RETHROW_HOST_RUNTIME_EXCEPTION)
+                 .build()) {
+            context.getBindings(PYTHON).putMember("thrower", new Thrower());
+            Value callback = context.eval(PYTHON, "lambda: thrower.throwWithSuppressed()");
+
+            IllegalStateException exception = assertThrows(IllegalStateException.class, callback::execute);
+
+            assertEquals("boom", exception.getMessage());
+            Throwable[] suppressed = PythonExceptions.suppressed(exception);
+            assertEquals(1, suppressed.length, "reported suppressed exceptions: " + Arrays.toString(suppressed));
+            assertEquals("closed badly", suppressed[0].getMessage());
+        }
+    }
+
     public static final class Thrower {
         public void throwRuntime() {
             throw new IllegalStateException("boom");
+        }
+
+        public void throwWithSuppressed() {
+            IllegalStateException exception = new IllegalStateException("boom");
+            exception.addSuppressed(new IllegalArgumentException("closed badly"));
+            throw exception;
         }
     }
 
