@@ -7,11 +7,13 @@ import io.micronaut.core.propagation.PropagatedContextElement;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import jakarta.inject.Singleton;
 
 import java.net.URI;
+import java.util.List;
 // end::imports[]
 
 @Requires(property = "spec.name", value = "GroupRoutesTest")
@@ -63,6 +65,24 @@ public class GroupRoutes implements HttpRoutes {
             api.GET((request, pathVariables) -> text("api of " + PropagatedContext.get().get(Tenant.class).id())); // <7>
         });
         // end::groups[]
+
+        // tag::groupSettings[]
+        routes.path("/notes", notes -> {
+            notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE); // <1>
+            notes.executeOn(TaskExecutors.BLOCKING); // <2>
+
+            notes.POST(String.class, (request, pathVariables, text) -> HttpResponse.ok("saved " + text));
+            notes.POST("/items", Item.class, (request, pathVariables, item) -> HttpResponse.ok("saved " + item.name()))
+                .consumes(MediaType.APPLICATION_JSON_TYPE); // <3>
+            notes.GET("/count", (request, pathVariables) -> HttpResponse.ok("1"))
+                .nonBlocking(); // <4>
+
+            notes.path("/drafts", drafts -> {
+                drafts.GET((request, pathVariables) -> HttpResponse.ok(List.of(new Item(1, "draft"))));
+                drafts.produces(MediaType.APPLICATION_JSON_TYPE); // <5>
+            });
+        });
+        // end::groupSettings[]
 
         // tag::serverFilters[]
         routes.filter("/api/**").order(100) // <1>
