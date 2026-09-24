@@ -29,6 +29,7 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
@@ -83,7 +84,9 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     protected BindingResult<T> bindBodyPart(ArgumentConversionContext<T> context, HttpRequest<?> source, String bodyComponent) {
-        if (source instanceof FormCapableHttpRequest<?> nhr && nhr.hasFormBody()) {
+        // the request itself, or e.g. the mutable view of the request that a filter continued with
+        FormCapableHttpRequest<?> nhr = source instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(source);
+        if (nhr != null && nhr.hasFormBody()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
             return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), nhr, bodyComponent, true);
         } else {
@@ -204,9 +207,12 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         // the form is decoded by the Netty request whose bytes are the body, e.g. of the mutable
         // view a filter continued with after it changed the URI in place
         NettyHttpRequest<?> formRequest = server instanceof NettyHttpRequest<?> netty ? netty : NettyHttpRequest.findBodyRequest(server);
-        // the decoded body is kept by the Netty request it is read from, not by a request a filter
-        // continued with
-        NettyHttpRequest<?> nhr = request == server && formRequest == server ? formRequest : null;
+        // the decoded body is kept by the Netty request it is read from when the route is bound with
+        // that request or with its mutable view whose body a filter did not set, whose body is then
+        // the decoded body too; not by a wrapper, e.g. one that keeps no decoded body, nor by
+        // another server request a filter continued with
+        NettyHttpRequest<?> nhr = formRequest != null && !(request instanceof HttpRequestWrapper<?>)
+            && NettyHttpRequest.findBodyRequest(request) == formRequest ? formRequest : null;
         MessageBodyReader<T> reader = null;
         final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(request).orElse(null);
         if (routeInfo != null) {
