@@ -50,7 +50,6 @@ import io.netty.handler.codec.http.HttpMessage;
 import io.netty.handler.codec.http.HttpObjectAggregator;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.codec.http.HttpServerUpgradeHandler;
-import io.netty.handler.codec.http.websocketx.extensions.compression.WebSocketServerCompressionHandler;
 import io.netty.handler.codec.http2.CleartextHttp2ServerUpgradeHandler;
 import io.netty.handler.codec.http2.Http2CodecUtil;
 import io.netty.handler.codec.http2.Http2ConnectionHandler;
@@ -77,7 +76,6 @@ import io.netty.handler.ssl.ApplicationProtocolNames;
 import io.netty.handler.ssl.ApplicationProtocolNegotiationHandler;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.ssl.SslHandshakeCompletionEvent;
-import io.netty.handler.timeout.IdleStateHandler;
 import io.netty.util.AsciiString;
 import io.netty.util.AttributeKey;
 import io.netty.util.ReferenceCountUtil;
@@ -425,7 +423,7 @@ final class HttpPipelineBuilder {
             if (idleTime != null && !idleTime.isNegative()) {
                 // millisecond precision: truncating to whole seconds turns a sub-second timeout into 0,
                 // which IdleStateHandler treats as "disabled"
-                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new IdleStateHandler(
+                pipeline.addLast(ChannelPipelineCustomizer.HANDLER_IDLE_STATE, new ServerIdleStateHandler(
                         server.getServerConfiguration().getReadIdleTimeout().toMillis(),
                         server.getServerConfiguration().getWriteIdleTimeout().toMillis(),
                         idleTime.toMillis(),
@@ -807,10 +805,9 @@ final class HttpPipelineBuilder {
                 channel.attr(SSL_SESSION_ATTRIBUTE.get()).set(sslHandler.findSslSession());
             }
 
+            // the websocket compression handler is only added to the pipeline when a connection is upgraded, see
+            // NettyServerWebSocketUpgradeHandler
             Optional<NettyServerWebSocketUpgradeHandler> webSocketUpgradeHandler = embeddedServices.getWebSocketUpgradeHandler(server);
-            if (webSocketUpgradeHandler.isPresent()) {
-                pipeline.addLast(NettyServerWebSocketUpgradeHandler.COMPRESSION_HANDLER, new WebSocketServerCompressionHandler());
-            }
             if (server.getServerConfiguration().getServerType() != NettyHttpServerConfiguration.HttpServerType.STREAMED) {
                 pipeline.addLast(ChannelPipelineCustomizer.HANDLER_HTTP_AGGREGATOR,
                     new HttpObjectAggregator(
