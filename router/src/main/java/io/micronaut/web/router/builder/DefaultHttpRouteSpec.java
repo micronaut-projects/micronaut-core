@@ -42,14 +42,14 @@ import java.util.function.ToIntFunction;
  * @since 5.3.0
  */
 @Internal
-record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> ports,
+record DefaultHttpRouteSpec(List<RouteSettings> routes, ToIntFunction<String> ports,
                             RouteGroupDefaults.@Nullable Inheriting inherited) implements HttpRouteSpec, ContextFilterSpec<HttpRouteSpec> {
 
     @Override
     public HttpRouteSpec consumes(MediaType... mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
         own(RouteGroupDefaults.CONSUMES);
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.consumes(checked);
         }
         return this;
@@ -58,7 +58,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public HttpRouteSpec consumesAll() {
         own(RouteGroupDefaults.CONSUMES);
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.consumesAll();
         }
         return this;
@@ -68,7 +68,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     public HttpRouteSpec produces(MediaType... mediaTypes) {
         MediaType[] checked = AbstractHttpRouteBuilder.mediaTypes(mediaTypes);
         own(RouteGroupDefaults.PRODUCES);
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.produces(checked);
         }
         return this;
@@ -76,7 +76,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.annotationMetadata(annotationMetadata);
         }
         return this;
@@ -85,7 +85,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public <T extends Annotation> HttpRouteSpec annotate(AnnotationValue<T> annotationValue) {
         Objects.requireNonNull(annotationValue, "annotationValue");
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.annotate(annotationValue);
         }
         return this;
@@ -94,7 +94,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public HttpRouteSpec responseType(Argument<?> responseType) {
         Objects.requireNonNull(responseType, "responseType");
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.responseType(responseType);
         }
         return this;
@@ -104,7 +104,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     public HttpRouteSpec executeOn(String executorName) {
         RouteArguments.executorName(executorName);
         own(RouteGroupDefaults.EXECUTOR);
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.executeOn(executorName);
         }
         return this;
@@ -113,7 +113,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public HttpRouteSpec nonBlocking() {
         own(RouteGroupDefaults.EXECUTOR);
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.nonBlocking();
         }
         return this;
@@ -126,8 +126,9 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec port(int port) {
-        for (HandlerUriRoute route : routes) {
-            route.port(port);
+        int checked = RouteArguments.port(port);
+        for (RouteSettings route : routes) {
+            route.port(checked);
         }
         return this;
     }
@@ -136,7 +137,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     public HttpRouteSpec attribute(String name, Object value) {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(value, "value");
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.attribute(name, value);
         }
         return this;
@@ -144,7 +145,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public HttpRouteSpec order(int order) {
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.order(order);
         }
         return this;
@@ -153,7 +154,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
     @Override
     public HttpRouteSpec where(Predicate<HttpRequest<?>> condition) {
         Objects.requireNonNull(condition, "condition");
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.where(condition);
         }
         return this;
@@ -161,7 +162,7 @@ record DefaultHttpRouteSpec(List<HandlerUriRoute> routes, ToIntFunction<String> 
 
     @Override
     public FilterSpec<HttpRouteSpec> addFilter(FilterRegistration filter) {
-        for (HandlerUriRoute route : routes) {
+        for (RouteSettings route : routes) {
             route.filter(filter);
         }
         return new DefaultFilterSpec<>(this, filter);
