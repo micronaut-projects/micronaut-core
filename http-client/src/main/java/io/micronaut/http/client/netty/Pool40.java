@@ -553,7 +553,7 @@ final class Pool40 implements Pool {
 
     final class Http2 extends PoolEntry implements Http2PoolEntry {
         private final AtomicInteger earmarkedOrLiveRequests = new AtomicInteger(0);
-        private int maxStreamCount;
+        private volatile int maxStreamCount;
 
         public Http2(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
@@ -576,6 +576,12 @@ final class Pool40 implements Pool {
         public void onConnectionEstablished(int maxStreamCount) {
             this.maxStreamCount = maxStreamCount;
             onNewConnectionEstablished2(this);
+        }
+
+        @Override
+        public void updateMaxStreamCount(int maxStreamCount) {
+            this.maxStreamCount = maxStreamCount;
+            markConnectionAvailable();
         }
 
         @Override

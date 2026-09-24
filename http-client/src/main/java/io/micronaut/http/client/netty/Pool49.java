@@ -807,7 +807,10 @@ final class Pool49 implements Pool {
     }
 
     final class Http2PoolEntry extends PoolEntry implements Pool.Http2PoolEntry {
+        private int maxStreamCount = 0;
+        private int liveStreams = 0;
         private int available = 0;
+        private boolean unavailable = false;
 
         Http2PoolEntry(EventLoop eventLoop, ResizerConnection connection) {
             super(eventLoop, connection);
@@ -817,18 +820,23 @@ final class Pool49 implements Pool {
         public void onConnectionEstablished(int maxStreamCount) {
             checkInEventLoop();
             if (poolPair.http2.connections.add(this)) {
-                markAvailable0(maxStreamCount);
+                this.maxStreamCount = maxStreamCount;
+                updateAvailable();
                 onOpenConnection();
             }
         }
 
         @Override
+        public void updateMaxStreamCount(int maxStreamCount) {
+            checkInEventLoop();
+            this.maxStreamCount = maxStreamCount;
+            updateAvailable();
+        }
+
+        @Override
         public void onConnectionInactive() {
             checkInEventLoop();
-            if (available > 0) {
-                available = 0;
-                poolPair.http2.removeAvailable(this);
-            }
+            markUnavailable();
             if (poolPair.http2.connections.remove(this)) {
                 globalStats.updateAndGet(s -> s.addHttp2ConnectionCount(-1));
                 openGlobalConnectionIfNecessary();
@@ -837,19 +845,27 @@ final class Pool49 implements Pool {
 
         @Override
         public void markAvailable() {
-            markAvailable0(1);
+            checkInEventLoop();
+            liveStreams--;
+            updateAvailable();
         }
 
-        private void markAvailable0(int n) {
-            checkInEventLoop();
+        /**
+         * Recompute the number of streams that may still be opened on this connection and update
+         * the available list of the pool accordingly.
+         */
+        private void updateAvailable() {
+            int newAvailable = unavailable ? 0 : Math.max(0, maxStreamCount - liveStreams);
             if (log.isTraceEnabled()) {
-                log.trace("{} became available x{}", this, n);
+                log.trace("{} has {} available streams", this, newAvailable);
             }
-            boolean newlyAvailable = available == 0;
-            available += n;
-            if (newlyAvailable) {
+            boolean wasAvailable = available > 0;
+            available = newAvailable;
+            if (newAvailable > 0 && !wasAvailable) {
                 poolPair.http2.addAvailable(this);
                 poolPair.dispatchPendingRequests();
+            } else if (newAvailable == 0 && wasAvailable) {
+                poolPair.http2.removeAvailable(this);
             }
         }
 
@@ -859,6 +875,7 @@ final class Pool49 implements Pool {
             if (log.isTraceEnabled()) {
                 log.trace("{} became unavailable", this);
             }
+            unavailable = true;
             available = 0;
             poolPair.http2.removeAvailable(this);
         }
@@ -868,6 +885,7 @@ final class Pool49 implements Pool {
             checkInEventLoop();
             assert available > 0;
             available--;
+            liveStreams++;
             if (available == 0) {
                 poolPair.http2.removeAvailable(this);
             }

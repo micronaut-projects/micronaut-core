@@ -895,7 +895,7 @@ public class ConnectionManager {
                 @Override
                 public void channelActive0(ChannelHandlerContext ctx) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    connectionHolder.init();
+                    connectionHolder.init(null); // server settings not known yet with prior knowledge
                     ctx.pipeline().remove(ctx.name());
                 }
             });
@@ -903,10 +903,10 @@ public class ConnectionManager {
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                    if (msg instanceof Http2SettingsFrame) {
+                    if (msg instanceof Http2SettingsFrame settingsFrame) {
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                        connectionHolder.init();
+                        connectionHolder.init(settingsFrame.settings());
                         return;
                     } else {
                         log.warn("Premature frame: {}", msg.getClass());
@@ -927,6 +927,10 @@ public class ConnectionManager {
             public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                 if (msg instanceof Http2SettingsAckFrame || msg instanceof Http2PingFrame) {
                     // this is fine
+                    return;
+                }
+                if (msg instanceof Http2SettingsFrame settingsFrame) {
+                    connectionHolder.onRemoteSettings(settingsFrame.settings());
                     return;
                 }
                 if (msg instanceof Http2GoAwayFrame goAway) {
@@ -1209,7 +1213,7 @@ public class ConnectionManager {
                                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                     if (msg instanceof Http3SettingsFrame) {
                                         ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init();
+                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init(null);
                                     }
                                     super.channelRead(ctx, msg);
                                 }
@@ -1701,18 +1705,23 @@ public class ConnectionManager {
         sealed class Http2ConnectionHolder extends ConnectionHolder {
             private final Pool.Http2PoolEntry poolEntry;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
+            private final Http2StreamLimit streamLimit = new Http2StreamLimit(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
 
             Http2ConnectionHolder(Channel channel, NettyClientCustomizer customizer) {
                 super(channel, customizer);
                 this.poolEntry = pool.createHttp2PoolEntry(channel.eventLoop(), this);
             }
 
-            void init() {
+            void init(@Nullable Http2Settings remoteSettings) {
                 addTimeoutHandlers();
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                poolEntry.onConnectionEstablished(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
+                poolEntry.onConnectionEstablished(streamLimit.update(remoteSettings));
+            }
+
+            void onRemoteSettings(Http2Settings remoteSettings) {
+                poolEntry.updateMaxStreamCount(streamLimit.update(remoteSettings));
             }
 
             void addTimeoutHandlers() {
@@ -1796,7 +1805,9 @@ public class ConnectionManager {
                                 if (windDownConnection && newCount <= 0) {
                                     Http2ConnectionHolder.this.channel.close();
                                 } else if (!windDownConnection) {
-                                    poolEntry.markAvailable();
+                                    // netty only closes the stream after the final frame has been
+                                    // delivered, i.e. after this returns, so defer freeing the slot
+                                    Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }
 
