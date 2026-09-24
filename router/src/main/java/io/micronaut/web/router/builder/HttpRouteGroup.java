@@ -18,7 +18,9 @@ package io.micronaut.web.router.builder;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.AnnotationValueBuilder;
 import io.micronaut.core.annotation.Experimental;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.MediaType;
 
 import java.lang.annotation.Annotation;
 import java.util.Objects;
@@ -75,6 +77,14 @@ import java.util.function.Predicate;
  * with {@code global = true}. A request no route of the group matched, e.g. a {@code 404} under
  * the prefix of the group, is answered by the global error and status routes only.</p>
  *
+ * <p><b>Settings.</b> The media types, the executor, the port, the conditions, the order, the
+ * attributes and the annotations of a group, see {@link #consumes(MediaType...)},
+ * {@link #executeOn(String)}, {@link #port(int)} and the others, apply to the routes declared in
+ * the lambda of the group, and of its nested groups, wherever they are declared in the lambda,
+ * like its filters. A route, or a nested group, with its own value overrides the one of the
+ * group. The media types and the executor apply to the routes to handlers, not to the locator
+ * routes of the group.</p>
+ *
  * <p><b>Locators.</b> A {@link #locate locator route} declared in a group is under the prefix of
  * the group, and the filters of the group apply to every route of the located tables, before the
  * filters of the located route.</p>
@@ -88,6 +98,90 @@ import java.util.function.Predicate;
  */
 @Experimental
 public sealed interface HttpRouteGroup extends HttpRouteBuilder, RouteFilterSpec<HttpRouteGroup> permits DefaultHttpRouteGroup {
+
+    /**
+     * Accept requests with these media types only, like {@code @Consumes} on a controller, see
+     * {@link HttpRouteSpec#consumes(MediaType...)}: the routes of the group, and of its nested
+     * groups, consume them instead of {@code application/json}, wherever they are declared in the
+     * lambda. A route that declares what it consumes, with {@link HttpRouteSpec#consumes(MediaType...)}
+     * or {@link HttpRouteSpec#consumesAll()}, and a nested group that does, replace them, like a
+     * method-level {@code @Consumes} replaces the one of its controller. So does a form route,
+     * e.g. {@link #handleForm(HttpMethod, String, FormRequestHandler)}, which consumes the form
+     * media types: a form handler reads a form.
+     *
+     * <pre>{@code
+     * routes.path("/notes", notes -> {
+     *     notes.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE);
+     *     notes.POST("/", String.class, (request, pathVariables, text) -> HttpResponse.ok(notes.save(text)));
+     *     notes.POST("/json", Note.class, (request, pathVariables, note) -> HttpResponse.ok(notes.save(note)))
+     *         .consumes(MediaType.APPLICATION_JSON_TYPE);
+     * });
+     * }</pre>
+     *
+     * <p>The media types, and the executor, of a group apply to its routes to handlers, including
+     * the implicit {@code HEAD} routes, the routes declared for several methods and the declared
+     * routes, not to its locator routes, whose located tables declare their own, nor to its error
+     * and status routes.</p>
+     *
+     * @param mediaTypes The media types
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup consumes(MediaType... mediaTypes);
+
+    /**
+     * Accept requests with any media type, see {@link HttpRouteSpec#consumesAll()}, for the
+     * routes of the group, like {@link #consumes(MediaType...)}.
+     *
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup consumesAll();
+
+    /**
+     * Produce these media types, like {@code @Produces} on a controller, see
+     * {@link HttpRouteSpec#produces(MediaType...)}: the routes of the group, and of its nested
+     * groups, produce them, wherever they are declared in the lambda. A route that declares what
+     * it produces, or a nested group that does, replaces them.
+     *
+     * @param mediaTypes The media types
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup produces(MediaType... mediaTypes);
+
+    /**
+     * Run the routes of the group on the named executor, like {@code @ExecuteOn} on a controller,
+     * see {@link HttpRouteSpec#executeOn(String)}: the routes of the group, and of its nested
+     * groups, run on it, wherever it is declared in the lambda. A route that chooses its thread,
+     * with {@link HttpRouteSpec#executeOn(String)} or {@link HttpRouteSpec#nonBlocking()}, or a
+     * nested group that does, overrides it. The last of {@code executeOn} and
+     * {@link #nonBlocking()} declared on the group wins.
+     *
+     * <pre>{@code
+     * routes.path("/reports", reports -> {
+     *     reports.executeOn(TaskExecutors.BLOCKING);
+     *     reports.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(repository.find(pathVariables.getLong("id"))));
+     *     reports.GET("/count", (request, pathVariables) -> HttpResponse.ok(cache.count())).nonBlocking();
+     * });
+     * }</pre>
+     *
+     * @param executorName The name of the executor, e.g. {@code TaskExecutors.BLOCKING}
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup executeOn(String executorName);
+
+    /**
+     * Run the routes of the group on the event loop, like {@code @NonBlocking} on a controller,
+     * when the server selects threads automatically, see {@link HttpRouteSpec#nonBlocking()}: the
+     * routes of the group, and of its nested groups, wherever it is declared in the lambda, unless
+     * they, or a nested group, choose their thread, like {@link #executeOn(String)}.
+     *
+     * @return This group
+     * @since 5.3.0
+     */
+    HttpRouteGroup nonBlocking();
 
     /**
      * Route the requests of the routes of the group on this port only, like
