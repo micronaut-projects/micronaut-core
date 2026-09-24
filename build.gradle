@@ -55,11 +55,13 @@ def pythonTestProjects = [
         ":micronaut-inject-python",
         ":micronaut-inject-python-test",
         ":micronaut-context-python",
-        ":micronaut-context-python-netty"
+        ":micronaut-context-python-netty",
+        ":test-suite-python-corpus"
 ]
 // Too few test classes to split across the jobs: the first job runs them all
 def pythonUnshardedProjects = [
-        ":micronaut-context-python-netty"
+        ":micronaut-context-python-netty",
+        ":test-suite-python-corpus"
 ]
 def pythonProjects = pythonTestProjects + [":test-suite-python"]
 

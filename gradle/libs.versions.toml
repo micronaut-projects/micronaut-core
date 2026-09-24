@@ -49,6 +49,7 @@ micronaut-validation = "5.1.0"
 micronaut-rxjava3 = "4.1.0"
 micronaut-reactor = "4.1.0"
 micronaut-data = "5.0.5"
+micronaut-platform = "5.1.0"
 micronaut-serde = "3.1.0"
 micronaut-kotlin = "5.1.0"
 native-gradle-plugin = "0.11.5"
@@ -114,6 +115,7 @@ test-boms-micronaut-reactor = { module = "io.micronaut.reactor:micronaut-reactor
 test-boms-micronaut-kotlin = { module = "io.micronaut.kotlin:micronaut-kotlin-bom", version.ref = "micronaut-kotlin" }
 test-boms-micronaut-data = { module = "io.micronaut.data:micronaut-data-bom", version.ref = "micronaut-data" }
 test-boms-micronaut-serde = { module = "io.micronaut.serde:micronaut-serde-bom", version.ref = "micronaut-serde" }
+test-boms-micronaut-platform = { module = "io.micronaut.platform:micronaut-platform", version.ref = "micronaut-platform" }
 
 boms-groovy = { module = "org.apache.groovy:groovy-bom", version.ref = "managed-groovy" }
 boms-kotlin = { module = "org.jetbrains.kotlin:kotlin-bom", version.ref = "managed-kotlin" }
