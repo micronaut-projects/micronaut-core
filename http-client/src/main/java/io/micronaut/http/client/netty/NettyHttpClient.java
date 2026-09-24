@@ -1823,20 +1823,37 @@ final class NettyHttpClient implements
 
         AtomicBoolean responded = new AtomicBoolean();
 
-        // whether the body is still held back for a 100 Continue; only touched on the event loop
+        // whether the body is still held back for a 100 Continue; only touched on the event loop.
+        // The body is either sent (100 Continue, or the fallback timer) or dropped (a final
+        // response arrived first), whichever happens first, and only once.
         AtomicBoolean stillExpectingContinue = new AtomicBoolean(expectContinue);
         AtomicReference<ScheduledFuture<?>> continueFallback = new AtomicReference<>();
+        Runnable cancelContinueFallback = () -> {
+            ScheduledFuture<?> fallback = continueFallback.getAndSet(null);
+            if (fallback != null) {
+                fallback.cancel(false);
+            }
+        };
         Runnable sendHeldBody = () -> {
             if (stillExpectingContinue.compareAndSet(true, false)) {
-                ScheduledFuture<?> fallback = continueFallback.getAndSet(null);
-                if (fallback != null) {
-                    fallback.cancel(false);
-                }
+                cancelContinueFallback.run();
                 if (streamWriter == null) {
                     poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
                 } else {
                     streamWriter.startWriting();
                 }
+            }
+        };
+        Runnable dropHeldBody = () -> {
+            if (stillExpectingContinue.compareAndSet(true, false)) {
+                cancelContinueFallback.run();
+                if (streamWriter != null) {
+                    streamWriter.cancel();
+                } else if (byteBuf != null) {
+                    byteBuf.release();
+                }
+                // the request was not sent completely, so the connection cannot be reused
+                poolHandle.taint();
             }
         };
 
@@ -1896,6 +1913,10 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
+                // the final response arrived before 100 Continue, e.g. 417 Expectation Failed: the
+                // server rejected the body, so it is not sent when the fallback timer fires later,
+                // while the response body is still streaming
+                dropHeldBody.run();
                 code = response.status().code();
                 responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
@@ -1943,13 +1964,8 @@ final class NettyHttpClient implements
                     }
                     ctx.pipeline().remove(streamWriter);
                 }
-                ScheduledFuture<?> fallback = continueFallback.getAndSet(null);
-                if (fallback != null) {
-                    fallback.cancel(false);
-                }
-                if (stillExpectingContinue.getAndSet(false) && byteBuf != null) {
-                    byteBuf.release();
-                }
+                // the body is still held if the exchange failed before any response arrived
+                dropHeldBody.run();
                 poolHandle.release();
             }
         }));
@@ -1982,7 +1998,7 @@ final class NettyHttpClient implements
             }
         }
 
-        if (expectContinue) {
+        if (stillExpectingContinue.get()) {
             // a server that ignores the expectation waits for the body: send it after a while anyway (RFC 9110 10.1.1).
             // The head is written right after this, on this event loop, before the timer can fire
             configuration.getExpectContinueTimeout().ifPresent(timeout ->
