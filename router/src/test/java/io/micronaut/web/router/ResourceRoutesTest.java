@@ -19,6 +19,8 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
+import io.micronaut.http.MediaType;
+import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.PathVariables;
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * The shape of the routes of {@link HttpRouteBuilder#resources(String, ResourceHandler)}: a
@@ -163,6 +166,25 @@ class ResourceRoutesTest {
         assertEquals(Optional.of(true), route(router, HttpRequest.GET("/assets")).getAttribute("static", Boolean.class));
         assertNull(router.findClosest(HttpRequest.GET("/assets/site.css").header("X-Skip", "1")));
         assertNull(router.findClosest(HttpRequest.GET("/assets").header("X-Skip", "1")));
+    }
+
+    @Test
+    void inAGroupTheRouteHasTheExecutorOfTheGroupButNotItsMediaTypes() {
+        Router plain = router(routes -> routes.resources("/assets", resources("assets", "path")));
+        Router grouped = router(routes -> routes.path("/assets", assets -> {
+            assets.consumes(MediaType.TEXT_PLAIN_TYPE).produces(MediaType.TEXT_PLAIN_TYPE).executeOn("group-executor");
+            assets.resources(resources("assets", "path"));
+        }));
+
+        for (String uri : new String[]{"/assets", "/assets/site.css"}) {
+            UriRouteInfo<Object, Object> route = route(grouped, HttpRequest.GET(uri).accept(MediaType.of("text/css")));
+            UriRouteInfo<Object, Object> expected = route(plain, HttpRequest.GET(uri));
+            assertEquals(expected.getConsumes(), route.getConsumes(), uri);
+            assertEquals(expected.getProduces(), route.getProduces(), uri);
+            // no executor of that name in this router
+            Exception error = assertThrows(Exception.class, () -> route.getExecutor(ThreadSelection.MANUAL), uri);
+            assertTrue(error.getMessage().contains("group-executor"), error.getMessage());
+        }
     }
 
     private static String path(Router router, String uri) {
