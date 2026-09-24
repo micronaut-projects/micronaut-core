@@ -28,7 +28,6 @@ import org.jspecify.annotations.NullUnmarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Closeable;
-import java.io.IOException;
 
 /**
  * This is a combination of a {@link HttpRequest} with a {@link ByteBody}. It implements
@@ -59,7 +58,7 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     }
 
     @Override
-    public void close() throws IOException {
+    public void close() {
         byteBody.close();
     }
 }

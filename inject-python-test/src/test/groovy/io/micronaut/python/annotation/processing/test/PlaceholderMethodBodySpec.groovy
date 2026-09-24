@@ -124,6 +124,95 @@ class Explicit:
         }
     }
 
+    void "test a docstring before the placeholder keeps the body a placeholder"() {
+        expect: 'an ABC method documented by a docstring is abstract; a pass body and a raise body are not placeholders'
+        buildClassElement('''
+from abc import ABC
+
+class Operations(ABC):
+    def run(self, value: str) -> str:
+        """Runs the operation on the value."""
+        ...
+
+    def skip(self, value: str) -> str:
+        """Skips the value."""
+        pass
+
+    def fail(self, value: str) -> str:
+        """Fails."""
+        raise NotImplementedError()
+''', "Operations") { ClassElement classElement ->
+            assert classElement.isAbstract()
+            assert !classElement.isInterface()
+            def methods = classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())
+            assert methods.find { it.name == "run" }.isAbstract()
+            assert !methods.find { it.name == "skip" }.isAbstract()
+            assert !methods.find { it.name == "fail" }.isAbstract()
+            return classElement
+        }
+
+        and: 'a concrete bean keeps a documented placeholder as a concrete method'
+        buildClassElement('''
+from jakarta.inject import Singleton
+
+@Singleton
+class MessageListener:
+    def on_message(self, message: str) -> None:
+        """Handles a message."""
+        ...
+''', "MessageListener") { ClassElement classElement ->
+            assert !classElement.isAbstract()
+            assert !classElement.getEnclosedElements(ElementQuery.ALL_METHODS.onlyDeclared())[0].isAbstract()
+            return classElement
+        }
+    }
+
+    void "test a documented placeholder body of an introduction type is implemented by the introduction advice"() {
+        given:
+        def context = buildContext('''
+from micronaut.aop import InterceptorBean, Introduction, MethodInvocationContext
+from jakarta.inject import Singleton
+import java
+
+MethodInterceptor = java.type("io.micronaut.aop.MethodInterceptor")
+
+@Introduction
+def Stub(cls):
+    return cls
+
+@InterceptorBean(Stub)
+@Singleton
+class StubInterceptor(MethodInterceptor):
+    def intercept(self, context: MethodInvocationContext):
+        return "introduced " + context.getMethodName()
+
+@Stub
+@Singleton
+class Documented:
+    def list_all(self) -> str:
+        """Lists everything.
+
+        The docstring documents the declared method; the body stays a placeholder.
+        """
+        ...
+
+    def query_all(self) -> str:
+        """Queries everything."""
+        ...
+''')
+
+        when: 'the class has only documented placeholders, so it compiles to an introduction interface'
+        def bean = getBean(context, "python.Documented")
+
+        then: 'the methods are abstract, so the introduction advice implements them instead of a bridge returning None'
+        context.classLoader.loadClass("python.Documented").isInterface()
+        bean.list_all() == "introduced list_all"
+        bean.query_all() == "introduced query_all"
+
+        cleanup:
+        context?.close()
+    }
+
     void "test placeholder bodies of an introduction type are implemented by the introduction advice"() {
         given:
         def context = buildContext('''
