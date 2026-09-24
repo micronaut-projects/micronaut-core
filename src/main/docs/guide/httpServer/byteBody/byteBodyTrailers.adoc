@@ -18,7 +18,9 @@ return Mono.fromFuture(request.byteBody().buffer())
 To send trailers, create the body with api:io.micronaut.http.body.ByteBodyFactory[]`.withTrailers(body, trailers)`.
 The trailers are sent when the given stage completes, so they can be computed while the bytes are being sent, for
 example a checksum. A message with such a body always uses the chunked transfer coding on HTTP/1.1, because trailers
-cannot follow a body with a `Content-Length`. A route sends trailers by returning a
+cannot follow a body with a `Content-Length`. The same holds for a relayed body whose trailers have already arrived,
+for example one that was received fully before it is sent on: its length is known, but the message is still chunked
+so that the trailers are not lost. A route sends trailers by returning a
 api:io.micronaut.http.ByteBodyHttpResponse[] with such a body, and the raw HTTP client sends the trailers of the
 request body it is given.
 

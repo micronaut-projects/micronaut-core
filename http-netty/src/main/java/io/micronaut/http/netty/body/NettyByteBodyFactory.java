@@ -159,6 +159,27 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
      */
     @Nullable
     public static HttpHeaders trailersToSend(ByteBody body) {
+        io.micronaut.http.HttpHeaders headers = knownTrailers(body);
+        return headers == null ? null : toNettyHeaders(headers);
+    }
+
+    /**
+     * Whether a body carries trailers that are already known, e.g. because it was received fully
+     * before it is sent on. On HTTP/1 the message of such a body must use the chunked transfer
+     * coding even when the length of the body is known: a {@code Content-Length} message cannot
+     * carry trailers, and they would be dropped. The trailers of a body created with
+     * {@link ByteBodyFactory#withTrailers} may complete later, which is why that body has no
+     * expected length at all.
+     *
+     * @param body The body
+     * @return {@code true} if the trailers of the body are known and not empty
+     * @since 5.3.0
+     */
+    public static boolean hasTrailers(ByteBody body) {
+        return knownTrailers(body) != null;
+    }
+
+    private static io.micronaut.http.@Nullable HttpHeaders knownTrailers(ByteBody body) {
         CompletableFuture<io.micronaut.http.HttpHeaders> trailers = body.trailers().toCompletableFuture();
         if (!trailers.isDone() || trailers.isCompletedExceptionally()) {
             return null;
@@ -167,7 +188,7 @@ public final class NettyByteBodyFactory extends ByteBodyFactory {
         if (headers == null || headers.isEmpty()) {
             return null;
         }
-        return toNettyHeaders(headers);
+        return headers;
     }
 
     /**

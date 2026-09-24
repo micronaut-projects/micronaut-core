@@ -1149,7 +1149,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
             if (body instanceof AvailableByteBody available) {
                 writeFull(new DefaultFullHttpResponse(response.protocolVersion(), response.status(), NettyByteBodyFactory.toByteBuf(available), response.headers(), EmptyHttpHeaders.INSTANCE), false);
             } else {
-                OptionalLong expectedLength = body.expectedLength();
+                // a body whose trailers are known, e.g. a relayed body that was received fully
+                // before it is written, may have a known length. The trailers need the chunked
+                // transfer coding: a Content-Length response would drop them
+                OptionalLong expectedLength = NettyByteBodyFactory.hasTrailers(body) ? OptionalLong.empty() : body.expectedLength();
                 if (expectedLength.isPresent()) {
                     response.headers().remove(HttpHeaderNames.TRANSFER_ENCODING);
                     if (canHaveBody(response.status())) {
@@ -1628,7 +1631,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
         /**
          * The message that ends the response, with the trailers of the body when it carries any.
          * The HTTP/1 encoder only sends trailers in chunked mode: a body with trailers has no
-         * expected length, so its response is chunked.
+         * expected length, or its known length is ignored, so its response is chunked.
          *
          * @param content The final bytes, or {@code null} for none
          * @return The last content

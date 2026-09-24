@@ -31,7 +31,9 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.annotation.Post;
 import io.micronaut.http.annotation.Produces;
+import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.ByteBodyFactory;
+import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawRequestOptions;
 import io.micronaut.http.simple.SimpleHttpHeaders;
@@ -82,7 +84,7 @@ public final class TrailersRelayTest {
         try (GrpcLikeUpstream upstream = new GrpcLikeUpstream();
              ServerUnderTest server = server();
              Socket socket = connect(server)) {
-            server.getApplicationContext().getBean(UpstreamAddress.class).uri = upstream.uri();
+            server.getApplicationContext().getBean(RelayState.class).uri = upstream.uri();
             OutputStream out = socket.getOutputStream();
             InputStream in = socket.getInputStream();
             out.write(("POST /trailers-relay HTTP/1.1\r\nHost: localhost\r\nTE: trailers\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\n\r\n" + REQUEST_BODY).getBytes(StandardCharsets.US_ASCII));
@@ -97,6 +99,47 @@ public final class TrailersRelayTest {
             String head = readHead(in);
             Assertions.assertTrue(head.startsWith("HTTP/1.1 200 "), head);
             Assertions.assertTrue(head.toLowerCase(Locale.ROOT).contains("transfer-encoding: chunked\r\n"), head);
+            Assertions.assertEquals("5\r\nhello\r\n0\r\ngrpc-status: 0\r\ngrpc-message: fine\r\n\r\n", readChunkedBody(in));
+        }
+    }
+
+    /**
+     * A relay that inspects a message, e.g. to verify a checksum, consumes one half of
+     * {@link ByteBody#split()} before it forwards the other. That half is then complete, with a
+     * known length, but it still carries the trailers: the relayed message must stay chunked so
+     * that they are not lost.
+     */
+    @Test
+    void trailersAreRelayedAfterTheBodyIsInspected() throws Exception {
+        try (GrpcLikeUpstream upstream = new GrpcLikeUpstream();
+             ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            RelayState relay = server.getApplicationContext().getBean(RelayState.class);
+            relay.uri = upstream.uri();
+            // the upstream holds its trailers back until the relay has the response, so that
+            // the relay inspects a streamed response
+            upstream.beforeTrailers = relay.responseInspected;
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            // the data first, the trailers once the route has the request, so that the relay
+            // inspects a streamed request
+            int trailerStart = REQUEST_BODY.indexOf("0\r\n");
+            out.write(("POST /trailers-relay/inspect HTTP/1.1\r\nHost: localhost\r\nTE: trailers\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\n\r\n" + REQUEST_BODY.substring(0, trailerStart)).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            Assertions.assertTrue(relay.requestInspected.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The route did not get the request");
+            out.write(REQUEST_BODY.substring(trailerStart).getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+
+            Assertions.assertTrue(upstream.requestReceived.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream did not get the request: " + upstream.request);
+            String relayed = upstream.request.toLowerCase(Locale.ROOT);
+            Assertions.assertTrue(relayed.contains("transfer-encoding: chunked\r\n"), "The relayed request is not chunked: " + relayed);
+            Assertions.assertFalse(relayed.contains("content-length:"), "A body with trailers must be chunked: " + relayed);
+            Assertions.assertTrue(relayed.endsWith("\r\n0\r\nx-checksum: abc\r\n\r\n"), "The request trailers were not relayed: " + relayed);
+
+            String head = readHead(in);
+            Assertions.assertTrue(head.startsWith("HTTP/1.1 200 "), head);
+            Assertions.assertTrue(head.toLowerCase(Locale.ROOT).contains("transfer-encoding: chunked\r\n"), "The relayed response is not chunked: " + head);
+            Assertions.assertFalse(head.toLowerCase(Locale.ROOT).contains("content-length:"), "A body with trailers must be chunked: " + head);
             Assertions.assertEquals("5\r\nhello\r\n0\r\ngrpc-status: 0\r\ngrpc-message: fine\r\n\r\n", readChunkedBody(in));
         }
     }
@@ -236,12 +279,21 @@ public final class TrailersRelayTest {
     }
 
     /**
-     * Where the relay sends the requests, set by the test once the upstream is listening.
+     * The state the test and the relay share: where the relay sends the requests, set by the
+     * test once the upstream is listening, and how far the relay got.
      */
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
-    static class UpstreamAddress {
+    static class RelayState {
         volatile URI uri;
+        /**
+         * Counted down when the relay starts to inspect the request.
+         */
+        final CountDownLatch requestInspected = new CountDownLatch(1);
+        /**
+         * Counted down when the relay starts to inspect the response.
+         */
+        final CountDownLatch responseInspected = new CountDownLatch(1);
     }
 
     @Controller("/trailers-relay")
@@ -249,20 +301,48 @@ public final class TrailersRelayTest {
     static class Routes {
         private static final ByteBodyFactory BODY_FACTORY = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE);
         private final RawHttpClient client;
-        private final UpstreamAddress upstream;
+        private final RelayState relay;
 
-        Routes(RawHttpClient client, UpstreamAddress upstream) {
+        Routes(RawHttpClient client, RelayState relay) {
             this.client = client;
-            this.upstream = upstream;
+            this.relay = relay;
         }
 
         @Post
         @Consumes(MediaType.ALL)
         @Produces(MediaType.ALL)
         Mono<HttpResponse<?>> relay(ServerHttpRequest<?> request) {
-            MutableHttpRequest<Object> outbound = HttpRequest.create(request.getMethod(), upstream.uri.resolve("/grpc").toString());
+            MutableHttpRequest<Object> outbound = HttpRequest.create(request.getMethod(), relay.uri.resolve("/grpc").toString());
             request.getHeaders().forEach((name, values) -> values.forEach(value -> outbound.header(name, value)));
             return Mono.from(client.exchange(outbound, request.byteBody().move(), null, RawRequestOptions.proxy()));
+        }
+
+        /**
+         * Inspect the request and the response before they are relayed: read one half of the
+         * body fully, then forward the other half.
+         */
+        @Post("/inspect")
+        @Consumes(MediaType.ALL)
+        @Produces(MediaType.ALL)
+        Mono<HttpResponse<?>> inspectAndRelay(ServerHttpRequest<?> request) {
+            MutableHttpRequest<Object> outbound = HttpRequest.create(request.getMethod(), relay.uri.resolve("/grpc").toString());
+            request.getHeaders().forEach((name, values) -> values.forEach(value -> outbound.header(name, value)));
+            return inspect(request.byteBody(), relay.requestInspected)
+                .flatMap(ignored -> Mono.from(client.exchange(outbound, request.byteBody().move(), null, RawRequestOptions.proxy())))
+                .flatMap(response -> inspect(((ByteBodyHttpResponse<?>) response).byteBody(), relay.responseInspected).thenReturn(response));
+        }
+
+        /**
+         * Consume one half of the body: once done, the other half is complete with a known length.
+         */
+        private static Mono<String> inspect(ByteBody body, CountDownLatch inspecting) {
+            CloseableByteBody half = body.split(ByteBody.SplitBackpressureMode.FASTEST);
+            inspecting.countDown();
+            return Mono.fromFuture(half.buffer()).map(bytes -> {
+                try (bytes) {
+                    return bytes.toString(StandardCharsets.UTF_8);
+                }
+            });
         }
 
         @Get("/local")
@@ -293,6 +373,10 @@ public final class TrailersRelayTest {
     static final class GrpcLikeUpstream implements AutoCloseable {
         final CountDownLatch requestReceived = new CountDownLatch(1);
         volatile String request = "";
+        /**
+         * When set, the response trailers are only sent once this latch is counted down.
+         */
+        volatile CountDownLatch beforeTrailers;
         private final ServerSocket serverSocket;
 
         GrpcLikeUpstream() throws IOException {
@@ -312,16 +396,34 @@ public final class TrailersRelayTest {
                 OutputStream out = socket.getOutputStream();
                 String head = readHead(in);
                 request = head;
-                request = head + readChunkedBody(in);
+                // a relayed request that lost its trailers may come with a Content-Length
+                int contentLength = contentLength(head);
+                request = head + (contentLength < 0 ? readChunkedBody(in) : new String(in.readNBytes(contentLength), StandardCharsets.ISO_8859_1));
                 requestReceived.countDown();
-                out.write(("HTTP/1.1 200 OK\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\n\r\n" +
-                    "5\r\nhello\r\n0\r\ngrpc-status: 0\r\ngrpc-message: fine\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+                out.write("HTTP/1.1 200 OK\r\nContent-Type: application/grpc\r\nTransfer-Encoding: chunked\r\n\r\n5\r\nhello\r\n".getBytes(StandardCharsets.US_ASCII));
+                out.flush();
+                CountDownLatch beforeTrailers = this.beforeTrailers;
+                if (beforeTrailers != null && !beforeTrailers.await(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                    return;
+                }
+                out.write("0\r\ngrpc-status: 0\r\ngrpc-message: fine\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
                 // wait for the relay to close, so that the response is not cut short
                 in.read();
             } catch (IOException ignored) {
                 // the connection was closed
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
             }
+        }
+
+        private static int contentLength(String head) {
+            for (String line : head.split("\r\n")) {
+                if (line.toLowerCase(Locale.ROOT).startsWith("content-length:")) {
+                    return Integer.parseInt(line.substring("content-length:".length()).trim());
+                }
+            }
+            return -1;
         }
 
         @Override
