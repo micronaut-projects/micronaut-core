@@ -248,6 +248,8 @@ final class NettyHttpClient implements
     private final ConversionService conversionService;
     @Nullable
     private final ExecutorService blockingExecutor;
+    @Nullable
+    private final LifecycleListener lifecycleListener;
 
     NettyHttpClient(NettyHttpClientBuilder builder) {
         this.loadBalancer = builder.loadBalancer;
@@ -281,6 +283,7 @@ final class NettyHttpClient implements
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
         this.informationalServiceId = builder.informationalServiceId;
         this.blockingExecutor = builder.blockingExecutor;
+        this.lifecycleListener = builder.lifecycleListener;
 
         this.connectionManager = new ConnectionManager(log, configuration, builder);
     }
@@ -333,6 +336,9 @@ final class NettyHttpClient implements
         if (!isRunning()) {
             connectionManager.start();
         }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStart(this);
+        }
         return this;
     }
 
@@ -345,6 +351,9 @@ final class NettyHttpClient implements
     public HttpClient stop() {
         if (isRunning()) {
             connectionManager.shutdown();
+        }
+        if (lifecycleListener != null) {
+            lifecycleListener.onStop(this);
         }
         return this;
     }
@@ -2181,5 +2190,25 @@ final class NettyHttpClient implements
         String name;
         @Nullable
         Duration retry;
+    }
+
+    /**
+     * Notified whenever a client is started or stopped, so that the owner of the client can
+     * track the clients that are running.
+     */
+    interface LifecycleListener {
+        /**
+         * Called after {@link #start()}.
+         *
+         * @param client The client
+         */
+        void onStart(NettyHttpClient client);
+
+        /**
+         * Called after {@link #stop()}, including when the client is closed.
+         *
+         * @param client The client
+         */
+        void onStop(NettyHttpClient client);
     }
 }
