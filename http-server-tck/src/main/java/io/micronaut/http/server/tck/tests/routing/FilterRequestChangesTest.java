@@ -320,13 +320,13 @@ public class FilterRequestChangesTest {
                     textResponse(request.getMethodName() + " handler " + body)).consumesAll();
                 routes.PUT(prefix + "/handler", Argument.STRING, (request, pathVariables, body) ->
                     textResponse(request.getMethodName() + " handler " + body)).consumesAll();
-                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async", (request, pathVariables) ->
-                    request.text().thenApply(text -> textResponse(request.getMethodName() + " async " + text))).consumesAll();
-                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async-body", (request, pathVariables) ->
-                    request.body(String.class).thenApply(text -> textResponse(request.getMethodName() + " async-body " + text))).consumesAll();
+                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async", (request, pathVariables, body) ->
+                    body.text().thenApply(text -> textResponse(request.getMethodName() + " async " + text))).consumesAll();
+                routes.handleAsync(Set.of(HttpMethod.POST, HttpMethod.PUT), prefix + "/async-body", (request, pathVariables, body) ->
+                    body.body(String.class).thenApply(text -> textResponse(request.getMethodName() + " async-body " + text))).consumesAll();
             }
-            routes.asyncPOST("/rc/charset/async", (request, pathVariables) ->
-                request.text().thenApply(FilterRequestChangesTest::textResponse)).consumesAll();
+            routes.asyncPOST("/rc/charset/async", (request, pathVariables, body) ->
+                body.text().thenApply(FilterRequestChangesTest::textResponse)).consumesAll();
             routes.POST("/rc/replace/json", Argument.mapOf(String.class, String.class), (request, pathVariables, body) ->
                 textResponse(body.get("NAME")));
             routes.PUT("/rc/whole/target", Argument.STRING, (request, pathVariables, body) -> textResponse(request.getMethodName()

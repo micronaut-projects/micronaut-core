@@ -1,4 +1,4 @@
-WARNING: Functional routes are experimental. The API, in the package pkg:web.router.builder[] and the related types api:http.AsyncServerHttpRequest[], api:http.body.BodyElements[] and the package pkg:http.form[], is annotated with ann:core.annotation.Experimental[] and may change in a future release.
+WARNING: Functional routes are experimental. The API, in the package pkg:web.router.builder[] and the related types api:http.body.AsyncRequestBody[], api:http.body.BodyElements[] and the package pkg:http.form[], is annotated with ann:core.annotation.Experimental[] and may change in a future release.
 
 Besides controllers, the Micronaut HTTP server routes requests to *handler functions* declared in code. A bean of type api:web.router.builder.HttpRoutes[] receives an api:web.router.builder.HttpRouteBuilder[] and declares its routes with it:
 

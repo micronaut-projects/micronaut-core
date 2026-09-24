@@ -314,22 +314,22 @@ class HandlerRouteCancelledUploadTest {
         HttpRoutes cancelledUploadRoutes(Outcomes outcomes, @Value("${spec.destination}") String destination) {
             Path directory = Path.of(destination);
             return routes -> {
-                routes.asyncPOST("/cancel/parts", (request, pathVariables) -> outcomes.record("parts", request.parts()
+                routes.asyncPOST("/cancel/parts", (request, pathVariables, body) -> outcomes.record("parts", body.parts()
                     .forEach(part -> part.isFile()
                         ? part.file().transferTo(directory.resolve(UUID.randomUUID() + ".bin"))
                         : part.text()))).consumesAll();
-                routes.asyncPOST("/cancel/form", (request, pathVariables) ->
-                    outcomes.record("form", request.form())).consumesAll();
-                routes.asyncPOST("/cancel/form-unawaited", (request, pathVariables) -> {
-                    outcomes.record("form-unawaited", request.form());
+                routes.asyncPOST("/cancel/form", (request, pathVariables, body) ->
+                    outcomes.record("form", body.form())).consumesAll();
+                routes.asyncPOST("/cancel/form-unawaited", (request, pathVariables, body) -> {
+                    outcomes.record("form-unawaited", body.form());
                     return CompletableFuture.completedFuture(HttpResponse.ok());
                 }).consumesAll();
-                routes.asyncPOST("/cancel/transfer", (request, pathVariables) ->
-                    outcomes.record("transfer", request.transferTo(directory.resolve(UUID.randomUUID() + ".bin")))).consumesAll();
-                routes.asyncPOST("/cancel/bytes", (request, pathVariables) ->
-                    outcomes.record("bytes", request.bytes(32 * 1024 * 1024))).consumesAll();
-                routes.asyncPOST("/cancel/text", (request, pathVariables) ->
-                    outcomes.record("text", request.text())).consumesAll();
+                routes.asyncPOST("/cancel/transfer", (request, pathVariables, body) ->
+                    outcomes.record("transfer", body.transferTo(directory.resolve(UUID.randomUUID() + ".bin")))).consumesAll();
+                routes.asyncPOST("/cancel/bytes", (request, pathVariables, body) ->
+                    outcomes.record("bytes", body.bytes(32 * 1024 * 1024))).consumesAll();
+                routes.asyncPOST("/cancel/text", (request, pathVariables, body) ->
+                    outcomes.record("text", body.text())).consumesAll();
                 routes.POST("/cancel/sync-form", (FormRequestHandler) (request, pathVariables, form) -> {
                     outcomes.started.put("sync-form", Boolean.TRUE);
                     return HttpResponse.ok();
