@@ -38,7 +38,6 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
-import java.util.function.IntUnaryOperator;
 
 /**
  * This class handles the sizing of a connection pool to conform to the configuration in
@@ -561,15 +560,9 @@ final class Pool40 implements Pool {
 
         @Override
         boolean tryEarmarkForRequest() {
-            IntUnaryOperator upd = old -> {
-                if (old >= Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount)) {
-                    return old;
-                } else {
-                    return old + 1;
-                }
-            };
-            int old = earmarkedOrLiveRequests.updateAndGet(upd);
-            return upd.applyAsInt(old) != old;
+            int limit = Math.min(connectionPoolConfiguration.getMaxConcurrentRequestsPerHttp2Connection(), maxStreamCount);
+            int prev = earmarkedOrLiveRequests.getAndUpdate(old -> old >= limit ? old : old + 1);
+            return prev < limit;
         }
 
         @Override
