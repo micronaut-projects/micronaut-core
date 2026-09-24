@@ -13,6 +13,7 @@ import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.annotation.FilterMatcher;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RouteDeclaration;
@@ -68,18 +69,27 @@ public class AuditedRoutes implements HttpRoutes {
     @Override
     public void routes(HttpRouteBuilder routes) {
         // tag::annotationRoutes[]
+        routes.path("/admin", admin -> {
+            admin.executeOn(TaskExecutors.BLOCKING) // <4>
+                .annotate(Audited.class) // <5>
+                .annotate(Version.class, version -> version.value("2"));
+            admin.GET("/users", (request, pathVariables) ->
+                HttpResponse.ok("users on " + Thread.currentThread().getName()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            admin.DELETE("/users/{id}", (request, pathVariables) ->
+                HttpResponse.ok("deleted " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE));
+        });
         routes.POST("/payments/{amount}", (request, pathVariables) ->
                 HttpResponse.ok(payments.pay(pathVariables.getLong("amount"))).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <4>
+            .annotationMetadata(beanContext.getBeanDefinition(Payments.class).getRequiredMethod("pay", long.class)); // <6>
         routes.POST("/refunds/{amount}", (request, pathVariables) ->
                 HttpResponse.ok("refunded " + pathVariables.getLong("amount")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotate(Audited.class); // <5>
+            .annotate(Audited.class); // <7>
         routes.GET("/receipts/{id}", (request, pathVariables) ->
                 HttpResponse.ok("receipt v1 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotate(AnnotationValue.builder(Version.class).value("1").build()); // <6>
+            .annotate(AnnotationValue.builder(Version.class).value("1").build()); // <8>
         routes.GET("/receipts/{id}", (request, pathVariables) ->
                 HttpResponse.ok("receipt v2 " + pathVariables.getLong("id")).contentType(MediaType.TEXT_PLAIN_TYPE))
-            .annotate(Version.class, version -> version.value("2")) // <7>
+            .annotate(Version.class, version -> version.value("2")) // <9>
             .annotate(Audited.class);
         routes.GET("/prices", (request, pathVariables) -> HttpResponse.ok("prices").contentType(MediaType.TEXT_PLAIN_TYPE));
         // end::annotationRoutes[]

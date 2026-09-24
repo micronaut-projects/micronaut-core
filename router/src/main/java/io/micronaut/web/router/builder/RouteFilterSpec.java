@@ -49,7 +49,7 @@ import io.micronaut.core.annotation.Experimental;
  * @since 5.3.0
  */
 @Experimental
-public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits HttpRouteSpec, HttpRouteGroup, ServerFilterSpec, ContextFilterSpec {
+public sealed interface RouteFilterSpec<S extends RouteFilterSpec<S>> permits RouteSpec, ServerFilterSpec, ContextFilterSpec {
 
     /**
      * Filter the requests, like a {@code @RequestFilter} method that returns nothing. The filters

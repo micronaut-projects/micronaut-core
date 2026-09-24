@@ -11,6 +11,8 @@ The meta-annotations of an annotation type are not known at runtime. The feature
 
 The route keeps the element: `MethodBasedRouteInfo.getAnnotationMetadataProvider()` returns it for the matched route, the bean method of a controller route, or nothing for a handler route without annotations, so an integration finds the bean method of a route with `instanceof ExecutableMethod`.
 
+A group has the same settings as a route, those of `RouteSpec`: its media types, executor, annotations, annotated element, attributes, conditions, order and port are the defaults of the routes declared in its lambda and in its nested groups, wherever they are declared in the lambda. A route, or a nested group, with its own value overrides the one of the group. The element given to a group with `annotationMetadata(...)` is the element of its routes that have none of their own, e.g. the `BeanDefinition` of a resource for every route of the resource.
+
 snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", indent=0, title="An annotation that binds a filter"]
 
 <1> A filter matcher annotation.
@@ -19,10 +21,12 @@ snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotations", i
 
 snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="annotationRoutes", indent=0, title="Handler routes with annotations"]
 
-<4> The route implements the bean method and has its annotations: the filter applies.
-<5> The route has the annotation: the filter applies too.
-<6> A route with a version, see <<apiVersioning, API Versioning>>.
-<7> Several annotations are chained calls: the version and the annotation that binds the filter.
+<4> A group has the settings of a route, see `RouteSpec`: its routes run on the blocking executor, like the methods of a controller annotated `@ExecuteOn(TaskExecutors.BLOCKING)`.
+<5> The routes of the group have the annotations of the group, wherever they are declared in its lambda: the filter applies to them, and they answer the version `2` of the API, see <<apiVersioning, API Versioning>>.
+<6> The route implements the bean method and has its annotations: the filter applies.
+<7> The route has the annotation: the filter applies too.
+<8> A route with a version.
+<9> Several annotations are chained calls: the version and the annotation that binds the filter.
 
 The route of `/prices` has no annotation, and the filter does not apply to it.
 
