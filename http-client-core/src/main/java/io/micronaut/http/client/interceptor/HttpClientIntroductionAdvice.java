@@ -562,8 +562,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                                      ReturnType<?> returnType,
                                                      Argument<?> errorType,
                                                      Argument<?> reactiveValueArgument) {
-        Flux<RequestBinderResult> requestFlux = Flux.from(requestPublisher);
-        return requestFlux.filter(result -> !result.isError()).map(RequestBinderResult::request).flatMap(request -> {
+        return Flux.from(requestPublisher).flatMap(result -> {
+            if (result.isError()) {
+                return errorResultPublisher(result);
+            }
+            MutableHttpRequest<?> request = Objects.requireNonNull(result.request());
             Class<?> argumentType = reactiveValueArgument.getType();
             if (Void.class == argumentType || returnType.isVoid()) {
                 request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -574,7 +577,16 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                 }
                 return httpClient.retrieve(request, reactiveValueArgument, errorType);
             }
-        }).switchIfEmpty(requestFlux.mapNotNull(RequestBinderResult::errorResult));
+        });
+    }
+
+    /**
+     * The publisher emitted when binding the request failed: the error result computed by the
+     * binder, or nothing when there is none. The binding must not be repeated at this point.
+     */
+    private static Publisher<?> errorResultPublisher(RequestBinderResult result) {
+        Object errorResult = result.errorResult();
+        return errorResult == null ? Flux.empty() : Flux.just(errorResult);
     }
 
     private Publisher<?> httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
@@ -582,8 +594,11 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                                                            Publisher<RequestBinderResult> requestPublisher,
                                                            Argument<?> errorType,
                                                            Argument<?> reactiveValueArgument) {
-        Flux<RequestBinderResult> requestFlux = Flux.from(requestPublisher);
-        return requestFlux.filter(result -> !result.isError()).map(RequestBinderResult::request).flatMap(request -> {
+        return Flux.from(requestPublisher).flatMap(result -> {
+            if (result.isError()) {
+                return errorResultPublisher(result);
+            }
+            MutableHttpRequest<?> request = Objects.requireNonNull(result.request());
             Class<?> reactiveValueType = reactiveValueArgument.getType();
             if (Void.class == reactiveValueType) {
                 request.getHeaders().remove(HttpHeaders.ACCEPT);
@@ -617,7 +632,7 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
                     }
                 }
             }
-        }).switchIfEmpty(requestFlux.mapNotNull(RequestBinderResult::errorResult));
+        });
     }
 
     private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,
