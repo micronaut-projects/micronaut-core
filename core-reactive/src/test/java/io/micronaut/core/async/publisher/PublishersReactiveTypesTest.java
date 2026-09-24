@@ -15,10 +15,13 @@
  */
 package io.micronaut.core.async.publisher;
 
+import io.micronaut.core.async.subscriber.Completable;
 import io.micronaut.core.optim.StaticOptimizations;
 import io.micronaut.core.reflect.ClassUtils;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 import java.io.File;
 import java.lang.classfile.ClassFile;
@@ -30,6 +33,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.Callable;
@@ -85,6 +89,46 @@ class PublishersReactiveTypesTest {
         }
     }
 
+    @Test
+    void typesCanBeRegisteredWithOptimizations() throws Exception {
+        // Micronaut AOT generates fixed-size lists
+        List<Class<?>> reactiveTypes = Arrays.asList(Flux.class, Mono.class, Completable.class);
+        List<Class<?>> singleTypes = Arrays.asList(Mono.class);
+        List<Class<?>> completableTypes = Arrays.asList(Completable.class);
+        try (IsolatedClassLoader classLoader = new IsolatedClassLoader()) {
+            classLoader.setOptimization(PublishersOptimizations.class.getName(), new Class<?>[] {List.class, List.class, List.class}, reactiveTypes, singleTypes, completableTypes);
+            Class<?> publishers = classLoader.initialize(Publishers.class.getName());
+
+            assertTypesCanBeRegistered(publishers);
+            assertTrue(isType(publishers, "isSingle", Mono.class));
+            assertEquals(List.of(Flux.class, Mono.class, Completable.class), reactiveTypes);
+            assertEquals(List.of(Mono.class), singleTypes);
+            assertEquals(List.of(Completable.class), completableTypes);
+        }
+    }
+
+    @Test
+    void typesCanBeRegisteredWithoutOptimizations() throws Exception {
+        try (IsolatedClassLoader classLoader = new IsolatedClassLoader()) {
+            assertTypesCanBeRegistered(classLoader.initialize(Publishers.class.getName()));
+        }
+    }
+
+    private static void assertTypesCanBeRegistered(Class<?> publishers) throws ReflectiveOperationException {
+        publishers.getMethod("registerReactiveType", Class.class).invoke(null, CustomReactive.class);
+        publishers.getMethod("registerReactiveSingle", Class.class).invoke(null, CustomSingle.class);
+        publishers.getMethod("registerReactiveCompletable", Class.class).invoke(null, CustomCompletable.class);
+
+        assertTrue(typeNames(publishers, "getKnownReactiveTypes").containsAll(List.of(CustomReactive.class.getName(), CustomSingle.class.getName(), CustomCompletable.class.getName())));
+        assertTrue(isType(publishers, "isConvertibleToPublisher", CustomReactive.class));
+        assertTrue(isType(publishers, "isSingle", CustomSingle.class));
+        assertTrue(isType(publishers, "isCompletable", CustomCompletable.class));
+    }
+
+    private static boolean isType(Class<?> publishers, String method, Class<?> type) throws ReflectiveOperationException {
+        return (boolean) publishers.getMethod(method, Class.class).invoke(null, type);
+    }
+
     @SuppressWarnings("unchecked")
     private static List<String> typeNames(Class<?> publishers, String method) throws ReflectiveOperationException {
         List<Class<?>> types = (List<Class<?>>) publishers.getMethod(method).invoke(null);
@@ -112,6 +156,15 @@ class PublishersReactiveTypesTest {
                 .invokestatic(ClassDesc.of(System.class.getName()), "setProperty", MethodTypeDesc.of(ConstantDescs.CD_String, ConstantDescs.CD_String, ConstantDescs.CD_String))
                 .pop()
                 .return_()));
+    }
+
+    private interface CustomReactive {
+    }
+
+    private interface CustomSingle {
+    }
+
+    private interface CustomCompletable {
     }
 
     /**

@@ -69,9 +69,10 @@ public class Publishers {
         Optional<PublishersOptimizations> publishers = StaticOptimizations.get(PublishersOptimizations.class);
         if (publishers.isPresent()) {
             PublishersOptimizations optimizations = publishers.get();
-            reactiveTypes = optimizations.getReactiveTypes();
-            singleTypes = optimizations.getSingleTypes();
-            completableTypes = optimizations.getCompletableTypes();
+            // copies, since Micronaut AOT generates fixed-size lists and the registerReactive* methods add to them
+            reactiveTypes = new ArrayList<>(optimizations.getReactiveTypes());
+            singleTypes = new ArrayList<>(optimizations.getSingleTypes());
+            completableTypes = new ArrayList<>(optimizations.getCompletableTypes());
         } else {
             reactiveTypes = new ArrayList<>(3);
             singleTypes = new ArrayList<>(3);
