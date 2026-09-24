@@ -18,6 +18,7 @@ package io.micronaut.http.netty.body;
 import io.micronaut.buffer.netty.NettyByteBufferFactory;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.io.buffer.ByteBuffer;
+import io.micronaut.http.exceptions.ContentLengthExceededException;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.CompositeByteBuf;
 import org.jspecify.annotations.Nullable;
@@ -36,6 +37,10 @@ import java.io.IOException;
 @Internal
 final class JsonChunkedProcessor {
     final JsonCounter counter = new JsonCounter();
+    /**
+     * The maximum number of bytes of a JSON value that is buffered to be emitted.
+     */
+    private final long maxElementSize;
     // guarded by this: the subscriber may cancel, which releases them, on another thread than
     // the one that processes the input
     @Nullable
@@ -45,13 +50,26 @@ final class JsonChunkedProcessor {
     // the buffers were released: what the processing still buffers is released at once
     private boolean released;
 
+    JsonChunkedProcessor() {
+        this(Long.MAX_VALUE);
+    }
+
+    /**
+     * @param maxElementSize The maximum number of bytes of a JSON value: a larger one fails the
+     *                       processing with a {@link ContentLengthExceededException}, once that
+     *                       many bytes of it were buffered
+     */
+    JsonChunkedProcessor(long maxElementSize) {
+        this.maxElementSize = maxElementSize;
+    }
+
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
         return Flux.concat(input
                 .concatMap(b -> Flux.<ByteBuffer<?>>create(s -> {
                     try {
                         countLoop(s, b);
                         s.complete();
-                    } catch (IOException e) {
+                    } catch (IOException | ContentLengthExceededException e) {
                         s.error(e);
                     } finally {
                         b.release();
@@ -96,6 +114,7 @@ final class JsonChunkedProcessor {
             counter.feed(content);
             JsonCounter.BufferRegion bufferRegion = counter.pollFlushedRegion();
             if (bufferRegion != null) {
+                checkSize(bufferRegion.end() - bufferRegion.start());
                 long start = Math.max(initialPosition, bufferRegion.start());
                 buffer(content.retainedSlice(
                     Math.toIntExact(start - bias),
@@ -105,9 +124,18 @@ final class JsonChunkedProcessor {
             }
         }
         if (counter.isBuffering()) {
+            // what is buffered of a value that is not complete yet: a value that is too large
+            // fails before it is buffered whole
+            checkSize(counter.position() - counter.bufferStart());
             int currentBufferStart = Math.toIntExact(Math.max(initialPosition, counter.bufferStart()) - bias);
             content.readerIndex(currentBufferStart);
             buffer(content.retain());
+        }
+    }
+
+    private void checkSize(long size) {
+        if (size > maxElementSize) {
+            throw new ContentLengthExceededException("The size of a JSON value [" + size + "] exceeds the maximum allowed content length [" + maxElementSize + "]");
         }
     }
 

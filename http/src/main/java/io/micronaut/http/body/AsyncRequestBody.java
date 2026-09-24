@@ -211,6 +211,12 @@ public interface AsyncRequestBody {
      * an {@link io.micronaut.http.exceptions.HttpStatusException} with the status
      * {@code 415 Unsupported Media Type}.</p>
      *
+     * <p>An element is decoded in memory: an element larger than the limit of the server for
+     * buffered request content ({@code micronaut.server.max-request-buffer-size}) fails
+     * {@link BodyElements#next()} with a
+     * {@link io.micronaut.http.exceptions.ContentLengthExceededException}, like a body read
+     * whole that is too large. The body as a whole is not limited by it.</p>
+     *
      * @param type The type of an element
      * @param <T>  The type of an element
      * @return The elements, read as they are asked for. They are closed when the stage returned
