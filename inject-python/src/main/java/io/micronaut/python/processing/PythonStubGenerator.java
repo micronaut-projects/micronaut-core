@@ -73,6 +73,7 @@ import org.graalvm.polyglot.Value;
 import io.micronaut.context.annotation.Executable;
 import io.micronaut.context.annotation.Factory;
 import io.micronaut.core.annotation.AnnotationUtil;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.annotation.Introspected;
 import io.micronaut.core.annotation.NonNull;
 import io.micronaut.inject.ast.ClassElement;
@@ -4003,7 +4004,8 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             if (className != null) {
                 ClassElement type = context.getClassElement(className).orElse(null);
                 if (type != null) {
-                    return ClassTypeDef.of(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
+                    // a class literal names the raw type: FindAllInterceptor.class, not FindAllInterceptor<Object, Object>.class
+                    return javaClassType(type).getStaticField(CLASS_FIELD, TypeDef.of(Class.class));
                 }
             }
             throw unrepresentable(annotationName, memberName, value, memberType);
@@ -4135,6 +4137,20 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
         return false;
     }
 
+    /**
+     * Whether an annotation type is annotated with {@link Internal}: it is served by the annotation
+     * metadata and never copied onto the generated source.
+     *
+     * @param annotationName The annotation
+     * @param visitorContext The visitor context
+     * @return Whether the annotation type is internal
+     */
+    private static boolean isInternalAnnotation(String annotationName, VisitorContext visitorContext) {
+        return visitorContext.getClassElement(annotationName)
+            .map(annotationType -> annotationType.hasDeclaredAnnotation(Internal.class))
+            .orElse(false);
+    }
+
     private PythonReflectionGate.Copy runtimeAnnotationCopy(String annotationName, ElementType declaration, VisitorContext visitorContext) {
         if (annotationName.startsWith(MICRONAUT_PACKAGE_PREFIX)) {
             // The ones a test framework reads reflectively on the test class are always copied:
@@ -4150,6 +4166,11 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
             // (@TestResourcesProperties of micronaut-test-resources), so it is reflection data of the
             // generated type and falls through to the gate like a third-party annotation
             if (isMicronautProcessedAnnotation(annotationName, visitorContext)) {
+                return PythonReflectionGate.Copy.NEVER;
+            }
+            // An @Internal annotation is framework metadata, often added by a visitor rather than declared
+            // in the Python source (@DataMethod of micronaut-data): no module reads it from the class
+            if (isInternalAnnotation(annotationName, visitorContext)) {
                 return PythonReflectionGate.Copy.NEVER;
             }
         }
