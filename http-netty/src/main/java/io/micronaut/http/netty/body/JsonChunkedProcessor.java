@@ -25,7 +25,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.FluxSink;
 
 import java.io.IOException;
-import java.util.Objects;
 
 /**
  * Adapted from JsonContentProcessor. This class takes input data and splits it up according to the
@@ -37,10 +36,14 @@ import java.util.Objects;
 @Internal
 final class JsonChunkedProcessor {
     final JsonCounter counter = new JsonCounter();
+    // guarded by this: the subscriber may cancel, which releases them, on another thread than
+    // the one that processes the input
     @Nullable
     private ByteBuf singleBuffer;
     @Nullable
     private CompositeByteBuf compositeBuffer;
+    // the buffers were released: what the processing still buffers is released at once
+    private boolean released;
 
     public Flux<ByteBuffer<?>> process(Flux<ByteBuf> input) {
         return Flux.concat(input
@@ -61,10 +64,21 @@ final class JsonChunkedProcessor {
                     s.error(e);
                 }
             }))
-            .doOnTerminate(this::releaseBuffers);
+            // also when the subscriber cancels, e.g. a reader that stops before the last element:
+            // the partial element and the elements and input not delivered yet are released
+            .doFinally(signal -> releaseBuffers())
+            .doOnDiscard(ByteBuffer.class, JsonChunkedProcessor::release)
+            .doOnDiscard(ByteBuf.class, ByteBuf::release);
     }
 
-    private void releaseBuffers() {
+    private static void release(ByteBuffer<?> buffer) {
+        if (buffer.asNativeBuffer() instanceof ByteBuf buf) {
+            buf.release();
+        }
+    }
+
+    private synchronized void releaseBuffers() {
+        released = true;
         if (this.singleBuffer != null) {
             this.singleBuffer.release();
             this.singleBuffer = null;
@@ -97,7 +111,11 @@ final class JsonChunkedProcessor {
         }
     }
 
-    private void buffer(ByteBuf buffer) {
+    private synchronized void buffer(ByteBuf buffer) {
+        if (released) {
+            buffer.release();
+            return;
+        }
         if (this.singleBuffer == null && this.compositeBuffer == null) {
             this.singleBuffer = buffer;
         } else {
@@ -111,17 +129,26 @@ final class JsonChunkedProcessor {
     }
 
     private void flush(FluxSink<? super ByteBuffer<?>> out) {
+        ByteBuf completedNode = take();
+        if (completedNode != null) {
+            // emitted without the lock: the subscriber may cancel meanwhile
+            out.next(NettyByteBufferFactory.DEFAULT.wrap(completedNode));
+        }
+    }
+
+    /**
+     * @return The buffered element, taken from this, or {@code null} if nothing is buffered, or
+     * the buffers were released
+     */
+    private synchronized @Nullable ByteBuf take() {
         ByteBuf completedNode = compositeBuffer == null ? singleBuffer : compositeBuffer;
-        ByteBuffer<ByteBuf> wrapped = NettyByteBufferFactory.DEFAULT.wrap(Objects.requireNonNull(completedNode));
-        out.next(wrapped);
         compositeBuffer = null;
         singleBuffer = null;
+        return completedNode;
     }
 
     private void complete(FluxSink<? super ByteBuffer<?>> out) throws IOException {
         counter.noMoreInput();
-        if (this.singleBuffer != null || this.compositeBuffer != null) {
-            flush(out);
-        }
+        flush(out);
     }
 }

@@ -33,6 +33,8 @@ import io.micronaut.http.bind.binders.UnmatchedRequestArgumentBinder;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.inject.UnsafeExecutionHandle;
+import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.web.router.builder.PathVariables;
 import io.micronaut.web.router.exceptions.UnsatisfiedRouteException;
 import org.jspecify.annotations.Nullable;
 
@@ -285,6 +287,13 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
         checkIfFulfilled();
     }
 
+    /**
+     * @return The target a locator returned for the route, or {@code null} if the route was not located
+     */
+    @Nullable Object locatedTarget() {
+        return null;
+    }
+
     @Override
     public void fulfillBeforeFilters(RequestBinderRegistry requestBinderRegistry, HttpRequest<?> request) {
         if (fulfilled) {
@@ -299,6 +308,11 @@ abstract class AbstractRouteMatch<T, R> implements MethodBasedRouteMatch<T, R> {
                 continue;
             }
             Argument<Object> argument = (Argument<Object>) arguments[i];
+            if (arguments[i].getType() == PathVariables.class) {
+                // a handler function's path variables come from the match, not a binder
+                setValue(i, argument, new DefaultPathVariables(getVariableValues(), conversionService, locatedTarget()));
+                continue;
+            }
             Object value = getVariableValues().get(argumentNames[i]);
             if (value != null) {
                 setValue(i, argument, value);

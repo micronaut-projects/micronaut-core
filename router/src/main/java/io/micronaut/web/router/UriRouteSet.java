@@ -20,7 +20,10 @@ import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.web.router.exceptions.DuplicateRouteException;
+import io.micronaut.web.router.spi.CompiledRouteMatcher;
+import io.micronaut.web.router.spi.IndexedRouteDeclaration;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -28,11 +31,14 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Predicate;
+import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -56,13 +62,30 @@ final class UriRouteSet {
     static final UriRouteSet NONE = UriRouteSet.of(List.of());
 
     private static final UriRouteInfo<Object, Object>[] EMPTY = new UriRouteInfo[0];
+    private static final String VARIABLE_SEGMENT = "{}";
+    private static final String ANY_SEGMENTS = "{*}";
+    private static final Pattern SIMPLE_VARIABLE = Pattern.compile("\\{\\w[\\w-]*}");
 
     private final Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodRoutesByMethod;
     private final Map<String, UriRouteInfo<Object, Object>[]> allRoutesByMethod;
+    /**
+     * The index of the routes of each method, by method name, see {@link #allRoutesByMethod}.
+     */
+    private final Map<String, RouteIndex> indexesByMethod;
+    /**
+     * The routes of generated URL parsers, by the ordinal of their declarations.
+     */
+    private final CompiledRoutes[] compiledRoutes;
+    /**
+     * Whether a route is a locator route, see {@link RouteLocator}.
+     */
+    private final boolean hasLocators;
     private final boolean empty;
 
     private UriRouteSet(Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod,
-                        Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod) {
+                        Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod,
+                        Map<CompiledRouteMatcher, CompiledRoutes> compiled,
+                        boolean hasLocators) {
         Map<HttpMethod, UriRouteInfo<Object, Object>[]> methodMap = CollectionUtils.newEnumMap(HttpMethod.values());
         Map<String, UriRouteInfo<Object, Object>[]> customMethodMap = CollectionUtils.newHashMap(routesByMethod.size() + customRoutesByMethod.size());
         for (Map.Entry<HttpMethod, List<UriRouteInfo<Object, Object>>> e : routesByMethod.entrySet()) {
@@ -75,6 +98,13 @@ final class UriRouteSet {
         }
         this.methodRoutesByMethod = methodMap;
         this.allRoutesByMethod = customMethodMap;
+        Map<String, RouteIndex> indexes = CollectionUtils.newHashMap(customMethodMap.size());
+        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> e : customMethodMap.entrySet()) {
+            indexes.put(e.getKey(), indexRoutes(e.getValue()));
+        }
+        this.indexesByMethod = indexes;
+        this.hasLocators = hasLocators;
+        this.compiledRoutes = compiled.isEmpty() ? new CompiledRoutes[0] : withExclusivity(compiled.values());
         this.empty = customMethodMap.isEmpty();
     }
 
@@ -86,8 +116,23 @@ final class UriRouteSet {
      * @return The set
      */
     static UriRouteSet of(Collection<? extends UriRoute> routes) {
+        return of(routes, List.of());
+    }
+
+    /**
+     * The set of the given routes.
+     *
+     * @param routes     The routes, in the order they were declared: routes that are equally
+     *                   specific keep it
+     * @param lazyRoutes The routes built when first used, after the routes
+     * @return The set
+     */
+    static UriRouteSet of(Collection<? extends UriRoute> routes, Collection<LazyUriRouteInfo> lazyRoutes) {
         Builder builder = new Builder();
         for (UriRoute route : routes) {
+            builder.add(route);
+        }
+        for (LazyUriRouteInfo route : lazyRoutes) {
             builder.add(route);
         }
         return builder.build();
@@ -145,6 +190,29 @@ final class UriRouteSet {
      * @throws DuplicateRouteException if several routes match equally closely
      */
     @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
+        UriRouteMatch<T, R> match = findClosestRoute(request, ports);
+        if (hasLocators && match != null) {
+            RouteLocator locator = RouteLocator.of(match.getRouteInfo());
+            if (locator != null) {
+                // the rest of the path is matched with the routes of the located target
+                RouteLocator.Located located = locator.locate(request, match);
+                if (located == null) {
+                    return null;
+                }
+                UriRouteMatch<T, R> target = located.routes().findClosest(located.request(), null);
+                return target == null ? null : located.wrap(target);
+            }
+        }
+        return match;
+    }
+
+    private @Nullable <T, R> UriRouteMatch<T, R> findClosestRoute(HttpRequest<?> request, @Nullable Set<Integer> ports) throws DuplicateRouteException {
+        if (compiledRoutes.length != 0) {
+            UriRouteMatch<T, R> compiledMatch = findCompiled(request, ports);
+            if (compiledMatch != null) {
+                return compiledMatch;
+            }
+        }
         List<UriRouteInfo<Object, Object>> routes = findInternal(request, ports);
         if (routes.isEmpty()) {
             return null;
@@ -173,7 +241,8 @@ final class UriRouteSet {
     }
 
     /**
-     * The closest of equally close matches: an explicit route over an implicit {@code HEAD} route.
+     * The closest of equally close matches: an explicit route over an implicit {@code HEAD} route,
+     * then the route of the lowest order.
      *
      * @param path    The path
      * @param matches The closest matches
@@ -185,6 +254,9 @@ final class UriRouteSet {
     static @Nullable <T, R> UriRouteMatch<T, R> closest(String path, List<UriRouteMatch<T, R>> matches) throws DuplicateRouteException {
         if (matches.size() > 1) {
             matches = ImplicitHeadRoutes.preferExplicit(matches);
+        }
+        if (matches.size() > 1) {
+            matches = RouteOrders.preferLowest(matches);
         }
         if (matches.size() > 1) {
             throw new DuplicateRouteException(path, (List) matches);
@@ -207,6 +279,64 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request,
                                                     @Nullable Predicate<UriRouteMatch<T, R>> filter,
                                                     @Nullable Set<Integer> ports) {
+        return locate(request, findAllClosestRoutes(request, filter, ports), filter);
+    }
+
+    /**
+     * Replace the matches of locator routes with the matches of the rest of the path in the
+     * tables of their targets.
+     *
+     * @param request The request
+     * @param matches The closest matches
+     * @param filter  The filter of the candidates, applied to the matches of a target's table
+     *                before its ambiguity is resolved
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches, located
+     */
+    private <T, R> List<UriRouteMatch<T, R>> locate(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (!hasLocators || matches.isEmpty()) {
+            return matches;
+        }
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            RouteLocator locator = RouteLocator.of(match.getRouteInfo());
+            if (locator == null) {
+                result.add(match);
+                continue;
+            }
+            RouteLocator.Located located = locator.locate(request, match);
+            if (located != null) {
+                List<UriRouteMatch<T, R>> targetMatches = filter == null
+                    ? located.routes().findAllClosest(located.request(), null, null)
+                    // the filter sees the match of the request, as it does for the other routes
+                    : located.routes().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)), null);
+                result.addAll(located.wrap(targetMatches));
+            }
+        }
+        return result;
+    }
+
+    /**
+     * The closest matches of a request.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, applied before the ambiguity is resolved
+     * @param ports   The default ports, or {@code null}
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request,
+                                                                  @Nullable Predicate<UriRouteMatch<T, R>> filter,
+                                                                  @Nullable Set<Integer> ports) {
+        if (compiledRoutes.length != 0) {
+            UriRouteMatch<T, R> compiledMatch = findCompiled(request, ports);
+            // a compiled match the filter rejects can hide a less specific route it accepts
+            if (compiledMatch != null && (filter == null || accepts(filter, compiledMatch))) {
+                return List.of(compiledMatch);
+            }
+        }
         List<UriRouteInfo<Object, Object>> routes = findInternal(request, ports);
         if (routes.isEmpty()) {
             return Collections.emptyList();
@@ -218,17 +348,25 @@ final class UriRouteSet {
         return DefaultRouter.resolveAmbiguity(request, uriRoutes);
     }
 
-    private static <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+    private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         if (filter == null || matches.isEmpty()) {
             return matches;
         }
         var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
         for (UriRouteMatch<T, R> match : matches) {
-            if (filter.test(match)) {
+            if (accepts(filter, match)) {
                 filtered.add(match);
             }
         }
         return filtered;
+    }
+
+    /**
+     * Whether the filter accepts a candidate. The route of a locator is no candidate: the filter
+     * applies to the routes of its target's table, see {@link #locate}.
+     */
+    private <T, R> boolean accepts(Predicate<UriRouteMatch<T, R>> filter, UriRouteMatch<T, R> match) {
+        return hasLocators && RouteLocator.of(match.getRouteInfo()) != null || filter.test(match);
     }
 
     private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
@@ -299,8 +437,10 @@ final class UriRouteSet {
     @SuppressWarnings("unchecked")
     <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
-        for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {
-            for (UriRouteInfo<Object, Object> route : routes) {
+        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
+            UriRouteInfo<Object, Object>[] routes = entry.getValue();
+            for (int candidate : index(entry.getKey()).candidates(uri)) {
+                UriRouteInfo<Object, Object> route = routes[candidate];
                 if (request != null) {
                     if (shouldSkipForPort(request, route, ports)) {
                         continue;
@@ -331,8 +471,10 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAny(HttpRequest<?> request, @Nullable Set<Integer> ports) {
         String path = request.getPath();
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
-        for (UriRouteInfo<Object, Object>[] routes : allRoutesByMethod.values()) {
-            for (UriRouteInfo<Object, Object> route : routes) {
+        for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
+            UriRouteInfo<Object, Object>[] routes = entry.getValue();
+            for (int candidate : index(entry.getKey()).candidates(path)) {
+                UriRouteInfo<Object, Object> route = routes[candidate];
                 if (shouldSkipForPort(request, route, ports)) {
                     continue;
                 }
@@ -345,7 +487,242 @@ final class UriRouteSet {
                 }
             }
         }
-        return matchedRoutes;
+        return hasLocators ? locateAny(request, matchedRoutes) : matchedRoutes;
+    }
+
+    /**
+     * Replace the matches of locator routes, one per HTTP method, with the matches of the rest of
+     * the path in the routes of the located target, e.g. to find the allowed methods.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> locateAny(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches) {
+        UriRouteMatch<T, R> locatorMatch = null;
+        RouteLocator locator = null;
+        List<UriRouteMatch<T, R>> result = new ArrayList<>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            RouteLocator matchLocator = RouteLocator.of(match.getRouteInfo());
+            if (matchLocator == null) {
+                result.add(match);
+            } else if (locatorMatch == null || match.getRouteInfo().compareTo((UriRouteInfo) locatorMatch.getRouteInfo()) < 0) {
+                // the most specific locator locates the target
+                locatorMatch = match;
+                locator = matchLocator;
+            }
+        }
+        if (locator == null || locatorMatch == null) {
+            return matches;
+        }
+        RouteLocator.Located located;
+        try {
+            located = locator.locate(request, locatorMatch);
+        } catch (RuntimeException e) {
+            if (RouteLocator.pendingLocation(e) == null) {
+                throw e;
+            }
+            // an asynchronous locator that has not located its target: no route of it is known
+            return result;
+        }
+        if (located != null) {
+            result.addAll(located.wrap(located.routes().<T, R>findAny(located.request(), null)));
+        }
+        return result;
+    }
+
+    /**
+     * Match the request with the generated URL parsers. A route the parser answers is returned
+     * directly only when no other route of its method can match the same paths: then the normal
+     * selection could not choose another route, and the match is built from the captured path
+     * variables. Otherwise the router selects among all candidates as usual, so specificity,
+     * media types, ambiguity and explicit {@code HEAD} routes decide, and the order of the
+     * parsers does not.
+     *
+     * @param request The request
+     * @return The match, or {@code null} to select among the candidates
+     */
+    @SuppressWarnings("unchecked")
+    private <T, R> @Nullable UriRouteMatch<T, R> findCompiled(HttpRequest<?> request, @Nullable Set<Integer> ports) {
+        HttpMethod method = request.getMethod();
+        if (method == HttpMethod.CUSTOM) {
+            return null;
+        }
+        String path = UriTemplateMatcher.normalizeForMatching(request.getPath());
+        for (CompiledRoutes compiled : compiledRoutes) {
+            String[] captured = new String[compiled.capturedSize];
+            UriRouteInfo<Object, Object> route = null;
+            boolean exclusive = false;
+            int ordinal = compiled.matcher.match(method, path, captured);
+            if (ordinal >= 0 && ordinal < compiled.byOrdinal.length) {
+                route = compiled.byOrdinal[ordinal];
+                exclusive = compiled.exclusive[ordinal];
+            } else if (method == HttpMethod.HEAD) {
+                // the implicit HEAD route of a GET route
+                ordinal = compiled.matcher.match(HttpMethod.GET, path, captured);
+                if (ordinal >= 0 && ordinal < compiled.headByOrdinal.length) {
+                    route = compiled.headByOrdinal[ordinal];
+                    exclusive = compiled.headExclusive[ordinal];
+                }
+            }
+            if (route == null) {
+                // not a bound route of this parser: another parser, or the router, may have one
+                continue;
+            }
+            if (!exclusive || !isAcceptable(request, route, ports)) {
+                return null;
+            }
+            UriRouteInfo<Object, Object> built = route instanceof LazyUriRouteInfo lazy ? lazy.delegate() : route;
+            if (built instanceof DefaultUrlRouteInfo<?, ?> defaultRoute) {
+                return (UriRouteMatch<T, R>) defaultRoute.capturedMatch(request.getPath(), captured);
+            }
+            return (UriRouteMatch<T, R>) built.tryMatch(request.getPath());
+        }
+        return null;
+    }
+
+    /**
+     * Mark the compiled routes that no other route of the same method can compete with.
+     *
+     * @param compiled The routes bound to the generated URL parsers
+     * @return The routes with their exclusivity
+     */
+    private CompiledRoutes[] withExclusivity(Collection<CompiledRoutes> compiled) {
+        Map<UriRouteInfo<Object, Object>, String[]> segments = new IdentityHashMap<>();
+        CompiledRoutes[] result = new CompiledRoutes[compiled.size()];
+        int i = 0;
+        for (CompiledRoutes routes : compiled) {
+            boolean[] exclusive = new boolean[routes.byOrdinal.length];
+            boolean[] headExclusive = new boolean[routes.headByOrdinal.length];
+            for (int ordinal = 0; ordinal < exclusive.length; ordinal++) {
+                exclusive[ordinal] = isExclusive(routes.byOrdinal[ordinal], segments);
+            }
+            for (int ordinal = 0; ordinal < headExclusive.length; ordinal++) {
+                headExclusive[ordinal] = isExclusive(routes.headByOrdinal[ordinal], segments);
+            }
+            // room for the variables of every bound route, even if the matcher under-reports them
+            int capturedSize = routes.matcher.maxVariables();
+            for (UriRouteInfo<Object, Object> route : routes.byOrdinal) {
+                if (route instanceof IndexedRoute indexed) {
+                    capturedSize = Math.max(capturedSize, indexed.getPathVariableCount());
+                }
+            }
+            for (UriRouteInfo<Object, Object> route : routes.headByOrdinal) {
+                if (route instanceof IndexedRoute indexed) {
+                    capturedSize = Math.max(capturedSize, indexed.getPathVariableCount());
+                }
+            }
+            result[i++] = new CompiledRoutes(routes.matcher, routes.byOrdinal, routes.headByOrdinal, exclusive, headExclusive, capturedSize);
+        }
+        return result;
+    }
+
+    private boolean isExclusive(@Nullable UriRouteInfo<Object, Object> route, Map<UriRouteInfo<Object, Object>, String[]> segments) {
+        if (!(route instanceof LazyUriRouteInfo lazy)) {
+            return false;
+        }
+        String[] own = segments.computeIfAbsent(route, UriRouteSet::templateSegments);
+        for (UriRouteInfo<Object, Object> other : allRoutesByMethod.getOrDefault(lazy.methodKey(), EMPTY)) {
+            if (other != route && mayOverlap(own, segments.computeIfAbsent(other, UriRouteSet::templateSegments))) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The path segments of a route's template: a literal, {@link #VARIABLE_SEGMENT} for a
+     * variable that is a whole segment, or {@link #ANY_SEGMENTS} for anything else, which may
+     * match any number of segments, e.g. {@code {+path}}, {@code {/id}} or a regular expression.
+     */
+    private static String[] templateSegments(UriRouteInfo<Object, Object> route) {
+        String template = route instanceof LazyUriRouteInfo lazy ? lazy.uriTemplate() : route.getUriMatchTemplate().toString();
+        int query = template.indexOf("{?");
+        if (query >= 0) {
+            template = template.substring(0, query);
+        }
+        List<String> result = new ArrayList<>();
+        for (String segment : template.split("/")) {
+            if (segment.isEmpty()) {
+                continue;
+            }
+            if (segment.indexOf('{') < 0) {
+                result.add(segment);
+            } else if (SIMPLE_VARIABLE.matcher(segment).matches()) {
+                result.add(VARIABLE_SEGMENT);
+            } else {
+                result.add(ANY_SEGMENTS);
+            }
+        }
+        return result.toArray(String[]::new);
+    }
+
+    /**
+     * Whether two templates may match the same path. Only {@code false} is certain.
+     */
+    private static boolean mayOverlap(String[] a, String[] b) {
+        int common = Math.min(a.length, b.length);
+        for (int i = 0; i < common; i++) {
+            String x = a[i];
+            String y = b[i];
+            if (ANY_SEGMENTS.equals(x) || ANY_SEGMENTS.equals(y)) {
+                return true;
+            }
+            if (!VARIABLE_SEGMENT.equals(x) && !VARIABLE_SEGMENT.equals(y) && !x.equals(y)) {
+                return false;
+            }
+        }
+        // the longer template matches the same paths only if its remaining segments can be empty
+        String[] longer = a.length > b.length ? a : b;
+        for (int i = common; i < longer.length; i++) {
+            if (!ANY_SEGMENTS.equals(longer[i])) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * The same checks as {@link #findInternal(HttpRequest, Set)} for one route.
+     */
+    private boolean isAcceptable(HttpRequest<?> request, UriRouteInfo<Object, Object> route, @Nullable Set<Integer> ports) {
+        if (shouldSkipForPort(request, route, ports)) {
+            return false;
+        }
+        if (request.getMethod().permitsRequestBody()) {
+            if (!route.isPermitsRequestBody()) {
+                return false;
+            }
+            if (!route.consumesAll() && !route.doesConsume(request.getContentType().orElse(null))) {
+                return false;
+            }
+        }
+        if (!route.producesAll() && !route.doesProduce(request.accept())) {
+            return false;
+        }
+        return route.matching(request);
+    }
+
+    private static void addCompiled(Map<CompiledRouteMatcher, CompiledRoutes> compiled, LazyUriRouteInfo route) {
+        IndexedRouteDeclaration declaration = route.declaration();
+        if (declaration == null || !(declaration instanceof Enum<?> constant)) {
+            return;
+        }
+        CompiledRouteMatcher matcher = declaration.matcher();
+        if (matcher == null) {
+            return;
+        }
+        if (matcher.maxVariables() < 0) {
+            throw new IllegalStateException("The compiled route matcher " + matcher + " of the route declaration "
+                + constant.getDeclaringClass().getName() + "." + constant.name() + " has a negative maxVariables(): " + matcher.maxVariables());
+        }
+        int ordinal = constant.ordinal();
+        CompiledRoutes routes = compiled.get(matcher);
+        if (routes == null || ordinal >= routes.byOrdinal.length) {
+            // sized by the largest bound ordinal: the enum's constants are not read reflectively
+            int size = Math.max(ordinal + 1, routes == null ? 0 : routes.byOrdinal.length);
+            routes = routes == null
+                ? new CompiledRoutes(matcher, new UriRouteInfo[size], new UriRouteInfo[size])
+                : new CompiledRoutes(matcher, Arrays.copyOf(routes.byOrdinal, size), Arrays.copyOf(routes.headByOrdinal, size));
+            compiled.put(matcher, routes);
+        }
+        (route.isImplicitHead() ? routes.headByOrdinal : routes.byOrdinal)[ordinal] = route;
     }
 
     private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request, @Nullable Set<Integer> ports) {
@@ -353,13 +730,18 @@ final class UriRouteSet {
         boolean permitsBody = httpMethod.permitsRequestBody();
         Collection<MediaType> acceptedProducedTypes = null;
         MediaType contentType = null;
-        UriRouteInfo<Object, Object>[] routes = httpMethod == HttpMethod.CUSTOM ?
-            allRoutesByMethod.getOrDefault(request.getMethodName(), EMPTY) : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY);
+        String methodKey = httpMethod == HttpMethod.CUSTOM ? request.getMethodName() : httpMethod.name();
+        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.getOrDefault(methodKey, EMPTY);
         if (routes.length == 0) {
             return Collections.emptyList();
         }
-        var result = new ArrayList<UriRouteInfo<Object, Object>>(routes.length);
-        for (UriRouteInfo<Object, Object> route : routes) {
+        int[] candidates = index(methodKey).candidates(request.getPath());
+        if (candidates.length == 0) {
+            return Collections.emptyList();
+        }
+        var result = new ArrayList<UriRouteInfo<Object, Object>>(candidates.length);
+        for (int candidate : candidates) {
+            UriRouteInfo<Object, Object> route = routes[candidate];
             if (shouldSkipForPort(request, route, ports)) {
                 continue;
             }
@@ -399,6 +781,19 @@ final class UriRouteSet {
         return !ports.contains(request.getServerAddress().getPort());
     }
 
+    private RouteIndex index(String methodKey) {
+        // every method with routes has an index
+        return Objects.requireNonNull(indexesByMethod.get(methodKey));
+    }
+
+    private static RouteIndex indexRoutes(UriRouteInfo<Object, Object>[] routes) {
+        String[] prefixes = new String[routes.length];
+        for (int i = 0; i < routes.length; i++) {
+            prefixes[i] = routes[i] instanceof IndexedRoute route ? route.getRequiredPathPrefix() : "";
+        }
+        return RouteIndex.build(prefixes);
+    }
+
     private static UriRouteInfo<Object, Object>[] finalizeRoutes(List<UriRouteInfo<Object, Object>> routes) {
         Collections.sort(routes);
         return routes.toArray(EMPTY);
@@ -411,6 +806,8 @@ final class UriRouteSet {
     static final class Builder {
         private final Map<String, List<UriRouteInfo<Object, Object>>> customRoutesByMethod = new HashMap<>();
         private final Map<HttpMethod, List<UriRouteInfo<Object, Object>>> routesByMethod = CollectionUtils.newEnumMap(HttpMethod.values());
+        private final Map<CompiledRouteMatcher, CompiledRoutes> compiled = new IdentityHashMap<>(2);
+        private boolean hasLocators;
 
         /**
          * Add a route.
@@ -420,6 +817,7 @@ final class UriRouteSet {
         void add(UriRoute route) {
             HttpMethod httpMethod = route.getHttpMethod();
             UriRouteInfo<Object, Object> uriRouteInfo = route.toRouteInfo();
+            hasLocators = hasLocators || RouteLocator.of(uriRouteInfo) != null;
             if (httpMethod == HttpMethod.CUSTOM) {
                 String key = route.getHttpMethodName();
                 customRoutesByMethod.computeIfAbsent(key, x -> new ArrayList<>()).add(uriRouteInfo);
@@ -429,10 +827,49 @@ final class UriRouteSet {
         }
 
         /**
+         * Add a route built when first used.
+         *
+         * @param uriRouteInfo The route
+         */
+        void add(LazyUriRouteInfo uriRouteInfo) {
+            addCompiled(compiled, uriRouteInfo);
+            HttpMethod httpMethod = uriRouteInfo.getHttpMethod();
+            if (httpMethod == HttpMethod.CUSTOM) {
+                customRoutesByMethod.computeIfAbsent(uriRouteInfo.methodKey(), x -> new ArrayList<>()).add(uriRouteInfo);
+            } else {
+                routesByMethod.computeIfAbsent(httpMethod, x -> new ArrayList<>()).add(uriRouteInfo);
+            }
+        }
+
+        /**
          * @return The set of the added routes
          */
         UriRouteSet build() {
-            return new UriRouteSet(routesByMethod, customRoutesByMethod);
+            return new UriRouteSet(routesByMethod, customRoutesByMethod, compiled, hasLocators);
+        }
+    }
+
+    /**
+     * The routes bound to the declarations of a generated URL parser.
+     *
+     * @param matcher       The parser
+     * @param byOrdinal     The bound routes, by the ordinal of their declarations
+     * @param headByOrdinal The implicit {@code HEAD} routes of the bound {@code GET} routes, by ordinal
+     * @param exclusive     Whether the route of an ordinal is the only route that can match its paths
+     * @param headExclusive Whether the implicit {@code HEAD} route of an ordinal is the only route that can match its paths
+     * @param capturedSize  The size of the array the matcher captures the path variables into: at
+     *                      least its {@link CompiledRouteMatcher#maxVariables()} and the number of
+     *                      path variables of every bound route
+     */
+    private record CompiledRoutes(CompiledRouteMatcher matcher,
+                                  UriRouteInfo<Object, Object>[] byOrdinal,
+                                  UriRouteInfo<Object, Object>[] headByOrdinal,
+                                  boolean[] exclusive,
+                                  boolean[] headExclusive,
+                                  int capturedSize) {
+
+        CompiledRoutes(CompiledRouteMatcher matcher, UriRouteInfo<Object, Object>[] byOrdinal, UriRouteInfo<Object, Object>[] headByOrdinal) {
+            this(matcher, byOrdinal, headByOrdinal, new boolean[byOrdinal.length], new boolean[headByOrdinal.length], matcher.maxVariables());
         }
     }
 }

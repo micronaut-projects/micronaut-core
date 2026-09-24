@@ -19,6 +19,7 @@ import io.micronaut.context.exceptions.ConfigurationException;
 import io.micronaut.core.annotation.AnnotationMetadata;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.convert.exceptions.ConversionErrorException;
+import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.ReturnType;
@@ -53,6 +54,7 @@ import io.micronaut.web.router.DefaultRouteInfo;
 import io.micronaut.web.router.DefaultUriRouteMatch;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
+import io.micronaut.web.router.RouteLocator;
 import io.micronaut.web.router.RouteMatch;
 import io.micronaut.web.router.UriRouteMatch;
 import org.jspecify.annotations.Nullable;
@@ -67,6 +69,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletionException;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.BiFunction;
@@ -251,12 +254,15 @@ public class RequestLifecycle {
     protected final ExecutionFlow<HttpResponse<?>> onWriteError(HttpRequest<?> request, Throwable throwable) {
         PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
         try {
+            // the route that answered, whose own filters filter the response: an error route
+            // replaces the route match of the request
+            RouteMatch<?> routeMatch = RouteAttributes.getRouteMatch(request).orElse(null);
             return onErrorNoFilter(request, throwable, propagatedContext)
                 .flatMap(response -> {
                     RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(response).orElse(null);
                     return handleStatusException(request, response, routeInfo, propagatedContext);
                 })
-                .flatMap(response -> runResponseFilters(request, response, propagatedContext))
+                .flatMap(response -> runResponseFilters(request, routeMatch, response, propagatedContext))
                 .onErrorResume(t -> createDefaultErrorResponseFlow(request, t, propagatedContext));
         } catch (Throwable e) {
             return createDefaultErrorResponseFlow(request, e, propagatedContext);
@@ -394,11 +400,13 @@ public class RequestLifecycle {
     }
 
     private ExecutionFlow<HttpResponse<?>> runResponseFilters(HttpRequest<?> request,
+                                                              @Nullable RouteMatch<?> routeMatch,
                                                               HttpResponse<?> response,
                                                               PropagatedContext propagatedContext) {
         FilterRunner filterRunner = new FilterRunner(
             routeExecutor.router.findPreMatchingFilters(request),
-            routeExecutor.router.findFilters(request),
+            // the filters of the route too, like the filters that ran for the request
+            routeExecutor.router.findFilters(request, routeMatch),
             (httpRequest, context) -> {
                 throw new IllegalStateException("Should not be called");
             }) {
@@ -433,7 +441,8 @@ public class RequestLifecycle {
 
                 @Override
                 protected List<GenericHttpFilter> findFiltersAfterRouteMatch(HttpRequest<?> request) {
-                    return routeExecutor.router.findFilters(request);
+                    // the matched route selects the filters that apply to it, and brings its own route filters
+                    return routeExecutor.router.findFilters(request, routeMatch);
                 }
 
                 @Override
@@ -455,6 +464,25 @@ public class RequestLifecycle {
                             propagatedContext);
                     }
                     return executeRoute(request, propagatedContext, routeMatch);
+                }
+
+                @Override
+                protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
+                    try {
+                        doRouteMatch(request);
+                        return null;
+                    } catch (RuntimeException e) {
+                        CompletionStage<?> pending = RouteLocator.pendingLocation(e);
+                        if (pending == null) {
+                            throw e;
+                        }
+                        // an asynchronous locator locates its target: match again when it has
+                        PropagatedContext context = PropagatedContext.getOrEmpty();
+                        return CompletableFutureExecutionFlow.just(pending).flatMap(located -> context.propagate(() -> {
+                            ExecutionFlow<?> next = doRouteMatchAsync(request);
+                            return next == null ? ExecutionFlow.just(Boolean.TRUE) : next;
+                        }));
+                    }
                 }
 
                 @Override
