@@ -43,7 +43,9 @@ import io.micronaut.sourcegen.model.TypeDef;
 
 import javax.lang.model.element.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.concurrent.CompletionStage;
 
@@ -193,9 +195,13 @@ final class PythonPooledStubGenerator {
         );
         boolean hasAsyncBridgeMethod = methodsToBridge.stream().anyMatch(PythonStubGenerator::isAsyncPythonMethod);
 
+        Set<String> bridged = new HashSet<>();
         for (MethodElement methodElement : methodsToBridge) {
             addBridgeMethodPooledScript(scriptElement, methodElement, builder, pkg, script, allClasses, context);
+            bridged.add(methodElement.getName());
         }
+        // the plain functions the plan compiled: static methods, reaching no instance and no context
+        PythonStubGenerator.addCompiledModuleFunctions(builder, typeName, bridged, context, PythonStubGenerator.pooledStaticAccess());
 
         List<PropertyElement> beanProperties = scriptElement.getBeanProperties();
         for (PropertyElement beanProperty : beanProperties) {
