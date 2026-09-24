@@ -47,6 +47,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
@@ -280,15 +281,46 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
+        return findAllClosestRoutes(request, null);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return findAllClosestRoutes(request, filter);
+    }
+
+    /**
+     * The closest matches of a request.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, applied before the ambiguity is resolved
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         List<UriRouteInfo<Object, Object>> routes = findInternal(request);
         if (routes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
-        if (uriRoutes.size() == 1) {
+        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
+        if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
         return resolveAmbiguity(request, uriRoutes);
+    }
+
+    private static <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (filter == null || matches.isEmpty()) {
+            return matches;
+        }
+        var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (filter.test(match)) {
+                filtered.add(match);
+            }
+        }
+        return filtered;
     }
 
     /**
