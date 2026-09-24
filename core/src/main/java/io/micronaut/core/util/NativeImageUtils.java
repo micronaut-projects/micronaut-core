@@ -51,9 +51,12 @@ public final class NativeImageUtils {
 
     /**
      * Native image produces an error at runtime if a JFR event class is initialized, even if that
-     * event is not enabled. This flag guards class initialization of any JFR events.
+     * event is not enabled. On the JVM, the {@code jdk.jfr} module can be left out of the runtime
+     * (a jlink image, {@code --limit-modules}), and loading a JFR event class then fails with a
+     * {@link NoClassDefFoundError}. This flag guards class initialization of any JFR events.
      */
-    public static final boolean JFR_AVAILABLE = !inImageCode();
+    public static final boolean JFR_AVAILABLE = !inImageCode()
+        && ModuleLayer.boot().findModule("jdk.jfr").isPresent();
 
     private static final String GRAALVM_IMAGESINGLETONS_ENABLED = "micronaut.graalvm.imagesingletons.enabled";
 
