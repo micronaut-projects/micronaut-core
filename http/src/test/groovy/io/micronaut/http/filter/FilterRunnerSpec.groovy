@@ -17,6 +17,8 @@ import io.micronaut.http.HttpResponse
 import io.micronaut.http.HttpStatus
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.bind.DefaultRequestBinderRegistry
+import io.micronaut.http.context.ServerHttpRequestContext
+import io.micronaut.http.context.ServerRequestContext
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
 import org.reactivestreams.Publisher
@@ -1426,6 +1428,89 @@ class FilterRunnerSpec extends Specification {
         assert reactorFrames.isEmpty()
     }
 
+    def 'pass-through around filter keeps the flow imperative'(boolean legacy) {
+        given:
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    return chain.proceed(request)
+                }
+        ]
+
+        when:
+        def flow = filterRunner(filters, {
+            ExecutionFlow.just(HttpResponse.ok("resp1"))
+        }).run(HttpRequest.GET("/req1"))
+        def result = flow.tryComplete()
+        then:
+        result != null
+        result.value.status() == HttpStatus.OK
+        result.value.body() == "resp1"
+
+        where:
+        legacy << [false, true]
+    }
+
+    def 'around filter returning an immediate response keeps the flow imperative'(boolean legacy) {
+        given:
+        def resp2 = HttpResponse.ok("resp2")
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    return Mono.just(resp2)
+                }
+        ]
+
+        when:
+        def flow = filterRunner(filters, {
+            ExecutionFlow.just(HttpResponse.ok("resp1"))
+        }).run(HttpRequest.GET("/req1"))
+        def result = flow.tryComplete()
+        then:
+        result != null
+        result.value == resp2
+
+        where:
+        legacy << [false, true]
+    }
+
+    def 'request context is visible in the continuation publisher'(boolean legacy) {
+        given:
+        def req = HttpRequest.GET("/req1")
+        def seen = []
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    return Mono.from(chain.proceed(request))
+                            .flatMap { resp ->
+                                Mono.fromCallable {
+                                    seen.add(ServerRequestContext.currentRequest().orElse(null))
+                                    resp
+                                }
+                            }
+                            .flatMap { resp ->
+                                Mono.deferContextual { ctx ->
+                                    seen.add(ServerRequestContext.currentRequest(ctx).orElse(null))
+                                    Mono.just(resp)
+                                }
+                            }
+                }
+        ]
+
+        when:
+        def runner = filterRunner(filters, {
+            ExecutionFlow.just(HttpResponse.ok("resp1"))
+        })
+        def result = PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(req)).propagate({
+            await(runner.run(req))
+        } as Supplier)
+        then:
+        result.value.status() == HttpStatus.OK
+        seen == [req, req]
+
+        where:
+        legacy << [false, true]
+    }
+
+     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
+         return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED), null)
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
         return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED), null)
     }

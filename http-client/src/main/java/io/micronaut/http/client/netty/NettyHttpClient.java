@@ -1445,7 +1445,9 @@ final class NettyHttpClient implements
         if (loadBalancer instanceof FixedLoadBalancer fixed) {
             selected = ExecutionFlow.just(fixed.getServiceInstance());
         } else {
-            selected = ReactiveExecutionFlow.fromPublisher(loadBalancer.select(getLoadBalancerDiscriminator(request)));
+            // a synchronous balancer (round-robin) completes right away, so the request proceeds
+            // without a Reactor chain
+            selected = ReactiveExecutionFlow.fromPublisherEager(loadBalancer.select(getLoadBalancerDiscriminator(request)), PropagatedContext.getOrEmpty());
         }
 
         LoadBalancer balancer = loadBalancer;
