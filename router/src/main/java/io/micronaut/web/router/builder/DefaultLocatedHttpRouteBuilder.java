@@ -81,10 +81,10 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     }
 
     @Override
-    public HttpRouteSpec handleAsync(HttpMethod method, String uri, LocatedAsyncRequestHandler<T> handler) {
+    public HttpRouteSpec handleAsync(HttpMethod method, String uri, LocatedAsyncBodyRequestHandler<T> handler) {
         Objects.requireNonNull(handler, "handler");
-        return handleAsync(method, uri, (AsyncRequestHandler) (request, pathVariables) ->
-            handler.handle(request, pathVariables, target(pathVariables)));
+        return handleAsync(method, uri, (AsyncBodyRequestHandler) (request, pathVariables, body) ->
+            handler.handle(request, pathVariables, target(pathVariables), body));
     }
 
     @Override
@@ -108,10 +108,10 @@ public final class DefaultLocatedHttpRouteBuilder<T> extends AbstractHttpRouteBu
     }
 
     @Override
-    public HttpRouteSpec handleAsync(RouteDeclaration route, LocatedAsyncRequestHandler<T> handler) {
+    public HttpRouteSpec handleAsync(RouteDeclaration route, LocatedAsyncBodyRequestHandler<T> handler) {
         Objects.requireNonNull(handler, "handler");
-        return handleAsync(route, (AsyncRequestHandler) (request, pathVariables) ->
-            handler.handle(request, pathVariables, target(pathVariables)));
+        return handleAsync(route, (AsyncBodyRequestHandler) (request, pathVariables, body) ->
+            handler.handle(request, pathVariables, target(pathVariables), body));
     }
 
     @Override

@@ -352,8 +352,20 @@ public final class PythonAstParser {
         return winner;
     }
 
-    private static boolean isWithinSourceDir(String srcDir, String path) {
-        return path.startsWith(srcDir) || path.startsWith("/private" + srcDir);
+    static boolean isWithinSourceDir(String srcDir, String path) {
+        String normalizedSrcDir = normalizePath(srcDir);
+        String normalizedPath = normalizePath(path);
+        return normalizedPath.startsWith(normalizedSrcDir) || normalizedPath.startsWith("/private" + normalizedSrcDir);
+    }
+
+    private static String normalizePath(String path) {
+        if (path == null) {
+            return null;
+        }
+        String normalized = path.replace('\\', '/');
+        return normalized.length() > 2 && normalized.charAt(0) == '/' && Character.isLetter(normalized.charAt(1)) && normalized.charAt(2) == ':'
+            ? normalized.substring(1)
+            : normalized;
     }
 
     private static String sourceRootOf(List<String> srcDirs, Source source) {
@@ -369,7 +381,8 @@ public final class PythonAstParser {
     }
 
     public static String getPackageNameOfSource(String srcDir, Source source) {
-        String path = source.getPath();
+        String path = normalizePath(source.getPath());
+        srcDir = normalizePath(srcDir);
         String packageName = "python";
         if (StringUtils.isNotEmpty(srcDir) && StringUtils.isNotEmpty(path)) {
             int i = path.indexOf(srcDir);
@@ -420,6 +433,18 @@ public final class PythonAstParser {
         return calls;
     }
 
+    /**
+     * The run time strips a leading {@code io.} from every Java package when it derives the Python
+     * module name, so {@code io.swagger.v3.oas.annotations} is imported as
+     * {@code swagger.v3.oas.annotations}. Compile-time lookups therefore have to try the prefixed
+     * name as well, for any library and not only {@code io.micronaut}.
+     */
+    private static final String JAVA_IO_PACKAGE_PREFIX = "io.";
+
+    private static boolean isJavaIoPackage(String name) {
+        return name.startsWith(JAVA_IO_PACKAGE_PREFIX);
+    }
+
     public @NotNull List<TransformResult> transform(VisitorContext visitorContext, Source... pythonSource) {
         return transform(visitorContext, List.of(), pythonSource);
     }
@@ -458,6 +483,12 @@ public final class PythonAstParser {
                 // a class generated from a Python source of a package under micronaut.* carries no io. prefix
                 classElement = visitorContext.getClassElement(name).filter(PythonJavaTypes::isPythonClass);
             }
+            if (classElement.isEmpty() && !isJavaIoPackage(javaName)) {
+                // The run time strips a leading "io." from every Java package, not just io.micronaut,
+                // so an import written the way the run time names it -- swagger.v3.oas.annotations for
+                // io.swagger.v3.oas.annotations -- has to resolve here too.
+                classElement = visitorContext.getClassElement(JAVA_IO_PACKAGE_PREFIX + javaName);
+            }
             if (classElement.isPresent()) {
                 classElementCache.put(javaName, classElement.get());
                 return classElement.get();
@@ -471,7 +502,14 @@ public final class PythonAstParser {
             String javaPackageName = packageName.startsWith("micronaut.") ? "io." + packageName : packageName;
             return packageClassElementsCache.computeIfAbsent(
                 javaPackageName,
-                name -> visitorContext.getClassElements(name, "*")
+                name -> {
+                    Object[] elements = visitorContext.getClassElements(name, "*");
+                    if ((elements == null || elements.length == 0) && !isJavaIoPackage(name)) {
+                        // As above: io.swagger.v3.oas.annotations is imported as swagger.v3.oas.annotations.
+                        elements = visitorContext.getClassElements(JAVA_IO_PACKAGE_PREFIX + name, "*");
+                    }
+                    return elements;
+                }
             );
         });
         List<TransformResult> results = new ArrayList<>();

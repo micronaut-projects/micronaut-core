@@ -28,11 +28,25 @@ builder.exitCondition(lambda scope, index: index == 3)  # <1>
 
 <1> Selects `exitCondition(BiPredicate<AgenticScope, Integer>)`.
 
-This rule covers every interface of `java.util.function` plus `Runnable`, `java.util.concurrent.Callable` and `java.util.Comparator`.
+This rule covers every interface of `java.util.function` plus `Runnable`, `java.util.concurrent.Callable` and `java.util.Comparator`, and every functional interface (an interface annotated with `@FunctionalInterface`, or one with a single abstract method) the Python compiler finds in the Java types the Python sources reference: the imported Java types, the Java bases of the Python classes and the Java types named in type hints, the parameters of their methods (inherited ones included) and, one level further, the parameters of the methods of the types those methods return. A data repository overloaded on a specification and on `Iterable`, for example `deleteAll(PredicateSpecification<T>)` and `deleteAll(Iterable<T>)`, or a `KStream` returned by a factory and overloaded on `ValueMapper` and `ValueMapperWithKey`, is called with a plain lambda:
+
+[source,python]
+----
+def name_equals(name: str):
+    return lambda root, criteria_builder: criteria_builder.equal(root.get("name"), name)
+
+person_repository.deleteAll(name_equals("Denis"))  # <1>
+person_repository.deleteAll([denis, josh])  # <2>
+----
+
+<1> A callable is not an `Iterable`: the lambda selects `deleteAll(PredicateSpecification<Person>)`. Without the rule the host interop treats `Iterable` as a functional interface too, and the call is ambiguous.
+<2> A sequence selects `deleteAll(Iterable<Person>)` as before.
+
+An interface of a library counts as a functional interface when it has a single abstract method, whether or not it is annotated: a lambda passed to a method overloaded on `Iterable<String>` and `org.reactivestreams.Publisher<String>` implements `subscribe(Subscriber)` and selects the `Publisher` overload, while a list selects the `Iterable` one.
 
 === Adapting a Callable Explicitly
 
-For overloads on custom functional interfaces, or on interfaces of the same arity, adapt the callable to the interface with api:context.python.PythonInterop[PythonInterop] before passing it:
+For overloads on functional interfaces of the same arity, or on an interface the compiler did not see because it is only reachable through objects obtained at run time, adapt the callable to the interface with api:context.python.PythonInterop[PythonInterop] before passing it:
 
 [source,python]
 ----

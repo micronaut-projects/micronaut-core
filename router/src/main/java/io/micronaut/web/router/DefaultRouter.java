@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 package io.micronaut.web.router;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.reflect.ClassUtils;
 import io.micronaut.core.util.CollectionUtils;
@@ -51,6 +52,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -367,7 +369,27 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        List<UriRouteMatch<T, R>> matches = findAllClosestRoutes(request);
+        return locate(request, findAllClosestRoutes(request, null), null);
+    }
+
+    @Override
+    public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, Predicate<UriRouteMatch<T, R>> filter) {
+        return locate(request, findAllClosestRoutes(request, filter), filter);
+    }
+
+    /**
+     * Replace the matches of locator routes with the matches of the rest of the path in the
+     * tables of their targets.
+     *
+     * @param request The request
+     * @param matches The closest matches
+     * @param filter  The filter of the candidates, applied to the matches of a target's table
+     *                before its ambiguity is resolved
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches, located
+     */
+    private <T, R> List<UriRouteMatch<T, R>> locate(HttpRequest<?> request, List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         if (!hasLocators || matches.isEmpty()) {
             return matches;
         }
@@ -380,16 +402,30 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
             }
             RouteLocator.Located located = locator.locate(request, match);
             if (located != null) {
-                result.addAll(located.wrap(located.router().<T, R>findAllClosest(located.request())));
+                List<UriRouteMatch<T, R>> targetMatches = filter == null
+                    ? located.router().findAllClosest(located.request())
+                    // the filter sees the match of the request, as it does for the other routes
+                    : located.router().findAllClosest(located.request(), targetMatch -> filter.test(located.wrap(targetMatch)));
+                result.addAll(located.wrap(targetMatches));
             }
         }
         return result;
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request) {
+    /**
+     * The closest matches of a request.
+     *
+     * @param request The request
+     * @param filter  The filter of the candidates, applied before the ambiguity is resolved
+     * @param <T>     The target type
+     * @param <R>     The result type
+     * @return The closest matches
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findAllClosestRoutes(HttpRequest<?> request, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
         if (compiledRoutes.length != 0) {
             UriRouteMatch<T, R> compiledMatch = findCompiled(request);
-            if (compiledMatch != null) {
+            // a compiled match the filter rejects can hide a less specific route it accepts
+            if (compiledMatch != null && (filter == null || accepts(filter, compiledMatch))) {
                 return List.of(compiledMatch);
             }
         }
@@ -397,15 +433,47 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         if (routes.isEmpty()) {
             return Collections.emptyList();
         }
-        List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
-        if (uriRoutes.size() == 1) {
+        List<UriRouteMatch<T, R>> uriRoutes = filter(toMatches(request.getPath(), routes), filter);
+        if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
         return resolveAmbiguity(request, uriRoutes);
     }
 
-    private <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
-                                                              List<UriRouteMatch<T, R>> uriRoutes) {
+    private <T, R> List<UriRouteMatch<T, R>> filter(List<UriRouteMatch<T, R>> matches, @Nullable Predicate<UriRouteMatch<T, R>> filter) {
+        if (filter == null || matches.isEmpty()) {
+            return matches;
+        }
+        var filtered = new ArrayList<UriRouteMatch<T, R>>(matches.size());
+        for (UriRouteMatch<T, R> match : matches) {
+            if (accepts(filter, match)) {
+                filtered.add(match);
+            }
+        }
+        return filtered;
+    }
+
+    /**
+     * Whether the filter accepts a candidate. The route of a locator is no candidate: the filter
+     * applies to the routes of its target's table, see {@link #locate}.
+     */
+    private <T, R> boolean accepts(Predicate<UriRouteMatch<T, R>> filter, UriRouteMatch<T, R> match) {
+        return hasLocators && RouteLocator.of(match.getRouteInfo()) != null || filter.test(match);
+    }
+
+    /**
+     * Narrows the given route matches for a request down to the closest ones.
+     *
+     * @param request   The request
+     * @param uriRoutes The route matches of the request
+     * @param <T>       The target type
+     * @param <R>       The result type
+     * @return The closest matches
+     * @since 5.2.2
+     */
+    @Internal
+    public static <T, R> List<UriRouteMatch<T, R>> resolveAmbiguity(HttpRequest<?> request,
+                                                                    List<UriRouteMatch<T, R>> uriRoutes) {
         // if there are multiple routes, try to resolve the ambiguity
 
         final Collection<MediaType> acceptedProducedTypes = request.accept();

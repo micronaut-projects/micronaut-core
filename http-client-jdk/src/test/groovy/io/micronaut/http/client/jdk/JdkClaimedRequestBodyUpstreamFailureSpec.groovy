@@ -77,6 +77,19 @@ class JdkClaimedRequestBodyUpstreamFailureSpec extends Specification {
         rawClient instanceof JdkRawHttpClient
     }
 
+    void "the request body of a raw exchange is released when the upstream refuses the connection"() {
+        when:
+        List<ByteBuf> buffers = (1..REPEAT).collect {
+            ByteBuf buf = buffer()
+            CloseableByteBody body = new NettyByteBodyFactory(new EmbeddedChannel()).adapt(buf)
+            Mono.from(rawClient.exchange(HttpRequest.POST(refused.toString(), null), body, null)).onErrorResume(e -> Mono.empty()).block()
+            buf
+        }
+
+        then:
+        buffers.every { it.refCnt() == 0 }
+    }
+
     void "a proxied server request body is released when the upstream refuses the connection"() {
         when:
         List<ByteBuf> buffers = (1..REPEAT).collect {

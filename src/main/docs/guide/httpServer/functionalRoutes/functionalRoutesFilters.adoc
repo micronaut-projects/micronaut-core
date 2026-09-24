@@ -43,7 +43,7 @@ Each method has a variant whose lambda also receives a api:core.propagation.Muta
 A request filter receives a `MutableHttpRequest`:
 
 * Headers and attributes changed in place, and a URI set with `uri(...)`, are seen by the rest of the chain: a `before` filter is enough. Other changes, such as a new body, need a request to be returned by a `beforeReplacing` filter.
-* To answer the request instead of the route, a `beforeReplacing` filter returns a response. To continue with another request, it returns the request: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncServerHttpRequest` read.
+* To answer the request instead of the route, a `beforeReplacing` filter returns a response. To continue with another request, it returns the request: an `HttpRequestWrapper` that overrides `getMethod()` changes the method, and a `ServerHttpRequest` with another `byteBody()` changes the body, which `@Body` arguments, body handlers and the `AsyncRequestBody` read.
 * A new URI or method only changes the matched route in a pre-matching server filter. The other filters run after the route was matched.
 
 A response filter declared with `after` changes the response in place; one declared with `afterReplacing` can return a new response, which the response filters after it and the client see.

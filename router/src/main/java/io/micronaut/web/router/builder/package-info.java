@@ -37,7 +37,7 @@
  *             group.beforeReplacing(request -> request.getHeaders().contains("X-Tenant") ? null : HttpResponse.badRequest());
  *             group.GET("/{id}", (request, pathVariables) -> HttpResponse.ok(orders.find(pathVariables.getLong("id"))));
  *             group.POST("/", Order.class, (request, pathVariables, order) -> HttpResponse.created(orders.save(order)));
- *             group.asyncPOST("/import", (request, pathVariables) -> request.elements(Order.class)
+ *             group.asyncPOST("/import", (request, pathVariables, body) -> body.elements(Order.class)
  *                 .forEach(orders::saveAsync)
  *                 .thenApply(done -> HttpResponse.accepted()));
  *             group.error(NoSuchOrderException.class, (request, error) -> HttpResponse.notFound());
@@ -62,8 +62,10 @@
  *     <li>the handler functions ({@link io.micronaut.web.router.builder.RequestHandler},
  *     {@link io.micronaut.web.router.builder.BodyRequestHandler},
  *     {@link io.micronaut.web.router.builder.FormRequestHandler},
- *     {@link io.micronaut.web.router.builder.AsyncRequestHandler}, the error, status and locator
- *     handlers) and the route filter functions;</li>
+ *     {@link io.micronaut.web.router.builder.AsyncRequestHandler},
+ *     {@link io.micronaut.web.router.builder.AsyncBodyRequestHandler}, which reads the
+ *     {@link io.micronaut.http.body.AsyncRequestBody}, the error, status and locator handlers)
+ *     and the route filter functions;</li>
  *     <li>{@link io.micronaut.web.router.builder.PathVariables}, the typed path variables of the
  *     matched route, and {@link io.micronaut.web.router.builder.RequestPredicates}, conditions
  *     for {@code where(...)};</li>

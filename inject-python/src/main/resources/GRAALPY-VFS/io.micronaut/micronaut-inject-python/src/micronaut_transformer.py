@@ -609,6 +609,7 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             java_interface_names = []
             replaced_throwable = False
             replaced_java_base = False
+            keeps_java_interface_base = self._is_java_interface_adapter(node)
             has_python_exception_base = any(
                 isinstance(base, ast.Name)
                 and base.id == 'Exception'
@@ -618,7 +619,15 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
             for base in node.bases:
                 java_interface_name = self._java_interface_base_name(base)
                 if java_interface_name is not None:
-                    java_interface_names.append(java_interface_name)
+                    if keeps_java_interface_base:
+                        # A class defined inside a function has no generated Java class: it keeps the
+                        # Java interface as its base and GraalPy's host adapter implements it, so its
+                        # instances are Java objects of the interface (see _is_java_interface_adapter).
+                        # A type argument (Subscriber[str]) has no run time meaning: the raw interface
+                        # is the base, as the host adapter cannot be built from a parameterized one
+                        runtime_bases.append(base.value if isinstance(base, ast.Subscript) else base)
+                    else:
+                        java_interface_names.append(java_interface_name)
                     continue
                 if self._is_java_throwable_base(base):
                     if not replaced_throwable and not has_python_exception_base:
@@ -638,7 +647,8 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
                     # The generated Java class extends the Java class; the Python class gets a
                     # Python base standing in for it (see PythonJavaBases in the runtime). A class
                     # defined inside a function has no generated Java class: it keeps the Java class
-                    # as its base and GraalPy's host adapter implements the subclass.
+                    # as its base and GraalPy's host adapter implements the subclass, the Python
+                    # constructor arguments being those of the Java constructor.
                     runtime_bases.append(ast.copy_location(self._java_base_call(java_class_name), base))
                     self.uses_java_base = True
                     replaced_java_base = True
@@ -1049,6 +1059,39 @@ def micronaut_annotation(name, repeated=None, annotationTypeTarget=False):
         if class_element is not None and class_element.isInterface():
             return class_element.getName()
         return None
+
+    def _is_java_interface_adapter(self, node: ast.ClassDef) -> bool:
+        """
+        Whether a class defined inside a function keeps its Java interface base at run time.
+
+        A class at module level, or nested in a class, is stripped of its Java interface bases: its
+        generated Java class implements the interfaces and stands for its instances in Java. A class
+        defined inside a function (a factory function, a test method) has no generated Java class, so
+        an instance of it stripped of the interface is a plain Python object, which Java receives as an
+        interface proxy that no overloaded method can select (``Mono.subscribe(Subscriber)`` against
+        ``subscribe(Consumer)``). Such a class keeps the interface as its base, and GraalPy's host
+        adapter implements it: the instances are Java objects of the interface. The adapter takes the
+        constructor arguments for the Java constructor, which an interface has none of, and cannot
+        combine the interface with another base, so a class with constructor parameters or with more
+        than one base is stripped as before and stays a plain Python object. A decorated class counts
+        as having constructor parameters: a decorator may generate the constructor (``@dataclass``,
+        ``attrs``), which the class body does not show.
+        """
+        if self.function_depth == 0 or len(node.bases) != 1 or node.decorator_list:
+            return False
+        if self._java_interface_base_name(node.bases[0]) is None:
+            return False
+        return not self._has_constructor_parameters(node)
+
+    @staticmethod
+    def _has_constructor_parameters(node: ast.ClassDef) -> bool:
+        """Whether the class body defines an ``__init__`` taking parameters besides ``self``."""
+        for statement in node.body:
+            if isinstance(statement, (ast.FunctionDef, ast.AsyncFunctionDef)) and statement.name == '__init__':
+                arguments = statement.args
+                parameters = arguments.posonlyargs + arguments.args + arguments.kwonlyargs
+                return len(parameters) > 1 or arguments.vararg is not None or arguments.kwarg is not None
+        return False
 
     def _is_java_throwable_base(self, base: ast.AST) -> bool:
         """Strip Java Throwable bases from native runtime bytecode.
