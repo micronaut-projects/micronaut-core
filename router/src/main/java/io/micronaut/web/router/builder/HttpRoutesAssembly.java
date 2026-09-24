@@ -20,14 +20,21 @@ import io.micronaut.context.ExecutionHandleLocator;
 import io.micronaut.context.annotation.Requires;
 import io.micronaut.context.annotation.Value;
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.core.annotation.Order;
 import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.order.OrderUtil;
+import io.micronaut.core.order.Ordered;
 import io.micronaut.web.router.AssembledRoutes;
+import io.micronaut.web.router.DefaultRouteBuilder;
+import io.micronaut.web.router.DefaultRouter;
+import io.micronaut.web.router.FilterRoute;
 import io.micronaut.web.router.RouteAssembly;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 
 /**
@@ -35,6 +42,10 @@ import java.util.List;
  * router. Like controller routes, their URIs are under {@code micronaut.server.context-path}, and
  * like a {@code @Get} method, every {@code GET} route gets an implicit {@code HEAD} route unless a
  * {@code HEAD} route has the same URI.
+ * <p>The assembly is a {@link io.micronaut.web.router.RouteBuilder} bean, so the router receives
+ * the routes with the other route builders: a router that replaces {@link DefaultRouter} and only
+ * calls {@link DefaultRouter#DefaultRouter(Collection)} has them too. It is ordered last, as the
+ * routes were added after the routes of every route builder before.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -42,9 +53,11 @@ import java.util.List;
 @Internal
 @Singleton
 @Requires(beans = HttpRoutes.class)
-final class HttpRoutesAssembly implements AssembledRoutes {
+@Order(Ordered.LOWEST_PRECEDENCE)
+final class HttpRoutesAssembly extends DefaultRouteBuilder implements AssembledRoutes {
 
     private final RouteAssembly assembly;
+    private final List<FilterRoute> filterRoutes;
 
     /**
      * @param executionHandleLocator The locator of the application beans
@@ -52,12 +65,21 @@ final class HttpRoutesAssembly implements AssembledRoutes {
      * @param routes                 The routes to add
      * @param contextPath            The context path of the server
      */
+    @Inject
     HttpRoutesAssembly(ExecutionHandleLocator executionHandleLocator,
                        ConversionService conversionService,
                        List<HttpRoutes> routes,
                        @Nullable @Value("${micronaut.server.context-path}") String contextPath) {
-        this.assembly = new RouteAssembly(executionHandleLocator, conversionService,
-            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath);
+        this(executionHandleLocator, conversionService, routes, new RouteAssembly(executionHandleLocator, conversionService,
+            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { }, contextPath));
+    }
+
+    private HttpRoutesAssembly(ExecutionHandleLocator executionHandleLocator,
+                               ConversionService conversionService,
+                               List<HttpRoutes> routes,
+                               RouteAssembly assembly) {
+        super(executionHandleLocator, conversionService, assembly);
+        this.assembly = assembly;
         // the ports given as strings are resolved like the port of a @Controller
         DefaultHttpRouteBuilder builder = new DefaultHttpRouteBuilder(assembly,
             executionHandleLocator instanceof ApplicationContext context ? context.getEnvironment().getPlaceholderResolver() : null);
@@ -72,6 +94,12 @@ final class HttpRoutesAssembly implements AssembledRoutes {
             builder.close();
         }
         assembly.addImplicitHeadRoutes();
+        this.filterRoutes = assembly.filterRoutes();
+    }
+
+    @Override
+    public List<FilterRoute> getFilterRoutes() {
+        return filterRoutes;
     }
 
     @Override

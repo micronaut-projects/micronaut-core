@@ -104,10 +104,13 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
     }
 
     /**
-     * Construct a new router for the given route builders.
+     * Construct a new router for the given route builders. The routes of the
+     * {@link io.micronaut.web.router.builder.HttpRoutes} beans reach the router as a route builder
+     * bean too, so a router that replaces this one and calls this constructor has them.
      *
      * @param builders The builders
      */
+    @Inject
     public DefaultRouter(Collection<RouteBuilder> builders) {
         this(builders, List.of());
     }
@@ -116,10 +119,9 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
      * Construct a new router for the given route builders and the routes assembled without one.
      *
      * @param builders  The builders
-     * @param assembled The routes assembled without a builder, e.g. the routes of the {@link io.micronaut.web.router.builder.HttpRoutes} beans
+     * @param assembled The routes assembled without a builder, e.g. the routes of a route table
      * @since 5.3.0
      */
-    @Inject
     public DefaultRouter(Collection<RouteBuilder> builders, List<AssembledRoutes> assembled) {
         this(builders, assembled, NO_ROUTE_SOURCES, NO_ROUTE_MATCH_FILTERS);
     }
