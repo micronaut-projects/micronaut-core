@@ -67,6 +67,7 @@ import io.netty.handler.codec.http2.Http2HeadersFrame
 import io.netty.handler.codec.http2.Http2PingFrame
 import io.netty.handler.codec.http2.Http2ResetFrame
 import io.netty.handler.codec.http2.Http2ServerUpgradeCodec
+import io.netty.handler.codec.http2.Http2Settings
 import io.netty.handler.codec.http2.Http2SettingsAckFrame
 import io.netty.handler.codec.http2.Http2SettingsFrame
 import io.netty.handler.codec.http2.Http2Stream
@@ -410,6 +411,75 @@ class ConnectionManagerSpec extends Specification {
         then:
         f1.get().status() == HttpStatus.OK
         f2.get().status() == HttpStatus.OK
+
+        // the same connection is reused for all requests
+        assertPoolConnections(client, 1)
+
+        cleanup:
+        client.close()
+        ctx.close()
+    }
+
+    def 'http2 server max concurrent streams limits pool dispatch'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.client.ssl.insecure-trust-all-certificates': true,
+                'spec.name': ConnectionManagerSpec.simpleName,
+        ])
+        def client = ctx.getBean(DefaultHttpClient)
+
+        def conn = new EmbeddedTestConnectionHttp2()
+        // the server only allows a single concurrent stream
+        conn.setupHttp2Tls(new Http2Settings().maxConcurrentStreams(1))
+        patch(client, conn)
+
+        when:
+        // start three requests before the handshake completes
+        def f1 = Mono.from(client.exchange('https://example.com/r1')).toFuture()
+        f1.exceptionally(t -> t.printStackTrace())
+        def f2 = Mono.from(client.exchange('https://example.com/r2')).toFuture()
+        f2.exceptionally(t -> t.printStackTrace())
+        def f3 = Mono.from(client.exchange('https://example.com/r3')).toFuture()
+        f3.exceptionally(t -> t.printStackTrace())
+        conn.exchangeSettings()
+        then:
+        // only the first request is dispatched, the others stay pending in the pool
+        def req1 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req1.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r1'
+        conn.serverChannel.readInbound() == null
+        !f1.isDone()
+        !f2.isDone()
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req1.stream())
+        conn.advance()
+        then:
+        f1.get().status() == HttpStatus.OK
+        // the completed stream frees up a slot for the second request
+        def req2 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req2.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r2'
+        req2.stream().id() != req1.stream().id()
+        conn.serverChannel.readInbound() == null
+        !f2.isDone()
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req2.stream())
+        conn.advance()
+        then:
+        f2.get().status() == HttpStatus.OK
+        def req3 = conn.serverChannel.<Http2HeadersFrame> readInbound()
+        req3.headers().get(Http2Headers.PseudoHeaderName.PATH.value()) == '/r3'
+        conn.serverChannel.readInbound() == null
+        !f3.isDone()
+
+        when:
+        conn.respondOk(req3.stream())
+        conn.advance()
+        then:
+        f3.get().status() == HttpStatus.OK
+        conn.serverChannel.readInbound() == null
 
         // the same connection is reused for all requests
         assertPoolConnections(client, 1)
@@ -1668,7 +1738,7 @@ class ConnectionManagerSpec extends Specification {
         private String scheme
         Http2FrameStream h2cResponseStream
 
-        void setupHttp2Tls() {
+        void setupHttp2Tls(Http2Settings serverSettings = Http2Settings.defaultSettings()) {
             scheme = 'https'
 
             def certificate = new SelfSignedCertificate()
@@ -1682,7 +1752,7 @@ class ConnectionManagerSpec extends Specification {
                         @Override
                         protected void configurePipeline(ChannelHandlerContext chtx, String protocol) throws Exception {
                             chtx.pipeline()
-                                    .addLast(Http2FrameCodecBuilder.forServer().build())
+                                    .addLast(Http2FrameCodecBuilder.forServer().initialSettings(serverSettings).build())
                         }
                     })
         }

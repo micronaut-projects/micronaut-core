@@ -895,7 +895,7 @@ public class ConnectionManager {
                 @Override
                 public void channelActive0(ChannelHandlerContext ctx) {
                     ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                    connectionHolder.init();
+                    connectionHolder.init(null); // server settings not known yet with prior knowledge
                     ctx.pipeline().remove(ctx.name());
                 }
             });
@@ -903,10 +903,10 @@ public class ConnectionManager {
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS, new ChannelInboundHandlerAdapter() {
                 @Override
                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
-                    if (msg instanceof Http2SettingsFrame) {
+                    if (msg instanceof Http2SettingsFrame settingsFrame) {
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_HTTP2_SETTINGS);
                         ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                        connectionHolder.init();
+                        connectionHolder.init(settingsFrame.settings());
                         return;
                     } else {
                         log.warn("Premature frame: {}", msg.getClass());
@@ -1209,7 +1209,7 @@ public class ConnectionManager {
                                 public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
                                     if (msg instanceof Http3SettingsFrame) {
                                         ch.pipeline().remove(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR);
-                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init();
+                                        pool.new Http3ConnectionHolder(ch, quicChannel, channelCustomizer).init(null);
                                     }
                                     super.channelRead(ctx, msg);
                                 }
@@ -1707,12 +1707,20 @@ public class ConnectionManager {
                 this.poolEntry = pool.createHttp2PoolEntry(channel.eventLoop(), this);
             }
 
-            void init() {
+            void init(@Nullable Http2Settings remoteSettings) {
                 addTimeoutHandlers();
 
                 connectionCustomizer.onStreamPipelineBuilt();
 
-                poolEntry.onConnectionEstablished(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
+                // the configured limit, capped by SETTINGS_MAX_CONCURRENT_STREAMS of the server.
+                // Later SETTINGS updates from the server are not applied to the pool.
+                int maxStreams = configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection();
+                Long remoteLimit = remoteSettings == null ? null : remoteSettings.maxConcurrentStreams();
+                if (remoteLimit != null && remoteLimit < maxStreams) {
+                    // allow at least one stream even if the server advertises 0, so requests don't hang
+                    maxStreams = (int) Math.max(1, remoteLimit);
+                }
+                poolEntry.onConnectionEstablished(maxStreams);
             }
 
             void addTimeoutHandlers() {
@@ -1796,7 +1804,11 @@ public class ConnectionManager {
                                 if (windDownConnection && newCount <= 0) {
                                     Http2ConnectionHolder.this.channel.close();
                                 } else if (!windDownConnection) {
-                                    poolEntry.markAvailable();
+                                    // release() may run while the frame codec is still delivering the
+                                    // final frame of this stream, so netty only closes the stream after
+                                    // this returns. Defer marking the slot available so that the next
+                                    // request does not exceed the stream limit of the connection.
+                                    Http2ConnectionHolder.this.channel.eventLoop().execute(poolEntry::markAvailable);
                                 }
                             }
 
