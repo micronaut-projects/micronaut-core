@@ -12,4 +12,6 @@ A locator that answers `null`, or a stage that completes with `null`, is a `404`
 
 The filters of the matched route of the table apply, after the filters of the groups of the locator route, and the server filters apply to the full path. A table of a located target may declare locator routes of its own, which locate again from the rest of the path.
 
-A synchronous locator runs while the request is matched, on the event loop, and must not block. The target is located once per request and kept for the rest of the request. Requests with a custom HTTP method are not located.
+A synchronous locator runs while the request is matched, on the event loop, and must not block. The target is located once per request and kept for the rest of the request: a locator, synchronous or asynchronous, runs at most once per request, also when the request is answered with a `405` whose allowed methods are those of the table of the target. Requests with a custom HTTP method are not located.
+
+The server waits for the stage of an asynchronous locator without blocking, and cancels it when the client closes the connection before it completes. A CORS preflight request for a path under the prefix of an asynchronous locator is answered once the locator has located its target, with the methods of the routes of its table.
