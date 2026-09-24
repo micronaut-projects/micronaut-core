@@ -172,6 +172,55 @@ class HandlerRouteAnnotateTest {
     }
 
     @Test
+    void theRoutesOfAGroupHaveTheElementOfItsInnermostGroupUnlessTheyHaveTheirOwn() {
+        AnnotationMetadataProvider outer = element(Version.class.getName(), Map.of("value", "1"), Other.class.getName());
+        AnnotationMetadataProvider inner = element(Version.class.getName(), Map.of("value", "2"));
+        AnnotationMetadataProvider own = element(Version.class.getName(), Map.of("value", "3"));
+        Router router = router(routes -> routes.path("/g", group -> {
+            // declared before the element of the group: the position in the lambda does not matter
+            group.GET("/before", (request, pathVariables) -> HttpResponse.ok());
+            group.annotationMetadata(outer);
+            group.GET("/own", (request, pathVariables) -> HttpResponse.ok()).annotationMetadata(own);
+            group.GET("/annotated", (request, pathVariables) -> HttpResponse.ok())
+                .annotate(AnnotationValue.builder(Version.class).value("4").build());
+            group.path("/nested", nested -> {
+                nested.GET("/ping", (request, pathVariables) -> HttpResponse.ok());
+                nested.annotationMetadata(inner);
+            });
+            group.path("/plain", plain -> plain.GET("/ping", (request, pathVariables) -> HttpResponse.ok()));
+        }));
+        for (String path : List.of("/g/before", "/g/plain/ping")) {
+            MethodBasedRouteInfo<?, ?> route = (MethodBasedRouteInfo<?, ?>) route(router, path);
+            assertSame(outer, route.getAnnotationMetadataProvider().orElseThrow(), path);
+            assertEquals("1", route.getAnnotationMetadata().stringValue(Version.class).orElseThrow(), path);
+            assertTrue(route.getAnnotationMetadata().hasAnnotation(Other.class), path);
+        }
+        MethodBasedRouteInfo<?, ?> ownRoute = (MethodBasedRouteInfo<?, ?>) route(router, "/g/own");
+        assertSame(own, ownRoute.getAnnotationMetadataProvider().orElseThrow());
+        assertEquals("3", ownRoute.getAnnotationMetadata().stringValue(Version.class).orElseThrow());
+        assertTrue(!ownRoute.getAnnotationMetadata().hasAnnotation(Other.class));
+        // an annotation of the route overrides the element of its group
+        assertEquals("4", route(router, "/g/annotated").getAnnotationMetadata().stringValue(Version.class).orElseThrow());
+        MethodBasedRouteInfo<?, ?> nested = (MethodBasedRouteInfo<?, ?>) route(router, "/g/nested/ping");
+        assertSame(inner, nested.getAnnotationMetadataProvider().orElseThrow());
+        assertEquals("2", nested.getAnnotationMetadata().stringValue(Version.class).orElseThrow());
+        assertTrue(!nested.getAnnotationMetadata().hasAnnotation(Other.class));
+    }
+
+    @Test
+    void theAnnotationsOfAGroupOverrideTheElementOfTheGroup() {
+        AnnotationMetadataProvider element = element(Version.class.getName(), Map.of("value", "1"), Other.class.getName());
+        Router router = router(routes -> routes.group(group -> {
+            group.annotate(AnnotationValue.builder(Version.class).value("5").build());
+            group.annotationMetadata(element);
+            group.GET("/ping", (request, pathVariables) -> HttpResponse.ok());
+        }));
+        AnnotationMetadata metadata = route(router, "/ping").getAnnotationMetadata();
+        assertEquals("5", metadata.stringValue(Version.class).orElseThrow());
+        assertTrue(metadata.hasAnnotation(Other.class));
+    }
+
+    @Test
     void aDeclaredRouteHasItsAnnotations() {
         RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared");
         Router router = router(routes -> routes.group(group -> {
@@ -202,6 +251,20 @@ class HandlerRouteAnnotateTest {
             assertThrows(NullPointerException.class, () -> route.annotate((String) null));
             assertThrows(NullPointerException.class, () -> route.annotate(Marker.class, null));
         });
+    }
+
+    private static AnnotationMetadataProvider element(String annotation, Map<CharSequence, Object> members, String... markers) {
+        MutableAnnotationMetadata metadata = new MutableAnnotationMetadata();
+        metadata.addDeclaredAnnotation(annotation, members);
+        for (String marker : markers) {
+            metadata.addDeclaredAnnotation(marker, Map.of());
+        }
+        return new AnnotationMetadataProvider() {
+            @Override
+            public AnnotationMetadata getAnnotationMetadata() {
+                return metadata;
+            }
+        };
     }
 
     private static RouteInfo<?> route(Router router, String path) {

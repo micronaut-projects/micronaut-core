@@ -16,6 +16,7 @@
 package io.micronaut.web.router.builder;
 
 import io.micronaut.context.env.PropertyPlaceholderResolver;
+import io.micronaut.core.annotation.AnnotationMetadataProvider;
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.http.HttpRequest;
@@ -128,7 +129,13 @@ final class DefaultHttpRouteGroup extends AbstractHttpRouteBuilder implements Ht
 
     @Override
     public <T extends Annotation> HttpRouteGroup annotate(AnnotationValue<T> annotationValue) {
-        settings.annotate(Objects.requireNonNull(annotationValue, "annotationValue"));
+        settings.annotations().add(Objects.requireNonNull(annotationValue, "annotationValue"));
+        return this;
+    }
+
+    @Override
+    public HttpRouteGroup annotationMetadata(AnnotationMetadataProvider annotationMetadata) {
+        settings.annotations().element(annotationMetadata);
         return this;
     }
 

@@ -414,7 +414,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * The annotations of the route: of its element, then of its groups, then its own.
      */
     private void updateAnnotationMetadata() {
-        AnnotationMetadataProvider provider = annotationMetadataProvider;
+        AnnotationMetadataProvider provider = elementProvider();
         AnnotationMetadata base = provider == null ? AnnotationMetadata.EMPTY_METADATA : provider.getAnnotationMetadata();
         DefaultRouteAnnotations group = groupAnnotations;
         List<DefaultRouteAnnotations> levels = group == null ? new ArrayList<>(1) : group.levels();
@@ -439,7 +439,19 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      */
     @Internal
     public @Nullable AnnotationMetadataProvider getAnnotationMetadataProvider() {
-        return annotationMetadataProvider;
+        return elementProvider();
+    }
+
+    /**
+     * @return The element of the route, or else the one of its innermost group that has one, see
+     * {@link HttpRouteGroup#annotationMetadata}
+     */
+    private @Nullable AnnotationMetadataProvider elementProvider() {
+        AnnotationMetadataProvider provider = annotationMetadataProvider;
+        if (provider == null && groupAnnotations != null) {
+            return groupAnnotations.element();
+        }
+        return provider;
     }
 
     /**
@@ -470,7 +482,7 @@ public final class HandlerMethod<R> implements ExecutableMethod<Object, R>, Meth
      * @return The bean method the route implements: the element of its annotations, if it is a method
      */
     private @Nullable ExecutableMethod<?, ?> implemented() {
-        return annotationMetadataProvider instanceof ExecutableMethod<?, ?> method ? method : null;
+        return elementProvider() instanceof ExecutableMethod<?, ?> method ? method : null;
     }
 
     /**
