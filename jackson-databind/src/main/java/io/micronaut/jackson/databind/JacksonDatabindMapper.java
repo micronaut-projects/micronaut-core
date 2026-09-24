@@ -44,6 +44,7 @@ import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
 import org.reactivestreams.Processor;
 import org.reactivestreams.Subscriber;
+import tools.jackson.core.JsonGenerator;
 import tools.jackson.core.JsonParser;
 import tools.jackson.core.exc.StreamReadException;
 import tools.jackson.core.json.JsonFactory;
@@ -53,7 +54,6 @@ import tools.jackson.databind.JacksonModule;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.ObjectReader;
 import tools.jackson.databind.ObjectWriter;
-import tools.jackson.databind.SequenceWriter;
 import tools.jackson.databind.cfg.MapperBuilder;
 
 import java.io.IOException;
@@ -363,21 +363,26 @@ public final class JacksonDatabindMapper implements JsonMapper {
 
     @Override
     public <T> JsonStreamWriter<T> createStreamWriter(OutputStream outputStream, Argument<T> type) throws IOException {
-        // a sequence writer puts a space between root values by default; the caller frames the
-        // values, so nothing goes between them
-        SequenceWriter sequenceWriter = createWriter(type).withRootValueSeparator("").writeValues(outputStream);
+        // the generator, with its output buffer, is created once for all values. A generator
+        // puts a space between root values by default; the caller frames the values, so nothing
+        // goes between them
+        ObjectWriter writer = createWriter(type).withRootValueSeparator("");
+        JsonGenerator generator = writer.createGenerator(outputStream);
         return new JsonStreamWriter<>() {
             @Override
             public void write(@Nullable T value) throws IOException {
-                sequenceWriter.write(value);
+                // each value is serialized in a context of its own, as writeValue does: the
+                // values are decoded independently, so the object ids seen while writing one
+                // value (JsonIdentityInfo) must not carry over to the next
+                writer.writeValue(generator, value);
                 // the generator buffers its output, and FLUSH_AFTER_WRITE_VALUE may be disabled
-                sequenceWriter.flush();
+                generator.flush();
             }
 
             @Override
             public void close() throws IOException {
                 try {
-                    sequenceWriter.close();
+                    generator.close();
                 } finally {
                     outputStream.close();
                 }

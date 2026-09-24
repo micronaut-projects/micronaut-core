@@ -91,11 +91,11 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
     @Override
     public void close() {
         try {
-            // closes the stream too, which drops any bytes the generator writes to finish up
             writer.close();
         } catch (IOException e) {
             // nothing is written on close, and the stream cannot fail to close
         } finally {
+            // drops any bytes the writer wrote to finish up
             stream.discard();
         }
     }
@@ -104,20 +104,21 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
      * The stream the JSON writer writes to for the whole response. The bytes go into a buffer of
      * the {@link ReadBufferFactory}, opened when the first byte of a piece arrives and cut off
      * when the piece is done, at which point it becomes the body of the piece.
+     *
+     * <p>Closing the stream does nothing: a mapper may close the stream it was given after every
+     * value, as {@link JsonMapper#writeValue(OutputStream, Argument, Object)} implementations
+     * commonly do, and the pieces after that must still be written. The piece writer discards the
+     * stream itself when it is closed.
      */
     private static final class BufferStream extends OutputStream {
         private final ReadBufferFactory factory;
         private ReadBufferFactory.@Nullable BufferingOutputStream buffer;
-        private boolean closed;
 
         BufferStream(ReadBufferFactory factory) {
             this.factory = factory;
         }
 
         private OutputStream target() {
-            if (closed) {
-                return OutputStream.nullOutputStream();
-            }
             ReadBufferFactory.BufferingOutputStream buffer = this.buffer;
             if (buffer == null) {
                 buffer = factory.outputStreamBuffer();
@@ -168,8 +169,7 @@ final class JsonPieceWriter<T> implements PieceWriter<T> {
 
         @Override
         public void close() {
-            closed = true;
-            discard();
+            // see the class javadoc
         }
     }
 }
