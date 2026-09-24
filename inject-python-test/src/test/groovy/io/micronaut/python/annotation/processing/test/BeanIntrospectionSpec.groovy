@@ -548,6 +548,46 @@ class TestPropertyClass:
         context?.close()
     }
 
+    void "test @property class constructed without arguments has a Python object"() {
+        given:"an introspected class whose properties are Python properties and whose constructor takes no arguments"
+        def pythonCode = '''
+from micronaut.core.annotation import Introspected
+
+@Introspected
+class LazyCounter:
+    def __init__(self):
+        self._items = []
+
+    @property
+    def item_count(self) -> int:
+        return len(self._items)
+
+    def add(self, item: str):
+        self._items.append(item)
+'''
+
+        when:"the stub is created through its no-argument constructor, which leaves the Python object uncreated"
+        def context = buildContext(pythonCode)
+        def introspection = getBeanIntrospection(context, "python.LazyCounter")
+        def instance = introspection.instantiate()
+
+        then:"asPolyglotValue() creates the Python object rather than returning null"
+        instance.asPolyglotValue() != null
+        instance.item_count() == 0
+        introspection.getProperty("item_count").get().get(instance) == 0
+
+        when:"the Python object is used"
+        instance.add("first")
+
+        then:"the same object answers the property, and the proxy members of the wrapper resolve"
+        instance.item_count() == 1
+        instance.hasMember("add")
+        instance.getMemberKeys().contains("add")
+
+        cleanup:
+        context?.close()
+    }
+
     void "test generic placeholders for bean properties"() {
         given:
         def pythonCode = '''

@@ -105,6 +105,7 @@ import java.net.InetSocketAddress;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -234,6 +235,26 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     @Override
     public MutableHttpRequest<T> mutate() {
         return new NettyMutableHttpRequest();
+    }
+
+    /**
+     * The Netty request whose body is the body of the given request: the given request itself, or
+     * the Netty request of a {@link #mutate() mutable view}, e.g. one a filter continued with,
+     * whose body the filter did not set, not even to {@code null}.
+     *
+     * @param request The request
+     * @return The Netty request, or {@code null} if the body of the request is not the body of one
+     * @since 5.2.4
+     */
+    @Internal
+    public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
+        if (request instanceof NettyHttpRequest<?> nettyRequest) {
+            return nettyRequest;
+        }
+        if (request instanceof NettyHttpRequest<?>.NettyMutableHttpRequest view && !view.bodySet) {
+            return view.request();
+        }
+        return null;
     }
 
     @Override
@@ -807,6 +828,31 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         private MutableHttpParameters httpParameters;
         @Nullable
         private Object body;
+        /**
+         * Whether {@link #body(Object)} was called: a {@code null} body clears the body of the
+         * request, so it cannot mean that the body is the body of the request.
+         */
+        private boolean bodySet;
+
+        NettyMutableHttpRequest() {
+        }
+
+        /**
+         * A view derived from another view, e.g. by {@link #mutate()}, keeps the body of that view.
+         *
+         * @param view The view
+         */
+        NettyMutableHttpRequest(NettyMutableHttpRequest view) {
+            this.body = view.body;
+            this.bodySet = view.bodySet;
+        }
+
+        /**
+         * @return The request this is the mutable view of
+         */
+        NettyHttpRequest<T> request() {
+            return NettyHttpRequest.this;
+        }
 
         @Override
         public void setConversionService(ConversionService conversionService) {
@@ -837,6 +883,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public <T1> MutableHttpRequest<T1> body(@Nullable T1 body) {
             this.body = body;
+            this.bodySet = true;
             return (MutableHttpRequest<T1>) this;
         }
 
@@ -852,8 +899,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         @Override
         public Optional<T> getBody() {
-            if (body != null) {
-                return Optional.of((T) body);
+            if (bodySet) {
+                return Optional.ofNullable((T) body);
             }
             return NettyHttpRequest.this.getBody();
         }
@@ -882,6 +929,43 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public HttpMethod getMethod() {
             return NettyHttpRequest.this.getMethod();
+        }
+
+        // the connection is the connection of the request, whatever the URI of the view
+
+        @Override
+        public HttpVersion getHttpVersion() {
+            return NettyHttpRequest.this.getHttpVersion();
+        }
+
+        @Override
+        public InetSocketAddress getRemoteAddress() {
+            return NettyHttpRequest.this.getRemoteAddress();
+        }
+
+        @Override
+        public InetSocketAddress getServerAddress() {
+            return NettyHttpRequest.this.getServerAddress();
+        }
+
+        @Override
+        public String getServerName() {
+            return NettyHttpRequest.this.getServerName();
+        }
+
+        @Override
+        public boolean isSecure() {
+            return NettyHttpRequest.this.isSecure();
+        }
+
+        @Override
+        public Optional<SSLSession> getSslSession() {
+            return NettyHttpRequest.this.getSslSession();
+        }
+
+        @Override
+        public Optional<Certificate> getCertificate() {
+            return NettyHttpRequest.this.getCertificate();
         }
 
         @Override
@@ -946,7 +1030,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         @Override
         public MutableHttpRequest<T> mutate() {
-            return new NettyMutableHttpRequest();
+            return new NettyMutableHttpRequest(this);
         }
 
         @Override
@@ -956,14 +1040,14 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
         @Override
         public Optional<io.netty.handler.codec.http.HttpRequest> toHttpRequestDirect() {
-            return body != null ? Optional.empty() : NettyHttpRequest.this.toHttpRequestDirect();
+            return bodySet ? Optional.empty() : NettyHttpRequest.this.toHttpRequestDirect();
         }
 
         @Override
         @Nullable
         public ByteBody byteBodyDirect() {
-            // if the body has been changed we can't return the byteBody directly
-            return body != null ? null : NettyHttpRequest.this.byteBodyDirect();
+            // if the body has been changed, even to null, we can't return the byteBody directly
+            return bodySet ? null : NettyHttpRequest.this.byteBodyDirect();
         }
     }
 
