@@ -980,12 +980,12 @@ public class HandlerRoutesTest {
                 routes.POST("/fn/nullable-body", Argument.of(String.class, "body", nullable), (request, pathVariables, body) ->
                     HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))
                     .consumesAll();
-                routes.asyncPOST("/fn/nullable-body-async", (request, pathVariables) -> request.body(Argument.of(String.class, "body", nullable)).thenCompose(body ->
-                    completeLater(executor, () -> HttpResponse.ok(body == null ? "no body" : "body " + body).contentType(MediaType.TEXT_PLAIN_TYPE))))
+                routes.asyncPOST("/fn/nullable-body-async", (request, pathVariables, body) -> body.body(Argument.of(String.class, "body", nullable)).thenCompose(value ->
+                    completeLater(executor, () -> HttpResponse.ok(value == null ? "no body" : "body " + value).contentType(MediaType.TEXT_PLAIN_TYPE))))
                     .consumesAll();
                 routes.POST("/fn/items", Argument.mapOf(String.class, String.class), (request, pathVariables, item) ->
                     HttpResponse.created(Map.of("saved", item.get("name"))));
-                routes.asyncPOST("/fn/async-items", (request, pathVariables) -> request.body(Argument.mapOf(String.class, String.class)).thenCompose(item ->
+                routes.asyncPOST("/fn/async-items", (request, pathVariables, body) -> body.body(Argument.mapOf(String.class, String.class)).thenCompose(item ->
                     completeLater(executor, () -> HttpResponse.created(Map.of("saved", item.get("name") + " later")))));
                 routes.handleAsync(HttpMethod.GET, "/fn/async", (request, pathVariables) ->
                     completeLater(executor, () -> HttpResponse.ok("async").contentType(MediaType.TEXT_PLAIN_TYPE)));
@@ -1005,7 +1005,7 @@ public class HandlerRoutesTest {
                     .before("handler-filter", request -> {
                         request.setAttribute(FILTER_THREAD, Thread.currentThread().getName());
                     });
-                routes.asyncPOST("/fn/forms/{id}", (request, pathVariables) -> request.form().thenCompose(form -> {
+                routes.asyncPOST("/fn/forms/{id}", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     String fields = pathVariables.getLong("id") + " " + form.getString("name") + " " + (form.getInt("age") + 1)
                         + " " + form.getValues("tag") + " ";
                     CompletionStage<String> file = form.findFile("avatar")
@@ -1017,11 +1017,11 @@ public class HandlerRoutesTest {
                 routes.POST("/fn/forms-defaults", (request, pathVariables, form) ->
                     HttpResponse.ok(form.getInt("quantity", 1) + " " + form.getString("shipping", "standard") + " " + form.getBoolean("gift", false))
                         .contentType(MediaType.TEXT_PLAIN_TYPE));
-                routes.asyncPOST("/fn/forms-async", (request, pathVariables) -> request.form().thenCompose(form ->
+                routes.asyncPOST("/fn/forms-async", (request, pathVariables, body) -> body.form().thenCompose(form ->
                     completeLater(executor, () -> HttpResponse.ok("async " + form.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE))))
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-stream", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-stream", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     StringBuilder result = new StringBuilder();
                     return parts.forEach(part -> {
                         if (part.name().equals("ignored")) {
@@ -1037,8 +1037,8 @@ public class HandlerRoutesTest {
                     }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-part/{name}", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-part/{name}", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     StringBuilder result = new StringBuilder();
                     return parts.part(pathVariables.getString("name"), part -> {
                         if (part.isFile()) {
@@ -1051,8 +1051,8 @@ public class HandlerRoutesTest {
                         : HttpResponse.badRequest("no part " + pathVariables.getString("name")).contentType(MediaType.TEXT_PLAIN_TYPE));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-cursor/{first}/{second}", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-cursor/{first}/{second}", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     StringBuilder result = new StringBuilder();
                     Function<FormPart, CompletionStage<?>> append = part -> {
                         if (part.isFile()) {
@@ -1079,8 +1079,8 @@ public class HandlerRoutesTest {
                         });
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-abandoned", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-abandoned", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     StringBuilder result = new StringBuilder();
                     return parts.forEach(part -> {
                         if (part.isFile()) {
@@ -1092,8 +1092,8 @@ public class HandlerRoutesTest {
                     }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-failing", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-failing", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     return parts.forEach(part -> {
                         if (part.isFile()) {
                             part.file();
@@ -1103,8 +1103,8 @@ public class HandlerRoutesTest {
                     }).thenApply(done -> HttpResponse.ok("not reached"));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-close-pending", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-close-pending", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     CompletableFuture<Void> holding = new CompletableFuture<>();
                     parts.part("archive", part -> {
                         // obtained and held, never read, and the consumer never completes
@@ -1118,7 +1118,7 @@ public class HandlerRoutesTest {
                     });
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-transfer", (request, pathVariables) -> request.form().thenCompose(form -> {
+                routes.asyncPOST("/fn/forms-transfer", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     String name = form.getString("name");
                     FileUpload avatar = form.getFile("avatar");
                     Path destination = temporaryFile();
@@ -1128,7 +1128,7 @@ public class HandlerRoutesTest {
                             .contentType(MediaType.TEXT_PLAIN_TYPE));
                 }))
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-existing", (request, pathVariables) -> request.form().thenCompose(form -> {
+                routes.asyncPOST("/fn/forms-existing", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     Path destination = temporaryFile();
                     write(destination, "kept");
                     return form.getFile("avatar").transferTo(destination).handle((done, error) -> {
@@ -1138,10 +1138,10 @@ public class HandlerRoutesTest {
                     });
                 }))
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-limited", (request, pathVariables) -> request.form().thenCompose(form ->
+                routes.asyncPOST("/fn/forms-limited", (request, pathVariables, body) -> body.form().thenCompose(form ->
                     form.getFile("avatar").bytes(3).thenApply(bytes -> HttpResponse.ok("not reached"))))
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-closed", (request, pathVariables) -> request.form().thenCompose(form -> {
+                routes.asyncPOST("/fn/forms-closed", (request, pathVariables, body) -> body.form().thenCompose(form -> {
                     FileUpload avatar = form.getFile("avatar");
                     return form.closeAsync().thenApply(closed -> {
                         String state;
@@ -1155,27 +1155,27 @@ public class HandlerRoutesTest {
                     });
                 }))
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-part-file/{name}", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-part-file/{name}", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     return parts.part(pathVariables.getString("name"), part -> part.file().transferTo(temporaryFile()))
                         .thenApply(found -> HttpResponse.ok("not reached"));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-bounded/{limit}", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-bounded/{limit}", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     List<String> titles = new ArrayList<>();
                     return parts.part("title", part -> part.text(pathVariables.getInt("limit")).thenAccept(titles::add))
                         .thenCompose(found -> parts.closeAsync()
                             .thenApply(closed -> HttpResponse.ok(titles.toString()).contentType(MediaType.TEXT_PLAIN_TYPE)));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-taken", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-taken", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     StringBuilder result = new StringBuilder();
                     return parts.forEach(part -> {
                         // the callback takes the body, and consumes it before its stage completes
-                        CloseableByteBody body = part.takeBody();
-                        return body.buffer().thenAccept(available -> {
+                        CloseableByteBody taken = part.takeBody();
+                        return taken.buffer().thenAccept(available -> {
                             try (available) {
                                 result.append(part.name()).append('=').append(available.length()).append(';');
                             }
@@ -1183,8 +1183,8 @@ public class HandlerRoutesTest {
                     }).thenApply(done -> HttpResponse.ok(result.toString()).contentType(MediaType.TEXT_PLAIN_TYPE));
                 })
                     .consumes(FORM_MEDIA_TYPES);
-                routes.asyncPOST("/fn/forms-close-cancels", (request, pathVariables) -> {
-                    FormParts parts = request.parts();
+                routes.asyncPOST("/fn/forms-close-cancels", (request, pathVariables, body) -> {
+                    FormParts parts = body.parts();
                     CompletableFuture<Void> holding = new CompletableFuture<>();
                     CompletionStage<Boolean> operation = parts.part("archive", part -> {
                         holding.complete(null);

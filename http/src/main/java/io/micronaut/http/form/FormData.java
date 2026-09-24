@@ -45,7 +45,7 @@ import java.util.concurrent.CompletionStage;
  * }</pre>
  *
  * <p>The whole form is read before a form handler runs; an asynchronous handler reads it with
- * {@link io.micronaut.http.AsyncServerHttpRequest#form()}. Text fields convert like the path
+ * {@link io.micronaut.http.body.AsyncRequestBody#form()}. Text fields convert like the path
  * variables, with the same accessors, including default values for missing fields, e.g.
  * {@code getInt("quantity", 1)}, with the conversion service of the route: a missing required field or a value that
  * does not convert is answered with 400. Uploaded files are {@link FileUpload}s, stored in
@@ -54,7 +54,7 @@ import java.util.concurrent.CompletionStage;
  * released when the request completes, and an operation on a file must be part of the stage the
  * handler returns:</p>
  * <pre>{@code
- * routes.asyncPOST("/profile", (request, pathVariables) -> request.form().thenCompose(form ->
+ * routes.asyncPOST("/profile", (request, pathVariables, body) -> body.form().thenCompose(form ->
  *     form.getFile("avatar").transferTo(destination)
  *         .thenApply(done -> HttpResponse.ok(form.getString("displayName")))));
  * }</pre>

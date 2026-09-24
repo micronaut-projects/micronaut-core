@@ -25,11 +25,12 @@ import java.util.concurrent.CompletionStage;
  * A handler function for an error that completes the response later: the asynchronous
  * {@link ErrorRouteHandler}, like an {@code @Error(global = true)} method returning a
  * {@link CompletionStage}. It handles the exceptions of controller routes and handler routes
- * alike, including the exception a stage of an {@link AsyncRequestHandler} completes with.
+ * alike, including the exception a stage of an {@link AsyncRequestHandler} or an
+ * {@link AsyncBodyRequestHandler} completes with.
  *
  * <p>Like every error route it runs on the thread that handles the error, which can be the event
- * loop, so it must not block. It receives the request as an {@link HttpRequest}, not as the
- * {@link io.micronaut.http.AsyncServerHttpRequest} of an asynchronous route: the error can occur
+ * loop, so it must not block. It receives the request, without the
+ * {@link io.micronaut.http.body.AsyncRequestBody} of an asynchronous route: the error can occur
  * after the route read the body, or while it was reading it, so the body is not offered to the
  * error route to read again.</p>
  *

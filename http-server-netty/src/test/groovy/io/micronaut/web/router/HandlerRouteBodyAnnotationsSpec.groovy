@@ -6,17 +6,17 @@ import io.micronaut.context.annotation.Requires
 import io.micronaut.core.annotation.AnnotationMetadata
 import io.micronaut.core.type.Argument
 import io.micronaut.core.type.Headers
-import io.micronaut.http.AsyncServerHttpRequest
 import io.micronaut.http.HttpRequest
 import io.micronaut.http.HttpResponse
 import io.micronaut.http.MediaType
 import io.micronaut.http.annotation.Consumes
+import io.micronaut.http.body.AsyncRequestBody
 import io.micronaut.http.body.MessageBodyReader
 import io.micronaut.http.client.HttpClient
 import io.micronaut.http.codec.CodecException
 import io.micronaut.inject.annotation.MutableAnnotationMetadata
 import io.micronaut.runtime.server.EmbeddedServer
-import io.micronaut.web.router.builder.AsyncRequestHandler
+import io.micronaut.web.router.builder.AsyncBodyRequestHandler
 import io.micronaut.web.router.builder.BodyRequestHandler
 import io.micronaut.web.router.builder.HttpRouteBuilder
 import io.micronaut.web.router.builder.HttpRoutes
@@ -129,9 +129,9 @@ class HandlerRouteBodyAnnotationsSpec extends Specification {
                 routes.POST('/b/sync', tagged('sync'), { HttpRequest<?> request, PathVariables variables, Tagged body ->
                     text(body)
                 } as BodyRequestHandler<Tagged>).consumes(MediaType.TEXT_PLAIN_TYPE)
-                routes.asyncPOST('/b/async', { AsyncServerHttpRequest<?> request, PathVariables variables ->
-                    request.body(tagged('async')).thenApply { Tagged body -> text(body) }
-                } as AsyncRequestHandler).consumes(MediaType.TEXT_PLAIN_TYPE)
+                routes.asyncPOST('/b/async', { HttpRequest<?> request, PathVariables variables, AsyncRequestBody asyncBody ->
+                    asyncBody.body(tagged('async')).thenApply { Tagged body -> text(body) }
+                } as AsyncBodyRequestHandler).consumes(MediaType.TEXT_PLAIN_TYPE)
                 routes.POST('/b/nullable', HttpRouteBuilder.nullableBody(tagged('nullable')), { HttpRequest<?> request, PathVariables variables, Tagged body ->
                     text(body)
                 } as BodyRequestHandler<Tagged>).consumes(MediaType.TEXT_PLAIN_TYPE)

@@ -45,8 +45,10 @@ import java.util.function.Function;
  * it: a target that is not an instance of the type fails the request, answered by the error
  * routes like a failed controller method. The typed handlers have no shortcuts such as
  * {@code GET}: {@code POST(uri, (request, pathVariables, form) -> ...)} would be ambiguous with
- * the form handlers. The handlers of the groups of the table, see {@link #group}, read the
- * target with {@link PathVariables#locatedTarget(Class)}.</p>
+ * the form handlers. The asynchronous typed handler receives the body too, see
+ * {@link LocatedAsyncBodyRequestHandler}: {@code (request, pathVariables, target) -> ...} would be
+ * ambiguous with an {@link AsyncBodyRequestHandler}. The handlers of the groups of the table, see
+ * {@link #group}, read the target with {@link PathVariables#locatedTarget(Class)}.</p>
  *
  * @param <T> The type of the located target
  * @author Denis Stepanov
@@ -113,16 +115,16 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     HttpRouteSpec handleForm(HttpMethod method, String uri, LocatedFormRequestHandler<T> handler);
 
     /**
-     * Route requests to a handler function that receives the located target and completes the
-     * response later.
+     * Route requests to a handler function that receives the located target and the body of the
+     * request, which it reads, and completes the response later.
      *
      * @param method  The HTTP method
      * @param uri     The URI template, relative to the prefix of the locator
      * @param handler The handler
      * @return The route
-     * @see #handleAsync(HttpMethod, String, AsyncRequestHandler)
+     * @see #handleAsync(HttpMethod, String, AsyncBodyRequestHandler)
      */
-    HttpRouteSpec handleAsync(HttpMethod method, String uri, LocatedAsyncRequestHandler<T> handler);
+    HttpRouteSpec handleAsync(HttpMethod method, String uri, LocatedAsyncBodyRequestHandler<T> handler);
 
     /**
      * Bind a handler function that receives the located target to a declared route.
@@ -172,15 +174,15 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     HttpRouteSpec handleForm(RouteDeclaration route, LocatedFormRequestHandler<T> handler);
 
     /**
-     * Bind a handler function that receives the located target and completes the response later
-     * to a declared route.
+     * Bind a handler function that receives the located target and the body of the request, and
+     * completes the response later, to a declared route.
      *
      * @param route   The declared route, relative to the prefix of the locator
      * @param handler The handler
      * @return The route
-     * @see #handleAsync(RouteDeclaration, AsyncRequestHandler)
+     * @see #handleAsync(RouteDeclaration, AsyncBodyRequestHandler)
      */
-    HttpRouteSpec handleAsync(RouteDeclaration route, LocatedAsyncRequestHandler<T> handler);
+    HttpRouteSpec handleAsync(RouteDeclaration route, LocatedAsyncBodyRequestHandler<T> handler);
 
     /**
      * Like {@link #handle(HttpMethod, String, LocatedRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
@@ -235,14 +237,14 @@ public sealed interface LocatedHttpRouteBuilder<T> extends HttpRouteBuilder perm
     }
 
     /**
-     * Like {@link #handleAsync(HttpMethod, String, LocatedAsyncRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
+     * Like {@link #handleAsync(HttpMethod, String, LocatedAsyncBodyRequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link HttpRouteBuilder#path(String, java.util.function.Consumer) group}, the prefix of the locator in a route table of a located target, or {@code /} at the root, under the context path.
      *
      * @param method         The HTTP method
      * @param handler        The handler
      * @return The route
      * @since 5.3.0
      */
-    default HttpRouteSpec handleAsync(HttpMethod method, LocatedAsyncRequestHandler<T> handler) {
+    default HttpRouteSpec handleAsync(HttpMethod method, LocatedAsyncBodyRequestHandler<T> handler) {
         return handleAsync(method, "/", handler);
     }
 

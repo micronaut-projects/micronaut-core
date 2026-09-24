@@ -259,8 +259,8 @@ public class HandlerRoutesConcurrencyTest {
                     .after((request, response) -> response.header("X-Route-Filter", id(request)));
                 group.asyncGET("/async/{id}", (request, pathVariables) -> CompletableFuture.supplyAsync(() -> text("async " + pathVariables.getString("id")), executor))
                     .after(TaskExecutors.BLOCKING, (request, response) -> response.header("X-Route-Filter", id(request)));
-                group.asyncPOST("/echo/{id}", (request, pathVariables) -> request.text()
-                        .thenApply(body -> text("echo " + pathVariables.getString("id") + ": " + body)))
+                group.asyncPOST("/echo/{id}", (request, pathVariables, body) -> body.text()
+                        .thenApply(value -> text("echo " + pathVariables.getString("id") + ": " + value)))
                     .consumes(MediaType.TEXT_PLAIN_TYPE)
                     .afterAsync((request, response) -> CompletableFuture.runAsync(() -> response.header("X-Route-Filter", id(request)), executor));
                 group.locateAsync("/located/{id}", (request, pathVariables) -> {
