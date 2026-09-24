@@ -1001,7 +1001,14 @@ public final class PythonContextRuntime {
     public static Value newInstance(Context context, PythonClassReference classReference, Object... args) {
         return PythonContextRegistry.withExecutionFrame(context, () -> {
             Value pythonClass = findClass(classReference, context);
-            Value instance = instantiate(classReference, args, pythonClass);
+            Object[] constructorArguments = args;
+            if (isReuseContext() && helper(context, HAS_COROUTINE_METHODS).execute(pythonClass).asBoolean()) {
+                constructorArguments = new Object[args.length];
+                for (int i = 0; i < args.length; i++) {
+                    constructorArguments[i] = PythonCoercion.asyncConstructorArgument(context, args[i]);
+                }
+            }
+            Value instance = instantiate(classReference, constructorArguments, pythonClass);
             rememberConstructorArguments(context, classReference, pythonClass, instance, args);
             return instance;
         });
