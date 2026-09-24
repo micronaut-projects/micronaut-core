@@ -150,9 +150,14 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void read(ChannelHandlerContext ctx, HttpResponse msg) {
             ReaderState<HttpContent> nextState;
-            if (msg.status().code() == HttpResponseStatus.CONTINUE.code()) {
+            int code = msg.status().code();
+            if (code == HttpResponseStatus.CONTINUE.code()) {
                 listener.continueReceived(ctx);
-                nextState = new DiscardingContinueContent(this);
+                nextState = new DiscardingInterimContent(this);
+            } else if (code >= 100 && code < 200 && code != HttpResponseStatus.SWITCHING_PROTOCOLS.code()) {
+                // an interim response, e.g. 103 Early Hints: the final response follows
+                listener.interimResponseReceived(ctx, msg);
+                nextState = new DiscardingInterimContent(this);
             } else {
                 nextState = new BufferedContent(listener, msg);
             }
@@ -448,12 +453,13 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     /**
-     * Short-circuiting handler that discards incoming content of a CONTINUE response.
+     * Short-circuiting handler that discards the (empty) content of an interim (1xx) response,
+     * and waits for the next response.
      */
-    private final class DiscardingContinueContent extends ReaderState<HttpContent> {
+    private final class DiscardingInterimContent extends ReaderState<HttpContent> {
         private final BeforeResponse beforeResponse;
 
-        DiscardingContinueContent(BeforeResponse beforeResponse) {
+        DiscardingInterimContent(BeforeResponse beforeResponse) {
             this.beforeResponse = beforeResponse;
         }
 
@@ -518,6 +524,17 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
          */
         default boolean isHeadResponse() {
             return false;
+        }
+
+        /**
+         * Called when the handler receives an interim (1xx) response other than
+         * {@code CONTINUE}, e.g. {@code 103 Early Hints}. The final response follows. Ignored by
+         * default.
+         *
+         * @param ctx      The handler context
+         * @param response The interim response
+         */
+        default void interimResponseReceived(ChannelHandlerContext ctx, HttpResponse response) {
         }
 
         /**

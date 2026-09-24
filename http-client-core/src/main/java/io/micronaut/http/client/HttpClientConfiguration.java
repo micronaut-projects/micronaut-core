@@ -65,6 +65,13 @@ public abstract class HttpClientConfiguration {
     public static final long DEFAULT_READ_TIMEOUT_SECONDS = 10;
 
     /**
+     * The default time to wait for {@code 100 Continue} before sending the body anyway, in seconds.
+     *
+     * @since 5.3.0
+     */
+    public static final long DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS = 1;
+
+    /**
      * The default read idle timeout in minutes.
      */
     @SuppressWarnings("WeakerAccess")
@@ -165,6 +172,9 @@ public abstract class HttpClientConfiguration {
 
     @Nullable
     private Duration readTimeout = Duration.ofSeconds(DEFAULT_READ_TIMEOUT_SECONDS);
+
+    @Nullable
+    private Duration expectContinueTimeout = Duration.ofSeconds(DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS);
 
     @Nullable
     private Duration requestTimeout = null;
@@ -312,6 +322,7 @@ public abstract class HttpClientConfiguration {
             this.readIdleTimeout = copy.readIdleTimeout;
             this.connectionPoolIdleTimeout = copy.connectionPoolIdleTimeout;
             this.readTimeout = copy.readTimeout;
+            this.expectContinueTimeout = copy.expectContinueTimeout;
             this.shutdownTimeout = copy.shutdownTimeout;
             this.shutdownQuietPeriod = copy.shutdownQuietPeriod;
             this.sslConfiguration = copy.sslConfiguration;
@@ -639,6 +650,18 @@ public abstract class HttpClientConfiguration {
     }
 
     /**
+     * How long a request with {@code Expect: 100-continue} waits for the {@code 100 Continue}
+     * response before it sends the body anyway, as RFC 9110 allows: a server that ignores the
+     * expectation waits for the body. Empty to wait until the read timeout.
+     *
+     * @return The time to wait for {@code 100 Continue}. Defaults to 1 second
+     * @since 5.3.0
+     */
+    public Optional<Duration> getExpectContinueTimeout() {
+        return Optional.ofNullable(expectContinueTimeout);
+    }
+
+    /**
      * The request timeout for non-streaming requests. This is the maximum time until the response
      * must be completely received. Defaults to one second more than read-timeout.
      *
@@ -745,6 +768,19 @@ public abstract class HttpClientConfiguration {
      */
     public void setReadTimeout(@Nullable Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    /**
+     * Sets how long a request with {@code Expect: 100-continue} waits for {@code 100 Continue}
+     * before it sends the body anyway. Default value
+     * ({@value io.micronaut.http.client.HttpClientConfiguration#DEFAULT_EXPECT_CONTINUE_TIMEOUT_SECONDS} second).
+     * {@code null} waits until the read timeout.
+     *
+     * @param expectContinueTimeout The time to wait for {@code 100 Continue}
+     * @since 5.3.0
+     */
+    public void setExpectContinueTimeout(@Nullable Duration expectContinueTimeout) {
+        this.expectContinueTimeout = expectContinueTimeout;
     }
 
     /**

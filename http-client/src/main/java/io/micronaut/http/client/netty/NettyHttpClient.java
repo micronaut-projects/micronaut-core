@@ -197,6 +197,8 @@ import java.util.Optional;
 import java.util.OptionalLong;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
@@ -1821,8 +1823,24 @@ final class NettyHttpClient implements
 
         AtomicBoolean responded = new AtomicBoolean();
 
+        // whether the body is still held back for a 100 Continue; only touched on the event loop
+        AtomicBoolean stillExpectingContinue = new AtomicBoolean(expectContinue);
+        AtomicReference<ScheduledFuture<?>> continueFallback = new AtomicReference<>();
+        Runnable sendHeldBody = () -> {
+            if (stillExpectingContinue.compareAndSet(true, false)) {
+                ScheduledFuture<?> fallback = continueFallback.getAndSet(null);
+                if (fallback != null) {
+                    fallback.cancel(false);
+                }
+                if (streamWriter == null) {
+                    poolHandle.channel().writeAndFlush(new DefaultLastHttpContent(byteBuf), poolHandle.channel().voidPromise());
+                } else {
+                    streamWriter.startWriting();
+                }
+            }
+        };
+
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
-            boolean stillExpectingContinue = expectContinue;
             /**
              * The outcome of the exchange is reported to the load balancer once: a failure
              * before the response or of its body, or else the status once the body ended or
@@ -1873,14 +1891,7 @@ final class NettyHttpClient implements
 
             @Override
             public void continueReceived(ChannelHandlerContext ctx) {
-                if (stillExpectingContinue) {
-                    stillExpectingContinue = false;
-                    if (streamWriter == null) {
-                        ctx.writeAndFlush(new DefaultLastHttpContent(byteBuf), ctx.voidPromise());
-                    } else {
-                        streamWriter.startWriting();
-                    }
-                }
+                sendHeldBody.run();
             }
 
             @Override
@@ -1932,7 +1943,11 @@ final class NettyHttpClient implements
                     }
                     ctx.pipeline().remove(streamWriter);
                 }
-                if (stillExpectingContinue && byteBuf != null) {
+                ScheduledFuture<?> fallback = continueFallback.getAndSet(null);
+                if (fallback != null) {
+                    fallback.cancel(false);
+                }
+                if (stillExpectingContinue.getAndSet(false) && byteBuf != null) {
                     byteBuf.release();
                 }
                 poolHandle.release();
@@ -1965,6 +1980,13 @@ final class NettyHttpClient implements
             } else {
                 nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
             }
+        }
+
+        if (expectContinue) {
+            // a server that ignores the expectation waits for the body: send it after a while anyway (RFC 9110 10.1.1).
+            // The head is written right after this, on this event loop, before the timer can fire
+            configuration.getExpectContinueTimeout().ifPresent(timeout ->
+                continueFallback.set(poolHandle.channel().eventLoop().schedule(sendHeldBody, timeout.toNanos(), TimeUnit.NANOSECONDS)));
         }
     }
 
