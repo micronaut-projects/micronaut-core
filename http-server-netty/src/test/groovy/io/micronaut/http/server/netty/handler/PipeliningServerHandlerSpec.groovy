@@ -1,5 +1,6 @@
 package io.micronaut.http.server.netty.handler
 
+import io.micronaut.buffer.netty.NettyReadBufferFactory
 import io.micronaut.core.io.buffer.ByteBuffer
 import io.micronaut.http.body.AvailableByteBody
 import io.micronaut.http.body.ByteBody
@@ -11,6 +12,7 @@ import io.micronaut.http.exceptions.ContentLengthExceededException
 import io.micronaut.http.netty.body.NettyByteBodyFactory
 import io.netty.buffer.AbstractByteBufAllocator
 import io.netty.buffer.ByteBuf
+import io.netty.buffer.ByteBufAllocator
 import io.netty.buffer.CompositeByteBuf
 import io.netty.buffer.Unpooled
 import io.netty.buffer.UnpooledByteBufAllocator
@@ -1340,6 +1342,65 @@ class PipeliningServerHandlerSpec extends Specification {
         cleaned == 1
         upstream.discards == 1
         errors.size() == errorsOnClose
+    }
+
+    def 'responseWritten is called once when the final bytes arrive with the completion'() {
+        given:
+        def resp = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        resp.headers().add(HttpHeaderNames.TRANSFER_ENCODING, HttpHeaderValues.CHUNKED)
+        def upstream = new RecordingUpstream()
+        def streamingBody = null
+        PipeliningServerHandler.OutboundAccessImpl access = null
+        def cleaned = 0
+        def errors = []
+        def ch = new EmbeddedChannel(new PipeliningServerHandler(new RequestHandler() {
+            @Override
+            void accept(ChannelHandlerContext ctx, HttpRequest request, CloseableByteBody body, OutboundAccess outboundAccess) {
+                body.close()
+                access = outboundAccess
+                streamingBody = new NettyByteBodyFactory(ctx.channel()).createStreamingBody(BodySizeLimits.UNLIMITED, upstream)
+                outboundAccess.write(resp, streamingBody.rootBody())
+            }
+
+            @Override
+            void handleUnboundError(Throwable cause) {
+                errors << cause
+            }
+
+            @Override
+            void responseWritten(Object attachment) {
+                cleaned++
+            }
+        }))
+
+        when:
+        ch.writeInbound(new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/", Unpooled.EMPTY_BUFFER))
+        then:
+        upstream.starts == 1
+        cleaned == 0
+
+        when:
+        // the last bytes of the body and its completion arrive as a single signal
+        streamingBody.sharedBuffer().addAndComplete(NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).adapt(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)))
+        ch.runPendingTasks()
+        then:
+        ch.checkException()
+        ch.readOutbound() == resp
+        LastHttpContent last = ch.readOutbound()
+        last.content().toString(StandardCharsets.UTF_8) == "foo"
+        last.release()
+        ch.readOutbound() == null
+        cleaned == 1
+
+        when:
+        // the response is reported as done again, as a discard of the handler would do, and then
+        // the connection goes away
+        access.handler.markResponseWritten()
+        ch.finishAndReleaseAll()
+        then:
+        // the request is cleaned up only once
+        cleaned == 1
+        errors.empty
     }
 
     def 'graceful shutdown sets connection close on a queued streaming response'() {
