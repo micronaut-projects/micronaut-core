@@ -322,7 +322,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
 
     @Override
     public String getServerName() {
-        return getServerAddress().getHostName();
+        // getHostString does not trigger a reverse DNS lookup on the event loop like getHostName would
+        return getServerAddress().getHostString();
     }
 
     @Override
