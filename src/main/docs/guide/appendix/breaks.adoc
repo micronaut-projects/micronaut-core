@@ -1,6 +1,18 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== A route variable without a regular expression is more specific (5.3)
+
+Routes are ordered by the length of the literal parts of their URI templates, then by the number of path variables. Since Micronaut 5.3 a third key follows: among routes that tie on both, the route with fewer path variables constrained by a regular expression is more specific. For example, a `GET /items/1` request matched by both `@Get("/items/{id}")` and `@Get("/items/{id:.+}")` previously failed with a api:web.router.exceptions.DuplicateRouteException[] (answered with `400 Bad Request`), and is now routed to `/items/{id}`. A numeric modifier such as `{id:3}` limits the length of the value and is not a regular expression: it is not counted. Routes that tie on all three keys stay ambiguous.
+
+The change is in `UriTemplateMatcher.compareTo`, and with it in the natural order (`compareTo`) of api:web.router.UriRouteInfo[] and its default implementation `DefaultUrlRouteInfo`, so the order of routes sorted with it changes too. Routes also have a new `UriRouteInfo.getOrder()` (`0` by default and for every controller route): it is consulted after the specificity of the templates, the media types and the preference of an explicit `HEAD` route over an implicit one, and only decides between routes that would otherwise be ambiguous.
+
+=== A filter method that changes the URI of its `MutableHttpRequest` parameter changes the request (5.3)
+
+A request filter method without a continuation that takes a api:http.MutableHttpRequest[] parameter receives a mutable view of the request when the request itself is not mutable, as is the case for the server request. Previously, a change of the URI of that view in place, e.g. `request.uri(URI.create("/v2/items"))` in a `void` filter method, was lost unless the method returned the view. Since Micronaut 5.3 the filter chain continues with the view when its URI was changed and the method returned no request, so the route and the filters after it see the new URI, and a api:http.server.annotation.PreMatching[] filter changes the URI the route is matched with. The view of a server request still reads the body of the original request. An asynchronous filter's URI change is taken into account when its result completes. Changes to the parameters or the body of the view are not kept unless the filter returns the view; header changes are applied to the request, as before.
+
+When the request has no mutable view, e.g. an `HttpRequestWrapper` an earlier filter continued with, the parameter is now a mutable wrapper of it instead of failing with an `UnsupportedOperationException`.
+
 === A reflectively dispatched executable method propagates the method's exception
 
 An executable method that generated code cannot call directly, for example a `private` method annotated with `@Executable` and `@ReflectiveAccess`, is dispatched through reflection. Previously `ExecutableMethod.invoke` wrapped whatever such a method threw in an api:core.reflect.exception.InvocationException[], with the `java.lang.reflect.InvocationTargetException` as its cause, while the same method declared package-private or public threw its own exception.
