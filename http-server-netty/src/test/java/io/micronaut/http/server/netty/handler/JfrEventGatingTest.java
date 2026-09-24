@@ -22,6 +22,7 @@ import io.micronaut.http.annotation.Controller;
 import io.micronaut.http.annotation.Get;
 import io.micronaut.http.client.BlockingHttpClient;
 import io.micronaut.http.client.HttpClient;
+import io.micronaut.http.netty.JfrSupport;
 import io.micronaut.runtime.server.EmbeddedServer;
 import io.micronaut.scheduling.TaskExecutors;
 import io.micronaut.scheduling.annotation.ExecuteOn;
@@ -35,6 +36,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.lang.management.ManagementFactory;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -44,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -53,7 +56,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 /**
  * Checks, each in a fresh JVM, that serving requests neither needs the {@code jdk.jfr} module
  * nor initializes JFR, and that a recording started after the first request still gets the
- * events.
+ * events, with requests still served once it stops.
  */
 class JfrEventGatingTest {
     private static final String SPEC_NAME = "JfrEventGatingTest";
@@ -69,6 +72,7 @@ class JfrEventGatingTest {
 
         assertEquals("ok", child.result("body"), child::summary);
         assertEquals("false", child.result("recorderInitialized"), child::summary);
+        assertEquals("false", child.result("jfrSupport"), child::summary);
         assertFalse(child.output().contains(METADATA_REPOSITORY), () -> METADATA_REPOSITORY + "was loaded\n" + child.summary());
     }
 
@@ -78,6 +82,7 @@ class JfrEventGatingTest {
         ChildJvm child = ChildJvm.run(transport, Scenario.NO_JFR_MODULE, "--limit-modules", "java.se,jdk.unsupported,jdk.zipfs");
 
         assertEquals("false", child.result("jfrAvailable"), child::summary);
+        assertEquals("false", child.result("jfrSupport"), child::summary);
         assertEquals("ok", child.result("body"), child::summary);
     }
 
@@ -90,6 +95,8 @@ class JfrEventGatingTest {
         for (String eventName : transport.eventNames) {
             assertEquals(transport.expectedEvent, child.result("event:" + eventName), child::summary);
         }
+        assertEquals("true", child.result("jfrSupportAfterRecording"), child::summary);
+        assertEquals("ok", child.result("bodyAfterRecording"), child::summary);
     }
 
     @SuppressWarnings("ImmutableEnumChecker") // Map.of values and arrays nothing writes to
@@ -149,6 +156,7 @@ class JfrEventGatingTest {
             List<String> command = new ArrayList<>();
             command.add(Path.of(System.getProperty("java.home"), "bin", "java").toString());
             command.add("--add-opens=java.base/java.lang=ALL-UNNAMED");
+            command.addAll(coverageAgent());
             command.addAll(Arrays.asList(jvmArgs));
             command.add("-cp");
             command.add(System.getProperty("java.class.path"));
@@ -170,6 +178,16 @@ class JfrEventGatingTest {
             } catch (Exception e) {
                 throw new IllegalStateException("Failed to run the child JVM", e);
             }
+        }
+
+        /**
+         * @return the JaCoCo agent of this JVM, if any, so that the code run by the child JVM
+         *     counts towards the coverage of the build
+         */
+        private static List<String> coverageAgent() {
+            return ManagementFactory.getRuntimeMXBean().getInputArguments().stream()
+                .filter(arg -> arg.startsWith("-javaagent:") && arg.contains("jacoco"))
+                .toList();
         }
 
         private static String readAll(InputStream in) {
@@ -212,12 +230,17 @@ class JfrEventGatingTest {
                     BlockingHttpClient client = httpClient.toBlocking();
                     if (scenario == Scenario.NO_JFR_MODULE) {
                         result("jfrAvailable", NativeImageUtils.JFR_AVAILABLE);
+                        result("jfrSupport", JfrSupport.isRecorderInitialized());
                         result("body", client.retrieve(transport.path));
                     } else {
                         result("body", client.retrieve(transport.path));
                         result("recorderInitialized", Jfr.recorderInitialized());
+                        result("jfrSupport", JfrSupport.isRecorderInitialized());
                         if (scenario == Scenario.LATE_RECORDING) {
-                            Jfr.record(() -> client.retrieve(transport.path), transport.eventNames);
+                            Jfr.recordEvents(() -> client.retrieve(transport.path), transport.eventNames);
+                            // The Flight Recorder outlives the recording, whose events are off again
+                            result("jfrSupportAfterRecording", JfrSupport.isRecorderInitialized());
+                            result("bodyAfterRecording", client.retrieve(transport.path));
                         }
                     }
                 }
@@ -238,18 +261,22 @@ class JfrEventGatingTest {
             return FlightRecorder.isInitialized();
         }
 
-        static void record(Runnable action, String... eventNames) throws InterruptedException {
+        static void recordEvents(Runnable action, String... eventNames) throws InterruptedException {
             Map<String, String> received = new ConcurrentHashMap<>();
+            CountDownLatch allReceived = new CountDownLatch(eventNames.length);
             try (RecordingStream stream = new RecordingStream()) {
                 for (String eventName : eventNames) {
                     stream.enable(eventName);
-                    stream.onEvent(eventName, event -> received.putIfAbsent(eventName, describe(event)));
+                    stream.onEvent(eventName, event -> {
+                        if (received.putIfAbsent(eventName, describe(event)) == null) {
+                            allReceived.countDown();
+                        }
+                    });
                 }
                 stream.startAsync();
                 action.run();
-                long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(30);
-                while (received.size() < eventNames.length && System.nanoTime() < deadline) {
-                    TimeUnit.MILLISECONDS.sleep(50);
+                if (!allReceived.await(30, TimeUnit.SECONDS)) {
+                    System.out.println("Timed out waiting for the JFR events");
                 }
             }
             for (String eventName : eventNames) {
