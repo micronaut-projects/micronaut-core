@@ -91,7 +91,7 @@ public final class HttpRequestFactory {
         @Nullable MediaTypeCodecRegistry mediaTypeCodecRegistry,
         @Nullable MessageBodyHandlerRegistry messageBodyHandlerRegistry
     ) {
-        if (request instanceof RawHttpRequestWrapper<?> raw) {
+        if (request instanceof RawHttpRequestWrapper<?> raw && !raw.isBodyReplaced()) {
             OptionalLong length = raw.byteBody().expectedLength();
             if (length.isPresent() && length.getAsLong() == 0) {
                 // BodyPublishers.fromPublisher only takes a positive length. There is nothing to

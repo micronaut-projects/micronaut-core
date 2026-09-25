@@ -75,7 +75,6 @@ import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
 import io.netty.handler.codec.http2.Http2FrameLogger;
 import io.netty.handler.codec.http2.Http2GoAwayFrame;
 import io.netty.handler.codec.http2.Http2HeadersFrame;
-import io.netty.handler.codec.http2.Http2MultiplexActiveStreamsException;
 import io.netty.handler.codec.http2.Http2MultiplexHandler;
 import io.netty.handler.codec.http2.Http2PingFrame;
 import io.netty.handler.codec.http2.Http2Settings;
@@ -1475,15 +1474,17 @@ public class ConnectionManager {
              *               this handler.
              */
             final void addTimeoutHandlers(String before) {
-                // read timeout handles timeouts *during* a request
+                // read timeout handles timeouts *during* a request. The requests of an HTTP/2
+                // connection have one each, on their streams, see StreamReadTimeoutHandler
                 configuration.getReadTimeout()
+                    .filter(dur -> this instanceof Http1ConnectionHolder)
                     .ifPresent(dur -> {
                         ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
                                 if (hasLiveRequests()) {
                                     windDownConnection = true;
-                                    fireReadTimeout(ctx);
+                                    ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
                                     ctx.close();
                                 }
                             }
@@ -1578,13 +1579,6 @@ public class ConnectionManager {
             abstract boolean hasLiveRequests();
 
             /**
-             * Send a read timeout exception to all requests on this connection.
-             *
-             * @param ctx The connection-level channel handler context to use.
-             */
-            abstract void fireReadTimeout(ChannelHandlerContext ctx);
-
-            /**
              * Called when the connection becomes inactive, i.e. on disconnect.
              */
             void onInactive() {
@@ -1622,11 +1616,6 @@ public class ConnectionManager {
             @Override
             boolean hasLiveRequests() {
                 return hasLiveRequest;
-            }
-
-            @Override
-            void fireReadTimeout(ChannelHandlerContext ctx) {
-                ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
             }
 
             @Override
@@ -1702,7 +1691,7 @@ public class ConnectionManager {
             }
         }
 
-        sealed class Http2ConnectionHolder extends ConnectionHolder {
+        sealed class Http2ConnectionHolder extends ConnectionHolder implements StreamReadTimeoutHandler.Connection {
             private final Pool.Http2PoolEntry poolEntry;
             private final AtomicInteger liveRequests = new AtomicInteger(0);
             private final Http2StreamLimit streamLimit = new Http2StreamLimit(configuration.getConnectionPoolConfiguration().getMaxConcurrentRequestsPerHttp2Connection());
@@ -1759,8 +1748,14 @@ public class ConnectionManager {
             }
 
             @Override
-            void fireReadTimeout(ChannelHandlerContext ctx) {
-                channel.pipeline().fireExceptionCaught(new Http2MultiplexActiveStreamsException(ReadTimeoutException.INSTANCE));
+            public int liveRequests() {
+                return liveRequests.get();
+            }
+
+            @Override
+            public void closeAfterReadTimeout() {
+                windDownConnection = true;
+                channel.close();
             }
 
             @Override
@@ -1777,6 +1772,8 @@ public class ConnectionManager {
                     if (future.isSuccess()) {
                         Channel streamChannel = future.get();
                         ChannelPipeline streamPipeline = streamChannel.pipeline();
+                        configuration.getReadTimeout().ifPresent(timeout ->
+                            streamPipeline.addLast(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, new StreamReadTimeoutHandler(timeout, this)));
                         streamPipeline
                             .addLast(new ChannelOutboundHandlerAdapter() {
                                 @Override

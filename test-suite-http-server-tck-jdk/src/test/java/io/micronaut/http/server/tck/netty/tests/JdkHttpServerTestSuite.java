@@ -11,7 +11,7 @@ import org.junit.platform.suite.api.SuiteDisplayName;
 @SelectPackages("io.micronaut.http.server.tck.tests")
 @SuiteDisplayName("HTTP Server TCK for Javanet client")
 @ExcludeClassNamePatterns({
-    "io.micronaut.http.server.tck.tests.FilterProxyTest", // There's no proxy client for the JDK client
+    "io.micronaut.http.server.tck.tests.FilterProxyTest", // HttpClient.sendAsync completes on the common ForkJoinPool, whose threads carry no leak detection scope, so the server's buffer allocations fail in this harness
     "io.micronaut.http.server.tck.tests.raw.RawProxyTest", // HttpClient.sendAsync completes on the common ForkJoinPool, whose threads carry no leak detection scope, so the server's buffer allocations fail in this harness
     "io.micronaut.http.server.tck.tests.forms.FormsJacksonAnnotationsTest", // it seems application/x-www-form-urlencoded is not yet supported by the JDK client
     "io.micronaut.http.server.tck.tests.forms.UploadTest" // multipart

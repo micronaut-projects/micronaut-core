@@ -15,16 +15,19 @@
  */
 package io.micronaut.http.util;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.MutableHttpHeaders;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.charset.UnsupportedCharsetException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -40,12 +43,59 @@ import java.util.regex.Pattern;
  */
 public final class HttpHeadersUtil {
     private static final Charset DEFAULT_CHARSET = StandardCharsets.UTF_8;
+    private static final String PROXY_HEADER_PREFIX = "proxy-";
     private static final Supplier<Pattern> HEADER_MASK_PATTERNS = SupplierUtil.memoized(() ->
         Pattern.compile(".*(password|cred|cert|key|secret|token|auth|signat).*", Pattern.CASE_INSENSITIVE)
     );
 
     private HttpHeadersUtil() {
 
+    }
+
+    /**
+     * Remove the hop-by-hop headers, as a proxy must before it relays a request or a response
+     * (RFC 9110, section 7.6.1): {@code Connection} and the headers it lists, {@code Keep-Alive},
+     * {@code Proxy-*}, {@code TE}, {@code Trailer}, {@code Transfer-Encoding} and
+     * {@code Upgrade}.
+     *
+     * @param headers The headers to change
+     * @since 5.3.0
+     */
+    @Experimental
+    public static void stripHopByHopHeaders(MutableHttpHeaders headers) {
+        for (String connection : headers.getAll(HttpHeaders.CONNECTION)) {
+            int length = connection.length();
+            int start = 0;
+            while (start < length) {
+                int comma = connection.indexOf(',', start);
+                int end = comma < 0 ? length : comma;
+                String name = connection.substring(start, end).trim();
+                if (!name.isEmpty()) {
+                    headers.remove(name);
+                }
+                start = end + 1;
+            }
+        }
+        headers.remove(HttpHeaders.CONNECTION);
+        headers.remove(HttpHeaders.KEEP_ALIVE);
+        headers.remove(HttpHeaders.TE);
+        headers.remove(HttpHeaders.TRAILER);
+        headers.remove(HttpHeaders.TRANSFER_ENCODING);
+        headers.remove(HttpHeaders.UPGRADE);
+        List<String> proxyHeaders = null;
+        for (String name : headers.names()) {
+            if (name.regionMatches(true, 0, PROXY_HEADER_PREFIX, 0, PROXY_HEADER_PREFIX.length())) {
+                if (proxyHeaders == null) {
+                    proxyHeaders = new ArrayList<>(2);
+                }
+                proxyHeaders.add(name);
+            }
+        }
+        if (proxyHeaders != null) {
+            for (String name : proxyHeaders) {
+                headers.remove(name);
+            }
+        }
     }
 
     /**

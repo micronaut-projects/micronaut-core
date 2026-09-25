@@ -33,6 +33,9 @@ import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.RawRequestOptions;
+import io.micronaut.http.server.util.ForwardedHeaders;
+import io.micronaut.http.util.HttpHeadersUtil;
 import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.runtime.server.EmbeddedServer;
@@ -55,6 +58,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -233,6 +237,36 @@ public class RawProxyTest {
     }
 
     @Test
+    void proxyOptionsAndForwardedHeaders() throws IOException {
+        try (ServerUnderTest server = server()) {
+            HttpResponse<String> response = server.exchange(
+                HttpRequest.GET("/raw-proxy/gateway").header("X-Forwarded-For", "198.51.100.1").header("Keep-Alive", "timeout=5"),
+                String.class
+            );
+            assertEquals(HttpStatus.OK, response.getStatus());
+            Map<String, String> received = new java.util.TreeMap<>();
+            for (String line : response.body().split("\n")) {
+                int separator = line.indexOf('=');
+                received.put(line.substring(0, separator), line.substring(separator + 1));
+            }
+            // the untrusted X-Forwarded-For of the client is replaced, not appended to
+            assertFalse(received.get("x-forwarded-for").contains("198.51.100.1"), received.toString());
+            assertFalse(received.get("x-forwarded-for").isEmpty(), received.toString());
+            // the scheme the gateway was reached with, e.g. https for an HTTP/2 server with TLS
+            String scheme = server.getURL().orElseThrow().getProtocol();
+            assertEquals(scheme, received.get("x-forwarded-proto"));
+            assertTrue(received.get("forwarded").contains("proto=" + scheme + ";"), received.toString());
+            // the host header is computed from the upstream URI, the inbound one is in X-Forwarded-Host
+            assertEquals(received.get("x-forwarded-host") + ":" + received.get("x-forwarded-port"), response.getHeaders().get("X-Inbound-Host"));
+            assertEquals("", received.get("keep-alive"));
+            // hop-by-hop headers of the upstream response are removed. Keep-Alive is not checked
+            // here: some servers add their own to the response they send
+            assertFalse(response.getHeaders().contains(HttpHeaders.PROXY_AUTHENTICATE));
+            assertEquals("kept", response.getHeaders().get("X-End-To-End"));
+        }
+    }
+
+    @Test
     void clientDisconnectCancelsUpstream() throws Exception {
         try (ServerUnderTest server = server();
              Socket socket = connect(server)) {
@@ -315,7 +349,7 @@ public class RawProxyTest {
                 public X509Certificate[] getAcceptedIssuers() {
                     return new X509Certificate[0];
                 }
-            }}, null);
+            } }, null);
             return context;
         } catch (GeneralSecurityException e) {
             throw new IOException(e);
@@ -389,6 +423,17 @@ public class RawProxyTest {
                 .concatWith(Mono.delay(Duration.ofMillis(200)).then(Mono.error(new IllegalStateException("Upstream failure"))));
         }
 
+        @Get(value = "/inspect", produces = MediaType.TEXT_PLAIN)
+        HttpResponse<String> inspect(HttpRequest<?> request) {
+            StringBuilder received = new StringBuilder();
+            for (String name : List.of("host", "x-forwarded-for", "x-forwarded-proto", "x-forwarded-host", "x-forwarded-port", "forwarded", "keep-alive")) {
+                received.append(name).append('=').append(String.join(", ", request.getHeaders().getAll(name))).append('\n');
+            }
+            return HttpResponse.ok(received.toString())
+                .header("X-End-To-End", "kept")
+                .header(HttpHeaders.PROXY_AUTHENTICATE, "Basic");
+        }
+
         @Post(value = "/slow-upload", consumes = MediaType.APPLICATION_OCTET_STREAM, produces = MediaType.TEXT_PLAIN)
         Mono<String> slowUpload(@Body Publisher<byte[]> body) {
             AtomicBoolean first = new AtomicBoolean(true);
@@ -449,6 +494,21 @@ public class RawProxyTest {
         @Post(value = "/slow-upload", consumes = MediaType.ALL)
         Mono<HttpResponse<?>> slowUpload(ServerHttpRequest<?> request) {
             return relay(request, "/raw-upstream/slow-upload");
+        }
+
+        @Get("/gateway")
+        Mono<HttpResponse<?>> gateway(ServerHttpRequest<?> request) {
+            MutableHttpRequest<Object> outbound = HttpRequest.create(request.getMethod(), upstream("/raw-upstream/inspect").toString());
+            request.getHeaders().forEach((name, values) -> values.forEach(value -> outbound.header(name, value)));
+            // a proxy removes the hop-by-hop headers in both directions
+            HttpHeadersUtil.stripHopByHopHeaders(outbound.getHeaders());
+            ForwardedHeaders.apply(request, outbound);
+            return Mono.<HttpResponse<?>>from(client.exchange(outbound, request.byteBody().move(), null, RawRequestOptions.proxy()))
+                .map(response -> {
+                    MutableHttpResponse<?> relayed = response.toMutableResponse();
+                    HttpHeadersUtil.stripHopByHopHeaders(relayed.getHeaders());
+                    return relayed.header("X-Inbound-Host", request.getHeaders().get(HttpHeaders.HOST));
+                });
         }
 
         @Get("/stream")
