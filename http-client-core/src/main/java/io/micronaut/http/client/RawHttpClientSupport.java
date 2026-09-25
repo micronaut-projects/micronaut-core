@@ -218,7 +218,8 @@ public final class RawHttpClientSupport {
                 return serverRequest.byteBody().move();
             }
             if (current instanceof HttpRequestWrapper<?> wrapper) {
-                direct &= wrapper.getBody().equals(wrapper.getDelegate().getBody());
+                // by identity: a replacement that only compares equal (e.g. redacted) is still a replacement
+                direct &= wrapper.getBody().orElse(null) == wrapper.getDelegate().getBody().orElse(null);
                 current = wrapper.getDelegate();
             } else {
                 return null;

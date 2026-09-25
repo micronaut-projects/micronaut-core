@@ -5,6 +5,14 @@ import io.micronaut.core.execution.ExecutionFlow
 import io.micronaut.http.ByteBodyHttpResponse
 import io.micronaut.http.ByteBodyHttpResponseWrapper
 import io.micronaut.http.HttpResponse
+import groovy.transform.EqualsAndHashCode
+import io.micronaut.http.HttpMethod
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.HttpRequestWrapper
+import io.micronaut.http.ServerHttpRequest
+import io.micronaut.http.body.ByteBody
+import io.micronaut.http.body.DirectByteBodyAccess
+import io.micronaut.http.simple.SimpleHttpRequest
 import io.micronaut.http.body.ByteBodyFactory
 import io.micronaut.http.body.CloseableByteBody
 import io.micronaut.core.io.buffer.ByteArrayBufferFactory
@@ -110,5 +118,57 @@ class RawHttpClientSupportSpec extends Specification {
             }
         })
         return [response: response, closed: { closed }]
+    }
+
+    void "a body replaced by an equal but distinct object is not claimed"() {
+        given:
+        CloseableByteBody bytes = ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt("original".bytes)
+        DirectRequest received = new DirectRequest(new Entity(1, "secret"), bytes)
+        Entity redacted = new Entity(1, null)
+        HttpRequest<?> replaced = new HttpRequestWrapper<Object>(received) {
+            @Override
+            Optional<Object> getBody() {
+                return Optional.of(redacted)
+            }
+        }
+        HttpRequest<?> unchanged = new HttpRequestWrapper<Object>(received) {}
+
+        expect:
+        redacted == received.body.get()
+        RawHttpClientSupport.claimServerRequestBody(replaced) == null
+        RawHttpClientSupport.claimServerRequestBody(unchanged) != null
+
+        cleanup:
+        bytes.close()
+    }
+
+    @EqualsAndHashCode(includes = "id")
+    static class Entity {
+        final int id
+        final String secret
+
+        Entity(int id, String secret) {
+            this.id = id
+            this.secret = secret
+        }
+    }
+
+    static class DirectRequest extends SimpleHttpRequest<Object> implements ServerHttpRequest<Object>, DirectByteBodyAccess {
+        private final CloseableByteBody bytes
+
+        DirectRequest(Object body, CloseableByteBody bytes) {
+            super(HttpMethod.POST, "/items", body)
+            this.bytes = bytes
+        }
+
+        @Override
+        ByteBody byteBody() {
+            return bytes
+        }
+
+        @Override
+        ByteBody byteBodyDirect() {
+            return bytes
+        }
     }
 }
