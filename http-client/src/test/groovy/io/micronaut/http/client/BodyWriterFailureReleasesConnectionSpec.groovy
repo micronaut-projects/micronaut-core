@@ -37,7 +37,12 @@ class BodyWriterFailureReleasesConnectionSpec extends Specification {
     @AutoCleanup
     HttpClient client = server.applicationContext.createBean(HttpClient, server.URI)
 
-    def "connection is returned to the pool when the body writer throws"() {
+    def "connection is returned to the pool when the body writer throws (#description)"() {
+        given: "a warmed up client with a single pooled connection"
+        if (warmUp) {
+            assert client.toBlocking().retrieve("/body-writer-failure/ok") == "ok"
+        }
+
         when: "a request whose body writer fails"
         client.toBlocking().exchange(HttpRequest.POST("/body-writer-failure/echo", new Unwritable()), String)
 
@@ -45,11 +50,23 @@ class BodyWriterFailureReleasesConnectionSpec extends Specification {
         def e = thrown(Exception)
         causeChain(e).any { it instanceof IllegalStateException && it.message == "cannot write body" }
 
+        when: "the failing request is repeated on the connection that was just returned"
+        client.toBlocking().exchange(HttpRequest.POST("/body-writer-failure/echo", new Unwritable()), String)
+
+        then: "the client reports the writer error again"
+        def e2 = thrown(Exception)
+        causeChain(e2).any { it instanceof IllegalStateException && it.message == "cannot write body" }
+
         when: "a normal request is sent on the same client, which only has one connection"
         def response = client.toBlocking().retrieve("/body-writer-failure/ok")
 
         then: "the single connection was released and is reused"
         response == "ok"
+
+        where:
+        description             | warmUp
+        "new connection"        | false
+        "idle pooled connection" | true
     }
 
     private static List<Throwable> causeChain(Throwable t) {

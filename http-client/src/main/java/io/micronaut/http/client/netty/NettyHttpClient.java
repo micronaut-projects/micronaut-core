@@ -1497,8 +1497,13 @@ final class NettyHttpClient implements
                     );
                 } catch (Exception e) {
                     // nothing was written yet, so the connection is still usable: return it to
-                    // the pool instead of leaving it marked as busy forever
-                    poolHandle.release();
+                    // the pool instead of leaving it marked as busy forever. Like a release after
+                    // a response, this must happen on the event loop of the connection.
+                    if (poolHandle.channel.eventLoop().inEventLoop()) {
+                        poolHandle.release();
+                    } else {
+                        poolHandle.channel.eventLoop().execute(poolHandle::release);
+                    }
                     return ExecutionFlow.error(e);
                 }
 
