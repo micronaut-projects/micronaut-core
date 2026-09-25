@@ -247,6 +247,7 @@ class ClientBindOnceSpec extends Specification {
         @Get("/void")
         @Status(HttpStatus.OK)
         void noBody() {
+            // the response has no body; the test only checks that the binder ran once
         }
 
         @Get("/value")
