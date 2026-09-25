@@ -657,9 +657,10 @@ public final class RouteExecutor {
             if (bodyArgument.isAsyncOrReactive()) {
                 response = response.flatMap(resp ->
                     ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, resp, routeInfo)));
-            } else {
-                response = response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
             }
+            // the outer publisher sees the request and the propagated context, whether or not the
+            // bodies of its responses are reactive
+            response = response.contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request));
             return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, response));
         }
         return processPublisherBody(propagatedContext, request, forStatus(routeInfo, null), false, publisher, routeInfo);
