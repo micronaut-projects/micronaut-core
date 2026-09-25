@@ -265,7 +265,15 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         @Nullable
         private ChannelFuture lastWrite;
         private long unwritten;
+        /**
+         * Whether the body ended, failed or is cancelled: bytes that still arrive are dropped.
+         */
         private boolean done;
+        /**
+         * Whether the body was released. Apart from {@link #done}, since a write that fails
+         * after the body ended, or while it was still sending, must still release it.
+         */
+        private boolean released;
 
         RawWriter(StreamingNettyByteBody body) {
             this.body = body;
@@ -294,10 +302,11 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         }
 
         void cancel() {
-            if (done) {
+            done = true;
+            if (released) {
                 return;
             }
-            done = true;
+            released = true;
             if (upstream != null) {
                 upstream.allowDiscard();
                 upstream.disregardBackpressure();
@@ -360,7 +369,9 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         }
 
         private void error0(Throwable e) {
-            done = true;
+            // a write failed, or the body did: release the body first, whose source may still
+            // be sending, also when the connection was already finished
+            cancel();
             finish(e);
             channel.close();
         }
