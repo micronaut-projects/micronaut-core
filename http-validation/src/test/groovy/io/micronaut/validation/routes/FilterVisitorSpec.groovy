@@ -117,4 +117,61 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
     }
+
+    def 'execution flow return and continuation types'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.filter.FilterContinuation;
+
+@ServerFilter
+class Foo {
+    @RequestFilter
+    public ExecutionFlow<HttpResponse<?>> continuation(HttpRequest<?> request, FilterContinuation<ExecutionFlow<HttpResponse<?>>> continuation) {
+        return continuation.proceed();
+    }
+
+    @RequestFilter
+    public ExecutionFlow<HttpRequest<?>> request(HttpRequest<?> request) {
+        return ExecutionFlow.just(request);
+    }
+
+    @ResponseFilter
+    public ExecutionFlow<MutableHttpResponse<?>> response(MutableHttpResponse<?> response) {
+        return ExecutionFlow.just(response);
+    }
+}
+
+""")
+    }
+
+    def 'execution flow request on response filter'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.core.execution.ExecutionFlow;
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @ResponseFilter
+    ExecutionFlow<HttpRequest<?>> test() {
+        return null;
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
+    }
 }

@@ -17,6 +17,7 @@ package io.micronaut.validation.routes;
 
 import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.io.buffer.ByteBuffer;
 import io.micronaut.core.propagation.MutablePropagatedContext;
 import io.micronaut.http.HttpRequest;
@@ -195,14 +196,18 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
     }
 
    private static ClassElement resolveType(ClassElement returnType) {
-        if (returnType.isAssignable(Publisher.class) || returnType.isAssignable(CompletionStage.class) || returnType.isOptional()) {
+        if (isAsyncWrapper(returnType) || returnType.isOptional()) {
             returnType = returnType.getFirstTypeArgument().orElse(returnType);
         }
         return returnType;
     }
 
+    private static boolean isAsyncWrapper(ClassElement type) {
+        return type.isAssignable(Publisher.class) || type.isAssignable(CompletionStage.class) || type.isAssignable(ExecutionFlow.class);
+    }
+
     private static boolean isInvalidType(VisitorContext context, Element parameter, ClassElement parameterType, String message) {
-        if (parameterType.isAssignable(Publisher.class) || parameterType.isAssignable(CompletionStage.class)) {
+        if (isAsyncWrapper(parameterType)) {
             parameterType = parameterType.getFirstTypeArgument().orElse(parameterType);
         }
         boolean valid = PERMITTED_CLASSES.stream().anyMatch(parameterType::isAssignable);
