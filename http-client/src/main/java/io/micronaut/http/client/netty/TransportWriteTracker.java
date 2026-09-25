@@ -19,6 +19,7 @@ import io.micronaut.core.annotation.Internal;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
+import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
 import org.jspecify.annotations.Nullable;
 
@@ -47,6 +48,18 @@ final class TransportWriteTracker extends ChannelOutboundHandlerAdapter {
 
     private long writes;
     private long flushedWrites;
+
+    /**
+     * Add a tracker first in the pipeline of a connection, right before the transport, so that
+     * it sees every flush, unless it has one already.
+     *
+     * @param pipeline The pipeline of the connection
+     */
+    static void addFirst(ChannelPipeline pipeline) {
+        if (pipeline.get(TransportWriteTracker.class) == null) {
+            pipeline.addFirst(NAME, new TransportWriteTracker());
+        }
+    }
 
     /**
      * Find the tracker of the connection a channel belongs to.

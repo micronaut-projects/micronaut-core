@@ -29,7 +29,6 @@ import io.micronaut.http.client.HttpClientConfiguration;
 import io.micronaut.http.client.HttpVersionSelection;
 import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
-import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.netty.ssl.ClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslBuilder;
 import io.micronaut.http.client.netty.ssl.NettyClientSslFactory;
@@ -55,7 +54,6 @@ import io.netty.channel.ChannelOption;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.ConnectTimeoutException;
 import io.netty.channel.EventLoop;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
@@ -974,11 +972,8 @@ public class ConnectionManager {
 
         @Override
         public void handlerAdded(ChannelHandlerContext ctx) throws Exception {
-            // the tracker goes first, right before the transport, so that it sees every flush of
-            // the connection; before the pipeline is built, so that it stays first
-            if (ctx.pipeline().get(TransportWriteTracker.class) == null) {
-                ctx.pipeline().addFirst(TransportWriteTracker.NAME, new TransportWriteTracker());
-            }
+            // before the pipeline is built, so that the tracker stays first
+            TransportWriteTracker.addFirst(ctx.pipeline());
             super.handlerAdded(ctx);
         }
     }
@@ -1378,13 +1373,7 @@ public class ConnectionManager {
 
         @Override
         public Throwable wrapError(@Nullable Throwable error) {
-            // the request was never sent: the caller may retry it on another connection
-            if (error == null) {
-                // no failure observed, but channel closed
-                return new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT, "Unknown connect error", null);
-            }
-            UnprocessedRequestException.Reason reason = error instanceof ConnectTimeoutException ? UnprocessedRequestException.Reason.CONNECT_TIMEOUT : UnprocessedRequestException.Reason.CONNECT;
-            return new UnprocessedRequestException(reason, "Connect Error: " + error.getMessage(), error);
+            return NettyHttpClient.connectError(error);
         }
 
         @Override

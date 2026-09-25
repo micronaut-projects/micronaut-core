@@ -1967,6 +1967,20 @@ final class NettyHttpClient implements
         return promise;
     }
 
+    /**
+     * The failure of a connection that could not be opened: the request was never sent, so the
+     * caller may send it again on another connection.
+     *
+     * @param error The failure of the connect, or {@code null} if the channel closed without one
+     * @return The failure of the request
+     */
+    static UnprocessedRequestException connectError(@Nullable Throwable error) {
+        UnprocessedRequestException.Reason reason = error instanceof io.netty.channel.ConnectTimeoutException
+            ? UnprocessedRequestException.Reason.CONNECT_TIMEOUT
+            : UnprocessedRequestException.Reason.CONNECT;
+        return new UnprocessedRequestException(reason, error == null ? "Unknown connect error" : "Connect Error: " + error.getMessage(), error);
+    }
+
     private ReadBuffer charSequenceToByteBuf(CharSequence bodyValue, MediaType requestContentType) {
         return NettyReadBufferFactory.of(ByteBufAllocator.DEFAULT).copyOf(bodyValue.toString(), requestContentType.getCharset().orElse(defaultCharset));
     }
