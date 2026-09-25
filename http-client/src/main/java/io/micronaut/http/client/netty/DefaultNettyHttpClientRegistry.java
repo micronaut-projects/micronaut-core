@@ -97,6 +97,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
@@ -124,6 +125,12 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         RefreshEventListener {
     private static final Logger LOG = LoggerFactory.getLogger(DefaultNettyHttpClientRegistry.class);
     private final Map<ClientKey, DefaultHttpClient> unbalancedClients = new ConcurrentHashMap<>(10);
+    /**
+     * Cache of the client key computed for an annotation metadata instance. A declarative client
+     * passes the same (generated) metadata instance on every call, so this avoids repeating the
+     * annotation lookups. Weak keys so that transient metadata instances do not accumulate.
+     */
+    private final Map<AnnotationMetadata, ClientKey> clientKeyCache = Collections.synchronizedMap(new WeakHashMap<>());
     /**
      * The running clients created for a {@link LoadBalancer}, e.g. by
      * {@code createBean(HttpClient.class, url)}. The caller owns such a client and is expected to
@@ -579,6 +586,15 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
     }
 
     private ClientKey getClientKey(AnnotationMetadata metadata) {
+        ClientKey key = clientKeyCache.get(metadata);
+        if (key == null) {
+            key = computeClientKey(metadata);
+            clientKeyCache.put(metadata, key);
+        }
+        return key;
+    }
+
+    private ClientKey computeClientKey(AnnotationMetadata metadata) {
         HttpVersionSelection httpVersionSelection = HttpVersionSelection.forClientAnnotation(metadata);
         String clientId = metadata.stringValue(Client.class).orElse(null);
         String path = metadata.stringValue(Client.class, "path").orElse(null);
@@ -631,6 +647,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
         final Class<?> configurationClass;
         @Nullable
         final JsonFeatures jsonFeatures;
+        private final int hashCode;
 
         ClientKey(
                 @Nullable
@@ -651,6 +668,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             this.path = path;
             this.configurationClass = configurationClass;
             this.jsonFeatures = jsonFeatures;
+            this.hashCode = Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
         }
 
         @Override
@@ -672,7 +690,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
 
         @Override
         public int hashCode() {
-            return Objects.hash(httpVersion, clientId, filterAnnotations, path, configurationClass, jsonFeatures);
+            return hashCode;
         }
     }
 }
