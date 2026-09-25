@@ -15,6 +15,7 @@
  */
 package io.micronaut.http.server.netty.handler;
 
+import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.server.netty.DefaultHttpCompressionStrategy;
 import io.micronaut.http.server.netty.HttpCompressionStrategy;
@@ -49,14 +50,15 @@ import java.util.Iterator;
 import java.util.Objects;
 import java.util.Set;
 
-final class Compressor {
-    /**
-     * The compressor for the most recently requested strategy. The strategy is a server-wide
-     * singleton, so this lets all connections share one immutable compressor.
-     */
-    @Nullable
-    private static volatile Compressor shared;
-
+/**
+ * Response compressor for the HTTP server. It holds no per-connection state, so the server
+ * creates one instance with {@link #create(HttpCompressionStrategy)} and shares it between all
+ * of its connections.
+ *
+ * @since 5.3.0
+ */
+@Internal
+public final class Compressor {
     private final HttpCompressionStrategy strategy;
     @Nullable
     private final BrotliOptions brotliOptions;
@@ -96,19 +98,15 @@ final class Compressor {
     }
 
     /**
-     * Get a compressor for the given strategy, reusing the last one if it was built for the same
-     * strategy instance. A compressor holds no per-connection state.
+     * Create a compressor for the given strategy. The result holds no per-connection state and
+     * can be shared by all connections of a server.
      *
-     * @param strategy The enabled compression strategy
-     * @return The compressor
+     * @param strategy The compression strategy
+     * @return The compressor, or {@code null} if compression is disabled
      */
-    static Compressor forStrategy(HttpCompressionStrategy strategy) {
-        Compressor c = shared;
-        if (c == null || c.strategy != strategy) {
-            c = new Compressor(strategy);
-            shared = c;
-        }
-        return c;
+    @Nullable
+    public static Compressor create(HttpCompressionStrategy strategy) {
+        return strategy.isEnabled() ? new Compressor(strategy) : null;
     }
 
     @Nullable

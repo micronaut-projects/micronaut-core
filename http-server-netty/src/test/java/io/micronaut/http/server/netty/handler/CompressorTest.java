@@ -21,6 +21,8 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.EnumSet;
@@ -31,7 +33,9 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class CompressorTest {
@@ -326,10 +330,56 @@ class CompressorTest {
         session.discard();
     }
 
+    /**
+     * The compressor is owned by the server that creates it, so nothing may keep a strategy
+     * (and with it an application context) reachable in a static field.
+     */
     @Test
-    void compressorIsSharedPerStrategy() throws Exception {
-        DefaultHttpCompressionStrategy strategy = defaultStrategy(10);
-        assertSame(Compressor.forStrategy(strategy), Compressor.forStrategy(strategy));
+    void compressorHasNoStaticState() throws Exception {
+        for (Field field : Compressor.class.getDeclaredFields()) {
+            assertFalse(Modifier.isStatic(field.getModifiers()) && !field.isSynthetic(), "static field " + field);
+        }
+        DefaultHttpCompressionStrategy first = defaultStrategy(10);
+        DefaultHttpCompressionStrategy second = defaultStrategy(20);
+        Compressor a = Compressor.create(first);
+        Compressor b = Compressor.create(second);
+        assertNotSame(a, b);
+        assertNotSame(a, Compressor.create(first));
+        // each compressor applies its own strategy's threshold
+        ChannelHandlerContext ctx = context();
+        for (Compressor compressor : List.of(a, b)) {
+            HttpRequest request = new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/");
+            request.headers().add(HttpHeaderNames.ACCEPT_ENCODING, "gzip");
+            HttpResponse response = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK);
+            response.headers().add(HttpHeaderNames.CONTENT_TYPE, "text/plain");
+            Compressor.Session session = compressor.prepare(ctx, request, response, 15);
+            if (compressor == a) {
+                assertNotNull(session);
+                session.discard();
+            } else {
+                assertNull(session);
+            }
+        }
+    }
+
+    @Test
+    void disabledStrategyHasNoCompressor() {
+        assertNull(Compressor.create(new HttpCompressionStrategy() {
+            @Override
+            public boolean isEnabled() {
+                return false;
+            }
+
+            @Override
+            public boolean shouldCompress(HttpResponse response) {
+                return true;
+            }
+
+            @Override
+            public int getMaxZstdEncodeSize() {
+                return 1 << 20;
+            }
+        }));
     }
 
     private static Stream<Arguments> determineEncodingMatchesTheSplitBasedTokenizer() {

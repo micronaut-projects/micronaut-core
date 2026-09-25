@@ -170,11 +170,16 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
     }
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
-        if (compressionStrategy.isEnabled()) {
-            this.compressor = Compressor.forStrategy(compressionStrategy);
-        } else {
-            this.compressor = null;
-        }
+        setCompressor(Compressor.create(compressionStrategy));
+    }
+
+    /**
+     * Set the response compressor. The server shares one instance between its connections.
+     *
+     * @param compressor The compressor, or {@code null} to disable compression
+     */
+    public void setCompressor(@Nullable Compressor compressor) {
+        this.compressor = compressor;
     }
 
     public void setBodySizeLimits(BodySizeLimits bodySizeLimits) {

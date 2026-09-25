@@ -393,9 +393,17 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
         }
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
-            if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(Compressor.forStrategy(compressionStrategy));
-            }
+            return compressor(Compressor.create(compressionStrategy));
+        }
+
+        /**
+         * Set the response compressor. The server shares one instance between its connections.
+         *
+         * @param compressor The compressor, or {@code null} to disable compression
+         * @return This builder
+         */
+        public ConnectionHandlerBuilder compressor(@Nullable Compressor compressor) {
+            frameListener.compressor(compressor);
             return this;
         }
 
