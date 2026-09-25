@@ -394,7 +394,7 @@ public final class Http2ServerHandler extends MultiplexedServerHandler implement
 
         public ConnectionHandlerBuilder compressor(HttpCompressionStrategy compressionStrategy) {
             if (compressionStrategy.isEnabled()) {
-                frameListener.compressor(new Compressor(compressionStrategy));
+                frameListener.compressor(Compressor.forStrategy(compressionStrategy));
             }
             return this;
         }

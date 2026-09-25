@@ -50,6 +50,13 @@ import java.util.Objects;
 import java.util.Set;
 
 final class Compressor {
+    /**
+     * The compressor for the most recently requested strategy. The strategy is a server-wide
+     * singleton, so this lets all connections share one immutable compressor.
+     */
+    @Nullable
+    private static volatile Compressor shared;
+
     private final HttpCompressionStrategy strategy;
     @Nullable
     private final BrotliOptions brotliOptions;
@@ -88,6 +95,22 @@ final class Compressor {
         this.available = Collections.unmodifiableSet(algorithms);
     }
 
+    /**
+     * Get a compressor for the given strategy, reusing the last one if it was built for the same
+     * strategy instance. A compressor holds no per-connection state.
+     *
+     * @param strategy The enabled compression strategy
+     * @return The compressor
+     */
+    static Compressor forStrategy(HttpCompressionStrategy strategy) {
+        Compressor c = shared;
+        if (c == null || c.strategy != strategy) {
+            c = new Compressor(strategy);
+            shared = c;
+        }
+        return c;
+    }
+
     @Nullable
     Session prepare(ChannelHandlerContext ctx, HttpRequest request, HttpResponse response, long contentLength) {
         // from HttpContentEncoder: isPassthru
@@ -97,15 +120,16 @@ final class Compressor {
             response.protocolVersion() == HttpVersion.HTTP_1_0) {
             return null;
         }
-        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
-            return null;
-        }
         if (response.headers().contains(HttpHeaderNames.CONTENT_ENCODING)) {
             // already encoded
             return null;
         }
+        // check the request accepts a compression we can do before inspecting the content type
         Algorithm encoding = determineEncoding(request.headers().valueStringIterator(HttpHeaderNames.ACCEPT_ENCODING));
         if (encoding == null) {
+            return null;
+        }
+        if (strategy instanceof DefaultHttpCompressionStrategy def ? !def.shouldCompress(response, contentLength) : !strategy.shouldCompress(response)) {
             return null;
         }
         response.headers().add(HttpHeaderNames.CONTENT_ENCODING, encoding.contentEncoding);

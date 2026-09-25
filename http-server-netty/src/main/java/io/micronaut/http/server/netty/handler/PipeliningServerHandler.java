@@ -171,7 +171,7 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
     public void setCompressionStrategy(HttpCompressionStrategy compressionStrategy) {
         if (compressionStrategy.isEnabled()) {
-            this.compressor = new Compressor(compressionStrategy);
+            this.compressor = Compressor.forStrategy(compressionStrategy);
         } else {
             this.compressor = null;
         }
