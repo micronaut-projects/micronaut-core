@@ -5,9 +5,11 @@ import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
@@ -16,6 +18,9 @@ import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.SimpleChannelInboundHandler;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.codec.http2.DefaultHttp2DataFrame;
+import io.netty.handler.codec.http2.DefaultHttp2Headers;
+import io.netty.handler.codec.http2.DefaultHttp2HeadersFrame;
 import io.netty.handler.codec.http2.DefaultHttp2ResetFrame;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2FrameCodecBuilder;
@@ -28,7 +33,9 @@ import reactor.core.publisher.Mono;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -59,6 +66,21 @@ class Http2StreamResetTest {
         }
     }
 
+    @Test
+    void refusedStreamAfterTheHeadersCutsTheBody() throws Exception {
+        try (ResettingServer server = new ResettingServer(Http2Error.REFUSED_STREAM, true);
+             ApplicationContext ctx = start();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) Mono.from(client.exchange(HttpRequest.GET(server.uri()), null, null)).block()) {
+                Assertions.assertEquals(200, response.code());
+                ExecutionException failure = Assertions.assertThrows(ExecutionException.class, () -> response.byteBody().buffer().get(10, TimeUnit.SECONDS));
+                ResponseClosedException closed = Assertions.assertInstanceOf(ResponseClosedException.class, failure.getCause());
+                Assertions.assertTrue(closed.isHeadersReceived());
+                Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(closed));
+            }
+        }
+    }
+
     private static ApplicationContext start() {
         return ApplicationContext.run(Map.of(
             "micronaut.http.client.plaintext-mode", "h2c_prior_knowledge"
@@ -80,6 +102,15 @@ class Http2StreamResetTest {
         private final Channel channel;
 
         ResettingServer(Http2Error error) throws InterruptedException {
+            this(error, false);
+        }
+
+        /**
+         * @param error        The error code of the reset
+         * @param respondFirst Whether the response headers and part of the body are sent before
+         *                     the reset
+         */
+        ResettingServer(Http2Error error, boolean respondFirst) throws InterruptedException {
             channel = new ServerBootstrap()
                 .group(group)
                 .channel(NioServerSocketChannel.class)
@@ -94,6 +125,10 @@ class Http2StreamResetTest {
                                     stream.pipeline().addLast(new SimpleChannelInboundHandler<Http2HeadersFrame>() {
                                         @Override
                                         protected void channelRead0(ChannelHandlerContext ctx, Http2HeadersFrame headers) {
+                                            if (respondFirst) {
+                                                ctx.write(new DefaultHttp2HeadersFrame(new DefaultHttp2Headers().status("200")));
+                                                ctx.write(new DefaultHttp2DataFrame(Unpooled.copiedBuffer("partial", StandardCharsets.UTF_8)));
+                                            }
                                             ctx.writeAndFlush(new DefaultHttp2ResetFrame(error));
                                         }
                                     });
