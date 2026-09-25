@@ -230,7 +230,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 RawRequestOptions options = request.getAttribute(OPTIONS_ATTRIBUTE, RawRequestOptions.class).orElse(null);
                 // a raw client relays exchanges of different users, so it must not keep the cookies an upstream sets
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
-                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits)))
+                // the outcome is reported once the body ends: a response whose body is cut off is a failure
+                return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
+                        failure -> reportBodyEnd(target.instance(), responseInfo.statusCode(), failure))))
                     .onErrorMap(
                         e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
                         e -> {
@@ -245,7 +247,6 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
-                report(target.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
 
                 ByteBodyHttpResponse<?> response = ByteBodyHttpResponseWrapper.wrap(new BaseHttpResponseAdapter<CloseableByteBody, O>(netResponse, conversionService) {
                     @Override

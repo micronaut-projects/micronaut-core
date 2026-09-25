@@ -133,14 +133,20 @@ public class DefaultLoadBalancerResolver implements LoadBalancerResolver {
 
     @Nullable
     private LoadBalancer createLoadBalancerForServiceID(String serviceID) {
+        // the factories may be replaced by ones that override only the single-argument create:
+        // that is the one to call unless the service enables outlier detection, and even then
+        // the two-argument one only adds the detection to what the single-argument one returns
         OutlierDetectionConfiguration outlierDetection = beanContext.findBean(ServiceHttpClientConfiguration.class, Qualifiers.byName(serviceID))
             .map(ServiceHttpClientConfiguration::getOutlierDetection)
+            .filter(OutlierDetectionConfiguration::isEnabled)
             .orElse(null);
         if (serviceInstanceLists.containsKey(serviceID)) {
             ServiceInstanceList serviceInstanceList = serviceInstanceLists.get(serviceID);
-            return beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class).create(serviceInstanceList, outlierDetection);
+            ServiceInstanceListLoadBalancerFactory factory = beanContext.getBean(ServiceInstanceListLoadBalancerFactory.class);
+            return outlierDetection == null ? factory.create(serviceInstanceList) : factory.create(serviceInstanceList, outlierDetection);
         } else {
-            return beanContext.getBean(DiscoveryClientLoadBalancerFactory.class).create(serviceID, outlierDetection);
+            DiscoveryClientLoadBalancerFactory factory = beanContext.getBean(DiscoveryClientLoadBalancerFactory.class);
+            return outlierDetection == null ? factory.create(serviceID) : factory.create(serviceID, outlierDetection);
         }
     }
 }

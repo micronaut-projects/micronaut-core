@@ -46,11 +46,13 @@ public class DiscoveryClientLoadBalancerFactory {
      * @return The {@link LoadBalancer}
      */
     public LoadBalancer create(String serviceID) {
-        return create(serviceID, null);
+        return new DiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient);
     }
 
     /**
-     * Creates a {@link LoadBalancer} for the given service ID, with outlier detection.
+     * Creates a {@link LoadBalancer} for the given service ID, with outlier detection: the
+     * load balancer of {@link #create(String)}, which detects outliers when it is a round-robin
+     * one and the configuration enables it.
      *
      * @param serviceID        The service ID
      * @param outlierDetection The outlier detection configuration, or {@code null} for none
@@ -58,7 +60,7 @@ public class DiscoveryClientLoadBalancerFactory {
      * @since 5.3.0
      */
     public LoadBalancer create(String serviceID, @Nullable OutlierDetectionConfiguration outlierDetection) {
-        return new DiscoveryClientRoundRobinLoadBalancer(serviceID, discoveryClient, outlierDetection);
+        return AbstractRoundRobinLoadBalancer.withOutlierDetection(create(serviceID), outlierDetection);
     }
 
     /**

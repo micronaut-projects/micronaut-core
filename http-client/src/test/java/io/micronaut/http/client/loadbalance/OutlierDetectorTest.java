@@ -7,7 +7,12 @@ import org.junit.jupiter.api.Test;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 class OutlierDetectorTest {
@@ -113,6 +118,42 @@ class OutlierDetectorTest {
         Assertions.assertTrue(detector.isEjected(A));
         Assertions.assertFalse(detector.isEjected(B), "Ejecting B too would eject 2 of 3 instances");
         Assertions.assertEquals(List.of(B, C), detector.available(ALL));
+    }
+
+    @Test
+    void concurrentFailuresDoNotExceedTheMaximumShare() throws Exception {
+        // half of the instances may be ejected: every one failing at the same time must not eject more
+        int instances = 8;
+        List<ServiceInstance> all = new ArrayList<>();
+        for (int i = 0; i < instances; i++) {
+            all.add(ServiceInstance.of("svc", URI.create("http://instance-" + i + ":8080")));
+        }
+        ExecutorService executor = Executors.newFixedThreadPool(instances);
+        try {
+            for (int iteration = 0; iteration < 3000; iteration++) {
+                OutlierDetector detector = detector(1, 50);
+                detector.available(all);
+                // the threads reach the ejection decision together
+                CyclicBarrier barrier = new CyclicBarrier(instances);
+                List<Future<?>> reports = new ArrayList<>();
+                for (ServiceInstance instance : all) {
+                    reports.add(executor.submit(() -> {
+                        barrier.await();
+                        detector.report(instance, Outcome.CONNECT_FAILURE);
+                        return null;
+                    }));
+                }
+                for (Future<?> report : reports) {
+                    report.get(10, TimeUnit.SECONDS);
+                }
+                long ejected = all.stream().filter(detector::isEjected).count();
+                Assertions.assertTrue(ejected <= instances / 2, "In iteration " + iteration + ", " + ejected + " of " + instances + " instances are ejected, the maximum share is half");
+                Assertions.assertEquals(instances / 2, ejected, "The maximum share is ejected");
+                Assertions.assertEquals(instances / 2, detector.available(all).size());
+            }
+        } finally {
+            executor.shutdownNow();
+        }
     }
 
     @Test

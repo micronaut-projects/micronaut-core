@@ -33,7 +33,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     protected final AtomicInteger index = new AtomicInteger(0);
     @Nullable
-    private final OutlierDetector outlierDetector;
+    private volatile OutlierDetector outlierDetector;
 
     /**
      * A load balancer that ignores the reported outcomes.
@@ -49,6 +49,34 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
      * @since 5.3.0
      */
     protected AbstractRoundRobinLoadBalancer(@Nullable OutlierDetectionConfiguration outlierDetection) {
+        setOutlierDetection(outlierDetection);
+    }
+
+    /**
+     * Apply the outlier detection configuration of a service to a load balancer, if it is one
+     * that can detect outliers: a round-robin one. Any other load balancer is returned as it
+     * is, so that a custom load balancer keeps controlling the selection.
+     *
+     * @param loadBalancer     The load balancer
+     * @param outlierDetection The outlier detection configuration, or {@code null} for none
+     * @return The load balancer
+     * @since 5.3.0
+     */
+    public static LoadBalancer withOutlierDetection(LoadBalancer loadBalancer, @Nullable OutlierDetectionConfiguration outlierDetection) {
+        if (outlierDetection != null && outlierDetection.isEnabled() && loadBalancer instanceof AbstractRoundRobinLoadBalancer roundRobin) {
+            roundRobin.setOutlierDetection(outlierDetection);
+        }
+        return loadBalancer;
+    }
+
+    /**
+     * Stop selecting an instance that keeps failing, as configured, or ignore the reported
+     * outcomes with {@code null}. The ejection state starts over.
+     *
+     * @param outlierDetection The outlier detection configuration, or {@code null} for none
+     * @since 5.3.0
+     */
+    public void setOutlierDetection(@Nullable OutlierDetectionConfiguration outlierDetection) {
         this.outlierDetector = outlierDetection != null && outlierDetection.isEnabled() ? new OutlierDetector(outlierDetection) : null;
     }
 
@@ -68,6 +96,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
         List<ServiceInstance> availableServices = serviceInstances.stream()
             .filter(si -> si.getHealthStatus().equals(HealthStatus.UP))
             .collect(Collectors.toList());
+        OutlierDetector outlierDetector = this.outlierDetector;
         if (outlierDetector != null) {
             availableServices = outlierDetector.available(availableServices);
         }
@@ -87,6 +116,7 @@ public abstract class AbstractRoundRobinLoadBalancer implements LoadBalancer {
 
     @Override
     public void report(ServiceInstance serviceInstance, Outcome outcome) {
+        OutlierDetector outlierDetector = this.outlierDetector;
         if (outlierDetector != null) {
             outlierDetector.report(serviceInstance, outcome);
         }

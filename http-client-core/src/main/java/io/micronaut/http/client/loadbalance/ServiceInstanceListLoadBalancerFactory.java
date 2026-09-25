@@ -39,12 +39,13 @@ public class ServiceInstanceListLoadBalancerFactory {
      * @return The {@link LoadBalancer}
      */
     public LoadBalancer create(ServiceInstanceList serviceInstanceList) {
-        return create(serviceInstanceList, null);
+        return new ServiceInstanceListRoundRobinLoadBalancer(serviceInstanceList);
     }
 
     /**
      * Creates a {@link LoadBalancer} from the given {@link ServiceInstanceList}, with outlier
-     * detection.
+     * detection: the load balancer of {@link #create(ServiceInstanceList)}, which detects
+     * outliers when it is a round-robin one and the configuration enables it.
      *
      * @param serviceInstanceList The {@link ServiceInstanceList}
      * @param outlierDetection    The outlier detection configuration, or {@code null} for none
@@ -52,6 +53,6 @@ public class ServiceInstanceListLoadBalancerFactory {
      * @since 5.3.0
      */
     public LoadBalancer create(ServiceInstanceList serviceInstanceList, @Nullable OutlierDetectionConfiguration outlierDetection) {
-        return new ServiceInstanceListRoundRobinLoadBalancer(serviceInstanceList, outlierDetection);
+        return AbstractRoundRobinLoadBalancer.withOutlierDetection(create(serviceInstanceList), outlierDetection);
     }
 }

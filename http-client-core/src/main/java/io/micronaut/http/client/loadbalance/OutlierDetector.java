@@ -39,6 +39,12 @@ public final class OutlierDetector {
     private final OutlierDetectionConfiguration configuration;
     private final LongSupplier clock;
     private final Map<URI, State> states = new ConcurrentHashMap<>();
+    /**
+     * Guards the ejection of an instance: the count of the ejected instances and the decision
+     * to eject one more are one step, so that concurrent failures of different instances
+     * cannot eject more than the maximum share together.
+     */
+    private final Object ejectionLock = new Object();
     private volatile int instanceCount;
 
     /**
@@ -124,25 +130,33 @@ public final class OutlierDetector {
     /**
      * Eject an instance whose failures reached the threshold, unless that would eject more than
      * the maximum share of the instances; the counts are reset either way, so that the next
-     * ejection needs the threshold again.
+     * ejection needs the threshold again. Called with the lock of the instance, and takes the
+     * ejection lock after it: nothing takes them in the other order.
      */
     private void eject(State state, long now) {
         state.consecutiveFailures = 0;
         state.consecutiveServerErrors = 0;
-        int total = instanceCount;
-        if (total > 0) {
-            long ejected = states.values().stream().filter(s -> s != state && s.isEjected(now)).count();
-            if ((ejected + 1) * 100 > (long) configuration.getMaxEjectionPercent() * total) {
-                return;
+        synchronized (ejectionLock) {
+            int total = instanceCount;
+            if (total > 0) {
+                long ejected = 0;
+                for (State other : states.values()) {
+                    if (other != state && other.isEjected(now)) {
+                        ejected++;
+                    }
+                }
+                if ((ejected + 1) * 100 > (long) configuration.getMaxEjectionPercent() * total) {
+                    return;
+                }
             }
+            state.ejections++;
+            long duration = Math.min(
+                configuration.getBaseEjectionTime().toNanos() * state.ejections,
+                configuration.getMaxEjectionTime().toNanos());
+            state.ejectedUntil = now + duration;
+            state.ejected = true;
+            state.tried = false;
         }
-        state.ejections++;
-        long duration = Math.min(
-            configuration.getBaseEjectionTime().toNanos() * state.ejections,
-            configuration.getMaxEjectionTime().toNanos());
-        state.ejected = true;
-        state.ejectedUntil = now + duration;
-        state.tried = false;
     }
 
     /**
@@ -155,10 +169,12 @@ public final class OutlierDetector {
         /**
          * Whether the instance is ejected until {@link #ejectedUntil}. A flag, since the
          * clock is a {@code nanoTime}-like value that can be of any sign: only the difference
-         * of two of its values can be compared.
+         * of two of its values can be compared. Volatile, like {@link #ejectedUntil}: they are
+         * read without the lock of the instance by {@link #available} and by the ejection of
+         * another instance.
          */
-        boolean ejected;
-        long ejectedUntil;
+        volatile boolean ejected;
+        volatile long ejectedUntil;
         /**
          * Whether the instance was ejected and is tried again: a success then resets the
          * ejection multiplier.

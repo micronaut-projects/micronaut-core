@@ -523,6 +523,9 @@ abstract class AbstractJdkHttpClient {
         } else {
             if (e instanceof HttpTimeoutException) {
                 report(instance, LoadBalancer.Outcome.TIMEOUT);
+            } else if (ByteBodySubscriber.isTruncatedBody(e)) {
+                // a buffered response whose body was cut off
+                report(instance, LoadBalancer.Outcome.RESET);
             }
             result = new HttpClientException("Error sending request: " + e.getMessage(), e);
         }
@@ -542,6 +545,25 @@ abstract class AbstractJdkHttpClient {
         if (instance != null && loadBalancer != null) {
             loadBalancer.report(instance, outcome);
         }
+    }
+
+    /**
+     * Report the outcome of an exchange whose response body ended: the status when the body is
+     * complete, or the failure that cut it off.
+     *
+     * @param instance   The service instance the load balancer selected, or {@code null}
+     * @param statusCode The response status
+     * @param failure    The failure of the body, or {@code null} if it is complete
+     */
+    void reportBodyEnd(@Nullable ServiceInstance instance, int statusCode, @Nullable Throwable failure) {
+        if (failure == null) {
+            report(instance, statusCode >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
+        } else if (failure instanceof ResponseClosedException) {
+            report(instance, LoadBalancer.Outcome.RESET);
+        } else if (failure instanceof HttpTimeoutException) {
+            report(instance, LoadBalancer.Outcome.TIMEOUT);
+        }
+        // any other failure of the body says nothing about the instance, and is not a success either
     }
 
     /**
