@@ -14,6 +14,8 @@ import io.micronaut.http.MediaType
 import io.micronaut.http.MutableHttpResponse
 import io.micronaut.http.context.ServerHttpRequestContext
 import io.micronaut.http.context.ServerRequestContext
+import io.micronaut.http.filter.ReactiveFilterChainElement
+import io.micronaut.http.reactive.execution.ReactiveExecutionFlow
 import io.micronaut.http.server.exceptions.response.ErrorResponseProcessor
 import io.micronaut.scheduling.executor.ExecutorSelector
 import io.micronaut.web.router.RouteInfo
@@ -149,6 +151,41 @@ class RouteExecutorSpec extends Specification {
 
         then:
         result.get(5, TimeUnit.SECONDS).body() == "foo"
+    }
+
+    void "a filter subscribing to the response publisher keeps a context dependent route lazy"() {
+        given:
+        RouteExecutor routeExecutor = routeExecutor()
+        HttpRequest<?> request = HttpRequest.GET("/")
+        PropagatedContext propagatedContext = ReactiveFilterChainElement.mark(PropagatedContext.getOrEmpty())
+        Mono<String> body = Mono.deferContextual { ctx -> Mono.just(ctx.getOrDefault("tenant", "MISSING")) }
+
+        when:
+        ExecutionFlow<HttpResponse<?>> flow = routeExecutor.createResponseForBody(propagatedContext, request, body, monoRouteInfo(String), null)
+
+        then:
+        !(flow instanceof ImperativeExecutionFlow)
+        flow.tryComplete() == null
+
+        when: "the filter subscribes with its own context, like a continuation publisher with contextWrite"
+        HttpResponse<?> response = Mono.from(ReactiveExecutionFlow.toPublisher(flow)).contextWrite { ctx -> ctx.put("tenant", "acme") }.block()
+
+        then:
+        response.body() == "acme"
+    }
+
+    void "a Mono.just route stays imperative when a filter subscribes to the response publisher"() {
+        given:
+        RouteExecutor routeExecutor = routeExecutor()
+        HttpRequest<?> request = HttpRequest.GET("/")
+        PropagatedContext propagatedContext = ReactiveFilterChainElement.mark(PropagatedContext.getOrEmpty())
+
+        when:
+        ExecutionFlow<HttpResponse<?>> flow = routeExecutor.createResponseForBody(propagatedContext, request, Mono.just("foo"), monoRouteInfo(String), null)
+
+        then:
+        flow instanceof ImperativeExecutionFlow
+        flow.tryCompleteValue().body() == "foo"
     }
 
     void "the request is visible inside a Mono route body"() {
