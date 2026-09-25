@@ -72,6 +72,8 @@ import java.util.function.Predicate;
  * @param returnHandler       The return handler
  * @param isConditional       Is conditional filter
  * @param executor            The executor to run this filter on
+ * @param mutableRequestIndex The index of the {@link MutableHttpRequest} argument of a request
+ *                            filter without a continuation, or {@code -1}
  * @author Jonas Konrad
  * @author Denis Stepanov
  * @since 4.2.0
@@ -93,7 +95,8 @@ record MethodFilter<T>(FilterOrder order,
                        boolean filtersException,
                        FilterReturnHandler returnHandler,
                        boolean isConditional,
-                       @Nullable Executor executor) implements InternalHttpFilter {
+                       @Nullable Executor executor,
+                       int mutableRequestIndex) implements InternalHttpFilter {
 
     private static final Predicate<FilterMethodContext> FILTER_CONDITION_ALWAYS_TRUE = runner -> true;
     /**
@@ -127,6 +130,7 @@ record MethodFilter<T>(FilterOrder order,
         boolean skipOnError = isResponseFilter;
         boolean filtersException = false;
         ContinuationCreator continuationCreator = null;
+        int mutableRequestIndex = -1;
         for (int i = 0; i < arguments.length; i++) {
             Argument<?> argument = arguments[i];
             Class<?> argumentType = argument.getType();
@@ -136,10 +140,13 @@ record MethodFilter<T>(FilterOrder order,
                 // todo: only permit for server
                 fulfilled[i] = ctx -> (ServerHttpRequest<?>) ctx.request;
             } else if (argumentType.isAssignableFrom(MutableHttpRequest.class)) {
+                mutableRequestIndex = i;
                 fulfilled[i] = ctx -> {
                     HttpRequest<?> request = ctx.request;
                     if (!(ctx.request instanceof MutableHttpRequest<?>)) {
-                        request = ctx.request.mutate();
+                        // a mutable wrapper of a request that cannot be mutated, e.g. a wrapper
+                        // another filter continued with
+                        request = MutableServerRequest.mutable(ctx.request);
                     }
                     return request;
                 };
@@ -238,7 +245,8 @@ record MethodFilter<T>(FilterOrder order,
             filtersException,
             returnHandler,
             bean instanceof ConditionalFilter,
-            executor
+            executor,
+            isResponseFilter || continuationCreator != null ? -1 : mutableRequestIndex
         );
     }
 
@@ -389,6 +397,9 @@ record MethodFilter<T>(FilterOrder order,
                 returnValue = Objects.requireNonNull(method).invoke(bean, args);
             }
             ExecutionFlow<FilterContext> executionFlow = returnHandler.handle(filterContext, returnValue, methodContext.continuation);
+            if (mutableRequestIndex >= 0) {
+                executionFlow = keepChangedUri(filterContext, args[mutableRequestIndex], executionFlow);
+            }
             MutablePropagatedContext mutablePropagatedContext = methodContext.mutablePropagatedContext;
             if (!(executionFlow instanceof ImperativeExecutionFlow<FilterContext>)) {
                 // an asynchronous filter can change the context until its result completes
@@ -402,6 +413,48 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
+    }
+
+    /**
+     * A request filter that is given a {@link MutableHttpRequest} while the request is not
+     * mutable receives a mutable copy of it, see {@link HttpRequest#mutate()}. The headers of the
+     * copy are those of the request, but a new URI is the copy's own: when the filter changes
+     * the URI in place and does not return a request, the copy replaces the request, so that
+     * the new URI is used, e.g. to match the route after a pre-matching filter. The copy of a
+     * server request replaces it as a server request, see {@link MutableServerRequest}, so that the
+     * route still reads the bytes of the body. The URI of an asynchronous filter is compared when
+     * its result completes. Changes to the parameters or the body of the copy are not kept unless
+     * the filter returns the copy.
+     *
+     * @param filterContext The context the filter ran with
+     * @param argument      The mutable request the filter was given
+     * @param flow          The result of the filter
+     * @return The result, with the changed request if the filter changed the URI in place
+     */
+    private static ExecutionFlow<FilterContext> keepChangedUri(FilterContext filterContext, @Nullable Object argument, ExecutionFlow<FilterContext> flow) {
+        HttpRequest<?> request = filterContext.request();
+        if (!(argument instanceof MutableHttpRequest<?> copy) || argument == request) {
+            return flow;
+        }
+        if (flow.tryCompleteValue() != null && !isUriChanged(request, copy)) {
+            // a synchronous filter that did not change the URI
+            return flow;
+        }
+        // an asynchronous filter changes the URI until its result completes
+        return flow.map(result -> result.request() == request && result.response() == null && isUriChanged(request, copy)
+            ? result.withRequest(MutableServerRequest.of(request, copy))
+            : result);
+    }
+
+    /**
+     * Whether the filter changed the URI of the mutable copy of the request.
+     *
+     * @param request The request
+     * @param copy    Its mutable copy
+     * @return Whether the URI was changed
+     */
+    private static boolean isUriChanged(HttpRequest<?> request, MutableHttpRequest<?> copy) {
+        return !copy.getUri().equals(request.getUri());
     }
 
     private static FilterContext withMutatedContext(FilterContext filterContext,
