@@ -430,6 +430,96 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
     HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler);
 
     /**
+     * Route requests of any HTTP method, standard or custom, to one handler function: a route per
+     * standard method and one for the custom methods, which the returned route configures
+     * together.
+     *
+     * <ul>
+     *     <li>A route of a specific method that matches a request as closely as the route of any
+     *     method, e.g. {@code GET} on the same path, answers the request instead: the route of any
+     *     method answers the other methods.</li>
+     *     <li>The implicit {@code HEAD} route of a {@code GET} route on the same path answers a
+     *     {@code HEAD} request before it, and a CORS preflight request is answered by the CORS
+     *     filter as before: the route of any method answers the other {@code OPTIONS} and
+     *     {@code HEAD} requests.</li>
+     *     <li>A path the route matches is never answered with {@code 405}: every method has a
+     *     route. A more specific route of another method on a path the route matches does not
+     *     change that.</li>
+     * </ul>
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @see #handle(Set, String, RequestHandler)
+     * @since 5.3.0
+     */
+    HttpRouteSpec any(String uri, RequestHandler handler);
+
+    /**
+     * Route requests of any HTTP method to a handler function that receives the body decoded to
+     * the given type, see {@link #any(String, RequestHandler)} and
+     * {@link #handle(HttpMethod, String, Argument, BodyRequestHandler)}.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    <B> HttpRouteSpec any(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler);
+
+    /**
+     * Route requests of any HTTP method to a handler function that receives the body decoded to
+     * the given type, see {@link #any(String, Argument, BodyRequestHandler)}.
+     *
+     * @param uri      The URI template
+     * @param bodyType The body type
+     * @param handler  The handler
+     * @param <B>      The body type
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    default <B> HttpRouteSpec any(String uri, Class<B> bodyType, BodyRequestHandler<B> handler) {
+        return any(uri, Argument.of(Objects.requireNonNull(bodyType, "bodyType")), handler);
+    }
+
+    /**
+     * Route requests of any HTTP method with a submitted form to a handler function that receives
+     * the whole form, see {@link #any(String, RequestHandler)} and
+     * {@link #handleForm(HttpMethod, String, FormRequestHandler)}. The routes consume both form
+     * media types.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    HttpRouteSpec any(String uri, FormRequestHandler handler);
+
+    /**
+     * Route requests of any HTTP method to a handler function that completes the response later,
+     * see {@link #any(String, RequestHandler)}.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    HttpRouteSpec asyncAny(String uri, AsyncRequestHandler handler);
+
+    /**
+     * Route requests of any HTTP method to a handler function that reads the body and completes
+     * the response later, see {@link #any(String, RequestHandler)}.
+     *
+     * @param uri     The URI template
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler);
+
+    /**
      * Handle the exceptions of a type, and of its subtypes, with a handler function. Where it is
      * declared decides which routes it answers for:
      * <ul>
@@ -763,6 +853,17 @@ public sealed interface HttpRouteBuilder permits AbstractHttpRouteBuilder, HttpR
      */
     default HttpRouteSpec GET(RequestHandler handler) {
         return GET("/", handler);
+    }
+
+    /**
+     * Like {@link #any(String, RequestHandler)}, at the path of the scope, like a controller method mapped without a URI, e.g. {@code @Get}: the prefix of the {@link #path(String, Consumer) group}, or {@code /} at the root, under the context path.
+     *
+     * @param handler The handler
+     * @return The routes, to configure together
+     * @since 5.3.0
+     */
+    default HttpRouteSpec any(RequestHandler handler) {
+        return any("/", handler);
     }
 
     /**

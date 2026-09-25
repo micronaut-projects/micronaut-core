@@ -305,7 +305,8 @@ public final class RouteAssembly {
         List<DefaultUriRoute> getRoutes = new ArrayList<>();
         Set<UriMatchTemplate> headTemplates = new HashSet<>();
         for (UriRoute route : uriRoutes) {
-            if (route instanceof DefaultUriRoute defaultUriRoute) {
+            // a route of any method has its own HEAD route, and does not hide the implicit HEAD route of a GET route
+            if (route instanceof DefaultUriRoute defaultUriRoute && !defaultUriRoute.settings.isAnyMethod()) {
                 if (defaultUriRoute.httpMethod == HttpMethod.GET) {
                     getRoutes.add(defaultUriRoute);
                 } else if (defaultUriRoute.httpMethod == HttpMethod.HEAD) {
@@ -1309,7 +1310,8 @@ public final class RouteAssembly {
                 routeFilters(),
                 effectiveOrder(settings.getOrder(), group),
                 attributes(),
-                errorScope
+                errorScope,
+                settings.isAnyMethod()
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
