@@ -22,6 +22,7 @@ import io.micronaut.core.naming.NameUtils;
 import io.micronaut.core.util.StringUtils;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.processing.ProcessingException;
+import io.micronaut.inject.utils.JsonWriter;
 import io.micronaut.python.processing.beans.PythonBeanDefinitionProcessor;
 import io.micronaut.python.processing.util.PythonAnnotationTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
@@ -1153,28 +1154,17 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
 
         // three dict literals in JSON syntax, which both Python and the test readers parse
         StringBuilder source = new StringBuilder(JAVA_IMPORTS_MANIFEST_HEADER);
-        source.append("PACKAGES = {");
-        appendJsonEntries(source, packages, "    ");
-        source.append(packages.isEmpty() ? "}\n" : "\n}\n");
-        source.append("TYPES = {");
-        appendJsonEntries(source, types, "    ");
-        source.append(types.isEmpty() ? "}\n" : "\n}\n");
-        source.append("MEMBERS = {");
-        boolean firstModule = true;
+        source.append("PACKAGES = ").append(JsonWriter.indented("    ").value(packages)).append('\n');
+        source.append("TYPES = ").append(JsonWriter.indented("    ").value(types)).append('\n');
+        JsonWriter membersJson = JsonWriter.indented("    ").beginObject();
         for (Map.Entry<String, Map<String, String[]>> module : members.entrySet()) {
-            source.append(firstModule ? "\n    " : ",\n    ").append(jsonString(module.getKey())).append(": {");
-            boolean firstMember = true;
+            membersJson.name(module.getKey()).beginObject();
             for (Map.Entry<String, String[]> member : module.getValue().entrySet()) {
-                source.append(firstMember ? "\n        " : ",\n        ")
-                    .append(jsonString(member.getKey())).append(": [")
-                    .append(Arrays.stream(member.getValue()).map(PythonAnnotationProcessor::jsonString).collect(Collectors.joining(", ")))
-                    .append(']');
-                firstMember = false;
+                membersJson.name(member.getKey()).beginArray().values(Arrays.asList(member.getValue())).endArray();
             }
-            source.append("\n    }");
-            firstModule = false;
+            membersJson.endObject();
         }
-        source.append(members.isEmpty() ? "}\n" : "\n}\n");
+        source.append("MEMBERS = ").append(membersJson.endObject()).append('\n');
         String content = source.toString();
         writePythonToVfs(filesList, APPLICATION_SRC_PATH + JAVA_IMPORTS_MANIFEST_PREFIX + contentHash(content) + ".py", content, originatingElement);
     }
@@ -1272,18 +1262,6 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
         }
     }
 
-    private static void appendJsonEntries(StringBuilder json, Map<String, String> entries, String indent) {
-        boolean first = true;
-        for (Map.Entry<String, String> entry : entries.entrySet()) {
-            json.append(first ? "\n" : ",\n").append(indent).append(jsonString(entry.getKey())).append(": ").append(jsonString(entry.getValue()));
-            first = false;
-        }
-    }
-
-    private static String jsonString(String value) {
-        return '"' + value.replace("\\", "\\\\").replace("\"", "\\\"") + '"';
-    }
-
     /**
      * The top-level classes of a source the package initializer imports: all of them except those
      * another module's definition of the same generated Java type replaces (see {@link PythonEnvironment#shadowedTypes()}).
@@ -1308,7 +1286,7 @@ public class PythonAnnotationProcessor extends AbstractInjectAnnotationProcessor
     }
 
     private static @NotNull String toListOfString(List<String> allNames) {
-        return "[" + String.join(",", allNames.stream().map(n -> "\"" + n + "\"").toList()) + "]";
+        return new JsonWriter().beginArray().values(allNames).endArray().toString();
     }
 
     private static String toPythonImportName(String qualifiedName) {
