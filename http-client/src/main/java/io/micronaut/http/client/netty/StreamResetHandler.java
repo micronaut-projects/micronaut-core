@@ -23,12 +23,14 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.handler.codec.http2.Http2Error;
 import io.netty.handler.codec.http2.Http2ResetFrame;
+import io.netty.handler.codec.http2.Http2StreamChannel;
 
 /**
  * Reports a {@code RST_STREAM} of the server as an exception of the request on an HTTP/2 stream
  * channel, before the channel closes: a refused stream was not processed, so the request can be
  * sent again; any other reset may have been processed. The multiplex handler delivers reset
- * frames as user events, since they are not flow controlled.
+ * frames as user events, since they are not flow controlled. On an HTTP/3 request stream, the
+ * reset arrives as an exception, see {@link Http3StreamReset}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,5 +51,11 @@ final class StreamResetHandler extends ChannelInboundHandlerAdapter {
             return;
         }
         ctx.fireUserEventTriggered(evt);
+    }
+
+    @Override
+    public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
+        // a stream channel that is not an HTTP/2 one is an HTTP/3 one, whose classes are optional
+        ctx.fireExceptionCaught(ctx.channel() instanceof Http2StreamChannel ? cause : Http3StreamReset.map(cause));
     }
 }
