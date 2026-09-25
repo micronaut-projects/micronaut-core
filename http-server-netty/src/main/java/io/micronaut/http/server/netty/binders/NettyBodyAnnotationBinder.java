@@ -87,7 +87,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         FormCapableHttpRequest<?> nhr = source instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(source);
         if (nhr != null && nhr.hasFormBody()) {
             // skipClaimed=true because for unmatched binding, both this binder and PartUploadAnnotationBinder can be called on the same parameter
-            return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), nhr, bodyComponent, true);
+            return NettyPartUploadAnnotationBinder.bindPart(conversionService, context, formFactory.get(), source, nhr, bodyComponent, true);
         } else {
             return super.bindBodyPart(context, source, bodyComponent);
         }
