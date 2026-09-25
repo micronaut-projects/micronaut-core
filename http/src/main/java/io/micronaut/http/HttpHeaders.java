@@ -15,6 +15,7 @@
  */
 package io.micronaut.http;
 
+import io.micronaut.core.annotation.Experimental;
 import io.micronaut.core.convert.ConversionContext;
 import io.micronaut.core.type.Headers;
 import io.micronaut.http.util.HttpHeadersUtil;
@@ -347,6 +348,7 @@ public interface HttpHeaders extends Headers {
      *
      * @since 5.3.0
      */
+    @Experimental
     String KEEP_ALIVE = "Keep-Alive";
 
     /**
