@@ -26,6 +26,7 @@ import io.micronaut.core.type.GenericPlaceholder;
 import io.micronaut.core.type.ReturnType;
 import io.micronaut.core.type.UnsafeExecutable;
 import io.micronaut.core.util.ArgumentUtils;
+import io.micronaut.core.util.ImmutableStringIntMap;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.ExecutableMethod;
 import io.micronaut.inject.ExecutableMethodsDefinition;
@@ -433,6 +434,12 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @SuppressWarnings("java:S3077") // a Method is immutable: publishing the reference publishes it
         private volatile Method targetMethod;
 
+        // Built on first use and published without synchronization: ImmutableStringIntMap is filled in
+        // its constructor and only has final fields, so it is safe to share via a data race.
+        // Concurrent first calls may each build an equal table; that is harmless.
+        @Nullable
+        private ImmutableStringIntMap argumentIndex;
+
         private DispatchedExecutableMethod(AbstractExecutableMethodsDefinition dispatcher,
                                            int index,
                                            MethodReference methodReference,
@@ -502,6 +509,17 @@ public abstract class AbstractExecutableMethodsDefinition<T> implements Executab
         @Override
         public Argument<?>[] getArguments() {
             return arguments;
+        }
+
+        @Override
+        public int argumentIndexOf(String name) {
+            ArgumentUtils.requireNonNull("name", name);
+            ImmutableStringIntMap index = argumentIndex;
+            if (index == null) {
+                index = ImmutableStringIntMap.of(arguments, Argument::getName);
+                argumentIndex = index;
+            }
+            return index.get(name, -1);
         }
 
         @Override
