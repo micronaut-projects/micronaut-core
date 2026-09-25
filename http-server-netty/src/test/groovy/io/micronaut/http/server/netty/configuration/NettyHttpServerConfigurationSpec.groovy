@@ -199,6 +199,24 @@ class NettyHttpServerConfigurationSpec extends Specification {
         option == ChannelOption.WRITE_BUFFER_WATER_MARK
     }
 
+    void "test native channel option values are converted to the option type"() {
+        given:
+        ApplicationContext ctx = ApplicationContext.run()
+        ChannelOptionFactory epollChannelOptionFactory = new EpollChannelOptionFactory()
+        ChannelOptionFactory kqueueChannelOptionFactory = new KQueueChannelOptionFactory()
+        ChannelOptionFactory defaultChannelOptionFactory = new DefaultChannelOptionFactory()
+
+        expect:
+        epollChannelOptionFactory.convertValue(EpollChannelOption.TCP_QUICKACK, "true", ctx.environment) == Boolean.TRUE
+        epollChannelOptionFactory.convertValue(EpollChannelOption.TCP_KEEPIDLE, "10", ctx.environment) == 10
+        epollChannelOptionFactory.convertValue(ChannelOption.SO_BACKLOG, "128", ctx.environment) == 128
+        kqueueChannelOptionFactory.convertValue(KQueueChannelOption.SO_SNDLOWAT, "64", ctx.environment) == 64
+        defaultChannelOptionFactory.convertValue(ChannelOption.SO_KEEPALIVE, "true", ctx.environment) == Boolean.TRUE
+
+        cleanup:
+        ctx.close()
+    }
+
     @IgnoreIf({ ! Epoll.isAvailable() })
     void "test netty server use native transport configuration"() {
         given:
