@@ -23,8 +23,9 @@ import org.jspecify.annotations.Nullable;
  * the generic {@link HttpMessage#getAttributes() attribute map}, so that the per-request routing
  * does not have to allocate that map. The fields back the {@link HttpAttributes#ROUTE_MATCH},
  * {@link HttpAttributes#ROUTE_INFO} and {@link HttpAttributes#URI_TEMPLATE} attributes: the
- * message must keep those attributes and the fields consistent, e.g. by moving the fields into
- * the attribute map once {@link HttpMessage#getAttributes()} is called.
+ * message must keep those attributes and the fields consistent, e.g. by exposing the fields
+ * through a {@link RouteMetadataAttributes} attribute map, so that the fields stay the only
+ * store of the metadata.
  * <p>
  * The route match and route info are typed as {@link Object} because their types live in the
  * router module, which this module cannot depend on. The accessors in

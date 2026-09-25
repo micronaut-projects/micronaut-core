@@ -5,6 +5,10 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.RouteMetadataHolder;
 import org.junit.jupiter.api.Test;
 
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -12,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * The route metadata of a {@link NettyMutableHttpResponse} is stored in typed fields until the
- * attribute map is requested, and is then moved into the map.
+ * The route metadata of a {@link NettyMutableHttpResponse} is stored in typed fields only, which
+ * the attribute map, once requested, reads and writes through.
  */
 @SuppressWarnings("removal")
 class NettyMutableHttpResponseAttributesTest {
@@ -40,7 +44,7 @@ class NettyMutableHttpResponseAttributesTest {
         assertSame(routeInfo, response.getAttribute(HttpAttributes.ROUTE_INFO).orElseThrow());
         assertEquals("/foo/{id}", response.getAttribute(HttpAttributes.URI_TEMPLATE).orElseThrow());
 
-        // the map is created on demand and takes over the metadata
+        // the map is created on demand and exposes the metadata
         assertSame(routeMatch, response.getAttributes().getValue(HttpAttributes.ROUTE_MATCH.toString()));
         assertSame(routeInfo, response.getAttributes().get(HttpAttributes.ROUTE_INFO.toString(), Object.class).orElseThrow());
         assertEquals("/foo/{id}", response.getAttribute(HttpAttributes.URI_TEMPLATE, String.class).orElseThrow());
@@ -55,6 +59,17 @@ class NettyMutableHttpResponseAttributesTest {
         assertEquals("/bar", holder.getUriTemplateMetadata());
         response.setAttribute("other", "value");
         assertEquals("value", response.getAttribute("other").orElseThrow());
+        assertEquals(Set.of(HttpAttributes.ROUTE_INFO.toString(), HttpAttributes.URI_TEMPLATE.toString(), "other"),
+            response.getAttributes().names());
+        Map<String, Object> entries = new HashMap<>();
+        response.getAttributes().forEach(entries::put);
+        assertEquals(Map.of(HttpAttributes.ROUTE_INFO.toString(), routeInfo, HttpAttributes.URI_TEMPLATE.toString(), "/bar", "other", "value"), entries);
+        response.getAttributes().remove(HttpAttributes.ROUTE_INFO.toString());
+        assertNull(holder.getRouteInfoMetadata());
+        response.getAttributes().clear();
+        assertNull(holder.getUriTemplateMetadata());
+        assertTrue(response.getAttributes().isEmpty());
+        assertTrue(response.getAttribute("other").isEmpty());
     }
 
     @Test

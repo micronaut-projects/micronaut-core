@@ -13,17 +13,18 @@ import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
 
 /**
- * The first {@link NettyMutableHttpResponse#getAttributes()} call moves the route metadata into
- * the attribute map. Readers on other threads, through the typed accessors or
- * {@code getAttribute(name)}, must never observe the metadata as missing while that happens, and
- * only one map may ever be published. A typed setter racing with that first call must not have
- * its write lost to a map copied from the old field values.
+ * The route metadata of a {@link NettyMutableHttpResponse} is kept in typed fields that the attribute map reads
+ * and writes through. Readers on other threads, through the typed accessors or
+ * {@code getAttribute(name)}, must never observe the metadata as missing while the map is first
+ * created, and only one map may ever be published. A typed setter racing with that first call
+ * must not have its write lost, and once the setter has returned no reader may see the old value.
  */
 @SuppressWarnings("removal")
 class NettyMutableHttpResponseAttributesConcurrencyTest {
@@ -114,6 +115,61 @@ class NettyMutableHttpResponseAttributesConcurrencyTest {
                 }
             }
             assertEquals(0, lostWrites, "typed metadata writes lost to a concurrent materialisation");
+        } finally {
+            pool.shutdownNow();
+        }
+    }
+
+    @Test
+    void readsAfterASetterReturnedNeverSeeTheOldValue() throws Exception {
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
+            AtomicInteger staleReads = new AtomicInteger();
+            for (int round = 0; round < WRITE_ROUNDS; round++) {
+                NettyMutableHttpResponse<Object> response = new NettyMutableHttpResponse<>(ConversionService.SHARED);
+                response.setRouteMatchMetadata(new Object());
+                response.setRouteInfoMetadata(new Object());
+                response.setUriTemplateMetadata("/old");
+                Object routeMatch = new Object();
+                Object routeInfo = new Object();
+                AtomicBoolean written = new AtomicBoolean();
+
+                CyclicBarrier barrier = new CyclicBarrier(3);
+                Future<?> materialiser = pool.submit(() -> {
+                    barrier.await();
+                    return response.getAttributes();
+                });
+                Future<?> writer = pool.submit(() -> {
+                    barrier.await();
+                    response.setRouteMatchMetadata(routeMatch);
+                    response.setRouteInfoMetadata(routeInfo);
+                    response.setUriTemplateMetadata("/new");
+                    written.set(true);
+                    return null;
+                });
+                Future<?> reader = pool.submit(() -> {
+                    barrier.await();
+                    while (!written.get()) {
+                        Thread.onSpinWait();
+                    }
+                    // the setters have returned: no read may return the old values any more
+                    RouteMetadataHolder holder = response;
+                    if (holder.getRouteMatchMetadata() != routeMatch
+                        || response.getAttribute(HttpAttributes.ROUTE_MATCH).orElse(null) != routeMatch
+                        || response.getAttributes().getValue(HttpAttributes.ROUTE_MATCH.toString()) != routeMatch
+                        || holder.getRouteInfoMetadata() != routeInfo
+                        || response.getAttribute(HttpAttributes.ROUTE_INFO).orElse(null) != routeInfo
+                        || !"/new".equals(holder.getUriTemplateMetadata())
+                        || !"/new".equals(response.getAttribute(HttpAttributes.URI_TEMPLATE).orElse(null))) {
+                        staleReads.incrementAndGet();
+                    }
+                    return null;
+                });
+                materialiser.get();
+                writer.get();
+                reader.get();
+            }
+            assertEquals(0, staleReads.get(), "reads that saw route metadata older than a completed write");
         } finally {
             pool.shutdownNow();
         }
