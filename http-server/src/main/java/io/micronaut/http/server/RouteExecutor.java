@@ -74,6 +74,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Scheduler;
 import reactor.core.scheduler.Schedulers;
+import reactor.util.context.Context;
 import reactor.util.context.ContextView;
 
 import java.io.IOException;
@@ -117,6 +118,10 @@ public final class RouteExecutor {
     final ErrorResponseProcessor<?> errorResponseProcessor;
     private final ExecutorSelector executorSelector;
     private final Optional<CoroutineHelper> coroutineHelper;
+    /**
+     * Whether the Reactor context of the subscriber has to reach suspended routes as a {@code ReactorContext}.
+     */
+    private final boolean suspendedRoutesNeedReactorContext;
     private final ConversionService conversionService;
 
     /**
@@ -142,6 +147,7 @@ public final class RouteExecutor {
         this.errorResponseProcessor = errorResponseProcessor;
         this.executorSelector = executorSelector;
         this.coroutineHelper = beanContext.findBean(CoroutineHelper.class);
+        this.suspendedRoutesNeedReactorContext = coroutineHelper != null && coroutineHelper.isPresent() && coroutineHelper.get().isReactorContextPropagated();
         this.conversionService = beanContext.getConversionService();
     }
 
@@ -440,7 +446,11 @@ public final class RouteExecutor {
         ExecutorService executorService = routeInfo.getExecutor(serverConfiguration.getThreadSelection());
         ExecutionFlow<HttpResponse<?>> executeMethodResponseFlow;
         if (executorService != null) {
-            if (routeInfo.isSuspended()) {
+            if (routeInfo.isSuspended() && !suspendedRoutesNeedReactorContext) {
+                // without kotlinx-coroutines-reactor the Reactor context never reaches the coroutine, so the
+                // route is dispatched like a blocking one: the coroutine context keeps the continuation on the executor
+                executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, Context.empty(), executorService));
+            } else if (routeInfo.isSuspended()) {
                 // a suspend function runs synchronously on the caller until its first suspension point, and its
                 // coroutine context decides where it resumes, so honouring the executor needs both: applying it to
                 // the publisher moves the body off the event loop, and passing it on to the coroutine context keeps
@@ -465,7 +475,10 @@ public final class RouteExecutor {
                 executeMethodResponseFlow = ExecutionFlow.async(executorService, () -> executeRouteAndConvertBody(propagatedContext, routeMatch, request, false, null, null));
             }
         } else {
-            if (routeInfo.isSuspended()) {
+            if (routeInfo.isSuspended() && !suspendedRoutesNeedReactorContext) {
+                executeMethodResponseFlow = executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, Context.empty(), null);
+            } else if (routeInfo.isSuspended()) {
+                // the Reactor context of the subscriber becomes the coroutine's ReactorContext
                 executeMethodResponseFlow = ReactiveExecutionFlow.fromPublisher(Mono.deferContextual(contextView -> Mono.from(
                     ReactiveExecutionFlow.toPublisher(executeRouteAndConvertBody(propagatedContext, routeMatch, request, true, contextView, null))
                 )));
@@ -582,28 +595,29 @@ public final class RouteExecutor {
             if (supplier == null) {
                 return ExecutionFlow.error(new IllegalStateException("Missing coroutine continuation for suspended route"));
             }
-            Mono<MutableHttpResponse<?>> responsePublisher = Mono.fromCompletionStage(supplier)
-                .flatMap(obj -> {
-                    MutableHttpResponse<?> response;
-                    if (obj instanceof HttpResponse<?> httpResponse) {
-                        response = httpResponse.toMutableResponse();
-                        final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
-                        if (bodyArgument.isAsyncOrReactive()) {
-                            return Mono.from(ReactiveExecutionFlow.toPublisher(processPublisherBody(propagatedContext, request, response, routeInfo)));
-                        }
-                    } else {
-                        response = forStatus(routeInfo, null);
-                        if (!isKotlinFunctionReturnTypeUnit) {
-                            response = response.body(obj);
-                        }
+            boolean notFoundOnMissingBody = serverConfiguration.isNotFoundOnMissingBody();
+            // the result is wrapped so that an empty (null) result still reaches the transformer
+            CompletionStage<Optional<Object>> result = ((CompletableFuture<Object>) supplier.get()).thenApply(Optional::ofNullable);
+            return CompletableFutureExecutionFlow.just(result).flatMap(optional -> {
+                Object obj = optional.orElse(null);
+                if (obj == null) {
+                    return notFoundOnMissingBody ? ExecutionFlow.just(notFoundErrorResponse(request)) : ExecutionFlow.empty();
+                }
+                MutableHttpResponse<?> response;
+                if (obj instanceof HttpResponse<?> httpResponse) {
+                    response = httpResponse.toMutableResponse();
+                    final Argument<?> bodyArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
+                    if (bodyArgument.isAsyncOrReactive()) {
+                        return processPublisherBody(propagatedContext, request, response, routeInfo);
                     }
-                    return Mono.just(response);
-                });
-            if (serverConfiguration.isNotFoundOnMissingBody()) {
-                responsePublisher = responsePublisher
-                    .switchIfEmpty(Mono.fromCallable(() -> notFoundErrorResponse(request)));
-            }
-            return ReactiveExecutionFlow.fromPublisher(responsePublisher);
+                } else {
+                    response = forStatus(routeInfo, null);
+                    if (!isKotlinFunctionReturnTypeUnit) {
+                        response = response.body(obj);
+                    }
+                }
+                return ExecutionFlow.just(response);
+            });
         }
         Object suspendedBody = isKotlinFunctionReturnTypeUnit ? null : body;
         return fromImperativeExecute(propagatedContext, request, routeInfo, suspendedBody);
