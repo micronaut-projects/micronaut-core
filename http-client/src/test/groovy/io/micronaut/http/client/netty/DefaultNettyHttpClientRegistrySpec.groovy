@@ -4,6 +4,8 @@ import io.micronaut.context.ApplicationContext
 import io.micronaut.context.annotation.Requires
 import io.micronaut.context.event.BeanCreatedEvent
 import io.micronaut.context.event.BeanCreatedEventListener
+import io.micronaut.core.annotation.AnnotationMetadata
+import io.micronaut.core.annotation.AnnotationMetadataDelegate
 import io.micronaut.core.annotation.Introspected
 import io.micronaut.core.beans.BeanIntrospector
 import io.micronaut.http.annotation.Get
@@ -19,6 +21,39 @@ import spock.lang.Issue
 import spock.lang.Specification
 
 class DefaultNettyHttpClientRegistrySpec extends Specification {
+    def 'client key is computed once per annotation metadata instance'() {
+        given:
+        def ctx = ApplicationContext.run([
+                'micronaut.http.services.cached-key.url': 'https://micronaut.io'
+        ])
+        def registry = ctx.getBean(DefaultNettyHttpClientRegistry)
+        def metadata = new CountingMetadata(delegate: AnnotationMetadata.EMPTY_METADATA)
+
+        when:
+        def first = registry.getClient(metadata)
+        int lookups = metadata.lookups
+        def second = registry.getClient(metadata)
+
+        then:
+        lookups > 0
+        first.is(second)
+        metadata.lookups == lookups
+
+        cleanup:
+        ctx.close()
+    }
+
+    static class CountingMetadata implements AnnotationMetadataDelegate {
+        AnnotationMetadata delegate
+        int lookups
+
+        @Override
+        AnnotationMetadata getAnnotationMetadata() {
+            lookups++
+            return delegate
+        }
+    }
+
     @Issue('https://github.com/micronaut-projects/micronaut-core/issues/4829')
     def 'ChannelPipelineCustomizer invoked for declarative clients'() {
         given:
