@@ -566,27 +566,37 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (result.isError()) {
                 return errorResultPublisher(result);
             }
-            MutableHttpRequest<?> request = Objects.requireNonNull(result.request());
-            Class<?> argumentType = reactiveValueArgument.getType();
-            if (Void.class == argumentType || returnType.isVoid()) {
-                request.getHeaders().remove(HttpHeaders.ACCEPT);
-                return httpClient.retrieve(request, Argument.VOID, errorType);
-            } else {
-                if (HttpResponse.class.isAssignableFrom(argumentType)) {
-                    return httpClient.exchange(request, reactiveValueArgument, errorType);
-                }
-                return httpClient.retrieve(request, reactiveValueArgument, errorType);
-            }
+            return httpClientResponse(httpClient, Objects.requireNonNull(result.request()), returnType, errorType, reactiveValueArgument);
         });
     }
 
+    private Publisher<?> httpClientResponse(HttpClient httpClient,
+                                            MutableHttpRequest<?> request,
+                                            ReturnType<?> returnType,
+                                            Argument<?> errorType,
+                                            Argument<?> reactiveValueArgument) {
+        Class<?> argumentType = reactiveValueArgument.getType();
+        if (Void.class == argumentType || returnType.isVoid()) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+            return httpClient.retrieve(request, Argument.VOID, errorType);
+        }
+        if (HttpResponse.class.isAssignableFrom(argumentType)) {
+            return httpClient.exchange(request, reactiveValueArgument, errorType);
+        }
+        return httpClient.retrieve(request, reactiveValueArgument, errorType);
+    }
+
     /**
-     * The publisher emitted when binding the request failed: the error result computed by the
-     * binder, or nothing when there is none. The binding must not be repeated at this point.
+     * The publisher emitted when binding the request failed. The error result has already been
+     * computed by the binding step, so it is emitted as-is and the binding is never repeated.
+     * A reactive error result is flattened so the caller observes the failure of its publisher.
      */
     private static Publisher<?> errorResultPublisher(RequestBinderResult result) {
         Object errorResult = result.errorResult();
-        return errorResult == null ? Flux.empty() : Flux.just(errorResult);
+        if (errorResult instanceof Publisher<?> errorPublisher) {
+            return errorPublisher;
+        }
+        return Mono.justOrEmpty(errorResult);
     }
 
     private Publisher<?> httpClientResponseStreamingPublisher(StreamingHttpClient streamingHttpClient,
@@ -598,41 +608,43 @@ public class HttpClientIntroductionAdvice implements MethodInterceptor<Object, O
             if (result.isError()) {
                 return errorResultPublisher(result);
             }
-            MutableHttpRequest<?> request = Objects.requireNonNull(result.request());
-            Class<?> reactiveValueType = reactiveValueArgument.getType();
-            if (Void.class == reactiveValueType) {
-                request.getHeaders().remove(HttpHeaders.ACCEPT);
-            }
-
-            Collection<MediaType> acceptTypes = request.accept();
-
-            if (streamingHttpClient instanceof SseClient sseClient && acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
-                if (reactiveValueArgument.getType() == Event.class) {
-                    return sseClient.eventStream(
-                        request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
-                    );
-                }
-                return Publishers.map(sseClient.eventStream(request, reactiveValueArgument, errorType), Event::getData);
-            } else {
-                if (isJsonParsedMediaType(acceptTypes)) {
-                    return streamingHttpClient.jsonStream(request, reactiveValueArgument, errorType);
-                } else {
-                    Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request, errorType);
-                    if (reactiveValueType == ByteBuffer.class) {
-                        return byteBufferPublisher;
-                    } else {
-                        if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
-                            // It would be nice if we could capture the TypeConverter here
-                            return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
-                        } else {
-                            return Flux.error(new ConfigurationException("Cannot create the generated HTTP client's " +
-                                "required return type, since no TypeConverter from ByteBuffer to " +
-                                reactiveValueType + " is registered"));
-                        }
-                    }
-                }
-            }
+            return httpClientStreamingResponse(streamingHttpClient, Objects.requireNonNull(result.request()), errorType, reactiveValueArgument);
         });
+    }
+
+    private Publisher<?> httpClientStreamingResponse(StreamingHttpClient streamingHttpClient,
+                                                     MutableHttpRequest<?> request,
+                                                     Argument<?> errorType,
+                                                     Argument<?> reactiveValueArgument) {
+        Class<?> reactiveValueType = reactiveValueArgument.getType();
+        if (Void.class == reactiveValueType) {
+            request.getHeaders().remove(HttpHeaders.ACCEPT);
+        }
+
+        Collection<MediaType> acceptTypes = request.accept();
+
+        if (streamingHttpClient instanceof SseClient sseClient && acceptTypes.contains(MediaType.TEXT_EVENT_STREAM_TYPE)) {
+            if (reactiveValueType == Event.class) {
+                return sseClient.eventStream(
+                    request, reactiveValueArgument.getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT), errorType
+                );
+            }
+            return Publishers.map(sseClient.eventStream(request, reactiveValueArgument, errorType), Event::getData);
+        }
+        if (isJsonParsedMediaType(acceptTypes)) {
+            return streamingHttpClient.jsonStream(request, reactiveValueArgument, errorType);
+        }
+        Publisher<ByteBuffer<?>> byteBufferPublisher = streamingHttpClient.dataStream(request, errorType);
+        if (reactiveValueType == ByteBuffer.class) {
+            return byteBufferPublisher;
+        }
+        if (conversionService.canConvert(ByteBuffer.class, reactiveValueType)) {
+            // It would be nice if we could capture the TypeConverter here
+            return Publishers.map(byteBufferPublisher, value -> conversionService.convert(value, reactiveValueType).get());
+        }
+        return Flux.error(new ConfigurationException("Cannot create the generated HTTP client's " +
+            "required return type, since no TypeConverter from ByteBuffer to " +
+            reactiveValueType + " is registered"));
     }
 
     private CompletionStage<?> httpClientResponseStage(AsyncHttpClient asyncHttpClient,
