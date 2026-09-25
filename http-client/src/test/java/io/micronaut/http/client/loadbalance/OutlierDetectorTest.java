@@ -157,6 +157,28 @@ class OutlierDetectorTest {
     }
 
     @Test
+    void anInstanceThatLeftDoesNotTakeAnEjectionPlace() {
+        OutlierDetector detector = detector(1, 50);
+        List<ServiceInstance> before = List.of(A, B);
+        detector.available(before);
+        detector.report(A, Outcome.CONNECT_FAILURE);
+        Assertions.assertTrue(detector.isEjected(A));
+
+        // discovery replaces A with C while A is still ejected: of B and C, one may be ejected
+        List<ServiceInstance> after = List.of(B, C);
+        Assertions.assertEquals(after, detector.available(after));
+        detector.report(B, Outcome.CONNECT_FAILURE);
+        Assertions.assertTrue(detector.isEjected(B), "A left, so it does not count against the maximum share");
+        Assertions.assertEquals(List.of(C), detector.available(after));
+
+        // a late report for A, which left, is not counted against the instances that are members
+        detector.report(A, Outcome.CONNECT_FAILURE);
+        detector.report(C, Outcome.CONNECT_FAILURE);
+        Assertions.assertFalse(detector.isEjected(C), "Ejecting C too would eject both members");
+        Assertions.assertEquals(List.of(C), detector.available(after));
+    }
+
+    @Test
     void everyInstanceEjectedMeansNoneIs() {
         OutlierDetector detector = detector(1, 100);
         detector.available(ALL);

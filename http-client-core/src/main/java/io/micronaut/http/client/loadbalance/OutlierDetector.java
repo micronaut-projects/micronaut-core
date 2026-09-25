@@ -21,9 +21,11 @@ import io.micronaut.http.client.LoadBalancer;
 
 import java.net.URI;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.LongSupplier;
 
@@ -45,7 +47,11 @@ public final class OutlierDetector {
      * cannot eject more than the maximum share together.
      */
     private final Object ejectionLock = new Object();
-    private volatile int instanceCount;
+    /**
+     * The URIs of the instances of the last selection: the maximum share of ejected instances
+     * is a share of these, and only these are counted as ejected.
+     */
+    private volatile Set<URI> members = Set.of();
 
     /**
      * @param configuration The configuration
@@ -71,7 +77,7 @@ public final class OutlierDetector {
      * @return The instances to select among
      */
     public List<ServiceInstance> available(List<ServiceInstance> instances) {
-        instanceCount = instances.size();
+        updateMembers(instances);
         if (states.isEmpty()) {
             return instances;
         }
@@ -84,6 +90,34 @@ public final class OutlierDetector {
             }
         }
         return available.isEmpty() ? instances : available;
+    }
+
+    /**
+     * Record the instances of a selection when they changed, and forget the state of the
+     * instances that left: an instance that discovery removed must not take a place in the
+     * maximum share of ejected instances. A late report for such an instance creates a state
+     * again, which is not counted until the instance is a member again.
+     */
+    private void updateMembers(List<ServiceInstance> instances) {
+        Set<URI> current = members;
+        if (current.size() == instances.size()) {
+            boolean same = true;
+            for (ServiceInstance instance : instances) {
+                if (!current.contains(instance.getURI())) {
+                    same = false;
+                    break;
+                }
+            }
+            if (same) {
+                return;
+            }
+        }
+        Set<URI> uris = new HashSet<>();
+        for (ServiceInstance instance : instances) {
+            uris.add(instance.getURI());
+        }
+        members = uris;
+        states.keySet().retainAll(uris);
     }
 
     /**
@@ -137,11 +171,13 @@ public final class OutlierDetector {
         state.consecutiveFailures = 0;
         state.consecutiveServerErrors = 0;
         synchronized (ejectionLock) {
-            int total = instanceCount;
+            Set<URI> current = members;
+            int total = current.size();
             if (total > 0) {
                 long ejected = 0;
-                for (State other : states.values()) {
-                    if (other != state && other.isEjected(now)) {
+                for (URI uri : current) {
+                    State other = states.get(uri);
+                    if (other != null && other != state && other.isEjected(now)) {
                         ejected++;
                     }
                 }
