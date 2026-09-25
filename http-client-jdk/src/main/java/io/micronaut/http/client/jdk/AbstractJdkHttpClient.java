@@ -80,7 +80,6 @@ import java.net.http.HttpRequest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -434,18 +433,41 @@ abstract class AbstractJdkHttpClient {
         }
         ServiceInstance instance = target.instance();
         if (filtered.getScheme() != null) {
-            URI selected = target.uri();
-            boolean sameServer = filtered.getScheme().equalsIgnoreCase(selected.getScheme())
-                && Objects.equals(filtered.getRawAuthority(), selected.getRawAuthority());
-            return Mono.just(new ResolvedTarget(filtered, sameServer ? instance : null));
+            return Mono.just(new ResolvedTarget(filtered, sameServer(filtered, target.uri()) ? instance : null));
         }
         if (instance == null) {
             return resolveTarget(request);
         }
+        return Mono.fromCallable(() -> new ResolvedTarget(resolveAgainst(instance, filtered), instance));
+    }
+
+    /**
+     * @return Whether both URIs name the same server: scheme and host ignoring case, and port,
+     * the default port of the scheme when there is none
+     */
+    static boolean sameServer(URI a, URI b) {
+        return a.getScheme().equalsIgnoreCase(b.getScheme())
+            && a.getHost() != null && a.getHost().equalsIgnoreCase(b.getHost())
+            && effectivePort(a) == effectivePort(b);
+    }
+
+    private static int effectivePort(URI uri) {
+        if (uri.getPort() != -1) {
+            return uri.getPort();
+        }
+        return "https".equalsIgnoreCase(uri.getScheme()) ? 443 : 80;
+    }
+
+    /**
+     * @param instance   The service instance
+     * @param requestUri The relative request URI
+     * @return The request URI resolved against the instance, with the context path of the client
+     */
+    private URI resolveAgainst(ServiceInstance instance, URI requestUri) {
         try {
-            return Mono.just(new ResolvedTarget(instance.resolve(ContextPathUtils.prepend(filtered, contextPath)), instance));
+            return instance.resolve(ContextPathUtils.prepend(requestUri, contextPath));
         } catch (URISyntaxException e) {
-            return Mono.error(populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration));
+            throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
         }
     }
 
@@ -469,11 +491,7 @@ abstract class AbstractJdkHttpClient {
                     mutableRequest.getHeaders().auth(authInfo.get());
                 }
 
-                try {
-                    return new ResolvedTarget(server.resolve(ContextPathUtils.prepend(requestURI, contextPath)), server);
-                } catch (URISyntaxException e) {
-                    throw populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration);
-                }
+                return new ResolvedTarget(resolveAgainst(server, requestURI), server);
             }
         );
     }
