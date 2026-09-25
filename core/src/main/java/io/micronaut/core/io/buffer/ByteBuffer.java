@@ -277,10 +277,12 @@ public interface ByteBuffer<T> {
     String toString(Charset charset);
 
     /**
-     * Find the index of the first occurrence of the given byte.
+     * Find the index of the first occurrence of the given byte, searching from the
+     * {@link #readerIndex() reader index}. The returned index is absolute (not relative to the
+     * reader index), so it can be passed directly to {@link #getByte(int)}.
      *
      * @param b The byte to find
-     * @return The index of the byte
+     * @return The absolute index of the byte, or {@code -1} if it was not found
      */
     int indexOf(byte b);
 
