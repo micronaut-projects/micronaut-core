@@ -20,7 +20,7 @@ import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
 import io.micronaut.core.convert.ConversionError;
 import io.micronaut.core.convert.ConversionService;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
+import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
@@ -29,15 +29,13 @@ import io.micronaut.http.bind.binders.AnnotatedRequestArgumentBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FirstElementFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Bind values annotated with {@link Part}.
@@ -88,9 +86,8 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();
         }
-        CompletableFuture<Optional<T>> completableFuture = Mono.from(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
-            .flatMap(rff -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.completePart(nettyRequest, rff))))
-            .map(d -> {
+        ExecutionFlow<Optional<T>> flow = FirstElementFlow.first(completer.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, context.getArgument())))
+            .flatMap(rff -> formFactory.completePart(nettyRequest, rff).map(d -> {
                 boolean skipClose = false;
                 try {
                     Optional<T> converted = conversionService.convert(d, context);
@@ -103,15 +100,15 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
                         d.closeAsync(formFactory.getDiskWriteExecutor());
                     }
                 }
-            })
-            .toFuture();
-        BasicHttpAttributes.addRouteWaitsFor(nettyRequest, CompletableFutureExecutionFlow.just(completableFuture));
+            }));
+        FirstElementFlow.Settled<Optional<T>> settled = FirstElementFlow.settle(flow);
+        BasicHttpAttributes.addRouteWaitsFor(nettyRequest, settled.flow());
 
         return new PendingRequestBindingResult<>() {
 
             @Override
             public boolean isPending() {
-                return !completableFuture.isDone();
+                return !settled.isDone();
             }
 
             @Override
@@ -121,13 +118,8 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
 
             @Override
             public Optional<T> getValue() {
-                Optional<T> res = completableFuture.getNow(Optional.empty());
-                //noinspection OptionalAssignedToNull
-                if (res == null) {
-                    // tricky: If the Mono completes without an element, the future will return null here.
-                    res = Optional.empty();
-                }
-                return res;
+                // an empty flow (no such part) yields no value
+                return settled.valueNow().flatMap(r -> r);
             }
         };
     }

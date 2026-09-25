@@ -19,21 +19,18 @@ import io.micronaut.context.BeanProvider;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.bind.annotation.Bindable;
 import io.micronaut.core.convert.ArgumentConversionContext;
-import io.micronaut.core.execution.CompletableFutureExecutionFlow;
 import io.micronaut.core.execution.ExecutionFlow;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.TypedRequestArgumentBinder;
 import io.micronaut.http.multipart.CompletedFileUpload;
-import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.multipart.FirstElementFlow;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
-import reactor.core.publisher.Mono;
 
 import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 /**
  * Binds {@link CompletedFileUpload}.
@@ -64,22 +61,23 @@ final class NettyCompletedFileUploadBinder implements TypedRequestArgumentBinder
 
         FormRouteCompleter frc = formFactory.get().getOrCreateCompleter(request);
         // we implicitly just use the first field of this name.
-        CompletableFuture<CompletedFileUpload> completableFuture = Mono.from(frc.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, argument)))
-            .flatMap(raw -> Mono.from(ReactiveExecutionFlow.toPublisher(formFactory.get().completeFileUpload(request, raw))))
-            .toFuture();
+        ExecutionFlow<CompletedFileUpload> flow = FirstElementFlow.first(frc.subscribeField(inputName, new FormRouteCompleter.SubscriptionMetadata(FormRouteCompleter.SubscriptionMode.WAITS_FOR_FULL, argument)))
+            .flatMap(raw -> formFactory.get().completeFileUpload(request, raw));
 
-        BasicHttpAttributes.addRouteWaitsFor(request, CompletableFutureExecutionFlow.just(completableFuture).onErrorResume(t -> ExecutionFlow.empty()));
+        FirstElementFlow.Settled<CompletedFileUpload> settled = FirstElementFlow.settle(flow);
+
+        BasicHttpAttributes.addRouteWaitsFor(request, settled.flow().onErrorResume(t -> ExecutionFlow.empty()));
 
         return new PendingRequestBindingResult<>() {
 
             @Override
             public boolean isPending() {
-                return !completableFuture.isDone();
+                return !settled.isDone();
             }
 
             @Override
             public Optional<CompletedFileUpload> getValue() {
-                return Optional.ofNullable(completableFuture.getNow(null));
+                return settled.valueNow();
             }
         };
     }
