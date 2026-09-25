@@ -30,6 +30,7 @@ import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
+import io.micronaut.http.server.binding.FormBinding;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.multipart.FormRouteCompleter;
 import io.micronaut.http.server.netty.NettyHttpRequest;
@@ -66,9 +67,19 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
     @Override
     public BindingResult<T> bind(ArgumentConversionContext<T> context, HttpRequest<?> request) {
         // the request itself, or e.g. the mutable view of the request that a filter continued with
+        Argument<T> bound = context.getArgument();
+        BindingResult<T> replaced = FormBinding.bindReplaced(context, request, conversionService, bound.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(bound.getName()));
+        if (replaced != null) {
+            // a filter set the body: the form it set, never the bytes of the request
+            return replaced;
+        }
         FormCapableHttpRequest<?> nettyRequest = request instanceof FormCapableHttpRequest<?> formRequest ? formRequest : NettyHttpRequest.findBodyRequest(request);
         if (nettyRequest == null || !nettyRequest.hasFormBody()) {
             return BindingResult.unsatisfied();
+        }
+        if (FormBinding.isBound(context.getArgument())) {
+            // FileUpload, List<FileUpload>, FormPart and their Optional
+            return FormBinding.bind(context, request, nettyRequest, formFactory.get(), conversionService);
         }
         if (completedFileUploadBinder.matches(context.getArgument().getType())) {
             return completedFileUploadBinder.bind((ArgumentConversionContext) context, request);
@@ -80,10 +91,15 @@ final class NettyPartUploadAnnotationBinder<T> implements AnnotatedRequestArgume
         Argument<T> argument = context.getArgument();
         String inputName = argument.getAnnotationMetadata().stringValue(Bindable.NAME).orElse(argument.getName());
 
-        return bindPart(conversionService, context, formFactory.get(), nettyRequest, inputName, false);
+        return bindPart(conversionService, context, formFactory.get(), request, nettyRequest, inputName, false);
     }
 
-    static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, FormFactory formFactory, FormCapableHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
+    static <T> BindingResult<T> bindPart(ConversionService conversionService, ArgumentConversionContext<T> context, FormFactory formFactory, HttpRequest<?> source, FormCapableHttpRequest<?> nettyRequest, String inputName, boolean skipClaimed) {
+        BindingResult<T> fromForm = FormBinding.bindField(conversionService, context, source, nettyRequest, formFactory, inputName);
+        if (fromForm != null) {
+            // the form is read whole by a FormData or FormParts argument of the route
+            return fromForm;
+        }
         FormRouteCompleter completer = formFactory.getOrCreateCompleter(nettyRequest);
         if (skipClaimed && completer.isClaimed(inputName)) {
             return BindingResult.unsatisfied();

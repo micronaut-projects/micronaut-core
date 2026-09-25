@@ -81,7 +81,12 @@ public final class NettyJsonHandler<T> implements MessageBodyHandler<T>, Chunked
 
     @Override
     public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor();
+        return readChunked(type, mediaType, httpHeaders, input, Long.MAX_VALUE);
+    }
+
+    @Override
+    public Publisher<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         if (Iterable.class.isAssignableFrom(type.getType())) {
             // Publisher<List<T>> is parsed as a single item of type List
             processor.counter.noTokenization();
