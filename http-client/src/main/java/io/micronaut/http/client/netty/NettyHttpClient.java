@@ -776,7 +776,8 @@ final class NettyHttpClient implements
         // if a connection is available immediately, we can use its executor for the timeout
         // instead of a random executor for the whole group
         AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
-        // whether the final response arrived, to tell a request timeout while its body is read
+        // whether a response arrived whose body is still read, to tell a request timeout while
+        // the body is read from one before the response; cleared once the body ended
         AtomicBoolean headersReceived = new AtomicBoolean();
         ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
@@ -790,8 +791,14 @@ final class NettyHttpClient implements
                 (req, resp) -> {
                     headersReceived.set(true);
                     return InternalByteBody.bufferFlow(resp.byteBody())
-                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                        .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av));
+                        .onErrorResume(t -> {
+                            headersReceived.set(false);
+                            return ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t));
+                        })
+                        .flatMap(av -> {
+                            headersReceived.set(false);
+                            return handleExchangeResponse(bodyType, errorType, resp, av);
+                        });
                 }
             ).map(r -> (HttpResponse<O>) r);
         });
