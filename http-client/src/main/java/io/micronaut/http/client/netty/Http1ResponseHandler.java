@@ -23,6 +23,7 @@ import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
+import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
 import io.netty.buffer.ByteBuf;
@@ -104,13 +105,21 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
 
     /**
      * The failure of a body whose response arrived: a read timeout says so, so that it is not
-     * taken for a timeout while the response was awaited.
+     * taken for a timeout while the response was awaited, and a stream reset that claims the
+     * request was not processed (HTTP/2 {@code REFUSED_STREAM}, HTTP/3
+     * {@code H3_REQUEST_REJECTED}) is a body cut off, since the server did respond.
      *
      * @param cause The failure while the body was read
      * @return The failure of the body
      */
     private static Throwable bodyFailure(Throwable cause) {
-        return cause instanceof io.netty.handler.timeout.ReadTimeoutException ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : cause;
+        if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
+            return ReadTimeoutException.BODY_TIMEOUT_EXCEPTION;
+        }
+        if (cause instanceof UnprocessedRequestException) {
+            return new ResponseClosedException("Stream reset by the server after the response headers", true).initCause(cause);
+        }
+        return cause;
     }
 
     /**

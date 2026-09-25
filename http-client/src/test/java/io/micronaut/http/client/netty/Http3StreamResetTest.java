@@ -20,9 +20,11 @@ import io.micronaut.http.ByteBodyHttpResponse;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.client.RawHttpClient;
+import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.StreamResetException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -31,6 +33,8 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.MultiThreadIoEventLoopGroup;
 import io.netty.channel.nio.NioIoHandler;
 import io.netty.channel.socket.nio.NioDatagramChannel;
+import io.netty.handler.codec.http3.DefaultHttp3DataFrame;
+import io.netty.handler.codec.http3.DefaultHttp3HeadersFrame;
 import io.netty.handler.codec.http3.Http3;
 import io.netty.handler.codec.http3.Http3DataFrame;
 import io.netty.handler.codec.http3.Http3ErrorCode;
@@ -51,8 +55,10 @@ import reactor.core.publisher.Mono;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Map;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -85,6 +91,21 @@ class Http3StreamResetTest {
         }
     }
 
+    @Test
+    void rejectedRequestAfterTheHeadersCutsTheBody() throws Exception {
+        try (ResettingServer server = new ResettingServer(Http3ErrorCode.H3_REQUEST_REJECTED.code(), true);
+             ApplicationContext ctx = start();
+             RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) Mono.from(client.exchange(HttpRequest.GET(server.uri()), null, null)).block(Duration.ofSeconds(10))) {
+                Assertions.assertEquals(200, response.code());
+                ExecutionException failure = Assertions.assertThrows(ExecutionException.class, () -> response.byteBody().buffer().get(10, TimeUnit.SECONDS));
+                ResponseClosedException closed = Assertions.assertInstanceOf(ResponseClosedException.class, failure.getCause());
+                Assertions.assertTrue(closed.isHeadersReceived());
+                Assertions.assertFalse(UnprocessedRequestException.isUnprocessed(closed));
+            }
+        }
+    }
+
     private static ApplicationContext start() {
         return ApplicationContext.run(Map.of(
             "micronaut.http.client.alpn-modes", "h3",
@@ -108,6 +129,15 @@ class Http3StreamResetTest {
         private final Channel channel;
 
         ResettingServer(int errorCode) throws Exception {
+            this(errorCode, false);
+        }
+
+        /**
+         * @param errorCode    The error code of the reset
+         * @param respondFirst Whether the response headers and part of the body are sent, and
+         *                     have arrived, before the reset
+         */
+        ResettingServer(int errorCode, boolean respondFirst) throws Exception {
             SelfSignedCertificate certificate = new SelfSignedCertificate();
             QuicSslContext sslContext = QuicSslContextBuilder.forServer(certificate.key(), null, certificate.cert())
                 .applicationProtocols(Http3.supportedApplicationProtocols())
@@ -131,8 +161,20 @@ class Http3StreamResetTest {
                                     protected void channelRead(ChannelHandlerContext ctx, Http3HeadersFrame frame) {
                                         ReferenceCountUtil.release(frame);
                                         QuicStreamChannel requestStream = (QuicStreamChannel) ctx.channel();
-                                        requestStream.shutdownInput(errorCode);
-                                        requestStream.shutdownOutput(errorCode);
+                                        if (!respondFirst) {
+                                            requestStream.shutdownInput(errorCode);
+                                            requestStream.shutdownOutput(errorCode);
+                                            return;
+                                        }
+                                        DefaultHttp3HeadersFrame headers = new DefaultHttp3HeadersFrame();
+                                        headers.headers().status("200");
+                                        ctx.write(headers);
+                                        ctx.writeAndFlush(new DefaultHttp3DataFrame(Unpooled.copiedBuffer("partial", StandardCharsets.UTF_8)));
+                                        // a reset may drop the stream data not yet delivered, so let it arrive first
+                                        ctx.executor().schedule(() -> {
+                                            requestStream.shutdownInput(errorCode);
+                                            requestStream.shutdownOutput(errorCode);
+                                        }, 500, TimeUnit.MILLISECONDS);
                                     }
 
                                     @Override
@@ -159,7 +201,7 @@ class Http3StreamResetTest {
         }
 
         URI uri() {
-            return URI.create("https://localhost:" + ((InetSocketAddress) channel.localAddress()).getPort() + "/reset");
+            return URI.create("https://127.0.0.1:" + ((InetSocketAddress) channel.localAddress()).getPort() + "/reset");
         }
 
         @Override
