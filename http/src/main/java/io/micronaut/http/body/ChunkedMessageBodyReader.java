@@ -37,4 +37,32 @@ public interface ChunkedMessageBodyReader<T> extends MessageBodyReader<T> {
         Headers httpHeaders,
         Publisher<ByteBuffer<?>> input
     );
+
+    /**
+     * Read the input piecewise, like {@link #readChunked(Argument, MediaType, Headers, Publisher)},
+     * with a limit of the bytes of each piece: a reader that buffers a piece to decode it, e.g. a
+     * JSON value, fails the publisher with a
+     * {@link io.micronaut.http.exceptions.ContentLengthExceededException} when a piece exceeds
+     * the limit. The body as a whole is not limited.
+     *
+     * <p>The default implementation ignores the limit, for a reader that does not buffer the
+     * input to decode it.</p>
+     *
+     * @param type            The type of a piece
+     * @param mediaType       The media type
+     * @param httpHeaders     The headers
+     * @param input           The input
+     * @param maxElementSize  The maximum number of bytes of a piece
+     * @return The pieces
+     * @since 5.3.0
+     */
+    default Publisher<? extends T> readChunked(
+        Argument<T> type,
+        @Nullable MediaType mediaType,
+        Headers httpHeaders,
+        Publisher<ByteBuffer<?>> input,
+        long maxElementSize
+    ) {
+        return readChunked(type, mediaType, httpHeaders, input);
+    }
 }

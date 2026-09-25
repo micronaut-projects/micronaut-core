@@ -32,6 +32,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
@@ -147,6 +148,21 @@ public class FilterRunner {
     }
 
     /**
+     * Do the route match, which may complete later, e.g. when a route locator locates its
+     * target asynchronously, and set it into the request. The filters after the route match are
+     * found, and run, when the returned flow completes.
+     *
+     * @param request The request
+     * @return {@code null} if the route match is done, or a flow that completes with a non-null
+     * value when it is done, or fails with the error of the route match
+     * @since 5.3.0
+     */
+    protected @Nullable ExecutionFlow<?> doRouteMatchAsync(HttpRequest<?> request) {
+        doRouteMatch(request);
+        return null;
+    }
+
+    /**
      * Transform a response, e.g. by replacing an error response with an exception. Called before
      * every filter.
      *
@@ -226,13 +242,31 @@ public class FilterRunner {
             List<InternalHttpFilter> filtersToRun = filterFilters(preMatchingFilters, request);
             if (filtersToRun.isEmpty()) {
                 // No pre-matching filters
+                ExecutionFlow<?> matching;
                 try {
-                    doRouteMatch(request);
+                    matching = doRouteMatchAsync(request);
                 } catch (Throwable t) {
                     return processFailure(request, t, propagatedContext);
                 }
-                filtersToRun = filterFilters(findInternalFiltersAfterRouteMatch(request), request);
-                iterator = filtersToRun.listIterator();
+                if (matching != null) {
+                    Throwable error = matching.tryCompleteError();
+                    if (error != null) {
+                        return processFailure(request, error, propagatedContext);
+                    }
+                    if (matching.tryCompleteValue() == null) {
+                        // the route match completes later: then the filters after it run, and
+                        // only a failure of the route match itself is processed here
+                        return failureOf(matching).flatMap(failure -> {
+                            if (failure.isPresent()) {
+                                Throwable t = failure.get();
+                                ExecutionFlow<HttpResponse<?>> processed = processFailure(request, t, propagatedContext);
+                                return processed == null ? ExecutionFlow.error(t) : processed;
+                            }
+                            return runAfterRouteMatch(request, propagatedContext);
+                        });
+                    }
+                }
+                return runAfterRouteMatch(request, propagatedContext);
             } else {
                 // Pre-matching filters plus route match resolver
                 var f = new RouteMatchResolverHttpFilter();
@@ -243,6 +277,28 @@ public class FilterRunner {
         } else {
             iterator = filters == null ? List.<InternalHttpFilter>of().listIterator() : filterFilters(filters, request).listIterator();
         }
+        return runFilters(request, propagatedContext, iterator);
+    }
+
+    /**
+     * The failure of a route match that completes later, or nothing when it succeeds, so that a
+     * failure of what runs after the route match is not taken for one of the route match.
+     *
+     * @param matching The route match
+     * @return The failure, if any
+     */
+    private static ExecutionFlow<Optional<Throwable>> failureOf(ExecutionFlow<?> matching) {
+        return matching.<Optional<Throwable>>map(done -> Optional.empty())
+            .onErrorResume(t -> ExecutionFlow.just(Optional.of(t)));
+    }
+
+    private ExecutionFlow<HttpResponse<?>> runAfterRouteMatch(HttpRequest<?> request, PropagatedContext propagatedContext) {
+        return runFilters(request, propagatedContext, filterFilters(findInternalFiltersAfterRouteMatch(request), request).listIterator());
+    }
+
+    private ExecutionFlow<HttpResponse<?>> runFilters(HttpRequest<?> request,
+                                                      PropagatedContext propagatedContext,
+                                                      ListIterator<InternalHttpFilter> iterator) {
         if (!iterator.hasNext()) {
             return provideResponse(request, propagatedContext);
         }
@@ -478,24 +534,53 @@ public class FilterRunner {
 
         private ExecutionFlow<FilterContext> resolveRouteMatch(FilterContext context) {
             HttpRequest<?> request = context.request();
+            ExecutionFlow<?> matching;
             try {
-                doRouteMatch(request);
-                return ExecutionFlow.just(context);
+                matching = doRouteMatchAsync(request);
             } catch (Throwable throwable) {
-                return processFailurePropagateException(throwable, context);
-            } finally {
+                // the failure first, then the filters after the route match, as the filters see it
+                ExecutionFlow<FilterContext> failure = processFailurePropagateException(throwable, context);
+                replaceFilters(request);
+                return failure;
+            }
+            if (matching == null || matching.tryCompleteValue() != null) {
+                replaceFilters(request);
+                return ExecutionFlow.just(context);
+            }
+            Throwable error = matching.tryCompleteError();
+            if (error != null) {
+                ExecutionFlow<FilterContext> failure = processFailurePropagateException(error, context);
+                replaceFilters(request);
+                return failure;
+            }
+            // the route match completes later: then the filters after it are found, once, and a
+            // failure to find them is processed by the filter chain, not as one of the route match
+            return failureOf(matching).flatMap(failure -> {
+                if (failure.isPresent()) {
+                    ExecutionFlow<FilterContext> processed = processFailurePropagateException(failure.get(), context);
+                    replaceFilters(request);
+                    return processed;
+                }
+                replaceFilters(request);
+                return ExecutionFlow.just(context);
+            });
+        }
+
+        /**
+         * Replace the route match resolver with the filters after the route match.
+         */
+        private void replaceFilters(HttpRequest<?> request) {
+            filterIterator.remove();
+            while (filterIterator.hasPrevious()) {
+                filterIterator.previous();
                 filterIterator.remove();
-                while (filterIterator.hasPrevious()) {
-                    filterIterator.previous();
-                    filterIterator.remove();
-                }
-                List<InternalHttpFilter> postFilters = findInternalFiltersAfterRouteMatch(request);
-                for (InternalHttpFilter postFilter : postFilters) {
-                    filterIterator.add(postFilter);
-                }
-                while (filterIterator.hasPrevious()) {
-                    filterIterator.previous();
-                }
+            }
+            List<InternalHttpFilter> postFilters = findInternalFiltersAfterRouteMatch(request);
+            for (InternalHttpFilter postFilter : postFilters) {
+                filterIterator.add(postFilter);
+            }
+            while (filterIterator.hasPrevious()) {
+                filterIterator.previous();
             }
         }
     }

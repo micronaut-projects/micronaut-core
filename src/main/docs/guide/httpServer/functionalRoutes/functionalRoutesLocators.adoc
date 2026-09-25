@@ -1,0 +1,17 @@
+A locator route routes the requests under a prefix to the routes of a target located at runtime, like a JAX-RS sub-resource locator. The routes of the target are a api:web.router.RouteTable[], built with api:web.router.RouteTableFactory[], whose URIs are relative to the prefix.
+
+snippet::io.micronaut.docs.server.functional.LocatorRoutes[tags="imports,clazz", indent=0, title="Locator routes"]
+
+<1> The routes of a located shop, built once, when the bean is created, not per request.
+<2> The handler reads the located target from its path variables.
+<3> `locate(prefix, locator, tables)`: the locator finds the target of the request, here from a path variable of the prefix, and the function selects the table of the target. `GET /shops/north/items/1` is answered by the route `/items/{index}` of the table, with the path variables of the prefix and of the route.
+<4> `locateAsync` takes a locator that returns a `CompletionStage` of the target, e.g. loaded from a database: the request is matched with the table when the stage completes, without blocking the thread that matched it.
+<5> A table for the targets of a type: its handlers receive the located target as an argument, see api:web.router.builder.LocatedHttpRouteBuilder[]. A located target of another type fails the request.
+
+A locator that answers `null`, or a stage that completes with `null`, is a `404`. A locator that throws, or a failed stage, is handled by the error routes. When the table has no route for the rest of the path, the request is answered like a request no route of the table matches: `404`, or `405`, `415` or `406` if a route of the table matches the path with another method or media type. No other route of the application is tried.
+
+The filters of the matched route of the table apply, after the filters of the groups of the locator route, and the server filters apply to the full path. A table of a located target may declare locator routes of its own, which locate again from the rest of the path.
+
+A synchronous locator runs while the request is matched, on the event loop, and must not block. The target is located once per request and kept for the rest of the request: a locator, synchronous or asynchronous, runs at most once per request, also when the request is answered with a `405` whose allowed methods are those of the table of the target. Requests with a custom HTTP method are not located.
+
+The server waits for the stage of an asynchronous locator without blocking, and cancels it when the client closes the connection before it completes. A CORS preflight request for a path under the prefix of an asynchronous locator is answered once the locator has located its target, with the methods of the routes of its table.

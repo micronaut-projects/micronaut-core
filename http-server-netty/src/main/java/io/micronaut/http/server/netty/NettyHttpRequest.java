@@ -31,6 +31,7 @@ import io.micronaut.http.HttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.HttpVersion;
 import io.micronaut.http.MediaType;
 import io.micronaut.http.MutableHttpHeaders;
@@ -46,6 +47,9 @@ import io.micronaut.http.body.stream.AvailableByteArrayBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.cookie.Cookies;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
+import io.micronaut.http.filter.ServerRequestView;
+import io.micronaut.http.filter.UriChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.NettyHttpHeaders;
@@ -238,23 +242,43 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     }
 
     /**
-     * The Netty request whose body is the body of the given request: the given request itself, or
-     * the Netty request of a {@link #mutate() mutable view}, e.g. one a filter continued with,
-     * whose body the filter did not set, not even to {@code null}.
+     * The Netty request whose body is the body of the given request, e.g. of the request a filter
+     * continued with after it changed the URI in place: the given request itself, the Netty request
+     * a {@link HttpRequestWrapper} wraps, or the Netty request of a {@link #mutate() mutable view}
+     * whose body the filter did not set, not even to {@code null}. A request whose bytes are not
+     * those of the Netty request, e.g. a server request with another body, has none.
      *
      * @param request The request
      * @return The Netty request, or {@code null} if the body of the request is not the body of one
      * @since 5.2.4
      */
     @Internal
+    @SuppressWarnings("ReferenceEquality") // the same bytes
     public static @Nullable NettyHttpRequest<?> findBodyRequest(HttpRequest<?> request) {
-        if (request instanceof NettyHttpRequest<?> nettyRequest) {
-            return nettyRequest;
+        HttpRequest<?> current = request;
+        // the first server request: its bytes are the body of the request
+        ServerHttpRequest<?> server = null;
+        while (true) {
+            if (current instanceof NettyHttpRequest<?> nettyRequest) {
+                return server == null || server.byteBody() == nettyRequest.byteBody() ? nettyRequest : null;
+            }
+            if (current instanceof BodyChangeAwareRequest aware && aware.isBodySet()) {
+                // the body is the object a filter set, even none
+                return null;
+            }
+            if (current instanceof NettyHttpRequest<?>.NettyMutableHttpRequest view) {
+                NettyHttpRequest<?> nettyRequest = view.request();
+                return server == null || server.byteBody() == nettyRequest.byteBody() ? nettyRequest : null;
+            }
+            if (server == null && current instanceof ServerHttpRequest<?> serverRequest) {
+                server = serverRequest;
+            }
+            if (current instanceof HttpRequestWrapper<?> wrapper) {
+                current = wrapper.getDelegate();
+            } else {
+                return null;
+            }
         }
-        if (request instanceof NettyHttpRequest<?>.NettyMutableHttpRequest view && !view.bodySet) {
-            return view.request();
-        }
-        return null;
     }
 
     @Override
@@ -820,7 +844,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, UriChangeAwareRequest, BodyChangeAwareRequest, ServerRequestView {
 
         @Nullable
         private URI uri;
@@ -829,8 +853,8 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Nullable
         private Object body;
         /**
-         * Whether {@link #body(Object)} was called: a {@code null} body clears the body of the
-         * request, so it cannot mean that the body is the body of the request.
+         * Whether the body was set, even to {@code null}: then the body is that object, and not
+         * the bytes of the request.
          */
         private boolean bodySet;
 
@@ -838,17 +862,20 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         /**
-         * A view derived from another view, e.g. by {@link #mutate()}, keeps the body of that view.
+         * A view of a view, which keeps what the view changed.
          *
          * @param view The view
          */
         NettyMutableHttpRequest(NettyMutableHttpRequest view) {
+            this.uri = view.uri;
             this.body = view.body;
             this.bodySet = view.bodySet;
         }
 
         /**
-         * @return The request this is the mutable view of
+         * The request this is the mutable view of.
+         *
+         * @return The request
          */
         NettyHttpRequest<T> request() {
             return NettyHttpRequest.this;
@@ -888,6 +915,16 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         }
 
         @Override
+        public boolean isBodySet() {
+            return bodySet;
+        }
+
+        @Override
+        public ServerHttpRequest<?> serverRequest() {
+            return NettyHttpRequest.this;
+        }
+
+        @Override
         public MutableHttpHeaders getHeaders() {
             return headers;
         }
@@ -900,6 +937,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public Optional<T> getBody() {
             if (bodySet) {
+                // the body the filter set, none if it cleared it
                 return Optional.ofNullable((T) body);
             }
             return NettyHttpRequest.this.getBody();
@@ -966,6 +1004,11 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         public Optional<Certificate> getCertificate() {
             return NettyHttpRequest.this.getCertificate();
+        }
+
+        @Override
+        public boolean isUriSet() {
+            return uri != null;
         }
 
         @Override
@@ -1046,7 +1089,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
         @Override
         @Nullable
         public ByteBody byteBodyDirect() {
-            // if the body has been changed, even to null, we can't return the byteBody directly
+            // if the body has been changed we can't return the byteBody directly
             return bodySet ? null : NettyHttpRequest.this.byteBodyDirect();
         }
     }

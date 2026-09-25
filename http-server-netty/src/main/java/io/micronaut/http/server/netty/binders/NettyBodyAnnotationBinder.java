@@ -29,7 +29,9 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpHeaders;
 import io.micronaut.http.HttpRequest;
+import io.micronaut.http.HttpRequestWrapper;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.binders.DefaultBodyAnnotationBinder;
 import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.body.AvailableByteBody;
@@ -41,9 +43,11 @@ import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
+import io.micronaut.http.filter.BodyChangeAwareRequest;
 import io.micronaut.http.form.FormCapableHttpRequest;
 import io.micronaut.http.multipart.RawFormField;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
+import io.micronaut.http.server.binding.ServerRequestBody;
 import io.micronaut.http.server.multipart.FormFactory;
 import io.micronaut.http.server.netty.NettyHttpRequest;
 import io.micronaut.http.server.netty.configuration.NettyHttpServerConfiguration;
@@ -90,12 +94,41 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         }
     }
 
+    /**
+     * The server request whose bytes are the body of the request a route is bound with: the Netty
+     * request itself, the server request that a request a filter continued with is or wraps,
+     * see {@link ServerRequestBody}, or the Netty request of its mutable view, unless the filter
+     * set the body to an object, which the default binder converts, like before, or to
+     * {@code null}, which is no body.
+     *
+     * @param source The request
+     * @return The server request, or {@code null} if the body is not read from bytes
+     */
+    static @Nullable ServerHttpRequest<?> bodyOf(HttpRequest<?> source) {
+        if (source instanceof NettyHttpRequest<?> nhr) {
+            return nhr;
+        }
+        if (source.getBody().isPresent() || BodyChangeAwareRequest.isBodySet(source)) {
+            // the body a filter set, even none when it cleared it
+            return null;
+        }
+        ServerHttpRequest<?> server = ServerRequestBody.of(source);
+        if (server == null) {
+            // e.g. the mutable view of the Netty request, which a filter continued with
+            return NettyHttpRequest.findBodyRequest(source);
+        }
+        return server;
+    }
+
     @Override
     protected BindingResult<ConvertibleValues<?>> bindFullBodyConvertibleValues(HttpRequest<?> source) {
-        // the request itself, or e.g. the mutable view of the request that a filter continued with
-        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
-        if (nhr == null) {
-            return super.bindFullBodyConvertibleValues(source);
+        if (!(source instanceof NettyHttpRequest<?> nhr)) {
+            if (bodyOf(source) == null) {
+                return super.bindFullBodyConvertibleValues(source);
+            }
+            // a request a filter continued with: read from its bytes, not cached
+            //noinspection unchecked
+            return (BindingResult<ConvertibleValues<?>>) bindFullBody((ArgumentConversionContext<T>) ConversionContext.of(ConvertibleValues.class), source);
         }
         BindingResult<ConvertibleValues<?>> existing = nhr.convertibleBody;
         if (existing != null) {
@@ -110,18 +143,17 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
 
     @Override
     public BindingResult<T> bindFullBody(ArgumentConversionContext<T> context, HttpRequest<?> source) {
-        // the request itself, or e.g. the mutable view of the request that a filter continued with
-        NettyHttpRequest<?> nhr = NettyHttpRequest.findBodyRequest(source);
-        if (nhr == null) {
+        ServerHttpRequest<?> server = bodyOf(source);
+        if (server == null) {
             return super.bindFullBody(context, source);
         }
-        if (nhr.byteBody().expectedLength().orElse(-1) == 0) {
+        if (server.byteBody().expectedLength().orElse(-1) == 0) {
             return bindDefaultValue(context);
         }
 
         // If there's an error during conversion, the body must stay available, so we split here.
         // This costs us nothing because we need to buffer anyway.
-        ByteBody body = nhr.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
+        ByteBody body = server.byteBody().split(ByteBody.SplitBackpressureMode.FASTEST);
         ExecutionFlow<? extends CloseableAvailableByteBody> buffered = InternalByteBody.bufferFlow(body);
 
         return new PendingRequestBindingResult<>() {
@@ -132,10 +164,10 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
             {
                 // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
                 // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
-                BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
-                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
+                BasicHttpAttributes.addRouteWaitsFor(source, buffered.flatMap(imm ->
+                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(source)).propagate(() -> {
                         try {
-                            result = transform(nhr, context, imm);
+                            result = transform(source, server, context, imm);
                             return ExecutionFlow.just(null);
                         } catch (Throwable e) {
                             return ExecutionFlow.error(e);
@@ -161,35 +193,60 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         };
     }
 
-    Optional<T> transform(NettyHttpRequest<?> nhr, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
+    /**
+     * Read the body.
+     *
+     * @param request The request the route is bound with
+     * @param server  The server request whose bytes are the body, see {@link #bodyOf(HttpRequest)}
+     * @param context The conversion context
+     * @param imm     The bytes
+     * @return The body
+     * @throws Throwable If the body cannot be read
+     */
+    Optional<T> transform(HttpRequest<?> request, ServerHttpRequest<?> server, ArgumentConversionContext<T> context, AvailableByteBody imm) throws Throwable {
+        // the form is decoded by the Netty request whose bytes are the body, e.g. of the mutable
+        // view a filter continued with after it changed the URI in place
+        NettyHttpRequest<?> formRequest = server instanceof NettyHttpRequest<?> netty ? netty : NettyHttpRequest.findBodyRequest(server);
+        // the decoded body is kept by the Netty request it is read from when the route is bound with
+        // that request or with its mutable view whose body a filter did not set, whose body is then
+        // the decoded body too; not by a wrapper, e.g. one that keeps no decoded body, nor by
+        // another server request a filter continued with
+        NettyHttpRequest<?> nhr = formRequest != null && !(request instanceof HttpRequestWrapper<?>)
+            && NettyHttpRequest.findBodyRequest(request) == formRequest ? formRequest : null;
         MessageBodyReader<T> reader = null;
-        final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(nhr).orElse(null);
+        final RouteInfo<?> routeInfo = RouteAttributes.getRouteInfo(request).orElse(null);
         if (routeInfo != null) {
             reader = (MessageBodyReader<T>) routeInfo.getMessageBodyReader();
         }
-        MediaType mediaType = nhr.getContentType().orElse(null);
+        MediaType mediaType = request.getContentType().orElse(null);
         if (mediaType != null && (reader == null || !reader.isReadable(context.getArgument(), mediaType))) {
             reader = bodyHandlerRegistry.findReader(context.getArgument(), List.of(mediaType)).orElse(null);
         }
-        if (reader == null && nhr.hasFormBody()) {
+        if (reader == null && formRequest != null && formRequest.hasFormBody()) {
             Map<String, List<CloseableByteBody>> bodies = new LinkedHashMap<>();
-            for (RawFormField rff : toListNow(nhr.getRawFormFields(imm))) {
+            for (RawFormField rff : toListNow(formRequest.getRawFormFields(imm))) {
                 bodies.computeIfAbsent(rff.metadata().name(), k -> new ArrayList<>(1)).add(rff.byteBody());
             }
-            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, nhr.getCharacterEncoding());
+            Object intermediate = io.micronaut.http.server.multipart.FormRouteCompleter.mapForGetBody(bodies, formRequest.getCharacterEncoding());
             Optional<T> converted = conversionService.convert(intermediate, context);
-            nhr.setLegacyBody(converted.orElse(null));
+            if (nhr != null) {
+                nhr.setLegacyBody(converted.orElse(null));
+            }
             return converted;
         }
         if (reader != null) {
-            T result = read(context, reader, nhr.getHeaders(), mediaType, imm.toByteBuffer());
-            nhr.setLegacyBody(result);
+            T result = read(context, reader, request.getHeaders(), mediaType, imm.toByteBuffer());
+            if (nhr != null) {
+                nhr.setLegacyBody(result);
+            }
             return Optional.ofNullable(result);
         }
         ByteBuf byteBuf = NettyByteBodyFactory.toByteBuf(imm);
         Optional<T> converted = conversionService.convert(byteBuf, ByteBuf.class, context.getArgument().getType(), context);
         NettyConverters.postProcess(byteBuf, converted);
-        nhr.setLegacyBody(converted.orElse(null));
+        if (nhr != null) {
+            nhr.setLegacyBody(converted.orElse(null));
+        }
         return converted;
     }
 
