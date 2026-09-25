@@ -232,6 +232,7 @@ class MicronautAstVisitor(ast.NodeVisitor):
         self.local_classes = set()  # Track class names defined in this file
         self.local_constant_values = {}  # Track local class constants visible to annotation expressions
         self.unresolved_member_errors = []  # Decorator members referencing a Java class member that does not exist
+        self.annotation_instance_assignments = {}  # Module-level names bound to an annotation call, to diagnose Annotated[..., NAME]
         self.current_class_nested_types = {}  # Track nested classes visible in the current class body
         # Script handling
         self.current_script = None
@@ -984,6 +985,8 @@ class MicronautAstVisitor(ast.NodeVisitor):
         if value_node is None:
             return
 
+        self._track_annotation_instance_assignment(targets, value_node)
+
         resolved, value = self._literal_constant_value(value_node)
         if not resolved:
             return
@@ -1004,6 +1007,23 @@ class MicronautAstVisitor(ast.NodeVisitor):
                 names.insert(0, current.id)
             if names and names[0] in self.local_classes:
                 self.local_constant_values[".".join(names)] = value
+
+    def _track_annotation_instance_assignment(self, targets, value_node):
+        """
+        Remember a module-level name bound to an annotation call -- ``PASSWORD = Size(min=8, max=128)``.
+
+        Such a name reads like ordinary de-duplication but cannot be used as ``Annotated[str, PASSWORD]``:
+        the processor reads annotations from source and never evaluates the module, so the name resolves to
+        nothing and the constraint would be dropped without a word. Recording it here lets
+        ``_parse_annotated_metadata`` say so.
+        """
+        if self.current_class is not None or not isinstance(value_node, ast.Call):
+            return
+        if convert_ast_call_to_decorator(value_node, self) is None:
+            return
+        for target in targets:
+            if isinstance(target, ast.Name):
+                self.annotation_instance_assignments[target.id] = ast.unparse(value_node)
 
     def _handle_field_docstring(self, node):
         """
@@ -1381,6 +1401,16 @@ class MicronautAstVisitor(ast.NodeVisitor):
                         elif isinstance(metadata, ast.Name):
                             # Handle simple decorator names like NotBlank or Inject
                             decorator_reference = metadata.id
+                            if (decorator_reference in self.annotation_instance_assignments
+                                    and decorator_reference not in self.known_decorators
+                                    and decorator_reference not in self.imported_types):
+                                self.unresolved_member_errors.append(
+                                    f"[{decorator_reference}] in Annotated[...] is a name bound to "
+                                    f"[{self.annotation_instance_assignments[decorator_reference]}], not an annotation. "
+                                    "Annotations are read from source and never evaluated, so this one would be "
+                                    "dropped, taking any constraint it carries with it. Write the annotation inline."
+                                )
+                                continue
                             decorator = self.to_decorator_from_reference(decorator_reference)
                             decorators.append(decorator)
                         elif isinstance(metadata, ast.Attribute):
@@ -2477,6 +2507,29 @@ def convert_ast_value(node, visitor=None):
         # Fallback to AST dump for complex expressions
         return ast.dump(node)
 
+def _is_ast_dump_fallback(node, value):
+    """Whether convert_ast_value gave up on this node and returned ``ast.dump`` of it."""
+    return isinstance(value, str) and value == ast.dump(node)
+
+
+def _names_a_real_annotation(visitor, annotation_name):
+    """
+    Whether ``annotation_name`` is an annotation rather than any other call the walker passes through here.
+
+    This path also sees ordinary calls in a module body -- ``print(f'...')`` arrives as a member of
+    ``@print`` -- and those are not annotations, carry no metadata and must not be diagnosed.
+    """
+    if not annotation_name:
+        return False
+    simple_name = annotation_name.split(".")[-1]
+    return (
+        simple_name in visitor.known_decorators
+        or simple_name in visitor.imported_types
+        or annotation_name in visitor.imported_types
+        or find_known_decorator_by_annotation_name(visitor, annotation_name) is not None
+    )
+
+
 def convert_ast_call_to_decorator(node, visitor=None):
     if visitor is None or not isinstance(node, ast.Call):
         return None
@@ -2498,7 +2551,21 @@ def convert_ast_call_to_decorator(node, visitor=None):
 
 def convert_annotation_member_value(annotation_name, member_name, node, visitor=None):
     try:
-        return convert_ast_value(node, visitor)
+        value = convert_ast_value(node, visitor)
+        if (visitor is not None
+                and _names_a_real_annotation(visitor, annotation_name)
+                and _is_ast_dump_fallback(node, value)):
+            # convert_ast_value could not make a constant of this expression and fell back to dumping the
+            # AST. Left alone that dump becomes the member's value, so the annotation carries nonsense --
+            # a computed `defaultValue` publishes the parameter as required, a computed constraint bound
+            # stops constraining. Say so rather than emit it.
+            visitor.unresolved_member_errors.append(
+                f"The value [{ast.unparse(node)}] of member [{member_name}] of @{annotation_name} is not a "
+                "compile-time constant. Annotation arguments are read from source and never evaluated; "
+                "use a literal."
+            )
+            return ast.unparse(node)
+        return value
     except UnresolvedAnnotationMemberError as e:
         # reported once the module is visited; the value stays the dotted name meanwhile
         visitor.unresolved_member_errors.append(
