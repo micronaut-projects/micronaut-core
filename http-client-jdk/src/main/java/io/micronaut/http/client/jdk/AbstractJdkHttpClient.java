@@ -80,6 +80,7 @@ import java.net.http.HttpRequest;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Supplier;
 
@@ -418,6 +419,37 @@ abstract class AbstractJdkHttpClient {
     }
 
     /**
+     * The target of a request once the client filters ran, since a filter may have changed its
+     * URI: the request stays with the instance the load balancer selected as long as it goes to
+     * the same scheme, host and port, and the load balancer is not asked again.
+     *
+     * @param target  The target resolved before the filters ran
+     * @param request The request the filters passed on
+     * @return The target the request is sent to
+     */
+    Mono<ResolvedTarget> afterFilters(ResolvedTarget target, io.micronaut.http.HttpRequest<?> request) {
+        URI filtered = request.getUri();
+        if (filtered.equals(target.uri())) {
+            return Mono.just(target);
+        }
+        ServiceInstance instance = target.instance();
+        if (filtered.getScheme() != null) {
+            URI selected = target.uri();
+            boolean sameServer = filtered.getScheme().equalsIgnoreCase(selected.getScheme())
+                && Objects.equals(filtered.getRawAuthority(), selected.getRawAuthority());
+            return Mono.just(new ResolvedTarget(filtered, sameServer ? instance : null));
+        }
+        if (instance == null) {
+            return resolveTarget(request);
+        }
+        try {
+            return Mono.just(new ResolvedTarget(instance.resolve(ContextPathUtils.prepend(filtered, contextPath)), instance));
+        } catch (URISyntaxException e) {
+            return Mono.error(populateServiceId(new HttpClientException("Failed to construct the request URI", e), clientId, configuration));
+        }
+    }
+
+    /**
      * @param request The request object
      * @return The discriminator to use when selecting a server for the purposes of load balancing (defaults to {@link io.micronaut.http.HttpRequest})
      */
@@ -548,18 +580,19 @@ abstract class AbstractJdkHttpClient {
         }
 
         // built on subscription, so that any client filter changes are used
-        return Flux.defer(() -> Mono.just(toJdkRequest(target.uri(), request, bodyType)))
-            .map(httpRequest -> {
-                if (log.isDebugEnabled()) {
-                    log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
-                }
-                HttpHeadersUtil.trace(log,
-                    () -> httpRequest.headers().map().keySet(),
-                    headerName -> httpRequest.headers().allValues(headerName));
-                return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-            })
-            .flatMap(Mono::fromCompletionStage)
-            .onErrorMap(IOException.class, e -> sendError(target.instance(), target.uri(), e))
+        return Flux.defer(() -> afterFilters(target, request))
+            .flatMap(sent -> Mono.fromCallable(() -> toJdkRequest(sent.uri(), request, bodyType))
+                .map(httpRequest -> {
+                    if (log.isDebugEnabled()) {
+                        log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                    }
+                    HttpHeadersUtil.trace(log,
+                        () -> httpRequest.headers().map().keySet(),
+                        headerName -> httpRequest.headers().allValues(headerName));
+                    return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
+                })
+                .flatMap(Mono::fromCompletionStage)
+                .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e)))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {

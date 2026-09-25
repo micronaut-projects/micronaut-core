@@ -214,8 +214,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
     @Override
     <O> Publisher<HttpResponse<O>> responsePublisher(HttpRequest<?> request, ResolvedTarget target, @Nullable Argument<O> bodyType) {
         // built on subscription, so that any client filter changes are used
-        return Mono.defer(() -> Mono.just(toJdkRequest(target.uri(), request, bodyType)))
-            .flatMap(httpRequest -> {
+        return Mono.defer(() -> afterFilters(target, request))
+            .flatMap(sent -> {
+                java.net.http.HttpRequest httpRequest = toJdkRequest(sent.uri(), request, bodyType);
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
                 }
@@ -233,7 +234,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                         e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
                         e -> ReadTimeoutException.TIMEOUT_EXCEPTION
                     )
-                    .onErrorMap(IOException.class, e -> sendError(target.instance(), httpRequest.uri(), e));
+                    .onErrorMap(IOException.class, e -> sendError(sent.instance(), httpRequest.uri(), e));
             })
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .map(netResponse -> {
