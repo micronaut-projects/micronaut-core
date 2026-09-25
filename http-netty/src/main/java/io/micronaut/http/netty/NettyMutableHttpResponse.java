@@ -89,18 +89,24 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     /**
      * The attribute map. It is created lazily, by {@link #getAttributes()} only: the route
      * metadata is kept in the fields below until then, so that a plain response never allocates
-     * the map. The map is published fully populated, in one volatile write, and the fields are
-     * never cleared, so a reader that has not seen the map yet still sees the metadata in the
-     * fields. Once the map is visible it is the only store.
+     * the map. Once the map is visible it is the store readers use.
+     *
+     * <p>The typed setters always write their field and then read this reference; the first
+     * materialisation publishes this reference and then re-reads the fields. All of them are
+     * volatile, so either the setter sees the map and writes its field into it, or the
+     * materialisation sees the new field value and writes it into the map. Writes into the map
+     * from the setters and from the materialisation happen under the monitor of this object, so
+     * the map ends up with the latest field value. The setters take no lock while there is no
+     * map.
      */
     @Nullable
     private volatile MutableConvertibleValues<Object> attributes;
     @Nullable
-    private Object routeMatch;
+    private volatile Object routeMatch;
     @Nullable
-    private Object routeInfo;
+    private volatile Object routeInfo;
     @Nullable
-    private String uriTemplate;
+    private volatile String uriTemplate;
     @Nullable
     private BodyConvertor bodyConvertor;
     @Nullable
@@ -294,20 +300,33 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     private synchronized MutableConvertibleValues<Object> createAttributes() {
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
+            Object copiedRouteMatch = routeMatch;
+            Object copiedRouteInfo = routeInfo;
+            String copiedUriTemplate = uriTemplate;
             attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
             // copy the route metadata into the map before it is published, so that no reader
-            // sees a map without the metadata; the fields are kept for readers that have not
-            // seen the map yet
-            if (routeMatch != null) {
-                attributes.put(ROUTE_MATCH_KEY, routeMatch);
+            // sees a map without the metadata
+            if (copiedRouteMatch != null) {
+                attributes.put(ROUTE_MATCH_KEY, copiedRouteMatch);
             }
-            if (routeInfo != null) {
-                attributes.put(ROUTE_INFO_KEY, routeInfo);
+            if (copiedRouteInfo != null) {
+                attributes.put(ROUTE_INFO_KEY, copiedRouteInfo);
             }
-            if (uriTemplate != null) {
-                attributes.put(URI_TEMPLATE_KEY, uriTemplate);
+            if (copiedUriTemplate != null) {
+                attributes.put(URI_TEMPLATE_KEY, copiedUriTemplate);
             }
             this.attributes = attributes;
+            // a setter that did not see the map yet wrote its field before the publication
+            // above: pick up such a write, the setter will not write into the map itself
+            if (routeMatch != copiedRouteMatch) {
+                putOrRemove(attributes, ROUTE_MATCH_KEY, routeMatch);
+            }
+            if (routeInfo != copiedRouteInfo) {
+                putOrRemove(attributes, ROUTE_INFO_KEY, routeInfo);
+            }
+            if (uriTemplate != copiedUriTemplate) {
+                putOrRemove(attributes, URI_TEMPLATE_KEY, uriTemplate);
+            }
         }
         return attributes;
     }
@@ -366,15 +385,13 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public void setRouteMatchMetadata(@Nullable Object routeMatch) {
+        this.routeMatch = routeMatch;
         MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
-            this.routeMatch = routeMatch;
-            // the map may have been published meanwhile, from a copy of the fields taken before
-            // this write: then it is the store, so write there too
-            attributes = this.attributes;
-        }
         if (attributes != null) {
-            putOrRemove(attributes, ROUTE_MATCH_KEY, routeMatch);
+            // the map exists: it is the store, write the latest field value into it
+            synchronized (this) {
+                putOrRemove(attributes, ROUTE_MATCH_KEY, this.routeMatch);
+            }
         }
     }
 
@@ -386,15 +403,13 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public void setRouteInfoMetadata(@Nullable Object routeInfo) {
+        this.routeInfo = routeInfo;
         MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
-            this.routeInfo = routeInfo;
-            // the map may have been published meanwhile, from a copy of the fields taken before
-            // this write: then it is the store, so write there too
-            attributes = this.attributes;
-        }
         if (attributes != null) {
-            putOrRemove(attributes, ROUTE_INFO_KEY, routeInfo);
+            // the map exists: it is the store, write the latest field value into it
+            synchronized (this) {
+                putOrRemove(attributes, ROUTE_INFO_KEY, this.routeInfo);
+            }
         }
     }
 
@@ -409,15 +424,13 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public void setUriTemplateMetadata(@Nullable String uriTemplate) {
+        this.uriTemplate = uriTemplate;
         MutableConvertibleValues<Object> attributes = this.attributes;
-        if (attributes == null) {
-            this.uriTemplate = uriTemplate;
-            // the map may have been published meanwhile, from a copy of the fields taken before
-            // this write: then it is the store, so write there too
-            attributes = this.attributes;
-        }
         if (attributes != null) {
-            putOrRemove(attributes, URI_TEMPLATE_KEY, uriTemplate);
+            // the map exists: it is the store, write the latest field value into it
+            synchronized (this) {
+                putOrRemove(attributes, URI_TEMPLATE_KEY, this.uriTemplate);
+            }
         }
     }
 

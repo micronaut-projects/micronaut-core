@@ -30,13 +30,15 @@ import static org.junit.jupiter.api.Assertions.assertSame;
  * The first {@link NettyHttpRequest#getAttributes()} call moves the route metadata into the
  * attribute map. Readers on other threads, through the typed accessors or
  * {@code getAttribute(name)}, must never observe the metadata as missing while that happens, and
- * only one map may ever be published.
+ * only one map may ever be published. A typed setter racing with that first call must not have
+ * its write lost to a map copied from the old field values.
  */
 @SuppressWarnings("removal")
 class NettyHttpRequestAttributesConcurrencyTest {
     private static final int READERS = 3;
     private static final int ROUNDS = 20_000;
     private static final int READS_PER_ROUND = 50;
+    private static final int WRITE_ROUNDS = 50_000;
 
     @Test
     void concurrentReadersNeverLoseMetadataDuringMaterialisation() throws Exception {
@@ -87,6 +89,60 @@ class NettyHttpRequestAttributesConcurrencyTest {
                 request.release();
             }
             assertEquals(0, lostReads.get(), "reads that observed missing route metadata");
+        } finally {
+            pool.shutdownNow();
+            channel.finishAndReleaseAll();
+        }
+    }
+
+    @Test
+    void concurrentWritesAreNotLostToMaterialisation() throws Exception {
+        EmbeddedChannel channel = new EmbeddedChannel(new ChannelInboundHandlerAdapter());
+        ChannelHandlerContext ctx = channel.pipeline().firstContext();
+        HttpServerConfiguration configuration = new HttpServerConfiguration();
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            int lostWrites = 0;
+            for (int round = 0; round < WRITE_ROUNDS; round++) {
+                NettyHttpRequest<Object> request = new NettyHttpRequest<>(
+                    new DefaultFullHttpRequest(HttpVersion.HTTP_1_1, HttpMethod.GET, "/foo/1"),
+                    NettyByteBodyFactory.empty(),
+                    ctx,
+                    ConversionService.SHARED,
+                    configuration
+                );
+                request.setRouteMatchMetadata(new Object());
+                request.setRouteInfoMetadata(new Object());
+                request.setUriTemplateMetadata("/old");
+                Object routeMatch = new Object();
+                Object routeInfo = new Object();
+
+                CyclicBarrier barrier = new CyclicBarrier(2);
+                Future<?> materialiser = pool.submit(() -> {
+                    barrier.await();
+                    return request.getAttributes();
+                });
+                Future<?> writer = pool.submit(() -> {
+                    barrier.await();
+                    request.setRouteMatchMetadata(routeMatch);
+                    request.setRouteInfoMetadata(routeInfo);
+                    request.setUriTemplateMetadata("/new");
+                    return null;
+                });
+                materialiser.get();
+                writer.get();
+                RouteMetadataHolder holder = request;
+                if (holder.getRouteMatchMetadata() != routeMatch
+                    || holder.getRouteInfoMetadata() != routeInfo
+                    || !"/new".equals(holder.getUriTemplateMetadata())
+                    || request.getAttributes().getValue(HttpAttributes.ROUTE_MATCH.toString()) != routeMatch
+                    || request.getAttributes().getValue(HttpAttributes.ROUTE_INFO.toString()) != routeInfo
+                    || !"/new".equals(request.getAttributes().getValue(HttpAttributes.URI_TEMPLATE.toString()))) {
+                    lostWrites++;
+                }
+                request.release();
+            }
+            assertEquals(0, lostWrites, "typed metadata writes lost to a concurrent materialisation");
         } finally {
             pool.shutdownNow();
             channel.finishAndReleaseAll();
