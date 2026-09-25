@@ -17,6 +17,7 @@ package io.micronaut.web.router;
 import io.micronaut.core.annotation.Experimental;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.http.uri.UriMatcher;
 
@@ -40,8 +41,28 @@ public interface UriRouteInfo<T, R> extends MethodBasedRouteInfo<T, R>, RequestM
 
     /**
      * @return The {@link UriMatchTemplate} used to match URIs
+     * @throws UnsupportedOperationException for a route whose template is not in the Micronaut
+     * template language, see {@link #getRouteTemplate()}. Such routes can only be declared with
+     * {@code io.micronaut.web.router.builder.RouteDeclaration} since 5.3.0
      */
     UriMatchTemplate getUriMatchTemplate();
+
+    /**
+     * The template of the route with the engine of its language, see
+     * {@link io.micronaut.http.uri.spi.RouteTemplateEngine}. Unlike {@link #getUriMatchTemplate()}
+     * it is available for the routes of every engine; use it for labels, logging and metrics.
+     *
+     * <p>For a route of the Micronaut engine, the expression is the {@link UriMatchTemplate#toString()
+     * string} of {@link #getUriMatchTemplate()}. The {@link UriMatchTemplate} of a route of another
+     * engine is not available: {@link #getUriMatchTemplate()} throws an
+     * {@link UnsupportedOperationException} for it.</p>
+     *
+     * @return The template
+     * @since 5.3.0
+     */
+    default RouteTemplate getRouteTemplate() {
+        return RouteTemplate.micronaut(getUriMatchTemplate().toString());
+    }
 
     /**
      * Match this route within the given URI and produce a {@link RouteMatch} if a match is found.

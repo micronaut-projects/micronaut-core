@@ -57,6 +57,7 @@ import io.micronaut.context.propagation.instrument.execution.ContextPropagatingE
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.DefaultUrlRouteInfo;
 import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
@@ -186,7 +187,7 @@ public final class RouteExecutor {
 
     static void setRouteAttributes(HttpRequest<?> request, UriRouteMatch<Object, Object> route) {
         setRouteAttributes(request, (RouteMatch<?>) route);
-        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getUriMatchTemplate().toString());
+        BasicHttpAttributes.setUriTemplate(request, route.getRouteInfo().getRouteTemplate().expression());
     }
 
     static void setRouteAttributes(HttpRequest<?> request, RouteMatch<?> route) {
@@ -248,6 +249,13 @@ public final class RouteExecutor {
      * @return The default content type declared on the route
      */
     public MediaType resolveDefaultResponseContentType(@Nullable HttpRequest<?> request, RouteInfo<?> finalRoute) {
+        if (request != null && finalRoute instanceof DefaultUrlRouteInfo<?, ?> uriRoute && uriRoute.isSelectedByEngine()) {
+            // the media type the route selector of the engine of the route negotiated
+            MediaType selected = selectedMediaType(request);
+            if (selected != null) {
+                return selected;
+            }
+        }
         final List<MediaType> producesList = finalRoute.getProduces();
         if (request != null) {
             final Iterator<MediaType> i = request.accept().iterator();
@@ -267,6 +275,11 @@ public final class RouteExecutor {
             defaultResponseMediaType = MediaType.APPLICATION_JSON_TYPE;
         }
         return MediaType.ALL_TYPE.equals(defaultResponseMediaType) ? MediaType.APPLICATION_JSON_TYPE : defaultResponseMediaType;
+    }
+
+    private static @Nullable MediaType selectedMediaType(HttpRequest<?> request) {
+        RouteMatch<?> match = RouteAttributes.getRouteMatch(request).orElse(null);
+        return match instanceof UriRouteMatch<?, ?> uriMatch ? uriMatch.getSelectedMediaType().orElse(null) : null;
     }
 
     private MutableHttpResponse<?> notFoundErrorResponse(HttpRequest<?> request) {

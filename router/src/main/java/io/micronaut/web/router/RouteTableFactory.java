@@ -130,7 +130,7 @@ public final class RouteTableFactory {
     public RouteTable buildHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
         RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService,
-            uri -> RouteAssembly.underContextPath(contextPath, uri), route -> { });
+            contextPath, route -> { });
         declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, null);
@@ -155,7 +155,8 @@ public final class RouteTableFactory {
      */
     public RouteTable buildLocatedHttpRoutes(HttpRoutes routes) {
         Objects.requireNonNull(routes, "routes");
-        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, uri -> uri, route -> { });
+        // relative to the prefix of the locator: no context path, so templates of every engine are supported
+        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, (String) null, route -> { });
         declare(routes, assembly);
         assembly.addImplicitHeadRoutes();
         return table(assembly, null);
@@ -214,7 +215,8 @@ public final class RouteTableFactory {
     public <T> RouteTable buildLocatedHttpRoutes(Argument<T> targetType, Consumer<? super LocatedHttpRouteBuilder<T>> routes) {
         Objects.requireNonNull(targetType, "targetType");
         Objects.requireNonNull(routes, "routes");
-        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, uri -> uri, route -> { });
+        // relative to the prefix of the locator: no context path, so templates of every engine are supported
+        RouteAssembly assembly = new RouteAssembly(executionHandleLocator, conversionService, (String) null, route -> { });
         DefaultLocatedHttpRouteBuilder<T> builder = new DefaultLocatedHttpRouteBuilder<>(assembly, targetType);
         try {
             routes.accept(builder);

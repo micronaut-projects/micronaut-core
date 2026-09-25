@@ -18,12 +18,14 @@ package io.micronaut.web.router;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.http.HttpMethod;
+import io.micronaut.http.MediaType;
 import io.micronaut.http.uri.UriMatchInfo;
 
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A {@link RouteMatch} that matches a URI and {@link HttpMethod}.
@@ -71,4 +73,17 @@ public interface UriRouteMatch<T, R> extends UriMatchInfo, MethodBasedRouteMatch
      */
     HttpMethod getHttpMethod();
 
+    /**
+     * The media type of the response that the
+     * {@link io.micronaut.web.router.spi.RouteMatchSelector route selector} of the engine of the
+     * route negotiated when it selected this match. The server uses it as the content type of
+     * the response when the handler does not set one.
+     *
+     * @return The media type, or empty if the match was not selected by a route selector or it
+     * negotiated none
+     * @since 5.3.0
+     */
+    default Optional<MediaType> getSelectedMediaType() {
+        return Optional.empty();
+    }
 }

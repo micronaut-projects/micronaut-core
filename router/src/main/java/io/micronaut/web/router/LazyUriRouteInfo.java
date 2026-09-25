@@ -28,6 +28,8 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.uri.ParsedRouteTemplate;
+import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ThreadSelection;
@@ -60,7 +62,8 @@ import java.util.function.Supplier;
 final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRoute {
     private final HttpMethod httpMethod;
     private final String methodKey;
-    private final String uri;
+    private final RouteTemplate template;
+    private final Supplier<ParsedRouteTemplate> parsedTemplate;
     private final String requiredPathPrefix;
     private final int rawLength;
     private final int pathVariableCount;
@@ -71,17 +74,24 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     private final Supplier<UriRouteInfo<Object, Object>> delegate;
 
     /**
-     * @param declaration  The declaration a handler function is bound to
-     * @param httpMethod   The HTTP method of the route, which is {@code HEAD} for the implicit {@code HEAD} route of a {@code GET} declaration
-     * @param implicitHead Whether the route is an implicit {@code HEAD} route
-     * @param order        The order of the route, known before it is built
-     * @param builder      Builds the route
+     * @param declaration    The declaration a handler function is bound to
+     * @param httpMethod     The HTTP method of the route, which is {@code HEAD} for the implicit {@code HEAD} route of a {@code GET} declaration
+     * @param implicitHead   Whether the route is an implicit {@code HEAD} route
+     * @param order          The order of the route, known before it is built
+     * @param parsedTemplate The template of the declaration as its engine parses it
+     * @param builder        Builds the route
      */
-    LazyUriRouteInfo(IndexedRouteDeclaration declaration, HttpMethod httpMethod, boolean implicitHead, int order, Supplier<UriRouteInfo<Object, Object>> builder) {
+    LazyUriRouteInfo(IndexedRouteDeclaration declaration,
+                     HttpMethod httpMethod,
+                     boolean implicitHead,
+                     int order,
+                     Supplier<ParsedRouteTemplate> parsedTemplate,
+                     Supplier<UriRouteInfo<Object, Object>> builder) {
         this.httpMethod = httpMethod;
         // the custom name for a custom method, so that the router indexes the route under it
         this.methodKey = implicitHead ? httpMethod.name() : declaration.httpMethodName();
-        this.uri = declaration.uriTemplate();
+        this.template = declaration.template();
+        this.parsedTemplate = SupplierUtil.memoized(parsedTemplate);
         this.requiredPathPrefix = declaration.requiredPathPrefix();
         this.rawLength = declaration.rawLength();
         this.pathVariableCount = declaration.pathVariableCount();
@@ -138,10 +148,24 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     }
 
     /**
-     * @return The URI template of the route, without parsing it
+     * @return The declared template as its engine parsed it, without building the route
      */
-    String uriTemplate() {
-        return uri;
+    ParsedRouteTemplate parsedTemplate() {
+        return parsedTemplate.get();
+    }
+
+    /**
+     * @return Whether the declared template is of the Micronaut engine, without building the route
+     */
+    boolean isMicronautTemplate() {
+        return template.isMicronaut();
+    }
+
+    /**
+     * @return The identifier of the engine of the declared template, without building the route
+     */
+    String engineId() {
+        return template.engineId();
     }
 
     /**
@@ -165,6 +189,13 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     @Override
     public UriMatchTemplate getUriMatchTemplate() {
         return delegate().getUriMatchTemplate();
+    }
+
+    @Override
+    public RouteTemplate getRouteTemplate() {
+        // the string of the built UriMatchTemplate for a Micronaut template, as before; a template
+        // of another engine is known without building the route
+        return template.isMicronaut() ? delegate().getRouteTemplate() : template;
     }
 
     @Override
@@ -390,6 +421,6 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     @Override
     public String toString() {
-        return methodKey + ' ' + uri + " -> " + declaration;
+        return methodKey + ' ' + template + " -> " + declaration;
     }
 }

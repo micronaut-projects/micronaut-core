@@ -17,6 +17,7 @@ package io.micronaut.web.router.builder;
 
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.util.SupplierUtil;
+import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.web.router.RouteAssembly;
 import io.micronaut.web.router.UriRouteInfo;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
@@ -38,18 +39,24 @@ import java.util.function.Supplier;
 @Internal
 public final class DeclaredUriRoute {
     private final IndexedRouteDeclaration declaration;
+    private final Supplier<ParsedRouteTemplate> parsedTemplate;
     private final RouteSettings settings;
     private final Supplier<RouteAssembly.DefaultUriRoute> route;
     private @Nullable RouteSettings fixed;
 
     /**
-     * @param declaration The declaration
-     * @param factory     Creates the route with its settings, not added to the assembly
-     * @param exposePort  Exposes the port of the route when it is declared: the server opens the
-     *                    exposed ports before the route is built
+     * @param declaration    The declaration
+     * @param parsedTemplate Parses the template of the declaration with its engine
+     * @param factory        Creates the route with its settings, not added to the assembly
+     * @param exposePort     Exposes the port of the route when it is declared: the server opens the
+     *                       exposed ports before the route is built
      */
-    public DeclaredUriRoute(IndexedRouteDeclaration declaration, Function<RouteSettings, RouteAssembly.DefaultUriRoute> factory, IntConsumer exposePort) {
+    public DeclaredUriRoute(IndexedRouteDeclaration declaration,
+                            Supplier<ParsedRouteTemplate> parsedTemplate,
+                            Function<RouteSettings, RouteAssembly.DefaultUriRoute> factory,
+                            IntConsumer exposePort) {
         this.declaration = declaration;
+        this.parsedTemplate = SupplierUtil.memoized(parsedTemplate);
         // the settings of the handler are recorded: the handler is given them when the route is created
         this.settings = new RouteSettings(exposePort, null);
         this.route = SupplierUtil.memoized(() -> factory.apply(current()));
@@ -60,6 +67,13 @@ public final class DeclaredUriRoute {
      */
     public IndexedRouteDeclaration declaration() {
         return declaration;
+    }
+
+    /**
+     * @return The template of the declaration as its engine parses it, parsed once
+     */
+    public Supplier<ParsedRouteTemplate> parsedTemplate() {
+        return parsedTemplate;
     }
 
     /**
@@ -117,6 +131,6 @@ public final class DeclaredUriRoute {
 
     @Override
     public String toString() {
-        return declaration.httpMethodName() + " " + declaration.uriTemplate() + " (declared)";
+        return declaration.httpMethodName() + " " + declaration.template() + " (declared)";
     }
 }
