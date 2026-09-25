@@ -40,6 +40,7 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -520,10 +521,13 @@ abstract class AbstractJdkHttpClient {
             // the JDK client reports a connection closed before the response headers with this message
             result = new ResponseClosedException("Connection closed before response was received", false);
             report(instance, LoadBalancer.Outcome.RESET);
+        } else if (e instanceof HttpTimeoutException) {
+            // the request timeout of the JDK client, set from the read timeout, only runs until
+            // the response headers arrive
+            result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+            report(instance, LoadBalancer.Outcome.TIMEOUT);
         } else {
-            if (e instanceof HttpTimeoutException) {
-                report(instance, LoadBalancer.Outcome.TIMEOUT);
-            } else if (ByteBodySubscriber.isTruncatedBody(e)) {
+            if (ByteBodySubscriber.isTruncatedBody(e)) {
                 // a buffered response whose body was cut off
                 report(instance, LoadBalancer.Outcome.RESET);
             }
