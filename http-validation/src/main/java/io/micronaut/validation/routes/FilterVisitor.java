@@ -27,11 +27,17 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.ClientFilter;
 import io.micronaut.http.annotation.CookieValue;
 import io.micronaut.http.annotation.Header;
+import io.micronaut.http.annotation.Part;
 import io.micronaut.http.annotation.QueryValue;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.annotation.ServerFilter;
+import io.micronaut.http.body.AsyncRequestBody;
 import io.micronaut.http.filter.FilterContinuation;
+import io.micronaut.http.form.FileUpload;
+import io.micronaut.http.form.FormData;
+import io.micronaut.http.form.FormPart;
+import io.micronaut.http.form.FormParts;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.Element;
 import io.micronaut.inject.ast.MethodElement;
@@ -43,6 +49,7 @@ import io.micronaut.web.router.RouteInfo;
 import io.micronaut.web.router.RouteMatch;
 import org.reactivestreams.Publisher;
 
+import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
@@ -64,6 +71,17 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         MutablePropagatedContext.class,
         RouteMatch.class,
         RouteInfo.class
+    );
+    /**
+     * The types that read the body of a server request, which a request filter method of a
+     * {@link ServerFilter} can declare, as a controller method can.
+     */
+    private static final Set<Class<?>> SERVER_REQUEST_BODY_CLASSES = Set.of(
+        AsyncRequestBody.class,
+        FormData.class,
+        FormParts.class,
+        FormPart.class,
+        FileUpload.class
     );
     private static final Set<String> PERMITTED_BINDING_ANNOTATIONS = Set.of(
         Body.class.getName(),
@@ -113,8 +131,16 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
             ParameterElement continuationCreator = null;
             for (ParameterElement parameter : parameters) {
                 ClassElement parameterType = parameter.getGenericType();
+                boolean serverRequestFilter = !isResponseFilter && element.getDeclaringType().isAnnotationPresent(ServerFilter.class);
                 if (parameter.hasStereotype(Bindable.class)) {
                     String annotationName = parameter.getAnnotationNameByStereotype(Bindable.class).orElse(null);
+                    if (Part.class.getName().equals(annotationName)) {
+                        if (!serverRequestFilter) {
+                            context.fail("@Part can only be bound in a request filter method of a @ServerFilter", parameter);
+                            return;
+                        }
+                        continue;
+                    }
                     if (!PERMITTED_BINDING_ANNOTATIONS.contains(annotationName)) {
                         context.fail("Unsupported binding annotation on filter method: " + annotationName, parameter);
                         return;
@@ -123,6 +149,13 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
                         return;
                     } else if (Body.class.getName().equals(annotationName) && !isPermittedRawType(parameterType)) {
                         context.fail("The @Body to a filter method can only be a raw type (byte[], String, ByteBuffer etc.)", parameter);
+                        return;
+                    }
+                    continue;
+                }
+                if (isServerRequestBodyType(parameterType)) {
+                    if (!serverRequestFilter) {
+                        context.fail("The body of the request (" + parameterType.getName() + ") can only be bound in a request filter method of a @ServerFilter", parameter);
                         return;
                     }
                     continue;
@@ -180,6 +213,20 @@ public final class FilterVisitor implements TypeElementVisitor<Object, Object> {
         } catch (IllegalArgumentException e) {
             context.fail(Objects.requireNonNullElse(e.getMessage(), "Illegal argument"), element);
         }
+    }
+
+    /**
+     * @param parameterType The type of a parameter
+     * @return Whether it reads the body of a server request: one of the types, or a {@code List}
+     * or {@code Optional} of one
+     */
+    private static boolean isServerRequestBodyType(ClassElement parameterType) {
+        ClassElement type = parameterType;
+        if (type.isAssignable(List.class) || type.isOptional()) {
+            type = type.getFirstTypeArgument().orElse(type);
+        }
+        String name = type.getName();
+        return SERVER_REQUEST_BODY_CLASSES.stream().anyMatch(c -> c.getName().equals(name));
     }
 
     private boolean isPermittedRawType(ClassElement parameterType) {

@@ -37,6 +37,7 @@ import io.micronaut.http.annotation.Body;
 import io.micronaut.http.annotation.RequestFilter;
 import io.micronaut.http.annotation.ResponseFilter;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.ServerRequestBinderRegistry;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.InternalByteBody;
 import io.micronaut.http.annotation.ServerFilter;
@@ -81,7 +82,7 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
         this.filterAnnotation = filterAnnotation;
         this.threadSelectionConfiguration = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ThreadSelectionConfiguration.class).orElse(null) : null;
         this.executorSelector = beanContext != null && filterAnnotation == ServerFilter.class ? beanContext.findBean(ExecutorSelector.class).orElse(null) : null;
-        Optional<RequestBinderRegistry> requestBinderRegistry = beanContext != null ? beanContext.findBean(RequestBinderRegistry.class) : Optional.empty();
+        Optional<RequestBinderRegistry> requestBinderRegistry = findBinderRegistry(beanContext, filterAnnotation);
         this.argumentBinderRegistry = new RequestBinderRegistry() {
             @Override
             public <T> Optional<ArgumentBinder<T, HttpRequest<?>>> findArgumentBinder(Argument<T> argument) {
@@ -110,6 +111,23 @@ public abstract class BaseFilterProcessor<A extends Annotation> implements BeanD
                 }
             }
         };
+    }
+
+    /**
+     * The binders of the arguments of the filter methods: those the server binds its routes with,
+     * for a server filter, e.g. the binders of the form fields of a request.
+     */
+    private static Optional<RequestBinderRegistry> findBinderRegistry(@Nullable BeanContext beanContext, Class<?> filterAnnotation) {
+        if (beanContext == null) {
+            return Optional.empty();
+        }
+        if (filterAnnotation == ServerFilter.class) {
+            Optional<ServerRequestBinderRegistry> server = beanContext.findBean(ServerRequestBinderRegistry.class);
+            if (server.isPresent()) {
+                return Optional.of(server.get());
+            }
+        }
+        return beanContext.findBean(RequestBinderRegistry.class);
     }
 
     @Override

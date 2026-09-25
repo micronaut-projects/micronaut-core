@@ -32,12 +32,14 @@ import io.micronaut.core.propagation.PropagatedContext;
 import io.micronaut.core.type.Argument;
 import io.micronaut.core.type.Executable;
 import io.micronaut.core.type.UnsafeExecutable;
+import io.micronaut.http.BasicHttpAttributes;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpResponse;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.binders.PendingRequestBindingResult;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.inject.ExecutableMethod;
 import org.jspecify.annotations.Nullable;
@@ -54,6 +56,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 
 /**
  * Internal implementation of {@link io.micronaut.http.annotation.ServerFilter}.
@@ -214,7 +217,16 @@ record MethodFilter<T>(FilterOrder order,
                         fulfilled[i] = ctx -> {
                             HttpRequest<?> request = ctx.request;
                             ArgumentConversionContext<Object> conversionContext = (ArgumentConversionContext<Object>) ConversionContext.of(argument);
-                            ArgumentBinder.BindingResult<Object> result = argumentBinder.bind(conversionContext, request);
+                            @SuppressWarnings("unchecked")
+                            ArgumentBinder.BindingResult<Object>[] bound = new ArgumentBinder.BindingResult[1];
+                            // what the binding waits for is the filter's, not the route's
+                            ExecutionFlow<?> waitsFor = BasicHttpAttributes.detachRouteWaitsFor(request, () -> bound[0] = argumentBinder.bind(conversionContext, request));
+                            ArgumentBinder.BindingResult<Object> result = Objects.requireNonNull(bound[0], "binding result");
+                            if (result instanceof PendingRequestBindingResult<Object> pending && pending.isPending()) {
+                                // e.g. a form that is still read: the filter waits for it, like a
+                                // controller method does
+                                return new PendingArgument(waitsFor, () -> convertResult(method, argument, result));
+                            }
                             return convertResult(method, argument, result);
                         };
                         if (argumentBinder instanceof FilterArgumentBinderPredicate pred) {
@@ -383,6 +395,10 @@ record MethodFilter<T>(FilterOrder order,
                 } catch (Throwable e) {
                     return ExecutionFlow.error(e);
                 }
+                ExecutionFlow<Object[]> pending = PendingArgument.await(args);
+                if (pending != null) {
+                    return pending.flatMap(a -> filter(filterContext, methodContext, a, onExecutor));
+                }
             }
         }
         if (!onExecutor && executor != null) {
@@ -486,7 +502,8 @@ record MethodFilter<T>(FilterOrder order,
         } catch (Throwable e) {
             return ExecutionFlow.error(e);
         }
-        ExecutionFlow<Object[]> result = ExecutionFlow.just(args);
+        ExecutionFlow<Object[]> pending = PendingArgument.await(args);
+        ExecutionFlow<Object[]> result = pending == null ? ExecutionFlow.just(args) : pending;
         for (int i = 0; i < asyncArgBinders.length; i++) {
             AsyncFilterArgBinder binder = asyncArgBinders[i];
             if (binder != null) {
@@ -594,6 +611,37 @@ record MethodFilter<T>(FilterOrder order,
 
     private interface AsyncFilterArgBinder {
         ExecutionFlow<Object> bind(FilterMethodContext context);
+    }
+
+    /**
+     * An argument whose binding is pending, e.g. a form that is still read: bound once what the
+     * binding waits for completed.
+     *
+     * @param waitsFor What the binding waits for
+     * @param value    The value of the argument, once the binding completed
+     */
+    private record PendingArgument(ExecutionFlow<?> waitsFor, Supplier<@Nullable Object> value) {
+
+        /**
+         * Wait for the pending arguments.
+         *
+         * @param args The bound arguments
+         * @return Completes with the arguments once none is pending, or {@code null} if none is
+         */
+        static @Nullable ExecutionFlow<Object[]> await(Object[] args) {
+            ExecutionFlow<Object[]> result = null;
+            for (int i = 0; i < args.length; i++) {
+                if (args[i] instanceof PendingArgument pending) {
+                    int position = i;
+                    ExecutionFlow<Object[]> previous = result == null ? ExecutionFlow.just(args) : result;
+                    result = previous.flatMap(a -> pending.waitsFor.then(() -> {
+                        a[position] = pending.value.get();
+                        return ExecutionFlow.just(a);
+                    }));
+                }
+            }
+            return result;
+        }
     }
 
     /**
