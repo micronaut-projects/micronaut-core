@@ -150,11 +150,13 @@ public interface NettyHttpResponseBuilder {
                 return builder.toStreamHttpResponse();
             } else {
                 FullHttpResponse fullHttpResponse = builder.toFullHttpResponse();
-                return new DefaultStreamedHttpResponse(
-                        HttpVersion.HTTP_1_1,
-                        HttpResponseStatus.valueOf(response.code(), response.reason()),
+                DefaultStreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(
+                        fullHttpResponse.protocolVersion(),
+                        fullHttpResponse.status(),
                         Publishers.just(new DefaultLastHttpContent(fullHttpResponse.content()))
                 );
+                streamedHttpResponse.headers().setAll(fullHttpResponse.headers());
+                return streamedHttpResponse;
             }
         }
         // manual conversion
