@@ -54,12 +54,26 @@ final class ServiceScanner<S> {
     private final String serviceName;
     private final Predicate<String> lineCondition;
     private final Function<String, S> transformer;
+    @Nullable
+    private final ServiceIndex index;
 
     public ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer) {
+        this(classLoader, serviceName, lineCondition, transformer, ServiceIndex.find(classLoader));
+    }
+
+    /**
+     * @param classLoader   The class loader
+     * @param serviceName   The name of the service type
+     * @param lineCondition The condition tested on the service names
+     * @param transformer   The transformer of the service names
+     * @param index         The service index that applies to the class loader, or null to scan the class path
+     */
+    ServiceScanner(ClassLoader classLoader, String serviceName, Predicate<String> lineCondition, Function<String, S> transformer, @Nullable ServiceIndex index) {
         this.classLoader = classLoader;
         this.serviceName = serviceName;
         this.lineCondition = lineCondition;
         this.transformer = transformer;
+        this.index = index;
     }
 
     static ServiceScanner.@Nullable ExclusiveStaticServiceDefinitions findStaticServiceDefinitions() {
@@ -68,6 +82,16 @@ final class ServiceScanner<S> {
         } else {
             return null;
         }
+    }
+
+    /**
+     * Reads the service names listed by a {@code META-INF/services} file, the way the scan reads them.
+     *
+     * @param url The URL of the file
+     * @return The names
+     */
+    static Set<String> readStandardServiceNames(URL url) {
+        return UrlServicesLoader.computeStandardServiceTypeNames(url, name -> true);
     }
 
     SoftServiceLoader.ServiceCollector<S> createCollector() {
@@ -90,7 +114,7 @@ final class ServiceScanner<S> {
 
             private void collect(Consumer<? super S> consumer, boolean allowFork) {
                 boolean fork = allowFork && ForkJoinPool.getCommonPoolParallelism() > 1;
-                ServiceEntriesLoader<S> task = new ServiceEntriesLoader<>(serviceName, classLoader, lineCondition, transformer, fork);
+                ServiceEntriesLoader<S> task = new ServiceEntriesLoader<>(serviceName, classLoader, lineCondition, transformer, fork, index);
                 if (fork) {
                     ForkJoinPool.commonPool().invoke(task);
                 } else {
@@ -118,12 +142,15 @@ final class ServiceScanner<S> {
         private final boolean fork;
         @Nullable
         private final Set<String> serviceEntries;
+        @Nullable
+        private final ServiceIndex index;
 
-        private ServiceEntriesLoader(String serviceName, ClassLoader classLoader, Predicate<String> lineCondition, Function<String, S> transformer, boolean fork) {
+        private ServiceEntriesLoader(String serviceName, ClassLoader classLoader, Predicate<String> lineCondition, Function<String, S> transformer, boolean fork, @Nullable ServiceIndex index) {
             this.serviceName = serviceName;
             this.classLoader = classLoader;
             this.lineCondition = lineCondition;
             this.transformer = transformer;
+            this.index = index;
             final ExclusiveStaticServiceDefinitions ssd = ServiceScanner.findStaticServiceDefinitions();
             if (ssd != null) {
                 Map<String, Set<String>> stringSetMap = ssd.serviceTypeMap();
@@ -154,17 +181,11 @@ final class ServiceScanner<S> {
                     }
                     return;
                 }
-                Enumeration<URL> serviceConfigs = findStandardServiceConfigs();
-                while (serviceConfigs.hasMoreElements()) {
-                    URL url = serviceConfigs.nextElement();
-                    UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, transformer, fork);
-                    tasks.add(task);
-                    if (fork) {
-                        task.fork();
-                    } else {
-                        task.compute();
-                    }
+                if (index != null) {
+                    computeFromIndex(index);
+                    return;
                 }
+                scanStandardServiceConfigs();
                 Set<String> serviceEntries = MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, serviceName);
                 for (String serviceEntry : serviceEntries) {
                     final ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(serviceEntry, transformer);
@@ -180,8 +201,50 @@ final class ServiceScanner<S> {
             }
         }
 
-        private Enumeration<URL> findStandardServiceConfigs() throws IOException {
-            return classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
+        /**
+         * Loads the services named by the index. A type that is not indexed has its {@code META-INF/services} files
+         * scanned, while its {@code META-INF/micronaut} entries always come from the index, which lists all of them.
+         * The tasks are forked as for a scan, and the condition is tested on every name of the index.
+         *
+         * @param index The index
+         * @throws IOException If the {@code META-INF/services} files of a type that is not indexed cannot be found
+         */
+        private void computeFromIndex(ServiceIndex index) throws IOException {
+            List<String> standardNames = index.standardServices().get(serviceName);
+            if (standardNames == null) {
+                scanStandardServiceConfigs();
+            } else {
+                loadIndexedEntries(standardNames);
+            }
+            loadIndexedEntries(index.micronautServices().getOrDefault(serviceName, Set.of()));
+        }
+
+        private void loadIndexedEntries(Collection<String> names) {
+            for (String name : names) {
+                if (lineCondition.test(name)) {
+                    ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(name, transformer);
+                    tasks.add(task);
+                    if (fork) {
+                        task.fork();
+                    } else {
+                        task.compute();
+                    }
+                }
+            }
+        }
+
+        private void scanStandardServiceConfigs() throws IOException {
+            Enumeration<URL> serviceConfigs = classLoader.getResources(SoftServiceLoader.META_INF_SERVICES + '/' + serviceName);
+            while (serviceConfigs.hasMoreElements()) {
+                URL url = serviceConfigs.nextElement();
+                UrlServicesLoader<S> task = new UrlServicesLoader<>(url, lineCondition, transformer, fork);
+                tasks.add(task);
+                if (fork) {
+                    task.fork();
+                } else {
+                    task.compute();
+                }
+            }
         }
 
         @Override
@@ -220,7 +283,7 @@ final class ServiceScanner<S> {
         @Override
         @SuppressWarnings({"java:S3776", "java:S135"})
         protected void compute() {
-            for (String typeName : computeStandardServiceTypeNames(url)) {
+            for (String typeName : computeStandardServiceTypeNames(url, lineCondition)) {
                 ServiceInstanceLoader<S> task = new ServiceInstanceLoader<>(typeName, transformer);
                 tasks.add(task);
                 if (fork) {
@@ -242,7 +305,7 @@ final class ServiceScanner<S> {
         }
 
         @SuppressWarnings("java:S3398")
-        private Set<String> computeStandardServiceTypeNames(URL url) {
+        private static Set<String> computeStandardServiceTypeNames(URL url, Predicate<String> lineCondition) {
             Set<String> typeNames = new HashSet<>();
             try {
                 URLConnection uc = url.openConnection();
