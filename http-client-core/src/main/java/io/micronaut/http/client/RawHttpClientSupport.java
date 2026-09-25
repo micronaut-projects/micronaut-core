@@ -53,7 +53,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public final class RawHttpClientSupport {
     private static final List<String> HOP_BY_HOP_HEADERS = List.of(
         HttpHeaders.CONNECTION,
-        "Keep-Alive",
+        HttpHeaders.KEEP_ALIVE,
         HttpHeaders.TE,
         HttpHeaders.TRAILER,
         HttpHeaders.TRANSFER_ENCODING,
@@ -246,31 +246,43 @@ public final class RawHttpClientSupport {
      * was replaced
      */
     public static @Nullable CloseableByteBody claimServerRequestBody(HttpRequest<?> request) {
-        Object body = request.getBody().orElse(null);
-        HttpRequest<?> current = request;
-        // a wrapper that replaced the body hides the bytes of the request it wraps
-        boolean direct = true;
-        while (true) {
-            if (current instanceof DirectByteBodyAccess directAccess) {
-                // e.g. a request mutated from a Netty server request, which is no wrapper
-                ByteBody bytes = direct ? directAccess.byteBodyDirect() : null;
-                if (bytes != null || !(current instanceof ServerHttpRequest<?>)) {
-                    return bytes == null ? null : bytes.move();
-                }
-            }
-            if (current instanceof ServerHttpRequest<?> serverRequest) {
-                if (!direct || body != null && body != serverRequest.getBody().orElse(null)) {
-                    return null;
-                }
-                return serverRequest.byteBody().move();
-            }
-            if (current instanceof HttpRequestWrapper<?> wrapper) {
-                // by identity: a replacement that only compares equal (e.g. redacted) is still a replacement
-                direct &= wrapper.getBody().orElse(null) == wrapper.getDelegate().getBody().orElse(null);
-                current = wrapper.getDelegate();
-            } else {
-                return null;
+        HttpRequest<?> unwrapped = unwrapUnchangedBody(request);
+        if (unwrapped == null) {
+            return null;
+        }
+        if (unwrapped instanceof DirectByteBodyAccess directAccess) {
+            // e.g. a request mutated from a Netty server request, which is no wrapper
+            ByteBody bytes = directAccess.byteBodyDirect();
+            if (bytes != null) {
+                return bytes.move();
             }
         }
+        if (unwrapped instanceof ServerHttpRequest<?> serverRequest) {
+            Object body = request.getBody().orElse(null);
+            if (body == null || body == serverRequest.getBody().orElse(null)) {
+                return serverRequest.byteBody().move();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Unwrap the wrappers around a request down to the request that has the body bytes: a server
+     * request, one with direct access to its bytes, or one that is no wrapper.
+     *
+     * @return The request, or {@code null} if a wrapper replaced the body of the request it wraps
+     */
+    private static @Nullable HttpRequest<?> unwrapUnchangedBody(HttpRequest<?> request) {
+        HttpRequest<?> current = request;
+        while (current instanceof HttpRequestWrapper<?> wrapper
+            && !(current instanceof DirectByteBodyAccess)
+            && !(current instanceof ServerHttpRequest<?>)) {
+            // by identity: a replacement that only compares equal (e.g. redacted) is still a replacement
+            if (wrapper.getBody().orElse(null) != wrapper.getDelegate().getBody().orElse(null)) {
+                return null;
+            }
+            current = wrapper.getDelegate();
+        }
+        return current;
     }
 }
