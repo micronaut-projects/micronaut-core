@@ -16,6 +16,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
@@ -33,6 +34,10 @@ class LoomCarrierGroupTest {
     }
 
     private static LoomCarrierGroup createGroup() {
+        return createGroup(1);
+    }
+
+    private static LoomCarrierGroup createGroup(int nThreads) {
         LoomCarrierConfiguration configuration = new LoomCarrierConfiguration(
             Duration.ofNanos(1), // one continuation per carrier loop iteration
             Duration.ofNanos(1),
@@ -44,7 +49,7 @@ class LoomCarrierGroupTest {
             0 // no warmup, every thread goes straight to the runner
         );
         LoomCarrierGroup.Factory factory = new LoomCarrierGroup.Factory(new EventLoopLoomFactory(), configuration);
-        return (LoomCarrierGroup) factory.create(1, new ThreadPerTaskExecutor(new DefaultThreadFactory("loom-carrier-test")), NioIoHandler.newFactory());
+        return (LoomCarrierGroup) factory.create(nThreads, new ThreadPerTaskExecutor(new DefaultThreadFactory("loom-carrier-test")), NioIoHandler.newFactory());
     }
 
     @AfterEach
@@ -81,6 +86,115 @@ class LoomCarrierGroupTest {
         CompletableFuture<Boolean> plainVirtual = new CompletableFuture<>();
         Thread.ofVirtual().start(() -> plainVirtual.complete(runner.isOnRunner(Thread.currentThread())));
         assertFalse(plainVirtual.get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void ioThreadIsOnRunner() throws Exception {
+        CompletableFuture<Boolean> onRunner = new CompletableFuture<>();
+        runner.eventLoop().execute(() -> onRunner.complete(runner.isOnRunner(Thread.currentThread())));
+        assertTrue(onRunner.get(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void threadScheduledDirectlyByRunnerIsOnRunner() throws Exception {
+        assumeTrue(PrivateLoomSupport.isSupported());
+        CompletableFuture<Boolean> onRunner = new CompletableFuture<>();
+        Thread.Builder.OfVirtual builder = Thread.ofVirtual().name("direct");
+        PrivateLoomSupport.setScheduler(builder, runner);
+        Thread thread = builder.unstarted(() -> onRunner.complete(runner.isOnRunner(Thread.currentThread())));
+        thread.start();
+        assertTrue(onRunner.get(10, TimeUnit.SECONDS));
+        thread.join(10_000);
+        assertFalse(thread.isAlive());
+    }
+
+    @Test
+    void threadOfAnotherRunnerIsNotOnRunner() throws Exception {
+        LoomCarrierGroup twoRunners = createGroup(2);
+        try {
+            LoomCarrierGroup.Runner first = twoRunners.runners.get(0);
+            LoomCarrierGroup.Runner second = twoRunners.runners.get(1);
+
+            // sticky thread of the first runner
+            CompletableFuture<Boolean> stickyOnFirst = new CompletableFuture<>();
+            CompletableFuture<Boolean> stickyOnSecond = new CompletableFuture<>();
+            Thread sticky = first.newThread(() -> {
+                stickyOnFirst.complete(first.isOnRunner(Thread.currentThread()));
+                stickyOnSecond.complete(second.isOnRunner(Thread.currentThread()));
+            });
+            sticky.start();
+            assertTrue(stickyOnFirst.get(10, TimeUnit.SECONDS));
+            assertFalse(stickyOnSecond.get(10, TimeUnit.SECONDS));
+            sticky.join(10_000);
+            assertFalse(sticky.isAlive());
+
+            // io thread of the first runner
+            CompletableFuture<Boolean> ioOnFirst = new CompletableFuture<>();
+            CompletableFuture<Boolean> ioOnSecond = new CompletableFuture<>();
+            first.eventLoop().execute(() -> {
+                ioOnFirst.complete(first.isOnRunner(Thread.currentThread()));
+                ioOnSecond.complete(second.isOnRunner(Thread.currentThread()));
+            });
+            assertTrue(ioOnFirst.get(10, TimeUnit.SECONDS));
+            assertFalse(ioOnSecond.get(10, TimeUnit.SECONDS));
+        } finally {
+            twoRunners.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+            assertTrue(twoRunners.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void unmountedStickyThreadIsNotOnRunner() throws Exception {
+        assumeTrue(PrivateLoomSupport.isCarrierThreadSupported());
+        CountDownLatch parked = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
+        Thread thread = runner.newThread(() -> {
+            parked.countDown();
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        });
+        thread.start();
+        assertTrue(parked.await(10, TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (thread.getState() != Thread.State.WAITING) {
+            assertTrue(System.nanoTime() < deadline, "thread did not park");
+            Thread.onSpinWait();
+        }
+        // scheduled by this runner, but currently not mounted on its carrier
+        assertFalse(runner.isOnRunner(thread));
+        release.countDown();
+        thread.join(10_000);
+        assertFalse(thread.isAlive());
+    }
+
+    @Test
+    void externalEnqueueBeforeDrain() throws Exception {
+        CountDownLatch ran = new CountDownLatch(1);
+        assertTrue(runner.enqueueExternal(ran::countDown));
+        assertFalse(runner.drained);
+        // wake the carrier so it picks up the queued task
+        runner.eventLoop().execute(() -> { });
+        assertTrue(ran.await(10, TimeUnit.SECONDS));
+    }
+
+    @Test
+    void externalEnqueueAfterDrainIsHandedOff() throws Exception {
+        group.shutdownGracefully(0, 0, TimeUnit.MILLISECONDS);
+        assertTrue(group.awaitTermination(10, TimeUnit.SECONDS));
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (!runner.drained) {
+            assertTrue(System.nanoTime() < deadline, "carrier did not drain");
+            Thread.onSpinWait();
+        }
+
+        CompletableFuture<String> ran = new CompletableFuture<>();
+        assertFalse(runner.enqueueExternal(() -> ran.complete(Thread.currentThread().getName())));
+        // the task runs on the default scheduler, i.e. a ForkJoinPool worker
+        assertTrue(ran.get(10, TimeUnit.SECONDS).startsWith("ForkJoinPool"), ran.get());
+        assertEquals(0, runner.enqueuing.get());
     }
 
     @Test

@@ -603,7 +603,7 @@ public final class LoomCarrierGroup extends MultiThreadIoEventLoopGroup {
          * @param command The task
          * @return {@code true} if the task was queued, {@code false} if it was handed off
          */
-        private boolean enqueueExternal(Runnable command) {
+        boolean enqueueExternal(Runnable command) {
             enqueuing.incrementAndGet();
             try {
                 if (drained) {
