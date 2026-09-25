@@ -1118,7 +1118,6 @@ public class ConnectionManager {
         }
     }
 
-
     /**
      * Initializer for H2C prior-knowledge connections. Will proceed with
      * {@link #initHttp2} immediately.
@@ -1689,6 +1688,10 @@ public class ConnectionManager {
             @Override
             void windDownConnection() {
                 super.windDownConnection();
+                if (!channel.eventLoop().inEventLoop()) {
+                    channel.eventLoop().execute(this::windDownConnection);
+                    return;
+                }
                 if (!hasLiveRequest) {
                     channel.close();
                 }
