@@ -651,13 +651,13 @@ abstract class AbstractJdkHttpClient {
                     return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
                 })
                 .flatMap(Mono::fromCompletionStage)
-                .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e)))
+                .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e))
+                .doOnNext(netResponse -> report(sent.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS)))
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {
                     log.debug("Client {} Received HTTP Response: {} {}", clientId, netResponse.statusCode(), netResponse.uri());
                 }
-                report(target.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS);
                 boolean errorStatus = netResponse.statusCode() >= 400;
                 if (errorStatus && configuration.isExceptionOnErrorStatus()) {
                     sink.error(HttpClientExceptionUtils.populateServiceId(

@@ -232,11 +232,11 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 java.net.http.HttpClient httpClient = options == null || options.isFollowRedirects() ? rawClient.get() : rawNoRedirectClient.get();
                 // the outcome is reported once the body ends: a response whose body is cut off is a failure
                 return Mono.fromCompletionStage(httpClient.sendAsync(httpRequest, responseInfo -> new ByteBodySubscriber(bodySizeLimits,
-                        failure -> reportBodyEnd(target.instance(), responseInfo.statusCode(), failure))))
+                        failure -> reportBodyEnd(sent.instance(), responseInfo.statusCode(), failure))))
                     .onErrorMap(
                         e -> e instanceof HttpTimeoutException && !(e instanceof HttpConnectTimeoutException) && responseTimeout(request) != null,
                         e -> {
-                            report(target.instance(), LoadBalancer.Outcome.TIMEOUT);
+                            report(sent.instance(), LoadBalancer.Outcome.TIMEOUT);
                             return ReadTimeoutException.TIMEOUT_EXCEPTION;
                         }
                     )
