@@ -763,6 +763,8 @@ record MethodFilter<T>(FilterOrder order,
             } else {
                 filterContext = filterContext.withPropagatedContext(PropagatedContext.find().orElse(filterContext.propagatedContext()));
             }
+            // the filter subscribes to the returned publisher, possibly with a Reactor context of its own
+            filterContext = filterContext.withReactive();
             return ReactiveExecutionFlow.toPublisher(
                 downstream.apply(filterContext).<HttpResponse<?>>map(newFilterContext -> {
                     filterContext = newFilterContext;

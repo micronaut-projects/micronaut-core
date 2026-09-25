@@ -799,6 +799,50 @@ class FilterRunnerSpec extends Specification {
         legacy << [false, true]
     }
 
+    def 'a filter subscribing to the continuation publisher marks the context of the response provider'(boolean legacy) {
+        given:
+        List<GenericHttpFilter> filters = [
+                around(legacy) { request, chain ->
+                    return Mono.from(chain.proceed(request)).contextWrite { it.put('tenant', 'acme') }
+                }
+        ]
+        def marked = []
+
+        when:
+        def result = await(new FilterRunner(filters, (request, propagatedContext) -> {
+            marked.add(ReactiveFilterChainElement.isPresent(propagatedContext))
+            // the provider keeps the result lazy when marked, so the context of the filter is visible
+            return ReactiveExecutionFlow.fromPublisher(Mono.deferContextual { ctx -> Mono.just(HttpResponse.ok(ctx.getOrDefault('tenant', 'MISSING'))) })
+        }).run(HttpRequest.GET("/req1")))
+        then:
+        marked == [true]
+        result.value.body() == 'acme'
+
+        where:
+        legacy << [false, true]
+    }
+
+    def 'other filters do not mark the context of the response provider'() {
+        given:
+        List<GenericHttpFilter> filters = [
+                before(ReturnType.of(void)) { req -> null },
+                before(ReturnType.of(HttpResponse), [Argument.of(HttpRequest<?>), Argument.of(FilterContinuation, HttpResponse)]) { request, chain ->
+                    return chain.proceed()
+                },
+                after(ReturnType.of(void)) { req, resp -> null },
+        ]
+        def marked = []
+
+        when:
+        def flow = new FilterRunner(filters, (request, propagatedContext) -> {
+            marked.add(ReactiveFilterChainElement.isPresent(propagatedContext))
+            return ExecutionFlow.just(HttpResponse.ok("resp1"))
+        }).run(HttpRequest.GET("/req1"))
+        then:
+        marked == [false]
+        flow.tryComplete().value.body() == "resp1"
+    }
+
     private def after(ReturnType returnType, List<Argument> arguments = closure.parameterTypes.collect { Argument.of(it) }, Closure<?> closure) {
         return MethodFilter.prepareFilterMethod(ConversionService.SHARED, null, new LambdaExecutable(closure, arguments.toArray(new Argument[0]), returnType), true, new FilterOrder.Fixed(0), new DefaultRequestBinderRegistry(ConversionService.SHARED), null)
     }

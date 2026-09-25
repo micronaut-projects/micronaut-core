@@ -46,6 +46,7 @@ import io.micronaut.http.codec.CodecException;
 import io.micronaut.http.context.ServerHttpRequestContext;
 import io.micronaut.http.context.ServerRequestContext;
 import io.micronaut.http.exceptions.HttpStatusException;
+import io.micronaut.http.filter.ReactiveFilterChainElement;
 import io.micronaut.http.reactive.execution.ReactiveExecutionFlow;
 import io.micronaut.http.server.binding.RequestArgumentSatisfier;
 import io.micronaut.http.server.exceptions.response.ErrorContext;
@@ -104,6 +105,10 @@ public final class RouteExecutor {
      */
     private static final Pattern IGNORABLE_ERROR_MESSAGE = Pattern.compile(
         "^.*(?:connection (?:reset|closed|abort|broken)|broken pipe).*$", Pattern.CASE_INSENSITIVE);
+    /**
+     * The value of an empty single-valued publisher, the flows do not carry {@code null}.
+     */
+    private static final Object EMPTY = new Object();
 
     final Router router;
     final BeanContext beanContext;
@@ -613,11 +618,11 @@ public final class RouteExecutor {
             return subscribeSingle(propagatedContext, request, publisher)
                 .<MutableHttpResponse<?>>flatMap(o -> {
                     if (o instanceof Optional<?> optional) {
-                        if (optional.isPresent()) {
-                            o = optional.get();
-                        } else {
-                            return ExecutionFlow.empty();
-                        }
+                        o = optional.isPresent() ? optional.get() : EMPTY;
+                    }
+                    if (o == EMPTY) {
+                        // empty publisher, or empty Optional
+                        return ExecutionFlow.just(emptyResponse(request, routeInfo));
                     }
                     MutableHttpResponse<?> singleResponse;
                     if (o instanceof HttpResponse<?> httpResponse) {
@@ -635,9 +640,7 @@ public final class RouteExecutor {
                             .body(o);
                     }
                     return ExecutionFlow.just(singleResponse);
-                })
-                // flatMap skips an empty value: an empty publisher, or an empty Optional
-                .map(singleResponse -> singleResponse == null ? emptyResponse(request, routeInfo) : singleResponse);
+                });
         }
         // streaming case
         Argument<?> typeArgument = routeInfo.getReturnType().getFirstTypeVariable().orElse(Argument.OBJECT_ARGUMENT);
@@ -659,24 +662,35 @@ public final class RouteExecutor {
     }
 
     /**
-     * Subscribe to a single-valued publisher right away. The request and the propagated context are
-     * available in the Reactor context, and the propagated context is bound as a thread-local for
-     * the subscription and the signals.
+     * The flow of the first value of a single-valued publisher, {@link #EMPTY} if there is none. The
+     * request and the propagated context are available in the Reactor context of the publisher, and
+     * the propagated context is bound as a thread-local for the subscription and the signals.
+     * <p>The publisher is subscribed to right away, so a publisher that completes synchronously
+     * yields an imperative flow. The exception is a filter that subscribes to the response
+     * publisher itself ({@link ReactiveFilterChainElement}): it may add values to the Reactor
+     * context, so the publisher stays lazy and is subscribed to by the filter.
      *
      * @param propagatedContext The propagated context
      * @param request           The request
      * @param publisher         The publisher
-     * @param <T>               The value type
      * @return The flow of the first value, immediate if the publisher completed synchronously
      */
-    private <T> ExecutionFlow<T> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<T> publisher) {
+    private ExecutionFlow<Object> subscribeSingle(PropagatedContext propagatedContext, HttpRequest<?> request, Publisher<Object> publisher) {
         if (publisher instanceof Fuseable.ScalarCallable<?>) {
             // Mono.just, Mono.empty, Mono.error: nothing observes the context
-            return ReactiveExecutionFlow.fromPublisherEager(publisher, propagatedContext);
+            return ReactiveExecutionFlow.fromPublisherEager(publisher, propagatedContext)
+                .map(o -> o == null ? EMPTY : o);
         }
-        Mono<T> mono = Mono.from(publisher)
+        if (ReactiveFilterChainElement.isPresent(propagatedContext)) {
+            Mono<Object> lazy = Mono.from(publisher)
+                .contextWrite(context -> ReactorPropagation.addPropagatedContext(context, propagatedContext).put(ServerRequestContext.KEY, request))
+                .defaultIfEmpty(EMPTY);
+            return ReactiveExecutionFlow.fromPublisher(ReactivePropagation.propagate(propagatedContext, lazy));
+        }
+        Mono<Object> mono = Mono.from(publisher)
             .contextWrite(context -> context.put(ServerRequestContext.KEY, request));
-        return ReactiveExecutionFlow.fromPublisherEager(mono, propagatedContext);
+        return ReactiveExecutionFlow.fromPublisherEager(mono, propagatedContext)
+            .map(o -> o == null ? EMPTY : o);
     }
 
     private MutableHttpResponse<?> emptyResponse(HttpRequest<?> request, RouteInfo<?> routeInfo) {
@@ -772,7 +786,7 @@ public final class RouteExecutor {
         if (isSinglePublisher) {
             // the single value is the body, an empty publisher is a missing body
             return subscribeSingle(propagatedContext, request, bodyPublisher)
-                .map(b -> b == null ? emptyResponse(request, routeInfo) : response.body(b));
+                .map(b -> b == EMPTY ? emptyResponse(request, routeInfo) : response.body(b));
         }
         MediaType mediaType = response.getContentType().orElseGet(() -> resolveDefaultResponseContentType(request, routeInfo));
 

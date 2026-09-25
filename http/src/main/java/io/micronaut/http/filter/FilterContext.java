@@ -29,16 +29,20 @@ import java.util.Objects;
  * @param request           The request
  * @param response          The response
  * @param propagatedContext The propagated context
+ * @param reactive          Whether a filter subscribes to the publisher of its continuation, so the
+ *                          response provider must yield a lazy publisher that sees the Reactor
+ *                          context written by that filter
  * @author Denis Stepanov
  * @since 4.2.0
  */
 @Internal
 record FilterContext(HttpRequest<?> request,
                      @Nullable HttpResponse<?> response,
-                     PropagatedContext propagatedContext) {
+                     PropagatedContext propagatedContext,
+                     boolean reactive) {
 
     FilterContext(HttpRequest<?> request, PropagatedContext propagatedContext) {
-        this(request, null, propagatedContext);
+        this(request, null, propagatedContext, false);
     }
 
     FilterContext withRequest(HttpRequest<?> request) {
@@ -49,7 +53,7 @@ record FilterContext(HttpRequest<?> request,
             throw new IllegalStateException("Cannot modify the request after response is set!");
         }
         Objects.requireNonNull(request);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
     }
 
     FilterContext withResponse(HttpResponse<?> response) {
@@ -57,7 +61,7 @@ record FilterContext(HttpRequest<?> request,
             return this;
         }
         Objects.requireNonNull(response);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
     }
 
     FilterContext withPropagatedContext(PropagatedContext propagatedContext) {
@@ -65,7 +69,14 @@ record FilterContext(HttpRequest<?> request,
             return this;
         }
         Objects.requireNonNull(propagatedContext);
-        return new FilterContext(request, response, propagatedContext);
+        return new FilterContext(request, response, propagatedContext, reactive);
+    }
+
+    FilterContext withReactive() {
+        if (reactive) {
+            return this;
+        }
+        return new FilterContext(request, response, propagatedContext, true);
     }
 
 }

@@ -431,7 +431,10 @@ public class FilterRunner {
 
     private ExecutionFlow<FilterContext> provideResponseAndHandleErrors(FilterContext context,
                                                                         ListIterator<InternalHttpFilter> iterator) {
-        ExecutionFlow<HttpResponse<?>> flow = provideResponse(context.request(), context.propagatedContext());
+        // a filter that subscribes to the response publisher itself may write to its Reactor
+        // context, the provider is told to keep the result lazy in that case
+        PropagatedContext propagatedContext = context.reactive() ? ReactiveFilterChainElement.mark(context.propagatedContext()) : context.propagatedContext();
+        ExecutionFlow<HttpResponse<?>> flow = provideResponse(context.request(), propagatedContext);
         if (flow.tryCompleteValue() != null) {
             return flow.map(context::withResponse);
         }
