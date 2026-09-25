@@ -120,7 +120,7 @@ class LoadBalancerFeedbackTest {
                         () -> response.byteBody().buffer().get(30, TimeUnit.SECONDS));
                     Assertions.assertInstanceOf(HttpClientException.class, failure.getCause());
                 }
-                Assertions.assertEquals(List.of(LoadBalancer.Outcome.RESET), recording.outcomes);
+                Assertions.assertEquals(List.of(LoadBalancer.Outcome.RESET), awaitOutcomes(recording));
             }
         }
     }
@@ -133,7 +133,7 @@ class LoadBalancerFeedbackTest {
                 RecordingLoadBalancerFactory recording = clients.getBean(RecordingLoadBalancerFactory.class);
                 Assertions.assertThrows(HttpClientException.class,
                     () -> Mono.from(client.exchange(HttpRequest.GET("/truncated"), String.class)).block());
-                Assertions.assertEquals(List.of(LoadBalancer.Outcome.RESET), recording.outcomes);
+                Assertions.assertEquals(List.of(LoadBalancer.Outcome.RESET), awaitOutcomes(recording));
             }
         }
     }
@@ -149,9 +149,23 @@ class LoadBalancerFeedbackTest {
                     Assertions.assertEquals(200, response.code());
                     Assertions.assertEquals("ok", new String(response.byteBody().buffer().get(30, TimeUnit.SECONDS).toByteArray(), StandardCharsets.UTF_8));
                 }
-                Assertions.assertEquals(List.of(LoadBalancer.Outcome.SUCCESS), recording.outcomes);
+                Assertions.assertEquals(List.of(LoadBalancer.Outcome.SUCCESS), awaitOutcomes(recording));
             }
         }
+    }
+
+    /**
+     * The client reports the outcome on its own thread once the body ended, which may be just
+     * after the caller saw the body end: wait for the first report, and a little longer for a
+     * second one that should not come.
+     */
+    private static List<LoadBalancer.Outcome> awaitOutcomes(RecordingLoadBalancerFactory recording) throws InterruptedException {
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+        while (recording.outcomes.isEmpty() && System.nanoTime() < deadline) {
+            Thread.sleep(10);
+        }
+        Thread.sleep(100);
+        return List.copyOf(recording.outcomes);
     }
 
     private static ApplicationContext recordingClients(URI instance) {
