@@ -37,7 +37,6 @@ import org.jspecify.annotations.Nullable;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
@@ -73,12 +72,10 @@ public final class RawHttpClientSupport {
      * @param headers The headers to change
      */
     public static void stripHopByHopHeaders(MutableHttpHeaders headers) {
-        for (String connection : headers.getAll(HttpHeaders.CONNECTION)) {
-            for (String token : connection.split(",")) {
-                String name = token.trim();
-                if (!name.isEmpty()) {
-                    headers.remove(name);
-                }
+        List<String> listed = connectionTokens(headers);
+        if (listed != null) {
+            for (String name : listed) {
+                headers.remove(name);
             }
         }
         for (String name : HOP_BY_HOP_HEADERS) {
@@ -86,7 +83,7 @@ public final class RawHttpClientSupport {
         }
         List<String> proxyHeaders = null;
         for (String name : headers.names()) {
-            if (name.toLowerCase(Locale.ROOT).startsWith(PROXY_HEADER_PREFIX)) {
+            if (isProxyHeader(name)) {
                 if (proxyHeaders == null) {
                     proxyHeaders = new ArrayList<>(2);
                 }
@@ -98,6 +95,54 @@ public final class RawHttpClientSupport {
                 headers.remove(name);
             }
         }
+    }
+
+    /**
+     * @return The header names the {@code Connection} headers list, or {@code null} for none
+     */
+    private static @Nullable List<String> connectionTokens(HttpHeaders headers) {
+        List<String> connection = headers.getAll(HttpHeaders.CONNECTION);
+        if (connection.isEmpty()) {
+            return null;
+        }
+        List<String> tokens = new ArrayList<>(2);
+        for (String value : connection) {
+            int start = 0;
+            int length = value.length();
+            while (start < length) {
+                int comma = value.indexOf(',', start);
+                int end = comma < 0 ? length : comma;
+                String name = value.substring(start, end).trim();
+                if (!name.isEmpty()) {
+                    tokens.add(name);
+                }
+                start = end + 1;
+            }
+        }
+        return tokens;
+    }
+
+    private static boolean isProxyHeader(String name) {
+        return name.regionMatches(true, 0, PROXY_HEADER_PREFIX, 0, PROXY_HEADER_PREFIX.length());
+    }
+
+    private static boolean isHopByHop(String name, @Nullable List<String> listed) {
+        if (isProxyHeader(name)) {
+            return true;
+        }
+        for (String hopByHop : HOP_BY_HOP_HEADERS) {
+            if (hopByHop.equalsIgnoreCase(name)) {
+                return true;
+            }
+        }
+        if (listed != null) {
+            for (String token : listed) {
+                if (token.equalsIgnoreCase(name)) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     /**
@@ -113,18 +158,20 @@ public final class RawHttpClientSupport {
     public static MutableHttpRequest<Object> copyRequest(HttpRequest<?> request, RawRequestOptions options) {
         MutableHttpRequest<Object> copy = HttpRequest.create(request.getMethod(), request.getUri().toString(), request.getMethodName());
         MutableHttpHeaders headers = copy.getHeaders();
-        request.getHeaders().forEach((name, values) -> {
+        HttpHeaders source = request.getHeaders();
+        boolean strip = options.isStripHopByHopHeaders();
+        // the hop-by-hop headers are left out while copying, rather than copied and removed
+        List<String> listed = strip ? connectionTokens(source) : null;
+        boolean retainHost = options.isRetainHostHeader();
+        source.forEach((name, values) -> {
+            if (strip && isHopByHop(name, listed) || !retainHost && HttpHeaders.HOST.equalsIgnoreCase(name)) {
+                return;
+            }
             for (String value : values) {
                 headers.add(name, value);
             }
         });
         copy.getAttributes().putAll(request.getAttributes());
-        if (!options.isRetainHostHeader()) {
-            headers.remove(HttpHeaders.HOST);
-        }
-        if (options.isStripHopByHopHeaders()) {
-            stripHopByHopHeaders(headers);
-        }
         return copy;
     }
 
