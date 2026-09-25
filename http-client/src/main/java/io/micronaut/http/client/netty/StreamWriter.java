@@ -104,8 +104,11 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
 
     @Override
     public void add(ReadBuffer buf) {
-        if (Objects.requireNonNull(flow).executeNow(() -> add0(buf))) {
+        EventLoopFlow flow = Objects.requireNonNull(this.flow);
+        if (flow.tryRunNow()) {
             add0(buf);
+        } else {
+            flow.submit(() -> add0(buf));
         }
     }
 
@@ -144,8 +147,11 @@ final class StreamWriter extends ChannelInboundHandlerAdapter implements BufferC
 
     @Override
     public void complete() {
-        if (Objects.requireNonNull(flow).executeNow(this::complete0)) {
+        EventLoopFlow flow = Objects.requireNonNull(this.flow);
+        if (flow.tryRunNow()) {
             complete0();
+        } else {
+            flow.submit(this::complete0);
         }
     }
 

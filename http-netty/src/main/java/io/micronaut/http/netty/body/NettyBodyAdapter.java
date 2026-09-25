@@ -41,22 +41,28 @@ final class NettyBodyAdapter extends AbstractBodyAdapter {
 
     @Override
     public void onNext(ReadBuffer bytes) {
-        if (eventLoopFlow.executeNow(() -> super.onNext(bytes))) {
+        if (eventLoopFlow.tryRunNow()) {
             super.onNext(bytes);
+        } else {
+            eventLoopFlow.submit(() -> super.onNext(bytes));
         }
     }
 
     @Override
     public void onError(Throwable t) {
-        if (eventLoopFlow.executeNow(() -> super.onError(t))) {
+        if (eventLoopFlow.tryRunNow()) {
             super.onError(t);
+        } else {
+            eventLoopFlow.submit(() -> super.onError(t));
         }
     }
 
     @Override
     public void onComplete() {
-        if (eventLoopFlow.executeNow(super::onComplete)) {
+        if (eventLoopFlow.tryRunNow()) {
             super.onComplete();
+        } else {
+            eventLoopFlow.submit(super::onComplete);
         }
     }
 

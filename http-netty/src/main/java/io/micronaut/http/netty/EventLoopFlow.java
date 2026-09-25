@@ -28,8 +28,10 @@ import io.netty.util.concurrent.OrderedEventExecutor;
  * Should be used like this:
  * <pre>
  *     public void onNext(Object item) {
- *         if (serializer.executeNow(() -> onNext0(item))) {
+ *         if (flow.tryRunNow()) {
  *             onNext0(item);
+ *         } else {
+ *             flow.submit(() -> onNext0(item));
  *         }
  *     }
  *
@@ -37,15 +39,18 @@ import io.netty.util.concurrent.OrderedEventExecutor;
  *         ...
  *     }
  * </pre>
+ * The deferred task is only allocated when it is actually needed.
  * <p>
- * This class is <b>not</b> thread-safe: The invariants for calls to {@link #executeNow} are very
- * strict. In particular:
+ * This class is <b>not</b> thread-safe: The invariants for calls to {@link #tryRunNow} and
+ * {@link #submit} are very strict. In particular:
  * <ul>
- *     <li>There must be no concurrent calls to {@link #executeNow}.</li>
- *     <li>When {@link #executeNow} returns {@code true}, the subsequent execution of the child
+ *     <li>There must be no concurrent calls to {@link #tryRunNow} or {@link #submit}.</li>
+ *     <li>When {@link #tryRunNow} returns {@code true}, the subsequent execution of the child
  *     method ({@code onNext0} in the above example) must fully complete before the next
- *     {@link #executeNow} call. This ensures that there are no concurrent calls to the child
+ *     {@link #tryRunNow} call. This ensures that there are no concurrent calls to the child
  *     method.</li>
+ *     <li>When {@link #tryRunNow} returns {@code false}, the caller must call {@link #submit}
+ *     for that step before making any other call on this flow.</li>
  * </ul>
  * Both of these invariants are guaranteed by the reactive spec, but may not apply to other use
  * cases.
@@ -55,11 +60,6 @@ import io.netty.util.concurrent.OrderedEventExecutor;
  */
 @Internal
 public final class EventLoopFlow {
-    /**
-     * This adds some extra checks to find bugs.
-     */
-    private static final boolean STRICT_CHECKING = false;
-
     private final OrderedEventExecutor loop;
     /**
      * Generation assigned to the next task.
@@ -68,42 +68,33 @@ public final class EventLoopFlow {
     /**
      * Generation of the next task that can be executed immediately. All tasks with a lower
      * generation count have been fully executed already, with one exception: If the last task
-     * was submitted on the event loop, {@link #executeNow} returned true and the caller may not
-     * have fully executed it yet.
+     * was admitted by {@link #tryRunNow}, the caller may not have fully executed it yet.
+     * <p>
+     * This field is only ever read and written on the event loop: in {@link #tryRunNow} after the
+     * {@link OrderedEventExecutor#inEventLoop()} check, and in {@link Delayed#run}, which the
+     * loop executes. Memory visibility between those accesses is provided by the loop itself
+     * (same thread, or the happens-before edges of the executor task queue), so the field does
+     * not need to be volatile.
      */
-    private volatile int runGeneration = 0;
+    private int runGeneration = 0;
 
     public EventLoopFlow(OrderedEventExecutor loop) {
         this.loop = loop;
     }
 
     /**
-     * Determine whether the next step can be executed immediately. Iff this method returns
-     * {@code true}, {@code delayTask} will be ignored and the caller should call the target method
-     * manually. Iff this method returns {@code false}, the caller should take no further action as
-     * {@code delayTask} will be run in the future.
+     * Determine whether the next step can be executed immediately, without allocating anything.
+     * Iff this method returns {@code true}, the caller should run the target method inline right
+     * away. Iff this method returns {@code false}, the caller must pass the step to
+     * {@link #submit} instead, which will run it on the event loop after all previously
+     * submitted steps.
      *
-     * @param delayTask The task to run if it can't be run immediately
-     * @return {@code true} if the caller should instead run the task immediately
+     * @return {@code true} if the caller should run the step immediately
      */
-    @SuppressWarnings("java:S1143") // strict debug check intentionally throws from finally
-    public boolean executeNow(Runnable delayTask) {
-        // pick a generation ID for this task.
-        int generation = submitGeneration++;
+    public boolean tryRunNow() {
         if (loop.inEventLoop()) {
+            int generation = submitGeneration;
             if (runGeneration == generation) {
-                if (STRICT_CHECKING) {
-                    runGeneration = generation + 1;
-                    try {
-                        delayTask.run();
-                    } finally {
-                        if (runGeneration != generation + 1 || submitGeneration != generation + 1) {
-                            throw new AssertionError("Nested call?");
-                        }
-                    }
-                    return false;
-                }
-
                 /*
                  * All previous tasks have run completely, the caller can run the task immediately.
                  * Technically, we should only increment the runGeneration after the caller has
@@ -115,12 +106,42 @@ public final class EventLoopFlow {
                  * in the outer reactive method call, and the reactive spec forbids nested or
                  * concurrent calls
                  */
+                submitGeneration = generation + 1;
                 runGeneration = generation + 1;
                 return true;
             }
             // another task already submitted, need to delay to stay serialized
         }
-        loop.execute(new Delayed(delayTask, generation));
+        return false;
+    }
+
+    /**
+     * Run the given step on the event loop, after all previously submitted steps. Must be called
+     * (only) when {@link #tryRunNow} returned {@code false} for this step.
+     *
+     * @param delayTask The step to run later
+     */
+    public void submit(Runnable delayTask) {
+        loop.execute(new Delayed(delayTask, submitGeneration++));
+    }
+
+    /**
+     * Determine whether the next step can be executed immediately. Iff this method returns
+     * {@code true}, {@code delayTask} will be ignored and the caller should call the target method
+     * manually. Iff this method returns {@code false}, the caller should take no further action as
+     * {@code delayTask} will be run in the future.
+     * <p>
+     * Prefer {@link #tryRunNow} and {@link #submit}, which avoid allocating the delayed task when
+     * it is not needed.
+     *
+     * @param delayTask The task to run if it can't be run immediately
+     * @return {@code true} if the caller should instead run the task immediately
+     */
+    public boolean executeNow(Runnable delayTask) {
+        if (tryRunNow()) {
+            return true;
+        }
+        submit(delayTask);
         return false;
     }
 
@@ -134,7 +155,6 @@ public final class EventLoopFlow {
         }
 
         @Override
-        @SuppressWarnings("java:S1143") // strict debug check intentionally throws from finally
         public void run() {
             if (runGeneration != generation) {
                 throw new IllegalStateException("Improper run order. Expected " + generation + ", was " + runGeneration);
@@ -142,11 +162,6 @@ public final class EventLoopFlow {
             try {
                 task.run();
             } finally {
-                if (STRICT_CHECKING) {
-                    if (runGeneration != generation) {
-                        throw new AssertionError("Weird");
-                    }
-                }
                 runGeneration = generation + 1;
             }
         }

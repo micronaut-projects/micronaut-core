@@ -336,8 +336,10 @@ abstract class MultiplexedServerHandler {
 
                     @Override
                     public void add(ReadBuffer buf) {
-                        if (flow.executeNow(() -> add0(buf))) {
+                        if (flow.tryRunNow()) {
                             add0(buf);
+                        } else {
+                            flow.submit(() -> add0(buf));
                         }
                     }
 
@@ -371,8 +373,10 @@ abstract class MultiplexedServerHandler {
 
                     @Override
                     public void complete() {
-                        if (flow.executeNow(this::complete0)) {
+                        if (flow.tryRunNow()) {
                             complete0();
+                        } else {
+                            flow.submit(this::complete0);
                         }
                     }
 
@@ -391,8 +395,10 @@ abstract class MultiplexedServerHandler {
 
                     @Override
                     public void error(Throwable e) {
-                        if (flow.executeNow(() -> error0(e))) {
+                        if (flow.tryRunNow()) {
                             error0(e);
+                        } else {
+                            flow.submit(() -> error0(e));
                         }
                     }
 
@@ -408,12 +414,16 @@ abstract class MultiplexedServerHandler {
                 // the headers go first: a body with data already available (e.g. a relayed client
                 // response) delivers it from primary(), and HTTP/2 must not send DATA before the
                 // HEADERS of the stream. The flow runs its tasks in order on the event loop.
-                if (consumer.flow.executeNow(() -> writeStreamingHeaders(response, contentLength))) {
+                if (consumer.flow.tryRunNow()) {
                     writeStreamingHeaders(response, contentLength);
+                } else {
+                    consumer.flow.submit(() -> writeStreamingHeaders(response, contentLength));
                 }
                 BufferConsumer.Upstream upstream = snbb.primary(consumer);
-                if (consumer.flow.executeNow(() -> consumer.attach(upstream))) {
+                if (consumer.flow.tryRunNow()) {
                     consumer.attach(upstream);
+                } else {
+                    consumer.flow.submit(() -> consumer.attach(upstream));
                 }
             }
         }

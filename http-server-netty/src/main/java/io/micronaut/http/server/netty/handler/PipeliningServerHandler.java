@@ -1459,8 +1459,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void add(ReadBuffer buf) {
-            if (flow.executeNow(() -> add0(buf))) {
+            if (flow.tryRunNow()) {
                 add0(buf);
+            } else {
+                flow.submit(() -> add0(buf));
             }
         }
 
@@ -1520,8 +1522,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void addAndComplete(ReadBuffer buf) {
-            if (flow.executeNow(() -> addAndComplete0(buf))) {
+            if (flow.tryRunNow()) {
                 addAndComplete0(buf);
+            } else {
+                flow.submit(() -> addAndComplete0(buf));
             }
         }
 
@@ -1547,8 +1551,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void error(Throwable t) {
-            if (flow.executeNow(() -> error0(t))) {
+            if (flow.tryRunNow()) {
                 error0(t);
+            } else {
+                flow.submit(() -> error0(t));
             }
         }
 
@@ -1583,8 +1589,10 @@ public final class PipeliningServerHandler extends ChannelInboundHandlerAdapter 
 
         @Override
         public void complete() {
-            if (flow.executeNow(this::complete0)) {
+            if (flow.tryRunNow()) {
                 complete0();
+            } else {
+                flow.submit(this::complete0);
             }
         }
 

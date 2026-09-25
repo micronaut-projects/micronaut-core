@@ -82,6 +82,109 @@ class EventLoopFlowSpec extends Specification {
         mock.submitted.size() == 2
     }
 
+    def 'tryRunNow fast path on the event loop does not submit anything'() {
+        given:
+        def mock = new MockEventExecutor()
+        def flow = new EventLoopFlow(mock)
+        mock.inEventLoop = true
+
+        expect:
+        flow.tryRunNow()
+        flow.tryRunNow()
+        flow.tryRunNow()
+        mock.submitted.isEmpty()
+    }
+
+    def 'tryRunNow outside the event loop defers'() {
+        given:
+        def mock = new MockEventExecutor()
+        def flow = new EventLoopFlow(mock)
+        List<String> order = []
+
+        when:
+        def now = flow.tryRunNow()
+        then:
+        !now
+        mock.submitted.isEmpty()
+
+        when:
+        flow.submit { order << 'a' }
+        then:
+        mock.submitted.size() == 1
+        order.isEmpty()
+
+        when:
+        mock.submitted[0].run()
+        then:
+        order == ['a']
+    }
+
+    def 'inline step does not overtake pending deferred steps'() {
+        given:
+        def mock = new MockEventExecutor()
+        def flow = new EventLoopFlow(mock)
+        List<String> order = []
+
+        def step = { String name ->
+            if (flow.tryRunNow()) {
+                order << name
+            } else {
+                flow.submit { order << name }
+            }
+        }
+
+        when: 'a step arrives from outside the loop'
+        step('a')
+        then:
+        order.isEmpty()
+        mock.submitted.size() == 1
+
+        when: 'two steps arrive on the loop while the first is still pending'
+        mock.inEventLoop = true
+        step('b')
+        step('c')
+        then: 'they must defer as well'
+        order.isEmpty()
+        mock.submitted.size() == 3
+
+        when:
+        mock.submitted[0].run()
+        then:
+        order == ['a']
+
+        when: 'a step arrives on the loop while one deferred step is still pending'
+        step('d')
+        then:
+        order == ['a']
+        mock.submitted.size() == 4
+
+        when:
+        mock.submitted[1].run()
+        mock.submitted[2].run()
+        mock.submitted[3].run()
+        then:
+        order == ['a', 'b', 'c', 'd']
+
+        when: 'all deferred work is done, the fast path is available again'
+        step('e')
+        then:
+        order == ['a', 'b', 'c', 'd', 'e']
+        mock.submitted.size() == 4
+    }
+
+    def 'deferred steps must run in submission order'() {
+        given:
+        def mock = new MockEventExecutor()
+        def flow = new EventLoopFlow(mock)
+
+        when:
+        flow.submit {}
+        flow.submit {}
+        mock.submitted[1].run()
+        then:
+        thrown IllegalStateException
+    }
+
     private static final class MockEventExecutor extends AbstractEventExecutor implements OrderedEventExecutor {
         boolean inEventLoop = false
         List<Runnable> submitted = []

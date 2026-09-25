@@ -115,22 +115,28 @@ final class NettyResponseLifecycle extends ResponseLifecycle {
 
         @Override
         public void add(ReadBuffer buffer) {
-            if (flow.executeNow(() -> super.add(buffer))) {
+            if (flow.tryRunNow()) {
                 super.add(buffer);
+            } else {
+                flow.submit(() -> super.add(buffer));
             }
         }
 
         @Override
         protected void forwardComplete(@Nullable ReadBuffer trailing) {
-            if (flow.executeNow(() -> super.forwardComplete(trailing))) {
+            if (flow.tryRunNow()) {
                 super.forwardComplete(trailing);
+            } else {
+                flow.submit(() -> super.forwardComplete(trailing));
             }
         }
 
         @Override
         protected void forwardError(Throwable t) {
-            if (flow.executeNow(() -> super.forwardError(t))) {
+            if (flow.tryRunNow()) {
                 super.forwardError(t);
+            } else {
+                flow.submit(() -> super.forwardError(t));
             }
         }
     }
