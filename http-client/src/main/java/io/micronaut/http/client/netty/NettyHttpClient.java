@@ -776,6 +776,8 @@ final class NettyHttpClient implements
         // if a connection is available immediately, we can use its executor for the timeout
         // instead of a random executor for the whole group
         AtomicReference<ScheduledExecutorService> scheduler = new AtomicReference<>(connectionManager.getGroup());
+        // whether the final response arrived, to tell a request timeout while its body is read
+        AtomicBoolean headersReceived = new AtomicBoolean();
         ExecutionFlow<HttpResponse<O>> flow = resolveRequestURI(request).flatMap(target -> {
             MutableHttpRequest<?> mutableRequest = toMutableRequest(request).uri(target.uri());
             //noinspection unchecked
@@ -785,9 +787,12 @@ final class NettyHttpClient implements
                 blockHint,
                 mutableRequest,
                 target.instance(),
-                (req, resp) -> InternalByteBody.bufferFlow(resp.byteBody())
-                    .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
-                    .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av))
+                (req, resp) -> {
+                    headersReceived.set(true);
+                    return InternalByteBody.bufferFlow(resp.byteBody())
+                        .onErrorResume(t -> ExecutionFlow.error(handleResponseError(mutableRequest, target.instance(), t)))
+                        .flatMap(av -> handleExchangeResponse(bodyType, errorType, resp, av));
+                }
             ).map(r -> (HttpResponse<O>) r);
         });
 
@@ -803,7 +808,7 @@ final class NettyHttpClient implements
                 flow = flow.timeout(requestTimeout, Objects.requireNonNull(scheduler.get()), null)
                     .onErrorResume(throwable -> {
                         if (throwable instanceof TimeoutException) {
-                            return ExecutionFlow.error(ReadTimeoutException.TIMEOUT_EXCEPTION);
+                            return ExecutionFlow.error(headersReceived.get() ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION);
                         }
                         return ExecutionFlow.error(throwable);
                     });
@@ -2378,6 +2383,9 @@ final class NettyHttpClient implements
             result = decorate(new ContentLengthExceededException(blee.getAdvertisedLength(), blee.getReceivedLength()));
         } else if (cause instanceof io.netty.handler.timeout.ReadTimeoutException) {
             result = ReadTimeoutException.TIMEOUT_EXCEPTION;
+        } else if (cause instanceof ReadTimeoutException rte) {
+            // a shared instance takes no service id; a timeout of the body is already mapped
+            result = rte;
         } else if (cause instanceof HttpClientException hce) {
             result = decorate(hce);
         } else {
