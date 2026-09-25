@@ -89,17 +89,26 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
 
     @Override
     public List<GenericHttpFilter> resolveFilters(HttpRequest<?> request, List<FilterEntry> filterEntries) {
-        String requestPath = StringUtils.prependUri("/", request.getUri().getPath());
-        io.micronaut.http.HttpMethod method = request.getMethod();
         List<GenericHttpFilter> filterList = new ArrayList<>(filterEntries.size());
+        // the request path is only computed when a pattern-bound filter needs it
+        String requestPath = null;
         for (FilterEntry filterEntry : filterEntries) {
             final GenericHttpFilter filter = filterEntry.getFilter();
             if (!GenericHttpFilter.isEnabled(filter)) {
                 continue;
             }
-            if (matchesFilterEntry(method, requestPath, filterEntry)) {
-                filterList.add(filter);
+            if (filterEntry.hasMethods() && !anyMethodMatches(request.getMethod(), filterEntry.getFilterMethods())) {
+                continue;
             }
+            if (filterEntry.hasPatterns()) {
+                if (requestPath == null) {
+                    requestPath = StringUtils.prependUri("/", request.getUri().getPath());
+                }
+                if (!anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle())) {
+                    continue;
+                }
+            }
+            filterList.add(filter);
         }
         return filterList;
     }
@@ -127,19 +136,6 @@ public class DefaultHttpClientFilterResolver extends BaseFilterProcessor<ClientF
             metadata.serviceId(),
             metadata.excludeServiceId()
         ));
-    }
-
-    private boolean matchesFilterEntry(HttpMethod method,
-                                       String requestPath,
-                                       FilterEntry filterEntry) {
-        boolean matches = true;
-        if (filterEntry.hasMethods()) {
-            matches = anyMethodMatches(method, filterEntry.getFilterMethods());
-        }
-        if (filterEntry.hasPatterns()) {
-            matches = matches && anyPatternMatches(requestPath, filterEntry.getPatterns(), filterEntry.getPatternStyle());
-        }
-        return matches;
     }
 
     private boolean matchesClientFilterEntry(ClientFilterResolutionContext context,

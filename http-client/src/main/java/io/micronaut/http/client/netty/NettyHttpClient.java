@@ -83,6 +83,7 @@ import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
 import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
+import io.micronaut.http.client.filter.DefaultHttpClientFilterResolver;
 import io.micronaut.http.client.loadbalance.FixedLoadBalancer;
 import io.micronaut.http.client.multipart.MultipartBody;
 import io.micronaut.http.client.multipart.MultipartDataFactory;
@@ -256,6 +257,11 @@ final class NettyHttpClient implements
     private final Charset defaultCharset;
     private final Logger log;
     private final HttpClientFilterResolver<ClientFilterResolutionContext> filterResolver;
+    /**
+     * {@code true} when the default resolver is used and no filter entry applies to this client,
+     * so per-request filter resolution and sorting can be skipped.
+     */
+    private final boolean noFilters;
     private final WebSocketBeanRegistry webSocketRegistry;
     private final RequestBinderRegistry requestBinderRegistry;
     @Nullable
@@ -291,6 +297,7 @@ final class NettyHttpClient implements
                 new ClientFilterResolutionContext(null, AnnotationMetadata.EMPTY_METADATA)
             );
         }
+        this.noFilters = clientFilterEntries.isEmpty() && filterResolver.getClass() == DefaultHttpClientFilterResolver.class;
         this.webSocketRegistry = builder.webSocketBeanRegistry;
         this.conversionService = builder.conversionService;
         this.requestBinderRegistry = builder.requestBinderRegistry == null ? new DefaultRequestBinderRegistry(conversionService) : builder.requestBinderRegistry;
@@ -1536,10 +1543,13 @@ final class NettyHttpClient implements
             ClientAttributes.setServiceId(request, informationalServiceId);
         }
 
-        List<GenericHttpFilter> filters =
-            filterResolver.resolveFilters(request, clientFilterEntries);
-
-        FilterRunner.sortReverse(filters);
+        List<GenericHttpFilter> filters;
+        if (noFilters) {
+            filters = List.of();
+        } else {
+            filters = filterResolver.resolveFilters(request, clientFilterEntries);
+            FilterRunner.sortReverse(filters);
+        }
 
         FilterRunner runner = new FilterRunner(filters) {
             @Override
