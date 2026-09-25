@@ -1,6 +1,12 @@
 
 This section documents breaking changes between Micronaut versions
 
+=== A route variable without a regular expression is more specific (5.3)
+
+Routes are ordered by the length of the literal parts of their URI templates, then by the number of path variables. Since Micronaut 5.3 a third key follows: among routes that tie on both, the route with fewer path variables constrained by a regular expression is more specific. For example, a `GET /items/1` request matched by both `@Get("/items/{id}")` and `@Get("/items/{id:.+}")` previously failed with a api:web.router.exceptions.DuplicateRouteException[] (answered with `400 Bad Request`), and is now routed to `/items/{id}`. A numeric modifier such as `{id:3}` limits the length of the value and is not a regular expression: it is not counted. Routes that tie on all three keys stay ambiguous.
+
+The change is in `UriTemplateMatcher.compareTo`, and with it in the natural order (`compareTo`) of api:web.router.UriRouteInfo[] and its default implementation `DefaultUrlRouteInfo`, so the order of routes sorted with it changes too. Routes also have a new `UriRouteInfo.getOrder()` (`0` by default and for every controller route): it is consulted after the specificity of the templates, the media types and the preference of an explicit `HEAD` route over an implicit one, and only decides between routes that would otherwise be ambiguous.
+
 === A filter method that changes the URI of its `MutableHttpRequest` parameter changes the request (5.3)
 
 A request filter method without a continuation can declare a api:http.MutableHttpRequest[] parameter. The server request itself cannot be changed, so the method receives a mutable copy of it: headers changed on the copy are applied to the request, but everything else only changes the copy.
