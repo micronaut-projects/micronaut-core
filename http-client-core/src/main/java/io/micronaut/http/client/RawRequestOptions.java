@@ -27,8 +27,9 @@ import java.util.Objects;
  * <p>{@link #getDefault()} behaves like
  * {@link RawHttpClient#exchange(io.micronaut.http.HttpRequest, io.micronaut.http.body.CloseableByteBody, Thread)}.
  * {@link #proxy()} is the preset for relaying a request to an upstream server unchanged: redirects
- * are passed back to the caller, hop-by-hop headers are removed in both directions, and encoded
- * response bytes are not decompressed.
+ * are passed back to the caller and encoded response bytes are not decompressed. A proxy removes
+ * the hop-by-hop headers itself, see
+ * {@link io.micronaut.http.util.HttpHeadersUtil#stripHopByHopHeaders(io.micronaut.http.MutableHttpHeaders)}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -39,13 +40,11 @@ public final class RawRequestOptions {
     private static final RawRequestOptions PROXY = builder()
         .followRedirects(false)
         .retainHostHeader(false)
-        .stripHopByHopHeaders(true)
         .decompress(false)
         .build();
 
     private final boolean followRedirects;
     private final boolean retainHostHeader;
-    private final boolean stripHopByHopHeaders;
     private final boolean decompress;
     @Nullable
     private final Duration responseTimeout;
@@ -53,7 +52,6 @@ public final class RawRequestOptions {
     private RawRequestOptions(Builder builder) {
         this.followRedirects = builder.followRedirects;
         this.retainHostHeader = builder.retainHostHeader;
-        this.stripHopByHopHeaders = builder.stripHopByHopHeaders;
         this.decompress = builder.decompress;
         this.responseTimeout = builder.responseTimeout;
     }
@@ -74,8 +72,7 @@ public final class RawRequestOptions {
 
     /**
      * The preset for relaying a request to an upstream server: redirects are not followed, the
-     * {@code Host} header is computed from the request URI, hop-by-hop headers are removed and the
-     * response is not decompressed.
+     * {@code Host} header is computed from the request URI and the response is not decompressed.
      *
      * @return The proxy options
      */
@@ -90,7 +87,6 @@ public final class RawRequestOptions {
         return builder()
             .followRedirects(followRedirects)
             .retainHostHeader(retainHostHeader)
-            .stripHopByHopHeaders(stripHopByHopHeaders)
             .decompress(decompress)
             .responseTimeout(responseTimeout);
     }
@@ -120,18 +116,6 @@ public final class RawRequestOptions {
     }
 
     /**
-     * Whether the hop-by-hop headers are removed from the request before it is sent and from the
-     * response when it is received: {@code Connection} and the headers it lists,
-     * {@code Keep-Alive}, {@code Proxy-*}, {@code TE}, {@code Trailer},
-     * {@code Transfer-Encoding} and {@code Upgrade}. Defaults to {@code false}.
-     *
-     * @return Whether hop-by-hop headers are removed
-     */
-    public boolean isStripHopByHopHeaders() {
-        return stripHopByHopHeaders;
-    }
-
-    /**
      * Whether the response body is decompressed, if the client is configured to decompress. If
      * {@code false}, an encoded response is returned with its {@code Content-Encoding} header and
      * its bytes unchanged. Defaults to {@code true}.
@@ -143,11 +127,10 @@ public final class RawRequestOptions {
     }
 
     /**
-     * The maximum time to wait for the response headers, or {@code null} to use the client's
-     * read timeout. It replaces the read timeout of the client while the response headers are
-     * awaited, so it may be longer or shorter than the read timeout; the read timeout still
-     * applies to the reads of the response body. When it elapses, the exchange fails with a
-     * {@link io.micronaut.http.client.exceptions.ReadTimeoutException}.
+     * The maximum time to wait for the response headers, or {@code null} for no limit other than
+     * the client's read timeout. It can only shorten the wait: the read timeout of the client
+     * still applies, also to the reads of the response body. When it elapses, the exchange fails
+     * with a {@link io.micronaut.http.client.exceptions.ReadTimeoutException}.
      *
      * @return The response timeout
      */
@@ -160,14 +143,13 @@ public final class RawRequestOptions {
         return o instanceof RawRequestOptions that &&
             followRedirects == that.followRedirects &&
             retainHostHeader == that.retainHostHeader &&
-            stripHopByHopHeaders == that.stripHopByHopHeaders &&
             decompress == that.decompress &&
             Objects.equals(responseTimeout, that.responseTimeout);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(followRedirects, retainHostHeader, stripHopByHopHeaders, decompress, responseTimeout);
+        return Objects.hash(followRedirects, retainHostHeader, decompress, responseTimeout);
     }
 
     @Override
@@ -175,7 +157,6 @@ public final class RawRequestOptions {
         return "RawRequestOptions{" +
             "followRedirects=" + followRedirects +
             ", retainHostHeader=" + retainHostHeader +
-            ", stripHopByHopHeaders=" + stripHopByHopHeaders +
             ", decompress=" + decompress +
             ", responseTimeout=" + responseTimeout +
             '}';
@@ -187,7 +168,6 @@ public final class RawRequestOptions {
     public static final class Builder {
         private boolean followRedirects = true;
         private boolean retainHostHeader = true;
-        private boolean stripHopByHopHeaders = false;
         private boolean decompress = true;
         @Nullable
         private Duration responseTimeout;
@@ -210,15 +190,6 @@ public final class RawRequestOptions {
          */
         public Builder retainHostHeader(boolean retainHostHeader) {
             this.retainHostHeader = retainHostHeader;
-            return this;
-        }
-
-        /**
-         * @param stripHopByHopHeaders See {@link RawRequestOptions#isStripHopByHopHeaders()}
-         * @return This builder
-         */
-        public Builder stripHopByHopHeaders(boolean stripHopByHopHeaders) {
-            this.stripHopByHopHeaders = stripHopByHopHeaders;
             return this;
         }
 

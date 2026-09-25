@@ -23,24 +23,19 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * The response timeout of a raw exchange replaces the read timeout of the connection, over
- * HTTP/1.1 and HTTP/2.
+ * The response timeout of a raw exchange can shorten the wait for the response, and the read
+ * timeout of the connection still applies, over HTTP/1.1 and HTTP/2.
  */
 class RawResponseTimeoutOverrideTest {
     private static final Duration READ_TIMEOUT = Duration.ofSeconds(1);
 
     @ParameterizedTest
     @ValueSource(ints = {1, 2})
-    void longerResponseTimeoutOutlastsTheReadTimeout(int version) throws Exception {
+    void longerResponseTimeoutDoesNotOutlastTheReadTimeout(int version) throws Exception {
         try (ApplicationContext ctx = start(version);
              EmbeddedServer server = ctx.getBean(EmbeddedServer.class).start();
              RawHttpClient client = ctx.createBean(RawHttpClient.class)) {
-            try (ByteBodyHttpResponse<?> response = exchange(client, server, 2000, Duration.ofSeconds(10))) {
-                Assertions.assertEquals(200, response.code());
-                Assertions.assertEquals("slow", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));
-            }
-            // the connection is still usable, and its read timeout applies again
-            Assertions.assertThrows(ReadTimeoutException.class, () -> exchange(client, server, 2000, null).close());
+            Assertions.assertThrows(ReadTimeoutException.class, () -> exchange(client, server, 2000, Duration.ofSeconds(10)).close());
         }
     }
 

@@ -1478,8 +1478,7 @@ public class ConnectionManager {
                         ReadTimeoutHandler readTimeoutHandler = new ReadTimeoutHandler(dur.toNanos(), TimeUnit.NANOSECONDS) {
                             @Override
                             protected void readTimedOut(ChannelHandlerContext ctx) {
-                                // a request with a response timeout of its own does not use it
-                                if (hasLiveRequests() && ResponseDeadline.readTimeoutApplies(channel)) {
+                                if (hasLiveRequests()) {
                                     windDownConnection = true;
                                     ctx.fireExceptionCaught(ReadTimeoutException.INSTANCE);
                                     ctx.close();

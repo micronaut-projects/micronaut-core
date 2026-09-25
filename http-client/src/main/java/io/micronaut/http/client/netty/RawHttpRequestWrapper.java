@@ -54,20 +54,10 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     @Nullable
     private Object replacementBody;
 
-    /**
-     * Whether the Netty request leaves out the hop-by-hop headers.
-     */
-    private final boolean stripHopByHopHeaders;
-
     public RawHttpRequestWrapper(ConversionService conversionService, MutableHttpRequest<B> delegate, CloseableByteBody byteBody) {
-        this(conversionService, delegate, byteBody, false);
-    }
-
-    public RawHttpRequestWrapper(ConversionService conversionService, MutableHttpRequest<B> delegate, CloseableByteBody byteBody, boolean stripHopByHopHeaders) {
         super(conversionService, delegate);
         this.conversionService = conversionService;
         this.byteBody = byteBody;
-        this.stripHopByHopHeaders = stripHopByHopHeaders;
     }
 
     @Override
@@ -126,12 +116,7 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
 
     @Override
     public HttpRequest toHttpRequestWithoutBody() {
-        HttpRequest request = NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
-        if (stripHopByHopHeaders) {
-            // on the Netty headers, after the client filters ran
-            HopByHopHeaders.strip(request.headers());
-        }
-        return request;
+        return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
     }
 
     @Override

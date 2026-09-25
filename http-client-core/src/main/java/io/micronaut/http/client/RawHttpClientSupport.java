@@ -51,98 +51,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 @Internal
 public final class RawHttpClientSupport {
-    private static final List<String> HOP_BY_HOP_HEADERS = List.of(
-        HttpHeaders.CONNECTION,
-        HttpHeaders.KEEP_ALIVE,
-        HttpHeaders.TE,
-        HttpHeaders.TRAILER,
-        HttpHeaders.TRANSFER_ENCODING,
-        HttpHeaders.UPGRADE
-    );
-    private static final String PROXY_HEADER_PREFIX = "proxy-";
-
     private RawHttpClientSupport() {
-    }
-
-    /**
-     * Remove the hop-by-hop headers: {@code Connection} and the headers it lists,
-     * {@code Keep-Alive}, {@code Proxy-*}, {@code TE}, {@code Trailer},
-     * {@code Transfer-Encoding} and {@code Upgrade}.
-     *
-     * @param headers The headers to change
-     */
-    public static void stripHopByHopHeaders(MutableHttpHeaders headers) {
-        List<String> listed = connectionTokens(headers);
-        if (listed != null) {
-            for (String name : listed) {
-                headers.remove(name);
-            }
-        }
-        for (String name : HOP_BY_HOP_HEADERS) {
-            headers.remove(name);
-        }
-        List<String> proxyHeaders = null;
-        for (String name : headers.names()) {
-            if (isProxyHeader(name)) {
-                if (proxyHeaders == null) {
-                    proxyHeaders = new ArrayList<>(2);
-                }
-                proxyHeaders.add(name);
-            }
-        }
-        if (proxyHeaders != null) {
-            for (String name : proxyHeaders) {
-                headers.remove(name);
-            }
-        }
-    }
-
-    /**
-     * @return The header names the {@code Connection} headers list, or {@code null} for none
-     */
-    private static @Nullable List<String> connectionTokens(HttpHeaders headers) {
-        List<String> connection = headers.getAll(HttpHeaders.CONNECTION);
-        if (connection.isEmpty()) {
-            return null;
-        }
-        List<String> tokens = new ArrayList<>(2);
-        for (String value : connection) {
-            int start = 0;
-            int length = value.length();
-            while (start < length) {
-                int comma = value.indexOf(',', start);
-                int end = comma < 0 ? length : comma;
-                String name = value.substring(start, end).trim();
-                if (!name.isEmpty()) {
-                    tokens.add(name);
-                }
-                start = end + 1;
-            }
-        }
-        return tokens;
-    }
-
-    private static boolean isProxyHeader(String name) {
-        return name.regionMatches(true, 0, PROXY_HEADER_PREFIX, 0, PROXY_HEADER_PREFIX.length());
-    }
-
-    private static boolean isHopByHop(String name, @Nullable List<String> listed) {
-        if (isProxyHeader(name)) {
-            return true;
-        }
-        for (String hopByHop : HOP_BY_HOP_HEADERS) {
-            if (hopByHop.equalsIgnoreCase(name)) {
-                return true;
-            }
-        }
-        if (listed != null) {
-            for (String token : listed) {
-                if (token.equalsIgnoreCase(name)) {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     /**
@@ -158,13 +67,9 @@ public final class RawHttpClientSupport {
     public static MutableHttpRequest<Object> copyRequest(HttpRequest<?> request, RawRequestOptions options) {
         MutableHttpRequest<Object> copy = HttpRequest.create(request.getMethod(), request.getUri().toString(), request.getMethodName());
         MutableHttpHeaders headers = copy.getHeaders();
-        HttpHeaders source = request.getHeaders();
-        boolean strip = options.isStripHopByHopHeaders();
-        // the hop-by-hop headers are left out while copying, rather than copied and removed
-        List<String> listed = strip ? connectionTokens(source) : null;
         boolean retainHost = options.isRetainHostHeader();
-        source.forEach((name, values) -> {
-            if (strip && isHopByHop(name, listed) || !retainHost && HttpHeaders.HOST.equalsIgnoreCase(name)) {
+        request.getHeaders().forEach((name, values) -> {
+            if (!retainHost && HttpHeaders.HOST.equalsIgnoreCase(name)) {
                 return;
             }
             for (String value : values) {
@@ -176,21 +81,16 @@ public final class RawHttpClientSupport {
     }
 
     /**
-     * Apply the options to a received response.
+     * Make a received response mutable.
      *
      * @param response The response
-     * @param options  The options
      * @return The mutable response, a {@link MutableByteBodyHttpResponse} if the response
      * carries body bytes
      */
-    public static MutableHttpResponse<?> toMutableResponse(HttpResponse<?> response, RawRequestOptions options) {
-        MutableHttpResponse<?> mutable = response instanceof ByteBodyHttpResponse<?> byteBodyResponse
+    public static MutableHttpResponse<?> toMutableResponse(HttpResponse<?> response) {
+        return response instanceof ByteBodyHttpResponse<?> byteBodyResponse
             ? MutableByteBodyHttpResponse.of(byteBodyResponse)
             : response.toMutableResponse();
-        if (options.isStripHopByHopHeaders()) {
-            stripHopByHopHeaders(mutable.getHeaders());
-        }
-        return mutable;
     }
 
     /**

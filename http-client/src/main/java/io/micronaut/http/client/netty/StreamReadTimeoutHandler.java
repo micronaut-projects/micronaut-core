@@ -26,9 +26,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * The configured read timeout of one request of an HTTP/2 or HTTP/3 connection, on the channel
  * of its stream. The request times out alone: only its stream is reset, and the other requests
- * of the connection, e.g. one with a longer {@link ResponseDeadline response timeout} of its own,
- * go on. A request with a response timeout of its own is not failed by the read timeout until its
- * response arrives. <b>Event loop only.</b>
+ * of the connection go on. <b>Event loop only.</b>
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -49,7 +47,7 @@ final class StreamReadTimeoutHandler extends ReadTimeoutHandler {
 
     @Override
     protected void readTimedOut(ChannelHandlerContext ctx) {
-        if (timedOut || !ResponseDeadline.readTimeoutApplies(ctx.channel())) {
+        if (timedOut) {
             return;
         }
         timedOut = true;

@@ -39,8 +39,8 @@ import java.time.Duration;
 import java.util.Map;
 
 /**
- * The response timeout of {@link RawRequestOptions} replaces the read timeout the client is
- * configured with: it may be longer or shorter.
+ * The response timeout of {@link RawRequestOptions} can shorten the wait for the response, and
+ * the read timeout the client is configured with still applies.
  */
 @SuppressWarnings({
     "java:S2259", // The tests will show if it's null
@@ -54,13 +54,11 @@ class RawResponseTimeoutTest {
     private static final long UPSTREAM_DELAY_MILLIS = 2000;
 
     @Test
-    void longerResponseTimeoutOutlastsTheReadTimeout() throws Exception {
+    void longerResponseTimeoutDoesNotOutlastTheReadTimeout() throws Exception {
         try (ServerUnderTest server = server();
-             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
-             ByteBodyHttpResponse<?> response = exchange(client, slowRequest(server), RawRequestOptions.proxy().toBuilder().responseTimeout(Duration.ofSeconds(10)).build())) {
-
-            Assertions.assertEquals(200, response.code());
-            Assertions.assertEquals("slow", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            Assertions.assertThrows(HttpClientException.class, () -> exchange(client, slowRequest(server),
+                RawRequestOptions.proxy().toBuilder().responseTimeout(Duration.ofSeconds(10)).build()).close());
         }
     }
 

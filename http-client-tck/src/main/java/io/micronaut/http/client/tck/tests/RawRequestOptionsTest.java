@@ -39,8 +39,6 @@ import java.io.IOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.Locale;
-import java.util.stream.Collectors;
 import java.util.zip.GZIPOutputStream;
 
 @SuppressWarnings({
@@ -74,28 +72,6 @@ class RawRequestOptionsTest {
 
             Assertions.assertEquals(200, response.code());
             Assertions.assertEquals("redirect successful", response.byteBody().buffer().get().toString(StandardCharsets.UTF_8));
-        }
-    }
-
-    @Test
-    void hopByHopHeadersAreStrippedInBothDirections() throws Exception {
-        try (ServerUnderTest server = server();
-             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class);
-             ByteBodyHttpResponse<?> response = exchange(client, HttpRequest.GET(server.getURL().get() + "/raw-options/headers")
-                     .header(HttpHeaders.CONNECTION, "X-Hop")
-                     .header("X-Hop", "1")
-                     .header("Keep-Alive", "timeout=5")
-                     .header(HttpHeaders.PROXY_AUTHORIZATION, "Basic Zm9vOmJhcg==")
-                     .header(HttpHeaders.TE, "trailers")
-                     .header("X-End-To-End", "kept"),
-                 RawRequestOptions.proxy())) {
-
-            Assertions.assertEquals(200, response.code());
-            String received = response.byteBody().buffer().get().toString(StandardCharsets.UTF_8);
-            Assertions.assertEquals("x-end-to-end", received);
-            Assertions.assertEquals("kept", response.getHeaders().get("X-End-To-End"));
-            Assertions.assertFalse(response.getHeaders().contains(HttpHeaders.PROXY_AUTHENTICATE));
-            Assertions.assertFalse(response.getHeaders().contains("Keep-Alive"));
         }
     }
 
@@ -204,19 +180,6 @@ class RawRequestOptionsTest {
         @Get(value = "/redirect-to", produces = MediaType.TEXT_PLAIN)
         String redirectTo() {
             return "redirect successful";
-        }
-
-        @Get(value = "/headers", produces = MediaType.TEXT_PLAIN)
-        HttpResponse<String> headers(HttpRequest<?> request) {
-            String received = request.getHeaders().names().stream()
-                .map(name -> name.toLowerCase(Locale.ROOT))
-                .filter(name -> name.startsWith("x-") || name.equals("keep-alive") || name.startsWith("proxy-") || name.equals("te"))
-                .sorted()
-                .collect(Collectors.joining(","));
-            return HttpResponse.ok(received)
-                .header("X-End-To-End", "kept")
-                .header(HttpHeaders.PROXY_AUTHENTICATE, "Basic")
-                .header("Keep-Alive", "timeout=5");
         }
 
         @Get("/redirect-to-gzip")

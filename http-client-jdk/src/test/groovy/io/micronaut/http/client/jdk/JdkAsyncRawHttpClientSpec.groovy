@@ -182,33 +182,6 @@ class JdkAsyncRawHttpClientSpec extends Specification {
         following?.close()
     }
 
-    void "hop-by-hop headers are stripped in both directions"() {
-        given:
-        AsyncRawHttpClient client = server.applicationContext.getBean(AsyncRawHttpClient)
-        HttpRequest<?> request = HttpRequest.GET(server.URI.toString() + "/async-raw/headers")
-            .header(HttpHeaders.CONNECTION, "X-Hop")
-            .header("X-Hop", "1")
-            .header("Keep-Alive", "timeout=5")
-            .header(HttpHeaders.PROXY_AUTHORIZATION, "Basic Zm9vOmJhcg==")
-            .header(HttpHeaders.TE, "trailers")
-            .header("X-End-To-End", "kept")
-
-        when:
-        ByteBodyHttpResponse<?> response = send(client, request, RawRequestOptions.proxy())
-
-        then:
-        response.code() == 200
-        text(response) == "x-end-to-end"
-        response.headers.get("X-End-To-End") == "kept"
-        !response.headers.contains(HttpHeaders.PROXY_AUTHENTICATE)
-        !response.headers.contains("Keep-Alive")
-        // the request is not modified
-        request.headers.get("X-Hop") == "1"
-
-        cleanup:
-        response?.close()
-    }
-
     void "the Host header is computed from the URI"() {
         given:
         AsyncRawHttpClient client = server.applicationContext.getBean(AsyncRawHttpClient)

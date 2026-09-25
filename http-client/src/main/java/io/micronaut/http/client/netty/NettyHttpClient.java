@@ -231,11 +231,6 @@ final class NettyHttpClient implements
      * {@link RawRequestOptions#isDecompress()}.
      */
     private static final String NO_DECOMPRESSION = "micronaut.http.client.raw.no-decompression";
-    /**
-     * Request attribute with the {@link Duration} that replaces the configured read timeout for
-     * one exchange, see {@link RawRequestOptions#getResponseTimeout()}.
-     */
-    private static final String RESPONSE_TIMEOUT = "micronaut.http.client.raw.response-timeout";
 
     private MediaTypeCodecRegistry mediaTypeCodecRegistry;
     private final ByteBufferFactory<ByteBufAllocator, ByteBuf> byteBufferFactory = new NettyByteBufferFactory();
@@ -1440,22 +1435,13 @@ final class NettyHttpClient implements
                     new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
                 );
             }
-            // the hop-by-hop headers are stripped from the Netty headers of the request and the response
-            boolean strip = options.isStripHopByHopHeaders();
-            RawRequestOptions copyOptions = strip ? options.toBuilder().stripHopByHopHeaders(false).build() : options;
-            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, copyOptions), requestBody, strip);
+            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
             applyOptions(rawRequest, options);
             return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout()).map(response -> {
-                if (strip && response.getHeaders() instanceof NettyHttpHeaders nettyHeaders) {
-                    HopByHopHeaders.strip(nettyHeaders.getNettyHeaders());
-                    return RawHttpClientSupport.toMutableResponse(response, copyOptions);
-                }
-                return RawHttpClientSupport.toMutableResponse(response, options);
-            });
+            ), options.getResponseTimeout()).map(RawHttpClientSupport::toMutableResponse);
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
@@ -1489,9 +1475,6 @@ final class NettyHttpClient implements
         }
         if (!options.isDecompress()) {
             request.setAttribute(NO_DECOMPRESSION, Boolean.TRUE);
-        }
-        if (options.getResponseTimeout() != null) {
-            request.setAttribute(RESPONSE_TIMEOUT, options.getResponseTimeout());
         }
     }
 
@@ -1629,7 +1612,6 @@ final class NettyHttpClient implements
                     redirectRequest.setAttribute(REDIRECT_COUNT, redirectCount);
                     // the per-exchange options apply to the whole exchange, redirects included
                     request.getAttribute(NO_DECOMPRESSION).ifPresent(noDecompression -> redirectRequest.setAttribute(NO_DECOMPRESSION, noDecompression));
-                    request.getAttribute(RESPONSE_TIMEOUT).ifPresent(responseTimeout -> redirectRequest.setAttribute(RESPONSE_TIMEOUT, responseTimeout));
                     return resolveRedirectURI(request, redirectRequest)
                         .flatMap(uri -> {
                             setRedirectHeaders(request, redirectRequest.uri(uri), preserveBody);
@@ -1713,9 +1695,6 @@ final class NettyHttpClient implements
             }
         }
 
-        // a response timeout of the exchange replaces the read timeout until the response arrives
-        Duration responseTimeout = request.getAttribute(RESPONSE_TIMEOUT, Duration.class).orElse(null);
-        ResponseDeadline responseDeadline = responseTimeout == null ? null : ResponseDeadline.start(poolHandle, responseTimeout);
         AtomicBoolean responded = new AtomicBoolean();
 
         pipeline.addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new Http1ResponseHandler(new Http1ResponseHandler.ResponseListener() {
@@ -1723,9 +1702,6 @@ final class NettyHttpClient implements
 
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
-                if (responseDeadline != null) {
-                    responseDeadline.stop();
-                }
                 poolHandle.taint();
                 if (!sink.isCancelled()) {
                     // nobody takes the error of a cancelled exchange, e.g. its closed connection
@@ -1747,10 +1723,6 @@ final class NettyHttpClient implements
 
             @Override
             public void complete(io.netty.handler.codec.http.HttpResponse response, CloseableByteBody body) {
-                if (responseDeadline != null) {
-                    // the configured read timeout applies to the response body
-                    responseDeadline.stop();
-                }
                 responded.set(true);
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
@@ -1784,9 +1756,6 @@ final class NettyHttpClient implements
 
             @Override
             public void finish(ChannelHandlerContext ctx) {
-                if (responseDeadline != null) {
-                    responseDeadline.stop();
-                }
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
                 if (streamWriter != null) {
                     if (!streamWriter.isCompleted()) {

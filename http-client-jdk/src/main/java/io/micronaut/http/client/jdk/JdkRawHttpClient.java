@@ -164,7 +164,7 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
         // the response timeout is the timeout of the JDK request, see mapToHttpRequest
         ExecutionFlow<HttpResponse<?>> flow = ReactiveExecutionFlow.fromPublisher(Mono.from(exchangeImpl(request, null)).map(r -> (HttpResponse<?>) r));
         Mono<MutableHttpResponse<?>> response = Mono.from(ReactiveExecutionFlow.toPublisher(
-            flow.map(r -> RawHttpClientSupport.toMutableResponse(r, options))
+            flow.map(RawHttpClientSupport::toMutableResponse)
         ));
         if (requestBody != null) {
             // released unless they were sent, e.g. when the connection is refused, also when the
@@ -198,8 +198,9 @@ final class JdkRawHttpClient extends AbstractJdkHttpClient implements RawHttpCli
                 java.net.http.HttpRequest.Builder builder = HttpRequestFactory.builder(uri, request, configuration, bodyType, mediaTypeCodecRegistry, messageBodyHandlerRegistry);
                 Duration responseTimeout = responseTimeout(request);
                 if (responseTimeout != null) {
-                    // replaces the configured read timeout, it may be longer or shorter
-                    builder.timeout(responseTimeout);
+                    // it can only shorten the configured read timeout, like for the Netty client
+                    Duration readTimeout = configuration.getReadTimeout().orElse(null);
+                    builder.timeout(readTimeout != null && readTimeout.compareTo(responseTimeout) < 0 ? readTimeout : responseTimeout);
                 }
                 return builder.build();
             });

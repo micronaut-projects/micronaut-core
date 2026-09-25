@@ -4,6 +4,8 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.AppenderBase
 import io.micronaut.http.HttpHeaders
+import io.micronaut.http.HttpRequest
+import io.micronaut.http.MutableHttpHeaders
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import spock.lang.See
@@ -122,5 +124,31 @@ class HttpHeadersUtilSpec extends Specification {
         protected void append(ILoggingEvent e) {
             events.add(e.formattedMessage)
         }
+    }
+
+    void "the hop-by-hop headers are stripped in place"() {
+        given:
+        MutableHttpHeaders headers = HttpRequest.GET("/").headers
+        headers.add("Connection", "keep-alive, X-Hop")
+        headers.add("Connection", "x-other-hop,")
+        headers.add("X-Hop", "1")
+        headers.add("X-Other-Hop", "2")
+        headers.add("Keep-Alive", "timeout=5")
+        headers.add("Proxy-Authorization", "Basic abc")
+        headers.add("proxy-connection", "keep-alive")
+        headers.add("TE", "trailers")
+        headers.add("Trailer", "X-Checksum")
+        headers.add("Transfer-Encoding", "chunked")
+        headers.add("Upgrade", "h2c")
+        headers.add("Accept", "text/plain")
+        headers.add("Accept", "application/json")
+        headers.add("X-Proxyish", "kept")
+
+        when:
+        HttpHeadersUtil.stripHopByHopHeaders(headers)
+
+        then:
+        headers.names().toList().sort() == ["Accept", "X-Proxyish"]
+        headers.getAll("Accept") == ["text/plain", "application/json"]
     }
 }
