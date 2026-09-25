@@ -128,6 +128,7 @@ import io.netty.buffer.CompositeByteBuf;
 import io.netty.buffer.EmptyByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelPipeline;
 import io.netty.handler.codec.http.DefaultFullHttpRequest;
@@ -1595,8 +1596,15 @@ final class NettyHttpClient implements
                         permitsBody,
                         poolHandle.channel
                     );
-                } catch (HttpPostRequestEncoder.ErrorDataEncoderException e) {
-                    poolHandle.release();
+                } catch (Exception e) {
+                    // nothing was written yet, so the connection is still usable: return it to
+                    // the pool instead of leaving it marked as busy forever. Like a release after
+                    // a response, this must happen on the event loop of the connection.
+                    if (poolHandle.channel.eventLoop().inEventLoop()) {
+                        poolHandle.release();
+                    } else {
+                        poolHandle.channel.eventLoop().execute(poolHandle::release);
+                    }
                     return ExecutionFlow.error(e);
                 }
 
@@ -1691,19 +1699,77 @@ final class NettyHttpClient implements
         OptionalLong length = byteBody.expectedLength();
 
         // if the body is streamed, we have a StreamWriter, otherwise we have a ByteBuf.
-        StreamWriter streamWriter;
-        ByteBuf byteBuf;
-        if (byteBody instanceof AvailableByteBody available) {
-            byteBuf = NettyByteBodyFactory.toByteBuf(available);
-            streamWriter = null;
-        } else {
-            streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
-                poolHandle.taint();
-                completeExceptionallySafe(sink, e);
-            });
-            pipeline.addLast(streamWriter);
-            byteBuf = null;
+        StreamWriter streamWriter = null;
+        ByteBuf byteBuf = null;
+        try {
+            if (byteBody instanceof AvailableByteBody available) {
+                byteBuf = NettyByteBodyFactory.toByteBuf(available);
+            } else {
+                streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
+                    poolHandle.taint();
+                    completeExceptionallySafe(sink, e);
+                });
+                pipeline.addLast(streamWriter);
+            }
+            prepareRequestPipeline(poolHandle, request, sink, nettyRequest, expectContinue, length, streamWriter, byteBuf);
+        } catch (Throwable t) {
+            // the request was not written, but the pipeline may be half built: don't reuse the
+            // connection, and make sure the pool handle is released and the caller sees the error
+            poolHandle.taint();
+            ChannelHandler responseHandler = pipeline.get(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
+            if (responseHandler != null) {
+                pipeline.remove(responseHandler);
+            }
+            if (streamWriter != null && pipeline.context(streamWriter) != null) {
+                pipeline.remove(streamWriter);
+            }
+            if (byteBuf != null) {
+                byteBuf.release();
+            }
+            byteBody.close();
+            poolHandle.release();
+            completeExceptionallySafe(sink, t);
+            return;
         }
+
+        Channel channel = poolHandle.channel();
+        if (streamWriter == null) {
+            if (!expectContinue) {
+                // it's a bit more efficient to use a full request for HTTP/2
+                channel.writeAndFlush(new DefaultFullHttpRequest(
+                    nettyRequest.protocolVersion(),
+                    nettyRequest.method(),
+                    nettyRequest.uri(),
+                    byteBuf,
+                    nettyRequest.headers(),
+                    EmptyHttpHeaders.INSTANCE
+                ), channel.voidPromise());
+            } else {
+                channel.writeAndFlush(nettyRequest, channel.voidPromise());
+            }
+        } else {
+            channel.writeAndFlush(nettyRequest, channel.voidPromise());
+            if (!expectContinue) {
+                streamWriter.startWriting();
+            }
+        }
+    }
+
+    /**
+     * Add the response handler to the pipeline and finalize the request headers, without writing
+     * anything to the channel yet.
+     */
+    private void prepareRequestPipeline(
+        ConnectionManager.PoolHandle poolHandle,
+        io.micronaut.http.HttpRequest<?> request,
+        DelayedExecutionFlow<NettyClientByteBodyResponse> sink,
+        HttpRequest nettyRequest,
+        boolean expectContinue,
+        OptionalLong length,
+        @Nullable StreamWriter streamWriter,
+        @Nullable ByteBuf byteBuf
+    ) {
+        ChannelPipeline pipeline = poolHandle.channel.pipeline();
 
         if (log.isTraceEnabled()) {
             HttpHeadersUtil.trace(log, nettyRequest.headers().names(), nettyRequest.headers()::getAll);
@@ -1814,28 +1880,6 @@ final class NettyHttpClient implements
                 nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.KEEP_ALIVE);
             } else {
                 nettyRequest.headers().set(HttpHeaderNames.CONNECTION, HttpHeaderValues.CLOSE);
-            }
-        }
-
-        Channel channel = poolHandle.channel();
-        if (streamWriter == null) {
-            if (!expectContinue) {
-                // it's a bit more efficient to use a full request for HTTP/2
-                channel.writeAndFlush(new DefaultFullHttpRequest(
-                    nettyRequest.protocolVersion(),
-                    nettyRequest.method(),
-                    nettyRequest.uri(),
-                    byteBuf,
-                    nettyRequest.headers(),
-                    EmptyHttpHeaders.INSTANCE
-                ), channel.voidPromise());
-            } else {
-                channel.writeAndFlush(nettyRequest, channel.voidPromise());
-            }
-        } else {
-            channel.writeAndFlush(nettyRequest, channel.voidPromise());
-            if (!expectContinue) {
-                streamWriter.startWriting();
             }
         }
     }
