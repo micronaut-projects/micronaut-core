@@ -89,10 +89,12 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
     /**
      * The attribute map. It is created lazily, by {@link #getAttributes()} only: the route
      * metadata is kept in the fields below until then, so that a plain response never allocates
-     * the map. Once the map exists it is the only store, and the fields are cleared.
+     * the map. The map is published fully populated, in one volatile write, and the fields are
+     * never cleared, so a reader that has not seen the map yet still sees the metadata in the
+     * fields. Once the map is visible it is the only store.
      */
     @Nullable
-    private MutableConvertibleValues<Object> attributes;
+    private volatile MutableConvertibleValues<Object> attributes;
     @Nullable
     private Object routeMatch;
     @Nullable
@@ -276,23 +278,34 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
 
     @Override
     public MutableConvertibleValues<Object> getAttributes() {
-        // no synchronization: a response is built by a single thread at a time, and the map is
-        // not shared until it has been published by the caller
+        MutableConvertibleValues<Object> attributes = this.attributes;
+        if (attributes == null) {
+            attributes = createAttributes();
+        }
+        return attributes;
+    }
+
+    /**
+     * Create and publish the attribute map. Only the first materialisation takes the lock, the
+     * hot path that never asks for the map does not.
+     *
+     * @return The map
+     */
+    private synchronized MutableConvertibleValues<Object> createAttributes() {
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
             attributes = new MutableConvertibleValuesMap<>(new HashMap<>(4));
-            // move the route metadata into the map, which is the only store from now on
+            // copy the route metadata into the map before it is published, so that no reader
+            // sees a map without the metadata; the fields are kept for readers that have not
+            // seen the map yet
             if (routeMatch != null) {
                 attributes.put(ROUTE_MATCH_KEY, routeMatch);
-                routeMatch = null;
             }
             if (routeInfo != null) {
                 attributes.put(ROUTE_INFO_KEY, routeInfo);
-                routeInfo = null;
             }
             if (uriTemplate != null) {
                 attributes.put(URI_TEMPLATE_KEY, uriTemplate);
-                uriTemplate = null;
             }
             this.attributes = attributes;
         }
@@ -328,15 +341,15 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             String key = name.toString();
             if (attributes == null) {
                 if (key.equals(ROUTE_MATCH_KEY)) {
-                    routeMatch = value;
+                    setRouteMatchMetadata(value);
                     return this;
                 }
                 if (key.equals(ROUTE_INFO_KEY)) {
-                    routeInfo = value;
+                    setRouteInfoMetadata(value);
                     return this;
                 }
                 if (key.equals(URI_TEMPLATE_KEY) && (value == null || value instanceof String)) {
-                    uriTemplate = (String) value;
+                    setUriTemplateMetadata((String) value);
                     return this;
                 }
             }
@@ -356,7 +369,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
             this.routeMatch = routeMatch;
-        } else {
+            // the map may have been published meanwhile, from a copy of the fields taken before
+            // this write: then it is the store, so write there too
+            attributes = this.attributes;
+        }
+        if (attributes != null) {
             putOrRemove(attributes, ROUTE_MATCH_KEY, routeMatch);
         }
     }
@@ -372,7 +389,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
             this.routeInfo = routeInfo;
-        } else {
+            // the map may have been published meanwhile, from a copy of the fields taken before
+            // this write: then it is the store, so write there too
+            attributes = this.attributes;
+        }
+        if (attributes != null) {
             putOrRemove(attributes, ROUTE_INFO_KEY, routeInfo);
         }
     }
@@ -391,7 +412,11 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
         MutableConvertibleValues<Object> attributes = this.attributes;
         if (attributes == null) {
             this.uriTemplate = uriTemplate;
-        } else {
+            // the map may have been published meanwhile, from a copy of the fields taken before
+            // this write: then it is the store, so write there too
+            attributes = this.attributes;
+        }
+        if (attributes != null) {
             putOrRemove(attributes, URI_TEMPLATE_KEY, uriTemplate);
         }
     }
