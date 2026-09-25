@@ -24,7 +24,6 @@ import io.micronaut.http.uri.UriTemplateMatcher;
 import io.micronaut.http.uri.spi.RouteTemplateEngines;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.builder.RouteDeclaration;
-import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 
@@ -89,18 +88,6 @@ public interface IndexedRouteDeclaration extends RouteDeclaration {
             return 0;
         }
         return new UriTemplateMatcher(new UriMatchTemplate(uriTemplate).getTemplateString()).getPatternVariableCount();
-    }
-
-    /**
-     * The URL parser generated for the enum this declaration is a constant of, if any: the
-     * ordinal it answers selects the route bound to the constant with that ordinal. Every constant
-     * of the enum must return the same instance, on every call, e.g. a {@code static final}
-     * singleton: the router groups the routes of a parser by its identity.
-     *
-     * @return The matcher, or {@code null}
-     */
-    default @Nullable CompiledRouteMatcher matcher() {
-        return null;
     }
 
     /**

@@ -28,32 +28,40 @@ import io.micronaut.http.bind.RequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyReader;
 import io.micronaut.http.body.MessageBodyWriter;
+import io.micronaut.http.uri.MicronautRouteTemplateEngine;
 import io.micronaut.http.uri.ParsedRouteTemplate;
 import io.micronaut.http.uri.RouteTemplate;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.spi.ControllerRoute;
 import io.micronaut.web.router.spi.IndexedRouteDeclaration;
+import io.micronaut.web.router.spi.PlannedRouteDeclaration;
+import io.micronaut.web.router.spi.RoutePlan;
+import io.micronaut.web.router.spi.RouteSlot;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.function.Supplier;
 
 /**
- * A URI route that is built the first time it is needed: a handler function bound to an
+ * A URI route that is built the first time it is needed: the route of a controller method
+ * described by a slot of a {@link RoutePlan}, or a handler function bound to an
  * {@link IndexedRouteDeclaration}. Until then, the router indexes and orders it with keys computed
  * at compile time, which this route answers without building the route: the HTTP method, the
- * template, the order and the {@link IndexedRoute} keys. It forwards the other methods to the
- * built route, those the built route implements in a class: the defaults of the interfaces that
- * the built route does not override are computed from the forwarded methods, as they are for the
- * built route. {@code LazyUriRouteInfoForwardingTest} fails when a method of the route interfaces
- * is not handled.
+ * template, the order and the {@link IndexedRoute} keys; a route bound to a
+ * {@link RouteSlot#compiled() compiled} slot of a plan is matched by the parser of the plan. It
+ * forwards the other methods to the built route, those the built route implements in a class: the
+ * defaults of the interfaces that the built route does not override are computed from the
+ * forwarded methods, as they are for the built route. {@code LazyUriRouteInfoForwardingTest}
+ * fails when a method of the route interfaces is not handled.
  *
  * @author Denis Stepanov
  * @since 5.3.0
@@ -70,8 +78,22 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
     private final int patternVariableCount;
     private final boolean implicitHead;
     private final int order;
-    private final IndexedRouteDeclaration declaration;
+    private final String target;
+    private final @Nullable IndexedRouteDeclaration declaration;
+    private final @Nullable RoutePlan plan;
+    private final @Nullable String planKey;
     private final Supplier<UriRouteInfo<Object, Object>> delegate;
+
+    /**
+     * @param plan    The plan of the controller
+     * @param slot    The slot of the route, which describes a controller method
+     * @param builder Builds the route
+     */
+    LazyUriRouteInfo(RoutePlan plan, RouteSlot slot, Supplier<UriRouteInfo<Object, Object>> builder) {
+        this(slot.httpMethod(), slot.httpMethodName(), slot.template(), null, slot.requiredPrefix(), slot.rawLength(),
+            slot.pathVariableCount(), slot.patternVariableCount(), implicitHead(slot), 0,
+            String.valueOf(slot.controller()), null, plan, slot.key(), builder);
+    }
 
     /**
      * @param declaration    The declaration a handler function is bound to
@@ -87,26 +109,97 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
                      int order,
                      Supplier<ParsedRouteTemplate> parsedTemplate,
                      Supplier<UriRouteInfo<Object, Object>> builder) {
-        this.httpMethod = httpMethod;
         // the custom name for a custom method, so that the router indexes the route under it
-        this.methodKey = implicitHead ? httpMethod.name() : declaration.httpMethodName();
-        this.template = declaration.template();
-        this.parsedTemplate = SupplierUtil.memoized(parsedTemplate);
-        this.requiredPathPrefix = declaration.requiredPathPrefix();
-        this.rawLength = declaration.rawLength();
-        this.pathVariableCount = declaration.pathVariableCount();
-        this.patternVariableCount = declaration.patternVariableCount();
+        this(httpMethod, implicitHead ? httpMethod.name() : declaration.httpMethodName(), declaration.template(), parsedTemplate,
+            declaration.requiredPathPrefix(), declaration.rawLength(), declaration.pathVariableCount(), declaration.patternVariableCount(), implicitHead,
+            order, String.valueOf(declaration), declaration,
+            declaration instanceof PlannedRouteDeclaration planned ? planned.plan() : null,
+            declaration instanceof PlannedRouteDeclaration planned ? planned.key() : null,
+            builder);
+    }
+
+    @SuppressWarnings("ParameterNumber")
+    private LazyUriRouteInfo(HttpMethod httpMethod,
+                             String methodKey,
+                             RouteTemplate template,
+                             @Nullable Supplier<ParsedRouteTemplate> parsedTemplate,
+                             String requiredPathPrefix,
+                             int rawLength,
+                             int pathVariableCount,
+                             int patternVariableCount,
+                             boolean implicitHead,
+                             int order,
+                             String target,
+                             @Nullable IndexedRouteDeclaration declaration,
+                             @Nullable RoutePlan plan,
+                             @Nullable String planKey,
+                             Supplier<UriRouteInfo<Object, Object>> builder) {
+        this.httpMethod = httpMethod;
+        this.methodKey = methodKey;
+        this.template = template;
+        this.parsedTemplate = parsedTemplate != null
+            ? SupplierUtil.memoized(parsedTemplate)
+            // a Micronaut template parses its segments and facts without building the matcher
+            : SupplierUtil.memoized(() -> MicronautRouteTemplateEngine.INSTANCE.parse(template));
+        this.requiredPathPrefix = requiredPathPrefix;
+        this.rawLength = rawLength;
+        this.pathVariableCount = pathVariableCount;
+        this.patternVariableCount = patternVariableCount;
         this.implicitHead = implicitHead;
         this.order = order;
+        this.target = target;
         this.declaration = declaration;
+        this.plan = plan;
+        this.planKey = planKey;
         this.delegate = SupplierUtil.memoized(builder);
     }
 
+    private static boolean implicitHead(RouteSlot slot) {
+        ControllerRoute controller = slot.controller();
+        return controller != null && controller.implicitHead();
+    }
+
     /**
-     * @return The declaration a handler function is bound to
+     * @return The declaration a handler function is bound to, or {@code null} for the route of a controller method
      */
-    IndexedRouteDeclaration declaration() {
+    @Nullable IndexedRouteDeclaration declaration() {
         return declaration;
+    }
+
+    /**
+     * @return The template of the route, known without building it
+     */
+    RouteTemplate template() {
+        return template;
+    }
+
+    /**
+     * @return The plan with the slot of the route, or {@code null}
+     */
+    @Nullable RoutePlan plan() {
+        return plan;
+    }
+
+    /**
+     * @return The key of the slot of the route in its {@link #plan() plan}, or {@code null}
+     */
+    @Nullable String planKey() {
+        return planKey;
+    }
+
+    /**
+     * The match of this route, whose path variables the parser of its plan captured.
+     *
+     * @param path     The matched path, normalised
+     * @param captured The raw values of the captured path variables, in the order of the template
+     * @return The match
+     */
+    UriRouteMatch<Object, Object> capturedMatch(String path, String[] captured) {
+        UriRouteInfo<Object, Object> route = delegate();
+        if (route instanceof DefaultUrlRouteInfo<Object, Object> built) {
+            return built.capturedMatch(path, captured);
+        }
+        return Objects.requireNonNull(route.tryMatch(path), "The route does not match the path its plan matched");
     }
 
     /**
@@ -421,6 +514,6 @@ final class LazyUriRouteInfo implements UriRouteInfo<Object, Object>, IndexedRou
 
     @Override
     public String toString() {
-        return methodKey + ' ' + template + " -> " + declaration;
+        return methodKey + ' ' + template + " -> " + target;
     }
 }

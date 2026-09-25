@@ -47,8 +47,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * Derives the URI routes of a controller method from its annotations, for the runtime
- * {@link AnnotatedMethodRouteBuilder} and for code that derives the same routes at compile time.
+ * Derives the URI routes of a controller method from its annotations. Shared by the runtime
+ * {@link AnnotatedMethodRouteBuilder} and the route compiler ({@code micronaut-router-processor}),
+ * which describes the routes of controllers as the slots of route plans, so that both derive the
+ * same routes.
  * <p>Annotations are looked up by name, so this works on the annotation metadata of both a
  * compiled {@code ExecutableMethod} and a method element of the annotation processor.
  *

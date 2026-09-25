@@ -14,7 +14,9 @@
  * limitations under the License.
  */
 /**
- * Contracts between the router and code generated at compile time: route declarations with the keys the router indexes routes by.
+ * Contracts between the router and code generated at compile time: route declarations with the
+ * keys the router indexes routes by, and {@link io.micronaut.web.router.spi.RoutePlan route plans},
+ * the generated parsers and slot descriptors the router binds routes to.
  *
  * @author Denis Stepanov
  * @since 5.3.0

@@ -30,6 +30,8 @@ tasks.withType<Test>().configureEach {
 //compileTestGroovy.groovyOptions.fork = true
 
 noReflection {
+    // loads the route plans the route compiler generated for controllers, see RoutePlan
+    allowIn("io.micronaut.web.router.RoutePlans", "SERVICE_LOADING")
     allowIn("io.micronaut.web.router.AbstractRouteMatch", "TARGET_MEMBERS")
     allowIn("io.micronaut.web.router.DefaultErrorRouteInfo", "CLASS_NAMES")
     allowIn("io.micronaut.web.router.DefaultRouteBuilder", "CLASS_NAMES")

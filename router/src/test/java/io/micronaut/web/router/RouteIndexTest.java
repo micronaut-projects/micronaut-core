@@ -77,6 +77,14 @@ class RouteIndexTest {
         assertArrayEquals(new int[] {2}, index.candidates("/other"));
     }
 
+    @Test
+    void routesWithoutAPrefixAreNeverCandidates() {
+        // a route bound to a compiled slot of a route plan: the parser of the plan finds it
+        RouteIndex index = RouteIndex.build(new String[] {"/books/", null, "", null});
+        assertArrayEquals(new int[] {0, 2}, index.candidates("/books/12"));
+        assertArrayEquals(new int[] {2}, index.candidates("/other"));
+    }
+
     private static void check(String[] templates, String[] paths) {
         RouteIndex index = index(templates);
         UriTemplateMatcher[] matchers = Arrays.stream(templates).map(UriTemplateMatcher::of).toArray(UriTemplateMatcher[]::new);

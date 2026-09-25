@@ -16,13 +16,13 @@ import java.lang.reflect.Field;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
- * A declared route that a generated URL parser answers is selected like any other route: the most
+ * A declared route that the parser of a route plan finds is selected like any other route: the most
  * specific route, the preferred media type and an explicit {@code HEAD} route win, whether the
- * competing route is a controller route or the route of another parser. Only a compiled route no
- * other route competes with skips the selection.
+ * competing route is a controller route or the route of another plan. Every candidate the parser
+ * finds carries the values it captured into the selection, so the selected route is never matched
+ * again.
  */
 class CompiledRouteSelectionTest {
     static final String SPEC_NAME = "CompiledRouteSelectionTest";
@@ -77,11 +77,13 @@ class CompiledRouteSelectionTest {
     }
 
     @Test
-    void onlyARouteWithoutCompetitorsSkipsTheSelection() throws ReflectiveOperationException {
+    void theSelectedRouteKeepsTheValuesTheParserCaptured() throws ReflectiveOperationException {
         Router router = server.getApplicationContext().getBean(Router.class);
         assertEquals("CapturedUriMatchInfo", matchedBy(router, HttpRequest.GET("/docs/1")));
         assertEquals("CapturedUriMatchInfo", matchedBy(router, HttpRequest.HEAD("/docs/1")));
-        assertNotEquals("CapturedUriMatchInfo", matchedBy(router, HttpRequest.GET("/items/5").accept(MediaType.APPLICATION_JSON_TYPE)));
+        // a route with competitors: the selection decides, among candidates the parsers found
+        assertEquals("CapturedUriMatchInfo", matchedBy(router, HttpRequest.GET("/items/5").accept(MediaType.APPLICATION_JSON_TYPE)));
+        assertEquals("CapturedUriMatchInfo", matchedBy(router, HttpRequest.GET("/items/5").accept(MediaType.TEXT_PLAIN_TYPE, MediaType.APPLICATION_JSON_TYPE)));
         assertEquals("declared doc 1", client.toBlocking().retrieve("/docs/1"));
     }
 
