@@ -395,7 +395,7 @@ public final class NettyMutableHttpResponse<B> implements MutableHttpResponse<B>
             throw new IllegalStateException("Body needs to be converted to ByteBuf from " + body.getClass());
         }
         DefaultStreamedHttpResponse streamedHttpResponse = new DefaultStreamedHttpResponse(
-                HttpVersion.HTTP_1_1,
+                httpVersion,
                 httpResponseStatus,
                 true,
                 Publishers.just(new DefaultLastHttpContent(content))
