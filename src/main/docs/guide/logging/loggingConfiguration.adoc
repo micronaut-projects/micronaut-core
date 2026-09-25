@@ -20,6 +20,10 @@ logger:
 You can also set a custom Logback XML configuration file to be used via `logger.config`.
 The file is first checked on the classpath and then on the file system.
 
+When any `logger.*` property is set, the Micronaut framework resets Logback and configures it again at startup and on every refresh event, before it applies the levels. A Logback XML configuration file set in Micronaut configuration wins: `logback.configurationFile`, unless it is also set as a JVM system property, otherwise `logger.config`. The framework configures Logback from that file even when a custom Logback `Configurator` is registered as a service, and startup fails when the file does not exist.
+
+Otherwise, Logback is configured again the way Logback configures itself at startup, as described in the link:https://logback.qos.ch/manual/configuration.html#auto_configuration[Logback manual]: the `Configurator` services by rank, until one of them returns `DO_NOT_INVOKE_NEXT_IF_ANY`, then the file set with the `logback.configurationFile` JVM system property, `logback-test.xml` or `logback.xml`, then the basic console configuration.
+
 ==== Disabling a Logger with Properties
 
 To disable a logger, you need to set the logger level to `OFF`:

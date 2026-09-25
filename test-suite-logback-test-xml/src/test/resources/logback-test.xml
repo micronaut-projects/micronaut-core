@@ -1,0 +1,13 @@
+<configuration>
+
+    <appender name="TEST" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>TEST %d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+
+    <root level="info">
+        <appender-ref ref="TEST" />
+    </root>
+    <logger name="from.test" level="TRACE" />
+</configuration>
