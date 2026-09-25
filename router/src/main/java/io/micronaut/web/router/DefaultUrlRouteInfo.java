@@ -62,6 +62,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      */
     final RouteAssembly.@Nullable RouteGroup errorScope;
     /**
+     * Whether the route is a route of {@code HttpRouteBuilder.any(...)}, see {@link AnyMethodRoutes}.
+     */
+    final boolean anyMethod;
+    /**
      * The order of the route among equally good routes.
      */
     private final int order;
@@ -161,7 +165,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                boolean implicitHead) {
         this(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
-            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null);
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false);
     }
 
     /**
@@ -186,6 +190,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @param order                      The order of the route among equally good routes
      * @param attributes                 The attributes of the route
      * @param errorScope                 The innermost group of the route that has error or status routes, or {@code null}
+     * @param anyMethod                  Whether the route is a route of {@code HttpRouteBuilder.any(...)}
      */
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -206,7 +211,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                         List<GenericHttpFilter> routeFilters,
                         int order,
                         Map<String, Object> attributes,
-                        RouteAssembly.@Nullable RouteGroup errorScope) {
+                        RouteAssembly.@Nullable RouteGroup errorScope,
+                        boolean anyMethod) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -221,6 +227,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.order = order;
         this.attributes = attributes;
         this.errorScope = errorScope;
+        this.anyMethod = anyMethod;
     }
 
     @Override
