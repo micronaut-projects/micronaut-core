@@ -266,6 +266,9 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     public HttpVersion getHttpVersion() {
         HttpPipelineBuilder.StreamPipeline pipeline = channelHandlerContext.channel().attr(HttpPipelineBuilder.STREAM_PIPELINE_ATTRIBUTE.get()).get();
         if (pipeline != null) {
+            if (pipeline.httpVersion == HttpVersion.HTTP_1_1 && nettyRequest.protocolVersion().majorVersion() == 1 && nettyRequest.protocolVersion().minorVersion() == 0) {
+                return HttpVersion.HTTP_1_0;
+            }
             return pipeline.httpVersion;
         }
         // Http2ServerHandler case
