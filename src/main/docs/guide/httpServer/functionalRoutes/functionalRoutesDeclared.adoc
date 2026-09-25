@@ -1,0 +1,10 @@
+A api:web.router.builder.RouteDeclaration[] is the shape of a route, an HTTP method and a URI template, declared apart from its handler:
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="declaration", indent=0, title="A route declaration"]
+
+snippet::io.micronaut.docs.server.functional.AuditedRoutes[tags="declared", indent=0, title="A handler bound to the declaration"]
+
+<1> `RouteDeclaration.of(method, uriTemplate)` declares a route in code.
+<2> `handle(declaration, handler)`, and the `handleAsync` and `handleForm` variants, bind a handler to it. The route behaves like one declared with `GET(...)`, including its implicit `HEAD` route.
+
+A declared route is matched by its URI template like any other route. A declaration declares its own full URI template, so it cannot be bound in a group with a prefix.

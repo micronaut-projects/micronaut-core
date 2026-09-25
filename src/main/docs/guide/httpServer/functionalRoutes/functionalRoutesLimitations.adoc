@@ -1,0 +1,7 @@
+Functional routes are experimental and have these known limitations:
+
+* A handler route has no annotations unless it is given some, see <<functionalRoutesAnnotations, Annotations on Handler Routes>>. Validation of the body (`@Valid`, constraints) is not applied to handler routes: validate in the handler.
+* Tools that read the annotations of controllers, such as Micronaut OpenAPI, do not see handler routes.
+* There is no API to stream a response other than a `Publisher` body.
+* There is no Kotlin DSL and no support for `suspend` handler functions.
+* A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes when it is created. The routes cannot change while the application runs.

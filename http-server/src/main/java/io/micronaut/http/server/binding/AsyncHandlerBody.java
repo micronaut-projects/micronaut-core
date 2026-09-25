@@ -16,6 +16,7 @@
 package io.micronaut.http.server.binding;
 
 import io.micronaut.core.annotation.Internal;
+import io.micronaut.web.router.builder.ReleasableRequestBody;
 
 import java.util.concurrent.CompletionStage;
 
@@ -23,19 +24,14 @@ import java.util.concurrent.CompletionStage;
  * The body an asynchronous handler receives, as its route
  * sees it: when the stage the handler returned completes, the route releases what the handler's
  * read of the body left open, e.g. the parts of a form it did not read, before the response is
- * written.
+ * written. The routes of the router release it as a {@link ReleasableRequestBody}.
  *
  * @author Denis Stepanov
  * @since 5.3.0
  */
 @Internal
-public interface AsyncHandlerBody {
+public interface AsyncHandlerBody extends ReleasableRequestBody {
 
-    /**
-     * Release what the read of the body left open: the parts of a form, the elements of the
-     * body, or an operation on the body that is still running.
-     *
-     * @return Completes when released, exceptionally when releasing failed
-     */
+    @Override
     CompletionStage<Void> releaseBody();
 }
