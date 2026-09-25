@@ -50,6 +50,7 @@ import java.security.cert.X509Certificate;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A route that relays an {@code Upgrade} request to an upstream server through the
@@ -65,6 +66,9 @@ import java.util.concurrent.TimeUnit;
 public final class UpgradeRelayTest {
     public static final String SPEC_NAME = "UpgradeRelayTest";
     private static final long TIMEOUT_SECONDS = 10;
+    private static final int LARGE_STREAM_CHUNK = 16 * 1024;
+    private static final int LARGE_STREAM_CHUNKS = 1024;
+    private static final long LARGE_STREAM_SIZE = (long) LARGE_STREAM_CHUNK * LARGE_STREAM_CHUNKS;
 
     @Test
     void switchedProtocolIsRelayedBothWays() throws Exception {
@@ -110,6 +114,79 @@ public final class UpgradeRelayTest {
             String head = readHead(in);
             Assertions.assertTrue(head.startsWith("HTTP/1.1 200 "), head);
             Assertions.assertEquals("no", readExactly(in, 2));
+        }
+    }
+
+    @Test
+    void bytesSentWithTheUpgradeRequestReachTheUpstream() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            server.getApplicationContext().getBean(UpstreamAddress.class).uri = upstream.uri();
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            // the first bytes of the new protocol in the same write as the request, so they arrive with it
+            out.write(("GET /upgrade-relay HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\nhello").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+
+            String head = readHead(in);
+            Assertions.assertTrue(head.startsWith("HTTP/1.1 101 "), head);
+            Assertions.assertTrue(upstream.upgraded.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream did not see the upgrade");
+            // more bytes after the switch, to tell whether the first ones were lost or delayed
+            out.write("more".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            Assertions.assertEquals("HELL", readExactly(in, 4), "The bytes sent with the request did not reach the upstream first");
+            Assertions.assertEquals("OMORE", readExactly(in, 5));
+        }
+    }
+
+    @Test
+    void largeStreamFromTheClientReachesTheUpstream() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            server.getApplicationContext().getBean(UpstreamAddress.class).uri = upstream.uri();
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            out.write(("GET /upgrade-relay?mode=sink HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+
+            String head = readHead(in);
+            Assertions.assertTrue(head.startsWith("HTTP/1.1 101 "), head);
+            Assertions.assertTrue(upstream.upgraded.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream did not see the upgrade");
+            // a large stream, then the client closes: everything before its close reaches the upstream
+            byte[] chunk = new byte[LARGE_STREAM_CHUNK];
+            for (int i = 0; i < LARGE_STREAM_CHUNKS; i++) {
+                out.write(chunk);
+            }
+            out.flush();
+            socket.close();
+            Assertions.assertTrue(upstream.closed.await(TIMEOUT_SECONDS * 3, TimeUnit.SECONDS), "The upstream connection was not closed");
+            Assertions.assertEquals(LARGE_STREAM_SIZE, upstream.bytesReceived.get(), "Not all bytes of the client reached the upstream");
+        }
+    }
+
+    @Test
+    void largeStreamFromTheUpstreamReachesTheClient() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            server.getApplicationContext().getBean(UpstreamAddress.class).uri = upstream.uri();
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            out.write(("GET /upgrade-relay?mode=flood HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: echo\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+
+            String head = readHead(in);
+            Assertions.assertTrue(head.startsWith("HTTP/1.1 101 "), head);
+            // the upstream sends a large stream and closes: everything before its close reaches the client
+            long read = 0;
+            byte[] buffer = new byte[8192];
+            int n;
+            while ((n = in.read(buffer)) != -1) {
+                read += n;
+            }
+            Assertions.assertEquals(LARGE_STREAM_SIZE, read, "Not all bytes of the upstream reached the client");
         }
     }
 
@@ -207,11 +284,14 @@ public final class UpgradeRelayTest {
 
     /**
      * A raw upstream that switches to an "echo" protocol, answering every byte upper-cased, or
-     * refuses the switch with a {@code 200} when asked to.
+     * refuses the switch with a {@code 200} when asked to. With {@code mode=sink} it only counts
+     * the bytes it receives until the connection ends, with {@code mode=flood} it sends a large
+     * stream after the switch and closes.
      */
     static final class EchoUpstream implements AutoCloseable {
         final CountDownLatch upgraded = new CountDownLatch(1);
         final CountDownLatch closed = new CountDownLatch(1);
+        final AtomicLong bytesReceived = new AtomicLong();
         private final ServerSocket serverSocket;
 
         EchoUpstream() throws IOException {
@@ -238,11 +318,24 @@ public final class UpgradeRelayTest {
                 out.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n".getBytes(StandardCharsets.US_ASCII));
                 out.flush();
                 upgraded.countDown();
-                byte[] buffer = new byte[1024];
+                if (head.contains("mode=flood")) {
+                    // send a large stream, then close
+                    byte[] chunk = new byte[LARGE_STREAM_CHUNK];
+                    for (int i = 0; i < LARGE_STREAM_CHUNKS; i++) {
+                        out.write(chunk);
+                    }
+                    out.flush();
+                    return;
+                }
+                boolean sink = head.contains("mode=sink");
+                byte[] buffer = new byte[8192];
                 int n;
                 while ((n = in.read(buffer)) != -1) {
-                    out.write(new String(buffer, 0, n, StandardCharsets.ISO_8859_1).toUpperCase(Locale.ROOT).getBytes(StandardCharsets.ISO_8859_1));
-                    out.flush();
+                    bytesReceived.addAndGet(n);
+                    if (!sink) {
+                        out.write(new String(buffer, 0, n, StandardCharsets.ISO_8859_1).toUpperCase(Locale.ROOT).getBytes(StandardCharsets.ISO_8859_1));
+                        out.flush();
+                    }
                 }
             } catch (IOException ignored) {
                 // the connection was closed

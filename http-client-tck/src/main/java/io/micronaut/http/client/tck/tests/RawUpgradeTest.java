@@ -36,11 +36,14 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * A request that allows upgrades and is answered with {@code 101 Switching Protocols} returns an
@@ -55,6 +58,9 @@ import java.util.concurrent.TimeUnit;
 class RawUpgradeTest {
     static final String SPEC_NAME = "RawUpgradeTest";
     private static final long TIMEOUT_SECONDS = 10;
+    private static final int LARGE_STREAM_CHUNK = 16 * 1024;
+    private static final int LARGE_STREAM_CHUNKS = 1024;
+    private static final long LARGE_STREAM_SIZE = (long) LARGE_STREAM_CHUNK * LARGE_STREAM_CHUNKS;
 
     @Test
     void upgradeSwitchesTheConnection() throws Exception {
@@ -140,6 +146,107 @@ class RawUpgradeTest {
         }
     }
 
+    @Test
+    void bytesSentWithTheSwitchAreTheFirstOfTheBody() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(upgradeRequest(upstream), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            // the first bytes of the new protocol in the same write as the 101, so they arrive with it
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\nGREETING");
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+                Assertions.assertNotNull(upgraded, "Not an upgraded response: " + response.getClass());
+                Sinks.Many<ReadBuffer> outbound = Sinks.many().unicast().onBackpressureBuffer();
+                upgraded.send(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(outbound.asFlux()));
+                // more bytes after the switch, to tell whether the first ones were lost or delayed
+                connection.write("MORE");
+                Assertions.assertEquals("GREETINGMORE", readAtLeast(upgraded, 12), "The bytes sent with the 101 are not the first of the body");
+                outbound.tryEmitComplete();
+            }
+        }
+    }
+
+    @Test
+    void largeStreamToThePeerIsSentCompletely() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(upgradeRequest(upstream), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            long requestBytes = connection.received().length();
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n");
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+                Assertions.assertNotNull(upgraded, "Not an upgraded response: " + response.getClass());
+                // a body that ends, larger than the socket buffers: the connection is closed once the last of its bytes is sent
+                upgraded.send(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(new byte[(int) LARGE_STREAM_SIZE]));
+                Assertions.assertTrue(connection.awaitClosed(TIMEOUT_SECONDS * 3), "The connection was not closed when the sent stream ended");
+                Assertions.assertEquals(LARGE_STREAM_SIZE, connection.bytesReceived.get() - requestBytes, "Not all bytes of the sent stream arrived");
+            }
+        }
+    }
+
+    @Test
+    void largeStreamFromThePeerIsReadCompletely() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(upgradeRequest(upstream), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n");
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+                Assertions.assertNotNull(upgraded, "Not an upgraded response: " + response.getClass());
+                Sinks.Many<ReadBuffer> outbound = Sinks.many().unicast().onBackpressureBuffer();
+                upgraded.send(ByteBodyFactory.createDefault(ByteArrayBufferFactory.INSTANCE).adapt(outbound.asFlux()));
+                // the peer sends a large stream and closes: everything before its close is read
+                Thread writer = new Thread(() -> {
+                    try {
+                        byte[] chunk = new byte[LARGE_STREAM_CHUNK];
+                        for (int i = 0; i < LARGE_STREAM_CHUNKS; i++) {
+                            connection.write(chunk);
+                        }
+                        connection.close();
+                    } catch (IOException e) {
+                        throw new UncheckedIOException(e);
+                    }
+                }, "raw-upstream-writer");
+                writer.setDaemon(true);
+                writer.start();
+                Long read = Flux.from(upgraded.byteBody().toByteArrayPublisher())
+                    .map(bytes -> (long) bytes.length)
+                    .reduce(0L, Long::sum)
+                    .block(Duration.ofSeconds(TIMEOUT_SECONDS * 3));
+                writer.join(TimeUnit.SECONDS.toMillis(TIMEOUT_SECONDS));
+                Assertions.assertEquals(LARGE_STREAM_SIZE, read, "Not all bytes of the received stream were read");
+                outbound.tryEmitComplete();
+            }
+        }
+    }
+
     private static MutableHttpRequest<?> upgradeRequest(RawUpstream upstream) {
         return HttpRequest.GET(upstream.uri("/switch"))
             .header(HttpHeaders.CONNECTION, "upgrade")
@@ -155,6 +262,21 @@ class RawUpgradeTest {
         if (response instanceof ByteBodyHttpResponse<?> byteBodyResponse) {
             byteBodyResponse.close();
         }
+    }
+
+    /**
+     * Read the bytes the peer sent, until at least {@code n} arrived, or the time is up: then
+     * what did arrive, so that the failure shows it.
+     */
+    private static String readAtLeast(UpgradedHttpResponse<?> upgraded, int n) {
+        return Flux.from(upgraded.byteBody().toByteArrayPublisher())
+            .map(bytes -> new String(bytes, StandardCharsets.ISO_8859_1))
+            .scan("", String::concat)
+            .takeUntil(received -> received.length() >= n)
+            .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
+            .onErrorResume(TimeoutException.class, e -> Mono.empty())
+            .last("")
+            .block(Duration.ofSeconds(TIMEOUT_SECONDS * 2));
     }
 
     private static void awaitReceived(RawUpstream.Connection connection, String text) throws InterruptedException {

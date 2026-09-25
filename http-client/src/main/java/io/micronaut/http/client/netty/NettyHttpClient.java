@@ -1966,17 +1966,19 @@ final class NettyHttpClient implements
                     streamWriter.cancel();
                     pipeline.remove(streamWriter);
                 }
-                for (String name : List.of(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)) {
-                    if (pipeline.get(name) != null) {
-                        pipeline.remove(name);
-                    }
-                }
                 Duration activityTimeout = request.getAttribute(ACTIVITY_TIMEOUT, Duration.class).orElse(null);
                 if (activityTimeout != null) {
                     pipeline.addLast(new IdleStateHandler(0, 0, activityTimeout.toNanos(), TimeUnit.NANOSECONDS));
                 }
                 RawDuplexHandler duplex = new RawDuplexHandler(poolHandle.channel(), poolHandle::release);
+                // in place before the codec goes: the bytes of the new protocol the codec read together with the
+                // 101 are passed on to the next handlers when it is removed, and must reach the duplex handler
                 pipeline.addLast(RawDuplexHandler.NAME, duplex);
+                for (String name : List.of(ChannelPipelineCustomizer.HANDLER_READ_TIMEOUT, ChannelPipelineCustomizer.HANDLER_HTTP_DECODER, ChannelPipelineCustomizer.HANDLER_HTTP_CLIENT_CODEC)) {
+                    if (pipeline.get(name) != null) {
+                        pipeline.remove(name);
+                    }
+                }
                 sink.complete(new NettyClientUpgradedResponse(response, duplex, conversionService));
                 return true;
             }

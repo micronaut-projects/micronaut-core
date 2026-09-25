@@ -25,6 +25,7 @@ import io.micronaut.http.body.stream.LazyUpstream;
 import io.micronaut.http.netty.EventLoopFlow;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.Channel;
+import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
@@ -139,9 +140,13 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
                 buf.release();
                 return;
             }
+            // bytes that arrive before the consumer of the inbound bytes subscribed, e.g. the bytes of the
+            // new protocol the HTTP codec read together with the 101, which it passes on when it is removed,
+            // are buffered by the shared buffer until then, and count against the demand
             demand -= n;
             inbound.add(NettyReadBufferFactory.of(ctx.alloc()).adapt(buf));
         } else {
+            // the HTTP objects of the 101 that the codec still emits, e.g. its empty last content
             ReferenceCountUtil.release(msg);
         }
     }
@@ -257,6 +262,8 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         private final EventLoopFlow flow = new EventLoopFlow(loop);
         @Nullable
         private Upstream upstream;
+        @Nullable
+        private ChannelFuture lastWrite;
         private long unwritten;
         private boolean done;
 
@@ -311,7 +318,9 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
                 return;
             }
             int n = buf.readable();
-            channel.writeAndFlush(NettyReadBufferFactory.toByteBuf(buf)).addListener((ChannelFutureListener) future -> {
+            ChannelFuture write = channel.writeAndFlush(NettyReadBufferFactory.toByteBuf(buf));
+            lastWrite = write;
+            write.addListener((ChannelFutureListener) future -> {
                 if (future.isSuccess()) {
                     if (channel.isWritable()) {
                         Objects.requireNonNull(upstream).onBytesConsumed(n);
@@ -332,9 +341,15 @@ public final class RawDuplexHandler extends ChannelInboundHandlerAdapter impleme
         }
 
         private void complete0() {
-            // the bytes to the peer ended, i.e. the other side of the relay closed: end the connection
+            // the bytes to the peer ended, i.e. the other side of the relay closed: end the connection, but
+            // only once the last of them is written, a close would drop the writes still queued
             done = true;
-            channel.close();
+            ChannelFuture last = lastWrite;
+            if (last == null) {
+                channel.close();
+            } else {
+                last.addListener(ChannelFutureListener.CLOSE);
+            }
         }
 
         @Override
