@@ -412,7 +412,7 @@ public final class ForwardedHeaders {
      */
     private static String node(@Nullable String address) {
         if (address == null) {
-            return "unknown";
+            return UNKNOWN;
         }
         if (address.indexOf(':') >= 0) {
             return '"' + (address.startsWith("[") ? address : "[" + address + "]") + '"';
