@@ -40,6 +40,11 @@ import java.util.regex.Pattern;
 @Internal
 public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTemplateMatcher> {
 
+    /**
+     * Marker returned by {@link #matchSegments(String)} for a successful match of a template without a regexp segment.
+     */
+    private static final Matcher NO_REGEXP_MATCH = Pattern.compile("").matcher("");
+
     private final String templateString;
     private final List<UriTemplateParser.Part> parts;
     private final List<UriMatchVariable> variables;
@@ -284,59 +289,85 @@ public final class UriTemplateMatcher implements UriMatcher, Comparable<UriTempl
             }
             return null;
         }
-        Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
-        if (match(uri, variableMap)) {
-            return new DefaultUriMatchInfo(uri, variableMap, variables);
+        // Match first without allocating; only a successful match builds the variable map
+        Matcher regexpMatcher = matchSegments(uri);
+        if (regexpMatcher == null) {
+            return null;
         }
-        return null;
+        Map<String, Object> variableMap = CollectionUtils.newLinkedHashMap(variables.size());
+        collectVariables(uri, regexpMatcher, variableMap);
+        return new DefaultUriMatchInfo(uri, variableMap, variables);
     }
 
-    private boolean match(String uri, Map<String, Object> variableMap) {
+    /**
+     * Matches the URI against the segments without extracting the variable values.
+     *
+     * @param uri The URI
+     * @return {@code null} if the URI doesn't match, the matched regexp matcher if the template ends with a regexp segment,
+     * otherwise {@link #NO_REGEXP_MATCH}
+     */
+    @Nullable
+    private Matcher matchSegments(String uri) {
+        int length = uri.length();
+        int pos = 0;
         for (int i = 0; i < segments.length; i++) {
             Segment segment = segments[i];
             switch (segment.type) {
                 case LITERAL -> {
-                    if (uri.startsWith(segment.value)) {
-                        uri = uri.substring(segment.value.length());
+                    if (uri.startsWith(segment.value, pos)) {
+                        pos += segment.value.length();
                     } else {
-                        return false;
+                        return null;
                     }
                 }
                 case PATH -> {
                     boolean requiresSlash = i + 1 != segments.length;
-                    int index = readText(uri, requiresSlash);
-                    if (index > 0) { // Deny empty path
-                        String path = uri.substring(0, index);
-                        variableMap.put(segment.value, path);
-                        uri = uri.substring(index);
+                    int end = readText(uri, pos, requiresSlash);
+                    if (end > pos) { // Deny empty path
+                        pos = end;
                     } else {
-                        return false;
+                        return null;
                     }
                 }
                 case REGEXP -> {
                     Matcher matcher = segment.pattern.matcher(uri);
-                    if (matcher.matches()) {
-                        int groupInx = 2;
-                        for (String matchingVariable : segment.regexpVariables) {
-                            String group = matcher.group(groupInx);
-                            variableMap.put(matchingVariable, group);
-                            groupInx += 2;
-                        }
-                        return true;
-                    } else {
-                        return false;
-                    }
+                    matcher.region(pos, length);
+                    return matcher.matches() ? matcher : null;
                 }
                 default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
             }
         }
-        return uri.isEmpty();
+        return pos == length ? NO_REGEXP_MATCH : null;
     }
 
-    private static int readText(String input, boolean requiresSlash) {
+    private void collectVariables(String uri, Matcher regexpMatcher, Map<String, Object> variableMap) {
+        int pos = 0;
+        for (int i = 0; i < segments.length; i++) {
+            Segment segment = segments[i];
+            switch (segment.type) {
+                case LITERAL -> pos += segment.value.length();
+                case PATH -> {
+                    int end = readText(uri, pos, i + 1 != segments.length);
+                    variableMap.put(segment.value, uri.substring(pos, end));
+                    pos = end;
+                }
+                case REGEXP -> {
+                    int groupInx = 2;
+                    for (String matchingVariable : segment.regexpVariables) {
+                        variableMap.put(matchingVariable, regexpMatcher.group(groupInx));
+                        groupInx += 2;
+                    }
+                    return;
+                }
+                default -> throw new IllegalStateException("Unsupported segment type: " + segment.type);
+            }
+        }
+    }
+
+    private static int readText(String input, int from, boolean requiresSlash) {
         // NOTE: Micronaut doesn't allow some of the character in the path value
         int length = input.length();
-        for (int i = 0; i < length; i++) {
+        for (int i = from; i < length; i++) {
             char c = input.charAt(i);
             if (requiresSlash && c == '/') {
                 return i;
