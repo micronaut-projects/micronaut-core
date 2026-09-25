@@ -203,6 +203,7 @@ httpServer:
   http2Server: HTTP/2 Support
   http3Server: HTTP/3 Support
   serverEvents: Server Events
+  trainingRun: Training Runs
   serverConfiguration:
     title: Configuring the HTTP Server
     threadPools:

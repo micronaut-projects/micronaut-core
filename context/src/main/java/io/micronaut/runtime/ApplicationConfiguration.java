@@ -53,6 +53,15 @@ public class ApplicationConfiguration {
      */
     public static final String APPLICATION_NAME = PREFIX + ".name";
 
+    /**
+     * Property name for the training run switch. When it is {@code true}, {@link Micronaut#start()}
+     * stops the application once it has started, then exits the JVM with status 0 unless the
+     * {@code test} environment is active. Off by default.
+     *
+     * @since 5.3.0
+     */
+    public static final String TRAINING_ENABLED = PREFIX + ".training.enabled";
+
     private Charset defaultCharset = StandardCharsets.UTF_8;
     @Nullable
     private String name;

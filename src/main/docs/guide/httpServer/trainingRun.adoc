@@ -1,0 +1,62 @@
+A JDK AOT cache (`-XX:AOTCacheOutput`), a dynamic CDS archive (`-XX:ArchiveClassesAtExit`), a GraalVM profile for profile-guided optimization (`.iprof`) and the `native-image-agent` configuration are all written when the JVM exits after a representative run of the application. A Micronaut application does not exit on its own, so the build would have to start it, wait until it is ready, send it some requests and stop it.
+
+A _training run_ does this from inside the application. Set `micronaut.application.training.enabled` to `true`, for example with `-Dmicronaut.application.training.enabled=true` or the `MICRONAUT_APPLICATION_TRAINING_ENABLED=true` environment variable. `Micronaut.run` then starts the application as usual and, once startup has completed and every startup event listener has run:
+
+. logs a warning that this is a training run,
+. stops the application and closes the application context,
+. exits the JVM with status 0.
+
+A failure during startup, the warm-up included, still exits with a non-zero status, so a failed training run fails the build. This applies to every embedded application, including messaging applications without an HTTP server. In the `test` environment the application is stopped, but `System.exit` is not called.
+
+To warm up the application before it stops, list the paths the HTTP server should send GET requests to itself:
+
+[configuration]
+----
+micronaut:
+  application:
+    training:
+      enabled: true
+      warmup:
+        paths:
+          - /hello
+          - /books?page=1
+        repeat: 3
+----
+
+include::{includedir}configurationProperties/io.micronaut.http.server.TrainingWarmupConfiguration.adoc[]
+
+The warm-up runs after the other api:runtime.server.event.ServerStartupEvent[] listeners, for the server the application runs (not for other servers built with a server factory). It sends each path in order, `repeat` times, with `java.net.HttpURLConnection`, so no HTTP client is needed. The requests go to the configured `micronaut.server.host`, or to the loopback address when no host or a wildcard address such as `0.0.0.0` is set. The paths are sent as they are, so they include the context path if the server has one. A response status of 400 or above, or an I/O error, fails the startup.
+
+For example, the following command trains a JDK AOT cache with a warm-up and exits once the cache is written:
+
+[source,bash]
+----
+$ java -XX:AOTCacheOutput=app.aot \
+    -Dmicronaut.application.training.enabled=true \
+    -Dmicronaut.application.training.warmup.paths=/hello \
+    -jar app.jar
+----
+
+The built-in warm-up only sends plain HTTP GET requests: if warm-up paths are set and the server has SSL enabled, the training run fails. For other requests (a POST, authenticated requests, a server with SSL enabled, or a messaging application), write a startup listener that only exists during a training run:
+
+[source,java]
+----
+import io.micronaut.context.annotation.Requires;
+import io.micronaut.context.event.ApplicationEventListener;
+import io.micronaut.runtime.server.event.ServerStartupEvent;
+import jakarta.inject.Singleton;
+
+@Singleton
+@Requires(property = "micronaut.application.training.enabled", value = "true")
+public class CustomWarmup implements ApplicationEventListener<ServerStartupEvent> {
+
+    @Override
+    public void onApplicationEvent(ServerStartupEvent event) {
+        // send the requests to event.getSource(), throw to fail the training run
+    }
+}
+----
+
+For a messaging application, listen for api:runtime.event.ApplicationStartupEvent[] instead.
+
+WARNING: A training run executes application code, including the warm-up requests. If the application needs external services such as a database, run the training with an environment that configures them, or with Test Resources.
