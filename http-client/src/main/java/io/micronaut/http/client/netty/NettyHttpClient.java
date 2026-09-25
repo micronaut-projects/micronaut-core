@@ -1440,13 +1440,22 @@ final class NettyHttpClient implements
                     new RawHttpRequestWrapper<>(conversionService, request.toMutableRequest(), requestBody)
                 );
             }
-            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, options), requestBody);
+            // the hop-by-hop headers are stripped from the Netty headers of the request and the response
+            boolean strip = options.isStripHopByHopHeaders();
+            RawRequestOptions copyOptions = strip ? options.toBuilder().stripHopByHopHeaders(false).build() : options;
+            MutableHttpRequest<Object> rawRequest = new RawHttpRequestWrapper<>(conversionService, RawHttpClientSupport.copyRequest(request, copyOptions), requestBody, strip);
             applyOptions(rawRequest, options);
             return RawHttpClientSupport.withResponseTimeout(sendRawExchange(
                 propagatedContext,
                 blockHint,
                 rawRequest
-            ), options.getResponseTimeout()).map(response -> RawHttpClientSupport.toMutableResponse(response, options));
+            ), options.getResponseTimeout()).map(response -> {
+                if (strip && response.getHeaders() instanceof NettyHttpHeaders nettyHeaders) {
+                    HopByHopHeaders.strip(nettyHeaders.getNettyHeaders());
+                    return RawHttpClientSupport.toMutableResponse(response, copyOptions);
+                }
+                return RawHttpClientSupport.toMutableResponse(response, options);
+            });
         } catch (RuntimeException | Error e) {
             requestBody.close();
             throw e;
