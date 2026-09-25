@@ -22,6 +22,7 @@ import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpStatus;
 import io.micronaut.http.MediaType;
 import io.micronaut.inject.MethodExecutionHandle;
+import io.micronaut.web.router.AnyMethodRoutes;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
@@ -32,6 +33,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 /**
  * Adds the routes to handler functions to a {@link RouteAssembly}: the routes of the builder of
@@ -164,6 +166,66 @@ abstract sealed class AbstractHttpRouteBuilder implements HttpRouteBuilder permi
     @Override
     public final HttpRouteSpec handleAsync(Set<HttpMethod> methods, String uri, AsyncBodyRequestHandler handler) {
         return forEach(methods, uri, method -> route(method, uri, HandlerMethod.of(handler), null));
+    }
+
+    @Override
+    public final HttpRouteSpec any(String uri, RequestHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
+    }
+
+    @Override
+    public final <B> HttpRouteSpec any(String uri, Argument<B> bodyType, BodyRequestHandler<B> handler) {
+        Objects.requireNonNull(handler, "handler");
+        return anyMethod(uri, () -> HandlerMethod.of(bodyType, handler), null);
+    }
+
+    @Override
+    public final HttpRouteSpec any(String uri, FormRequestHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        return anyMethod(uri, () -> HandlerMethod.of(handler), FORM_MEDIA_TYPES);
+    }
+
+    @Override
+    public final HttpRouteSpec asyncAny(String uri, AsyncRequestHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
+    }
+
+    @Override
+    public final HttpRouteSpec asyncAny(String uri, AsyncBodyRequestHandler handler) {
+        Objects.requireNonNull(handler, "handler");
+        return anyMethod(uri, () -> HandlerMethod.of(handler), null);
+    }
+
+    /**
+     * The routes of any method: one per standard method and one for the custom methods, see
+     * {@link AnyMethodRoutes}.
+     *
+     * @param uri      The URI template
+     * @param handler  Creates the handler method of a route
+     * @param consumes The media types the routes consume, or {@code null} for the default
+     * @return Their spec
+     */
+    private HttpRouteSpec anyMethod(String uri, Supplier<HandlerMethod<?>> handler, MediaType @Nullable [] consumes) {
+        Objects.requireNonNull(uri, "uri");
+        List<RouteSettings> routes = new ArrayList<>(HttpMethod.values().length);
+        for (HttpMethod method : HttpMethod.values()) {
+            if (method != HttpMethod.CUSTOM) {
+                routes.add(route(method, uri, handler.get(), consumes));
+            }
+        }
+        RouteSettings custom = grouped(assembly.addRoute(AnyMethodRoutes.CUSTOM_METHODS, HttpMethod.CUSTOM, uri(uri), DEFAULT_CONSUMES,
+            handle(handler.get())).settings());
+        if (consumes != null) {
+            custom.consumes(consumes);
+        }
+        routes.add(custom);
+        for (RouteSettings route : routes) {
+            route.anyMethod();
+        }
+        // a form route consumes the form media types whatever its group consumes
+        return spec(consumes == null ? 0 : RouteGroupDefaults.CONSUMES, routes.toArray(new RouteSettings[0]));
     }
 
     @Override

@@ -66,6 +66,7 @@ public final class RouteSettings {
     private RouteAssembly.@Nullable RouteGroup group;
     private @Nullable AnnotationMetadataProvider element;
     private @Nullable Argument<?> responseType;
+    private boolean anyMethod;
 
     /**
      * @param exposePort Exposes the port of the route when it is set
@@ -98,6 +99,7 @@ public final class RouteSettings {
         this.group = other.group;
         this.element = other.element;
         this.responseType = other.responseType;
+        this.anyMethod = other.anyMethod;
     }
 
     /**
@@ -105,6 +107,22 @@ public final class RouteSettings {
      */
     public RouteSettings copy() {
         return new RouteSettings(this);
+    }
+
+    /**
+     * Mark the route as one of the routes of {@link HttpRouteBuilder#any(String, RequestHandler)}:
+     * a route of a specific method, or an implicit {@code HEAD} route, that matches a request as
+     * closely is preferred to it.
+     */
+    public void anyMethod() {
+        this.anyMethod = true;
+    }
+
+    /**
+     * @return Whether the route is one of the routes of {@link HttpRouteBuilder#any(String, RequestHandler)}
+     */
+    public boolean isAnyMethod() {
+        return anyMethod;
     }
 
     /**

@@ -79,8 +79,15 @@ final class UriRouteSet {
             methodMap.put(e.getKey(), values);
             customMethodMap.put(e.getKey().name(), values);
         }
+        // the routes of any method match every custom method: of a custom method with routes of its own too
+        List<UriRouteInfo<Object, Object>> anyCustomMethod = customRoutesByMethod.getOrDefault(AnyMethodRoutes.CUSTOM_METHODS, List.of());
         for (Map.Entry<String, List<UriRouteInfo<Object, Object>>> e : customRoutesByMethod.entrySet()) {
-            customMethodMap.put(e.getKey(), finalizeRoutes(e.getValue()));
+            List<UriRouteInfo<Object, Object>> routes = e.getValue();
+            if (!anyCustomMethod.isEmpty() && !AnyMethodRoutes.CUSTOM_METHODS.equals(e.getKey())) {
+                routes = new ArrayList<>(routes);
+                routes.addAll(anyCustomMethod);
+            }
+            customMethodMap.put(e.getKey(), finalizeRoutes(routes));
         }
         this.methodRoutesByMethod = methodMap;
         this.allRoutesByMethod = customMethodMap;
@@ -199,8 +206,9 @@ final class UriRouteSet {
     }
 
     /**
-     * The closest of equally close matches: an explicit route over an implicit {@code HEAD} route,
-     * then the route of the lowest order.
+     * The closest of equally close matches: a route of a specific method over a route of any
+     * method, an explicit route over an implicit {@code HEAD} route, then the route of the lowest
+     * order.
      *
      * @param path    The path
      * @param matches The closest matches
@@ -210,6 +218,9 @@ final class UriRouteSet {
      * @throws DuplicateRouteException if several routes match equally closely
      */
     static @Nullable <T, R> UriRouteMatch<T, R> closest(String path, List<UriRouteMatch<T, R>> matches) throws DuplicateRouteException {
+        if (matches.size() > 1) {
+            matches = AnyMethodRoutes.preferSpecificMethod(matches);
+        }
         if (matches.size() > 1) {
             matches = ImplicitHeadRoutes.preferExplicit(matches);
         }
@@ -340,6 +351,10 @@ final class UriRouteSet {
     <T, R> List<UriRouteMatch<T, R>> findAny(String uri, @Nullable HttpRequest<?> request, @Nullable Set<Integer> ports) {
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
+            if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
+                // the route of any method has a route of each standard method too
+                continue;
+            }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
             for (int candidate : index(entry.getKey()).candidates(uri)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
@@ -374,6 +389,10 @@ final class UriRouteSet {
         String path = request.getPath();
         var matchedRoutes = new ArrayList<UriRouteMatch<T, R>>(5);
         for (Map.Entry<String, UriRouteInfo<Object, Object>[]> entry : allRoutesByMethod.entrySet()) {
+            if (AnyMethodRoutes.CUSTOM_METHODS.equals(entry.getKey())) {
+                // the route of any method has a route of each standard method too
+                continue;
+            }
             UriRouteInfo<Object, Object>[] routes = entry.getValue();
             for (int candidate : index(entry.getKey()).candidates(path)) {
                 UriRouteInfo<Object, Object> route = routes[candidate];
@@ -422,8 +441,13 @@ final class UriRouteSet {
         Collection<MediaType> acceptedProducedTypes = null;
         MediaType contentType = null;
         String methodKey = httpMethod == HttpMethod.CUSTOM ? request.getMethodName() : httpMethod.name();
-        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.getOrDefault(methodKey, EMPTY);
-        if (routes.length == 0) {
+        UriRouteInfo<Object, Object>[] routes = allRoutesByMethod.get(methodKey);
+        if (routes == null && httpMethod == HttpMethod.CUSTOM) {
+            // a custom method without routes of its own: the routes of any method
+            methodKey = AnyMethodRoutes.CUSTOM_METHODS;
+            routes = allRoutesByMethod.get(methodKey);
+        }
+        if (routes == null || routes.length == 0) {
             return Collections.emptyList();
         }
         int[] candidates = index(methodKey).candidates(request.getPath());
