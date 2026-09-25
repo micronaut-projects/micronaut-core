@@ -258,7 +258,15 @@ final class DefaultAsyncRequestBody implements AsyncRequestBody, AsyncHandlerBod
             FormCapableHttpRequest<?> formRequest = formRequest();
             // the one form of the request, shared with the FormData, FileUpload and text field
             // arguments of the route and of the filters, and released when the request ends
-            return FormBinding.of(formRequest).form(binder.formFactory(), binder.conversionService).minimalCompletionStage();
+            FormBinding binding = FormBinding.of(formRequest);
+            CompletionStage<FormData> form = binding.form(binder.formFactory(), binder.conversionService).minimalCompletionStage();
+            // a form the handler of a handler route did not wait for is not read after the
+            // handler completed, see AsyncHandlerBody
+            owned(() -> {
+                binding.cancelForm();
+                return CompletableFuture.completedStage(null);
+            }, binding::cancelForm);
+            return form;
         } catch (Throwable e) {
             return CompletableFuture.failedStage(e);
         }

@@ -57,6 +57,7 @@ import io.micronaut.context.propagation.instrument.execution.ContextPropagatingE
 import io.micronaut.context.propagation.instrument.execution.ContextPropagatingScheduledExecutorService;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.web.router.DefaultRouteInfo;
+import io.micronaut.web.router.GroupErrorRoutes;
 import io.micronaut.web.router.MethodBasedRouteInfo;
 import io.micronaut.web.router.RouteAttributes;
 import io.micronaut.web.router.RouteInfo;
@@ -325,6 +326,12 @@ public final class RouteExecutor {
             // handle error with a method that is non-global with exception
             errorRoute = router.findErrorRoute(declaringType, cause, httpRequest).orElse(null);
         }
+        RouteInfo<?> failedRoute = null;
+        if (errorRoute == null) {
+            // handle error with an error route of the groups of the handler route, innermost first
+            failedRoute = RouteAttributes.getRouteInfo(httpRequest).orElse(null);
+            errorRoute = GroupErrorRoutes.findErrorRoute(httpRequest, failedRoute, cause);
+        }
         if (errorRoute == null) {
             // handle error with a method that is global with exception
             errorRoute = router.findErrorRoute(cause, httpRequest).orElse(null);
@@ -345,6 +352,10 @@ public final class RouteExecutor {
                 if (declaringType != null) {
                     // handle error with a method that is non-global with bad request
                     errorRoute = router.findStatusRoute(declaringType, errorStatus, httpRequest).orElse(null);
+                }
+                if (errorRoute == null) {
+                    // handle error with a status route of the groups of the handler route
+                    errorRoute = GroupErrorRoutes.findStatusRoute(httpRequest, failedRoute, errorStatus.getCode());
                 }
                 if (errorRoute == null) {
                     // handle error with a method that is global with bad request
@@ -371,8 +382,14 @@ public final class RouteExecutor {
         RouteMatch<Object> statusRoute = null;
         // if declaringType is not null, this means it's a locally marked method handler
         if (declaringType != null) {
-            statusRoute = router.findStatusRoute(declaringType, status, incomingRequest)
-                .orElseGet(() -> router.findStatusRoute(status, incomingRequest).orElse(null));
+            statusRoute = router.<Object>findStatusRoute(declaringType, status, incomingRequest).orElse(null);
+            if (statusRoute == null) {
+                // a status route of the groups of the handler route, innermost first
+                statusRoute = GroupErrorRoutes.findStatusRoute(incomingRequest, finalRoute, status);
+            }
+            if (statusRoute == null) {
+                statusRoute = router.<Object>findStatusRoute(status, incomingRequest).orElse(null);
+            }
         }
         return statusRoute;
     }
