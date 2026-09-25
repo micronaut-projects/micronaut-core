@@ -36,6 +36,7 @@ import io.micronaut.http.netty.NettySslContextBuilder;
 import io.micronaut.http.netty.SslContextAutoLoader;
 import io.micronaut.http.netty.SslContextHolder;
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer;
+import io.micronaut.http.netty.channel.DomainSocketAddresses;
 import io.micronaut.http.ssl.AbstractClientSslConfiguration;
 import io.micronaut.http.ssl.CertificateProvider;
 import io.micronaut.http.ssl.SslConfiguration;
@@ -181,10 +182,13 @@ public class ConnectionManager {
     private final ThreadFactory threadFactory;
     private final ChannelFactory<? extends Channel> socketChannelFactory;
     private final ChannelFactory<? extends Channel> udpChannelFactory;
+    private final ChannelFactory<? extends Channel> domainSocketChannelFactory;
     @Nullable
     private Bootstrap bootstrap;
     @Nullable
     private Bootstrap udpBootstrap;
+    @Nullable
+    private Bootstrap domainSocketBootstrap;
     private final HttpClientConfiguration configuration;
     private final SslContextAutoLoader sslContextWrapper;
     private final SslContextAutoLoader sslContextWrapperWs;
@@ -213,6 +217,7 @@ public class ConnectionManager {
         this.threadFactory = from.threadFactory;
         this.socketChannelFactory = from.socketChannelFactory;
         this.udpChannelFactory = from.udpChannelFactory;
+        this.domainSocketChannelFactory = from.domainSocketChannelFactory;
         this.bootstrap = from.bootstrap;
         this.udpBootstrap = from.udpBootstrap;
         this.configuration = from.configuration;
@@ -240,6 +245,7 @@ public class ConnectionManager {
         this.threadFactory = builder.threadFactory == null ? new DefaultThreadFactory(MultithreadEventLoopGroup.class) : builder.threadFactory;
         this.socketChannelFactory = builder.socketChannelFactory;
         this.udpChannelFactory = builder.udpChannelFactory;
+        this.domainSocketChannelFactory = builder.domainSocketChannelFactory;
         this.configuration = configuration;
         this.clientCustomizer = builder.clientCustomizer;
         this.informationalServiceId = builder.informationalServiceId;
@@ -382,22 +388,31 @@ public class ConnectionManager {
             .channelFactory(socketChannelFactory)
             .option(ChannelOption.SO_KEEPALIVE, true);
         this.bootstrap = newBootstrap;
+        // netty does not allow a bootstrap's channel factory to be replaced, so a UNIX domain
+        // socket connection is built from its own bootstrap. It has no name to resolve.
+        Bootstrap newDomainSocketBootstrap = new Bootstrap()
+            .channelFactory(domainSocketChannelFactory)
+            .resolver(NoopAddressResolverGroup.INSTANCE);
+        this.domainSocketBootstrap = newDomainSocketBootstrap;
         if (httpVersion.isHttp3()) {
             this.udpBootstrap = new Bootstrap()
                 .channelFactory(udpChannelFactory);
         }
 
         Optional<Duration> connectTimeout = configuration.getConnectTimeout();
-        connectTimeout.ifPresent(duration -> newBootstrap.option(
-            ChannelOption.CONNECT_TIMEOUT_MILLIS,
-            (int) duration.toMillis()
-        ));
+        connectTimeout.ifPresent(duration -> {
+            int connectTimeoutMillis = (int) duration.toMillis();
+            newBootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis);
+            newDomainSocketBootstrap.option(ChannelOption.CONNECT_TIMEOUT_MILLIS, connectTimeoutMillis);
+        });
 
         for (Map.Entry<String, Object> entry : configuration.getChannelOptions().entrySet()) {
             Object v = entry.getValue();
             if (v != null) {
                 String channelOption = entry.getKey();
-                newBootstrap.option(ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH)), v);
+                ChannelOption<Object> option = ChannelOption.valueOf(NameUtils.underscoreSeparate(channelOption).toUpperCase(Locale.ENGLISH));
+                newBootstrap.option(option, v);
+                newDomainSocketBootstrap.option(option, v);
             }
         }
 
@@ -473,15 +488,21 @@ public class ConnectionManager {
      * @return Future that terminates when the TCP connection is established.
      */
     ChannelFuture doConnect(NettyHttpClient.RequestKey requestKey, CustomizerAwareInitializer channelInitializer, EventLoopGroup eventLoop) {
-        String host = requestKey.getHost();
-        int port = requestKey.getPort();
-        Bootstrap localBootstrap = Objects.requireNonNull(bootstrap).clone();
-        Proxy proxy = configuration.resolveProxy(requestKey.isSecure(), host, port);
-        if (proxy.type() != Proxy.Type.DIRECT) {
-            localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+        String socketPath = requestKey.getSocketPath();
+        Bootstrap localBootstrap = Objects.requireNonNull(
+            socketPath == null ? bootstrap : domainSocketBootstrap).clone();
+        if (socketPath != null) {
+            localBootstrap.remoteAddress(DomainSocketAddresses.of(socketPath, eventLoop));
+        } else {
+            String host = requestKey.getHost();
+            int port = requestKey.getPort();
+            Proxy proxy = configuration.resolveProxy(requestKey.isSecure(), host, port);
+            if (proxy.type() != Proxy.Type.DIRECT) {
+                localBootstrap.resolver(NoopAddressResolverGroup.INSTANCE);
+            }
+            localBootstrap.remoteAddress(host, port);
         }
         localBootstrap.handler(channelInitializer)
-            .remoteAddress(host, port)
             .group(eventLoop);
         channelInitializer.bootstrappedCustomizer = clientCustomizer.specializeForBootstrap(localBootstrap);
         return localBootstrap.connect();
@@ -647,6 +668,14 @@ public class ConnectionManager {
         });
 
         return initial.asMono();
+    }
+
+    private void configureProxy(ChannelPipeline pipeline, boolean secure, NettyHttpClient.RequestKey requestKey) {
+        if (requestKey.getSocketPath() != null) {
+            // a proxy cannot sit in front of a UNIX domain socket
+            return;
+        }
+        configureProxy(pipeline, secure, requestKey.getHost(), requestKey.getPort());
     }
 
     private void configureProxy(ChannelPipeline pipeline, boolean secure, String host, int port) {
@@ -1136,7 +1165,7 @@ public class ConnectionManager {
 
             insertPcapLoggingHandlerLazy(ch, "outer");
 
-            configureProxy(ch.pipeline(), false, pool.requestKey.getHost(), pool.requestKey.getPort());
+            configureProxy(ch.pipeline(), false, pool.requestKey);
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_HTTP2_CONNECTION, makeFrameCodec());
             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_INITIAL_ERROR, pool.initialErrorHandler);
             initHttp2(pool, ch, connectionCustomizer, true);
@@ -1413,7 +1442,7 @@ public class ConnectionManager {
                         @Override
                         protected void initChannel(Channel ch) throws Exception {
                             insertPcapLoggingHandlerLazy(ch, "outer");
-                            configureProxy(ch.pipeline(), false, requestKey.getHost(), requestKey.getPort());
+                            configureProxy(ch.pipeline(), false, requestKey);
                             initHttp1(ch);
                             ch.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_ACTIVITY_LISTENER, new ActivityHandler() {
                                 @Override

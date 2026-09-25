@@ -265,6 +265,7 @@ httpClient:
   clientFilter: HTTP Client Filters
   clientHttp2: HTTP/2 Support
   clientHttp3: HTTP/3 Support
+  clientUnixDomainSocket: UNIX Domain Socket Support
   clientSample: HTTP Client Sample
   nettyPooling: Connection pooling in the netty client
 certificates: Certificate providers

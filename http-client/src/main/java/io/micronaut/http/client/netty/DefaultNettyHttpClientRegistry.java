@@ -467,6 +467,7 @@ class DefaultNettyHttpClientRegistry implements AutoCloseable,
             .eventLoopGroup(resolveEventLoopGroup(configuration, beanContext))
             .socketChannelFactory(resolveSocketChannelFactory(NettyChannelType.CLIENT_SOCKET, configuration, beanContext))
             .udpChannelFactory(resolveSocketChannelFactory(NettyChannelType.DATAGRAM_SOCKET, configuration, beanContext))
+            .domainSocketChannelFactory(resolveSocketChannelFactory(NettyChannelType.DOMAIN_SOCKET, configuration, beanContext))
             .clientCustomizer(clientCustomizer)
             .informationalServiceId(clientId)
             .conversionService(beanContext.getBean(ConversionService.class))

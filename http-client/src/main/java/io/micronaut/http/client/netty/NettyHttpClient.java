@@ -901,6 +901,9 @@ final class NettyHttpClient implements
             .map(m -> m.intValue(OnMessage.class, "maxPayloadLength")
                 .orElse(65536)).orElse(65536);
         String subprotocol = webSocketBean.getBeanDefinition().stringValue(ClientWebSocket.class, "subprotocol").orElse(StringUtils.EMPTY_STRING);
+        if (requestKey.getSocketPath() != null) {
+            return Mono.error(decorate(new HttpClientException("WebSockets over a UNIX domain socket are not supported")));
+        }
         URI webSocketURL = UriBuilder.of(uri)
             .scheme(!requestKey.isSecure() ? "ws" : "wss")
             .host(requestKey.getHost())
@@ -1758,6 +1761,11 @@ final class NettyHttpClient implements
 
     private String getHostHeader(URI requestURI) {
         RequestKey requestKey = new RequestKey(this, requestURI);
+        if (requestKey.getSocketPath() != null) {
+            // there is no host for a UNIX domain socket, and the socket path does not belong on the
+            // wire. curl and the docker CLI both send localhost in this case.
+            return "localhost";
+        }
         StringBuilder host = new StringBuilder(requestKey.getHost());
         int port = requestKey.getPort();
         if (port > -1 && port != 80 && port != 443) {
@@ -2114,9 +2122,13 @@ final class NettyHttpClient implements
      * Key used for connection pooling and determining host/port.
      */
     public static class RequestKey {
+        private static final String SCHEME_UNIX = "unix";
+
         private final String host;
         private final int port;
         private final boolean secure;
+        @Nullable
+        private final String socketPath;
 
         /**
          * @param ctx        The HTTP client that created this request key. Only used for exception
@@ -2124,6 +2136,18 @@ final class NettyHttpClient implements
          * @param requestURI The request URI
          */
         public RequestKey(NettyHttpClient ctx, URI requestURI) {
+            if (SCHEME_UNIX.equalsIgnoreCase(requestURI.getScheme())) {
+                String rawAuthority = requestURI.getRawAuthority();
+                if (StringUtils.isEmpty(rawAuthority)) {
+                    throw decorate(ctx, new NoHostException("URI specifies no socket path to connect to"));
+                }
+                this.socketPath = requestURI.getAuthority();
+                this.host = rawAuthority;
+                this.port = -1;
+                this.secure = false;
+                return;
+            }
+            this.socketPath = null;
             this.secure = isSecureScheme(requestURI.getScheme());
             String host = requestURI.getHost();
             int port;
@@ -2155,6 +2179,11 @@ final class NettyHttpClient implements
 
         public InetSocketAddress getRemoteAddress() {
             return InetSocketAddress.createUnresolved(host, port);
+        }
+
+        @Nullable
+        public String getSocketPath() {
+            return socketPath;
         }
 
         public boolean isSecure() {
