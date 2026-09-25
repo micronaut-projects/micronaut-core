@@ -101,6 +101,28 @@ public final class UpgradeRelayTest {
     }
 
     @Test
+    void oneOfTheOfferedProtocolsIsRelayed() throws Exception {
+        try (EchoUpstream upstream = new EchoUpstream();
+             ServerUnderTest server = server();
+             Socket socket = connect(server)) {
+            server.getApplicationContext().getBean(UpstreamAddress.class).uri = upstream.uri();
+            OutputStream out = socket.getOutputStream();
+            InputStream in = socket.getInputStream();
+            // the client offers several protocols; the upstream selects one of them
+            out.write(("GET /upgrade-relay HTTP/1.1\r\nHost: localhost\r\nConnection: Upgrade\r\nUpgrade: example/1, example/2\r\nUpgrade: echo\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+
+            String head = readHead(in);
+            Assertions.assertTrue(head.startsWith("HTTP/1.1 101 "), head);
+            Assertions.assertTrue(head.toLowerCase(Locale.ROOT).contains("upgrade: echo"), head);
+            Assertions.assertTrue(upstream.upgraded.await(TIMEOUT_SECONDS, TimeUnit.SECONDS), "The upstream did not see the upgrade");
+            out.write("hello".getBytes(StandardCharsets.US_ASCII));
+            out.flush();
+            Assertions.assertEquals("HELLO", readExactly(in, 5));
+        }
+    }
+
+    @Test
     void upstreamThatDoesNotSwitchIsRelayedNormally() throws Exception {
         try (EchoUpstream upstream = new EchoUpstream();
              ServerUnderTest server = server();

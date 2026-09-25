@@ -108,6 +108,49 @@ class RawUpgradeTest {
     }
 
     @Test
+    void switchToOneOfTheOfferedProtocols() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            // the protocols offered on two field lines, one of them in a list: the server selects one
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(offeringRequest(upstream), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: echo\r\nConnection: Upgrade\r\n\r\n");
+
+            try (ByteBodyHttpResponse<?> response = (ByteBodyHttpResponse<?>) pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                UpgradedHttpResponse<?> upgraded = UpgradedHttpResponse.unwrap(response);
+                Assertions.assertNotNull(upgraded, "Not an upgraded response: " + response.getClass());
+                Assertions.assertEquals("echo", upgraded.getProtocol());
+            }
+        }
+    }
+
+    @Test
+    void switchToAProtocolThatWasNotOfferedFails() throws Exception {
+        try (RawUpstream upstream = new RawUpstream();
+             ServerUnderTest server = server();
+             RawHttpClient client = server.getApplicationContext().createBean(RawHttpClient.class)) {
+            if (isJdkClient(client)) {
+                return;
+            }
+            CompletableFuture<HttpResponse<?>> pending = Mono.<HttpResponse<?>>from(
+                client.exchange(offeringRequest(upstream), null, null, RawRequestOptions.proxy())).toFuture();
+            RawUpstream.Connection connection = upstream.nextConnection(TIMEOUT_SECONDS);
+            Assertions.assertNotNull(connection, "The client did not connect");
+            Assertions.assertTrue(connection.awaitRequest(TIMEOUT_SECONDS), "The request did not arrive");
+            connection.write("HTTP/1.1 101 Switching Protocols\r\nUpgrade: example/2\r\nConnection: Upgrade\r\n\r\n");
+            ExecutionException failure = Assertions.assertThrows(ExecutionException.class, () -> pending.get(TIMEOUT_SECONDS, TimeUnit.SECONDS));
+            Assertions.assertInstanceOf(HttpClientException.class, failure.getCause());
+        }
+    }
+
+    @Test
     void switchToAnotherProtocolFails() throws Exception {
         try (RawUpstream upstream = new RawUpstream();
              ServerUnderTest server = server();
@@ -246,6 +289,13 @@ class RawUpgradeTest {
                 outbound.tryEmitComplete();
             }
         }
+    }
+
+    private static MutableHttpRequest<?> offeringRequest(RawUpstream upstream) {
+        return HttpRequest.GET(upstream.uri("/switch"))
+            .header(HttpHeaders.CONNECTION, "upgrade")
+            .header(HttpHeaders.UPGRADE, "example/1, websocket")
+            .header(HttpHeaders.UPGRADE, "echo");
     }
 
     private static MutableHttpRequest<?> upgradeRequest(RawUpstream upstream) {

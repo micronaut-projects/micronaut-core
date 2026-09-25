@@ -1748,7 +1748,8 @@ final class NettyHttpClient implements
         }
 
         boolean expectContinue = HttpUtil.is100ContinueExpected(nettyRequest);
-        String requestedUpgrade = request.getAttribute(ALLOW_UPGRADE).isPresent() ? nettyRequest.headers().get(HttpHeaderNames.UPGRADE) : null;
+        // the protocols the request offers, from all its Upgrade field lines
+        String requestedUpgrade = request.getAttribute(ALLOW_UPGRADE).isPresent() ? joinedValues(nettyRequest.headers(), HttpHeaderNames.UPGRADE) : null;
         if (requestedUpgrade != null && poolHandle.http2) {
             // a protocol switch takes the whole connection, which an HTTP/2 stream is not
             byteBody.close();
@@ -1944,10 +1945,10 @@ final class NettyHttpClient implements
                 if (requestedUpgrade == null) {
                     return false;
                 }
-                String accepted = response.headers().get(HttpHeaderNames.UPGRADE);
-                if (accepted == null || !accepted.trim().equalsIgnoreCase(requestedUpgrade.trim())) {
+                String accepted = joinedValues(response.headers(), HttpHeaderNames.UPGRADE);
+                if (accepted == null || !isOffered(accepted, requestedUpgrade)) {
                     // the server switched to something else than what was asked: not a connection to relay
-                    fail(ctx, new HttpClientException("The server switched the connection to protocol '" + accepted + "', but '" + requestedUpgrade + "' was requested"));
+                    fail(ctx, new HttpClientException("The server switched the connection to protocol '" + accepted + "', but '" + requestedUpgrade + "' was offered"));
                     finish(ctx);
                     return true;
                 }
@@ -2401,6 +2402,46 @@ final class NettyHttpClient implements
                 "Cannot acquire connection: the acquire timeout of " + configuration.getConnectionPoolConfiguration().getAcquireTimeout().orElse(null) + " elapsed", failure);
         }
         return failure;
+    }
+
+    /**
+     * @return The values of all field lines of a header, joined as one list, or {@code null} if
+     * there is none
+     */
+    private static @Nullable String joinedValues(io.netty.handler.codec.http.HttpHeaders headers, CharSequence name) {
+        List<String> values = headers.getAll(name);
+        return values.isEmpty() ? null : String.join(",", values);
+    }
+
+    /**
+     * Whether the protocols a server switched to were offered: a client may offer several, e.g.
+     * {@code Upgrade: websocket, example/1}, and the server selects among them (RFC 9110, section
+     * 7.8). Tokens are compared ignoring case.
+     *
+     * @param selected The {@code Upgrade} list of the {@code 101} response
+     * @param offered  The {@code Upgrade} list of the request
+     * @return Whether every selected protocol was offered
+     */
+    static boolean isOffered(String selected, String offered) {
+        boolean any = false;
+        for (String token : selected.split(",")) {
+            String protocol = token.trim();
+            if (protocol.isEmpty()) {
+                continue;
+            }
+            any = true;
+            boolean found = false;
+            for (String candidate : offered.split(",")) {
+                if (candidate.trim().equalsIgnoreCase(protocol)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                return false;
+            }
+        }
+        return any;
     }
 
     /**
