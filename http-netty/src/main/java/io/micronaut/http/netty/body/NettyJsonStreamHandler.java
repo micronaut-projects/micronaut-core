@@ -93,7 +93,12 @@ public final class NettyJsonStreamHandler<T> implements MessageBodyHandler<T>, C
 
     @Override
     public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input) {
-        JsonChunkedProcessor processor = new JsonChunkedProcessor();
+        return readChunked(type, mediaType, httpHeaders, input, Long.MAX_VALUE);
+    }
+
+    @Override
+    public Flux<T> readChunked(Argument<T> type, @Nullable MediaType mediaType, Headers httpHeaders, Publisher<ByteBuffer<?>> input, long maxElementSize) {
+        JsonChunkedProcessor processor = new JsonChunkedProcessor(maxElementSize);
         return processor.process(Flux.from(input).map(bb -> {
             if (!(bb.asNativeBuffer() instanceof ByteBuf buf)) {
                 throw new IllegalArgumentException("Only netty buffers are supported");
