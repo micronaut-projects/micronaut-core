@@ -32,6 +32,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import reactor.core.Disposable;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import reactor.core.publisher.Sinks;
@@ -41,9 +42,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 
 /**
  * A request that allows upgrades and is answered with {@code 101 Switching Protocols} returns an
@@ -266,17 +267,30 @@ class RawUpgradeTest {
 
     /**
      * Read the bytes the peer sent, until at least {@code n} arrived, or the time is up: then
-     * what did arrive, so that the failure shows it.
+     * what did arrive, so that the failure shows it. Waits on a latch rather than a reactor
+     * timeout: the shared parallel scheduler would create its threads in the leak scope of this
+     * test, and a later test that allocates on them fails once the scope is closed.
      */
-    private static String readAtLeast(UpgradedHttpResponse<?> upgraded, int n) {
-        return Flux.from(upgraded.byteBody().toByteArrayPublisher())
-            .map(bytes -> new String(bytes, StandardCharsets.ISO_8859_1))
-            .scan("", String::concat)
-            .takeUntil(received -> received.length() >= n)
-            .timeout(Duration.ofSeconds(TIMEOUT_SECONDS))
-            .onErrorResume(TimeoutException.class, e -> Mono.empty())
-            .last("")
-            .block(Duration.ofSeconds(TIMEOUT_SECONDS * 2));
+    private static String readAtLeast(UpgradedHttpResponse<?> upgraded, int n) throws InterruptedException {
+        StringBuilder received = new StringBuilder();
+        CountDownLatch enough = new CountDownLatch(1);
+        Disposable reading = Flux.from(upgraded.byteBody().toByteArrayPublisher())
+            .subscribe(bytes -> {
+                synchronized (received) {
+                    received.append(new String(bytes, StandardCharsets.ISO_8859_1));
+                    if (received.length() >= n) {
+                        enough.countDown();
+                    }
+                }
+            }, e -> enough.countDown(), enough::countDown);
+        try {
+            enough.await(TIMEOUT_SECONDS, TimeUnit.SECONDS);
+        } finally {
+            reading.dispose();
+        }
+        synchronized (received) {
+            return received.toString();
+        }
     }
 
     private static void awaitReceived(RawUpstream.Connection connection, String text) throws InterruptedException {
