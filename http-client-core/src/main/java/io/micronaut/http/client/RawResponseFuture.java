@@ -26,6 +26,7 @@ import org.reactivestreams.Subscriber;
 import org.reactivestreams.Subscription;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * The {@link CompletableFuture} of an {@link AsyncRawHttpClient} exchange.
@@ -37,7 +38,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @Internal
 public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> {
-    private volatile @Nullable Runnable onCancel;
+    private final AtomicReference<@Nullable Runnable> onCancel = new AtomicReference<>();
 
     private RawResponseFuture() {
     }
@@ -52,10 +53,10 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
      */
     public static RawResponseFuture of(ExecutionFlow<? extends HttpResponse<?>> flow, CloseableByteBody requestBody) {
         RawResponseFuture future = new RawResponseFuture();
-        future.onCancel = () -> {
+        future.onCancel.set(() -> {
             flow.cancel();
             requestBody.close();
-        };
+        });
         flow.onComplete((response, error) -> {
             requestBody.close();
             future.deliver(response, error);
@@ -75,7 +76,7 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
         publisher.subscribe(new Subscriber<HttpResponse<?>>() {
             @Override
             public void onSubscribe(Subscription s) {
-                future.onCancel = s::cancel;
+                future.onCancel.set(s::cancel);
                 if (future.isCancelled()) {
                     s.cancel();
                 } else {
@@ -118,7 +119,7 @@ public final class RawResponseFuture extends CompletableFuture<HttpResponse<?>> 
     public boolean cancel(boolean mayInterruptIfRunning) {
         boolean cancelled = super.cancel(mayInterruptIfRunning);
         if (cancelled) {
-            Runnable onCancel = this.onCancel;
+            Runnable onCancel = this.onCancel.get();
             if (onCancel != null) {
                 onCancel.run();
             }

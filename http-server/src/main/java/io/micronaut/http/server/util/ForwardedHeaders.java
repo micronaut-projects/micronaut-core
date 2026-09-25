@@ -208,7 +208,7 @@ public final class ForwardedHeaders {
         out.remove(HttpHeaders.FORWARDED);
 
         if (xForwarded) {
-            String forwardedFor = clientAddress == null ? "unknown" : clientAddress;
+            String forwardedFor = clientAddress == null ? UNKNOWN : clientAddress;
             out.set(X_FORWARDED_FOR, inboundFor == null ? forwardedFor : inboundFor + ", " + forwardedFor);
             out.set(X_FORWARDED_PROTO, inboundProto == null ? proto : inboundProto);
             if (inboundHost != null) {

@@ -46,6 +46,7 @@ import io.micronaut.http.client.LoadBalancer;
 import io.micronaut.http.client.LoadBalancerResolver;
 import io.micronaut.http.client.ProxyHttpClient;
 import io.micronaut.http.client.AsyncRawHttpClient;
+import io.micronaut.http.client.DefaultAsyncOverRawHttpClient;
 import io.micronaut.http.client.RawHttpClient;
 import io.micronaut.http.client.RawHttpClientRegistry;
 import io.micronaut.http.client.annotation.Client;
@@ -198,7 +199,8 @@ public final class DefaultJdkHttpClientRegistry implements AutoCloseable, HttpCl
         @Parameter @Nullable HttpClientConfiguration configuration,
         BeanContext beanContext
     ) {
-        return new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext)).toAsyncRaw();
+        // the async client owns the raw client and closes it
+        return new DefaultAsyncOverRawHttpClient(new JdkRawHttpClient(resolveDefaultHttpClient(injectionPoint, loadBalancer, configuration, beanContext)));
     }
 
     /**
