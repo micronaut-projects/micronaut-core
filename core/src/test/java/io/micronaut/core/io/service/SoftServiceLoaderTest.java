@@ -3,7 +3,9 @@ package io.micronaut.core.io.service;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
+import java.io.IOException;
 import java.lang.module.Configuration;
 import java.lang.module.ModuleFinder;
 import java.nio.file.Path;
@@ -12,7 +14,11 @@ import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 
+import jdk.jfr.Recording;
+import jdk.jfr.consumer.RecordedEvent;
+import jdk.jfr.consumer.RecordingFile;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import io.micronaut.core.util.NativeImageUtils;
 import io.micronaut.core.io.service.SoftServiceLoader.ServiceCollector;
@@ -64,6 +70,35 @@ public class SoftServiceLoaderTest {
             SoftServiceLoader.StaticDefinition.of(PackagePrivateConstructorService.class.getName(), PackagePrivateConstructorService.class);
 
         assertEquals("fallback", serviceDefinition.load().value());
+    }
+
+    @Test
+    void imageSingletonsAreNotLookedUpOutsideImageCode(@TempDir Path tempDir) throws IOException {
+        assumeTrue(System.getProperty(NativeImageUtils.PROPERTY_IMAGE_CODE_KEY) == null);
+        ClassLoader classLoader = getClass().getClassLoader();
+        Path file = tempDir.resolve("errors.jfr");
+        try (Recording recording = new Recording()) {
+            recording.enable("jdk.JavaErrorThrow");
+            recording.start();
+            assertNull(ServiceScanner.findStaticServiceDefinitions());
+            SoftServiceLoader.load(TestService.class, classLoader).collectAll();
+            SoftServiceLoader.load(TestService.class, classLoader).disableFork().collectAll();
+            MicronautMetaServiceLoaderUtils.findMicronautMetaServiceEntries(classLoader, TestService.class.getName());
+            recording.stop();
+            recording.dump(file);
+        }
+
+        // without the GraalVM SDK on the class path, each lookup of the ImageSingletons class throws a NoClassDefFoundError
+        List<String> imageSingletonsErrors = RecordingFile.readAllEvents(file).stream()
+            .map(SoftServiceLoaderTest::errorMessage)
+            .filter(message -> message.contains("ImageSingletons"))
+            .toList();
+        assertEquals(List.of(), imageSingletonsErrors);
+    }
+
+    private static String errorMessage(RecordedEvent event) {
+        String message = event.getString("message");
+        return event.getClass("thrownClass").getName() + ": " + (message == null ? "" : message);
     }
 
     @Test
