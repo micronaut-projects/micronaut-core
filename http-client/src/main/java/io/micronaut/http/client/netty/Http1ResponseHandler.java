@@ -103,17 +103,20 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     }
 
     /**
-     * @return The failure of a response whose headers were received, but whose body was cut off
-     * by the connection closing
-     */
-    /**
      * The failure of a body whose response arrived: a read timeout says so, so that it is not
      * taken for a timeout while the response was awaited.
+     *
+     * @param cause The failure while the body was read
+     * @return The failure of the body
      */
     private static Throwable bodyFailure(Throwable cause) {
         return cause instanceof io.netty.handler.timeout.ReadTimeoutException ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : cause;
     }
 
+    /**
+     * @return The failure of a response whose headers were received, but whose body was cut off
+     * by the connection closing
+     */
     private static ResponseClosedException closedDuringBody() {
         return new ResponseClosedException("Connection closed before the response body was received completely", true);
     }
