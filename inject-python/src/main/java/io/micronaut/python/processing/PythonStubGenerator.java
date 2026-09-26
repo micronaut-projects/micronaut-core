@@ -229,6 +229,13 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * generated class a second time. Every other Micronaut annotation is reflection data of the type like
      * a third-party one, copied when the {@link PythonReflectionGate} allows it.
      *
+     * <p>Some entries are here only as stereotype keys, never as names to match: an annotation named
+     * {@link AnnotationUtil#SCOPE} or {@link AnnotationUtil#QUALIFIER} is in {@code jakarta.inject} and
+     * {@code @Introspected} is in {@code io.micronaut.core.annotation}, so all three are excluded by
+     * package before this set is consulted. They earn their place in the stereotype loop of
+     * {@link #isMicronautProcessedAnnotation}, which is what keeps a custom {@code io.micronaut} scope
+     * or qualifier, and {@code @Serdeable}, off the generated source.
+     *
      * @see #MICRONAUT_PROCESSED_ANNOTATION_PACKAGES
      */
     private static final Set<String> MICRONAUT_PROCESSED_ANNOTATIONS = Set.of(
@@ -4115,27 +4122,62 @@ public class PythonStubGenerator implements TypeElementVisitor<Object, Object> {
      * Whether a Micronaut annotation is one the compiler and the Java processing round act on, by being
      * one of {@link #MICRONAUT_PROCESSED_ANNOTATIONS}, by belonging to one of
      * {@link #MICRONAUT_PROCESSED_ANNOTATION_PACKAGES} or by carrying one of the former as a stereotype
-     * ({@code @Controller} is {@code @Executable}, {@code @Serdeable} is {@code @Introspected}).
+     * ({@code @Controller} is {@code @Executable}, {@code @Serdeable} is {@code @Introspected}), or by
+     * being the container a repeated one of them is folded into ({@code @Requirements} holds
+     * {@code @Requires}, {@code @InterceptorBindingDefinitions} holds {@code @InterceptorBinding}).
      *
      * @param annotationName The annotation
      * @param visitorContext The visitor context
      * @return Whether the annotation stays off the generated source
      */
     private static boolean isMicronautProcessedAnnotation(String annotationName, VisitorContext visitorContext) {
-        if (MICRONAUT_PROCESSED_ANNOTATIONS.contains(annotationName)
-            || MICRONAUT_PROCESSED_ANNOTATION_PACKAGES.stream().anyMatch(annotationName::startsWith)) {
-            return true;
-        }
-        ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
+        ClassElement annotationType = unprocessedAnnotationType(annotationName, visitorContext);
         if (annotationType == null) {
             return true;
         }
+        // The annotation metadata folds a repeated annotation into its container, so a Python class with
+        // two @Requires reports @Requirements: a container carries none of the stereotypes of the
+        // annotation it holds, and is processed when the annotation it holds is
+        String repeated = repeatedAnnotationType(annotationType);
+        return repeated != null && unprocessedAnnotationType(repeated, visitorContext) == null;
+    }
+
+    /**
+     * The resolved type of an annotation that is not one the compiler and the Java processing round act
+     * on, or {@code null} when the annotation is one of them (or does not resolve, in which case it is
+     * kept off the generated source).
+     */
+    @Nullable
+    private static ClassElement unprocessedAnnotationType(String annotationName, VisitorContext visitorContext) {
+        if (MICRONAUT_PROCESSED_ANNOTATIONS.contains(annotationName)
+            || MICRONAUT_PROCESSED_ANNOTATION_PACKAGES.stream().anyMatch(annotationName::startsWith)) {
+            return null;
+        }
+        ClassElement annotationType = visitorContext.getClassElement(annotationName).orElse(null);
+        if (annotationType == null) {
+            return null;
+        }
         for (String stereotype : MICRONAUT_PROCESSED_ANNOTATIONS) {
             if (annotationType.hasStereotype(stereotype)) {
-                return true;
+                return null;
             }
         }
-        return false;
+        return annotationType;
+    }
+
+    /**
+     * The annotation a repeatable container holds, the component type of its {@code value()}, or
+     * {@code null} when the annotation is not such a container.
+     */
+    @Nullable
+    private static String repeatedAnnotationType(ClassElement annotationType) {
+        return annotationType.getEnclosedElement(ElementQuery.ALL_METHODS.onlyDeclared().named("value"))
+            .map(MethodElement::getReturnType)
+            .filter(ClassElement::isArray)
+            .map(ClassElement::fromArray)
+            .filter(PythonAnnotationTypes::isAnnotationType)
+            .map(ClassElement::getName)
+            .orElse(null);
     }
 
     /**
