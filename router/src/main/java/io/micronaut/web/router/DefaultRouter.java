@@ -220,12 +220,12 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request, CharSequence uri) {
-        return this.<T, R>toMatches(uri.toString(), findInternal(request)).stream();
+        return this.<T, R>findMatches(request, uri.toString()).stream();
     }
 
     @Override
     public <T, R> Stream<UriRouteMatch<T, R>> find(HttpRequest<?> request) {
-        return this.<T, R>toMatches(request.getPath(), findInternal(request)).stream();
+        return this.<T, R>findMatches(request, request.getPath()).stream();
     }
 
     @Override
@@ -243,28 +243,41 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public @Nullable <T, R> UriRouteMatch<T, R> findClosest(HttpRequest<?> request) throws DuplicateRouteException {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request);
-        if (routes.isEmpty()) {
+        UriRouteInfo<Object, Object>[] routes = candidateRoutes(request);
+        if (routes.length == 0) {
             return null;
         }
         String path = request.getPath();
-        if (routes.size() == 1) {
-            Object o = routes.iterator().next();
-            // avoid type pollution perf issues
-            UriRouteInfo next = o instanceof DefaultUrlRouteInfo def ? def : (UriRouteInfo<Object, Object>) o;
-            return (UriRouteMatch) next.tryMatch(path);
-        }
-        List<UriRouteMatch<T, R>> uriRoutes = new ArrayList<>(routes.size());
+        boolean permitsBody = request.getMethod().permitsRequestBody();
+        MediaType contentType = null;
+        Collection<MediaType> acceptedProducedTypes = null;
+        // most requests match a single route: keep it in a local and only allocate a list once a second match shows up
+        UriRouteMatch<Object, Object> first = null;
+        List<UriRouteMatch<T, R>> uriRoutes = null;
         for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
+            if (permitsBody && contentType == null && !route.consumesAll()) {
+                contentType = request.getContentType().orElse(null);
+            }
+            if (acceptedProducedTypes == null && !route.producesAll()) {
+                acceptedProducedTypes = request.accept();
+            }
+            UriRouteMatch<Object, Object> match = matchRoute(request, route, path, permitsBody, contentType, acceptedProducedTypes);
+            if (match == null) {
+                continue;
+            }
+            if (first == null) {
+                first = match;
+            } else {
+                if (uriRoutes == null) {
+                    uriRoutes = new ArrayList<>(4);
+                    uriRoutes.add((UriRouteMatch) first);
+                }
+                uriRoutes.add((UriRouteMatch) match);
             }
         }
-        if (uriRoutes.size() == 1) {
-            Object obj = uriRoutes.get(0);
+        if (uriRoutes == null) {
             // type pollution avoidance (should be covered by type pollution test)
-            return obj instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) obj;
+            return first instanceof DefaultUriRouteMatch<?, ?> def ? (DefaultUriRouteMatch<T, R>) def : (UriRouteMatch<T, R>) first;
         }
         uriRoutes = resolveAmbiguity(request, uriRoutes);
         if (uriRoutes.size() > 1) {
@@ -280,12 +293,8 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
 
     @Override
     public <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request) {
-        List<UriRouteInfo<Object, Object>> routes = findInternal(request);
-        if (routes.isEmpty()) {
-            return Collections.emptyList();
-        }
-        List<UriRouteMatch<T, R>> uriRoutes = toMatches(request.getPath(), routes);
-        if (uriRoutes.size() == 1) {
+        List<UriRouteMatch<T, R>> uriRoutes = findMatches(request, request.getPath());
+        if (uriRoutes.size() < 2) {
             return uriRoutes;
         }
         return resolveAmbiguity(request, uriRoutes);
@@ -364,24 +373,6 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
                 closestMatches.add(match);
             }
             uriRoutes = closestMatches;
-        }
-        return uriRoutes;
-    }
-
-    private <T, R> List<UriRouteMatch<T, R>> toMatches(String path, List<UriRouteInfo<Object, Object>> routes) {
-        if (routes.size() == 1) {
-            UriRouteMatch match = routes.iterator().next().tryMatch(path);
-            if (match != null) {
-                return List.of(match);
-            }
-            return List.of();
-        }
-        var uriRoutes = new ArrayList<UriRouteMatch<T, R>>(routes.size());
-        for (UriRouteInfo<Object, Object> route : routes) {
-            UriRouteMatch match = route.tryMatch(path);
-            if (match != null) {
-                uriRoutes.add(match);
-            }
         }
         return uriRoutes;
     }
@@ -697,48 +688,83 @@ public class DefaultRouter implements Router, HttpServerFilterResolver<RouteMatc
         return matchedRoutes;
     }
 
-    private List<UriRouteInfo<Object, Object>> findInternal(HttpRequest<?> request) {
-        HttpMethod httpMethod = request.getMethod();
-        boolean permitsBody = httpMethod.permitsRequestBody();
-        Collection<MediaType> acceptedProducedTypes = null;
-        MediaType contentType = null;
-        UriRouteInfo<Object, Object>[] routes = httpMethod == HttpMethod.CUSTOM ?
-            allRoutesByMethod.getOrDefault(request.getMethodName(), EMPTY) : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY);
+    /**
+     * Finds the routes whose filters accept the request and whose URI matches the given path, in route order.
+     * Returns a shared immutable list when there is at most one match and only allocates a mutable list
+     * once a second match is found.
+     */
+    private <T, R> List<UriRouteMatch<T, R>> findMatches(HttpRequest<?> request, String path) {
+        UriRouteInfo<Object, Object>[] routes = candidateRoutes(request);
         if (routes.length == 0) {
             return Collections.emptyList();
         }
-        var result = new ArrayList<UriRouteInfo<Object, Object>>(routes.length);
+        boolean permitsBody = request.getMethod().permitsRequestBody();
+        MediaType contentType = null;
+        Collection<MediaType> acceptedProducedTypes = null;
+        UriRouteMatch<T, R> first = null;
+        List<UriRouteMatch<T, R>> matches = null;
         for (UriRouteInfo<Object, Object> route : routes) {
-            if (shouldSkipForPort(request, route)) {
+            if (permitsBody && contentType == null && !route.consumesAll()) {
+                contentType = request.getContentType().orElse(null);
+            }
+            if (acceptedProducedTypes == null && !route.producesAll()) {
+                acceptedProducedTypes = request.accept();
+            }
+            UriRouteMatch match = matchRoute(request, route, path, permitsBody, contentType, acceptedProducedTypes);
+            if (match == null) {
                 continue;
             }
-            if (permitsBody) {
-                if (!route.isPermitsRequestBody()) {
-                    continue;
+            if (first == null) {
+                first = match;
+            } else {
+                if (matches == null) {
+                    matches = new ArrayList<>(4);
+                    matches.add(first);
                 }
-                if (!route.consumesAll()) {
-                    if (contentType == null) {
-                        contentType = request.getContentType().orElse(null);
-                    }
-                    if (!route.doesConsume(contentType)) {
-                        continue;
-                    }
-                }
+                matches.add(match);
             }
-            if (!route.producesAll()) {
-                if (acceptedProducedTypes == null) {
-                    acceptedProducedTypes = request.accept();
-                }
-                if (!route.doesProduce(acceptedProducedTypes)) {
-                    continue;
-                }
-            }
-            if (!route.matching(request)) {
-                continue;
-            }
-            result.add(route);
         }
-        return result;
+        if (matches != null) {
+            return matches;
+        }
+        return first == null ? Collections.emptyList() : Collections.singletonList(first);
+    }
+
+    private UriRouteInfo<Object, Object>[] candidateRoutes(HttpRequest<?> request) {
+        HttpMethod httpMethod = request.getMethod();
+        return httpMethod == HttpMethod.CUSTOM ?
+            allRoutesByMethod.getOrDefault(request.getMethodName(), EMPTY) : methodRoutesByMethod.getOrDefault(httpMethod, EMPTY);
+    }
+
+    /**
+     * Applies the port, body, Content-Type, Accept and request matcher checks and then matches the path.
+     *
+     * @return The match, or {@code null} if the route does not apply to the request
+     */
+    private @Nullable UriRouteMatch<Object, Object> matchRoute(HttpRequest<?> request,
+                                                               UriRouteInfo<Object, Object> route,
+                                                               String path,
+                                                               boolean permitsBody,
+                                                               @Nullable MediaType contentType,
+                                                               @Nullable Collection<MediaType> acceptedProducedTypes) {
+        if (shouldSkipForPort(request, route)) {
+            return null;
+        }
+        if (permitsBody) {
+            if (!route.isPermitsRequestBody()) {
+                return null;
+            }
+            if (!route.consumesAll() && !route.doesConsume(contentType)) {
+                return null;
+            }
+        }
+        if (!route.producesAll() && !route.doesProduce(acceptedProducedTypes)) {
+            return null;
+        }
+        if (!route.matching(request)) {
+            return null;
+        }
+        return route.tryMatch(path);
     }
 
     private boolean shouldSkipForPort(HttpRequest<?> request, UriRouteInfo<Object, Object> route) {
