@@ -18,11 +18,15 @@ package io.micronaut.http.client.netty;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpHeaders;
+import io.micronaut.http.MutableHttpHeaders;
 import io.micronaut.http.MutableHttpRequest;
 import io.micronaut.http.MutableHttpRequestWrapper;
 import io.micronaut.http.ServerHttpRequest;
 import io.micronaut.http.body.ByteBody;
 import io.micronaut.http.body.CloseableByteBody;
+import io.micronaut.http.cookie.ClientCookieEncoder;
+import io.micronaut.http.cookie.Cookie;
 import io.micronaut.http.netty.NettyHttpRequestBuilder;
 import io.netty.handler.codec.http.HttpRequest;
 
@@ -64,6 +68,27 @@ final class RawHttpRequestWrapper<B> extends MutableHttpRequestWrapper<B> implem
     @Override
     public HttpRequest toHttpRequestWithoutBody() {
         return NettyHttpRequestBuilder.asBuilder(getDelegate()).toHttpRequestWithoutBody();
+    }
+
+    @Override
+    public MutableHttpRequest<B> cookie(Cookie cookie) {
+        // the raw request is sent with the headers of the wrapped request: a cookie a client
+        // filter adds goes to its Cookie header, like for a client request
+        MutableHttpHeaders headers = getHeaders();
+        StringBuilder value = new StringBuilder();
+        String existing = headers.get(HttpHeaders.COOKIE);
+        if (existing != null) {
+            // a cookie of the same name is replaced
+            String prefix = cookie.getName() + "=";
+            for (String pair : existing.split(";")) {
+                String trimmed = pair.trim();
+                if (!trimmed.isEmpty() && !trimmed.startsWith(prefix)) {
+                    value.append(trimmed).append("; ");
+                }
+            }
+        }
+        headers.set(HttpHeaders.COOKIE, value.append(ClientCookieEncoder.INSTANCE.encode(cookie)).toString());
+        return this;
     }
 
     @Override
