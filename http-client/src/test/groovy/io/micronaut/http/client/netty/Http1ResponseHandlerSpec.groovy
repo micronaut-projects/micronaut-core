@@ -9,6 +9,7 @@ import io.micronaut.http.body.stream.BufferConsumer
 import io.micronaut.http.netty.body.StreamingNettyByteBody
 import io.netty.buffer.Unpooled
 import io.netty.channel.ChannelHandlerContext
+import io.netty.channel.ChannelInboundHandlerAdapter
 import io.netty.channel.ChannelOutboundHandlerAdapter
 import io.netty.channel.embedded.EmbeddedChannel
 import io.netty.handler.codec.DecoderResult
@@ -263,7 +264,8 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.writeInbound(LastHttpContent.EMPTY_LAST_CONTENT)
         then:
         completed
-        counter.reads == 4
+        // the response is done, the idle handler does not request more data
+        counter.reads == 3
 
         cleanup:
         channel.checkException()
@@ -293,6 +295,106 @@ class Http1ResponseHandlerSpec extends Specification {
         channel.checkException()
     }
 
+    def "sequential requests on one handler"() {
+        given:
+        def tail = new TailRecorder()
+        def handler = new Http1ResponseHandler()
+        def channel = new EmbeddedChannel(handler, tail)
+
+        expect:
+        handler.idle
+
+        when:
+        // without a request, messages pass through like there was no handler
+        def stray = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK)
+        channel.writeInbound(stray)
+        then:
+        tail.messages == [stray]
+        handler.idle
+
+        when:
+        def listener1 = new SimpleListener()
+        def response1 = new DefaultHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, new DefaultHttpHeaders()
+                .add(HttpHeaderNames.CONTENT_LENGTH, 3))
+        handler.startRequest(listener1)
+        then:
+        !handler.idle
+
+        when:
+        channel.writeInbound(
+                response1,
+                new DefaultHttpContent(Unpooled.copiedBuffer("foo", StandardCharsets.UTF_8)),
+                LastHttpContent.EMPTY_LAST_CONTENT
+        )
+        then:
+        listener1.response == response1
+        listener1.body.toString(StandardCharsets.UTF_8) == "foo"
+        listener1.finished
+        handler.idle
+        tail.messages == [stray]
+
+        when:
+        def listener2 = new SimpleListener()
+        def response2 = new DefaultFullHttpResponse(
+                HttpVersion.HTTP_1_1,
+                HttpResponseStatus.OK,
+                Unpooled.copiedBuffer("bar", StandardCharsets.UTF_8),
+                new DefaultHttpHeaders().add(HttpHeaderNames.CONTENT_LENGTH, 3),
+                EmptyHttpHeaders.INSTANCE
+        )
+        handler.startRequest(listener2)
+        channel.writeInbound(response2)
+        then:
+        listener2.response == response2
+        listener2.body.toString(StandardCharsets.UTF_8) == "bar"
+        listener2.finished
+        handler.idle
+        tail.messages == [stray]
+
+        when:
+        handler.startRequest(new SimpleListener())
+        handler.startRequest(new SimpleListener())
+        then:
+        // a second request cannot start while the first is in progress
+        thrown(IllegalStateException)
+
+        cleanup:
+        listener1.body.close()
+        listener2.body.close()
+    }
+
+    def "failure before the response resets the handler"() {
+        given:
+        def handler = new Http1ResponseHandler()
+        def channel = new EmbeddedChannel(handler)
+        Throwable seen = null
+        def listener = new SimpleListener() {
+            @Override
+            void fail(ChannelHandlerContext ctx, Throwable t) {
+                seen = t
+            }
+        }
+        handler.startRequest(listener)
+
+        when:
+        def exc = new Exception("test")
+        channel.pipeline().fireExceptionCaught(exc)
+        then:
+        seen == exc
+        listener.finished
+        handler.idle
+        channel.checkException()
+    }
+
+    private static final class TailRecorder extends ChannelInboundHandlerAdapter {
+        final List<Object> messages = []
+
+        @Override
+        void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            messages.add(msg)
+        }
+    }
+
     private static final class ReadCounter extends ChannelOutboundHandlerAdapter {
         int reads = 0
 
@@ -311,6 +413,7 @@ class Http1ResponseHandlerSpec extends Specification {
     private static class SimpleListener implements Http1ResponseHandler.ResponseListener {
         HttpResponse response
         CloseableByteBody body
+        boolean finished
 
         @Override
         void continueReceived(ChannelHandlerContext ctx) {
@@ -330,6 +433,7 @@ class Http1ResponseHandlerSpec extends Specification {
 
         @Override
         void finish(ChannelHandlerContext ctx) {
+            finished = true
         }
     }
 }

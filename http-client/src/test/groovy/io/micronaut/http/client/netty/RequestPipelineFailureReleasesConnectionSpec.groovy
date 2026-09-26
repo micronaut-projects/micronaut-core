@@ -11,7 +11,6 @@ import io.micronaut.http.annotation.Post
 import io.micronaut.http.netty.channel.ChannelPipelineCustomizer
 import io.micronaut.runtime.server.EmbeddedServer
 import io.netty.channel.Channel
-import io.netty.channel.ChannelInboundHandlerAdapter
 import reactor.core.publisher.Flux
 import spock.lang.AutoCleanup
 import spock.lang.Specification
@@ -24,9 +23,8 @@ import java.nio.charset.StandardCharsets
  * before the request is written) must fail the request, close the connection, and give the pool
  * handle back so that the pool can open a new connection for the next request.
  * <p>
- * The failure is provoked by planting a handler with the name of the client's response handler
- * on the pooled connection: adding the response handler for the next request then fails with a
- * duplicate handler name.
+ * The failure is provoked by removing the client's response handler, which is installed once
+ * per connection, from the pooled connection: starting the next request on it then fails.
  */
 class RequestPipelineFailureReleasesConnectionSpec extends Specification {
 
@@ -52,9 +50,9 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
         Channel first = before[0]
         assert first.isActive()
 
-        and: "a handler on that connection that makes adding the response handler fail"
+        and: "the response handler of that connection is gone, so that starting a request on it fails"
         first.eventLoop().submit {
-            first.pipeline().addLast(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE, new ChannelInboundHandlerAdapter())
+            first.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE)
         }.get()
 
         when: "a request is sent on that connection"
@@ -62,7 +60,7 @@ class RequestPipelineFailureReleasesConnectionSpec extends Specification {
 
         then: "the client reports the pipeline error"
         def e = thrown(Exception)
-        causeChain(e).any { it instanceof IllegalArgumentException && it.message.contains(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE) }
+        causeChain(e).any { it instanceof IllegalStateException && it.message == "Not added to a channel" }
 
         and: "the connection the request was going to use is closed, and nothing is left running on it"
         new PollingConditions(timeout: 5).eventually {
