@@ -362,6 +362,7 @@ languageSupport:
     generatedClasses: Generated Java Classes
     aopProxies: AOP Proxies
     extendingJavaClasses: Extending Java Classes
+    typeChecking: Type Checking
     moduleScripts:
       title: Module Scripts
       testing: JUnit 5 Module Tests
