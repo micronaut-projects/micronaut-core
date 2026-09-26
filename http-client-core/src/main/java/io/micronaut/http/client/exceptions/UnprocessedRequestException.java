@@ -43,7 +43,7 @@ public class UnprocessedRequestException extends HttpClientException {
     @Nullable
     private URI uri;
     @Nullable
-    private ServiceInstance serviceInstance;
+    private transient ServiceInstance serviceInstance;
     private boolean targetSet;
 
     /**
