@@ -24,6 +24,7 @@ import io.micronaut.inject.processing.ProcessingException;
 import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.python.compiler.PythonBytecodeCompiler;
 import io.micronaut.python.processing.diagnostic.PythonDiagnostic;
+import io.micronaut.python.processing.typecheck.TypeCheckConfiguration;
 import io.micronaut.python.processing.util.PythonJavaTypes;
 import io.micronaut.python.processing.util.PythonKeywords;
 import io.micronaut.python.processing.model.ClassDef;
@@ -80,6 +81,16 @@ public final class PythonAstParser {
     private static final Source PROCESSOR_SOURCE = Source.newBuilder(PYTHON, getSource(), "micronaut-processor-driver.py").cached(true).buildLiteral();
     private static final Source CALL_EXTRACTION_SOURCE = Source.newBuilder(PYTHON, getCallExtractionSource(), "micronaut-call-extraction.py").cached(true).buildLiteral();
     private static final Source TRANSFORM_SOURCE = Source.newBuilder(PYTHON, getTransformSource(), "micronaut-transform-driver.py").cached(true).buildLiteral();
+    private static final Source TYPE_CHECKER_SOURCE = Source.newBuilder(PYTHON, """
+        if type_check_enabled:
+            from micronaut_typecheck import TypeChecker
+            type_checker = TypeChecker(type_check_mode, list(type_check_annotations))
+        else:
+            type_checker = None
+        """, "micronaut-typecheck-init.py").cached(true).buildLiteral();
+    private static final Source TYPE_CHECK_SOURCE = Source.newBuilder(PYTHON, """
+        diagnostics = [] if type_checker is None else type_checker.check(visitor_context)
+        """, "micronaut-typecheck-driver.py").cached(true).buildLiteral();
     private final Context context;
     private final Value runtimeAstCompiler;
     private final IdentityHashMap<TransformResult, TransformArtifacts> transformArtifacts = new IdentityHashMap<>();
@@ -189,6 +200,7 @@ public final class PythonAstParser {
             }
             return o;
         });
+        initializeTypeChecker(null);
         List<PythonDiagnostic> diagnostics = evaluateProcessor(bindings, sources, tree, packageName != null ? packageName : "", "Unknown", "Unknown", "", visitorContext);
         return new PythonEnvironment(
             classes,
@@ -279,6 +291,7 @@ public final class PythonAstParser {
      * @return The parsed environment
      */
     public PythonEnvironment parse(List<Source> sources, List<String> srcDirs, VisitorContext visitorContext) {
+        initializeTypeChecker(null);
         return parseSources(sources.stream().map(source -> new ParsedSource(source, null)).toList(), srcDirs, visitorContext);
     }
 
@@ -294,11 +307,67 @@ public final class PythonAstParser {
      * @since 5.3.0
      */
     public PythonEnvironment parseTransformed(List<TransformResult> transformed, List<String> srcDirs, VisitorContext visitorContext) {
+        return parseTransformed(transformed, srcDirs, visitorContext, TypeCheckConfiguration.OFF);
+    }
+
+    /**
+     * Parse the transformed sources located within the given source directories, collecting the
+     * definitions for the type checker as configured. The check itself runs once every source is
+     * modelled, see {@link #typeCheck(VisitorContext)}.
+     *
+     * @param transformed    The transformed sources, as returned by this parser
+     * @param srcDirs        The source directories
+     * @param visitorContext The visitor context for constant resolution
+     * @param typeCheck      The type checking requested for the compilation
+     * @return The parsed environment
+     * @since 5.3.0
+     */
+    public PythonEnvironment parseTransformed(List<TransformResult> transformed,
+                                              List<String> srcDirs,
+                                              VisitorContext visitorContext,
+                                              TypeCheckConfiguration typeCheck) {
         List<ParsedSource> sources = new ArrayList<>(transformed.size());
+        List<Source> originals = new ArrayList<>(transformed.size());
         for (TransformResult result : transformed) {
             sources.add(new ParsedSource(result.originalSource(), artifacts(result).tree()));
+            originals.add(result.originalSource());
         }
+        initializeTypeChecker(typeCheck.isEnabledFor(originals) ? typeCheck : null);
         return parseSources(sources, srcDirs, visitorContext);
+    }
+
+    /**
+     * Creates the type checker the processor hands its definitions to, or removes it when nothing
+     * is checked so an unchecked compilation costs nothing.
+     */
+    private void initializeTypeChecker(@Nullable TypeCheckConfiguration typeCheck) {
+        Value bindings = context.getBindings(PYTHON);
+        bindings.putMember("type_check_enabled", typeCheck != null);
+        bindings.putMember("type_check_mode", typeCheck != null ? typeCheck.mode().optionValue() : "off");
+        bindings.putMember("type_check_annotations", typeCheck != null ? typeCheck.annotationNames().toArray(String[]::new) : new String[0]);
+        context.eval(TYPE_CHECKER_SOURCE);
+    }
+
+    /**
+     * Runs the type checker over the definitions collected by the last
+     * {@link #parseTransformed(List, List, VisitorContext, TypeCheckConfiguration)}, once every
+     * source of the compilation is modelled and its classes are registered with the given context.
+     *
+     * @param visitorContext The visitor context resolving the Java and Python classes of the compilation
+     * @return The problems found, at the severity of the scope they were found in
+     * @since 5.3.0
+     */
+    @SuppressWarnings("unchecked")
+    public List<PythonDiagnostic> typeCheck(VisitorContext visitorContext) {
+        Value bindings = context.getBindings(PYTHON);
+        Value checker = bindings.getMember("type_checker");
+        if (checker == null || checker.isNull()) {
+            return List.of();
+        }
+        bindings.putMember("visitor_context", visitorContext);
+        context.eval(TYPE_CHECK_SOURCE);
+        Value diagnostics = bindings.getMember("diagnostics");
+        return diagnostics == null ? List.of() : List.copyOf(diagnostics.as(List.class));
     }
 
     private TransformArtifacts artifacts(TransformResult transformResult) {
@@ -681,7 +750,7 @@ public final class PythonAstParser {
             tree = parsed_tree if has_parsed_tree else ast.parse(src)
             visitor = MicronautAstVisitor(
                 callback, package_name, file_name, visitor_context, src_root,
-                source_path=source_path, source_text=src
+                source_path=source_path, source_text=src, type_checker=type_checker
             )
             visitor.visit(tree)
             diagnostics = visitor.diagnostics
