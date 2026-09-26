@@ -77,5 +77,6 @@ final class DefaultPieceWriter<T> implements PieceWriter<T> {
 
     @Override
     public void close() {
+        // nothing is held between pieces
     }
 }
