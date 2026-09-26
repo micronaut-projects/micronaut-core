@@ -21,6 +21,7 @@ import io.micronaut.core.io.buffer.ReadBuffer;
 import io.micronaut.http.body.CloseableByteBody;
 import io.micronaut.http.body.stream.BodySizeLimits;
 import io.micronaut.http.body.stream.BufferConsumer;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.netty.body.NettyByteBodyFactory;
 import io.micronaut.http.netty.body.StreamingNettyByteBody;
@@ -99,6 +100,17 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
         state.exceptionCaught(ctx, cause);
+    }
+
+    /**
+     * The failure of a body whose response arrived: a read timeout says so, so that it is not
+     * taken for a timeout while the response was awaited.
+     *
+     * @param cause The failure while the body was read
+     * @return The failure of the body
+     */
+    private static Throwable bodyFailure(Throwable cause) {
+        return cause instanceof io.netty.handler.timeout.ReadTimeoutException ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : cause;
     }
 
     /**
@@ -325,8 +337,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, AfterContent.INSTANCE);
-            listener.bodyFailed(ctx, cause);
-            streaming.error(cause);
+            Throwable failure = bodyFailure(cause);
+            listener.bodyFailed(ctx, failure);
+            streaming.error(failure);
             listener.finish(ctx);
         }
 
@@ -440,8 +453,9 @@ final class Http1ResponseHandler extends SimpleChannelInboundHandlerInstrumented
         @Override
         void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
             transitionToState(ctx, this, AfterContent.INSTANCE);
-            listener.bodyFailed(ctx, cause);
-            streaming.error(cause);
+            Throwable failure = bodyFailure(cause);
+            listener.bodyFailed(ctx, failure);
+            streaming.error(failure);
             listener.finish(ctx);
         }
 

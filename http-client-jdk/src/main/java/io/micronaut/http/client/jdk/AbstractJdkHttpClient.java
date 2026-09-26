@@ -40,6 +40,7 @@ import io.micronaut.http.client.exceptions.HttpClientException;
 import io.micronaut.http.client.exceptions.HttpClientExceptionUtils;
 import io.micronaut.http.client.exceptions.HttpClientResponseException;
 import io.micronaut.http.client.exceptions.NoHostException;
+import io.micronaut.http.client.exceptions.ReadTimeoutException;
 import io.micronaut.http.client.exceptions.ResponseClosedException;
 import io.micronaut.http.client.exceptions.UnprocessedRequestException;
 import io.micronaut.http.client.filter.ClientFilterResolutionContext;
@@ -82,6 +83,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Supplier;
 
 import static io.micronaut.http.client.exceptions.HttpClientExceptionUtils.populateServiceId;
@@ -509,6 +511,18 @@ abstract class AbstractJdkHttpClient {
      * @return The client exception
      */
     HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e) {
+        return sendError(instance, uri, e, false);
+    }
+
+    /**
+     * @param instance        The service instance the load balancer selected, or {@code null}
+     * @param uri             The request URI
+     * @param e               The failure of {@link HttpClient#sendAsync}
+     * @param headersReceived Whether the response headers had arrived, i.e. the failure is one of
+     *                        a body read by the JDK client
+     * @return The client exception
+     */
+    HttpClientException sendError(@Nullable ServiceInstance instance, URI uri, IOException e, boolean headersReceived) {
         HttpClientException result;
         if (e instanceof HttpConnectTimeoutException) {
             result = new UnprocessedRequestException(UnprocessedRequestException.Reason.CONNECT_TIMEOUT, "Connect Error: " + e.getMessage(), e);
@@ -520,10 +534,13 @@ abstract class AbstractJdkHttpClient {
             // the JDK client reports a connection closed before the response headers with this message
             result = new ResponseClosedException("Connection closed before response was received", false);
             report(instance, LoadBalancer.Outcome.RESET);
+        } else if (e instanceof HttpTimeoutException) {
+            // the request timeout of the JDK client is set from the read timeout; up to JDK 25 it
+            // only runs until the response headers arrive, a later JDK may extend it to the body
+            result = headersReceived ? ReadTimeoutException.BODY_TIMEOUT_EXCEPTION : ReadTimeoutException.TIMEOUT_EXCEPTION;
+            report(instance, LoadBalancer.Outcome.TIMEOUT);
         } else {
-            if (e instanceof HttpTimeoutException) {
-                report(instance, LoadBalancer.Outcome.TIMEOUT);
-            } else if (ByteBodySubscriber.isTruncatedBody(e)) {
+            if (ByteBodySubscriber.isTruncatedBody(e)) {
                 // a buffered response whose body was cut off
                 report(instance, LoadBalancer.Outcome.RESET);
             }
@@ -640,19 +657,26 @@ abstract class AbstractJdkHttpClient {
 
         // built on subscription, so that any client filter changes are used
         return Flux.defer(() -> afterFilters(target, request))
-            .flatMap(sent -> Mono.fromCallable(() -> toJdkRequest(sent.uri(), request, bodyType))
-                .map(httpRequest -> {
-                    if (log.isDebugEnabled()) {
-                        log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
-                    }
-                    HttpHeadersUtil.trace(log,
-                        () -> httpRequest.headers().map().keySet(),
-                        headerName -> httpRequest.headers().allValues(headerName));
-                    return client.sendAsync(httpRequest, java.net.http.HttpResponse.BodyHandlers.ofByteArray());
-                })
-                .flatMap(Mono::fromCompletionStage)
-                .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e))
-                .doOnNext(netResponse -> report(sent.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS)))
+            .flatMap(sent -> {
+                // whether the headers arrived, so that a failure of the body is told from one before
+                AtomicBoolean headersReceived = new AtomicBoolean();
+                return Mono.fromCallable(() -> toJdkRequest(sent.uri(), request, bodyType))
+                    .map(httpRequest -> {
+                        if (log.isDebugEnabled()) {
+                            log.debug("Client {} Sending HTTP Request: {}", clientId, httpRequest);
+                        }
+                        HttpHeadersUtil.trace(log,
+                            () -> httpRequest.headers().map().keySet(),
+                            headerName -> httpRequest.headers().allValues(headerName));
+                        return client.sendAsync(httpRequest, responseInfo -> {
+                            headersReceived.set(true);
+                            return java.net.http.HttpResponse.BodySubscribers.ofByteArray();
+                        });
+                    })
+                    .flatMap(Mono::fromCompletionStage)
+                    .onErrorMap(IOException.class, e -> sendError(sent.instance(), sent.uri(), e, headersReceived.get()))
+                    .doOnNext(netResponse -> report(sent.instance(), netResponse.statusCode() >= 500 ? LoadBalancer.Outcome.SERVER_ERROR : LoadBalancer.Outcome.SUCCESS));
+            })
             .onErrorMap(InterruptedException.class, e -> new HttpClientException("Error sending request: " + e.getMessage(), e))
             .handle((netResponse, sink) -> {
                 if (log.isDebugEnabled()) {
