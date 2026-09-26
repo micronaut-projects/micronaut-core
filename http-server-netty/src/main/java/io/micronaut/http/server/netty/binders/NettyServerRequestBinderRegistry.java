@@ -23,7 +23,7 @@ import io.micronaut.core.convert.ConversionService;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.bind.DefaultRequestBinderRegistry;
-import io.micronaut.http.bind.RequestBinderRegistry;
+import io.micronaut.http.bind.ServerRequestBinderRegistry;
 import io.micronaut.http.bind.binders.RequestArgumentBinder;
 import io.micronaut.http.body.MessageBodyHandlerRegistry;
 import io.micronaut.http.server.multipart.FormFactory;
@@ -43,7 +43,7 @@ import java.util.Optional;
 @Internal
 @Singleton
 @Order(100) // Prefer default implementation
-public final class NettyServerRequestBinderRegistry implements RequestBinderRegistry {
+public final class NettyServerRequestBinderRegistry implements ServerRequestBinderRegistry {
 
     private final DefaultRequestBinderRegistry internalRequestBinderRegistry;
 

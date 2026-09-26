@@ -512,5 +512,27 @@ class Foo {
             noExceptionThrown()
     }
 
+    void "test a PathVariables parameter reads every uri variable"() {
+        when:
+        buildTypeElement("""
 
+package test;
+
+import io.micronaut.http.PathVariables;
+import io.micronaut.http.annotation.*;
+
+@Controller("/foo")
+class Foo {
+
+    @Get("/{abc}/{def}")
+    String abc(PathVariables pathVariables) {
+        return "";
+    }
+}
+
+""")
+
+        then:
+        noExceptionThrown()
+    }
 }

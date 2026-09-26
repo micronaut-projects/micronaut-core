@@ -117,4 +117,158 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("Unsupported filter return type: io.micronaut.http.HttpRequest")
     }
+
+    def 'server request filter reads the body and the form'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.body.AsyncRequestBody;
+import io.micronaut.http.form.*;
+import java.util.List;
+import java.util.Optional;
+
+@ServerFilter
+class Foo {
+    @RequestFilter("/data")
+    void data(HttpRequest<?> request, FormData form, @Part("name") String name, @Part("avatar") FileUpload avatar,
+              List<FileUpload> docs, Optional<FileUpload> cover) {
+    }
+
+    @RequestFilter("/parts")
+    void parts(FormParts parts) {
+    }
+
+    @RequestFilter("/part")
+    void part(FormPart part) {
+    }
+
+    @RequestFilter("/body")
+    void body(AsyncRequestBody body) {
+    }
+}
+
+""")
+    }
+
+    def 'response filter cannot read the form'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.form.FormData;
+
+@ServerFilter
+class Foo {
+    @ResponseFilter
+    void test(HttpResponse<?> response, FormData form) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("can only be bound in a request filter method of a @ServerFilter")
+    }
+
+    def 'client filter cannot bind a part'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ClientFilter
+class Foo {
+    @RequestFilter
+    void test(HttpRequest<?> request, @Part("name") String name) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("@Part can only be bound in a request filter method of a @ServerFilter")
+    }
+
+    def 'server filter reads the path variables after routing'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter("/items/{id}")
+    void request(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+
+    @ResponseFilter("/items/{id}")
+    void response(HttpResponse<?> response, PathVariables pathVariables) {
+    }
+}
+
+""")
+    }
+
+    def 'pre-matching filter cannot bind the path variables'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.server.annotation.PreMatching;
+
+@ServerFilter
+class Foo {
+    @PreMatching
+    @RequestFilter
+    void test(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("A @PreMatching filter method runs before the request is routed and cannot bind the path variables of the route (io.micronaut.http.PathVariables)")
+    }
+
+    def 'client filter cannot bind the path variables'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ClientFilter
+class Foo {
+    @RequestFilter
+    void test(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("can only be bound in a filter method of a @ServerFilter")
+    }
 }

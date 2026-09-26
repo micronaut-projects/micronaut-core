@@ -843,7 +843,7 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
     /**
      * Mutable version of the request.
      */
-    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, ServerHttpRequest<T> {
+    private final class NettyMutableHttpRequest implements MutableHttpRequest<T>, NettyHttpRequestBuilder, ServerHttpRequest<T>, FormCapableHttpRequest<T> {
 
         @Nullable
         private URI uri;
@@ -878,6 +878,29 @@ public final class NettyHttpRequest<T> extends AbstractNettyHttpRequest<T> imple
          */
         NettyHttpRequest<T> request() {
             return NettyHttpRequest.this;
+        }
+
+        /**
+         * The form of the request, unless the body was set: then the body is that object.
+         *
+         * @return Whether the request has a form body
+         */
+        @Override
+        public boolean hasFormBody() {
+            return !bodySet && NettyHttpRequest.this.hasFormBody();
+        }
+
+        @Override
+        public Publisher<RawFormField> getRawFormFields() {
+            if (bodySet) {
+                throw new IllegalStateException("The body of the request was set: it has no form fields to read");
+            }
+            return NettyHttpRequest.this.getRawFormFields();
+        }
+
+        @Override
+        public void addDisposalResource(Runnable dispose) {
+            NettyHttpRequest.this.addDisposalResource(dispose);
         }
 
         @Override

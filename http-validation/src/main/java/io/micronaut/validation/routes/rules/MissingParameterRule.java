@@ -17,6 +17,7 @@ package io.micronaut.validation.routes.rules;
 
 import io.micronaut.core.annotation.AnnotatedElement;
 import io.micronaut.core.bind.annotation.Bindable;
+import io.micronaut.http.PathVariables;
 import io.micronaut.http.uri.UriMatchTemplate;
 import io.micronaut.inject.ast.ClassElement;
 import io.micronaut.inject.ast.MethodElement;
@@ -48,6 +49,12 @@ public class MissingParameterRule implements RouteValidationRule {
         Set<String> variables = templates.stream().flatMap(t -> t.getVariableNames().stream()).collect(Collectors.toSet());
         Set<String> routeVariables = Arrays.stream(parameters).map(ParameterElement::getName).collect(Collectors.toCollection(LinkedHashSet::new));
 
+        for (ParameterElement parameter : parameters) {
+            if (parameter.getType().getName().equals(PathVariables.class.getName())) {
+                // reads every variable of the route
+                return new RouteValidationResult(EMPTY_STRING_ARRAY);
+            }
+        }
         for (ParameterElement parameter : parameters) {
             if (parameter.hasAnnotation("io.micronaut.http.annotation.Body")) {
                 for (AnnotatedElement element : findProperties(parameter.getType())) {
