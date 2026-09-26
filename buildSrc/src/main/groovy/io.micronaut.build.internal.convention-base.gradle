@@ -36,6 +36,16 @@ tasks.withType(Test).configureEach {
     jvmArgs "--enable-preview"
 }
 
+pluginManager.withPlugin("jacoco") {
+    tasks.withType(Test).configureEach {
+        // The agent instruments every class a test loads by default, including the Java, Groovy and
+        // Kotlin compilers the annotation processing tests run, while coverage only reports our classes
+        jacoco {
+            includes = ["io.micronaut.*"]
+        }
+    }
+}
+
 java {
     sourceCompatibility = JavaVersion.VERSION_25
     targetCompatibility = JavaVersion.VERSION_25
