@@ -21,6 +21,7 @@ import io.micronaut.core.annotation.Internal;
 import io.micronaut.core.type.Argument;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.RouteArguments;
 import io.micronaut.web.router.RouteAssembly;
 import org.jspecify.annotations.Nullable;
@@ -53,6 +54,7 @@ public final class RouteSettings {
     private final IntConsumer exposePort;
     private final @Nullable HandlerMethod<?> handler;
     private final List<Predicate<HttpRequest<?>>> conditions;
+    private final List<Predicate<? super PathVariables>> constraints;
     private final Map<String, Object> attributes;
     private final List<FilterRegistration> filters;
     private final List<AnnotationValue<?>> annotations;
@@ -77,6 +79,7 @@ public final class RouteSettings {
         this.exposePort = exposePort;
         this.handler = handler;
         this.conditions = new ArrayList<>(0);
+        this.constraints = new ArrayList<>(0);
         this.attributes = new LinkedHashMap<>(0);
         this.filters = new ArrayList<>(0);
         this.annotations = new ArrayList<>(0);
@@ -86,6 +89,7 @@ public final class RouteSettings {
         this.exposePort = other.exposePort;
         this.handler = other.handler;
         this.conditions = new ArrayList<>(other.conditions);
+        this.constraints = new ArrayList<>(other.constraints);
         this.attributes = new LinkedHashMap<>(other.attributes);
         this.filters = new ArrayList<>(other.filters);
         this.annotations = new ArrayList<>(other.annotations);
@@ -232,6 +236,14 @@ public final class RouteSettings {
     }
 
     /**
+     * @param constraint The constraint on the path variables
+     * @see RouteSpec#constrain(Predicate)
+     */
+    public void constrain(Predicate<? super PathVariables> constraint) {
+        constraints.add(Objects.requireNonNull(constraint, "constraint"));
+    }
+
+    /**
      * @param filter The filter, whose executor may be chosen until the route is built
      * @see RouteFilterSpec
      */
@@ -354,6 +366,13 @@ public final class RouteSettings {
      */
     public List<Predicate<HttpRequest<?>>> getConditions() {
         return Collections.unmodifiableList(conditions);
+    }
+
+    /**
+     * @return The constraints on the path variables of the route, a read-only view
+     */
+    public List<Predicate<? super PathVariables>> getConstraints() {
+        return Collections.unmodifiableList(constraints);
     }
 
     /**

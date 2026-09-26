@@ -30,7 +30,11 @@ import io.micronaut.inject.MethodExecutionHandle;
 import io.micronaut.scheduling.executor.ExecutorSelector;
 import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
+import io.micronaut.web.router.builder.DefaultPathVariables;
+import io.micronaut.http.PathVariables;
 import org.jspecify.annotations.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.charset.Charset;
 import java.util.List;
@@ -50,6 +54,8 @@ import java.util.function.Predicate;
  */
 @Internal
 public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R> implements UriRouteInfo<T, R>, IndexedRoute {
+
+    private static final Logger LOG = LoggerFactory.getLogger(DefaultUrlRouteInfo.class);
 
     /**
      * The filters of this route only, in the order the filter chain runs them.
@@ -81,6 +87,10 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
     private final ConversionService conversionService;
     private final ExecutorSelector executorSelector;
     private final boolean implicitHead;
+    /**
+     * The constraints on the path variables of the route, of its groups first, empty for a route without them.
+     */
+    private final List<Predicate<? super PathVariables>> constraints;
 
     @Nullable
     private ExecutorService executorService;
@@ -164,7 +174,7 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                                boolean implicitHead) {
         this(httpMethod, httpMethodName, uriMatchTemplate, defaultCharset, targetMethod, bodyArgumentName, bodyArgument,
             consumesMediaTypes, producesMediaTypes, predicates, port, conversionService, executorSelector,
-            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false);
+            messageBodyHandlerRegistry, implicitHead, List.of(), 0, Map.of(), null, false, List.of());
     }
 
     /**
@@ -190,6 +200,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
      * @param attributes                 The attributes of the route
      * @param errorScope                 The innermost group of the route that has error or status routes, or {@code null}
      * @param anyMethod                  Whether the route is a route of {@code HttpRouteBuilder.any(...)}
+     * @param constraints                The constraints on the path variables, of the groups of the route first, see
+     *                                   {@code RouteSpec#constrain(Predicate)}
      */
     @SuppressWarnings("ParameterNumber")
     DefaultUrlRouteInfo(HttpMethod httpMethod,
@@ -211,7 +223,8 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
                         int order,
                         Map<String, Object> attributes,
                         RouteAssembly.@Nullable RouteGroup errorScope,
-                        boolean anyMethod) {
+                        boolean anyMethod,
+                        List<Predicate<? super PathVariables>> constraints) {
         super(targetMethod, bodyArgument, bodyArgumentName, consumesMediaTypes, producesMediaTypes, httpMethod.permitsRequestBody(), false, predicates, messageBodyHandlerRegistry);
         this.implicitHead = implicitHead;
         this.httpMethod = httpMethod;
@@ -227,6 +240,38 @@ public final class DefaultUrlRouteInfo<T, R> extends DefaultRequestMatcher<T, R>
         this.attributes = attributes;
         this.errorScope = errorScope;
         this.anyMethod = anyMethod;
+        this.constraints = List.copyOf(constraints);
+    }
+
+    /**
+     * @return Whether the route has constraints on its path variables, see {@link #acceptsVariables(Map)}
+     */
+    boolean isConstrained() {
+        return !constraints.isEmpty();
+    }
+
+    /**
+     * Whether the path variables of a match of this route pass its constraints, viewed as the
+     * {@link PathVariables} the handler gets. A constraint that throws rejects them.
+     *
+     * @param variables The variable values of the match
+     * @return Whether all the constraints accept them
+     */
+    boolean acceptsVariables(Map<String, Object> variables) {
+        PathVariables pathVariables = new DefaultPathVariables(variables, conversionService);
+        for (Predicate<? super PathVariables> constraint : constraints) {
+            try {
+                if (!constraint.test(pathVariables)) {
+                    return false;
+                }
+            } catch (RuntimeException e) {
+                if (LOG.isDebugEnabled()) {
+                    LOG.debug("A constraint of the route {} rejected the path variables {}: {}", this, variables, e.getMessage(), e);
+                }
+                return false;
+            }
+        }
+        return true;
     }
 
     @Override

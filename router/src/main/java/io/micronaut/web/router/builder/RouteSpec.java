@@ -22,10 +22,13 @@ import io.micronaut.core.annotation.Experimental;
 import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.MediaType;
+import io.micronaut.http.PathVariables;
 import io.micronaut.inject.ExecutableMethod;
 
 import java.lang.annotation.Annotation;
+import java.util.Collection;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
 
@@ -295,6 +298,117 @@ public sealed interface RouteSpec<S extends RouteSpec<S>> extends RouteFilterSpe
      * @return The route or the group
      */
     S where(Predicate<HttpRequest<?>> condition);
+
+    /**
+     * Constrain the path variables of the route: the route matches a request only when the
+     * constraint accepts the path variables its URI template bound. Otherwise the route is not a
+     * match, as if its URI template did not match: the request goes on to the other routes, e.g. a
+     * route with the same URI template, or is answered with {@code 404} when none matches.
+     *
+     * <pre>{@code
+     * routes.path("/shops/{shop}", shop -> shop
+     *     .constrain("shop", SHOPS)
+     *     .route(locator));
+     * routes.GET("/orders/{id}", ordersHandler)
+     *     .constrain("id", Long.class, id -> id > 0);
+     * }</pre>
+     *
+     * <p>A constraint runs while the request is matched, after the URI template of the route
+     * matched and bound the variables, before the media types, the conditions, see
+     * {@link #where(Predicate)}, and the ambiguity between the routes are considered. It is given
+     * the same {@link PathVariables} the handler is given. Since a rejected route is not a match,
+     * the methods allowed on a path for a {@code 405}, the media types for a {@code 415} or
+     * {@code 406}, a CORS preflight request and the implicit {@code HEAD} route consider only
+     * the routes whose constraints pass: a rejected value never produces a {@code 405}. A
+     * constraint that throws an exception, e.g. a variable that does not convert, rejects the
+     * variables; the exception is logged at debug level.</p>
+     *
+     * <p>A constraint should be cheap, and must not have side effects: it runs for every request
+     * the URI template of the route matches, including the requests another route answers. A
+     * route without constraints costs nothing more to match.</p>
+     *
+     * <p>On a group, the constraint applies to the routes of the group, including the routes of
+     * its nested groups: the constraints of the groups, outer group first, and of the route must
+     * all pass.</p>
+     *
+     * @param accepted Whether the path variables are accepted
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    S constrain(Predicate<? super PathVariables> accepted);
+
+    /**
+     * Constrain a path variable, see {@link #constrain(Predicate)}: a request whose variable has
+     * no value, or a value the predicate does not accept, is not a match of the route.
+     *
+     * <pre>{@code
+     * routes.GET("/files/{name}", filesHandler)
+     *     .constrain("name", name -> !name.startsWith("."));
+     * }</pre>
+     *
+     * @param variable The name of the variable
+     * @param accepted Whether the value, as a string, is accepted
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    default S constrain(String variable, Predicate<? super String> accepted) {
+        Objects.requireNonNull(variable, "variable");
+        Objects.requireNonNull(accepted, "accepted");
+        return constrain(variables -> {
+            String value = variables.findString(variable).orElse(null);
+            return value != null && accepted.test(value);
+        });
+    }
+
+    /**
+     * Constrain a path variable converted to a type, see {@link #constrain(Predicate)}: a request
+     * whose variable has no value, a value that does not convert to the type, or a value the
+     * predicate does not accept, is not a match of the route.
+     *
+     * <pre>{@code
+     * routes.GET("/orders/{id}", ordersHandler)
+     *     .constrain("id", Long.class, id -> id > 0); // "/orders/abc" is not a match either
+     * }</pre>
+     *
+     * @param variable The name of the variable
+     * @param type     The type to convert the value to
+     * @param accepted Whether the converted value is accepted
+     * @param <T>      The type
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    default <T> S constrain(String variable, Class<T> type, Predicate<? super T> accepted) {
+        Objects.requireNonNull(variable, "variable");
+        Objects.requireNonNull(type, "type");
+        Objects.requireNonNull(accepted, "accepted");
+        // a conversion error throws, which rejects the variables
+        return constrain(variables -> variables.find(variable, type).map(accepted::test).orElse(false));
+    }
+
+    /**
+     * Constrain a path variable to a set of values, see {@link #constrain(Predicate)}: a request
+     * whose variable has another value, or none, is not a match of the route. The values are
+     * copied when the constraint is declared.
+     *
+     * <pre>{@code
+     * routes.path("/shops/{shop}", shop -> shop
+     *     .constrain("shop", Set.of("north", "south"))
+     *     .GET("/stock", stockHandler));
+     * }</pre>
+     *
+     * @param variable The name of the variable
+     * @param values   The accepted values
+     * @return The route or the group
+     * @since 5.3.0
+     */
+    @Experimental
+    default S constrain(String variable, Collection<String> values) {
+        Set<String> accepted = Set.copyOf(values);
+        return constrain(variable, accepted::contains);
+    }
 
     /**
      * Break a tie with other routes that are equally good for a request: the route with the

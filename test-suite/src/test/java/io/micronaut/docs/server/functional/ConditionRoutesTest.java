@@ -52,6 +52,18 @@ class ConditionRoutesTest {
     }
 
     @Test
+    void aConstraintOnThePathVariables() {
+        BlockingHttpClient http = client.toBlocking();
+        assertEquals("stock of north", http.retrieve(HttpRequest.GET("/shops/north/stock")));
+        HttpClientResponseException notFound = assertThrows(HttpClientResponseException.class,
+            () -> http.retrieve(HttpRequest.GET("/shops/west/stock")));
+        assertEquals(HttpStatus.NOT_FOUND, notFound.getStatus());
+        assertEquals("item 5", http.retrieve(HttpRequest.GET("/items/5")));
+        assertEquals("item named lamp", http.retrieve(HttpRequest.GET("/items/lamp")));
+        assertEquals("item named -1", http.retrieve(HttpRequest.GET("/items/-1")));
+    }
+
+    @Test
     void aFilterReadsTheAttributesOfTheRoute() {
         BlockingHttpClient http = client.toBlocking();
         assertEquals("daily report", http.retrieve(HttpRequest.GET("/reports/daily").header("X-Role", "auditor")));

@@ -11,11 +11,15 @@ import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
 import io.micronaut.web.router.builder.RequestPredicates;
 import jakarta.inject.Singleton;
+
+import java.util.Set;
 // end::imports[]
 
 @Requires(property = "spec.name", value = "ConditionRoutesTest")
 @Singleton
 public class ConditionRoutes implements HttpRoutes {
+    private static final Set<String> SHOPS = Set.of("north", "south");
+
     private final int managementPort;
 
     ConditionRoutes(@Value("${management.port}") int managementPort) {
@@ -32,6 +36,17 @@ public class ConditionRoutes implements HttpRoutes {
             .order(-1); // <2>
         routes.GET("/search", (request, pathVariables) -> text("search")); // <3>
         // end::where[]
+
+        // tag::constrain[]
+        routes.path("/shops/{shop}", shop -> {
+            shop.constrain("shop", SHOPS); // <1>
+            shop.GET("/stock", (request, pathVariables) -> text("stock of " + pathVariables.getString("shop")));
+        });
+        routes.GET("/items/{id}", (request, pathVariables) -> text("item " + pathVariables.getLong("id")))
+            .constrain("id", Long.class, id -> id > 0) // <2>
+            .order(-1);
+        routes.GET("/items/{name}", (request, pathVariables) -> text("item named " + pathVariables.getString("name"))); // <3>
+        // end::constrain[]
 
         // tag::attributes[]
         routes.path("/reports", reports -> {

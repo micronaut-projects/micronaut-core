@@ -47,6 +47,7 @@ import io.micronaut.scheduling.executor.ThreadSelection;
 import io.micronaut.scheduling.executor.ThreadSelectionConfiguration;
 import io.micronaut.web.router.builder.FilterRegistration;
 import io.micronaut.web.router.builder.HandlerMethod;
+import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RouteSettings;
 import io.micronaut.web.router.builder.DefaultRouteAnnotations;
 import io.micronaut.web.router.builder.RouteDeclaration;
@@ -934,6 +935,7 @@ public final class RouteAssembly {
     public final class RouteGroup {
         private final @Nullable RouteGroup enclosing;
         private final List<Predicate<HttpRequest<?>>> predicates = new ArrayList<>(0);
+        private final List<Predicate<? super PathVariables>> constraints = new ArrayList<>(0);
         private final Map<String, Object> attributes = new LinkedHashMap<>(0);
         private final DefaultRouteAnnotations annotations;
         private final List<DefaultErrorRoute> errorRoutes = new ArrayList<>(0);
@@ -1105,6 +1107,30 @@ public final class RouteAssembly {
             Objects.requireNonNull(condition, "condition");
             checkOpen();
             predicates.add(condition);
+        }
+
+        /**
+         * A constraint the path variables of the routes of the group must pass.
+         *
+         * @param constraint The constraint
+         */
+        public void constrain(Predicate<? super PathVariables> constraint) {
+            Objects.requireNonNull(constraint, "constraint");
+            checkOpen();
+            constraints.add(constraint);
+        }
+
+        /**
+         * Add the constraints of the enclosing groups, then of this group.
+         *
+         * @param routeConstraints The constraints to add to
+         */
+        void addConstraints(List<Predicate<? super PathVariables>> routeConstraints) {
+            RouteGroup group = enclosing;
+            if (group != null) {
+                group.addConstraints(routeConstraints);
+            }
+            routeConstraints.addAll(constraints);
         }
 
         /**
@@ -1311,7 +1337,8 @@ public final class RouteAssembly {
                 effectiveOrder(settings.getOrder(), group),
                 attributes(),
                 errorScope,
-                settings.isAnyMethod()
+                settings.isAnyMethod(),
+                constraints(group)
             );
             if (errorScope != null) {
                 // built now: a duplicate fails when the router is built
@@ -1336,6 +1363,20 @@ public final class RouteAssembly {
             }
             all.putAll(attributes);
             return all.isEmpty() ? Map.of() : Collections.unmodifiableMap(all);
+        }
+
+        /**
+         * @return The constraints on the path variables of the groups of the route, outer group first, then of the route
+         */
+        private List<Predicate<? super PathVariables>> constraints(@Nullable RouteGroup group) {
+            List<Predicate<? super PathVariables>> own = settings.getConstraints();
+            if (group == null) {
+                return own.isEmpty() ? List.of() : List.copyOf(own);
+            }
+            List<Predicate<? super PathVariables>> all = new ArrayList<>(own.size());
+            group.addConstraints(all);
+            all.addAll(own);
+            return all.isEmpty() ? List.of() : List.copyOf(all);
         }
 
         /**
