@@ -15,4 +15,4 @@ Functional routes add what is natural to declare in code: groups of routes with 
 
 Every `HttpRoutes` bean adds its routes next to the controllers, under `micronaut.server.context-path` if one is configured. Declare an `HttpRoutes` bean as a class, as above, or return a lambda from a factory method, as in the next section. The order of the `HttpRoutes` beans only orders the beans: it never decides which route answers a request.
 
-The builder is only valid while `HttpRoutes.routes(...)` runs: the router reads the routes, their configuration and their filters when it is created. Keep the builder, a group or a route specification for later, and the changes you make are not seen.
+WARNING: A route specification, group or builder kept after `HttpRoutes.routes(...)` returned has no effect: the router reads the routes, their configuration and their filters when it is created. The routes cannot change while the application runs.
