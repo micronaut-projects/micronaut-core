@@ -200,4 +200,75 @@ class Foo {
         def ex = thrown(RuntimeException)
         ex.message.contains("@Part can only be bound in a request filter method of a @ServerFilter")
     }
+
+    def 'server filter reads the path variables after routing'() {
+        expect:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ServerFilter
+class Foo {
+    @RequestFilter("/items/{id}")
+    void request(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+
+    @ResponseFilter("/items/{id}")
+    void response(HttpResponse<?> response, PathVariables pathVariables) {
+    }
+}
+
+""")
+    }
+
+    def 'pre-matching filter cannot bind the path variables'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+import io.micronaut.http.server.annotation.PreMatching;
+
+@ServerFilter
+class Foo {
+    @PreMatching
+    @RequestFilter
+    void test(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("A @PreMatching filter method runs before the request is routed and cannot bind the path variables of the route (io.micronaut.http.PathVariables)")
+    }
+
+    def 'client filter cannot bind the path variables'() {
+        when:
+        buildTypeElement("""
+
+package test;
+
+import io.micronaut.http.*;
+import io.micronaut.http.annotation.*;
+
+@ClientFilter
+class Foo {
+    @RequestFilter
+    void test(HttpRequest<?> request, PathVariables pathVariables) {
+    }
+}
+
+""")
+
+        then:
+        def ex = thrown(RuntimeException)
+        ex.message.contains("can only be bound in a filter method of a @ServerFilter")
+    }
 }

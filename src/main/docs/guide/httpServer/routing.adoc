@@ -53,6 +53,8 @@ snippet::io.micronaut.docs.server.routes.IssuesControllerTest[tags="defaultvalue
 <1> This test illustrates the substitution of a default `PathVariable` value when the URI variable is missing
 <2> And another test to illustrate when the optional URI variable is provided
 
+A method argument of type api:http.PathVariables[] gives all variables of the matched route, converted on access like `@PathVariable` arguments, e.g. `pathVariables.getLong("id")`, `pathVariables.getInt("page", 0)` or `pathVariables.getList("ids", Long.class)`. A missing variable or a value that does not convert is answered with `400`. The request filter methods of a `@ServerFilter` that run after routing can declare it too, but not `@PreMatching` ones.
+
 The following table provides examples of URI templates and what they match:
 
 .URI Template Matching
