@@ -462,7 +462,7 @@ public interface FormData extends AutoCloseable {
      */
     default OptionalInt findInt(String name) {
         Optional<Integer> value = find(name, Integer.class);
-        return value.isPresent() ? OptionalInt.of(value.get().intValue()) : OptionalInt.empty();
+        return value.isPresent() ? OptionalInt.of(value.get()) : OptionalInt.empty();
     }
 
     /**
@@ -474,7 +474,7 @@ public interface FormData extends AutoCloseable {
      */
     default OptionalLong findLong(String name) {
         Optional<Long> value = find(name, Long.class);
-        return value.isPresent() ? OptionalLong.of(value.get().longValue()) : OptionalLong.empty();
+        return value.isPresent() ? OptionalLong.of(value.get()) : OptionalLong.empty();
     }
 
     /**
@@ -486,7 +486,7 @@ public interface FormData extends AutoCloseable {
      */
     default OptionalDouble findDouble(String name) {
         Optional<Double> value = find(name, Double.class);
-        return value.isPresent() ? OptionalDouble.of(value.get().doubleValue()) : OptionalDouble.empty();
+        return value.isPresent() ? OptionalDouble.of(value.get()) : OptionalDouble.empty();
     }
 
     /**
