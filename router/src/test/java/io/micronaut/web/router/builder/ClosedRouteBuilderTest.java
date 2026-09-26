@@ -77,6 +77,7 @@ public class ClosedRouteBuilderTest {
         assertClosed(() -> routes.filter("/**"));
         assertClosed(() -> routes.group(group -> group.GET("/late", ClosedRouteBuilderTest::ok)));
         assertClosed(() -> routes.path("/late", group -> group.GET("/x", ClosedRouteBuilderTest::ok)));
+        assertClosed(() -> routes.locate("/late", (request, pathVariables) -> "target", target -> null));
     }
 
     /**
@@ -85,7 +86,7 @@ public class ClosedRouteBuilderTest {
     public static void assertClosed(Executable declaration) {
         IllegalStateException e = assertThrows(IllegalStateException.class, declaration);
         assertEquals("The route builder is closed: declare the routes inside HttpRoutes.routes(...), "
-            + "not after it returned", e.getMessage());
+            + "or inside LocatedRoutes.routes(...), not after it returned", e.getMessage());
     }
 
     private static HttpResponse<?> ok(HttpRequest<?> request, PathVariables pathVariables) {

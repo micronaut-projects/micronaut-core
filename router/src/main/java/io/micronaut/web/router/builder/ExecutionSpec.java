@@ -56,7 +56,8 @@ public sealed interface ExecutionSpec<S extends ExecutionSpec<S>> permits RouteS
      * {@code @ExecuteOn} on a controller, unless they, or a nested group, choose their thread.
      * The media types and the executor of a group apply to its routes to handlers, including the
      * implicit {@code HEAD} routes, the routes declared for several methods and the declared
-     * routes, not to its error and status routes.</p>
+     * routes, not to its locator routes, whose located routes declare their own, nor to its error
+     * and status routes.</p>
      *
      * <p>On a filter, the filter runs on the executor, like a filter method annotated
      * {@code @ExecuteOn}: use it for a filter that blocks, e.g. on a database. The filter chain

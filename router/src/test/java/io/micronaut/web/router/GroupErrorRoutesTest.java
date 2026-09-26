@@ -23,6 +23,7 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.ErrorRouteHandler;
 import io.micronaut.web.router.builder.HandlerMethod;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.StatusRouteHandler;
 import io.micronaut.web.router.exceptions.RoutingException;
@@ -111,6 +112,29 @@ class GroupErrorRoutesTest {
                 group.error(IllegalStateException.class, new NamedError<>("b"));
             });
         }));
+    }
+
+    @Test
+    void locatedRoutesDeclareErrorRoutesInTheirGroupsAndTheLocatedRoutesHaveThoseOfTheLocatorGroups() {
+        LocatedRoutes<?> global = TestLocatedRoutes.of(routes -> {
+            routes.GET("/items", GroupErrorRoutesTest::ok);
+            routes.error(IllegalStateException.class, new NamedError<>("global in located routes"));
+        });
+        Router globalRouter = router(routes -> routes.locate("/global/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> global));
+        assertThrows(IllegalArgumentException.class, () -> globalRouter.findClosest(HttpRequest.GET("/global/1/items")));
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.group(group -> {
+            group.GET("/items", GroupErrorRoutesTest::ok);
+            group.error(IllegalArgumentException.class, new NamedError<>("table argument"));
+        }));
+        Router router = router(routes -> routes.path("/shop", shop -> {
+            shop.error(IllegalStateException.class, new NamedError<>("shop state"));
+            shop.error(IllegalArgumentException.class, new NamedError<>("shop argument"));
+            shop.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> items);
+        }));
+
+        // the group of the located route first, then the group of the locator route
+        assertEquals("table argument", error(router, "/shop/orders/1/items", new IllegalArgumentException()));
+        assertEquals("shop state", error(router, "/shop/orders/1/items", new IllegalStateException()));
     }
 
     private static String error(Router router, String path, Throwable error) {

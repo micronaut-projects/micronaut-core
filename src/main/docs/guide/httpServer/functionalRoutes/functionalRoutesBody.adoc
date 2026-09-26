@@ -20,3 +20,5 @@ The rules of an `AsyncRequestBody`:
 * A read that completes when the rest of the body arrives completes on the event loop thread that delivers it. As for a controller argument of type `CompletableFuture`, the propagated context of the request is not in scope in its continuation: continue on an executor that propagates the context, or use a synchronous body or form handler, which is called once the body has arrived.
 
 An error route receives the request without its `AsyncRequestBody`: the error can happen after the body was read, or while it was read.
+
+In the api:web.router.builder.LocatedRoutes[] of a <<functionalRoutesLocators, located target>>, the asynchronous handler that receives the target, a api:web.router.builder.LocatedAsyncBodyRequestHandler[], receives the body too: `(request, pathVariables, target, body) -> ...`. A lambda `(request, pathVariables, target) -> ...` would be ambiguous with an `AsyncBodyRequestHandler`. A handler that does not read the body leaves it unread, like an `AsyncRequestHandler`.

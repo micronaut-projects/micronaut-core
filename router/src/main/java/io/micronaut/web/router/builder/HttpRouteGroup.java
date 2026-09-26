@@ -79,7 +79,11 @@ import io.micronaut.http.MediaType;
  * declared in the lambda of the group, and of its nested groups, wherever they are declared in
  * the lambda, like its filters. A route, or a nested group, with its own value overrides the one
  * of the group. The media types, the executor and the annotated element apply to the routes to
- * handlers.</p>
+ * handlers, not to the locator routes of the group.</p>
+ *
+ * <p><b>Locators.</b> A {@link #locate locator route} declared in a group is under the prefix of
+ * the group, and the filters of the group apply to every located route, before the filters of
+ * the located route.</p>
  *
  * <p><b>Declared routes.</b> A {@link RouteDeclaration} is bound with its own URI template. It
  * can be bound in a group without a prefix, whose filters apply to it, but not in a group with a prefix.</p>

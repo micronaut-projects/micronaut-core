@@ -27,6 +27,7 @@ import io.micronaut.web.router.builder.BodyRequestHandler;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.FormRequestHandler;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RequestHandler;
 import org.junit.jupiter.api.Test;
@@ -45,10 +46,11 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Routes declared without a path, like a controller method mapped without a URI: at the prefix
- * of the group or at the root. Every shortcut
+ * of the group, at the prefix of the locator in a located table, or at the root. Every shortcut
  * compiles with lambdas and method references, next to the forms with a path.
  */
 class HandlerRoutePathlessTest {
+
 
     @Test
     void aRouteWithoutAPathIsAtThePrefixOfItsGroup() {
@@ -80,6 +82,20 @@ class HandlerRoutePathlessTest {
         }, uri -> RouteAssembly.underContextPath("/cp", uri));
         assertEquals(RouteAssembly.underContextPath("/cp", "/"), route(router, HttpRequest.GET("/cp")).getUriMatchTemplate().toString());
         assertEquals("/cp/users", route(router, HttpRequest.GET("/cp/users")).getUriMatchTemplate().toString());
+    }
+
+    @Test
+    void aRouteWithoutAPathInALocatedTableIsAtThePrefixOfTheLocator() {
+        LocatedRoutes<?> table = TestLocatedRoutes.of(Item.class, item -> {
+            item.handle(HttpMethod.GET, (request, pathVariables, target) -> HttpResponse.ok("item " + target.name()));
+            item.handle(HttpMethod.PUT, Item.class, (request, pathVariables, target, body) -> HttpResponse.ok());
+            item.GET("/details", (request, pathVariables) -> HttpResponse.ok("details"));
+        });
+        Router router = router(routes -> routes.locate("/items/{name}", (request, pathVariables) -> new Item(pathVariables.getString("name")),
+            target -> table), uri -> uri);
+        assertNotNull(router.findClosest(HttpRequest.GET("/items/a")));
+        assertNotNull(router.findClosest(HttpRequest.PUT("/items/a", "")));
+        assertNotNull(router.findClosest(HttpRequest.GET("/items/a/details")));
     }
 
     /**

@@ -30,6 +30,7 @@ import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteGroup;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
 import io.micronaut.web.router.builder.RouteDeclaration;
 import org.jspecify.annotations.Nullable;
@@ -204,6 +205,28 @@ class RouteGroupSettingsTest {
             kept[0].produces(MediaType.APPLICATION_XML_TYPE);
         });
         assertEquals(XML, route(router, HttpRequest.GET("/kept")).getProduces());
+    }
+
+    @Test
+    void theRoutesOfALocatedTableAndOfItsGroupsHaveTheirOwnSettings() {
+        LocatedRoutes<?> table = TestLocatedRoutes.of(String.class, located -> {
+            located.GET("/plain", RouteGroupSettingsTest::ok);
+            located.group(group -> {
+                group.produces(MediaType.TEXT_PLAIN_TYPE);
+                group.GET("/grouped", (request, pathVariables) -> HttpResponse.ok(LocatedRoutes.locatedTarget(pathVariables, String.class)));
+            });
+        });
+        // the media types of the group of the locator route are not the ones of the located table
+        Router router = router(routes -> routes.path("/located", group -> {
+            group.produces(MediaType.APPLICATION_XML_TYPE).consumes(MediaType.APPLICATION_XML_TYPE);
+            group.locate("/{id}", (request, pathVariables) -> pathVariables.getString("id"), target -> table);
+        }));
+
+        assertEquals(TEXT, route(router, HttpRequest.GET("/located/1/grouped")).getProduces());
+        UriRouteInfo<?, ?> plain = route(router, HttpRequest.GET("/located/1/plain"));
+        assertEquals(JSON, plain.getConsumes());
+        assertEquals(route(router(routes -> routes.GET("/plain", RouteGroupSettingsTest::ok)), HttpRequest.GET("/plain")).getProduces(),
+            plain.getProduces());
     }
 
     @Test

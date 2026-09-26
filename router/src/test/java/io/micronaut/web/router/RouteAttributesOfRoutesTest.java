@@ -16,11 +16,14 @@
 package io.micronaut.web.router;
 
 import io.micronaut.core.convert.ConversionService;
+import io.micronaut.http.HttpMethod;
 import io.micronaut.http.HttpRequest;
 import io.micronaut.http.HttpResponse;
 import io.micronaut.web.router.builder.DefaultHttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import io.micronaut.http.PathVariables;
+import io.micronaut.web.router.builder.RouteDeclaration;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -77,6 +80,21 @@ class RouteAttributesOfRoutesTest {
         Map<String, Object> attributes = attributes(router, "/x");
         assertThrows(UnsupportedOperationException.class, () -> attributes.put("b", 2));
         assertThrows(NullPointerException.class, () -> router(routes -> routes.GET("/y", RouteAttributesOfRoutesTest::ok).attribute("a", null)));
+    }
+
+    @Test
+    void declaredAndLocatedRoutesHaveTheirAttributes() {
+        RouteDeclaration declaration = RouteDeclaration.of(HttpMethod.GET, "/declared/{id}");
+        LocatedRoutes<?> items = TestLocatedRoutes.of(located -> located.GET("/items", RouteAttributesOfRoutesTest::ok).attribute("kind", "item"));
+        Router router = router(routes -> routes.group(group -> {
+            group.attribute("bean", "shop");
+            group.handle(declaration, RouteAttributesOfRoutesTest::ok).attribute("kind", "declared");
+            group.locate("/orders/{id}", (request, pathVariables) -> pathVariables.getLong("id"), target -> items);
+        }));
+
+        assertEquals(Map.of("bean", "shop", "kind", "declared"), attributes(router, "/declared/1"));
+        // the attributes of the located route, from its own table
+        assertEquals(Map.of("kind", "item"), attributes(router, "/orders/1/items"));
     }
 
     private static Map<String, Object> attributes(Router router, String path) {

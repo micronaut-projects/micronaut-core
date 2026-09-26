@@ -26,11 +26,13 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * The constraints on the path variables of handler routes, {@code constrain} on a route or a
@@ -45,6 +47,7 @@ import java.util.Set;
 public class HandlerRouteConstraintsTest {
     public static final String SPEC_NAME = "HandlerRouteConstraintsTest";
     private static final Set<String> SHOPS = Set.of("north", "south");
+    private static final AtomicInteger LOCATED = new AtomicInteger();
 
     @Test
     void aRejectedRequestFallsThroughToAnotherRoute() throws IOException {
@@ -80,6 +83,21 @@ public class HandlerRouteConstraintsTest {
         }
     }
 
+    @Test
+    void anUnknownShopIsNotFoundWithoutCallingTheLocator() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/constraints/located/north/stock"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("located stock of north")
+                .build());
+            int located = LOCATED.get();
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/constraints/located/west/stock"), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .build());
+            org.junit.jupiter.api.Assertions.assertEquals(located, LOCATED.get(), "the locator is not called for an unknown shop");
+        }
+    }
+
     private static ServerUnderTest server() {
         return ServerUnderTestProviderUtils.getServerUnderTestProvider().getServer(SPEC_NAME);
     }
@@ -101,6 +119,14 @@ public class HandlerRouteConstraintsTest {
                 shop.constrain("shop", SHOPS);
                 shop.GET("/stock", (request, pathVariables) -> text("stock of " + pathVariables.getString("shop")));
                 shop.POST("/stock", (request, pathVariables) -> text("restocked " + pathVariables.getString("shop")));
+            });
+            routes.path("/constraints/located/{shop}", shop -> {
+                shop.constrain("shop", SHOPS);
+                shop.locate("", (request, pathVariables) -> {
+                    LOCATED.incrementAndGet();
+                    return pathVariables.getString("shop");
+                }, TckLocatedRoutes.of(String.class, located ->
+                    located.GET("/stock", (request, pathVariables) -> text("located stock of " + LocatedRoutes.locatedTarget(pathVariables, String.class)))));
             });
         }
     }

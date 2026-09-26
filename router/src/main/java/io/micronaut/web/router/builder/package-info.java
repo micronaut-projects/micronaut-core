@@ -51,7 +51,7 @@
  * <ul>
  *     <li>{@link io.micronaut.web.router.builder.HttpRouteBuilder}: routes per HTTP method, by
  *     method name, with a decoded body, a form or an asynchronous handler; error and status
- *     routes; server filters; groups;</li>
+ *     routes; locator routes, see {@link io.micronaut.web.router.builder.LocatedRoutes}; server filters; groups;</li>
  *     <li>{@link io.micronaut.web.router.builder.HttpRouteSpec}: the configuration of a route
  *     (media types, executor, annotations, conditions, port, order, attributes) and its filters,
  *     from {@link io.micronaut.web.router.builder.RouteFilterSpec};</li>
@@ -64,7 +64,7 @@
  *     {@link io.micronaut.web.router.builder.FormRequestHandler},
  *     {@link io.micronaut.web.router.builder.AsyncRequestHandler},
  *     {@link io.micronaut.web.router.builder.AsyncBodyRequestHandler}, which reads the
- *     {@link io.micronaut.http.body.AsyncRequestBody}, the error and status handlers)
+ *     {@link io.micronaut.http.body.AsyncRequestBody}, the error, status and locator handlers)
  *     and the route filter functions;</li>
  *     <li>{@link io.micronaut.http.PathVariables}, the typed path variables of the
  *     matched route, and {@link io.micronaut.web.router.builder.RequestPredicates}, conditions

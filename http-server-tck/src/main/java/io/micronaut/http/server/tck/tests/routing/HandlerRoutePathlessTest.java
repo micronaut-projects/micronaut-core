@@ -30,6 +30,7 @@ import io.micronaut.http.tck.ServerUnderTest;
 import io.micronaut.http.tck.ServerUnderTestProviderUtils;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRoutes;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Singleton;
 import org.junit.jupiter.api.Test;
 
@@ -38,8 +39,8 @@ import java.util.Map;
 
 /**
  * Handler routes declared without a path, like a controller method mapped without a URI: at the
- * prefix of their group, at the root, under the context path, with their implicit {@code HEAD}
- * route and a {@code 405} for another method.
+ * prefix of their group, at the root, at the prefix of the locator in located routes, under the
+ * context path, with their implicit {@code HEAD} route and a {@code 405} for another method.
  */
 @SuppressWarnings({
     "java:S5960", // We're allowed assertions, as these are used in tests only
@@ -61,6 +62,15 @@ public class HandlerRoutePathlessTest {
             AssertionUtils.assertThrows(server, HttpRequest.PUT("/pathless/users", "{}"), HttpResponseAssertion.builder()
                 .status(HttpStatus.METHOD_NOT_ALLOWED)
                 .build());
+        }
+    }
+
+    @Test
+    void aRouteWithoutAPathIsAtTheRootAndAtThePrefixOfALocator() throws IOException {
+        try (ServerUnderTest server = server(Map.of())) {
+            assertBody(server, HttpRequest.GET("/"), "root");
+            assertBody(server, HttpRequest.GET("/pathless/items/a"), "item a");
+            assertBody(server, HttpRequest.GET("/pathless/items/a/details"), "details of a");
         }
     }
 
@@ -92,6 +102,9 @@ public class HandlerRoutePathlessTest {
     record User(String name) {
     }
 
+    record Item(String name) {
+    }
+
     @Controller("/pathless/ctl")
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class PathlessController {
@@ -105,6 +118,11 @@ public class HandlerRoutePathlessTest {
     @Singleton
     @Requires(property = "spec.name", value = SPEC_NAME)
     static class PathlessRoutes implements HttpRoutes {
+        private final LocatedRoutes<Item> items = TckLocatedRoutes.of(Item.class, item -> {
+            item.handle(io.micronaut.http.HttpMethod.GET, (request, pathVariables, target) -> text("item " + target.name()));
+            item.GET("/details", (request, pathVariables) -> text("details of " + LocatedRoutes.locatedTarget(pathVariables, Item.class).name()));
+        });
+
         @Override
         public void routes(HttpRouteBuilder routes) {
             routes.GET((request, pathVariables) -> text("root"));
@@ -112,6 +130,7 @@ public class HandlerRoutePathlessTest {
                 users.GET((request, pathVariables) -> text("users"));
                 users.POST(User.class, (request, pathVariables, user) -> text("created " + user.name()));
             });
+            routes.locate("/pathless/items/{name}", (request, pathVariables) -> new Item(pathVariables.getString("name")), items);
         }
     }
 }

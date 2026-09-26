@@ -54,6 +54,8 @@ import io.micronaut.web.router.builder.RouteDeclaration;
 import io.micronaut.web.router.Router;
 import io.micronaut.web.router.builder.HttpRouteBuilder;
 import io.micronaut.web.router.builder.HttpRouteSpec;
+import io.micronaut.web.router.builder.LocatedHttpRouteBuilder;
+import io.micronaut.web.router.builder.LocatedRoutes;
 import jakarta.inject.Named;
 import jakarta.inject.Singleton;
 import org.jspecify.annotations.Nullable;
@@ -213,6 +215,84 @@ public class HandlerRoutesTest {
                     .body(entry.getValue())
                     .build());
             }
+        }
+    }
+
+    @Test
+    void locatorRoutesTheRestOfThePathToTheRoutesOfTheTarget() throws IOException {
+        try (ServerUnderTest server = server()) {
+            Map<String, String> expected = new LinkedHashMap<>();
+            expected.put("/fn/loc/orders/5", "order 5");
+            expected.put("/fn/loc/orders/5/", "order 5");
+            expected.put("/fn/loc/orders/5/items/3", "order 5 item 3");
+            // a locator of the located routes locates again, with the variables of both prefixes
+            expected.put("/fn/loc/orders/5/customers/fred", "customer fred of order 5");
+            for (Map.Entry<String, String> entry : expected.entrySet()) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET(entry.getKey()), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body(entry.getValue())
+                    .headers(Map.of("X-Fn-Filter", "true"))
+                    .build());
+            }
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.POST("/fn/loc/orders/5/items", "{}"), HttpResponseAssertion.builder()
+                .status(HttpStatus.CREATED)
+                .body("added to order 5")
+                .build());
+        }
+    }
+
+    @Test
+    void locatorRoutesLocateRecursively() throws IOException {
+        try (ServerUnderTest server = server()) {
+            StringBuilder path = new StringBuilder("/fn/loc/levels");
+            for (int level = 1; level <= 10; level++) {
+                AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET(path + "/value"), HttpResponseAssertion.builder()
+                    .status(HttpStatus.OK)
+                    .body("level " + level)
+                    .build());
+                path.append("/next");
+            }
+        }
+    }
+
+    @Test
+    void theRestOfThePathIsAnsweredLikeTheRoutesOfTheTarget() throws IOException {
+        try (ServerUnderTest server = server()) {
+            // no located route
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/loc/orders/5/nothing"), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .build());
+            // no target
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/loc/orders/0/items/3"), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .build());
+            // the prefix is not followed by a segment boundary
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/loc/orders5"), HttpResponseAssertion.builder()
+                .status(HttpStatus.NOT_FOUND)
+                .build());
+            // a located route has another method
+            AssertionUtils.assertThrows(server, HttpRequest.DELETE("/fn/loc/orders/5/items/3"), HttpResponseAssertion.builder()
+                .status(HttpStatus.METHOD_NOT_ALLOWED)
+                .build());
+            // a located route consumes another media type
+            AssertionUtils.assertThrows(server, HttpRequest.POST("/fn/loc/orders/5/items", "text").contentType(MediaType.TEXT_PLAIN_TYPE), HttpResponseAssertion.builder()
+                .status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .build());
+            // a locator error is handled by the error routes
+            AssertionUtils.assertThrows(server, HttpRequest.GET("/fn/loc/orders/-1/items/3"), HttpResponseAssertion.builder()
+                .status(HttpStatus.CONFLICT)
+                .build());
+        }
+    }
+
+    @Test
+    void routeFiltersOfTheLocatedRouteApply() throws IOException {
+        try (ServerUnderTest server = server()) {
+            AssertionUtils.assertDoesNotThrow(server, HttpRequest.GET("/fn/loc/orders/5/filtered"), HttpResponseAssertion.builder()
+                .status(HttpStatus.OK)
+                .body("filtered order 5 before")
+                .headers(Map.of("X-Located", "after"))
+                .build());
         }
     }
 
@@ -1270,6 +1350,87 @@ public class HandlerRoutesTest {
                 .and()
                 .after((request, response) -> response.header("X-Declared", "true"))
                 .and();
+        }
+    }
+
+    record Order(long id) {
+    }
+
+    record Customer(Order order, String name) {
+    }
+
+    record Level(int level) {
+    }
+
+    static final class LocatorConflict extends RuntimeException {
+        LocatorConflict() {
+            super("negative order id");
+        }
+    }
+
+    /**
+     * Locator routes: the rest of the path is routed to the routes of a located target.
+     */
+    @Singleton
+    @Requires(property = "spec.name", value = SPEC_NAME)
+    static class LocatorRoutes implements HttpRoutes {
+        private final LocatedRoutes<Customer> customerRoutes = TckLocatedRoutes.of(Customer.class, customer ->
+            customer.GET("/", (request, pathVariables) -> {
+                Customer target = LocatedRoutes.locatedTarget(pathVariables, Customer.class);
+                return text("customer " + target.name() + " of order " + target.order().id());
+            }));
+        private final LocatedRoutes<Order> orderRoutes = TckLocatedRoutes.of(Order.class, order -> {
+            order.GET("/", (request, pathVariables) -> text("order " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id()));
+            order.GET("/items/{item}", (request, pathVariables) ->
+                text("order " + pathVariables.getLong("id") + " item " + pathVariables.getInt("item")));
+            order.POST("/items", Argument.of(String.class), (request, pathVariables, body) ->
+                HttpResponse.created("added to order " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            order.GET("/filtered", (request, pathVariables) ->
+                    text("filtered order " + LocatedRoutes.locatedTarget(pathVariables, Order.class).id() + " " + request.getAttribute("located-filter", String.class).orElse("")))
+                .before(request -> {
+                    request.setAttribute("located-filter", "before");
+                })
+                .and()
+                .after((request, response) -> response.header("X-Located", "after"));
+            order.locate("/customers/{name}",
+                (request, pathVariables, target) -> new Customer(target, pathVariables.getString("name")),
+                customerRoutes);
+        });
+
+        @Override
+        public void routes(HttpRouteBuilder routes) {
+            routes.locate("/fn/loc/orders/{id}", (request, pathVariables) -> {
+                long id = pathVariables.getLong("id");
+                if (id < 0) {
+                    throw new LocatorConflict();
+                }
+                return id == 0 ? null : new Order(id);
+            }, order -> orderRoutes);
+            routes.locate("/fn/loc/levels", (request, pathVariables) -> new Level(1), LevelRoutes.INSTANCE);
+            routes.error(LocatorConflict.class, (request, error) -> HttpResponse.status(HttpStatus.CONFLICT));
+        }
+
+        private static HttpResponse<?> text(String text) {
+            return HttpResponse.ok(text).contentType(MediaType.TEXT_PLAIN_TYPE);
+        }
+    }
+
+    /**
+     * The routes of a level, which locate the next level with themselves.
+     */
+    enum LevelRoutes implements LocatedRoutes<Level> {
+        INSTANCE;
+
+        @Override
+        public Argument<Level> targetType() {
+            return Argument.of(Level.class);
+        }
+
+        @Override
+        public void routes(LocatedHttpRouteBuilder<Level> level) {
+            level.handle(HttpMethod.GET, "/value", (request, pathVariables, target) ->
+                HttpResponse.ok("level " + target.level()).contentType(MediaType.TEXT_PLAIN_TYPE));
+            level.locate("/next", (request, pathVariables, target) -> new Level(target.level() + 1), this);
         }
     }
 

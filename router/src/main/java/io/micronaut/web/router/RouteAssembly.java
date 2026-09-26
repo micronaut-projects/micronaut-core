@@ -94,6 +94,10 @@ public final class RouteAssembly {
     final List<ErrorRoute> errorRoutes = new ArrayList<>();
     final Set<Integer> exposedPorts = new HashSet<>(5);
     @Nullable DefaultUriRoute currentParentRoute;
+    /**
+     * The tables of the located targets of the routes, shared with the located tables.
+     */
+    @Nullable RouteTableFactory locatedTables;
     private final @Nullable ExecutorSelector executorSelector;
     private final ThreadSelection threadSelection;
     private final MessageBodyHandlerRegistry messageBodyHandlerRegistry;
@@ -101,6 +105,7 @@ public final class RouteAssembly {
     private final Consumer<DefaultUriRoute> routeCreated;
     private final List<ServerFilters> serverFilters = new ArrayList<>(0);
     private final @Nullable String contextPath;
+    private final @Nullable Object beanLocator;
 
     /**
      * @param beanLocator       The locator of the application beans: the executor selector and the message body handlers
@@ -128,6 +133,7 @@ public final class RouteAssembly {
                          Consumer<DefaultUriRoute> routeCreated,
                          @Nullable String contextPath) {
         this.contextPath = contextPath;
+        this.beanLocator = beanLocator;
         this.conversionService = conversionService;
         this.routeUri = routeUri;
         this.routeCreated = routeCreated;
@@ -144,6 +150,19 @@ public final class RouteAssembly {
             this.threadSelection = ThreadSelection.MANUAL;
             this.messageBodyHandlerRegistry = MessageBodyHandlerRegistry.EMPTY;
         }
+    }
+
+    /**
+     * @return The factory of the tables of the targets that the locator routes of the assembly
+     * locate, shared by the assembly and those tables
+     */
+    public RouteTableFactory locatedTables() {
+        RouteTableFactory tables = locatedTables;
+        if (tables == null) {
+            tables = new RouteTableFactory(beanLocator, conversionService);
+            locatedTables = tables;
+        }
+        return tables;
     }
 
     /**

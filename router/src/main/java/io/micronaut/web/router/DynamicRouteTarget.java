@@ -23,6 +23,7 @@ import io.micronaut.web.router.builder.HandlerMethod;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.function.Predicate;
 
 /**
  * The target of a handler route that is resolved when a request matches the route, instead of
@@ -75,11 +76,14 @@ interface DynamicRouteTarget {
      *
      * @param request The request
      * @param match   The match of the route
+     * @param filter  The filter of the candidates, applied to the resolved matches before their
+     *                ambiguity is resolved, or {@code null}
      * @param <T>     The target type
      * @param <R>     The result type
      * @return The matches
      */
-    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, UriRouteMatch<T, R> match);
+    <T, R> List<UriRouteMatch<T, R>> findAllClosest(HttpRequest<?> request, UriRouteMatch<T, R> match,
+                                                    @Nullable Predicate<UriRouteMatch<T, R>> filter);
 
     /**
      * The matches of any method to use instead of a match of the route, see
