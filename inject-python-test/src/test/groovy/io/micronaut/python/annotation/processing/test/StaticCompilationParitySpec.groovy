@@ -22,7 +22,8 @@ class StaticCompilationParitySpec extends AbstractPythonTypeElementSpec {
     static final String SOURCE = '''
 from jakarta.inject import Singleton
 from java.lang import Math, StringBuilder
-from java.net import URL
+from java.lang import IllegalArgumentException
+from java.net import URL, MalformedURLException
 from java.util import AbstractMap, Objects
 
 @Singleton
@@ -97,6 +98,99 @@ class Calc:
     def entry(self, key: str, value: int) -> str:
         return f"{AbstractMap.SimpleEntry(key, value).getKey()}={AbstractMap.SimpleEntry(key, value).getValue()}"
 
+    def summed(self, n: int, skip: int, stop: int) -> int:
+        total = 0
+        for i in range(1, n + 1):
+            if i == stop:
+                break
+            if i == skip:
+                continue
+            total += i
+        return total
+
+    def countdown(self, n: int, step: int) -> str:
+        parts = ""
+        for i in range(n, 0, step):
+            parts = parts + str(i) + ","
+        return parts
+
+    def relooped(self, n: int) -> int:
+        total = 0
+        for i in range(n):
+            total += i
+        for i in range(n, 2 * n):
+            total += i
+        i = 100
+        return total
+
+    def collatz(self, n: int) -> int:
+        steps = 0
+        while n != 1:
+            if n % 2 == 0:
+                n = n // 2
+            else:
+                n = 3 * n + 1
+            steps += 1
+            if steps > 500:
+                break
+        return steps
+
+    def words(self, names: list[str]) -> str:
+        joined = ""
+        for name in names:
+            if name == "skip":
+                continue
+            joined = joined + name + ";"
+        return joined
+
+    def safe_host(self, spec: str) -> str:
+        try:
+            return URL(spec).getHost()
+        except MalformedURLException as error:
+            return "bad: " + error.getMessage()
+        finally:
+            pass
+
+    def strict_host(self, spec: str) -> str:
+        if not spec:
+            raise IllegalArgumentException("empty spec")
+        return URL(spec).getHost()
+
+    def keyed(self, prices: dict[str, int]) -> int:
+        total = 0
+        for name in prices:
+            if name == "a":
+                total += 1
+            else:
+                total += 10
+        return total
+
+    def branch_local(self, flag: bool) -> str:
+        if flag:
+            token = "t" + str(flag)
+            return token
+        return "n"
+
+    def guarded(self, n: int) -> int:
+        try:
+            value = self.risky(n)
+        except IllegalArgumentException:
+            return -1
+        return value + 1
+
+    def risky(self, n: int) -> int:
+        if n == 0:
+            raise IllegalArgumentException("zero")
+        return n * 2
+
+    def edge(self, broken0: int) -> int:
+        count = 0
+        for stop0 in range(9223372036854775805, 9223372036854775807, 2):
+            count += 1
+            if count > 5:
+                break
+        return count
+
 @Singleton
 class Pair:
     def __init__(self, calc: Calc):
@@ -127,6 +221,14 @@ class Pair:
         ["signed", 1.0d, 0.1d], ["signed", -4.0d, 2.0d], ["signed", 4.0d, -2.0d],
         ["host", "http://example.com/x"], ["host", "not a url"],
         ["entry", "k", 3],
+        ["summed", 10, 3, 7], ["summed", 10, 0, 0], ["summed", 0, 0, 0],
+        ["countdown", 9, -3], ["countdown", 3, 0], ["countdown", 1, -1],
+        ["collatz", 27], ["collatz", 1],
+        ["relooped", 3], ["relooped", 0],
+        ["safe_host", "http://example.com/x"], ["safe_host", "not a url"],
+        ["strict_host", ""], ["strict_host", "http://example.com/x"],
+        ["branch_local", true], ["branch_local", false],
+        ["guarded", 3], ["guarded", 0],
     ]
 
     void "compiled bodies agree with the Python bodies on every input"() {
@@ -141,9 +243,12 @@ class Pair:
                 def pair = getBean(context, 'python.Pair')
                 results[m] = CASES.collectEntries { List row -> [(row.toString()): invoke(calc, row)] }
                 results[m]['pair'] = pair.has_partner()
+                results[m]['words'] = calc.words(new ArrayList<>(['a', 'skip', 'b']))
+                results[m]['keyed'] = calc.keyed(new LinkedHashMap<>([bb: 2, a: 1]))
+                results[m]['edge'] = calc.edge(0)
                 if (m == StaticCompilationMode.ALL) {
                     def compiled = decisions.findAll { it.outcome() == StaticCompilationDecision.Outcome.COMPILED }*.qualifiedName()
-                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner']), decisions.toString()
+                    assert compiled.containsAll(CASES*.get(0).unique().collect { "Calc.$it".toString() } + ['Pair.has_partner', 'Calc.words', 'Calc.keyed', 'Calc.edge']), decisions.toString()
                 }
             } finally {
                 context.close()
@@ -158,6 +263,17 @@ class Pair:
         results[StaticCompilationMode.OFF][["host", "not a url"].toString()] == "raised"
         results[StaticCompilationMode.OFF][["entry", "k", 3].toString()] == "k=3"
         results[StaticCompilationMode.OFF]['pair'] == true
+        results[StaticCompilationMode.OFF]['words'] == 'a;b;'
+        results[StaticCompilationMode.OFF]['keyed'] == 11
+        results[StaticCompilationMode.OFF]['edge'] == 1
+        results[StaticCompilationMode.OFF][["guarded", 0].toString()] == -1
+        results[StaticCompilationMode.OFF][["branch_local", true].toString()] == 'tTrue'
+        results[StaticCompilationMode.OFF][["summed", 10, 3, 7].toString()] == 18
+        results[StaticCompilationMode.OFF][["countdown", 9, -3].toString()] == '9,6,3,'
+        results[StaticCompilationMode.OFF][["countdown", 3, 0].toString()] == 'raised'
+        results[StaticCompilationMode.OFF][["collatz", 27].toString()] == 111
+        results[StaticCompilationMode.OFF][["safe_host", "not a url"].toString()].startsWith('bad: ')
+        results[StaticCompilationMode.OFF][["strict_host", ""].toString()] == 'raised'
         results[StaticCompilationMode.OFF][["checked", 0].toString()] == "raised"
         results[StaticCompilationMode.OFF][["signed", 1.0d, 0.1d].toString()] == "10.0 0.09999999999999995"  // GraalPy floors the quotient; CPython would say 9.0
         results[StaticCompilationMode.OFF][["signed", -4.0d, 2.0d].toString()] == "-2.0 0.0"

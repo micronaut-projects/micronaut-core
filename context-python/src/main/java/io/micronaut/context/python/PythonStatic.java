@@ -376,6 +376,68 @@ public final class PythonStatic {
     }
 
     /**
+     * @param value An element of a collection, boxed by the host boundary
+     * @return The value as a Python int
+     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     */
+    public static long toLong(@Nullable Object value) {
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        if (value instanceof Boolean bool) {
+            return bool ? 1 : 0;
+        }
+        throw new ClassCastException("not an int: " + str(value));
+    }
+
+    /**
+     * @param value An element of a collection, boxed by the host boundary
+     * @return The value as a Python float
+     * @throws ClassCastException When the element is not a number, as Python raises TypeError
+     */
+    public static double toDouble(@Nullable Object value) {
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        throw new ClassCastException("not a float: " + str(value));
+    }
+
+    /**
+     * @param step The step of a range
+     * @return The step
+     * @throws IllegalArgumentException When the step is zero, as Python raises ValueError
+     */
+    public static long step(long step) {
+        if (step == 0) {
+            throw new IllegalArgumentException("range() arg 3 must not be zero");
+        }
+        return step;
+    }
+
+    /**
+     * @param value The current value of a range loop
+     * @param stop  The bound
+     * @param step  The step
+     * @return The next value of the range; the bound when the next value would not fit a long,
+     * since the loop ends there as Python's would
+     */
+    public static long advance(long value, long stop, long step) {
+        long next = value + step;
+        boolean overflowed = step > 0 ? next < value : next > value;
+        return overflowed ? stop : next;
+    }
+
+    /**
+     * @param value The current value of a range loop
+     * @param stop  The bound
+     * @param step  The step
+     * @return Whether the value is within the range
+     */
+    public static boolean inRange(long value, long stop, long step) {
+        return step > 0 ? value < stop : value > stop;
+    }
+
+    /**
      * @param value A string, or None
      * @return Its truthiness: non-null and non-empty
      */
