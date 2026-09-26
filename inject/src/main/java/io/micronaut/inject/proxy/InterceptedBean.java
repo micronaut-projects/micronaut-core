@@ -18,6 +18,7 @@ package io.micronaut.inject.proxy;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.ExecutableMethod;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -51,10 +52,46 @@ public interface InterceptedBean {
      *
      * @return The retained interceptor registrations, never {@code null}
      * @since 5.2.0
+     * @deprecated Since 5.3.0 a proxy retains nothing, and this returns an empty list for a proxy generated since
+     * 5.3: the beans created for a bean, its non-singleton interceptors among them, are the dependents of its
+     * registration. A listener reads them from {@link io.micronaut.context.event.BeanEvent#getDependentBeans()},
+     * anything else from {@link BeanRegistration#getDependentBeans()}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     // The $ prefix marks this as generated-code infrastructure and keeps it clear of any method on the proxied type.
     @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
     default List<? extends BeanRegistration<?>> $interceptorRegistrations() {
         return List.of();
+    }
+
+    /**
+     * The registration the context created for this proxy, which carries what the bean owns, its non-singleton
+     * interceptors among them.
+     *
+     * <p>A proxy that is the bean, and is held by whoever asked for it, keeps its registration here so that the
+     * registration lives exactly as long as the bean: the context finds it again from the instance, to destroy the
+     * bean with its dependents, however long ago the bean was created. A reference from the bean to its registration
+     * does not keep either alive, as a reference held by the context would whenever a dependent refers back to the
+     * bean. A proxy compiled before 5.3 keeps none.</p>
+     *
+     * @return The registration, or {@code null}
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
+    default @Nullable BeanRegistration<?> $beanRegistration() {
+        return null;
+    }
+
+    /**
+     * Keeps the registration the context created for this proxy, see {@link #$beanRegistration()}.
+     *
+     * @param registration The registration, or {@code null} once the bean is destroyed
+     * @since 5.3.0
+     */
+    @Internal
+    @SuppressWarnings({"checkstyle:MethodName", "java:S100"})
+    default void $beanRegistration(@Nullable BeanRegistration<?> registration) {
+        // a proxy compiled before 5.3 keeps nothing
     }
 }

@@ -18,48 +18,36 @@ package io.micronaut.context;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
-import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
- * The disposing bean registration.
+ * A registration the context created, which destroys its bean through the context when it is closed.
  *
  * @param <BT> The bean type
  * @author Denis Stepanov
- * @since 3.5.0
+ * @since 4.0.0
  */
 @Internal
+@SuppressWarnings("removal")
 final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implements DependentBeanProvider {
-    private final BeanContext beanContext;
     private final java.util.concurrent.atomic.AtomicBoolean closed =
         new java.util.concurrent.atomic.AtomicBoolean();
-    @Nullable
-    private final List<BeanRegistration<?>> dependents;
-    @Nullable
-    private final List<?> interceptorRegistrations;
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
                               BT createdBean,
-                              List<BeanRegistration<?>> dependents,
-                              @Nullable List<?> interceptorRegistrations) {
-        super(identifier, beanDefinition, createdBean);
-        this.beanContext = beanContext;
-        this.dependents = dependents;
-        this.interceptorRegistrations = interceptorRegistrations;
+                              List<BeanRegistration<?>> dependents) {
+        super(beanContext, identifier, beanDefinition, createdBean, dependents);
     }
 
     BeanDisposingRegistration(BeanContext beanContext,
                               BeanIdentifier identifier,
                               BeanDefinition<BT> beanDefinition,
-                              BT createdBean,
-                              @Nullable List<?> interceptorRegistrations) {
-        super(identifier, beanDefinition, createdBean);
-        this.beanContext = beanContext;
-        this.dependents = null;
-        this.interceptorRegistrations = interceptorRegistrations;
+                              BT createdBean) {
+        super(beanContext, identifier, beanDefinition, createdBean, null);
     }
 
     @Override
@@ -69,25 +57,12 @@ final class BeanDisposingRegistration<BT> extends BeanRegistration<BT> implement
         // try-with-resources and an explicit close, or by two owners that each believe they hold it — must
         // not run them twice
         if (closed.compareAndSet(false, true)) {
-            beanContext.destroyBean(this);
+            Objects.requireNonNull(beanContext).destroyBean(this);
         }
-    }
-
-    @Nullable
-    public List<BeanRegistration<?>> getDependents() {
-        return dependents;
     }
 
     @Override
     public List<BeanRegistration<?>> dependentBeans() {
-        return dependents == null ? List.of() : List.copyOf(dependents);
-    }
-
-    /**
-     * @return The interceptor registrations selected while this bean was created, or {@code null}
-     */
-    @Nullable
-    List<?> getInterceptorRegistrations() {
-        return interceptorRegistrations;
+        return getDependentBeans();
     }
 }

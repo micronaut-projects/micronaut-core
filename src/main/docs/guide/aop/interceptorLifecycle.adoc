@@ -41,9 +41,10 @@ singleton:
 * *Singleton* – one instance for the whole application context, shared by every intercepted bean and every kind it is
 bound to. It must not hold state that belongs to one intercepted bean, because it will see many. State that belongs to
 one _type_ can be cached against the `ExecutableMethod` or declaring type from the api:aop.InvocationContext[].
-* *Non-singleton* – declare ann:context.annotation.Prototype[], or another non-singleton scope, and the framework
-creates *one instance per intercepted bean*. That instance is then reused for every kind bound to that bean, so state
-set up while the bean is constructed is still there when the bean is destroyed.
+* *Non-singleton* – declare ann:context.annotation.Prototype[], or leave the scope out, and the interceptor is the
+intercepted bean's own: *one instance per intercepted bean*, created with the bean as one of its dependents, found
+there by every interception point of the bean, and destroyed with it. State set up while the bean is constructed is still there when the bean is destroyed. An
+interceptor of a custom scope belongs to that scope instead.
 
 .A per-target interceptor
 [source,java]
@@ -80,8 +81,10 @@ hierarchy is intercepted once, and `proceed()` invokes all of them. See <<lifecy
 
 For one intercepted bean, in order:
 
-. The interceptors bound to that bean are resolved once, while the bean is being created.
+. The interceptors bound to that bean are resolved while the bean is being created; the non-singleton ones are
+created as dependents of its registration, and every later interception point finds them there.
 . `AROUND_CONSTRUCT` interception runs, then the bean's constructor.
+. Once every `AROUND_CONSTRUCT` interceptor has returned, the bean's fields and methods are injected.
 . `POST_CONSTRUCT` interception runs once, then the bean's `@PostConstruct` methods, superclass methods first.
 . `AROUND` or `INTRODUCTION` interception runs on each method call, for as long as the bean lives.
 . `PRE_DESTROY` interception runs once, then the bean's `@PreDestroy` methods, superclass methods first.
@@ -91,41 +94,97 @@ target's.
 The same instance serves every step. A singleton interceptor follows the same sequence but the instance is shared with
 every other intercepted bean, and it is destroyed with the context rather than with any one target.
 
-Where the interceptors are held depends on the shape of the intercepted bean, which is an implementation detail but
-explains the one case that behaves differently:
+Whatever the shape of the intercepted bean, its non-singleton interceptors are held in one place: the registration the
+context keeps for the bean, as its dependents.
 
 |===
 |Target |Held by |Phases sharing one instance
 
 |ann:aop.Around[] advice
-|The generated proxy
+|The bean's registration in the context
 |construct, methods, post-construct, pre-destroy
 
-|`@Around(proxyTarget = true)`
-|The generated proxy
+|`@Around(proxyTarget = true)`, which includes every scoped proxy
+|The target's registration in the context; the proxy selects from it for the target of each call
 |construct, methods, post-construct, pre-destroy
 
 |ann:aop.Introduction[] advice
-|The generated proxy
+|The bean's registration in the context
 |methods, post-construct, pre-destroy
 
 |Bean produced by a ann:context.annotation.Factory[] method
-|The generated proxy
+|The target's registration in the context; the proxy selects from it for the target of each call
 |methods, post-construct, pre-destroy
 
 |ann:aop.AroundConstruct[] advice with no ann:aop.Around[]
 |The bean's registration in the context
 |construct, post-construct, pre-destroy
 
-|A ann:context.annotation.Prototype[] with ann:aop.AroundConstruct[] advice and no proxy, created with `createBean` and destroyed with `destroyBean(Object)`
-|Nothing; the context tracks no registration for it
-|construct and post-construct only
+|A ann:context.annotation.Prototype[] created with `createBean` or `getBean` and destroyed with `destroyBean(Object)`
+|The bean's registration, which the context finds again from the instance
+|construct, methods, post-construct, pre-destroy
 |===
 
-NOTE: In the last row the context has no registration for the instance, so nothing links its destruction back to what
-it was created with, and `PRE_DESTROY` resolves a new interceptor. A proxied bean created and destroyed the same way
-is unaffected: the proxy retained its registrations and `destroyBean(Object)` destroys the non-singleton ones with the
-target. Prototypes injected into other beans, and prototypes destroyed through their `BeanRegistration`, are unaffected.
+NOTE: A prototype the context created together with other beans is remembered weakly, so `destroyBean(Object)` finds
+the registration that carries them and destroys them with the bean; the context holds neither the bean nor the
+registration, and forgets both once the bean is unreachable.
+
+=== Proxied Targets
+
+A bean whose proxy fronts a separate target, which is what `@Around(proxyTarget = true)` generates and what every
+scoped proxy (ann:runtime.http.scope.RequestScope[], ann:runtime.context.scope.ThreadLocal[],
+ann:runtime.context.scope.Refreshable[]) and every advised bean a ann:context.annotation.Factory[] method produces
+use, is two beans to the container: the proxy and the target. The interceptors belong to the target. A non-singleton
+interceptor bound to the target is created with the target, as a dependent of the target's registration, and the
+proxy takes the interceptors of every call from that registration: once, for a proxy that holds one target for its
+life, or on each call for a proxy whose target changes, such as a scoped proxy that fronts one target per request or
+per thread. Two targets never share an instance, and each instance is destroyed with its target. The proxy itself
+holds the singleton interceptors only. An interceptor of a custom scope is obtained from its scope on every call, so a
+call never reaches an instance whose scope has ended.
+
+An interceptor bound for `AROUND` alone is not resolved while the target is created; the proxy resolves it as the
+target's own the first time it selects for that target, which creates it as a dependent of the target, so it is
+destroyed with the target as well.
+
+NOTE: A target handed to a hot-swappable proxy through `swap` is intercepted with its own instances when the context
+created it, whether as a singleton, in a scope, or as the target of another proxy. An object the context did not
+create is intercepted with instances the proxy creates once and keeps.
+
+NOTE: A api:aop.runtime.RuntimeProxyCreator[] that takes the interceptors of each call from
+`RuntimeProxyDefinition.interceptors(method, target)` declares so by returning `true` from
+`selectsInterceptorsPerTarget()`. A creator that does not, such as one written for an earlier version, reads the
+interceptors of each intercepted method alone, and gets all of them, the non-singleton ones created once for the proxy
+as before.
+
+=== Finding a Bean's Interceptors from Bean Events
+
+A listener finds the non-singleton interceptors of a bean among the dependents every bean event reports,
+`BeanEvent.getDependentBeans()`. The context builds the registration of a bean once the bean is created, so the two
+creation events have none:
+
+[cols="1,1,2"]
+|===
+|Event |`getBeanRegistration()` |`getDependentBeans()`
+
+|api:context.event.BeanInitializingEvent[]
+|`null`
+|the dependents created so far
+
+|api:context.event.BeanCreatedEvent[]
+|`null`
+|the dependents the bean was created with
+
+|api:context.event.BeanPreDestroyEvent[]
+|the registration
+|its dependents, alive
+
+|api:context.event.BeanDestroyedEvent[]
+|the registration the bean was destroyed through
+|the dependents destroyed with it
+|===
+
+For a proxy that fronts a separate target, the events of the target report its interceptors; the proxy holds only the
+singletons.
 
 == Ordering
 
@@ -157,6 +216,7 @@ bound to that kind. Binding to one kind does not imply the others, so an interce
 never runs for `AROUND`, and an interceptor bound only to `AROUND` never runs for a lifecycle phase. Interceptors bound
 by a different annotation are never applied to the bean.
 
-TIP: Reuse of one interceptor instance across the phases of a proxied bean is part of the generated proxy. After
-upgrading, recompile intercepted classes so that beans compiled by an earlier version pick it up; until then they
-behave as they did before, resolving an interceptor per interception point.
+TIP: A generated proxy resolves its interceptors as the bean's own, and a proxy that fronts a separate target selects
+that target's interceptors from its registration. After upgrading, recompile intercepted classes so
+that beans compiled by an earlier version pick it up; until then a proxy compiled by 5.2 keeps the registrations it
+was built with, which the runtime still honours, and intercepts every target with that one set.

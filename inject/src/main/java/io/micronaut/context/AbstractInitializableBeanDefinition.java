@@ -883,7 +883,7 @@ public abstract class AbstractInitializableBeanDefinition<T> extends AbstractBea
         final List<Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>>> beanInitializedEventListeners
                 = ((DefaultBeanContext) context).beanInitializedEventListeners;
         if (CollectionUtils.isNotEmpty(beanInitializedEventListeners)) {
-            BeanInitializingEvent event = new BeanInitializingEvent(context, this, bean);
+            BeanInitializingEvent event = new BeanInitializingEvent(context, this, bean, resolutionContext.getDependentBeans());
             List<ListenersSupplier.ListenerAndOrder<BeanInitializedEventListener>> listeners = new ArrayList<>();
             for (Map.Entry<Class<?>, ListenersSupplier<BeanInitializedEventListener>> entry : beanInitializedEventListeners) {
                 if (entry.getKey().isAssignableFrom(getBeanType())) {

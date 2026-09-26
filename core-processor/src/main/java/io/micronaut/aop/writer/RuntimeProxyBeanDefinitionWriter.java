@@ -31,6 +31,7 @@ import io.micronaut.inject.visitor.VisitorContext;
 import io.micronaut.inject.writer.BeanDefinitionWriter;
 import io.micronaut.sourcegen.model.ClassTypeDef;
 import io.micronaut.sourcegen.model.ExpressionDef;
+import io.micronaut.sourcegen.model.StatementDef;
 import io.micronaut.sourcegen.model.TypeDef;
 import org.jspecify.annotations.NullUnmarked;
 
@@ -62,7 +63,7 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
     private static final Method AROUND = ReflectionUtils.getRequiredInternalMethod(
         DefaultRuntimeProxyDefinition.class,
         "around",
-        BeanResolutionContext.class, BeanDefinition.class, boolean.class, Object[].class);
+        BeanResolutionContext.class, BeanDefinition.class, boolean.class, Object[].class, RuntimeProxyCreator.class);
 
     private static final Method INTRODUCTION = ReflectionUtils.getRequiredInternalMethod(
         DefaultRuntimeProxyDefinition.class,
@@ -115,18 +116,21 @@ public class RuntimeProxyBeanDefinitionWriter extends ProxyingBeanDefinitionWrit
             .orElseThrow(() -> new ProcessingException(targetType, "Missing runtime proxy creator"));
         proxyBeanDefinitionWriter.visitBuildCustomMethodDefinition((statements, aThis, methodParameters, constructorValues) -> {
             TypeDef runtimeProxyCreatorClass = TypeDef.of(runtimeProxyClass);
+            StatementDef.DefineAndAssign creator = methodParameters.getFirst()
+                .invoke(GET_BEAN, ExpressionDef.constant(runtimeProxyCreatorClass))
+                .cast(runtimeProxyCreatorClass)
+                .newLocal("runtimeProxyCreator");
+            statements.add(creator);
             ExpressionDef runtimeProxyDefinition;
             if (isIntroduction) {
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
                     .invokeStatic(INTRODUCTION, methodParameters.getFirst(), aThis, TypeDef.OBJECT.array().instantiate(constructorValues));
             } else {
+                // the definition learns from the creator whether it asks for the interceptors of a target per call
                 runtimeProxyDefinition = ClassTypeDef.of(DefaultRuntimeProxyDefinition.class)
-                    .invokeStatic(AROUND, methodParameters.getFirst(), aThis, ExpressionDef.constant(isProxyTarget), TypeDef.OBJECT.array().instantiate(constructorValues));
+                    .invokeStatic(AROUND, methodParameters.getFirst(), aThis, ExpressionDef.constant(isProxyTarget), TypeDef.OBJECT.array().instantiate(constructorValues), creator.variable());
             }
-            return methodParameters.getFirst()
-                .invoke(GET_BEAN, ExpressionDef.constant(runtimeProxyCreatorClass))
-                .cast(runtimeProxyCreatorClass)
-                .invoke(CREATE_PROXY, runtimeProxyDefinition);
+            return creator.variable().invoke(CREATE_PROXY, runtimeProxyDefinition);
         });
     }
 

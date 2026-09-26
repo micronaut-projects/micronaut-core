@@ -15,16 +15,16 @@
  */
 package io.micronaut.aop.beandefinition;
 
-import io.micronaut.aop.Interceptor;
-import io.micronaut.aop.chain.ConstructorInterceptorChain;
-import io.micronaut.context.BeanContext;
-import io.micronaut.context.BeanRegistration;
+import java.util.Objects;
+import java.util.List;
 import io.micronaut.context.BeanResolutionContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.context.BeanContext;
+import io.micronaut.aop.chain.ConstructorInterceptorChain;
+import io.micronaut.aop.Interceptor;
+import io.micronaut.aop.chain.LifecycleInterception;
 import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.InstantiatableBeanDefinition;
-
-import java.util.List;
-import java.util.Objects;
 
 /**
  * Intercepted {@link InstantiatableBeanDefinition} that carries constructor interceptor metadata
@@ -34,21 +34,28 @@ import java.util.Objects;
  * @author Denis Stepanov
  * @since 5.1.0
  */
+@Deprecated(since = "5.3.0", forRemoval = true)
 @Internal
 public interface ProxyInterceptedBeanDefinition<T> extends InterceptedBeanDefinition<T> {
 
     /**
-     * Number of internal constructor parameters appended for runtime proxy construction:
-     * intercepted bean, resolution context, bean context, proxy target bean definition, and interceptor registrations.
+     * Number of internal constructor parameters appended to the constructor of a proxy compiled by 5.2: the
+     * resolution context, the bean context, the qualifier, the interceptor registrations and the registry.
+     *
+     * @deprecated Since 5.3.0 a generated proxy appends {@link LifecycleInterception#PROXY_CONSTRUCTOR_PARAMETERS}
+     * and implements the parent interface; this one serves proxies compiled by earlier versions.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     int ADDITIONAL_PROXY_CONSTRUCTOR_PARAMETERS_COUNT = 5;
 
+    /**
+     * Instantiates as a proxy compiled by 5.2 expects: the interceptors it was given are the second to last
+     * constructor value, and five internal values follow the bean's own.
+     */
+    @SuppressWarnings({"unchecked", "rawtypes", "removal"})
     @Override
     default T instantiate(BeanResolutionContext resolutionContext, BeanContext context) {
-        Object[] constructorValues = Objects.requireNonNull(
-            resolveInstantiationValues(resolutionContext, context),
-            "Resolved instantiation values cannot be null"
-        );
+        Object[] constructorValues = Objects.requireNonNull(resolveInstantiationValues(resolutionContext, context), "Resolved instantiation values cannot be null");
         List<BeanRegistration<Interceptor<T, T>>> interceptors = (List) constructorValues[constructorValues.length - 2];
         return ConstructorInterceptorChain.instantiate(
             resolutionContext,

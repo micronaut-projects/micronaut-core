@@ -50,12 +50,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Attribute that exposes the dependent bean registrations already created for the bean this context is operating
      * on.
      *
-     * <p>During bean creation those registrations are available from {@link #getDependentBeans()}, but a bean is
-     * destroyed with a fresh resolution context that has no dependents of its own. This attribute is retained for
-     * compatibility with generated factory definitions that still use that fallback.</p>
-     *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 the context a bean is destroyed with carries the dependents of that bean itself, so
+     * {@link #getDependentBeans()} answers during destruction as it does during creation. Still set for a reader
+     * compiled against an earlier version.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String EXISTING_DEPENDENT_BEANS = "io.micronaut.context.existingDependentBeans";
 
     /**
@@ -66,7 +66,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * creation and must be treated as an implementation detail.</p>
      *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing reads it: an interception point resolves its interceptors as the bean's own,
+     * see {@link #getInterceptorRegistrations(Argument, Qualifier)}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.interceptorRegistrations";
 
     /**
@@ -87,7 +90,10 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * is intended for lifecycle interception.</p>
      *
      * @since 5.2.0
+     * @deprecated Since 5.3.0 nothing sets or reads it: pre-destroy interception reuses the dependents handed over
+     * as {@link #EXISTING_DEPENDENT_BEANS}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     String EXISTING_INTERCEPTOR_REGISTRATIONS = "io.micronaut.aop.existingInterceptorRegistrations";
 
     @Override
@@ -111,6 +117,56 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * @since 3.5.0
      */
     <T> Collection<BeanRegistration<T>> getBeanRegistrations(Argument<T> beanType, @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Obtains the registrations of the interceptors bound to the bean this context resolves for.
+     *
+     * <p>The interceptors of a bean are the bean's own. A singleton, or an interceptor of a custom scope, comes from
+     * its scope as always. Any other interceptor is the one the bean already has among {@link #getDependentBeans()},
+     * created for it earlier, and is otherwise created now as a new dependent of the bean, so that it is destroyed
+     * with the bean. That is what gives every interception point of a bean, from its construction to its
+     * destruction, the same instance of a non-singleton interceptor.</p>
+     *
+     * <p>A context of the container answers so. The default here is for a context of another kind, which owns
+     * nothing: it resolves as {@link #getBeanRegistrations(Argument, Qualifier)} does.</p>
+     *
+     * @param interceptorType The interceptor type
+     * @param binding         The interceptor binding qualifier
+     * @param <I>             The interceptor type
+     * @return The registrations
+     * @since 5.3.0
+     */
+    default <I> Collection<BeanRegistration<I>> getInterceptorRegistrations(Argument<I> interceptorType, @Nullable Qualifier<I> binding) {
+        return getBeanRegistrations(interceptorType, binding);
+    }
+
+    /**
+     * Obtains the registration of one interceptor bound to the bean this context resolves for, the bean's own
+     * instance of it, as {@link #getInterceptorRegistrations(Argument, Qualifier)} would list it.
+     *
+     * @param interceptor The interceptor definition
+     * @param <I>         The interceptor type
+     * @return The registration
+     * @since 5.3.0
+     */
+    default <I> BeanRegistration<I> getInterceptorRegistration(BeanDefinition<I> interceptor) {
+        return getContext().getBeanRegistration(interceptor);
+    }
+
+    /**
+     * Whether an interceptor of the given definition belongs to a scope of its own, rather than being a singleton or
+     * the intercepted bean's own: a registered custom scope holds it.
+     *
+     * <p>Such an interceptor is obtained from its scope every time it is needed, and a selection that contains it
+     * must not keep the instance: the scope, not the bean, decides when the instance is replaced.</p>
+     *
+     * @param interceptor The interceptor definition
+     * @return Whether the interceptor is of a custom scope
+     * @since 5.3.0
+     */
+    default boolean isScopedInterceptor(BeanDefinition<?> interceptor) {
+        return false;
+    }
 
     /**
      * Call back to destroy any {@link io.micronaut.context.annotation.InjectScope} beans.
@@ -287,8 +343,12 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     }
 
     /**
-     * @return The current dependent beans that must be destroyed by an upstream bean.
+     * The dependent beans of the bean this context operates on: the beans created for it so far while it is being
+     * created, and the beans that were created with it when it is being destroyed. A non-singleton interceptor
+     * created for the bean is among them, which is how {@link #getInterceptorRegistrations(Argument, Qualifier)}
+     * gives every interception point of the bean the same instance.
      *
+     * @return The dependent beans, never {@code null}
      * @since 5.1.0
      */
     default List<BeanRegistration<?>> getDependentBeans() {
@@ -308,10 +368,30 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
      * Marks first dependent as factory.
      * Dependent can be missing which means it's a singleton or scoped bean.
      *
+     * <p>Superseded by {@link #markDependentAsFactory(Object)}, which generated code calls now; kept for bean
+     * definitions compiled by earlier versions.</p>
+     *
      * @since 3.5.0
      */
     @UsedByGeneratedCode
     default void markDependentAsFactory() {
+    }
+
+    /**
+     * Marks the dependent registration of the given factory bean as the factory that produces the bean being
+     * created, so that a factory which is itself a dependent, a prototype for instance, is destroyed once it has
+     * produced the bean. A singleton or scoped factory has no dependent registration, and nothing is marked.
+     *
+     * <p>Unlike {@link #markDependentAsFactory()}, which marks whichever dependent was resolved first, this finds
+     * the registration by the factory instance, so that dependents resolved before the factory was looked up, such
+     * as the interceptors of a bean whose creation is advised, are left alone.</p>
+     *
+     * @param factoryBean The factory bean that was just looked up
+     * @since 5.2.2
+     */
+    @UsedByGeneratedCode
+    default void markDependentAsFactory(Object factoryBean) {
+        markDependentAsFactory();
     }
 
     /**
@@ -363,6 +443,34 @@ public interface BeanResolutionContext extends ValueResolver<CharSequence>, Auto
     <T> T getProxyTargetBean(BeanDefinition<T> definition,
                              Argument<T> beanType,
                              @Nullable Qualifier<T> qualifier);
+
+    /**
+     * Resolves the registration of the proxy target for a given proxy bean definition.
+     *
+     * <p>Where {@link #getProxyTargetBean(BeanDefinition, Argument, Qualifier)} returns the target alone, this
+     * returns the registration the context holds for it: the singleton scope's for a singleton, the one a custom
+     * scope keeps for a scoped bean, or the one created for a prototype. A generated proxy fronting a target that
+     * is not a singleton resolves the target of each call this way and takes the non-singleton interceptors of the
+     * call from the dependents of that registration, which is where the interceptors created with the target live.</p>
+     *
+     * @param definition The proxy target bean definition
+     * @param beanType   The bean type
+     * @param qualifier  The qualifier
+     * @param <T>        The generic type
+     * @return The registration of the proxy target
+     * @since 5.3.0
+     */
+    @UsedByGeneratedCode
+    default <T> BeanRegistration<T> getProxyTargetBeanRegistration(BeanDefinition<T> definition,
+                                                                  Argument<T> beanType,
+                                                                  @Nullable Qualifier<T> qualifier) {
+        return BeanRegistration.of(
+            getContext(),
+            new DefaultBeanContext.BeanKey<>(beanType, qualifier),
+            definition,
+            getProxyTargetBean(definition, beanType, qualifier)
+        );
+    }
 
     /**
      * Represents a path taken to resolve a bean definitions dependencies.

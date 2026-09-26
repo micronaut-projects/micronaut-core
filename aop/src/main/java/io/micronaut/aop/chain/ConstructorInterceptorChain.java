@@ -18,14 +18,11 @@ package io.micronaut.aop.chain;
 import io.micronaut.aop.ConstructorInvocationContext;
 import io.micronaut.aop.Interceptor;
 import io.micronaut.aop.InterceptorKind;
-import io.micronaut.aop.InterceptorRegistry;
 import io.micronaut.aop.InvocationContext;
 import io.micronaut.context.BeanContext;
 import io.micronaut.context.BeanRegistration;
 import io.micronaut.context.BeanResolutionContext;
-import io.micronaut.context.exceptions.ConstructorAdviceException;
 import io.micronaut.core.annotation.AnnotationMetadata;
-import io.micronaut.core.annotation.AnnotationValue;
 import io.micronaut.core.annotation.Internal;
 import org.jspecify.annotations.Nullable;
 import io.micronaut.core.annotation.UsedByGeneratedCode;
@@ -35,13 +32,9 @@ import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.ArrayUtils;
 import io.micronaut.inject.AdvisedBeanType;
 import io.micronaut.inject.BeanDefinition;
-import io.micronaut.inject.annotation.AnnotationMetadataHierarchy;
-import io.micronaut.inject.qualifiers.Qualifiers;
 
 import java.lang.reflect.Constructor;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
 
@@ -57,6 +50,12 @@ import java.util.Objects;
 public final class ConstructorInterceptorChain<T> extends AbstractInterceptorChain<T, T> implements ConstructorInvocationContext<T> {
 
     /**
+     * The exception the intercepted constructor's own body threw, if it threw one. Kept so that
+     * {@link LifecycleInterception#instantiate} can tell it apart from an exception thrown by the advice around it:
+     * the two are propagated differently.
+     */
+    @Nullable RuntimeException bodyFailure;
+    /**
      * The constructor that is actually invoked. For a proxied bean this is the generated proxy constructor, which
      * declares the bean's own parameters followed by {@code additionalInterceptorParametersCount} internal ones.
      */
@@ -67,12 +66,6 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      */
     private final BeanConstructor<T> interceptedConstructor;
     private final @Nullable Object[] internalParameters;
-    /**
-     * The exception the intercepted constructor's own body threw, if it threw one. Kept so that
-     * {@link #instantiate} can tell it apart from an exception thrown by the advice around it: the two are
-     * propagated differently.
-     */
-    private @Nullable RuntimeException bodyFailure;
 
     /**
      * Default constructor.
@@ -84,7 +77,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
      * @param additionalInterceptorParametersCount The additional interceptor parameters count
      */
     @UsedByGeneratedCode
-    private ConstructorInterceptorChain(
+    ConstructorInterceptorChain(
         BeanDefinition<T> beanDefinition,
         BeanConstructor<T> beanConstructor,
         Interceptor<T, T>[] interceptors,
@@ -148,18 +141,21 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
     }
 
     /**
-     * Internal methods that handles the logic of instantiating a bean that has constructor interception applied.
+     * Instantiates a bean whose construction is intercepted.
      *
      * @param resolutionContext The resolution context
-     * @param beanContext The bean context
-     * @param interceptors The interceptors. Can be null and if so should be resolved from the context.
-     * @param definition The definition
-     * @param constructor The bean constructor
-     * @param parameters The resolved parameters
-     * @param <T1> The bean type
+     * @param beanContext       The bean context
+     * @param interceptors      The interceptors, or {@code null} to resolve them
+     * @param definition        The definition
+     * @param constructor       The bean constructor
+     * @param parameters        The resolved parameters
+     * @param <T1>              The bean type
      * @return The instantiated bean
      * @since 3.0.0
+     * @deprecated Since 5.3.0 the lifecycle events of a bean are intercepted by {@link LifecycleInterception}; this
+     * chain only runs. Kept for bean definitions compiled by earlier versions, which call it directly.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
     @UsedByGeneratedCode
     public static <T1> T1 instantiate(
@@ -169,24 +165,26 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         BeanDefinition<T1> definition,
         BeanConstructor<T1> constructor,
         @Nullable Object... parameters) {
-        int micronaut3additionalProxyConstructorParametersCount = 3;
-        return instantiate(resolutionContext, beanContext, interceptors, definition, constructor, micronaut3additionalProxyConstructorParametersCount, parameters);
+        return LifecycleInterception.instantiate(resolutionContext, beanContext, interceptors, definition, constructor, parameters);
     }
 
     /**
-     * Internal methods that handles the logic of instantiating a bean that has constructor interception applied.
+     * Instantiates a bean whose construction is intercepted.
      *
-     * @param resolutionContext The resolution context
-     * @param beanContext The bean context
-     * @param interceptors The interceptors. Can be null and if so should be resolved from the context.
-     * @param definition The definition
-     * @param constructor The bean constructor
+     * @param resolutionContext                         The resolution context
+     * @param beanContext                               The bean context
+     * @param interceptors                              The interceptors, or {@code null} to resolve them
+     * @param definition                                The definition
+     * @param constructor                               The bean constructor
      * @param additionalProxyConstructorParametersCount The additional proxy constructor parameters count
-     * @param parameters The resolved parameters
-     * @param <T1> The bean type
+     * @param parameters                                The resolved parameters
+     * @param <T1>                                      The bean type
      * @return The instantiated bean
      * @since 3.0.0
+     * @deprecated Since 5.3.0 the lifecycle events of a bean are intercepted by {@link LifecycleInterception}; this
+     * chain only runs. Kept for bean definitions compiled by earlier versions, which call it directly.
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     @Internal
     @UsedByGeneratedCode
     public static <T1> T1 instantiate(
@@ -197,43 +195,7 @@ public final class ConstructorInterceptorChain<T> extends AbstractInterceptorCha
         BeanConstructor<T1> constructor,
         int additionalProxyConstructorParametersCount,
         @Nullable Object... parameters) {
-
-        if (interceptors == null) {
-            final AnnotationMetadataHierarchy hierarchy = new AnnotationMetadataHierarchy(definition.getAnnotationMetadata(), constructor.getAnnotationMetadata());
-            final Collection<AnnotationValue<?>> annotationValues = resolveInterceptorValues(hierarchy, InterceptorKind.AROUND_CONSTRUCT);
-
-            final Collection<BeanRegistration<Interceptor<?, ?>>> resolved = resolutionContext.getBeanRegistrations(
-                Interceptor.ARGUMENT,
-                Qualifiers.byInterceptorBindingValues(annotationValues)
-            );
-            interceptors = new ArrayList(resolved);
-        }
-        final InterceptorRegistry interceptorRegistry = beanContext.getBean(InterceptorRegistry.ARGUMENT);
-        final Interceptor<T1, T1>[] resolvedInterceptors = interceptorRegistry
-            .resolveConstructorInterceptors(constructor, interceptors);
-        ConstructorInterceptorChain<T1> chain = new ConstructorInterceptorChain<>(
-            definition,
-            constructor,
-            resolvedInterceptors,
-            additionalProxyConstructorParametersCount,
-            parameters
-        );
-        T1 bean;
-        try {
-            bean = chain.proceed();
-        } catch (ConstructorAdviceException e) {
-            // Already carried, by the advice around a bean this one's construction depends on
-            throw e;
-        } catch (RuntimeException e) {
-            if (e == chain.bodyFailure) {
-                // The constructor's own body threw. Keep the wrapping an unadvised constructor's throwable gets
-                throw e;
-            }
-            // The advice around the constructor threw. Advice around a method reaches its caller as it was
-            // thrown; carry this one so that construction advice does too
-            throw new ConstructorAdviceException(e);
-        }
-        return Objects.requireNonNull(bean, "Constructor interceptor chain illegally returned null for constructor: " + constructor.getDescription());
+        return LifecycleInterception.instantiate(resolutionContext, beanContext, interceptors, definition, constructor, additionalProxyConstructorParametersCount, parameters);
     }
 
     private static @Nullable Object[] resolveConcreteSubset(BeanDefinition<?> beanDefinition,

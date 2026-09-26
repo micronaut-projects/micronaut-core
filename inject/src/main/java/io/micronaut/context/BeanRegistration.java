@@ -16,14 +16,15 @@
 package io.micronaut.context;
 
 import io.micronaut.context.scope.CreatedBean;
-import org.jspecify.annotations.Nullable;
 import io.micronaut.core.order.OrderUtil;
 import io.micronaut.core.order.Ordered;
+import io.micronaut.core.type.Argument;
 import io.micronaut.core.util.CollectionUtils;
 import io.micronaut.core.util.ObjectUtils;
 import io.micronaut.inject.BeanDefinition;
 import io.micronaut.inject.BeanIdentifier;
 import io.micronaut.inject.BeanType;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Objects;
@@ -40,6 +41,11 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
     final BeanIdentifier identifier;
     final BeanDefinition<T> beanDefinition;
     final T bean;
+    // the context that created this registration, or null for one built by hand
+    @Nullable
+    final BeanContext beanContext;
+    // what the bean owns, and the one lock of everything that creates for the bean, selects for it or destroys it
+    final BeanDependents dependents;
     private final int order;
 
     /**
@@ -48,9 +54,22 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      * @param bean           The bean instance
      */
     public BeanRegistration(BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean) {
+        this(null, identifier, beanDefinition, bean, null);
+    }
+
+    /**
+     * @param beanContext    The context that created the bean, or {@code null}
+     * @param identifier     The bean identifier
+     * @param beanDefinition The bean definition
+     * @param bean           The bean instance
+     * @param dependents     The beans created for the bean, or {@code null}
+     */
+    BeanRegistration(@Nullable BeanContext beanContext, BeanIdentifier identifier, BeanDefinition<T> beanDefinition, T bean, @Nullable List<BeanRegistration<?>> dependents) {
+        this.beanContext = beanContext;
         this.identifier = identifier;
         this.beanDefinition = beanDefinition;
         this.bean = bean;
+        this.dependents = new BeanDependents(dependents);
         if (bean == null) {
             this.order = beanDefinition == null ? 0 : beanDefinition.getOrder();
         } else {
@@ -105,23 +124,9 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
                                              K bean,
                                              @Nullable
                                              List<BeanRegistration<?>> dependents) {
-        return of(beanContext, identifier, beanDefinition, bean, dependents, null);
-    }
-
-    /**
-     * Creates a bean registration with optional dependent and lifecycle interceptor registrations.
-     *
-     * <p>This overload is package-private because the interceptor registrations are an internal bean-creation detail.</p>
-     */
-    static <K> BeanRegistration<K> of(BeanContext beanContext,
-                                      BeanIdentifier identifier,
-                                      BeanDefinition<K> beanDefinition,
-                                      K bean,
-                                      @Nullable List<BeanRegistration<?>> dependents,
-                                      @Nullable List<?> interceptorRegistrations) {
         return CollectionUtils.isNotEmpty(dependents) ?
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents), interceptorRegistrations) :
-            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, interceptorRegistrations);
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean, Objects.requireNonNull(dependents)) :
+            new BeanDisposingRegistration<>(beanContext, identifier, beanDefinition, bean);
     }
 
     @Override
@@ -148,6 +153,72 @@ public class BeanRegistration<T> implements Ordered, CreatedBean<T>, BeanType<T>
      */
     public T getBean() {
         return bean;
+    }
+
+    /**
+     * The dependent beans of this bean: the beans created for it, which belong to it alone and are destroyed with
+     * it, after its own {@code @PreDestroy}.
+     *
+     * <p>A registration the context created carries them; among them are the non-singleton interceptors bound to
+     * the bean, which are the bean's own. A registration built any other way has none.</p>
+     *
+     * @return The dependent beans, never {@code null}
+     * @since 5.3.0
+     */
+    public List<BeanRegistration<?>> getDependentBeans() {
+        return dependents.list();
+    }
+
+    /**
+     * Opens a resolution context for this bean, which exists already: its dependents are the bean's, as they were of
+     * the context that created it, and whatever is created through it joins them when it is closed, to be destroyed
+     * with the bean. The context must be opened and closed under the lock of {@link #dependents}.
+     *
+     * <p>For a bean that is destroyed already the context is a plain one, carrying nothing: what is created through
+     * it belongs to nothing, as it did for every bean before 5.3, rather than being destroyed as it is created and
+     * handed over destroyed.</p>
+     *
+     * @return The resolution context
+     * @throws UnsupportedOperationException If the registration was not created by the bean context
+     */
+    BeanResolutionContext newResolutionContext() {
+        if (beanContext == null) {
+            throw new UnsupportedOperationException("The registration of " + bean + " was not created by the bean context");
+        }
+        if (dependents.isDestroyed()) {
+            return new DefaultBeanResolutionContext(beanContext, beanDefinition);
+        }
+        return new ExistingBeanResolutionContext(beanContext, this);
+    }
+
+    /**
+     * Adds a bean created for this bean after this bean itself was created, so that it is destroyed with it.
+     *
+     * @param registration The registration of the dependent bean
+     */
+    void addDependentBean(BeanRegistration<?> registration) {
+        if (!dependents.add(registration) && beanContext != null) {
+            // created for a bean that is destroyed already, so it is not one of the dependents its destruction
+            // walked: it is destroyed here instead of outliving the bean it was created for
+            beanContext.destroyBean(registration);
+        }
+    }
+
+    /**
+     * Marks this bean as created for the interception of the bean it is a dependent of, through that bean's
+     * {@link BeanResolutionContext#getInterceptorRegistrations(Argument, Qualifier)}, and so the one instance of its
+     * definition that bean is intercepted with. A dependency injected into the bean is a dependent too, but carries
+     * no mark: an interceptor injected into a bean is not the instance that intercepts it.
+     */
+    void markCreatedAsInterceptor() {
+        dependents.markCreatedAsInterceptor();
+    }
+
+    /**
+     * @return Whether this bean was created for the interception of the bean it is a dependent of
+     */
+    boolean isCreatedAsInterceptor() {
+        return dependents.isCreatedAsInterceptor();
     }
 
     @Override

@@ -16,7 +16,12 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * <p>An event fired when a bean has been destroyed and all {@link jakarta.annotation.PreDestroy} methods have been invoked.</p>
@@ -27,13 +32,30 @@ import io.micronaut.inject.BeanDefinition;
  * @since 3.0.0
  */
 public class BeanDestroyedEvent<T> extends BeanEvent<T> {
+
     /**
      * @param beanContext    The bean context
      * @param beanDefinition The bean definition
      * @param bean           The bean
      */
     public BeanDestroyedEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
-        super(beanContext, beanDefinition, bean);
+        this(beanContext, beanDefinition, bean, null, List.of());
+    }
+
+    /**
+     * @param beanContext      The bean context
+     * @param beanDefinition   The bean definition
+     * @param bean             The bean
+     * @param beanRegistration The registration the bean was destroyed through
+     * @param dependentBeans   The dependent beans that were destroyed with the bean
+     * @since 5.3.0
+     */
+    @Internal
+    public BeanDestroyedEvent(BeanContext beanContext,
+                              BeanDefinition<T> beanDefinition,
+                              T bean,
+                              @Nullable BeanRegistration<T> beanRegistration,
+                              @Nullable List<BeanRegistration<?>> dependentBeans) {
+        super(beanContext, beanDefinition, bean, beanRegistration, dependentBeans);
     }
 }
-

@@ -20,17 +20,21 @@ import io.micronaut.core.annotation.Internal;
 import java.util.List;
 
 /**
- * Internal interface implemented by bean registrations that keep dependent bean registrations.
+ * Provides the dependent beans of a bean.
  *
+ * @author Denis Stepanov
  * @since 5.1.0
+ * @deprecated Since 5.3.0 every {@link BeanRegistration} answers with {@link BeanRegistration#getDependentBeans()};
+ * the registrations the context creates still implement this for a reader compiled against an earlier version.
  */
+@Deprecated(since = "5.3.0", forRemoval = true)
 @Internal
 public interface DependentBeanProvider {
 
     /**
-     * Returns an immutable snapshot of the dependent bean registrations.
-     *
-     * @return The dependent bean registrations
+     * @return The dependent beans
+     * @deprecated Use {@link BeanRegistration#getDependentBeans()}
      */
+    @Deprecated(since = "5.3.0", forRemoval = true)
     List<BeanRegistration<?>> dependentBeans();
 }

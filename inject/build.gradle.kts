@@ -56,7 +56,7 @@ noReflection {
     allowIn("io.micronaut.context.AnnotationReflectionUtils", "ANNOTATIONS", "CLASS_MEMBERS", "GENERIC_SIGNATURES", "REFLECTION_UTILS", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.BeanLocator", "REFLECTIVE_ACCESS")
     allowIn("io.micronaut.context.DefaultApplicationContextBuilder", "SERVICE_LOADING")
-    allowIn("io.micronaut.context.DefaultBeanContext", "CLASS_LOADING", "CLASS_NAMES", "REFLECTION_UTILS", "TARGET_MEMBERS")
+    allowIn("io.micronaut.context.DefaultBeanContext", "CLASS_LOADING", "CLASS_NAMES", "REFLECTION_UTILS", "SERVICE_LOADING", "TARGET_MEMBERS")
     allowIn("io.micronaut.context.DefaultFieldInjectionPoint", "ANNOTATION_SYNTHESIS", "CLASS_NAMES", "REFLECTION_UTILS")
     allowIn("io.micronaut.context.DefaultMethodInjectionPoint", "CLASS_NAMES")
     allowIn("io.micronaut.context.DefaultRuntimeBeanDefinition", "CLASS_NAMES")

@@ -39,7 +39,6 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
     private final Argument<T> beanType;
     @Nullable
     private final transient BeanDefinition<?> rootBeanDefinition;
-    private final transient List<BeanRegistration<?>> dependentBeans;
 
     public BeanCreatedEvent(BeanContext beanContext,
                             BeanDefinition<T> beanDefinition,
@@ -80,11 +79,10 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
                             T bean,
                             @Nullable BeanDefinition<?> rootBeanDefinition,
                             @Nullable List<BeanRegistration<?>> dependentBeans) {
-        super(beanContext, beanDefinition, bean);
+        super(beanContext, beanDefinition, bean, null, dependentBeans);
         this.beanIdentifier = beanIdentifier;
         this.beanType = beanType;
         this.rootBeanDefinition = rootBeanDefinition;
-        this.dependentBeans = dependentBeans == null ? List.of() : List.copyOf(dependentBeans);
     }
 
     /**
@@ -114,7 +112,8 @@ public class BeanCreatedEvent<T> extends BeanEvent<T> {
      * @return The direct dependent beans created for this bean
      * @since 5.1.0
      */
+    @Override
     public List<BeanRegistration<?>> getDependentBeans() {
-        return dependentBeans;
+        return super.getDependentBeans();
     }
 }

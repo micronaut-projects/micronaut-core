@@ -18,8 +18,6 @@ package io.micronaut.inject.writer;
 import io.micronaut.aop.beandefinition.DisposableIntercepted;
 import io.micronaut.aop.beandefinition.InitializableIntercepted;
 import io.micronaut.aop.beandefinition.ParameterizedInterceptedBeanDefinition;
-import io.micronaut.aop.beandefinition.ProxyInterceptedBeanDefinition;
-import io.micronaut.aop.beandefinition.ParameterizedProxyBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinition;
 import io.micronaut.context.AbstractInitializableBeanDefinitionAndReference;
 import io.micronaut.context.BeanContext;
@@ -199,7 +197,6 @@ import java.util.stream.IntStream;
 
 import static io.micronaut.core.util.StringUtils.EMPTY_STRING_ARRAY;
 import static io.micronaut.inject.visitor.BeanElementVisitor.VISITORS;
-
 /**
  * <p>Responsible for building {@link BeanDefinition} instances at compile time. Uses ASM build the class definition.</p>
  *
@@ -581,7 +578,7 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
 
     private static final Method METHOD_QUALIFIER_BY_TYPE = ReflectionUtils.getRequiredMethod(Qualifiers.class, "byType", Class[].class);
 
-    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory");
+    private static final Method METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY = ReflectionUtils.getRequiredMethod(BeanResolutionContext.class, "markDependentAsFactory", Object.class);
 
     private static final Method METHOD_PROXY_TARGET_TYPE = ReflectionUtils.getRequiredInternalMethod(ProxyBeanDefinition.class, "getTargetDefinitionType");
 
@@ -1585,37 +1582,48 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
         boolean isParametrized = isParametrized();
 
         if (isConstructorIntercepted(elementProducerDefinition.annotationMetadata())) {
+            // A generated proxy appends the three parameters every intercepted definition expects, so the same
+            // interface serves a proxy and a bean intercepted in place
             Method resolveValuesMethod;
             Method defaultInstantiateMethod;
             ClassTypeDef interceptedInterface;
-            boolean isAopProxy = StringUtils.isNotEmpty(interceptedType);
             if (isParametrized) {
                 resolveValuesMethod = RESOLVE_PARAMETRIZED_INSTANTIATION_VALUES_METHOD;
-                if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ParameterizedProxyBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
-                } else {
-                    interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = null;
-                }
+                interceptedInterface = ClassTypeDef.of(ParameterizedInterceptedBeanDefinition.class);
+                defaultInstantiateMethod = INTERCEPTED_PARAMETRIZED_DEFAULT_INSTANTIATE_METHOD;
             } else {
                 resolveValuesMethod = RESOLVE_INSTANTIATION_VALUES_METHOD;
-                if (isAopProxy) {
-                    interceptedInterface = ClassTypeDef.of(ProxyInterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
-                } else {
-                    interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
-                    defaultInstantiateMethod = null;
-                }
+                interceptedInterface = ClassTypeDef.of(io.micronaut.aop.beandefinition.InterceptedBeanDefinition.class);
+                defaultInstantiateMethod = INTERCEPTED_DEFAULT_INSTANTIATE_METHOD;
             }
             classDefBuilder.addSuperinterface(interceptedInterface);
 
+            // The interceptor chain runs in the default method of the intercepted interface, which returns as soon
+            // as the chain has: members are injected and post-construct run here, on the instance it returned, so that
+            // neither happens before an outer construction interceptor has completed or at all when one throws
+            boolean injectsMembers = needsInjectMethod() || needsPostConstruct();
+
             // Remove after AbstractInitializableBeanDefinition#doInstantiate is removed
             classDefBuilder.addMethod(MethodDef.override(PARAMETRIZED_DO_INSTANTIATE_METHOD)
-                .build((aThis, methodParameters) ->
-                    aThis.superRef(interceptedInterface).invoke(PARAMETRIZED_DO_INSTANTIATE_METHOD, methodParameters).returning()));
+                .build((aThis, methodParameters) -> {
+                    ExpressionDef constructed = aThis.superRef(interceptedInterface)
+                        .invoke(PARAMETRIZED_DO_INSTANTIATE_METHOD, methodParameters);
+                    if (isParametrized && injectsMembers) {
+                        return injectAndReturn(aThis, methodParameters, constructed, false);
+                    }
+                    return constructed.returning();
+                }));
 
-            if (superBeanDefinition) {
+            if (!isParametrized && injectsMembers) {
+                classDefBuilder.addMethod(MethodDef.override(INSTANTIATE_METHOD)
+                    .build((aThis, methodParameters) ->
+                        injectAndReturn(
+                            aThis,
+                            methodParameters,
+                            aThis.superRef(interceptedInterface).invoke(defaultInstantiateMethod, methodParameters),
+                            false
+                        )));
+            } else if (superBeanDefinition) {
                 classDefBuilder.addMethod(MethodDef.override(INSTANTIATE_METHOD)
                     .build((aThis, methodParameters) ->
                         aThis.superRef(interceptedInterface).invoke(defaultInstantiateMethod, methodParameters).returning()));
@@ -1639,7 +1647,17 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                         .<ExpressionDef>mapToObj(index -> constructorValuesArray.arrayElement(index).cast(TypeDef.erasure(parameterElements[index].getType())))
                         .toList();
                     ExpressionDef newInstance = buildNewInstance(aThis, methodParameters, statements, extractedValues);
-                    statements.add(injectAndReturn(aThis, methodParameters, newInstance));
+                    if (hasInjectScope()) {
+                        // An @InjectScope constructor argument is released as soon as the constructor has run, which is
+                        // the contract of the annotation and keeps the release on the path where an outer construction
+                        // interceptor throws after proceed() and the instance is never injected
+                        statements.add(newInstance.newLocal("constructed", constructedVar -> StatementDef.multi(
+                            destroyInjectScopeBeansIfNecessary(methodParameters),
+                            constructedVar.returning()
+                        )));
+                    } else {
+                        statements.add(newInstance.returning());
+                    }
                     return StatementDef.multi(statements);
                 }));
         } else {
@@ -1861,11 +1879,35 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
             && parameters[1].getType().isAssignable(TimeUnit.class);
     }
 
+    private boolean needsInjectMethod() {
+        return !injectCommands.isEmpty() || superBeanDefinition;
+    }
+
     private StatementDef injectAndReturn(VariableDef.This aThis,
                                          List<VariableDef.MethodParameter> methodParameters,
                                          ExpressionDef beanInstance) {
-        boolean needsInjectMethod = !injectCommands.isEmpty() || superBeanDefinition;
-        boolean needsInjectScope = hasInjectScope();
+        return injectAndReturn(aThis, methodParameters, beanInstance, true);
+    }
+
+    /**
+     * Injects the members of the instance and runs its post-construct callbacks.
+     *
+     * @param aThis                   The definition
+     * @param methodParameters        The parameters of the method being built, the resolution context first and the
+     *                                bean context second
+     * @param beanInstance            The instance
+     * @param destroyInjectScopeBeans Whether to release the {@link io.micronaut.context.annotation.InjectScope}
+     *                                arguments of the constructor here. False for an intercepted construction, where
+     *                                the generated {@code doInstantiate} releases them as soon as the constructor has
+     *                                run, rather than after the interceptor chain has returned
+     * @return The statement
+     */
+    private StatementDef injectAndReturn(VariableDef.This aThis,
+                                         List<VariableDef.MethodParameter> methodParameters,
+                                         ExpressionDef beanInstance,
+                                         boolean destroyInjectScopeBeans) {
+        boolean needsInjectMethod = needsInjectMethod();
+        boolean needsInjectScope = destroyInjectScopeBeans && hasInjectScope();
         boolean needsPostConstruct = needsPostConstruct();
         if (!needsInjectScope && !needsInjectMethod && !needsPostConstruct) {
             return beanInstance.returning();
@@ -2224,7 +2266,9 @@ public final class BeanDefinitionWriter implements BeanElement, Toggleable, Elem
                 getQualifier(factoryClass, argumentExpression)
             ).cast(factoryTypeDef).newLocal("factoryBean");
         additionalStatements.add(defineAndAssign);
-        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY));
+        // by instance: the interceptors of an advised bean are resolved before the factory is looked up, so the
+        // factory need not be the first dependent
+        additionalStatements.add(beanResolutionContxt.invoke(METHOD_BEAN_RESOLUTION_CONTEXT_MARK_FACTORY, defineAndAssign.variable()));
         return defineAndAssign.variable();
     }
 

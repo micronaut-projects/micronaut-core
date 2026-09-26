@@ -2,7 +2,11 @@ package io.micronaut.aop.lifecycle
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
+import io.micronaut.inject.BeanIdentifier
+import io.micronaut.inject.qualifiers.Qualifiers
 
 class LifecycleInterceptorReuseSpec extends AbstractTypeElementSpec {
 
@@ -392,10 +396,10 @@ class Holder {
         context.close()
     }
 
-    // destroyBean(Object) cannot find a registration for a bean created with createBean, so the registrations
-    // owned by that bean are not available to the dispose call and pre destroy still resolves a new interceptor.
-    // This bean has constructor advice but no around proxy, so nothing retains the registrations for it.
-    void 'test a prototype created through createBean reuses the interceptor up to post construct'() {
+    // A bean created with createBean has no scope to hold its registration, but the context remembers it, weakly,
+    // when beans were created for it: destroyBean(Object) finds the registration again, and the pre destroy
+    // interception resolves the bean's own interceptor, the one created with it.
+    void 'test a prototype created through createBean and destroyed through destroyBean(Object) reuses the interceptor for every phase'() {
         given:
         ApplicationContext context = buildContext('''
 package reuse.createbean;
@@ -448,9 +452,9 @@ class Product {
         def product = context.createBean(context.classLoader.loadClass('reuse.createbean.Product'), 'test')
         context.destroyBean(product)
 
-        then: 'construction and post construct share one instance, pre destroy does not'
-        interceptorType.instances == 2
-        interceptorType.events == ['1:AROUND_CONSTRUCT', '1:POST_CONSTRUCT', '2:PRE_DESTROY']
+        then: 'the context remembers the registration of a bean created with dependents, so pre destroy reaches the same instance'
+        interceptorType.instances == 1
+        interceptorType.events == ['1:AROUND_CONSTRUCT', '1:POST_CONSTRUCT', '1:PRE_DESTROY']
 
         cleanup:
         context.close()
@@ -891,12 +895,10 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('reuse.identity.MyBean'))
         bean.work()
-        def accessor = io.micronaut.aop.Intercepted.getMethod('$interceptorRegistrations')
-        def registrations = accessor.invoke(bean)
+        def registrations = interceptorRegistrations(context, bean)
 
-        then: 'the proxy exposes the registrations it was constructed with, not a copy'
+        then: 'the registration answers for the interceptors the bean was constructed with'
         bean instanceof io.micronaut.aop.Intercepted
-        accessor.invoke(bean).is(registrations)
         registrations.every { it instanceof io.micronaut.context.BeanRegistration }
 
         and: 'every interceptor bound to the target is present exactly once'
@@ -977,14 +979,14 @@ class MyBean {
         when:
         def bean = context.getBean(context.classLoader.loadClass('reuse.ctorproxy.MyBean'))
         bean.work()
-        def registrations = io.micronaut.aop.Intercepted.getMethod('$interceptorRegistrations').invoke(bean)
+        def registrations = interceptorRegistrations(context, bean)
         context.stop()
 
         then: 'one interceptor is resolved for the bean and used by every phase'
         seen.instances == 1
         seen.BY_KIND.keySet() as List == ['AROUND_CONSTRUCT', 'POST_CONSTRUCT', 'AROUND', 'PRE_DESTROY']
 
-        and: 'constructor interception used the very instance the proxy retains, so nothing was resolved twice'
+        and: 'constructor interception used the very instance the bean owns, so nothing was resolved twice'
         registrations.size() == 1
         seen.BY_KIND.values().every { it.is(registrations[0].bean) }
 
@@ -1060,5 +1062,18 @@ class BeanB {
 
         cleanup:
         context.close()
+    }
+
+    /**
+     * The interceptors bound to the bean, as its registration answers for them: since 5.3 a proxy retains nothing,
+     * and the bean's own interceptors are resolved from its registration instead.
+     */
+    private static List<BeanRegistration> interceptorRegistrations(ApplicationContext context, Object bean) {
+        def registration = context.findBeanRegistration(bean).orElseGet {
+            // a bean of no scope that nothing was created for is held by nobody; a registration built for it answers the same way
+            def definition = context.getBeanDefinition(bean.getClass())
+            BeanRegistration.of(context, BeanIdentifier.of(definition.name), definition, bean)
+        }
+        new ArrayList<>(io.micronaut.context.RegisteredBeanInterceptors.getInterceptorRegistrations(registration, Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(registration.beanDefinition.annotationMetadata)))
     }
 }

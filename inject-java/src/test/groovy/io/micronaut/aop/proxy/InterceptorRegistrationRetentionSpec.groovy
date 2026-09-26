@@ -2,7 +2,11 @@ package io.micronaut.aop.proxy
 
 import io.micronaut.annotation.processing.test.AbstractTypeElementSpec
 import io.micronaut.aop.Intercepted
+import io.micronaut.aop.Interceptor
 import io.micronaut.context.ApplicationContext
+import io.micronaut.context.BeanRegistration
+import io.micronaut.inject.BeanIdentifier
+import io.micronaut.inject.qualifiers.Qualifiers
 
 /**
  * Every generated proxy retains the interceptor registrations its constructor was given, not only a proxy whose
@@ -10,9 +14,22 @@ import io.micronaut.context.ApplicationContext
  */
 class InterceptorRegistrationRetentionSpec extends AbstractTypeElementSpec {
 
-    private static List<String> interceptorNames(Object bean) {
+    private static List<String> interceptorNames(ApplicationContext context, Object bean) {
         assert bean instanceof Intercepted
-        ((Intercepted) bean).$interceptorRegistrations()*.bean*.getClass()*.simpleName
+        interceptorRegistrations(context, bean)*.bean*.getClass()*.simpleName
+    }
+
+    /**
+     * The interceptors bound to the bean, as its registration answers for them: since 5.3 a proxy retains nothing,
+     * and the bean's own interceptors are resolved from its registration instead.
+     */
+    private static List<BeanRegistration> interceptorRegistrations(ApplicationContext context, Object bean) {
+        def registration = context.findBeanRegistration(bean).orElseGet {
+            // a bean of no scope that nothing was created for is held by nobody; a registration built for it answers the same way
+            def definition = context.getBeanDefinition(bean.getClass())
+            BeanRegistration.of(context, BeanIdentifier.of(definition.name), definition, bean)
+        }
+        new ArrayList<>(io.micronaut.context.RegisteredBeanInterceptors.getInterceptorRegistrations(registration, Interceptor.ARGUMENT, Qualifiers.byInterceptorBinding(registration.beanDefinition.annotationMetadata)))
     }
 
     void 'test an around only proxy retains the around interceptors bound to it'() {
@@ -51,7 +68,7 @@ class MyBean {
 
         then: 'the proxy reports the interceptor it was built with'
         bean.work() == 'done'
-        interceptorNames(bean) == ['AroundInterceptor']
+        interceptorNames(context, bean) == ['AroundInterceptor']
 
         cleanup:
         context.close()
@@ -92,7 +109,7 @@ interface MyItfce {
 
         then:
         bean.work() == 'stubbed'
-        interceptorNames(bean) == ['StubInterceptor']
+        interceptorNames(context, bean) == ['StubInterceptor']
 
         cleanup:
         context.close()
@@ -155,7 +172,7 @@ class MyBean {
         def bean = context.getBean(context.classLoader.loadClass('retention.lifecycle.MyBean'))
 
         then: 'the constructor qualifier is still widened, so the list covers the lifecycle binding too'
-        interceptorNames(bean).toSorted() == ['AroundInterceptor', 'LifecycleInterceptor']
+        interceptorNames(context, bean).toSorted() == ['AroundInterceptor', 'LifecycleInterceptor']
 
         cleanup:
         context.close()
@@ -205,7 +222,7 @@ class MyBean {
 
         then:
         bean.work() == 'done'
-        interceptorNames(bean) == ['TrackingInterceptor']
+        interceptorNames(context, bean) == ['TrackingInterceptor']
 
         cleanup:
         context.close()
@@ -249,12 +266,12 @@ class MyBean {
 
         then:
         !first.is(second)
-        interceptorNames(first) == ['AroundInterceptor']
-        interceptorNames(second) == ['AroundInterceptor']
+        interceptorNames(context, first) == ['AroundInterceptor']
+        interceptorNames(context, second) == ['AroundInterceptor']
 
         and: 'each proxy holds its own interceptor instance'
-        !((Intercepted) first).$interceptorRegistrations()[0].bean
-                .is(((Intercepted) second).$interceptorRegistrations()[0].bean)
+        !interceptorRegistrations(context, first)[0].bean
+                .is(interceptorRegistrations(context, second)[0].bean)
 
         cleanup:
         context.close()
@@ -340,7 +357,7 @@ class MyBean {
         context.close()
     }
 
-    // MethodInterceptorChain#doIntercept selects intercepted.$interceptorRegistrations() whenever the list is
+    // Since 5.3 the lifecycle interception resolves the bean's own interceptors by binding; before, the retained list was used whenever it was
     // non-empty. Retaining a list on every proxy makes that branch reachable for an around-only proxy, so pin down
     // that such a proxy still has no lifecycle interception at all: the definition only generates the post-construct
     // and pre-destroy entry points when the bean carries lifecycle bindings, which is the same condition that widens
@@ -391,7 +408,7 @@ class MyBean {
         bean.work()
 
         then: 'the retained list is non-empty, but post construct was not routed through the chain'
-        interceptorNames(bean) == ['AroundInterceptor']
+        interceptorNames(context, bean) == ['AroundInterceptor']
         beanType.callbacks == ['init']
         around.events == ['AROUND']
 
@@ -442,7 +459,7 @@ class MyBean {
 
         then:
         bean.work() == 'done'
-        interceptorNames(bean) == ['AroundInterceptor']
+        interceptorNames(context, bean) == ['AroundInterceptor']
 
         cleanup:
         context.close()

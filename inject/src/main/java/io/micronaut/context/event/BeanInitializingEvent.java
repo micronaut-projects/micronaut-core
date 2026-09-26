@@ -16,7 +16,12 @@
 package io.micronaut.context.event;
 
 import io.micronaut.context.BeanContext;
+import io.micronaut.context.BeanRegistration;
+import io.micronaut.core.annotation.Internal;
 import io.micronaut.inject.BeanDefinition;
+import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * <p>An event fired when a bean's properties have been populated but initialization hooks (such as
@@ -38,5 +43,20 @@ public class BeanInitializingEvent<T> extends BeanEvent<T> {
      */
     public BeanInitializingEvent(BeanContext beanContext, BeanDefinition<T> beanDefinition, T bean) {
         super(beanContext, beanDefinition, bean);
+    }
+
+    /**
+     * @param beanContext    The bean context
+     * @param beanDefinition The bean definition
+     * @param bean           The bean
+     * @param dependentBeans The dependent beans created for the bean so far
+     * @since 5.3.0
+     */
+    @Internal
+    public BeanInitializingEvent(BeanContext beanContext,
+                                 BeanDefinition<T> beanDefinition,
+                                 T bean,
+                                 @Nullable List<BeanRegistration<?>> dependentBeans) {
+        super(beanContext, beanDefinition, bean, null, dependentBeans);
     }
 }
