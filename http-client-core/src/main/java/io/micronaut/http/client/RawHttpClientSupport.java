@@ -150,10 +150,10 @@ public final class RawHttpClientSupport {
         }
         if (unwrapped instanceof DirectByteBodyAccess directAccess) {
             // e.g. a request mutated from a Netty server request, which is no wrapper
+            // none once its body was set, even when it is also a server request, e.g. the
+            // mutable view of a server request
             ByteBody bytes = directAccess.byteBodyDirect();
-            if (bytes != null) {
-                return bytes.move();
-            }
+            return bytes == null ? null : bytes.move();
         }
         if (unwrapped instanceof ServerHttpRequest<?> serverRequest) {
             Object body = request.getBody().orElse(null);
