@@ -1806,7 +1806,7 @@ final class NettyHttpClient implements
         AtomicReference<ScheduledExecutorService> preferredScheduler
     ) {
         boolean reusedConnection = markRequestSent(poolHandle);
-        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !isIdempotent(request.getMethod())) {
+        if (!reusedConnection || poolHandle.http2 || !(byteBody instanceof AvailableByteBody) || !request.getMethod().isIdempotent()) {
             return sendRawRequest(poolHandle, request, selection, byteBody, nettyRequest, false);
         }
         return sendRawRequestWithRetry(poolHandle, request, selection, byteBody, nettyRequest, blockHint, preferredScheduler);
@@ -1928,20 +1928,6 @@ final class NettyHttpClient implements
             response.cancel();
         });
         return result;
-    }
-
-    /**
-     * Whether a request with this method may be sent again when its connection failed before any
-     * response was received. Only idempotent methods qualify.
-     *
-     * @param method The request method
-     * @return {@code true} iff the method is idempotent
-     */
-    private static boolean isIdempotent(io.micronaut.http.HttpMethod method) {
-        return switch (method) {
-            case GET, HEAD, OPTIONS, TRACE, PUT, DELETE -> true;
-            default -> false;
-        };
     }
 
     /**
