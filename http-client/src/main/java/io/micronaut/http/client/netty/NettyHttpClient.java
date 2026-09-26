@@ -167,6 +167,7 @@ import io.netty.handler.codec.http.multipart.InterfaceHttpData;
 import io.netty.handler.codec.http.websocketx.WebSocketClientHandshakerFactory;
 import io.netty.handler.codec.http.websocketx.WebSocketVersion;
 import io.netty.util.AsciiString;
+import io.netty.util.AttributeKey;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.FastThreadLocalThread;
@@ -231,6 +232,10 @@ final class NettyHttpClient implements
      * Default logger, use {@link #log} where possible.
      */
     private static final Logger DEFAULT_LOG = LoggerFactory.getLogger(NettyHttpClient.class);
+    /**
+     * Set on a connection once a request was sent on it, to tell reused connections from new ones.
+     */
+    private static final AttributeKey<Boolean> REQUEST_SENT = AttributeKey.valueOf(NettyHttpClient.class, "requestSent");
     private static final int DEFAULT_HTTP_PORT = 80;
     private static final int DEFAULT_HTTPS_PORT = 443;
     private static final String REDIRECT_COUNT = "micronaut.http.client.redirect-count";
@@ -1701,8 +1706,15 @@ final class NettyHttpClient implements
                     return ExecutionFlow.error(e);
                 }
 
-                // send the raw request
-                return sendRawRequest(poolHandle, request, selection, byteBody, nettyRequest);
+                // send the raw request. A request that fails on a stale reused connection is
+                // sent again with the same outgoing request head.
+                return sendRawRequest(poolHandle, request, selection, byteBody, nettyRequest, true)
+                    .onErrorResume(e -> {
+                        if (e instanceof StaleConnectionException stale) {
+                            return resendOnNewConnection(requestKey, blockHint, preferredScheduler, request, selection, nettyRequest, stale.replayBody);
+                        }
+                        return ExecutionFlow.error(e);
+                    });
             })
             .flatMap(byteBodyResponse -> {
                 // handle redirects or map the response bytes
@@ -1777,6 +1789,150 @@ final class NettyHttpClient implements
     }
 
     /**
+     * Send a request a second time, after its first attempt failed because the reused connection
+     * it was written to had already been closed by the server (see
+     * {@link StaleConnectionException}). The connection is acquired from the pool as usual, and
+     * this attempt is not retried again.
+     *
+     * @param requestKey         The request key
+     * @param blockHint          The optional block hint
+     * @param preferredScheduler The preferred scheduler reference
+     * @param request            The request to send
+     * @param selection          The selection of the load balancer, or {@code null}. The first
+     *                           attempt handed it on unreported: it is reported by this attempt, or
+     *                           released if this attempt is not sent
+     * @param firstAttemptRequest The netty request of the first attempt, with the headers the
+     *                           client generated for it. It is not sent again, see
+     *                           {@link #outgoingRequestForRetry}
+     * @param replayBody         The request body of the first attempt
+     * @return The response flow
+     */
+    private ExecutionFlow<NettyClientByteBodyResponse> resendOnNewConnection(
+        RequestKey requestKey,
+        @Nullable BlockHint blockHint,
+        AtomicReference<ScheduledExecutorService> preferredScheduler,
+        MutableHttpRequest<?> request,
+        @Nullable LoadBalancerSelection selection,
+        HttpRequest firstAttemptRequest,
+        CloseableAvailableByteBody replayBody
+    ) {
+        if (log.isDebugEnabled()) {
+            log.debug("Reused connection was closed before a response to {} {} was received, retrying once", request.getMethodName(), request.getUri());
+        }
+        // The replay body is owned by this method until it is either handed to sendRawRequest
+        // or closed. Whoever sets this flag first (connection acquired, acquisition failed, or
+        // exchange cancelled while the acquisition is pending) is responsible for the body.
+        AtomicBoolean replayBodyClaimed = new AtomicBoolean();
+        ExecutionFlow<NettyClientByteBodyResponse> response = connectionManager.connect(requestKey, blockHint, preferredScheduler)
+            .onErrorResume(e -> {
+                Throwable failure = failedBeforeSending(connectFailure(e), request, selection);
+                if (replayBodyClaimed.compareAndSet(false, true)) {
+                    replayBody.close();
+                    releaseSelection(selection);
+                }
+                return ExecutionFlow.error(failure);
+            })
+            .flatMap(poolHandle -> {
+                if (!replayBodyClaimed.compareAndSet(false, true)) {
+                    // the exchange was cancelled while the connection was acquired, and the
+                    // body is already closed. This may run on any thread, but like any other
+                    // release, this must happen on the event loop of the connection.
+                    if (poolHandle.channel.eventLoop().inEventLoop()) {
+                        poolHandle.release();
+                    } else {
+                        poolHandle.channel.eventLoop().execute(poolHandle::release);
+                    }
+                    // the selection was released with the body
+                    return ExecutionFlow.error(new HttpClientException("Request cancelled"));
+                }
+                poolHandle.touch();
+                preferredScheduler.set(poolHandle.channel.eventLoop());
+                request.setAttribute(NettyClientHttpRequest.CHANNEL, poolHandle.channel);
+                return sendRawRequest(poolHandle, request, selection, replayBody, outgoingRequestForRetry(firstAttemptRequest), false);
+            });
+        if (replayBodyClaimed.get()) {
+            // the connection was available immediately, the body has been handed off already
+            return response;
+        }
+        // cancelling the exchange cancels the pending acquisition, which then completes neither
+        // way, so the body must be released on cancellation
+        DelayedExecutionFlow<NettyClientByteBodyResponse> result = DelayedExecutionFlow.create();
+        response.onComplete((r, e) -> {
+            if (e != null) {
+                result.completeExceptionally(e);
+            } else if (result.isCancelled()) {
+                if (r != null) {
+                    r.close();
+                }
+            } else {
+                result.complete(r);
+            }
+        });
+        result.onCancel(() -> {
+            if (replayBodyClaimed.compareAndSet(false, true)) {
+                replayBody.close();
+                releaseSelection(selection);
+            }
+            response.cancel();
+        });
+        return result;
+    }
+
+    /**
+     * Whether a request with this method may be sent again when its connection failed before any
+     * response was received. Only idempotent methods qualify.
+     *
+     * @param method The request method
+     * @return {@code true} iff the method is idempotent
+     */
+    private static boolean isIdempotent(HttpMethod method) {
+        return method.equals(HttpMethod.GET)
+            || method.equals(HttpMethod.HEAD)
+            || method.equals(HttpMethod.OPTIONS)
+            || method.equals(HttpMethod.TRACE)
+            || method.equals(HttpMethod.PUT)
+            || method.equals(HttpMethod.DELETE);
+    }
+
+    /**
+     * Whether a failure before the response headers means that the connection was closed or
+     * broken, as opposed to e.g. a timeout or an invalid response.
+     *
+     * @param cause The failure
+     * @return {@code true} iff the connection was closed
+     */
+    private static boolean isConnectionClosedError(Throwable cause) {
+        if (cause instanceof UnprocessedRequestException unprocessed) {
+            // the request head could not be written because the connection was closed
+            return unprocessed.getReason() == UnprocessedRequestException.Reason.CLOSED_BEFORE_WRITE;
+        }
+        return cause instanceof ResponseClosedException || cause instanceof IOException;
+    }
+
+    /**
+     * The netty request to send a request again with, after its first attempt failed on a stale
+     * connection. The request of the first attempt was handed to the pipeline of that connection,
+     * so it is not reused: the new request has a copy of its head, with the headers the client
+     * generated for the first attempt (Host, Content-Type...). The framing headers
+     * (Content-Length, Transfer-Encoding) and Connection are set again for the new connection
+     * when its pipeline is prepared; Connection is removed here so that it is only sent where
+     * the new connection uses it.
+     *
+     * @param firstAttemptRequest The netty request of the first attempt
+     * @return A new netty request with the same head
+     */
+    private static HttpRequest outgoingRequestForRetry(HttpRequest firstAttemptRequest) {
+        HttpHeaders headers = firstAttemptRequest.headers().copy();
+        headers.remove(HttpHeaderNames.CONNECTION);
+        return new DefaultHttpRequest(
+            firstAttemptRequest.protocolVersion(),
+            firstAttemptRequest.method(),
+            firstAttemptRequest.uri(),
+            headers
+        );
+    }
+
+    /**
      * This is the low-level request method, without redirect handling and with raw body bytes.
      *
      * @param poolHandle The pool handle to send the request on
@@ -1784,6 +1940,8 @@ final class NettyHttpClient implements
      * @param selection  The selection of the load balancer, or {@code null}
      * @param byteBody   The request body
      * @param nettyRequest The netty request to send, from {@link #toOutgoingNettyRequest}
+     * @param allowRetry Whether the request may fail with a {@link StaleConnectionException} so
+     *                   that it is sent again on another connection
      * @return A mono containing the response
      */
     private ExecutionFlow<NettyClientByteBodyResponse> sendRawRequest(
@@ -1791,21 +1949,22 @@ final class NettyHttpClient implements
         io.micronaut.http.HttpRequest<?> request,
         @Nullable LoadBalancerSelection selection,
         CloseableByteBody byteBody,
-        HttpRequest nettyRequest
+        HttpRequest nettyRequest,
+        boolean allowRetry
     ) {
         poolHandle.touch();
 
         DelayedExecutionFlow<NettyClientByteBodyResponse> flow = DelayedExecutionFlow.create();
         // need to run the create() on the event loop so that pipeline modification happens synchronously
         if (poolHandle.channel.eventLoop().inEventLoop()) {
-            sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest);
+            sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest, allowRetry);
         } else {
-            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest));
+            poolHandle.channel.eventLoop().execute(() -> sendRawRequest0(poolHandle, request, selection, byteBody, flow, nettyRequest, allowRetry));
         }
         return flow;
     }
 
-    private void sendRawRequest0(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, @Nullable LoadBalancerSelection selection, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest) {
+    private void sendRawRequest0(ConnectionManager.PoolHandle poolHandle, io.micronaut.http.HttpRequest<?> request, @Nullable LoadBalancerSelection selection, CloseableByteBody byteBody, DelayedExecutionFlow<NettyClientByteBodyResponse> sink, HttpRequest nettyRequest, boolean allowRetry) {
         if (log.isDebugEnabled()) {
             log.debug("Sending HTTP {} to {}", request.getMethodName(), request.getUri());
         }
@@ -1829,12 +1988,19 @@ final class NettyHttpClient implements
         // is sent on, may have a known length. The trailers need the chunked transfer coding: a
         // Content-Length request would drop them
         OptionalLong length = NettyByteBodyFactory.hasTrailers(byteBody) ? OptionalLong.empty() : byteBody.expectedLength();
+        // an earlier request on this connection means that it was reused from the pool
+        boolean reusedConnection = poolHandle.channel().attr(REQUEST_SENT).getAndSet(Boolean.TRUE) != null;
 
         // if the body is streamed, we have a StreamWriter, otherwise we have a ByteBuf.
         StreamWriter streamWriter = null;
         ByteBuf byteBuf = null;
+        // copy of the request body, kept so that the request can be sent again if the reused
+        // connection turns out to be closed already. Streamed bodies are never sent again.
+        CloseableAvailableByteBody replayBody = null;
         try {
             if (byteBody instanceof AvailableByteBody available) {
+                replayBody = allowRetry && !expectContinue && !poolHandle.http2() && reusedConnection && isIdempotent(nettyRequest.method()) ?
+                    available.split() : null;
                 byteBuf = NettyByteBodyFactory.toByteBuf(available);
             } else {
                 streamWriter = new StreamWriter(new NettyByteBodyFactory(poolHandle.channel()).toStreaming(byteBody), e -> {
@@ -1843,7 +2009,7 @@ final class NettyHttpClient implements
                 });
                 pipeline.addLast(streamWriter);
             }
-            prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf);
+            prepareRequestPipeline(poolHandle, request, selection, sink, nettyRequest, expectContinue, requestedUpgrade, length, streamWriter, byteBuf, replayBody);
         } catch (Throwable t) {
             // the request was not written, but the pipeline may be half built: don't reuse the
             // connection, and make sure the pool handle is released and the caller sees the error
@@ -1857,6 +2023,10 @@ final class NettyHttpClient implements
             }
             if (byteBuf != null) {
                 byteBuf.release();
+            }
+            if (replayBody != null) {
+                // the response handler is gone, so nothing sends the request again
+                replayBody.close();
             }
             byteBody.close();
             poolHandle.release();
@@ -1909,7 +2079,8 @@ final class NettyHttpClient implements
         @Nullable String requestedUpgrade,
         OptionalLong length,
         @Nullable StreamWriter streamWriter,
-        @Nullable ByteBuf byteBuf
+        @Nullable ByteBuf byteBuf,
+        @Nullable CloseableAvailableByteBody replayBody
     ) {
         ChannelPipeline pipeline = poolHandle.channel.pipeline();
 
@@ -1970,6 +2141,10 @@ final class NettyHttpClient implements
              */
             boolean reported;
             int code;
+            @Nullable
+            CloseableAvailableByteBody unusedReplayBody = replayBody;
+            @Nullable
+            CloseableAvailableByteBody retryBody;
 
             private void reportOnce(LoadBalancer.@Nullable Outcome outcome) {
                 if (!reported) {
@@ -1991,6 +2166,18 @@ final class NettyHttpClient implements
             @Override
             public void fail(ChannelHandlerContext ctx, Throwable cause) {
                 poolHandle.taint();
+                CloseableAvailableByteBody replay = unusedReplayBody;
+                unusedReplayBody = null;
+                if (replay != null) {
+                    if (!sink.isCancelled() && isConnectionClosedError(cause)) {
+                        // the server closed the connection while it was idle in the pool, so it
+                        // cannot have processed this request. Send it again once the dead
+                        // connection is released, in finish().
+                        retryBody = replay;
+                        return;
+                    }
+                    replay.close();
+                }
                 if (!sink.isCancelled()) {
                     // nobody takes the error of a cancelled exchange, e.g. its closed connection
                     HttpClientException failure = handleResponseError(request, instance, cause);
@@ -2034,6 +2221,10 @@ final class NettyHttpClient implements
                 responded.set(true);
                 // the exchange ends with the switch: what the new protocol does is not counted
                 reportOnce(null);
+                if (unusedReplayBody != null) {
+                    unusedReplayBody.close();
+                    unusedReplayBody = null;
+                }
                 // the connection belongs to the new protocol now, and is closed when that ends
                 poolHandle.taint();
                 if (sink.isCancelled()) {
@@ -2073,6 +2264,10 @@ final class NettyHttpClient implements
                 dropHeldBody.run();
                 code = response.status().code();
                 responded.set(true);
+                if (unusedReplayBody != null) {
+                    unusedReplayBody.close();
+                    unusedReplayBody = null;
+                }
                 if (!HttpUtil.isKeepAlive(response)) {
                     poolHandle.taint();
                 }
@@ -2109,8 +2304,14 @@ final class NettyHttpClient implements
             public void finish(ChannelHandlerContext ctx) {
                 // the body ended, unless it failed, which was reported first
                 reportResponse();
-                // an exchange that ended without a response, e.g. cancelled, is released
-                reportOnce(null);
+                if (retryBody != null) {
+                    // a first attempt on a stale connection is not an outcome of the instance:
+                    // the selection goes on to the attempt that sends the request again
+                    reported = true;
+                } else {
+                    // an exchange that ended without a response, e.g. cancelled, is released
+                    reportOnce(null);
+                }
                 ctx.pipeline().remove(ChannelPipelineCustomizer.HANDLER_MICRONAUT_HTTP_RESPONSE);
                 if (streamWriter != null) {
                     if (!streamWriter.isCompleted()) {
@@ -2123,6 +2324,15 @@ final class NettyHttpClient implements
                 // the body is still held if the exchange failed before any response arrived
                 dropHeldBody.run();
                 poolHandle.release();
+                CloseableAvailableByteBody retry = retryBody;
+                if (retry != null) {
+                    retryBody = null;
+                    if (sink.isCancelled() || !sink.tryCompleteExceptionally(new StaleConnectionException(retry))) {
+                        retry.close();
+                        // nothing sends the request again
+                        releaseSelection(selection);
+                    }
+                }
             }
         }));
         // cancelling the exchange before the response arrives aborts the request: the connection
@@ -2586,6 +2796,17 @@ final class NettyHttpClient implements
         }
     }
 
+    /**
+     * Release the selection of the load balancer, if any, unless an outcome was reported already.
+     *
+     * @param selection The selection of the load balancer, or {@code null}
+     */
+    private static void releaseSelection(@Nullable LoadBalancerSelection selection) {
+        if (selection != null) {
+            selection.release();
+        }
+    }
+
     private void setRedirectHeaders(io.micronaut.http.HttpRequest<?> request,
                                     MutableHttpRequest<Object> redirectRequest,
                                     boolean preserveBody) {
@@ -2851,5 +3072,19 @@ final class NettyHttpClient implements
          * @param client The client
          */
         void onStop(NettyHttpClient client);
+    }
+
+    /**
+     * Internal signal that a request failed because the reused connection it was written to had
+     * already been closed, before any part of the response was received. The request is sent
+     * again on another connection, and this exception never reaches the caller.
+     */
+    private static final class StaleConnectionException extends RuntimeException {
+        final transient CloseableAvailableByteBody replayBody;
+
+        StaleConnectionException(CloseableAvailableByteBody replayBody) {
+            super("Reused connection was closed before the response was received", null, false, false);
+            this.replayBody = replayBody;
+        }
     }
 }
