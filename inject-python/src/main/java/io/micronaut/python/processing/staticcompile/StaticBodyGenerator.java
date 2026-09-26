@@ -174,6 +174,7 @@ public final class StaticBodyGenerator {
                 }
                 call.arguments().forEach(a -> collectNames(a, names));
             }
+            case Ir.InvokeSibling call -> call.arguments().forEach(a -> collectNames(a, names));
             case Ir.NewJava construction -> construction.arguments().forEach(a -> collectNames(a, names));
             case Ir.Field field -> collectNames(field.receiver(), names);
             case Ir.Binary binary -> {
@@ -329,7 +330,7 @@ public final class StaticBodyGenerator {
                 yield new StatementDef.DefineAndAssign(variable, expression(local.value()));
             }
             case Ir.Assign assign -> local(assign.name()).assign(expression(assign.value()));
-            case Ir.PutSelf put -> self.write(put.property(), type(put.type()), expression(put.value()));
+            case Ir.PutSelf put -> self.write(put.property(), type(put.type()), expression(put.value()), put.accessor());
             case Ir.If branch -> {
                 ExpressionDef.ConditionExpressionDef condition = condition(branch.test());
                 yield branch.orElse() == null
@@ -432,8 +433,9 @@ public final class StaticBodyGenerator {
             case Ir.Const constant -> constant(constant);
             case Ir.Param param -> parameter(param);
             case Ir.LocalRef ref -> local(ref.name());
-            case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()));
+            case Ir.SelfProperty property -> self.read(property.property(), property.type(), type(property.type()), property.accessor());
             case Ir.InvokeJava call -> invoke(call);
+            case Ir.InvokeSibling call -> self.invoke(call.name(), types(call.parameterTypes()), expressions(call.arguments()), call.type(), Ir.VOID.equals(call.type()) ? TypeDef.VOID : type(call.type()), "java".equals(call.dispatch()));
             case Ir.NewJava construction -> classType(construction.type()).instantiate(types(construction.parameterTypes()), expressions(construction.arguments()));
             case Ir.StaticField field -> classType(field.owner()).getStaticField(field.name(), type(field.type()));
             case Ir.Field field -> expression(field.receiver()).field(field.name(), type(field.type()));
@@ -707,16 +709,30 @@ public final class StaticBodyGenerator {
          * @param property The property
          * @param typeName The Java type of the property, as the IR spells it
          * @param type     The Java type of the property
+         * @param accessor Whether the property is a Python {@code @property}, whose getter runs on the
+         *                 Python object: never a Java field of the stub
          * @return The expression reading it
          */
-        ExpressionDef read(String property, String typeName, TypeDef type);
+        ExpressionDef read(String property, String typeName, TypeDef type, boolean accessor);
+
+        /**
+         * @param name           The method of the class to call on {@code self}
+         * @param parameterTypes The Java parameter types of the stub method, when dispatched to the stub
+         * @param arguments      The arguments, at the parameter types when dispatched to the stub, else boxed
+         * @param typeName       The Java return type as the IR spells it, {@code void} for none
+         * @param type           The Java return type
+         * @param direct         Whether the stub's Java method is called; else the method of the Python object
+         * @return The expression calling it
+         */
+        ExpressionDef invoke(String name, List<TypeDef> parameterTypes, List<ExpressionDef> arguments, String typeName, TypeDef type, boolean direct);
 
         /**
          * @param property The property
          * @param type     The Java type of the property
          * @param value    The value
+         * @param accessor Whether the property is a Python {@code @property}, whose setter runs on the Python object
          * @return The statement writing it
          */
-        StatementDef write(String property, TypeDef type, ExpressionDef value);
+        StatementDef write(String property, TypeDef type, ExpressionDef value, boolean accessor);
     }
 }
