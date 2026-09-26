@@ -61,6 +61,8 @@ dependencies {
 
 tasks.withType<Test>().configureEach {
     maxParallelForks = 4
+    // The annotation processing tests run short compilations: C2 costs more CPU than it saves
+    jvmArgs("-XX:TieredStopAtLevel=1")
     useJUnitPlatform()
 }
 
