@@ -45,7 +45,7 @@ import java.util.Optional;
 import java.util.function.Function;
 
 @Internal
-final class NettyRequestLifecycle extends RequestLifecycle {
+final class NettyRequestLifecycle extends RequestLifecycle implements Function<Throwable, ExecutionFlow<HttpResponse<?>>> {
     private static final Logger LOG = LoggerFactory.getLogger(NettyRequestLifecycle.class);
 
     private final RoutingInBoundHandler rib;
@@ -57,6 +57,12 @@ final class NettyRequestLifecycle extends RequestLifecycle {
      */
     @Nullable
     private NettyHttpRequest<?> nettyRequest;
+
+    /**
+     * The context that {@link #handleNormal} ran in, for handling write errors.
+     */
+    @Nullable
+    private PropagatedContext writeErrorContext;
 
     NettyRequestLifecycle(RoutingInBoundHandler rib, OutboundAccess outboundAccess) {
         super(rib.routeExecutor);
@@ -97,9 +103,9 @@ final class NettyRequestLifecycle extends RequestLifecycle {
             }
         }
 
-        PropagatedContext propagatedContext = PropagatedContext.getOrEmpty();
-        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler =
-            e -> propagatedContext.propagate(() -> onWriteError(request, e));
+        writeErrorContext = PropagatedContext.getOrEmpty();
+        // this lifecycle is the write error handler (see apply), so nothing is allocated for it
+        Function<Throwable, ExecutionFlow<HttpResponse<?>>> writeErrorHandler = this;
         ImperativeExecutionFlow<HttpResponse<?>> imperativeFlow = result.tryComplete();
         if (imperativeFlow != null) {
             Object value = ((ImperativeExecutionFlow<?>) imperativeFlow).getValue();
@@ -109,6 +115,19 @@ final class NettyRequestLifecycle extends RequestLifecycle {
         } else {
             result.onComplete((response, throwable) -> rib.writeResponse(outboundAccess, request, response, throwable, writeErrorHandler));
         }
+    }
+
+    /**
+     * Gives the error response when writing the body of the response fails, with the context of
+     * {@link #handleNormal} in scope.
+     *
+     * @param throwable The write error
+     * @return The error response
+     */
+    @Override
+    public ExecutionFlow<HttpResponse<?>> apply(Throwable throwable) {
+        NettyHttpRequest<?> request = Objects.requireNonNull(nettyRequest);
+        return Objects.requireNonNull(writeErrorContext).propagate(() -> onWriteError(request, throwable));
     }
 
     @Nullable

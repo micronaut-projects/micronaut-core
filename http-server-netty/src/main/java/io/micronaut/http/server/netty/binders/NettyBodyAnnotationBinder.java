@@ -154,7 +154,7 @@ final class NettyBodyAnnotationBinder<T> extends DefaultBodyAnnotationBinder<T> 
         // NettyRequestLifecycle will "subscribe" to the execution flow added to routeWaitsFor,
         // so we can't subscribe directly ourselves. Instead, use the side effect of a map.
         BasicHttpAttributes.addRouteWaitsFor(nhr, buffered.flatMap(imm ->
-            PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(nhr)).propagate(() -> {
+            ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), nhr).propagate(() -> {
                 try {
                     MessageBodyReader<T> reader = findReader(nhr, context);
                     // A body reader produces the value for the complete argument, including type arguments

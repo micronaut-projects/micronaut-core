@@ -195,8 +195,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             try {
                 if (shouldPublishTerminatedEvent(request)) {
                     terminatedFlow = ExecutionFlow.async(getRequestEventExecutor(), () -> {
-                        PropagatedContext.getOrEmpty()
-                            .plus(new ServerHttpRequestContext(request))
+                        ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request)
                             .propagate(() -> publishRequestEvent(request, terminateEventPublisher, new HttpRequestTerminatedEvent(request)));
                         return ExecutionFlow.empty();
                     });
@@ -276,16 +275,24 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return;
         }
         prepareRequest(ctx, outboundAccess, mnRequest);
+        if (receivedPublisher.isEmpty() && ctx.executor().inEventLoop()) {
+            // nothing to wait for: skip the completion callbacks
+            handleNormal(outboundAccess, mnRequest);
+            return;
+        }
         ExecutionFlow<Void> receivedFlow = executionFlowForReceivedEvent(mnRequest);
         receivedFlow.onComplete((ignore, throwable) -> {
             if (throwable != null) {
                 handleException(ctx, outboundAccess, mnRequest, throwable);
             } else {
-                executeOnEventLoopIfNeeded(ctx, () ->
-                    PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(mnRequest))
-                        .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest)));
+                executeOnEventLoopIfNeeded(ctx, () -> handleNormal(outboundAccess, mnRequest));
             }
         });
+    }
+
+    private void handleNormal(OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
+        ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), mnRequest)
+            .propagate(() -> new NettyRequestLifecycle(this, outboundAccess).handleNormal(mnRequest));
     }
 
     private void prepareRequest(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> mnRequest) {
@@ -312,7 +319,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
     }
 
     private void handleException(ChannelHandlerContext ctx, OutboundAccess outboundAccess, NettyHttpRequest<Object> request, Throwable throwable) {
-        executeOnEventLoopIfNeeded(ctx, () -> PropagatedContext.getOrEmpty().plus(new ServerHttpRequestContext(request)).propagate(() -> {
+        executeOnEventLoopIfNeeded(ctx, () -> ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request).propagate(() -> {
             new NettyRequestLifecycle(this, outboundAccess).handleException(request, throwable);
             return null;
         }));
@@ -331,8 +338,7 @@ public final class RoutingInBoundHandler implements RequestHandler {
             return ExecutionFlow.empty();
         }
         return ExecutionFlow.async(getRequestEventExecutor(), () -> {
-            PropagatedContext.getOrEmpty()
-                .plus(new ServerHttpRequestContext(request))
+            ServerHttpRequestContext.withRequest(PropagatedContext.getOrEmpty(), request)
                 .propagate(() -> publishRequestEvent(request, receivedPublisher, new HttpRequestReceivedEvent(request)));
             return ExecutionFlow.empty();
         });
