@@ -487,6 +487,7 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
     }
 
     @Override
+    @Deprecated(since = "5.2.1", forRemoval = false)
     public void markDependentAsFactory() {
         if (dependentBeans != null) {
             if (dependentBeans.isEmpty()) {
@@ -494,6 +495,22 @@ public abstract class AbstractBeanResolutionContext implements BeanResolutionCon
             }
             dependentFactory = dependentBeans.removeFirst();
         }
+    }
+
+    @Override
+    public void markDependentAsFactory(@Nullable Object factoryBean) {
+        if (factoryBean == null || dependentBeans == null || dependentBeans.isEmpty()) {
+            return;
+        }
+        // Search from the end, because the factory was looked up last and a definition that looks one up more than
+        // once has to mark the most recent registration.
+        for (int i = dependentBeans.size() - 1; i >= 0; i--) {
+            if (dependentBeans.get(i).bean == factoryBean) {
+                dependentFactory = dependentBeans.remove(i);
+                return;
+            }
+        }
+        // The factory is not a dependent of this bean, which is what a singleton or scoped factory looks like.
     }
 
     @Override
