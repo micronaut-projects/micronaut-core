@@ -54,6 +54,8 @@ tasks {
         exclude("**/*\$_closure*")
         forkEvery = 100
         maxParallelForks = 4
+        // The annotation processing tests run short compilations: C2 costs more CPU than it saves
+        jvmArgs("-XX:TieredStopAtLevel=1")
         systemProperty("groovy.attach.groovydoc", true)
     }
 }
