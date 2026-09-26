@@ -38,6 +38,7 @@ import org.jspecify.annotations.Nullable;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.nio.charset.Charset;
+import java.util.Objects;
 
 /**
  * Abstract implementation of {@link HttpRequest} for Netty.
@@ -230,10 +231,9 @@ public abstract class AbstractNettyHttpRequest<B> extends DefaultAttributeMap im
         if (validPath) {
             // the raw request target is exactly what URI would return from getRawPath/getRawQuery,
             // so skip building the URI
-            Charset cs = getCharacterEncoding();
             queryStringDecoder = new QueryStringDecoder(
                 unvalidatedUrl,
-                cs != null ? cs : HttpConstants.DEFAULT_CHARSET,
+                Objects.requireNonNullElse(getCharacterEncoding(), HttpConstants.DEFAULT_CHARSET),
                 true,
                 getMaxParams(),
                 isSemicolonIsNormalChar()
