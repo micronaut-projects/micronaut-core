@@ -181,4 +181,36 @@ class EventLoopGroupSpec extends Specification {
         config.shutdownQuietPeriod == Duration.ofMillis(10)
         config.shutdownTimeout == Duration.ofMillis(500)
     }
+
+    void "test small thread-core-ratio yields at least one thread"() {
+        given:
+        def context = ApplicationContext.run(['micronaut.netty.event-loops.default.thread-core-ratio': 0.0001])
+
+        when:
+        def eventLoopGroup = context.getBean(EventLoopGroup)
+
+        then:
+        eventLoopGroup.executorCount() == 1
+
+        cleanup:
+        context.close()
+    }
+
+    void "test numThreads calculation"() {
+        given:
+        EventLoopGroupConfiguration config = Stub {
+            getNumThreads() >> explicit
+            getThreadCoreRatio() >> ratio
+        }
+
+        expect:
+        DefaultEventLoopGroupRegistry.numThreads(config) == expected
+
+        where:
+        explicit | ratio  | expected
+        0        | 0.0001 | 1
+        3        | 0.0001 | 3
+        0        | 0      | 0
+        0        | 1.0    | NettyRuntime.availableProcessors()
+    }
 }
